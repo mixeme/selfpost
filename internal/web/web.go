@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
@@ -30,6 +31,7 @@ type Config struct {
 // Server is the panel HTTP application.
 type Server struct {
 	store    *store.Store
+	domains  *domain.Service
 	cfg      Config
 	tmpl     *templates
 	sessions *sessionStore
@@ -40,14 +42,16 @@ type Server struct {
 }
 
 // New builds the panel server. setupTokenPath is where the current setup token
-// is mirrored on disk (spec 7.6.1).
-func New(st *store.Store, cfg Config, setupTokenPath string) (*Server, error) {
+// is mirrored on disk (spec 7.6.1); domains is the sending-domain service that
+// owns DKIM keys and the OpenDKIM tables (spec 6).
+func New(st *store.Store, domains *domain.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	tmpl, err := loadTemplates()
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
 		store:    st,
+		domains:  domains,
 		cfg:      cfg,
 		tmpl:     tmpl,
 		sessions: newSessionStore(),
@@ -85,8 +89,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
 
-	// Authenticated panel.
-	mux.Handle("/", s.requireAuth(http.HandlerFunc(s.handleDashboard)))
+	// Authenticated panel. Everything not matched by a more specific pattern
+	// above falls through to this sub-mux, wrapped once in the auth middleware.
+	authed := http.NewServeMux()
+	authed.HandleFunc("GET /{$}", s.handleDashboard)
+	authed.HandleFunc("POST /domains", s.handleAddDomain)
+	authed.HandleFunc("GET /domains/{id}", s.handleDomainDetail)
+	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
+	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
+	authed.HandleFunc("POST /reload", s.handleReload)
+	mux.Handle("/", s.requireAuth(authed))
 
 	return mux
 }

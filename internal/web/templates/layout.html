@@ -37,9 +37,25 @@
   .error { color: #b42318; margin: 0.6rem 0 0; font-weight: 600; }
   .muted { color: #6b7280; }
   .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.2rem; }
+  .topbar .actions { display: flex; gap: 0.9rem; align-items: baseline; }
   form.inline { display: inline; margin: 0; }
   form.inline button { background: none; color: #2563eb; padding: 0; margin: 0; font-weight: 600; }
   form.inline button:hover { text-decoration: underline; background: none; }
+  main { max-width: 48rem; }
+  .card + .card { margin-top: 1.2rem; }
+  .flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
+  @media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; }
+  @media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
+  th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
+  td.actions { text-align: right; }
+  a.danger { color: #b42318; }
+  .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          font-size: 0.85rem; background: #f0f2f4; border: 1px solid #e2e5e9; border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
+  @media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
+  h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+  .back { display: inline-block; margin-bottom: 1rem; }
 </style>
 </head>
 <body>

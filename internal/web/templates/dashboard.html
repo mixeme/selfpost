@@ -1,15 +1,53 @@
 {{define "content"}}
 <div class="topbar">
   <h1>SelfPost</h1>
-  <div class="muted">
-    {{.User}} &middot;
+  <div class="actions muted">
+    <span>{{.User}}</span>
+    <form class="inline" method="post" action="/reload">
+      <button type="submit">Reload</button>
+    </form>
     <form class="inline" method="post" action="/logout">
       <button type="submit">Sign out</button>
     </form>
   </div>
 </div>
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
 <div class="card">
-  <p>You are signed in. Domains, applications and the send log arrive in the
-  next phases.</p>
+  <h2>Add a sending domain</h2>
+  <form method="post" action="/domains">
+    <label for="name">Domain</label>
+    <input id="name" name="name" type="text" placeholder="example.com"
+           autocomplete="off" autocapitalize="none" spellcheck="false"
+           value="{{.FormName}}" autofocus required>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <button type="submit">Add domain</button>
+  </form>
+  <p class="muted">A DKIM key is generated for the domain; you then publish the
+  shown DNS record. Adding a domain does not create an application.</p>
+</div>
+
+<div class="card">
+  <h2>Domains</h2>
+  {{if .Domains}}
+  <table>
+    <thead>
+      <tr><th>Domain</th><th>Selector</th><th>Apps</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Domains}}
+      <tr>
+        <td><a href="/domains/{{.ID}}">{{.Name}}</a></td>
+        <td class="muted">{{.DKIMSelector}}</td>
+        <td>{{.AppCount}}</td>
+        <td class="actions"><a class="danger" href="/domains/{{.ID}}/delete">Delete</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No domains yet. Add one above to get started.</p>
+  {{end}}
 </div>
 {{end}}
