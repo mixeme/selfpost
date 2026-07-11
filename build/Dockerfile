@@ -13,9 +13,9 @@ WORKDIR /src
 # Version stamped into both binaries; MUST match the image tag (spec 7.5.A).
 ARG VERSION=dev
 
-# Module metadata first for layer caching. No go.sum yet — Phase 1 has no
-# third-party dependencies.
-COPY go.mod ./
+# Module metadata first for layer caching. go.sum arrived in Phase 2 with the
+# SQLite driver and bcrypt.
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY cmd ./cmd
@@ -69,11 +69,13 @@ COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 COPY build/opendkim.conf /etc/opendkim.conf
 COPY build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
 COPY build/crashexit.py /usr/local/bin/crashexit.py
+COPY build/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY build/supervisord.conf /etc/supervisor/supervisord.conf
-RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/crashexit.py
+RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/crashexit.py /usr/local/bin/entrypoint.sh
 
 # 8080 panel; 25 outbound; 465/587 inbound submission (used from Phase 5).
 EXPOSE 8080 25 465 587
 
-# supervisord is PID 1 and owns process supervision + ordering (spec 4).
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# The entrypoint fixes /data ownership (bind mount) as root, then execs
+# supervisord, which becomes PID 1 and owns process supervision (spec 4).
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

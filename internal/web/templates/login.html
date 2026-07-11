@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>Sign in</h1>
+<div class="card narrow">
+  {{if .SetupHint}}
+    <p class="muted">No administrator has been created yet. Open the one-time
+    setup link printed in the container log to get started.</p>
+  {{else}}
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <form method="post" action="/login">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" autofocus required>
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+      <button type="submit">Sign in</button>
+    </form>
+  {{end}}
+</div>
+{{end}}

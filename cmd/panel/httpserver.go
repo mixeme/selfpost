@@ -6,19 +6,35 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"codeberg.org/mix/selfpost/internal/store"
+	"codeberg.org/mix/selfpost/internal/web"
 )
 
-// serveHTTP runs the panel's HTTP server until ctx is cancelled. Phase 1 serves
-// only a placeholder page and a health check; the login flow and real UI arrive
-// in Phase 2.
-func serveHTTP(ctx context.Context, addr string) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", handleHealth)
-	mux.HandleFunc("/", handleIndex)
+// serveHTTP opens the panel database and runs the control-panel HTTP server
+// until ctx is cancelled. From Phase 2 this serves the real setup, login and
+// authenticated panel surface (spec 7.6).
+func serveHTTP(ctx context.Context, cfg config) error {
+	st, err := store.Open(cfg.dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	srvApp, err := web.New(st, web.Config{
+		Hostname:     cfg.hostname,
+		CookieSecure: cfg.cookieSecure,
+	}, cfg.setupTokenPath)
+	if err != nil {
+		return err
+	}
+	if err := srvApp.Start(); err != nil {
+		return err
+	}
 
 	srv := &http.Server{
-		Addr:              addr,
-		Handler:           mux,
+		Addr:              cfg.httpAddr,
+		Handler:           srvApp.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -30,38 +46,9 @@ func serveHTTP(ctx context.Context, addr string) error {
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("http panel listening on %s", addr)
+	log.Printf("http panel listening on %s", cfg.httpAddr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
 }
-
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok\n"))
-}
-
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(indexHTML))
-}
-
-const indexHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SelfPost</title>
-</head>
-<body>
-<h1>SelfPost</h1>
-<p>The control panel is starting up. Administrator setup and login arrive in a later build.</p>
-</body>
-</html>
-`

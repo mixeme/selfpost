@@ -1,0 +1,15 @@
+{{define "content"}}
+<div class="topbar">
+  <h1>SelfPost</h1>
+  <div class="muted">
+    {{.User}} &middot;
+    <form class="inline" method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
+</div>
+<div class="card">
+  <p>You are signed in. Domains, applications and the send log arrive in the
+  next phases.</p>
+</div>
+{{end}}
