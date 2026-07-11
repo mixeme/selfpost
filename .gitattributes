@@ -1,0 +1,32 @@
+# Normalize all text files to LF in the working tree.
+# Critical: shell scripts, Dockerfile and configs run inside a Linux container
+# and MUST NOT get CRLF line endings (a "#!/bin/sh\r" shebang breaks startup).
+* text=auto eol=lf
+
+# Explicit LF for files copied into / executed in the image.
+*.go        text eol=lf
+*.sh        text eol=lf
+*.conf      text eol=lf
+*.cf        text eol=lf
+*.cnf       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.js        text eol=lf
+*.html      text eol=lf
+*.tmpl      text eol=lf
+Dockerfile  text eol=lf
+Makefile    text eol=lf
+go.mod      text eol=lf
+go.sum      text eol=lf
+LICENSE     text eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

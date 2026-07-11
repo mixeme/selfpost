@@ -1,1 +1,9 @@
+# Development-only material (secrets, server access notes) — never published.
 dev/
+
+# Build artifacts (binaries are built on the dev server, not committed).
+/bin/
+*.exe
+
+# Local Go caches / test output, if ever present.
+*.out

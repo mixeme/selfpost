@@ -51,6 +51,10 @@
 - **Статус:** план и решения утверждены; инфраструктура workflow настроена
 - **Следующий шаг:** начать Фазу 0 — `go mod init codeberg.org/mix/selfpost`, структура каталогов, `LICENSE` (AGPL-3.0), скелет README, сборка с ldflags-версией; затем спайк go-milter на `selfpost.mixfed.ru`.
 
+## Рабочая петля (dev loop) — ВАЖНО
+
+Локально (Windows, `D:\Local\Git\selfpost`) **нет Go и Docker** — только редактирование и git. Вся сборка/тесты идут на dev-сервере `selfpost.mixfed.ru` (Debian 12 bookworm, тот же, что базовый образ; провижён под разработку). Цикл: править локально → `rsync` дерева на сервер → `go build`/`go vet`/`docker build`/тесты там. Источник истины и git-история — локальный репозиторий; сервер — только исполнитель сборки/тестов. Подключение: `ssh root@selfpost.mixfed.ru` (по ключу).
+
 ## Утверждённые решения
 
 - Module path: `codeberg.org/mix/selfpost`
