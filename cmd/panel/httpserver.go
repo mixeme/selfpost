@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/store"
 	"codeberg.org/mix/selfpost/internal/web"
 )
@@ -21,7 +22,9 @@ func serveHTTP(ctx context.Context, cfg config) error {
 	}
 	defer st.Close()
 
-	srvApp, err := web.New(st, web.Config{
+	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), cfg.dkimSelectorDef)
+
+	srvApp, err := web.New(st, domains, web.Config{
 		Hostname:     cfg.hostname,
 		CookieSecure: cfg.cookieSecure,
 	}, cfg.setupTokenPath)

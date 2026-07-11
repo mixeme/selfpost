@@ -17,9 +17,11 @@ type templates struct {
 // pageFiles maps a logical page name to its template file. Every page composes
 // with layout.html.
 var pageFiles = map[string]string{
-	"setup":     "templates/setup.html",
-	"login":     "templates/login.html",
-	"dashboard": "templates/dashboard.html",
+	"setup":         "templates/setup.html",
+	"login":         "templates/login.html",
+	"dashboard":     "templates/dashboard.html",
+	"domain_detail": "templates/domain_detail.html",
+	"domain_delete": "templates/domain_delete.html",
 }
 
 func loadTemplates() (*templates, error) {

@@ -50,6 +50,9 @@ type config struct {
 	setupTokenPath string
 	hostname       string
 	cookieSecure   bool
+
+	opendkimDir     string
+	dkimSelectorDef string
 }
 
 func loadConfig() config {
@@ -66,6 +69,11 @@ func loadConfig() config {
 		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
 		// development-only escape hatch for testing over plain HTTP.
 		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",
+
+		// Per-domain DKIM state (spec 6). The directory layout matches what
+		// entrypoint.sh prepares (setgid, shared `selfpost` group).
+		opendkimDir:     envDefault("OPENDKIM_DIR", filepath.Join(dataDir, "opendkim")),
+		dkimSelectorDef: envDefault("DKIM_SELECTOR_DEFAULT", "selfpost"),
 	}
 }
 

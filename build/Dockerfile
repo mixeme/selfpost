@@ -58,6 +58,16 @@ RUN postconf -e "maillog_file=/var/log/mail.log"
 # Unprivileged user for the panel process (spec 7.6.8).
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
 
+# Shared group bridging the two unprivileged services (spec 6): the panel
+# generates per-domain DKIM keys and rewrites the OpenDKIM tables, while
+# OpenDKIM (a different user) must read them. Membership in this group — plus
+# setgid dirs under /data/opendkim (set up in entrypoint.sh) — lets OpenDKIM
+# read the panel-owned keys, and lets the panel reach the supervisor control
+# socket to signal an OpenDKIM reload without any process running as root.
+RUN groupadd --system selfpost \
+ && usermod -aG selfpost panel \
+ && usermod -aG selfpost opendkim
+
 # Runtime directories: milter sockets and the consolidated persistent root.
 RUN mkdir -p /run/opendkim /run/selfpost /data \
  && chown opendkim:opendkim /run/opendkim \

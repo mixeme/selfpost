@@ -36,16 +36,3 @@ func currentUser(r *http.Request) string {
 	}
 	return ""
 }
-
-// handleDashboard is the authenticated landing page. Phase 2 shows a minimal
-// shell; domains, applications and the send log arrive in later phases.
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	s.render(w, http.StatusOK, "dashboard", map[string]any{
-		"Title": "SelfPost",
-		"User":  currentUser(r),
-	})
-}
