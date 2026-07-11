@@ -46,10 +46,17 @@
 
 ## Текущее состояние
 
-- **Текущая фаза:** 0 (ещё не начата)
-- **Модель:** Opus
-- **Статус:** план и решения утверждены; инфраструктура workflow настроена
-- **Следующий шаг:** начать Фазу 0 — `go mod init codeberg.org/mix/selfpost`, структура каталогов, `LICENSE` (AGPL-3.0), скелет README, сборка с ldflags-версией; затем спайк go-milter на `selfpost.mixfed.ru`.
+- **Текущая фаза:** 0 ✅ закрыта → следующая **Фаза 1** (Docker + supervisord + три процесса)
+- **Модель для Фазы 1:** Opus
+- **Статус:** каркас собран и проверен на сервере; спайк milter снял главный риск ТЗ 7.3
+- **Следующий шаг (Фаза 1):** `Dockerfile` (bookworm-slim: postfix, opendkim, cyrus-sasl, supervisor, logrotate); `supervisord.conf` с `priority=` (opendkim→panel→postfix); стартовая обёртка Postfix с ожиданием milter-сокетов; панель `:8080` с заглушкой + stub journal-milter listener + stub log-tailer; непривилегированный пользователь панели. Проверка: `docker build`, контейнер стартует, три процесса живы.
+
+### Сделано в Фазе 0
+- Go-модуль `codeberg.org/mix/selfpost`, каркас `cmd/panel` + `cmd/selfpost-backup`, общий `internal/buildinfo` (версия через ldflags).
+- `Makefile` (статическая сборка `CGO_ENABLED=0`), `LICENSE` (полный AGPL-3.0), скелет `README.md`, `.gitattributes` (LF).
+- Проверено на сервере: `go vet` чист, `make build` даёт статические бинарники, версия впечатывается.
+- **Спайк go-milter** (де-риск ТЗ 7.3): v0.4.1 (BSD-2) ↔ Postfix 3.7.11 bookworm, протокол v6. Подтверждено чтение From/To(per-rcpt)/Subject/queue-id, client IP из Connect(), **fail-open** при падении milter'а. Детали: `dev/spike-milter-notes.md`.
+- **Провижён dev-сервер:** Go 1.26.5, Docker 29.6.1, git, rsync, make. Host-postfix (спайковый) остановлен+отключён.
 
 ## Рабочая петля (dev loop) — ВАЖНО
 
@@ -66,4 +73,4 @@
 
 ## Журнал фаз
 
-_(пока пусто — заполняется по мере закрытия фаз)_
+- **Фаза 0** (2026-07-11, Opus) — каркас проекта + build-пайплайн + спайк go-milter (риск ТЗ 7.3 снят). Коммиты `4e589e1` (каркас), `87388b4` (план).
