@@ -1,0 +1,11 @@
+# Keep the build context minimal and free of dev-only material.
+.git
+.gitignore
+.gitattributes
+dev
+docs
+bin
+*.exe
+README.md
+LICENSE
+Makefile
