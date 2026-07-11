@@ -46,10 +46,17 @@
 
 ## Текущее состояние
 
-- **Текущая фаза:** 0 ✅ закрыта → следующая **Фаза 1** (Docker + supervisord + три процесса)
-- **Модель для Фазы 1:** Opus
-- **Статус:** каркас собран и проверен на сервере; спайк milter снял главный риск ТЗ 7.3
-- **Следующий шаг (Фаза 1):** `Dockerfile` (bookworm-slim: postfix, opendkim, cyrus-sasl, supervisor, logrotate); `supervisord.conf` с `priority=` (opendkim→panel→postfix); стартовая обёртка Postfix с ожиданием milter-сокетов; панель `:8080` с заглушкой + stub journal-milter listener + stub log-tailer; непривилегированный пользователь панели. Проверка: `docker build`, контейнер стартует, три процесса живы.
+- **Текущая фаза:** 1 ✅ закрыта → следующая **Фаза 2** (SQLite + setup-link + вход админа)
+- **Модель для Фазы 2:** Opus (безопасность 7.6: крипто-токен, сессии, bcrypt)
+- **Статус:** образ собирается и проверен на сервере; три процесса живы, холодный старт и crashexit подтверждены
+- **Следующий шаг (Фаза 2):** SQLite-схема + миграции (домены, приложения, админ, `send_log`, лимиты, настройки, флаг «настройка завершена»/setup-токен), единый корень `/data`; **setup secret-link** (токен ≥128 бит `crypto/rand`, TTL 10 мин с перегенерацией, rate-limit маршрута, `subtle.ConstantTimeCompare`, неудачи НЕ инвалидируют токен, одноразовая форма создания админа, инвалидация навсегда после успеха → `/setup/*` 404); bcrypt-хэш пароля админа; логин + сессии (крипто-токен, cookie `HttpOnly`/`Secure`/`SameSite`), rate-limit логина; базовый layout `html/template` + вендоренный HTMX + auth-middleware. Выбрать драйвер `modernc.org/sqlite` (первая сторонняя зависимость — появится `go.sum`). Проверка: первый запуск печатает setup-ссылку, админ создаётся один раз, повторный `/setup` → 404, вход/выход работают.
+
+### Сделано в Фазе 1
+- **Образ** `build/Dockerfile` (bookworm-slim): многостадийная статическая сборка Go (`CGO_ENABLED=0`, `go vet` в сборке); рантайм — postfix, opendkim(+tools), cyrus-sasl (`sasl2-bin`, `libsasl2-modules`), supervisor, logrotate, ca-certificates; `maillog_file=/var/log/mail.log`; непривилегированный пользователь `panel` (ТЗ 7.6.8); `.dockerignore` (dev/ и docs/ не попадают в контекст).
+- **supervisord** (`build/supervisord.conf`, `nodaemon`, PID 1): порядок `priority=` opendkim(100)→panel(200)→postfix(300); event-listener `crashexit.py` на `PROCESS_STATE_FATAL` шлёт SIGTERM супервизору → контейнер завершается при неперезапускаемом падении (ТЗ 4).
+- **Обёртка Postfix** (`build/postfix-wrapper.sh`): опрос `test -S` обоих milter-сокетов (OpenDKIM `/run/opendkim/opendkim.sock` + journal `/run/selfpost/journal.sock`), таймаут 30с, при неготовности — выход ≠0 без запуска Postfix; иначе `exec postfix start-fg` (решает только холодный старт, ТЗ 4).
+- **Панель** (`cmd/panel`, три роли под общим ctx + graceful shutdown по SIGTERM): HTTP `:8080` заглушка + `/healthz`; **stub journal-milter** — открывает unix-сокет, чтобы обёртка проходила (реальный milter — Фаза 6); **stub log-tailer** (реальный хвост — Фаза 6). `opendkim.conf` временно Mode `v` (без ключей; Mode `s`+KeyTable — Фаза 3).
+- **Проверено на сервере** (selfpost.mixfed.ru): `docker build` ок; `docker run` → три живых процесса (opendkim, panel@non-root, postfix master); панель `/`→200 и `/healthz`→ok; обёртка дождалась сокетов; форсированный FATAL панели → crashexit → контейнер завершился чисто; SIGTERM → «panel stopped cleanly». Образ 334MB, тег `selfpost:dev` оставлен на сервере.
 
 ### Сделано в Фазе 0
 - Go-модуль `codeberg.org/mix/selfpost`, каркас `cmd/panel` + `cmd/selfpost-backup`, общий `internal/buildinfo` (версия через ldflags).
@@ -74,3 +81,4 @@
 ## Журнал фаз
 
 - **Фаза 0** (2026-07-11, Opus) — каркас проекта + build-пайплайн + спайк go-milter (риск ТЗ 7.3 снят). Коммиты `4e589e1` (каркас), `87388b4` (план).
+- **Фаза 1** (2026-07-11, Opus) — Docker-образ + supervisord + три процесса, холодный старт (обёртка ждёт milter-сокеты) и crashexit проверены на сервере. Коммит `ed9e942`.
