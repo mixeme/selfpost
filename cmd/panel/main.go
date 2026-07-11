@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -43,13 +44,28 @@ type config struct {
 	httpAddr      string
 	journalSocket string
 	mailLog       string
+
+	dataDir        string
+	dbPath         string
+	setupTokenPath string
+	hostname       string
+	cookieSecure   bool
 }
 
 func loadConfig() config {
+	dataDir := envDefault("SELFPOST_DATA_DIR", "/data")
 	return config{
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
 		mailLog:       envDefault("MAIL_LOG", "/var/log/mail.log"),
+
+		dataDir:        dataDir,
+		dbPath:         envDefault("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db")),
+		setupTokenPath: envDefault("SELFPOST_SETUP_TOKEN_FILE", filepath.Join(dataDir, "setup-token")),
+		hostname:       os.Getenv("SELFPOST_HOSTNAME"),
+		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
+		// development-only escape hatch for testing over plain HTTP.
+		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",
 	}
 }
 
@@ -79,7 +95,7 @@ func run() error {
 		name string
 		fn   func(context.Context) error
 	}{
-		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg.httpAddr) }},
+		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg) }},
 		{"journal-milter", func(ctx context.Context) error { return serveJournalStub(ctx, cfg.journalSocket) }},
 		{"log-tailer", func(ctx context.Context) error { return tailMailLog(ctx, cfg.mailLog) }},
 	}
