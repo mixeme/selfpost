@@ -78,26 +78,6 @@ func (s *Server) handleAddDomain(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d", d.ID), http.StatusSeeOther)
 }
 
-// handleDomainDetail shows a single domain and its DKIM DNS record (spec 7.2.10).
-func (s *Server) handleDomainDetail(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
-	if !ok {
-		return
-	}
-	record, err := s.domains.DKIMRecord(d)
-	if err != nil {
-		logf("panel: domain %d: dkim record: %v", d.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	s.render(w, http.StatusOK, "domain_detail", map[string]any{
-		"Title":  "SelfPost — " + d.Name,
-		"User":   currentUser(r),
-		"Domain": d,
-		"Record": record,
-	})
-}
-
 // handleDeleteConfirm shows the cascade warning before a domain is removed: the
 // panel must explicitly state that all bound applications go with it (spec 7.2.4).
 func (s *Server) handleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
@@ -131,11 +111,17 @@ func (s *Server) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/?deleted=1", http.StatusSeeOther)
 }
 
-// handleReload re-applies the OpenDKIM configuration on demand (spec 7.2.12).
-// The Postfix side of the reload button lands in Phase 5.
+// handleReload re-applies both the OpenDKIM configuration and the Postfix
+// sender map on demand (spec 7.2.12). Each Resync regenerates its files from the
+// database and reloads its daemon, so the button doubles as a drift-recovery.
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 	if err := s.domains.Resync(); err != nil {
-		logf("panel: manual reload: %v", err)
+		logf("panel: manual reload (opendkim): %v", err)
+		http.Error(w, "reload failed", http.StatusInternalServerError)
+		return
+	}
+	if err := s.apps.Resync(); err != nil {
+		logf("panel: manual reload (postfix): %v", err)
 		http.Error(w, "reload failed", http.StatusInternalServerError)
 		return
 	}

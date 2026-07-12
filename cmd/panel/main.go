@@ -53,6 +53,10 @@ type config struct {
 
 	opendkimDir     string
 	dkimSelectorDef string
+
+	saslDBPath string
+	saslRealm  string
+	postfixDir string
 }
 
 func loadConfig() config {
@@ -74,7 +78,28 @@ func loadConfig() config {
 		// entrypoint.sh prepares (setgid, shared `selfpost` group).
 		opendkimDir:     envDefault("OPENDKIM_DIR", filepath.Join(dataDir, "opendkim")),
 		dkimSelectorDef: envDefault("DKIM_SELECTOR_DEFAULT", "selfpost"),
+
+		// Application SASL accounts and the Postfix sender map (spec 5.1, 9),
+		// both under /data so they survive restarts. The SASL realm defaults to
+		// the server hostname so account identities line up with Postfix's SASL
+		// configuration; it falls back to localhost outside the container.
+		saslDBPath: envDefault("SASL_DB_PATH", filepath.Join(dataDir, "sasl", "sasldb2")),
+		saslRealm:  saslRealm(),
+		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
 	}
+}
+
+// saslRealm chooses the realm new SASL accounts live under. It mirrors the
+// hostname Postfix's SASL layer uses so a client authenticating with a bare
+// login resolves to the right account (finalised in Phase 5).
+func saslRealm() string {
+	if r := os.Getenv("SASL_REALM"); r != "" {
+		return r
+	}
+	if h := os.Getenv("SELFPOST_HOSTNAME"); h != "" {
+		return h
+	}
+	return "localhost"
 }
 
 func envDefault(key, def string) string {
