@@ -51,4 +51,23 @@ chown -R panel:selfpost /data/postfix
 chmod 2750 /data/postfix
 chmod 0640 /data/postfix/sender_login_maps
 
+# Milter socket directories (spec 5 p.3, 7.3). From Phase 5 Postfix (user
+# `postfix`) must actually CONNECT to both milter sockets — OpenDKIM's and the
+# panel's journal-milter — not just probe them at start-up. The sockets are
+# created by the opendkim and panel users respectively, so bridge them to
+# `postfix` through the shared `selfpost` group: group-owned + setgid dirs mean
+# each socket created inside inherits group `selfpost`, and group-traversable
+# (2750) lets postfix reach it. Without this, smtpd cannot talk to OpenDKIM and,
+# because signing is strict (default_action=tempfail), rejects all mail.
+mkdir -p /run/opendkim /run/selfpost
+chown opendkim:selfpost /run/opendkim
+chown panel:selfpost /run/selfpost
+chmod 2750 /run/opendkim /run/selfpost
+
+# Generate the outbound-relay Postfix configuration from the environment (spec
+# 5). Kept out of the image build so cert paths, rate limits, hostname and the
+# optional 587 service are all driven by env at run time, and re-derived on every
+# start the same way the /data normalisation above is.
+/usr/local/bin/postfix-config.sh
+
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

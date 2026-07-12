@@ -51,10 +51,6 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# Postfix logs to a plain file (via its built-in postlogd) so the panel's
-# log-tailer has something to follow and container logging works without syslog.
-RUN postconf -e "maillog_file=/var/log/mail.log"
-
 # Unprivileged user for the panel process (spec 7.6.8).
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
 
@@ -80,13 +76,19 @@ COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 
 COPY build/opendkim.conf /etc/opendkim.conf
 COPY build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
+COPY build/postfix-config.sh /usr/local/bin/postfix-config.sh
+COPY build/postfix-cert-reload.sh /usr/local/bin/postfix-cert-reload.sh
 COPY build/crashexit.py /usr/local/bin/crashexit.py
 COPY build/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY build/supervisord.conf /etc/supervisor/supervisord.conf
-RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/crashexit.py /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/postfix-config.sh \
+      /usr/local/bin/postfix-cert-reload.sh /usr/local/bin/crashexit.py \
+      /usr/local/bin/entrypoint.sh
 
-# 8080 panel; 25 outbound; 465/587 inbound submission (used from Phase 5).
-EXPOSE 8080 25 465 587
+# Published submission ports: 465 (smtps, primary) and 587 (submission, optional)
+# plus the panel on 8080. Outbound delivery dials remote MXs on 25 as a client,
+# which needs no inbound listener or EXPOSE.
+EXPOSE 8080 465 587
 
 # The entrypoint fixes /data ownership (bind mount) as root, then execs
 # supervisord, which becomes PID 1 and owns process supervision (spec 4).
