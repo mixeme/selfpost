@@ -6,21 +6,38 @@ import (
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
-// Service coordinates the three places a sending domain lives: the SQLite
-// registry, the on-disk DKIM keys and OpenDKIM's tables. Callers (the web
-// handlers) validate user input first; Service keeps the three stores in
-// agreement and drives the OpenDKIM reload (spec 6, 7.2.2-4, 7.2.10).
+// Applications is the slice of the application service the domain service needs
+// to keep the SASL database and sender map consistent when a domain (and its
+// applications, via cascade) is deleted. *app.Service satisfies it; it is an
+// interface here to avoid a package import cycle and to keep domain deletion
+// testable in isolation.
+type Applications interface {
+	// PurgeDomainSASL removes the SASL accounts of the domain's applications.
+	// It must run before the registry cascade so the logins are still known.
+	PurgeDomainSASL(domainID int64) error
+	// Resync rebuilds smtpd_sender_login_maps from the remaining applications
+	// and reloads Postfix.
+	Resync() error
+}
+
+// Service coordinates the places a sending domain lives: the SQLite registry,
+// the on-disk DKIM keys and OpenDKIM's tables, plus — on deletion — the SASL
+// database and Postfix sender map its applications touch. Callers (the web
+// handlers) validate user input first; Service keeps the stores in agreement and
+// drives the OpenDKIM/Postfix reloads (spec 6, 7.2.2-4, 7.2.10).
 type Service struct {
 	store    *store.Store
 	odk      *OpenDKIM
+	apps     Applications
 	selector string
 }
 
 // NewService builds the domain service. selectorDefault is the DKIM selector
 // assigned to new domains (spec 8: DKIM_SELECTOR_DEFAULT); it is
-// operator-configured, not user input.
-func NewService(st *store.Store, odk *OpenDKIM, selectorDefault string) *Service {
-	return &Service{store: st, odk: odk, selector: selectorDefault}
+// operator-configured, not user input. apps is used only on deletion, to clear
+// the SASL accounts and sender-map bindings of the domain's applications.
+func NewService(st *store.Store, odk *OpenDKIM, apps Applications, selectorDefault string) *Service {
+	return &Service{store: st, odk: odk, apps: apps, selector: selectorDefault}
 }
 
 // List returns all domains with application counts (spec 7.2.2).
@@ -68,20 +85,29 @@ func (s *Service) rollbackAdd(id int64) {
 	_ = s.store.DeleteDomain(id)
 }
 
-// Delete removes a domain and everything bound to it — applications and their
-// SASL/binding rows go via the DB cascade, and the DKIM key and table entries
-// are removed here (spec 7.2.4, 6.5). The registry row and tables are updated
-// (so OpenDKIM stops signing for the domain) before the key is deleted.
+// Delete removes a domain and everything bound to it (spec 7.2.4, 6.5). The
+// order matters: the applications' SASL accounts are cleared first, while their
+// logins are still in the registry; then the registry rows (applications and
+// their addresses) go via the DB cascade; then the OpenDKIM tables and the
+// Postfix sender map are rebuilt from what remains — so OpenDKIM stops signing
+// and Postfix stops authorising the domain's senders — before the DKIM key is
+// deleted.
 func (s *Service) Delete(id int64) error {
 	d, err := s.store.GetDomain(id)
 	if err != nil {
 		return err
+	}
+	if err := s.apps.PurgeDomainSASL(id); err != nil {
+		return fmt.Errorf("clear SASL accounts for %s: %w", d.Name, err)
 	}
 	if err := s.store.DeleteDomain(id); err != nil {
 		return err
 	}
 	if err := s.resync(); err != nil {
 		return err
+	}
+	if err := s.apps.Resync(); err != nil {
+		return fmt.Errorf("rebuild sender map after deleting %s: %w", d.Name, err)
 	}
 	if err := s.odk.RemoveKey(d.Name); err != nil {
 		// The domain is gone from the registry and tables; a leftover key

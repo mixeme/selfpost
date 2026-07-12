@@ -56,6 +56,24 @@
   @media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
   h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
   .back { display: inline-block; margin-bottom: 1rem; }
+  select, textarea {
+    width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
+    border: 1px solid #cfd4da; border-radius: 6px; background: #fff; color: inherit;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; }
+  @media (prefers-color-scheme: dark) {
+    select, textarea { background: #14171a !important; color: inherit !important; border-color: #2b3138 !important; }
+  }
+  button.danger { background: #b42318; }
+  button.danger:hover { background: #912018; }
+  form.inline button.danger { background: none; color: #b42318; }
+  form.inline button.danger:hover { background: none; }
+  td.actions form.inline, td.actions details { margin-left: 0.6rem; }
+  details summary { cursor: pointer; color: #2563eb; font-weight: 600; }
+  details form { margin-top: 0.6rem; }
+  .credential { border-color: #f5c518; background: #fffbeb; }
+  @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
 </style>
 </head>
 <body>

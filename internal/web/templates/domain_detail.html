@@ -11,6 +11,20 @@
 
 <a class="back" href="/">&larr; All domains</a>
 
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+{{if .NewCred}}
+<div class="card credential">
+  <h2>New application password</h2>
+  <p class="muted">This password is shown <strong>once only</strong> and is not
+  stored. Copy it now — if it is lost, regenerate a new one.</p>
+  <label>Login</label>
+  <span class="code">{{.NewCred.Login}}</span>
+  <label>Password</label>
+  <span class="code">{{.NewCred.Password}}</span>
+</div>
+{{end}}
+
 <div class="card">
   <h2>DKIM DNS record</h2>
   <p class="muted">Publish this TXT record in the DNS for <strong>{{.Domain.Name}}</strong>.
@@ -31,8 +45,81 @@
 
 <div class="card">
   <h2>Applications</h2>
-  <p class="muted">{{.Domain.AppCount}} application(s) bound to this domain.
-  Creating and managing applications arrives in the next phase.</p>
+  <p class="muted">Each application is a SASL login/password an app or script
+  uses to send mail as this domain. A login may send from any address of the
+  domain (<em>wildcard</em>) or only from a fixed list of addresses.</p>
+
+  {{if .Apps}}
+  <table>
+    <thead>
+      <tr><th>Login</th><th>Mode</th><th>Addresses</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Apps}}
+      <tr>
+        <td class="code">{{.Login}}</td>
+        <td>{{if eq .AddressMode $.Wildcard}}Any address (@{{$.Domain.Name}}){{else}}List{{end}}</td>
+        <td class="muted">
+          {{if eq .AddressMode $.Wildcard}}*@{{$.Domain.Name}}{{else}}
+            {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}
+          {{end}}
+        </td>
+        <td class="actions">
+          <details>
+            <summary>Edit mode</summary>
+            <form method="post" action="/applications/{{.ID}}/mode">
+              <label>Address mode</label>
+              <select name="mode">
+                <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
+                <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
+              </select>
+              <label>Addresses (for list mode; one per line or comma-separated)</label>
+              <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
+{{end}}{{$a}}{{end}}</textarea>
+              <button type="submit">Save mode</button>
+            </form>
+          </details>
+          <form class="inline" method="post" action="/applications/{{.ID}}/password"
+                onsubmit="return confirm('Regenerate the password for {{.Login}}? The current password stops working immediately.')">
+            <button type="submit">New password</button>
+          </form>
+          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
+                onsubmit="return confirm('Delete application {{.Login}}? Its credentials stop working immediately.')">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No applications yet. Create one below.</p>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2>Add an application</h2>
+  <form method="post" action="/domains/{{.Domain.ID}}/applications">
+    <label for="login">Login</label>
+    <input id="login" name="login" type="text" placeholder="prod-server"
+           autocomplete="off" autocapitalize="none" spellcheck="false"
+           value="{{.FormLogin}}" required>
+
+    <label for="mode">Address mode</label>
+    <select id="mode" name="mode">
+      <option value="{{.Wildcard}}" {{if eq .FormMode .Wildcard}}selected{{end}}>Any address of the domain</option>
+      <option value="{{.List}}" {{if eq .FormMode .List}}selected{{end}}>Specific addresses (list)</option>
+    </select>
+
+    <label for="addresses">Addresses (for list mode; one per line or comma-separated)</label>
+    <textarea id="addresses" name="addresses" rows="3"
+              placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
+
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <button type="submit">Create application</button>
+  </form>
+  <p class="muted">A strong password is generated and shown once. The login must
+  be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
 </div>
 
 <div class="card">

@@ -32,4 +32,23 @@ find /data/opendkim -type d -exec chmod 2750 {} +
 chmod 0640 /data/opendkim/KeyTable /data/opendkim/SigningTable
 find /data/opendkim/keys -type f -name '*.private' -exec chmod 0640 {} +
 
+# Application SASL accounts (spec 5.1, 9). The panel (user `panel`) writes the
+# sasldb2 via saslpasswd2; Postfix (user `postfix`) reads it to authenticate SMTP
+# clients. Share it through the `selfpost` group the same way as the DKIM tree:
+# setgid directory so new files inherit the group, and the database itself
+# group-readable (0640). Postfix wiring to actually consult it lands in Phase 5.
+mkdir -p /data/sasl
+chown -R panel:selfpost /data/sasl
+chmod 2750 /data/sasl
+[ -e /data/sasl/sasldb2 ] && chmod 0640 /data/sasl/sasldb2
+
+# Postfix sender_login_maps (spec 5.1). The panel writes it; Postfix reads it.
+# Ensure the file exists (empty is fine) before Postfix starts so a reload that
+# references it never fails on a missing file, and keep it group-readable.
+mkdir -p /data/postfix
+[ -e /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
+chown -R panel:selfpost /data/postfix
+chmod 2750 /data/postfix
+chmod 0640 /data/postfix/sender_login_maps
+
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

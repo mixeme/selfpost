@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"codeberg.org/mix/selfpost/internal/app"
 	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/store"
 )
@@ -32,6 +33,7 @@ type Config struct {
 type Server struct {
 	store    *store.Store
 	domains  *domain.Service
+	apps     *app.Service
 	cfg      Config
 	tmpl     *templates
 	sessions *sessionStore
@@ -43,8 +45,9 @@ type Server struct {
 
 // New builds the panel server. setupTokenPath is where the current setup token
 // is mirrored on disk (spec 7.6.1); domains is the sending-domain service that
-// owns DKIM keys and the OpenDKIM tables (spec 6).
-func New(st *store.Store, domains *domain.Service, cfg Config, setupTokenPath string) (*Server, error) {
+// owns DKIM keys and the OpenDKIM tables (spec 6); apps owns application SASL
+// accounts and the Postfix sender map (spec 5.1).
+func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	tmpl, err := loadTemplates()
 	if err != nil {
 		return nil, err
@@ -52,6 +55,7 @@ func New(st *store.Store, domains *domain.Service, cfg Config, setupTokenPath st
 	s := &Server{
 		store:    st,
 		domains:  domains,
+		apps:     apps,
 		cfg:      cfg,
 		tmpl:     tmpl,
 		sessions: newSessionStore(),
@@ -97,6 +101,10 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /domains/{id}", s.handleDomainDetail)
 	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
 	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
+	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
+	authed.HandleFunc("POST /applications/{aid}/mode", s.handleUpdateAppMode)
+	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
+	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
 	authed.HandleFunc("POST /reload", s.handleReload)
 	mux.Handle("/", s.requireAuth(authed))
 

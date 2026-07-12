@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"codeberg.org/mix/selfpost/internal/app"
 	"codeberg.org/mix/selfpost/internal/domain"
+	"codeberg.org/mix/selfpost/internal/postfix"
 	"codeberg.org/mix/selfpost/internal/store"
 	"codeberg.org/mix/selfpost/internal/web"
 )
@@ -22,9 +24,13 @@ func serveHTTP(ctx context.Context, cfg config) error {
 	}
 	defer st.Close()
 
-	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), cfg.dkimSelectorDef)
+	// Applications own the SASL accounts and the Postfix sender map; the domain
+	// service delegates to them when a domain (and its applications) is deleted.
+	pf := postfix.New(cfg.postfixDir)
+	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
+	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), apps, cfg.dkimSelectorDef)
 
-	srvApp, err := web.New(st, domains, web.Config{
+	srvApp, err := web.New(st, domains, apps, web.Config{
 		Hostname:     cfg.hostname,
 		CookieSecure: cfg.cookieSecure,
 	}, cfg.setupTokenPath)
