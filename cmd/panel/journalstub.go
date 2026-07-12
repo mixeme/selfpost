@@ -27,6 +27,13 @@ func serveJournalStub(ctx context.Context, socketPath string) error {
 	if err != nil {
 		return err
 	}
+	// Postfix (user `postfix`) connects to this socket as a milter and needs
+	// group access. The socket inherits group `selfpost` from the setgid parent
+	// dir entrypoint.sh prepares; make it group read/write so postfix can reach
+	// it (connecting to a Unix socket needs write permission on the node).
+	if err := os.Chmod(socketPath, 0o660); err != nil {
+		return err
+	}
 
 	// Closing the listener unblocks Accept and unlinks the socket file.
 	go func() {
