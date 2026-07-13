@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="topbar">
+  <h1>Mail log</h1>
+  <div class="actions muted">
+    <span>{{.User}}</span>
+    <a href="/">Domains</a>
+    <a href="/sendlog">Send log</a>
+    <a href="/queue">Queue</a>
+    <form class="inline" method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
+</div>
+
+<a class="back" href="/">&larr; Domains</a>
+
+<div class="card">
+  <h2>mail.log tail</h2>
+  {{template "logtail_body" .}}
+</div>
+{{end}}

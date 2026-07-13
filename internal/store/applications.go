@@ -195,6 +195,27 @@ func (s *Store) ListApplicationsByDomain(domainID int64) ([]Application, error) 
 	return out, nil
 }
 
+// ListApplicationLogins returns every application login across all domains,
+// ordered, for the send-log monitoring screen's filter dropdown (spec 7.2).
+// Logins are globally unique (spec 5.1), so no domain qualifier is needed.
+func (s *Store) ListApplicationLogins() ([]string, error) {
+	rows, err := s.db.Query("SELECT login FROM applications ORDER BY login")
+	if err != nil {
+		return nil, fmt.Errorf("list application logins: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var login string
+		if err := rows.Scan(&login); err != nil {
+			return nil, err
+		}
+		out = append(out, login)
+	}
+	return out, rows.Err()
+}
+
 // ListLoginsByDomain returns the SASL logins of a domain's applications. Used to
 // purge sasldb2 entries before a domain (and its applications via cascade) is
 // deleted, while the logins are still known (spec 7.2.4).

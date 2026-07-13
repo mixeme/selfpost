@@ -1,0 +1,7 @@
+{{define "logtail_body"}}
+<div id="logtail-body" hx-get="/logtail/body" hx-trigger="every 5s" hx-swap="outerHTML">
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <span class="code">{{if .Lines}}{{range .Lines}}{{.}}
+{{end}}{{else}}No log lines yet.{{end}}</span>
+</div>
+{{end}}

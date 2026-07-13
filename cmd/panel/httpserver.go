@@ -27,6 +27,7 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	srvApp, err := web.New(st, domains, apps, web.Config{
 		Hostname:     cfg.hostname,
 		CookieSecure: cfg.cookieSecure,
+		MailLogPath:  cfg.mailLog,
 	}, cfg.setupTokenPath)
 	if err != nil {
 		return err

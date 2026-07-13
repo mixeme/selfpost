@@ -27,6 +27,10 @@ type Config struct {
 	// to true (spec 7.6.6); it exists as a knob only so the panel can be tested
 	// over plain HTTP in development, never for production.
 	CookieSecure bool
+	// MailLogPath is where Postfix's delivery log lives, read by the mail.log
+	// monitoring view (spec 7.2.13). It is the same path the log-tailer role
+	// follows in cmd/panel.
+	MailLogPath string
 }
 
 // Server is the panel HTTP application.
@@ -106,6 +110,16 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
 	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
 	authed.HandleFunc("POST /reload", s.handleReload)
+
+	// Monitoring screens (spec 7.2.11-13): each page and its HTMX polling
+	// fragment (spec 7.1 — the /rows and /body endpoints return HTML, not JSON).
+	authed.HandleFunc("GET /sendlog", s.handleSendLog)
+	authed.HandleFunc("GET /sendlog/rows", s.handleSendLogRows)
+	authed.HandleFunc("GET /queue", s.handleQueue)
+	authed.HandleFunc("GET /queue/body", s.handleQueueBody)
+	authed.HandleFunc("GET /logtail", s.handleLogTail)
+	authed.HandleFunc("GET /logtail/body", s.handleLogTailBody)
+
 	mux.Handle("/", s.requireAuth(authed))
 
 	return mux

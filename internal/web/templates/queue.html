@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="topbar">
+  <h1>Mail queue</h1>
+  <div class="actions muted">
+    <span>{{.User}}</span>
+    <a href="/">Domains</a>
+    <a href="/sendlog">Send log</a>
+    <a href="/logtail">Log</a>
+    <form class="inline" method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
+</div>
+
+<a class="back" href="/">&larr; Domains</a>
+
+<div class="card">
+  <h2>postqueue -p</h2>
+  {{template "queue_body" .}}
+</div>
+{{end}}
