@@ -1,0 +1,37 @@
+{{define "content"}}
+<div class="topbar">
+  <h1>Send log</h1>
+  <div class="actions muted">
+    <span>{{.User}}</span>
+    <a href="/">Domains</a>
+    <a href="/queue">Queue</a>
+    <a href="/logtail">Log</a>
+    <form class="inline" method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
+</div>
+
+<a class="back" href="/">&larr; Domains</a>
+
+<div class="card">
+  <h2>Filter</h2>
+  <form method="get" action="/sendlog">
+    <label for="domain">Domain</label>
+    <select id="domain" name="domain">
+      <option value="">All domains</option>
+      {{range .FilterDomains}}<option value="{{.}}" {{if eq . $.FilterDomain}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <label for="app">Application</label>
+    <select id="app" name="app">
+      <option value="">All applications</option>
+      {{range .FilterApps}}<option value="{{.}}" {{if eq . $.FilterApp}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <button type="submit">Filter</button>
+  </form>
+</div>
+
+<div class="card">
+  {{template "sendlog_rows" .}}
+</div>
+{{end}}

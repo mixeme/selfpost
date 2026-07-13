@@ -8,6 +8,7 @@ package logtail
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"io"
 	"log"
@@ -116,6 +117,52 @@ func retentionLoop(ctx context.Context, st StatusStore, retentionDays int) {
 			prune()
 		}
 	}
+}
+
+// TailLines returns up to n of the most recent lines from path, for the
+// panel's mail.log monitoring view (spec 7.2.13). It is a one-shot,
+// point-in-time read on request — unrelated to the background follow loop
+// above — that reads backwards in chunks so it stays cheap against a
+// multi-megabyte log rather than reading the whole file every poll.
+func TailLines(path string, n int) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	const chunkSize = 8192
+	var (
+		buf    []byte
+		offset = info.Size()
+	)
+	for offset > 0 && bytes.Count(buf, []byte("\n")) <= n {
+		size := int64(chunkSize)
+		if size > offset {
+			size = offset
+		}
+		offset -= size
+		chunk := make([]byte, size)
+		if _, err := f.ReadAt(chunk, offset); err != nil {
+			return nil, err
+		}
+		buf = append(chunk, buf...)
+	}
+
+	text := strings.TrimRight(string(buf), "\n")
+	if text == "" {
+		return nil, nil
+	}
+	lines := strings.Split(text, "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines, nil
 }
 
 // follow tails path line by line, calling handle for each complete line, until

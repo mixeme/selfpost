@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -63,6 +64,89 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// SendLogRow is one row as returned to the monitoring UI (spec 7.2, 7.3.3): a
+// SendLogEntry plus the fields that only exist once a row has been written
+// (id, current status, timestamps).
+type SendLogRow struct {
+	ID        int64
+	QueueID   string
+	Domain    string
+	AppLogin  string
+	From      string
+	To        string
+	Subject   string
+	Status    string
+	CreatedAt time.Time
+}
+
+// SendLogFilter narrows QuerySendLog/CountSendLog by domain and/or
+// application login. An empty field matches everything.
+type SendLogFilter struct {
+	Domain   string
+	AppLogin string
+}
+
+// QuerySendLog returns send-log rows matching filter, newest first, for the
+// monitoring screen's server-side pagination (spec 7.2's send-log view).
+func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLogRow, error) {
+	where, args := sendLogWhere(filter)
+	args = append(args, limit, offset)
+	rows, err := s.db.Query(
+		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at
+		 FROM send_log`+where+`
+		 ORDER BY id DESC
+		 LIMIT ? OFFSET ?`,
+		args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query send_log: %w", err)
+	}
+	defer rows.Close()
+
+	var out []SendLogRow
+	for rows.Next() {
+		var (
+			row       SendLogRow
+			createdAt string
+		)
+		if err := rows.Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin,
+			&row.From, &row.To, &row.Subject, &row.Status, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan send_log row: %w", err)
+		}
+		row.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// CountSendLog returns how many send-log rows match filter, so the monitoring
+// screen can render page numbers/next-prev links.
+func (s *Store) CountSendLog(filter SendLogFilter) (int64, error) {
+	where, args := sendLogWhere(filter)
+	var n int64
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM send_log`+where, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count send_log: %w", err)
+	}
+	return n, nil
+}
+
+func sendLogWhere(f SendLogFilter) (string, []any) {
+	var clauses []string
+	var args []any
+	if f.Domain != "" {
+		clauses = append(clauses, "domain = ?")
+		args = append(args, f.Domain)
+	}
+	if f.AppLogin != "" {
+		clauses = append(clauses, "app_login = ?")
+		args = append(args, f.AppLogin)
+	}
+	if len(clauses) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
 }
 
 // DeleteSendLogBefore removes send-log rows created before cutoff, implementing

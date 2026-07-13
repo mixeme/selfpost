@@ -1,0 +1,6 @@
+{{define "queue_body"}}
+<div id="queue-body" hx-get="/queue/body" hx-trigger="every 5s" hx-swap="outerHTML">
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <span class="code">{{if .Output}}{{.Output}}{{else}}Queue is empty.{{end}}</span>
+</div>
+{{end}}

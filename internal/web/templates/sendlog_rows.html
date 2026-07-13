@@ -1,0 +1,32 @@
+{{define "sendlog_rows"}}
+<div id="sendlog-rows" hx-get="/sendlog/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
+     hx-trigger="every 5s" hx-swap="outerHTML">
+  {{if .Rows}}
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Domain</th><th>App</th><th>From</th><th>To</th><th>Subject</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {{range .Rows}}
+      <tr>
+        <td class="muted">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+        <td>{{.Domain}}</td>
+        <td>{{.AppLogin}}</td>
+        <td>{{.From}}</td>
+        <td>{{.To}}</td>
+        <td>{{.Subject}}</td>
+        <td>{{.Status}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <p class="muted">
+    Page {{.Page}}{{if .LastPage}} of {{.LastPage}}{{end}}
+    {{if .HasPrev}} &middot; <a href="/sendlog?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.PrevPage}}">&larr; Newer</a>{{end}}
+    {{if .HasNext}} &middot; <a href="/sendlog?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.NextPage}}">Older &rarr;</a>{{end}}
+  </p>
+  {{else}}
+  <p class="muted">No messages logged yet.</p>
+  {{end}}
+</div>
+{{end}}
