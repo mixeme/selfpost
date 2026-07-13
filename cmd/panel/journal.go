@@ -7,13 +7,17 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+
+	"codeberg.org/mix/selfpost/internal/milter"
+	"codeberg.org/mix/selfpost/internal/store"
 )
 
-// serveJournalStub opens the journal-milter Unix socket so the Postfix start
-// wrapper's readiness probe (test -S) succeeds and the cold-start ordering
-// (spec 4) can be exercised end to end. The real milter protocol handler is
-// implemented in Phase 6; here connections are simply accepted and closed.
-func serveJournalStub(ctx context.Context, socketPath string) error {
+// serveJournal opens the journal-milter Unix socket and runs the real milter
+// (spec 7.3), recording accepted messages into the send log. Socket lifecycle
+// (creation, stale cleanup, group permissions) lives here; the protocol handler
+// lives in internal/milter.
+func serveJournal(ctx context.Context, cfg config, st *store.Store) error {
+	socketPath := cfg.journalSocket
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
 		return err
 	}
@@ -32,24 +36,10 @@ func serveJournalStub(ctx context.Context, socketPath string) error {
 	// dir entrypoint.sh prepares; make it group read/write so postfix can reach
 	// it (connecting to a Unix socket needs write permission on the node).
 	if err := os.Chmod(socketPath, 0o660); err != nil {
+		ln.Close()
 		return err
 	}
 
-	// Closing the listener unblocks Accept and unlinks the socket file.
-	go func() {
-		<-ctx.Done()
-		_ = ln.Close()
-	}()
-
-	log.Printf("journal-milter stub listening on %s", socketPath)
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil // expected during shutdown
-			}
-			return err
-		}
-		_ = conn.Close()
-	}
+	log.Printf("journal-milter listening on %s", socketPath)
+	return milter.Serve(ctx, ln, st)
 }
