@@ -14,16 +14,10 @@ import (
 	"codeberg.org/mix/selfpost/internal/web"
 )
 
-// serveHTTP opens the panel database and runs the control-panel HTTP server
-// until ctx is cancelled. From Phase 2 this serves the real setup, login and
-// authenticated panel surface (spec 7.6).
-func serveHTTP(ctx context.Context, cfg config) error {
-	st, err := store.Open(cfg.dbPath)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-
+// serveHTTP runs the control-panel HTTP server until ctx is cancelled, using
+// the database handle shared by all roles. From Phase 2 this serves the real
+// setup, login and authenticated panel surface (spec 7.6).
+func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	// Applications own the SASL accounts and the Postfix sender map; the domain
 	// service delegates to them when a domain (and its applications) is deleted.
 	pf := postfix.New(cfg.postfixDir)

@@ -122,6 +122,18 @@ postconf -e \
 	"smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
 	"non_smtpd_milters="
 
+# Bounded milter timeouts (spec 7.3): a *hung* milter (socket accepts but never
+# replies) must fail open just like a crash, not stall mail acceptance until the
+# Postfix defaults (300s content) elapse. With default_action per milter, a
+# journal-milter hang then resolves to accept and an OpenDKIM hang to tempfail,
+# but within seconds rather than minutes. Values are well above any healthy
+# response time (signing/DB insert are sub-second), so they never fire in normal
+# operation.
+postconf -e \
+	"milter_connect_timeout=${MILTER_CONNECT_TIMEOUT:-15s}" \
+	"milter_command_timeout=${MILTER_COMMAND_TIMEOUT:-15s}" \
+	"milter_content_timeout=${MILTER_CONTENT_TIMEOUT:-30s}"
+
 # --- master.cf: inbound submission services ----------------------------------
 # smtps (465, implicit/wrapper TLS) — the primary, always-on submission service
 # (spec 5 p.1). chroot=n so smtpd can read the sasldb2 and sender map under /data

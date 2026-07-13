@@ -15,10 +15,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 
 	"codeberg.org/mix/selfpost/internal/buildinfo"
+	"codeberg.org/mix/selfpost/internal/logtail"
+	"codeberg.org/mix/selfpost/internal/store"
 )
 
 func main() {
@@ -44,6 +47,7 @@ type config struct {
 	httpAddr      string
 	journalSocket string
 	mailLog       string
+	retentionDays int
 
 	dataDir        string
 	dbPath         string
@@ -65,6 +69,9 @@ func loadConfig() config {
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
 		mailLog:       envDefault("MAIL_LOG", "/var/log/mail.log"),
+		// Send-log retention window (spec 7.3). Non-positive/invalid falls back
+		// to the 90-day default inside the log-tailer.
+		retentionDays: envInt("SEND_LOG_RETENTION_DAYS", 90),
 
 		dataDir:        dataDir,
 		dbPath:         envDefault("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db")),
@@ -109,6 +116,18 @@ func envDefault(key, def string) string {
 	return def
 }
 
+// envInt reads an integer environment variable, returning def if it is unset or
+// not a valid integer.
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+		log.Printf("ignoring invalid %s=%q, using %d", key, v, def)
+	}
+	return def
+}
+
 // run starts the panel's three roles and blocks until a shutdown signal or the
 // first fatal error from any role. A signal triggers a clean stop of all roles;
 // a role error cancels the others and is returned so the process exits non-zero
@@ -121,6 +140,15 @@ func run() error {
 
 	log.Printf("starting selfpost panel %s", buildinfo.Version)
 
+	// One database handle shared by every role. The store serialises writes
+	// (MaxOpenConns(1)), so the HTTP panel, the journal-milter and the tailer
+	// can all use it without stepping on each other under WAL.
+	st, err := store.Open(cfg.dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
 	var wg sync.WaitGroup
 	errc := make(chan error, 3)
 
@@ -128,9 +156,9 @@ func run() error {
 		name string
 		fn   func(context.Context) error
 	}{
-		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg) }},
-		{"journal-milter", func(ctx context.Context) error { return serveJournalStub(ctx, cfg.journalSocket) }},
-		{"log-tailer", func(ctx context.Context) error { return tailMailLog(ctx, cfg.mailLog) }},
+		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg, st) }},
+		{"journal-milter", func(ctx context.Context) error { return serveJournal(ctx, cfg, st) }},
+		{"log-tailer", func(ctx context.Context) error { return logtail.Run(ctx, cfg.mailLog, st, cfg.retentionDays) }},
 	}
 
 	for _, r := range roles {
