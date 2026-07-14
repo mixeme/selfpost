@@ -144,6 +144,8 @@ func detailFlash(r *http.Request) string {
 		return "Application address mode updated."
 	case r.URL.Query().Get("ratelimit") != "":
 		return "Rate limit updated."
+	case r.URL.Query().Get("imported") != "":
+		return "Domain imported. Its DKIM DNS record is unchanged — no DNS update is needed."
 	default:
 		return ""
 	}

@@ -46,6 +46,7 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
       opendkim-tools \
       sasl2-bin \
       libsasl2-modules \
+      db-util \
       supervisor \
       logrotate \
       ca-certificates \

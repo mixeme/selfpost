@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,6 +87,46 @@ func (o *OpenDKIM) RemoveKey(domainName string) error {
 		return fmt.Errorf("remove key dir for %s: %w", domainName, err)
 	}
 	return nil
+}
+
+// ExportKey returns a domain's DKIM private key as PKCS#1 PEM, for carrying in a
+// domain export so the receiving instance signs with the same key and the DNS
+// TXT record never has to change (spec 7.5.B). It re-marshals the parsed key
+// rather than returning the raw file, so a malformed on-disk key is caught here.
+func (o *OpenDKIM) ExportKey(domainName, selector string) ([]byte, error) {
+	if err := assertConfigSafe(domainName, selector); err != nil {
+		return nil, err
+	}
+	key, err := loadPrivateKeyPEM(o.keyPath(domainName, selector))
+	if err != nil {
+		return nil, err
+	}
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}
+	return pem.EncodeToMemory(block), nil
+}
+
+// ImportKey writes an imported DKIM private key to disk for a domain (spec
+// 7.5.B). The PEM is parsed and re-marshalled through the same writer used for
+// generated keys, so only a well-formed PKCS#1 RSA key is ever stored. Unlike
+// EnsureKey it overwrites: an import (re-)creates the domain with exactly this
+// key, which is the whole point of keeping the published DNS record valid.
+func (o *OpenDKIM) ImportKey(domainName, selector string, pemKey []byte) error {
+	if err := assertConfigSafe(domainName, selector); err != nil {
+		return err
+	}
+	block, _ := pem.Decode(pemKey)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return fmt.Errorf("import dkim key for %s: not a PKCS#1 RSA private key", domainName)
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("import dkim key for %s: %w", domainName, err)
+	}
+	path := o.keyPath(domainName, selector)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return fmt.Errorf("create key dir: %w", err)
+	}
+	return writePrivateKeyPEM(path, key)
 }
 
 // Record returns the published DKIM DNS record for a domain, recomputed from the

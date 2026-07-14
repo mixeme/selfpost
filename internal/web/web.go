@@ -31,6 +31,12 @@ type Config struct {
 	// monitoring view (spec 7.2.13). It is the same path the log-tailer role
 	// follows in cmd/panel.
 	MailLogPath string
+	// DataDir and DBPath locate the persistent state a full backup archives
+	// (spec 7.5.A); Version is stamped into the backup manifest. They mirror the
+	// panel's own configuration.
+	DataDir string
+	DBPath  string
+	Version string
 }
 
 // Server is the panel HTTP application.
@@ -102,16 +108,21 @@ func (s *Server) Handler() http.Handler {
 	authed := http.NewServeMux()
 	authed.HandleFunc("GET /{$}", s.handleDashboard)
 	authed.HandleFunc("POST /domains", s.handleAddDomain)
+	authed.HandleFunc("POST /domains/import", s.handleImportDomain)
 	authed.HandleFunc("GET /domains/{id}", s.handleDomainDetail)
 	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
 	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
 	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
 	authed.HandleFunc("POST /domains/{id}/ratelimit", s.handleDomainRateLimit)
+	authed.HandleFunc("POST /domains/{id}/export", s.handleExportDomain)
 	authed.HandleFunc("POST /applications/{aid}/mode", s.handleUpdateAppMode)
 	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
 	authed.HandleFunc("POST /applications/{aid}/ratelimit", s.handleAppRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
 	authed.HandleFunc("POST /reload", s.handleReload)
+
+	// Full-server backup download (spec 7.5.A).
+	authed.HandleFunc("POST /backup", s.handleBackup)
 
 	// Monitoring screens (spec 7.2.11-13): each page and its HTMX polling
 	// fragment (spec 7.1 — the /rows and /body endpoints return HTML, not JSON).

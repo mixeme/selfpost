@@ -221,6 +221,52 @@ func TestServiceRegeneratePassword(t *testing.T) {
 	}
 }
 
+func TestImportApplicationWritesRowAndSASL(t *testing.T) {
+	svc, st, rec, maps := newServiceHarness(t)
+	d := addDomain(t, st, "example.com")
+
+	if err := svc.ImportApplication(d.ID, "mailer", store.AddressModeList,
+		[]string{"a@example.com"}, "imported-pw"); err != nil {
+		t.Fatalf("ImportApplication: %v", err)
+	}
+	// Registry row and SASL account written with the imported password verbatim.
+	apps, _ := st.ListApplicationsByDomain(d.ID)
+	if len(apps) != 1 || apps[0].Login != "mailer" {
+		t.Fatalf("apps = %+v", apps)
+	}
+	if rec.set["mailer"] != "imported-pw" {
+		t.Errorf("SASL password = %q, want the imported one", rec.set["mailer"])
+	}
+	// Import does not rebuild the sender map itself (the caller batches that).
+	if maps.calls != 0 {
+		t.Errorf("ImportApplication rebuilt the map %d times, want 0", maps.calls)
+	}
+}
+
+func TestImportApplicationRejectsBadInput(t *testing.T) {
+	svc, st, rec, _ := newServiceHarness(t)
+	d := addDomain(t, st, "example.com")
+
+	// Empty password.
+	if err := svc.ImportApplication(d.ID, "mailer", store.AddressModeWildcard, nil, ""); err == nil {
+		t.Error("accepted empty imported password")
+	}
+	// Password with an embedded newline would truncate on the saslpasswd2 stdin.
+	if err := svc.ImportApplication(d.ID, "mailer", store.AddressModeWildcard, nil, "line1\nline2"); err == nil {
+		t.Error("accepted password with control characters")
+	}
+	// Cross-domain address.
+	if err := svc.ImportApplication(d.ID, "mailer", store.AddressModeList, []string{"x@evil.com"}, "pw"); err == nil {
+		t.Error("accepted cross-domain address")
+	}
+	if apps, _ := st.ListApplicationsByDomain(d.ID); len(apps) != 0 {
+		t.Errorf("rows persisted despite validation failure: %+v", apps)
+	}
+	if len(rec.set) != 0 {
+		t.Errorf("SASL accounts written despite validation failure: %v", rec.set)
+	}
+}
+
 func TestServicePurgeDomainSASL(t *testing.T) {
 	svc, st, rec, _ := newServiceHarness(t)
 	d := addDomain(t, st, "example.com")

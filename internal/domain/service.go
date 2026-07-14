@@ -18,6 +18,12 @@ type Applications interface {
 	// Resync rebuilds smtpd_sender_login_maps from the remaining applications
 	// and reloads Postfix.
 	Resync() error
+	// Secret returns an application's stored password, for a domain export
+	// (spec 7.5.B).
+	Secret(login string) (string, error)
+	// ImportApplication re-creates an application (registry row + SASL account)
+	// from a domain-export file, without rebuilding the sender map (spec 7.5.B).
+	ImportApplication(domainID int64, login, mode string, addresses []string, password string) error
 }
 
 // Service coordinates the places a sending domain lives: the SQLite registry,
