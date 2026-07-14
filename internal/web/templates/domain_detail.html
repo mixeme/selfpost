@@ -178,6 +178,19 @@
 </div>
 
 <div class="card">
+  <h2>Export domain</h2>
+  <p class="muted">Download this domain to move it to another SelfPost instance:
+  its DKIM key, selector and every application with its working password. On
+  import the DNS record stays the same, so no DNS change is needed.</p>
+  <p class="muted"><strong>The export file is a secret</strong> — it contains the
+  private DKIM key and application passwords. Transfer it securely and delete it
+  after the import.</p>
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/export">
+    <button type="submit">Export domain</button>
+  </form>
+</div>
+
+<div class="card">
   <h2>Danger zone</h2>
   <p class="muted">Deleting this domain also deletes its DKIM key and every
   application bound to it.</p>

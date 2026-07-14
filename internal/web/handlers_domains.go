@@ -13,13 +13,14 @@ import (
 // domains with their DKIM/selector and application counts, plus the add-domain
 // form (spec 7.2.2). Applications and the send log arrive in later phases.
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	s.renderDashboard(w, r, http.StatusOK, "", "")
+	s.renderDashboard(w, r, http.StatusOK, "", "", "")
 }
 
 // renderDashboard renders the domain list. formErr and formName repopulate the
-// add-domain form after a rejected submission; flash surfaces a one-shot status
-// message keyed by a redirect query flag (never reflected user input).
-func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status int, formErr, formName string) {
+// add-domain form after a rejected submission; importErr surfaces a failed
+// domain import (spec 7.5.B); flash surfaces a one-shot status message keyed by
+// a redirect query flag (never reflected user input).
+func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status int, formErr, formName, importErr string) {
 	domains, err := s.domains.List()
 	if err != nil {
 		logf("panel: dashboard: list domains: %v", err)
@@ -27,12 +28,13 @@ func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status 
 		return
 	}
 	s.render(w, status, "dashboard", map[string]any{
-		"Title":    "SelfPost",
-		"User":     currentUser(r),
-		"Domains":  domains,
-		"Error":    formErr,
-		"FormName": formName,
-		"Flash":    dashboardFlash(r),
+		"Title":     "SelfPost",
+		"User":      currentUser(r),
+		"Domains":   domains,
+		"Error":     formErr,
+		"FormName":  formName,
+		"ImportErr": importErr,
+		"Flash":     dashboardFlash(r),
 	})
 }
 
@@ -54,25 +56,25 @@ func dashboardFlash(r *http.Request) string {
 // publish is shown (spec 7.2.3).
 func (s *Server) handleAddDomain(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, "Invalid form submission.", "")
+		s.renderDashboard(w, r, http.StatusBadRequest, "Invalid form submission.", "", "")
 		return
 	}
 	raw := r.PostFormValue("name")
 	name := normalizeDomain(raw)
 	if err := validateDomain(name); err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, err.Error(), raw)
+		s.renderDashboard(w, r, http.StatusBadRequest, err.Error(), raw, "")
 		return
 	}
 
 	d, err := s.domains.Add(name)
 	if err != nil {
 		if errors.Is(err, store.ErrDomainExists) {
-			s.renderDashboard(w, r, http.StatusConflict, "That domain is already configured.", raw)
+			s.renderDashboard(w, r, http.StatusConflict, "That domain is already configured.", raw, "")
 			return
 		}
 		logf("panel: add domain %q: %v", name, err)
 		s.renderDashboard(w, r, http.StatusInternalServerError,
-			"Could not add the domain. Please check the logs and try again.", raw)
+			"Could not add the domain. Please check the logs and try again.", raw, "")
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d", d.ID), http.StatusSeeOther)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/mix/selfpost/internal/app"
+	"codeberg.org/mix/selfpost/internal/buildinfo"
 	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/postfix"
 	"codeberg.org/mix/selfpost/internal/store"
@@ -28,6 +29,9 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 		Hostname:     cfg.hostname,
 		CookieSecure: cfg.cookieSecure,
 		MailLogPath:  cfg.mailLog,
+		DataDir:      cfg.dataDir,
+		DBPath:       cfg.dbPath,
+		Version:      buildinfo.Version,
 	}, cfg.setupTokenPath)
 	if err != nil {
 		return err

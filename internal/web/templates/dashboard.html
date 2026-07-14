@@ -53,4 +53,31 @@
   <p class="muted">No domains yet. Add one above to get started.</p>
   {{end}}
 </div>
+
+<div class="card">
+  <h2>Backup &amp; migration</h2>
+  <p class="muted">Download a full backup of all persistent state — the database,
+  every domain's DKIM key and the application credentials. Use it to move the
+  whole server to a new machine: restore it into a container of the
+  <strong>same SelfPost version</strong>, with the same data mount, before first
+  start. TLS certificates and the mail queue are not included.</p>
+  <p class="muted"><strong>The backup file is a secret</strong> (it contains
+  private keys and credentials). Store and transfer it securely and delete it
+  once the restore succeeds.</p>
+  <form class="inline" method="post" action="/backup">
+    <button type="submit">Download full backup</button>
+  </form>
+
+  <h2>Import a domain</h2>
+  <p class="muted">Move a single domain here from another SelfPost instance using
+  a domain export file (from that domain's page). Its DKIM key and application
+  passwords come across, so the published DNS record needs no change. The export
+  file is a secret, like a full backup.</p>
+  {{if .ImportErr}}<p class="error">{{.ImportErr}}</p>{{end}}
+  <form method="post" action="/domains/import" enctype="multipart/form-data">
+    <label for="importfile">Domain export file</label>
+    <input id="importfile" name="file" type="file" accept=".json,application/json" required>
+    <button type="submit">Import domain</button>
+  </form>
+</div>
 {{end}}

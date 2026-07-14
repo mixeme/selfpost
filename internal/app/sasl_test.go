@@ -1,6 +1,9 @@
 package app
 
 import (
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -59,6 +62,78 @@ func TestSASLDeleteArgs(t *testing.T) {
 	}
 	if fr.stdin != "" {
 		t.Errorf("delete should not send stdin, got %q", fr.stdin)
+	}
+}
+
+// makeDump builds a db_dump byte-value document from key/value byte pairs, the
+// same shape `db_dump <sasldb2>` emits.
+func makeDump(pairs [][2][]byte) []byte {
+	var b strings.Builder
+	b.WriteString("VERSION=3\nformat=bytevalue\ntype=hash\nHEADER=END\n")
+	for _, p := range pairs {
+		fmt.Fprintf(&b, " %s\n", hex.EncodeToString(p[0]))
+		fmt.Fprintf(&b, " %s\n", hex.EncodeToString(p[1]))
+	}
+	b.WriteString("DATA=END\n")
+	return []byte(b.String())
+}
+
+func saslKey(login, realm, prop string) []byte {
+	return []byte(login + "\x00" + realm + "\x00" + prop)
+}
+
+func TestSecretExtractsPassword(t *testing.T) {
+	s := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	s.dump = func(path string) ([]byte, error) {
+		if path != "/data/sasl/sasldb2" {
+			t.Errorf("dump path = %q", path)
+		}
+		return makeDump([][2][]byte{
+			{saslKey("other", "mail.example.com", "userPassword"), []byte("otherpw")},
+			{saslKey("alerts", "mail.example.com", "userPassword"), []byte("hunter2-pass")},
+		}), nil
+	}
+	got, err := s.Secret("alerts")
+	if err != nil {
+		t.Fatalf("Secret: %v", err)
+	}
+	if got != "hunter2-pass" {
+		t.Errorf("Secret = %q, want %q", got, "hunter2-pass")
+	}
+}
+
+func TestSecretRealmMismatchNotFound(t *testing.T) {
+	s := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	s.dump = func(string) ([]byte, error) {
+		// Same login but a different realm must not match.
+		return makeDump([][2][]byte{
+			{saslKey("alerts", "other.host", "userPassword"), []byte("hunter2")},
+		}), nil
+	}
+	if _, err := s.Secret("alerts"); !errors.Is(err, ErrSecretNotFound) {
+		t.Errorf("Secret err = %v, want ErrSecretNotFound", err)
+	}
+}
+
+func TestSecretMissingLoginNotFound(t *testing.T) {
+	s := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	s.dump = func(string) ([]byte, error) {
+		return makeDump(nil), nil
+	}
+	if _, err := s.Secret("ghost"); !errors.Is(err, ErrSecretNotFound) {
+		t.Errorf("Secret err = %v, want ErrSecretNotFound", err)
+	}
+}
+
+func TestSecretRejectsInvalidLoginBeforeDump(t *testing.T) {
+	s := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	called := false
+	s.dump = func(string) ([]byte, error) { called = true; return nil, nil }
+	if _, err := s.Secret("bad login"); err == nil {
+		t.Error("Secret accepted invalid login")
+	}
+	if called {
+		t.Error("db_dump invoked for an invalid login")
 	}
 }
 

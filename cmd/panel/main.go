@@ -19,6 +19,7 @@ import (
 	"sync"
 	"syscall"
 
+	"codeberg.org/mix/selfpost/internal/backup"
 	"codeberg.org/mix/selfpost/internal/buildinfo"
 	"codeberg.org/mix/selfpost/internal/logtail"
 	"codeberg.org/mix/selfpost/internal/store"
@@ -51,6 +52,7 @@ type config struct {
 
 	dataDir        string
 	dbPath         string
+	manifestPath   string
 	setupTokenPath string
 	hostname       string
 	cookieSecure   bool
@@ -75,6 +77,7 @@ func loadConfig() config {
 
 		dataDir:        dataDir,
 		dbPath:         envDefault("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db")),
+		manifestPath:   filepath.Join(dataDir, backup.ManifestName),
 		setupTokenPath: envDefault("SELFPOST_SETUP_TOKEN_FILE", filepath.Join(dataDir, "setup-token")),
 		hostname:       os.Getenv("SELFPOST_HOSTNAME"),
 		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
@@ -139,6 +142,14 @@ func run() error {
 	defer stop()
 
 	log.Printf("starting selfpost panel %s", buildinfo.Version)
+
+	// Restore version guard (spec 7.5.A): if a backup was extracted into /data,
+	// its manifest version must match this binary before we touch the database,
+	// so schema/format skew between versions cannot corrupt the restored state.
+	// A match consumes the manifest; its absence is the normal (non-restore) case.
+	if err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version); err != nil {
+		return err
+	}
 
 	// One database handle shared by every role. The store serialises writes
 	// (MaxOpenConns(1)), so the HTTP panel, the journal-milter and the tailer

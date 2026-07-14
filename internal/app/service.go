@@ -92,6 +92,38 @@ func (s *Service) rollbackCreate(id int64, login string) {
 	_, _ = s.store.DeleteApplication(id)
 }
 
+// ImportApplication re-creates an application from a domain-export file (spec
+// 7.5.B): it validates the login and (in list mode) that every address belongs
+// to the domain, inserts the registry row and writes the SASL account with the
+// imported password verbatim, re-keyed under this instance's realm so the
+// credential keeps working without regeneration. It deliberately does not
+// rebuild the sender map — the caller (domain import) does that once after all
+// applications are in — and returns store.ErrLoginExists if the login collides.
+func (s *Service) ImportApplication(domainID int64, login, mode string, rawAddresses []string, password string) error {
+	addresses, err := s.validateForDomain(domainID, login, mode, rawAddresses)
+	if err != nil {
+		return err
+	}
+	if err := validateImportedPassword(password); err != nil {
+		return err
+	}
+	a, err := s.store.AddApplication(domainID, login, mode, addresses)
+	if err != nil {
+		return err // ErrLoginExists surfaces to the caller as a friendly message
+	}
+	if err := s.sasl.Set(login, password); err != nil {
+		_, _ = s.store.DeleteApplication(a.ID)
+		return err
+	}
+	return nil
+}
+
+// Secret returns an application's stored password for a domain export (spec
+// 7.5.B). See SASLDB.Secret for why this is possible and safe.
+func (s *Service) Secret(login string) (string, error) {
+	return s.sasl.Secret(login)
+}
+
 // UpdateMode switches an application's address mode / list and rebuilds the
 // sender map (spec 7.2.7). The login and password are untouched. Addresses are
 // re-validated against the application's domain.

@@ -35,6 +35,26 @@ func validateLogin(login string) error {
 	return nil
 }
 
+// validateImportedPassword guards a password taken from a domain-export file
+// (spec 7.5.B) before it is written to sasldb2. Our own exports carry base64url
+// passwords, but the file is untrusted input, so we reject an empty value or one
+// containing control characters — saslpasswd2 reads the passphrase from stdin
+// and a newline would silently truncate it (spec 7.6.2).
+func validateImportedPassword(password string) error {
+	if password == "" {
+		return fmt.Errorf("imported application password is empty")
+	}
+	if len(password) > 1024 {
+		return fmt.Errorf("imported application password is too long")
+	}
+	for _, r := range password {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("imported application password contains control characters")
+		}
+	}
+	return nil
+}
+
 // validateAddressMode checks the submitted mode is one of the two known values.
 func validateAddressMode(mode string) error {
 	if mode != store.AddressModeWildcard && mode != store.AddressModeList {
