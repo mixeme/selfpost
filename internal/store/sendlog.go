@@ -14,6 +14,10 @@ const (
 	StatusSent     = "sent"
 	StatusDeferred = "deferred"
 	StatusBounced  = "bounced"
+	// StatusRejected marks a message the journal-milter refused with a 4xx under
+	// a level-2 rate limit (spec 7.4). Such a row never gets a queue-id and is
+	// excluded from the level-2 message count (it was never sent).
+	StatusRejected = "rejected"
 )
 
 // SendLogEntry is a single queued send-log row. The journal-milter creates one
@@ -42,6 +46,24 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 	)
 	if err != nil {
 		return fmt.Errorf("insert send_log: %w", err)
+	}
+	return nil
+}
+
+// InsertRejected records a message the journal-milter refused under a level-2
+// rate limit (spec 7.4), so the rejection is visible in the send-log UI. Only
+// the fields known at MAIL FROM are set (domain, sender, app login); there is no
+// queue-id or recipient because the message was rejected before it was queued.
+func (s *Store) InsertRejected(e SendLogEntry) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		`INSERT INTO send_log
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, now, now,
+	)
+	if err != nil {
+		return fmt.Errorf("insert rejected send_log: %w", err)
 	}
 	return nil
 }

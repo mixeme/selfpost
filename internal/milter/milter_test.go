@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/emersion/go-milter"
 
@@ -11,10 +12,21 @@ import (
 )
 
 // fakeRecorder captures inserts and can be made to fail, to prove the milter
-// swallows recorder errors and still accepts the message.
+// swallows recorder errors and still accepts the message. By default it reports
+// no configured rate limit, so the level-2 check is inert unless a test sets
+// limits (see fakeRecorder fields).
 type fakeRecorder struct {
-	entries []store.SendLogEntry
-	fail    bool
+	entries  []store.SendLogEntry
+	rejected []store.SendLogEntry
+	fail     bool
+
+	// limits, keyed by "scope|ref", drive the level-2 rate-limit tests. counts
+	// gives the recent-message count returned for a "scope|ref". lookupErr and
+	// countErr force the store errors that must fail open.
+	limits    map[string]store.RateLimit
+	counts    map[string]int64
+	lookupErr error
+	countErr  error
 }
 
 func (f *fakeRecorder) InsertQueued(e store.SendLogEntry) error {
@@ -25,12 +37,32 @@ func (f *fakeRecorder) InsertQueued(e store.SendLogEntry) error {
 	return nil
 }
 
+func (f *fakeRecorder) InsertRejected(e store.SendLogEntry) error {
+	f.rejected = append(f.rejected, e)
+	return nil
+}
+
+func (f *fakeRecorder) RateLimit(scope, ref string) (store.RateLimit, bool, error) {
+	if f.lookupErr != nil {
+		return store.RateLimit{}, false, f.lookupErr
+	}
+	rl, ok := f.limits[scope+"|"+ref]
+	return rl, ok, nil
+}
+
+func (f *fakeRecorder) CountMessages(scope, ref string, _ time.Time) (int64, error) {
+	if f.countErr != nil {
+		return 0, f.countErr
+	}
+	return f.counts[scope+"|"+ref], nil
+}
+
 func mods(kv map[string]string) *milter.Modifier {
 	return &milter.Modifier{Macros: kv}
 }
 
 // drive replays a typical message through one session and returns the recorder.
-func drive(t *testing.T, rec Recorder) *session {
+func drive(t *testing.T, rec Store) *session {
 	t.Helper()
 	s := &session{rec: rec}
 	if _, err := s.Connect("localhost", "tcp4", 0, net.ParseIP("203.0.113.7"), mods(nil)); err != nil {
@@ -138,6 +170,135 @@ func TestBracedMacros(t *testing.T) {
 	}
 	if e.QueueID != "QBRACE" {
 		t.Fatalf("QueueID = %q, want QBRACE (braced {i} not resolved)", e.QueueID)
+	}
+}
+
+// limitAt is the client IP the rate-limit tests connect from; the limits below
+// register it so the differentiated check applies.
+const limitIP = "203.0.113.7"
+
+func activeLimit(ips ...string) store.RateLimit {
+	return store.RateLimit{AllowedIPs: ips, MaxMessages: 5, WindowSeconds: 3600}
+}
+
+// mailFrom drives just the connect + MAIL FROM stages and returns the response,
+// which is where the level-2 limit is enforced.
+func mailFrom(t *testing.T, rec Store, ip, from, login string) milter.Response {
+	t.Helper()
+	s := &session{rec: rec}
+	if _, err := s.Connect("h", "tcp4", 0, net.ParseIP(ip), mods(nil)); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	resp, err := s.MailFrom(from, mods(map[string]string{"auth_authen": login}))
+	if err != nil {
+		t.Fatalf("MailFrom: %v", err)
+	}
+	return resp
+}
+
+func TestRateLimitRefusesWhenDomainOverLimit(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 5}, // == max
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
+		t.Fatalf("over-limit MAIL FROM = %v, want TempFail (4xx)", resp)
+	}
+	if len(rec.rejected) != 1 || rec.rejected[0].Domain != "example.com" {
+		t.Fatalf("want one rejected send-log row for example.com, got %+v", rec.rejected)
+	}
+}
+
+func TestRateLimitRefusesWhenAppOverLimit(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeApp + "|app1": activeLimit(limitIP),
+		},
+		counts: map[string]int64{store.RateLimitScopeApp + "|app1": 9}, // over max
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
+		t.Fatalf("over app limit = %v, want TempFail", resp)
+	}
+}
+
+func TestRateLimitAllowsUnderLimit(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 4}, // < max
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("under limit = %v, want Continue", resp)
+	}
+	if len(rec.rejected) != 0 {
+		t.Fatalf("under limit must not record a rejection: %+v", rec.rejected)
+	}
+}
+
+func TestRateLimitIgnoresUnregisteredIP(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit("198.51.100.1"), // not limitIP
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
+	}
+	// The sender's IP is not in the domain's registered set, so level-2 does not
+	// apply even though the count is huge (level-1 anvil would still cover it).
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("unregistered IP = %v, want Continue (level-2 n/a)", resp)
+	}
+}
+
+func TestRateLimitInactiveWithoutCeiling(t *testing.T) {
+	rec := &fakeRecorder{
+		// IP registered but no ceiling/window: an inert draft, must not enforce.
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": {AllowedIPs: []string{limitIP}},
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("inactive limit = %v, want Continue", resp)
+	}
+}
+
+func TestRateLimitFailsOpenOnLookupError(t *testing.T) {
+	rec := &fakeRecorder{lookupErr: errors.New("db down")}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("lookup error = %v, want Continue (fail-open)", resp)
+	}
+}
+
+func TestRateLimitFailsOpenOnCountError(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+		},
+		countErr: errors.New("db down"),
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("count error = %v, want Continue (fail-open)", resp)
+	}
+}
+
+func TestRateLimitNoIPKeyDoesNotApply(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
+	}
+	// A session with no client IP (e.g. local submission) cannot be keyed.
+	s := &session{rec: rec}
+	resp, err := s.MailFrom("a@example.com", mods(map[string]string{"auth_authen": "app1"}))
+	if err != nil {
+		t.Fatalf("MailFrom: %v", err)
+	}
+	if resp != milter.RespContinue {
+		t.Fatalf("no-IP session = %v, want Continue", resp)
 	}
 }
 

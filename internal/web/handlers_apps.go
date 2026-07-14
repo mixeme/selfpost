@@ -27,6 +27,20 @@ type detailView struct {
 	FormMode  string
 	FormAddrs string
 	NewCred   *newCred
+	// RateLimitErr surfaces a validation error from a domain- or application-level
+	// rate-limit form (spec 7.4) as a page banner.
+	RateLimitErr string
+}
+
+// appRateLimitView pairs an application with its differentiated rate-limit
+// settings for the domain page. store.Application is embedded so the existing
+// template fields (Login, AddressMode, Addresses, ID) resolve unchanged.
+type appRateLimitView struct {
+	store.Application
+	HasLimit  bool   // an active limit is configured
+	IPsText   string // allowed IPs, newline-joined for the textarea
+	MaxText   string // message ceiling, blank when unset
+	WindowVal string // window seconds, defaulted when unset
 }
 
 // handleDomainDetail shows a single domain: its DKIM DNS record (spec 7.2.10)
@@ -56,21 +70,68 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	appViews := make([]appRateLimitView, 0, len(apps))
+	for _, a := range apps {
+		rl, ok, err := s.apps.RateLimit(a.ID)
+		if err != nil {
+			logf("panel: application %d: rate limit: %v", a.ID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		appViews = append(appViews, appRateLimitView{
+			Application: a,
+			HasLimit:    ok && rl.Active(),
+			IPsText:     strings.Join(rl.AllowedIPs, "\n"),
+			MaxText:     intOrBlank(rl.MaxMessages),
+			WindowVal:   windowOrDefault(rl.WindowSeconds),
+		})
+	}
+
+	domainRL, domainRLok, err := s.domains.RateLimit(d.ID)
+	if err != nil {
+		logf("panel: domain %d: rate limit: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	s.render(w, status, "domain_detail", map[string]any{
-		"Title":     "SelfPost — " + d.Name,
-		"User":      currentUser(r),
-		"Domain":    d,
-		"Record":    record,
-		"Apps":      apps,
-		"Error":     view.FormErr,
-		"FormLogin": view.FormLogin,
-		"FormMode":  view.FormMode,
-		"FormAddrs": view.FormAddrs,
-		"NewCred":   view.NewCred,
-		"Flash":     detailFlash(r),
-		"Wildcard":  store.AddressModeWildcard,
-		"List":      store.AddressModeList,
+		"Title":        "SelfPost — " + d.Name,
+		"User":         currentUser(r),
+		"Domain":       d,
+		"Record":       record,
+		"Apps":         appViews,
+		"Error":        view.FormErr,
+		"FormLogin":    view.FormLogin,
+		"FormMode":     view.FormMode,
+		"FormAddrs":    view.FormAddrs,
+		"NewCred":      view.NewCred,
+		"Flash":        detailFlash(r),
+		"Wildcard":     store.AddressModeWildcard,
+		"List":         store.AddressModeList,
+		"RateLimitErr": view.RateLimitErr,
+		"DomainHasRL":  domainRLok && domainRL.Active(),
+		"DomainRLIPs":  strings.Join(domainRL.AllowedIPs, "\n"),
+		"DomainRLMax":  intOrBlank(domainRL.MaxMessages),
+		"DomainRLWin":  windowOrDefault(domainRL.WindowSeconds),
 	})
+}
+
+// intOrBlank renders a non-positive number as an empty string so an unset field
+// shows blank rather than "0".
+func intOrBlank(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
+}
+
+// windowOrDefault renders the window seconds, substituting the default when
+// unset so the form always suggests a sensible value.
+func windowOrDefault(n int) string {
+	if n <= 0 {
+		return strconv.Itoa(defaultRateLimitWindowSeconds)
+	}
+	return strconv.Itoa(n)
 }
 
 // detailFlash maps a fixed redirect flag to a fixed message, so status text
@@ -81,6 +142,8 @@ func detailFlash(r *http.Request) string {
 		return "Application deleted."
 	case r.URL.Query().Get("modeupdated") != "":
 		return "Application address mode updated."
+	case r.URL.Query().Get("ratelimit") != "":
+		return "Rate limit updated."
 	default:
 		return ""
 	}

@@ -106,8 +106,10 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
 	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
 	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
+	authed.HandleFunc("POST /domains/{id}/ratelimit", s.handleDomainRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/mode", s.handleUpdateAppMode)
 	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
+	authed.HandleFunc("POST /applications/{aid}/ratelimit", s.handleAppRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
 	authed.HandleFunc("POST /reload", s.handleReload)
 

@@ -140,7 +140,36 @@ func (s *Service) Delete(id int64) error {
 	if err := s.sasl.Delete(a.Login); err != nil {
 		return err
 	}
+	// Drop the application's level-2 limit, if any (spec 7.4); rate_limits has no
+	// cascade of its own.
+	if err := s.store.DeleteRateLimit(store.RateLimitScopeApp, id); err != nil {
+		return err
+	}
 	return s.Resync()
+}
+
+// RateLimit returns the application-level differentiated rate limit (spec 7.4),
+// and whether one is configured, for the application's edit form.
+func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
+	return s.store.GetRateLimit(store.RateLimitScopeApp, appID)
+}
+
+// SaveRateLimit stores the application-level rate limit. The caller has validated
+// the IPs and numbers (spec 7.6.2); the milter reads the row live, so no reload
+// is needed.
+func (s *Service) SaveRateLimit(appID int64, ips []string, maxMessages, windowSeconds int) error {
+	return s.store.SetRateLimit(store.RateLimit{
+		Scope:         store.RateLimitScopeApp,
+		RefID:         appID,
+		AllowedIPs:    ips,
+		MaxMessages:   maxMessages,
+		WindowSeconds: windowSeconds,
+	})
+}
+
+// ClearRateLimit removes the application-level rate limit (spec 7.4).
+func (s *Service) ClearRateLimit(appID int64) error {
+	return s.store.DeleteRateLimit(store.RateLimitScopeApp, appID)
 }
 
 // PurgeDomainSASL removes the SASL accounts of every application bound to a
