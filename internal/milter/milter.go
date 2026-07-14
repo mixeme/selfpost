@@ -16,16 +16,22 @@ import (
 	"net"
 	"net/textproto"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-milter"
 
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
-// Recorder persists queued send-log entries. *store.Store satisfies it; tests
-// substitute a fake.
-type Recorder interface {
+// Store is the persistence the milter needs on the receive path: recording
+// accepted messages (spec 7.3) and, for level-2 rate limiting (spec 7.4),
+// looking up the configured limits and counting recent messages. *store.Store
+// satisfies it; tests substitute a fake.
+type Store interface {
 	InsertQueued(e store.SendLogEntry) error
+	InsertRejected(e store.SendLogEntry) error
+	RateLimit(scope, ref string) (store.RateLimit, bool, error)
+	CountMessages(scope, ref string, since time.Time) (int64, error)
 }
 
 // session accumulates the fields of one message as the milter callbacks fire.
@@ -37,7 +43,7 @@ type Recorder interface {
 // MailFrom (the start of every transaction).
 type session struct {
 	milter.NoOpMilter
-	rec Recorder
+	rec Store
 
 	clientIP string // captured once per connection
 
@@ -59,12 +65,20 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 
 // MailFrom starts a new message: reset per-message state, then capture the
 // envelope sender and the SASL login ({auth_authen}, carried by the MAIL-stage
-// macros).
+// macros). This is also the earliest stage where both the sending domain (from
+// the sender) and the application (the login) are known, so the level-2 rate
+// limit is enforced here: over the limit, the message is refused with a 4xx
+// tempfail before recipients are even offered (spec 7.4). Enforcement is
+// fail-open — see overLimit.
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
 	s.rcpts = nil
 	s.subject = ""
+	if s.overLimit() {
+		s.recordRejected()
+		return milter.RespTempFail, nil
+	}
 	return milter.RespContinue, nil
 }
 
@@ -152,7 +166,7 @@ func domainOf(addr string) string {
 
 // Serve runs the journal-milter on ln until ctx is cancelled. Each connection
 // gets a fresh session bound to rec. It returns nil on a clean shutdown.
-func Serve(ctx context.Context, ln net.Listener, rec Recorder) error {
+func Serve(ctx context.Context, ln net.Listener, rec Store) error {
 	srv := &milter.Server{
 		NewMilter: func() milter.Milter { return &session{rec: rec} },
 		Actions:   0,                // read-only: we make no message modifications

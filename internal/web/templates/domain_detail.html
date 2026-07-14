@@ -12,6 +12,7 @@
 <a class="back" href="/">&larr; All domains</a>
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
 
 {{if .NewCred}}
 <div class="card credential">
@@ -79,6 +80,25 @@
               <button type="submit">Save mode</button>
             </form>
           </details>
+          <details>
+            <summary>Rate limit{{if .HasLimit}} (active){{end}}</summary>
+            <form method="post" action="/applications/{{.ID}}/ratelimit">
+              <label>Expected client IPs (one per line or comma-separated)</label>
+              <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
+              <label>Message limit</label>
+              <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
+              <label>Window (seconds)</label>
+              <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
+              <button type="submit">Save limit</button>
+            </form>
+            {{if .HasLimit}}
+            <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
+                  onsubmit="return confirm('Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.')">
+              <input type="hidden" name="clear" value="1">
+              <button type="submit" class="danger">Remove limit</button>
+            </form>
+            {{end}}
+          </details>
           <form class="inline" method="post" action="/applications/{{.ID}}/password"
                 onsubmit="return confirm('Regenerate the password for {{.Login}}? The current password stops working immediately.')">
             <button type="submit">New password</button>
@@ -94,6 +114,41 @@
   </table>
   {{else}}
   <p class="muted">No applications yet. Create one below.</p>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2>Sending rate limit (domain)</h2>
+  <p class="muted">Optional level-2 limit (spec 7.4): cap how many messages this
+  domain may send from its expected client IP(s) within a time window, summed
+  across all its applications. It counts messages — one message to many
+  recipients counts once. Leave the IP list empty to disable it and rely only on
+  the global level-1 limit. Applications that send from changing IPs should be
+  left unbound here.</p>
+
+  <p class="muted">Status:
+    {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive (level-1 only){{end}}.</p>
+
+  <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
+    <label for="d_ips">Expected client IPs (one per line or comma-separated)</label>
+    <textarea id="d_ips" name="allowed_ips" rows="2"
+              placeholder="203.0.113.10">{{.DomainRLIPs}}</textarea>
+
+    <label for="d_max">Message limit</label>
+    <input id="d_max" name="max_messages" type="number" min="1"
+           value="{{.DomainRLMax}}" placeholder="1000">
+
+    <label for="d_win">Window (seconds)</label>
+    <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+
+    <button type="submit">Save limit</button>
+  </form>
+  {{if .DomainHasRL}}
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
+        onsubmit="return confirm('Remove the domain rate limit? Only the global level-1 limit will apply.')">
+    <input type="hidden" name="clear" value="1">
+    <button type="submit" class="danger">Remove limit</button>
+  </form>
   {{end}}
 </div>
 

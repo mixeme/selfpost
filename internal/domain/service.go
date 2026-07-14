@@ -100,6 +100,12 @@ func (s *Service) Delete(id int64) error {
 	if err := s.apps.PurgeDomainSASL(id); err != nil {
 		return fmt.Errorf("clear SASL accounts for %s: %w", d.Name, err)
 	}
+	// Drop the domain's own level-2 limit and those of its applications while the
+	// application rows still exist (the cleanup query joins them). rate_limits has
+	// no cascade of its own (ref_id is a plain integer, spec 7.4/9).
+	if err := s.store.DeleteRateLimitsForDomain(id); err != nil {
+		return fmt.Errorf("clear rate limits for %s: %w", d.Name, err)
+	}
 	if err := s.store.DeleteDomain(id); err != nil {
 		return err
 	}
@@ -120,6 +126,31 @@ func (s *Service) Delete(id int64) error {
 // DKIMRecord returns the DNS TXT record to publish for a domain (spec 7.2.10).
 func (s *Service) DKIMRecord(d store.Domain) (DKIMRecord, error) {
 	return s.odk.Record(d.Name, d.DKIMSelector)
+}
+
+// RateLimit returns the domain-level differentiated rate limit (spec 7.4), and
+// whether one is configured, for the domain's edit form.
+func (s *Service) RateLimit(domainID int64) (store.RateLimit, bool, error) {
+	return s.store.GetRateLimit(store.RateLimitScopeDomain, domainID)
+}
+
+// SaveRateLimit stores the domain-level rate limit. The caller has validated the
+// IPs and numbers (spec 7.6.2); the milter reads the row live, so no reload is
+// needed.
+func (s *Service) SaveRateLimit(domainID int64, ips []string, maxMessages, windowSeconds int) error {
+	return s.store.SetRateLimit(store.RateLimit{
+		Scope:         store.RateLimitScopeDomain,
+		RefID:         domainID,
+		AllowedIPs:    ips,
+		MaxMessages:   maxMessages,
+		WindowSeconds: windowSeconds,
+	})
+}
+
+// ClearRateLimit removes the domain-level rate limit, falling back to level 1
+// only (spec 7.4).
+func (s *Service) ClearRateLimit(domainID int64) error {
+	return s.store.DeleteRateLimit(store.RateLimitScopeDomain, domainID)
 }
 
 // Resync regenerates the OpenDKIM tables from the registry and reloads OpenDKIM.
