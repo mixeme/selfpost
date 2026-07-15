@@ -1,0 +1,55 @@
+
+# Alternative reverse-proxy: nginx (spec 10.3). PEM files land on the host
+# exactly like the Apache+certbot scenario — nginx and certbot are close
+# cousins here, both writing/reading plain PEM under /etc/letsencrypt.
+#
+# This is a FRAGMENT, not a full replacement for ../docker-compose.yml: it
+# adds an nginx + certbot pair and removes the panel's host port publish (nginx
+# takes over 80/443 and proxies to the panel over the compose network
+# instead). Merge it with the base file — run this from the deploy/ directory
+# (Compose resolves every relative path in both files against the directory of
+# the FIRST -f file, i.e. deploy/, which is why paths below are ./nginx/...):
+#
+#   docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
+#
+# First-run certificate issuance (webroot method, before nginx has a cert to
+# serve — run once):
+#   docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
+#     run --rm certbot certonly --webroot -w /var/www/certbot \
+#     -d mail.example.com --email you@example.com --agree-tos --no-eff-email
+
+services:
+  selfpost:
+    ports: !override
+      - "465:465"
+      - "587:587"
+      # No host publish for 8080 here: nginx reaches it over the compose
+      # network at selfpost:8080 instead (see nginx.conf.example).
+    volumes: !override
+      - ./data:/data
+      # Same host directory certbot below writes into — plain bind mount,
+      # no named volume, so the PEM files are as directly inspectable as in
+      # the Apache scenario (spec 10.3).
+      - ./nginx/certbot-etc/live/mail.example.com:/etc/postfix/tls:ro
+
+  nginx:
+    image: nginx:1.27
+    restart: unless-stopped
+    depends_on:
+      - selfpost
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf.example:/etc/nginx/conf.d/selfpost.conf:ro
+      - ./nginx/certbot-etc:/etc/letsencrypt:ro
+      - ./nginx/certbot-www:/var/www/certbot:ro
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./nginx/certbot-etc:/etc/letsencrypt
+      - ./nginx/certbot-www:/var/www/certbot
+    # Renewal twice a day is certbot's own recommended cadence; it no-ops
+    # until a certificate is within its renewal window.
+    entrypoint: sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'

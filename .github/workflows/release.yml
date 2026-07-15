@@ -1,0 +1,47 @@
+name: release
+
+# Publishes an immutable, version-tagged image on ghcr.io (spec 10.1).
+# Ordinary commits do not publish anything — only a pushed tag matching
+# vX.Y.Z does. That tag is the single source the version comes from: it goes
+# into both the image tag and the panel binary's -ldflags version, so the two
+# can never drift apart (the invariant restore's version check in spec 7.5.A
+# depends on).
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}

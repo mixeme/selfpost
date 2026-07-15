@@ -76,15 +76,17 @@ COPY --from=build /out/panel /usr/local/bin/panel
 COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 
 COPY build/opendkim.conf /etc/opendkim.conf
+COPY build/logrotate-mail.conf /etc/logrotate.d/mail
 COPY build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
 COPY build/postfix-config.sh /usr/local/bin/postfix-config.sh
 COPY build/postfix-cert-reload.sh /usr/local/bin/postfix-cert-reload.sh
+COPY build/logrotate-loop.sh /usr/local/bin/logrotate-loop.sh
 COPY build/crashexit.py /usr/local/bin/crashexit.py
 COPY build/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY build/supervisord.conf /etc/supervisor/supervisord.conf
 RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/postfix-config.sh \
-      /usr/local/bin/postfix-cert-reload.sh /usr/local/bin/crashexit.py \
-      /usr/local/bin/entrypoint.sh
+      /usr/local/bin/postfix-cert-reload.sh /usr/local/bin/logrotate-loop.sh \
+      /usr/local/bin/crashexit.py /usr/local/bin/entrypoint.sh
 
 # Published submission ports: 465 (smtps, primary) and 587 (submission, optional)
 # plus the panel on 8080. Outbound delivery dials remote MXs on 25 as a client,
