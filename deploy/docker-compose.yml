@@ -65,9 +65,19 @@ services:
     # `user: panel` or a fully read-only rootfs without breaking that startup
     # self-healing. What IS applied: no privilege escalation past what the
     # image already grants, and every Linux capability dropped except the
-    # small set Postfix/OpenDKIM genuinely need (binding <1024, chown/setuid
-    # during startup, and DAC overrides for cross-user file access within the
-    # shared group).
+    # small set the root startup phase and Postfix/OpenDKIM genuinely need:
+    #   - NET_BIND_SERVICE — bind 465/587 (and 25 outbound) below 1024;
+    #   - CHOWN            — entrypoint re-owns /data (bind mount) to `panel`;
+    #   - FOWNER           — entrypoint then chmods those now panel-owned /data
+    #                        dirs/files while still root (owner-check bypass);
+    #   - FSETID           — set the setgid bit (2750) on the shared /data dirs
+    #                        when the process gid differs from the dir's group;
+    #   - SETUID/SETGID    — supervisord drops the panel to the unprivileged
+    #                        `panel` user; Postfix switches to its own users;
+    #   - DAC_OVERRIDE     — cross-user file access within the `selfpost` group.
+    # FOWNER/FSETID are required by build/entrypoint.sh's permission
+    # self-healing; without them chmod fails with EPERM and the container
+    # crash-loops on start.
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -75,6 +85,8 @@ services:
     cap_add:
       - NET_BIND_SERVICE
       - CHOWN
+      - FOWNER
+      - FSETID
       - SETUID
       - SETGID
       - DAC_OVERRIDE
