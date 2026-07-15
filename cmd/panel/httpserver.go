@@ -26,12 +26,13 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), apps, cfg.dkimSelectorDef)
 
 	srvApp, err := web.New(st, domains, apps, web.Config{
-		Hostname:     cfg.hostname,
-		CookieSecure: cfg.cookieSecure,
-		MailLogPath:  cfg.mailLog,
-		DataDir:      cfg.dataDir,
-		DBPath:       cfg.dbPath,
-		Version:      buildinfo.Version,
+		Hostname:          cfg.hostname,
+		CookieSecure:      cfg.cookieSecure,
+		MailLogPath:       cfg.mailLog,
+		DataDir:           cfg.dataDir,
+		DBPath:            cfg.dbPath,
+		Version:           buildinfo.Version,
+		TrustedProxyCIDRs: cfg.trustedProxies,
 	}, cfg.setupTokenPath)
 	if err != nil {
 		return err

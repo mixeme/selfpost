@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"codeberg.org/mix/selfpost/internal/app"
@@ -37,6 +38,12 @@ type Config struct {
 	DataDir string
 	DBPath  string
 	Version string
+	// TrustedProxyCIDRs are the reverse-proxy addresses allowed to supply
+	// X-Forwarded-For (plan.md item A.1: TRUSTED_PROXY_CIDR). A request whose
+	// direct peer (RemoteAddr) is not in this list never has its XFF header
+	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
+	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
+	TrustedProxyCIDRs []*net.IPNet
 }
 
 // Server is the panel HTTP application.
@@ -51,6 +58,8 @@ type Server struct {
 
 	loginLimiter *rateLimiter
 	setupLimiter *rateLimiter
+
+	trustedProxies []*net.IPNet
 }
 
 // New builds the panel server. setupTokenPath is where the current setup token
@@ -74,6 +83,8 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		setupLimiter: newRateLimiter(10, time.Minute),
 		// Login: throttle brute-force by IP (spec 7.6.5).
 		loginLimiter: newRateLimiter(10, 15*time.Minute),
+
+		trustedProxies: cfg.TrustedProxyCIDRs,
 	}
 	s.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
 	return s, nil
@@ -144,16 +155,40 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ok\n"))
 }
 
-// clientIP extracts the peer IP for rate-limiting. It uses the transport peer
-// (RemoteAddr), not client-supplied headers, so it cannot be spoofed; behind a
-// reverse proxy this is the proxy address, which is an acceptable backstop for
-// a single-admin panel.
-func clientIP(r *http.Request) string {
+// clientIP extracts the peer IP for rate-limiting. By default it is the
+// transport peer (RemoteAddr), which cannot be spoofed. If RemoteAddr matches
+// one of trustedProxies, the last entry of X-Forwarded-For is used instead —
+// that is the address the trusted proxy itself appended, so a client can't
+// forge it by sending its own XFF header (plan.md item A.1). With no trusted
+// proxies configured, behind a reverse proxy this is the proxy's own address,
+// which is an acceptable backstop for a single-admin panel.
+func clientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
 	}
+
+	if len(trustedProxies) > 0 {
+		if peer := net.ParseIP(host); peer != nil && ipInAny(peer, trustedProxies) {
+			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+				parts := strings.Split(xff, ",")
+				if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+					return ip.String()
+				}
+			}
+		}
+	}
+
 	return host
+}
+
+func ipInAny(ip net.IP, nets []*net.IPNet) bool {
+	for _, n := range nets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // logf is a thin wrapper so handlers log with a consistent prefix.

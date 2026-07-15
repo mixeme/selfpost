@@ -50,7 +50,7 @@ func (s *Server) renderLogin(w http.ResponseWriter, status int, formErr string) 
 
 func (s *Server) submitLogin(w http.ResponseWriter, r *http.Request) {
 	// Brute-force throttle by client IP (spec 7.6.5).
-	if !s.loginLimiter.Allow(clientIP(r)) {
+	if !s.loginLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		s.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return
 	}

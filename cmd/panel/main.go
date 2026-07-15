@@ -12,10 +12,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -56,6 +58,7 @@ type config struct {
 	setupTokenPath string
 	hostname       string
 	cookieSecure   bool
+	trustedProxies []*net.IPNet
 
 	opendkimDir     string
 	dkimSelectorDef string
@@ -83,6 +86,11 @@ func loadConfig() config {
 		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
 		// development-only escape hatch for testing over plain HTTP.
 		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",
+		// Reverse-proxy addresses allowed to supply X-Forwarded-For for
+		// rate-limiting (plan.md item A.1). Empty by default: an untrusted peer's
+		// XFF header is trivially forgeable, so it's ignored unless the panel is
+		// told which proxy to trust.
+		trustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDR")),
 
 		// Per-domain DKIM state (spec 6). The directory layout matches what
 		// entrypoint.sh prepares (setgid, shared `selfpost` group).
@@ -129,6 +137,37 @@ func envInt(key string, def int) int {
 		log.Printf("ignoring invalid %s=%q, using %d", key, v, def)
 	}
 	return def
+}
+
+// parseTrustedProxies parses a comma-separated list of CIDRs (bare IPs are
+// accepted and treated as /32 or /128). Invalid entries are logged and
+// skipped rather than failing startup, matching envInt's tolerance of
+// misconfiguration.
+func parseTrustedProxies(raw string) []*net.IPNet {
+	if raw == "" {
+		return nil
+	}
+	var nets []*net.IPNet
+	for _, part := range strings.Split(raw, ",") {
+		cidr := strings.TrimSpace(part)
+		if cidr == "" {
+			continue
+		}
+		if !strings.Contains(cidr, "/") {
+			if ip := net.ParseIP(cidr); ip != nil && ip.To4() != nil {
+				cidr += "/32"
+			} else {
+				cidr += "/128"
+			}
+		}
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Printf("ignoring invalid TRUSTED_PROXY_CIDR entry %q: %v", part, err)
+			continue
+		}
+		nets = append(nets, n)
+	}
+	return nets
 }
 
 // run starts the panel's three roles and blocks until a shutdown signal or the
