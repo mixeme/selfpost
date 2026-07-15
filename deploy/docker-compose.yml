@@ -75,6 +75,12 @@ services:
     #   - SETUID/SETGID    — supervisord drops the panel to the unprivileged
     #                        `panel` user; Postfix switches to its own users;
     #   - DAC_OVERRIDE     — cross-user file access within the `selfpost` group.
+    #   - KILL             — supervisord (root) sends SIGUSR1 to opendkim (a
+    #                        different uid) on domain add/remove to reload its
+    #                        KeyTable/SigningTable; without it os.kill() fails
+    #                        with EPERM even though the caller is root, because
+    #                        the kernel's signal permission check for
+    #                        cross-uid kill() still consults CAP_KILL.
     # FOWNER/FSETID are required by build/entrypoint.sh's permission
     # self-healing; without them chmod fails with EPERM and the container
     # crash-loops on start.
@@ -90,3 +96,4 @@ services:
       - SETUID
       - SETGID
       - DAC_OVERRIDE
+      - KILL
