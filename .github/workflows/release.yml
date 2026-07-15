@@ -44,4 +44,5 @@ jobs:
           build-args: |
             VERSION=${{ steps.version.outputs.version }}
           push: true
+          provenance: false
           tags: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
