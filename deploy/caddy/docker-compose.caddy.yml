@@ -1,0 +1,49 @@
+
+# Alternative reverse-proxy: Caddy (spec 10.3) — the simplest option, fully
+# automatic ACME with no separate certbot container. Caddy writes certificates
+# as plain PEM under its own data directory, which this fragment bind-mounts
+# to the host so SelfPost can read the same files.
+#
+# NOTE (spec 10.3 explicitly flags this): Caddy's on-disk cert path includes
+# the ACME CA's name as a path segment, e.g.
+#   <data>/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>/<hostname>.crt
+# This has been stable across recent Caddy releases but is an internal
+# storage detail, not a documented public API — VERIFY the exact path against
+# the Caddy version you deploy (`docker compose exec caddy find /data/caddy/certificates -name '*.crt'`)
+# before wiring it into the volume mount below.
+#
+# Merge with the base file — run this from the deploy/ directory (Compose
+# resolves every relative path in both files against the directory of the
+# FIRST -f file, i.e. deploy/, which is why paths below are ./caddy/...):
+#
+#   docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
+
+services:
+  selfpost:
+    ports: !override
+      - "465:465"
+      - "587:587"
+    environment:
+      # Caddy names certificate files after the hostname, not
+      # fullchain.pem/privkey.pem like certbot — override the base file's
+      # paths to match.
+      TLS_CERT_FILE: /etc/postfix/tls/<hostname>.crt
+      TLS_KEY_FILE: /etc/postfix/tls/<hostname>.key
+    volumes: !override
+      - ./data:/data
+      # Replace <hostname> with your actual mail/panel hostname, matching
+      # the Caddyfile below and SELFPOST_HOSTNAME.
+      - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>:/etc/postfix/tls:ro
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - selfpost
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/caddy-data:/data
+      - ./caddy/caddy-config:/config

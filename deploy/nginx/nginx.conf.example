@@ -1,0 +1,32 @@
+# nginx vhost for the SelfPost panel (spec 10.3). Proxies HTTPS to the panel
+# over the compose network; mail (465/587) is published directly by the
+# selfpost container and never touches nginx.
+
+server {
+	listen 80;
+	server_name mail.example.com;
+
+	location /.well-known/acme-challenge/ {
+		root /var/www/certbot;
+	}
+
+	location / {
+		return 301 https://$host$request_uri;
+	}
+}
+
+server {
+	listen 443 ssl;
+	http2 on;
+	server_name mail.example.com;
+
+	ssl_certificate     /etc/letsencrypt/live/mail.example.com/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/mail.example.com/privkey.pem;
+
+	location / {
+		proxy_pass http://selfpost:8080;
+		proxy_set_header Host $host;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	}
+}
