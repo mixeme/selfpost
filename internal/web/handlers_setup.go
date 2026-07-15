@@ -13,7 +13,7 @@ import (
 // page, also 404.
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	// Route-specific rate limit, separate from login (spec 7.6.1).
-	if !s.setupLimiter.Allow(clientIP(r)) {
+	if !s.setupLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}

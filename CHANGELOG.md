@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - ci: disable provenance attestation on release image push, so the ghcr.io
   manifest list shows only `linux/amd64`/`linux/arm64` (no `unknown/unknown`).
+- security: optionally honour `X-Forwarded-For` for login/setup rate-limiting
+  when the request's direct peer is in the new `TRUSTED_PROXY_CIDR` list,
+  giving real per-client limits behind a reverse proxy instead of one global
+  bucket. Unset by default (unchanged `RemoteAddr`-only behaviour).
 
 ## [0.1.0] - 2026-07-15
 
