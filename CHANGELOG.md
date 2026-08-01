@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: security headers on every response — `Content-Security-Policy`,
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and
+  `Strict-Transport-Security` where the deployment is HTTPS-only. They are
+  emitted by the panel itself, so the reverse proxy still needs no security
+  configuration of its own.
+- panel: state-changing requests are now checked against the panel's own
+  origin (`Sec-Fetch-Site`, falling back to `Origin` vs `Host`). This closes
+  cross-site request forgery from a *neighbouring host on the same domain* —
+  a CMS or a forgotten staging subdomain next to the panel — which the session
+  cookie's `SameSite=Lax` counts as same-site and therefore cannot stop. A
+  request that sends neither header is still let through, so genuinely ancient
+  browsers keep working. **The reverse proxy must pass the original `Host`
+  header through** (every shipped fragment already does); one that rewrites it
+  makes the panel refuse every form submission, and the log line names both
+  the `Origin` and the `Host` it compared.
+- panel: the session cookie is now named `__Host-selfpost_session` wherever it
+  is `Secure` (the standard deployment), which makes the browser enforce that
+  no other host can set or overwrite it. **Upgrading signs the administrator
+  out once.** With `PANEL_COOKIE_SECURE=false` the old name is kept, because
+  the prefix is invalid without TLS. Signing out clears both names.
+- panel: if a request arrives with two cookies of the session cookie's name —
+  what a neighbouring host does when it overwrites the session — the request
+  counts as signed out and the log says so, instead of the panel silently
+  picking the other host's value and looping back to the login form forever.
+- panel: the layout's stylesheet moved to `/static/panel.css` and the
+  confirmation prompts on destructive buttons moved into `/static/panel.js`.
+  No visible change; the panel's CSP allows no inline script or style, and
+  this is what keeps that policy free of exemptions.
+- docs: the first-run setup link is also written to `/data/setup-token`
+  (`0600`) — documented in the README as the way to read it without the token
+  passing through a container-log pipeline.
 - panel: new **Status** page — supervised processes, mail queue, TLS
   certificate expiry, milter sockets and the server's own hostname/reverse-DNS
   (FCrDNS) check — and it is now the panel's landing page. The local checks
