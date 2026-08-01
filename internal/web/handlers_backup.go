@@ -17,6 +17,24 @@ import (
 // room while refusing anything large enough to be an abuse attempt.
 const maxImportBytes = 1 << 20 // 1 MiB
 
+// handleBackupPage renders the backup/migration screen: the full-server backup
+// and the domain import are separate actions with different risk, so each gets
+// its own card here rather than sharing a block on the domain list.
+func (s *Server) handleBackupPage(w http.ResponseWriter, r *http.Request) {
+	s.renderBackupPage(w, r, http.StatusOK, "")
+}
+
+// renderBackupPage draws the page; importErr surfaces a failed domain import
+// (spec 7.5.B) next to the form that produced it.
+func (s *Server) renderBackupPage(w http.ResponseWriter, r *http.Request, status int, importErr string) {
+	s.render(w, status, "backup", map[string]any{
+		"Title":     "SelfPost — backup",
+		"User":      currentUser(r),
+		"Active":    "backup",
+		"ImportErr": importErr,
+	})
+}
+
 // handleBackup streams a full-server backup as a download (spec 7.5.A). It is an
 // authenticated admin action (this handler sits behind the auth middleware). The
 // archive carries DKIM private keys, the admin password hash and SASL
@@ -75,17 +93,17 @@ func (s *Server) handleExportDomain(w http.ResponseWriter, r *http.Request) {
 // domain on this instance (spec 7.5.B). The domain name is normalised and
 // validated here (spec 7.6.2); the domain service validates the selector, each
 // login and address, and the DKIM key before writing anything. On success it
-// redirects to the new domain's page; on failure it re-renders the dashboard
-// with a friendly message.
+// redirects to the new domain's page; on failure it re-renders the backup page,
+// where the import form lives, with a friendly message.
 func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	if err := r.ParseMultipartForm(maxImportBytes); err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, "", "", "Could not read the uploaded file (too large or not a valid upload).")
+		s.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file (too large or not a valid upload).")
 		return
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, "", "", "Choose a domain export file to import.")
+		s.renderBackupPage(w, r, http.StatusBadRequest, "Choose a domain export file to import.")
 		return
 	}
 	defer file.Close()
@@ -94,7 +112,7 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(file)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&exp); err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, "", "", "That file is not a valid SelfPost domain export.")
+		s.renderBackupPage(w, r, http.StatusBadRequest, "That file is not a valid SelfPost domain export.")
 		return
 	}
 
@@ -102,7 +120,7 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	// same gate the add-domain form uses (spec 7.6.2).
 	exp.Domain = normalizeDomain(exp.Domain)
 	if err := validateDomain(exp.Domain); err != nil {
-		s.renderDashboard(w, r, http.StatusBadRequest, "", "", "Invalid domain in export file: "+err.Error())
+		s.renderBackupPage(w, r, http.StatusBadRequest, "Invalid domain in export file: "+err.Error())
 		return
 	}
 
@@ -110,7 +128,7 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logf("panel: import domain %q: %v", exp.Domain, err)
 		status, msg := importErrorMessage(err)
-		s.renderDashboard(w, r, status, "", "", msg)
+		s.renderBackupPage(w, r, status, msg)
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?imported=1", d.ID), http.StatusSeeOther)

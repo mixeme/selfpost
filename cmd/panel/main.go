@@ -52,13 +52,14 @@ type config struct {
 	mailLog       string
 	retentionDays int
 
-	dataDir        string
-	dbPath         string
-	manifestPath   string
-	setupTokenPath string
-	hostname       string
-	cookieSecure   bool
-	trustedProxies []*net.IPNet
+	dataDir           string
+	dbPath            string
+	manifestPath      string
+	setupTokenPath    string
+	hostname          string
+	cookieSecure      bool
+	submissionEnabled bool
+	trustedProxies    []*net.IPNet
 
 	opendkimDir     string
 	dkimSelectorDef string
@@ -86,6 +87,10 @@ func loadConfig() config {
 		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
 		// development-only escape hatch for testing over plain HTTP.
 		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",
+		// Whether this deployment also runs the 587 submission listener. The
+		// panel only displays it as a client connection setting; the comparison
+		// matches postfix-config.sh, which enables the listener on "true" alone.
+		submissionEnabled: os.Getenv("SUBMISSION_ENABLE") == "true",
 		// Reverse-proxy addresses allowed to supply X-Forwarded-For for
 		// rate-limiting (plan.md item A.1). Empty by default: an untrusted peer's
 		// XFF header is trivially forgeable, so it's ignored unless the panel is

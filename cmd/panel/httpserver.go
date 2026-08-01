@@ -28,6 +28,7 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	srvApp, err := web.New(st, domains, apps, web.Config{
 		Hostname:          cfg.hostname,
 		CookieSecure:      cfg.cookieSecure,
+		SubmissionEnabled: cfg.submissionEnabled,
 		MailLogPath:       cfg.mailLog,
 		DataDir:           cfg.dataDir,
 		DBPath:            cfg.dbPath,

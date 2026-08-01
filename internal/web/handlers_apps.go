@@ -95,24 +95,30 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	}
 
 	s.render(w, status, "domain_detail", map[string]any{
-		"Title":        "SelfPost — " + d.Name,
-		"User":         currentUser(r),
-		"Domain":       d,
-		"Record":       record,
-		"Apps":         appViews,
-		"Error":        view.FormErr,
-		"FormLogin":    view.FormLogin,
-		"FormMode":     view.FormMode,
-		"FormAddrs":    view.FormAddrs,
-		"NewCred":      view.NewCred,
-		"Flash":        detailFlash(r),
-		"Wildcard":     store.AddressModeWildcard,
-		"List":         store.AddressModeList,
-		"RateLimitErr": view.RateLimitErr,
-		"DomainHasRL":  domainRLok && domainRL.Active(),
-		"DomainRLIPs":  strings.Join(domainRL.AllowedIPs, "\n"),
-		"DomainRLMax":  intOrBlank(domainRL.MaxMessages),
-		"DomainRLWin":  windowOrDefault(domainRL.WindowSeconds),
+		"Title":  "SelfPost — " + d.Name,
+		"User":   currentUser(r),
+		"Active": "domains",
+		"Domain": d,
+		"Record": record,
+		// Client connection settings (the same for every domain on this
+		// instance): the hostname clients connect to, and whether the optional
+		// submission listener is enabled in this deployment.
+		"Hostname":          s.cfg.Hostname,
+		"SubmissionEnabled": s.cfg.SubmissionEnabled,
+		"Apps":              appViews,
+		"Error":             view.FormErr,
+		"FormLogin":         view.FormLogin,
+		"FormMode":          view.FormMode,
+		"FormAddrs":         view.FormAddrs,
+		"NewCred":           view.NewCred,
+		"Flash":             detailFlash(r),
+		"Wildcard":          store.AddressModeWildcard,
+		"List":              store.AddressModeList,
+		"RateLimitErr":      view.RateLimitErr,
+		"DomainHasRL":       domainRLok && domainRL.Active(),
+		"DomainRLIPs":       strings.Join(domainRL.AllowedIPs, "\n"),
+		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),
+		"DomainRLWin":       windowOrDefault(domainRL.WindowSeconds),
 	})
 }
 

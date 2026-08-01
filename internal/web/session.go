@@ -54,6 +54,32 @@ func (s *sessionStore) Lookup(token string) (string, bool) {
 	return sess.username, true
 }
 
+// Rename updates the username carried by a session, keeping its expiry. It is
+// used when the administrator renames their own account so the current session
+// keeps working under the new name.
+func (s *sessionStore) Rename(token, username string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sess, ok := s.sessions[token]; ok {
+		sess.username = username
+		s.sessions[token] = sess
+	}
+}
+
+// DestroyOthers invalidates every session except keep. It is called when the
+// administrator changes their password: a stolen cookie issued under the old
+// password must stop working, while the admin performing the change stays
+// signed in.
+func (s *sessionStore) DestroyOthers(keep string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for token := range s.sessions {
+		if token != keep {
+			delete(s.sessions, token)
+		}
+	}
+}
+
 // Destroy invalidates a session token (logout).
 func (s *sessionStore) Destroy(token string) {
 	s.mu.Lock()

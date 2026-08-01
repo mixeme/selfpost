@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: navigation bar is now rendered once from the shared layout, so every
+  authenticated page has it — including the domain page and the delete
+  confirmation, which had no navigation links at all — and the current page is
+  highlighted instead of silently missing from the list.
+- panel: new *Account* page to change the administrator's username and/or
+  password (the current password is required, throttled on the same limiter as
+  the login form). Changing the password invalidates all other sessions.
+- panel: *Backup & migration* moved off the domain list onto its own *Backup*
+  page, with the full backup and the domain import as two separate cards.
+- panel: the domain page now shows the *Sending server settings* (server,
+  port and encryption) needed to configure a mail client; port 587 is listed
+  only when `SUBMISSION_ENABLE=true` for this deployment.
+- panel: *Copy* buttons on the DKIM record, on a newly issued application
+  login/password and on the sending server name.
+- panel: the *Addresses* field is hidden while an application's address mode is
+  *Any address of the domain*, where the server ignores it.
 - ci: disable provenance attestation on release image push, so the ghcr.io
   manifest list shows only `linux/amd64`/`linux/arm64` (no `unknown/unknown`).
 - security: optionally honour `X-Forwarded-For` for login/setup rate-limiting

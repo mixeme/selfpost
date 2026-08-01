@@ -26,6 +26,8 @@ var pageFiles = map[string][]string{
 	"setup":         {"templates/setup.html"},
 	"login":         {"templates/login.html"},
 	"dashboard":     {"templates/dashboard.html"},
+	"account":       {"templates/account.html"},
+	"backup":        {"templates/backup.html"},
 	"domain_detail": {"templates/domain_detail.html"},
 	"domain_delete": {"templates/domain_delete.html"},
 	"sendlog":       {"templates/sendlog.html", "templates/sendlog_rows.html"},
@@ -71,6 +73,14 @@ func (s *Server) render(w http.ResponseWriter, status int, page string, data any
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
+	}
+	// The layout's navigation compares .Active against each item, so the key
+	// must exist on every authenticated page. Defaulting it here keeps a page
+	// that forgets it from failing to render — it simply highlights nothing.
+	if m, ok := data.(map[string]any); ok {
+		if _, has := m["Active"]; !has {
+			m["Active"] = ""
+		}
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {

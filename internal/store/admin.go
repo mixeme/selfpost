@@ -42,6 +42,29 @@ func (s *Store) CreateAdmin(username, passwordHash string) error {
 	return nil
 }
 
+// UpdateAdmin replaces the administrator's username and password hash. It
+// touches only the admin row (id = 1): panel credentials are unrelated to the
+// SASL logins applications authenticate with, which live in their own table.
+// ErrNoAdmin is returned if setup has not happened yet, so a change can never
+// silently create an account.
+func (s *Store) UpdateAdmin(username, passwordHash string) error {
+	res, err := s.db.Exec(
+		"UPDATE admin SET username = ?, password_hash = ? WHERE id = 1",
+		username, passwordHash,
+	)
+	if err != nil {
+		return fmt.Errorf("update admin: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update admin: %w", err)
+	}
+	if n == 0 {
+		return ErrNoAdmin
+	}
+	return nil
+}
+
 // GetAdmin returns the administrator account, or ErrNoAdmin if setup is pending.
 func (s *Store) GetAdmin() (Admin, error) {
 	var (
