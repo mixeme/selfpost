@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/fs"
 	"path"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +95,53 @@ func TestReloadFormLivesOnlyOnTheStatusPage(t *testing.T) {
 			t.Errorf("%s still posts to /reload; the reload control belongs on the status page", name)
 		}
 	})
+}
+
+// The panel's Content-Security-Policy is a plain default-src 'self' with no
+// inline exemption (phase 14.A), which makes inline script and inline style a
+// failure mode rather than a style question: an onclick= handler or a
+// style="..." attribute added to a template does not error, it silently stops
+// working in the browser. Behaviour belongs in static/panel.js (triggered from
+// a data- attribute), appearance in static/panel.css.
+func TestNoTemplateUsesInlineScriptOrStyle(t *testing.T) {
+	inlineHandler := regexp.MustCompile(`\son[a-z]+\s*=`)
+	inlineStyle := regexp.MustCompile(`\sstyle\s*=|<style[\s>]`)
+	scriptTag := regexp.MustCompile(`<script[^>]*>`)
+
+	forEachTemplate(t, func(name, body string) {
+		if m := inlineHandler.FindString(body); m != "" {
+			t.Errorf("%s has an inline event handler (%q); the CSP blocks it — move the behaviour into static/panel.js",
+				name, strings.TrimSpace(m))
+		}
+		if m := inlineStyle.FindString(body); m != "" {
+			t.Errorf("%s has an inline style (%q); the CSP blocks it — move the rule into static/panel.css",
+				name, strings.TrimSpace(m))
+		}
+		for _, tag := range scriptTag.FindAllString(body, -1) {
+			if !strings.Contains(tag, "src=") {
+				t.Errorf("%s has an inline script (%q); the CSP blocks it — put the code in static/panel.js", name, tag)
+			}
+		}
+	})
+}
+
+// default-src 'self' also means every asset a page pulls in must be one this
+// server actually serves, so a typo in a /static path is a blocked request,
+// not a 404 in the page's own colours.
+func TestLayoutReferencesOnlyEmbeddedAssets(t *testing.T) {
+	body, err := fs.ReadFile(assetsFS, "templates/layout.html")
+	if err != nil {
+		t.Fatalf("read layout: %v", err)
+	}
+	refs := regexp.MustCompile(`(?:src|href)="/static/([^"]+)"`).FindAllStringSubmatch(string(body), -1)
+	if len(refs) == 0 {
+		t.Fatal("the layout references no static assets at all")
+	}
+	for _, m := range refs {
+		if _, err := fs.Stat(assetsFS, "static/"+m[1]); err != nil {
+			t.Errorf("layout references /static/%s, which is not embedded: %v", m[1], err)
+		}
+	}
 }
 
 func TestStatusPageRendersEveryCheck(t *testing.T) {

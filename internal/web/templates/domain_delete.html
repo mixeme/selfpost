@@ -18,7 +18,7 @@
   invalid; remove it from DNS if you do not plan to re-add the domain.</p>
 
   <form method="post" action="/domains/{{.Domain.ID}}/delete">
-    <button type="submit" style="background:#b42318">Delete {{.Domain.Name}}</button>
+    <button type="submit" class="danger">Delete {{.Domain.Name}}</button>
   </form>
 </div>
 {{end}}
