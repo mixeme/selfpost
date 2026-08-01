@@ -28,6 +28,11 @@ type Config struct {
 	// to true (spec 7.6.6); it exists as a knob only so the panel can be tested
 	// over plain HTTP in development, never for production.
 	CookieSecure bool
+	// SubmissionEnabled mirrors SUBMISSION_ENABLE: whether this deployment also
+	// runs the 587/STARTTLS submission listener next to the primary 465 one
+	// (spec 5). The panel only reports it on the domain page's connection
+	// settings; it is a deploy-time flag, not something the panel can verify.
+	SubmissionEnabled bool
 	// MailLogPath is where Postfix's delivery log lives, read by the mail.log
 	// monitoring view (spec 7.2.13). It is the same path the log-tailer role
 	// follows in cmd/panel.
@@ -132,7 +137,12 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
 	authed.HandleFunc("POST /reload", s.handleReload)
 
-	// Full-server backup download (spec 7.5.A).
+	// Administrator's own panel credentials.
+	authed.HandleFunc("/account", s.handleAccount)
+
+	// Backup and migration: the page with both actions (spec 7.5.A-B), and the
+	// full-server backup download itself.
+	authed.HandleFunc("GET /backup", s.handleBackupPage)
 	authed.HandleFunc("POST /backup", s.handleBackup)
 
 	// Monitoring screens (spec 7.2.11-13): each page and its HTMX polling

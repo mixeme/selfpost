@@ -39,7 +39,9 @@ docker compose up -d
 This starts SelfPost alone; it assumes Apache is already installed on the host
 as the reverse proxy (see below) and expects certificates at `./certs`. The
 first log line (`docker compose logs -f`) prints the one-time setup link —
-open it to create the admin account.
+open it to create the admin account. That username and password can be changed
+later from the panel's *Account* page (changing the password signs out every
+other session).
 
 ## Reverse proxy (mandatory)
 
@@ -101,7 +103,7 @@ Two related but distinct operations — spec 7.5:
 
 - **Full backup** (whole `/data`: SQLite, all domains' DKIM keys, all
   applications' SASL credentials, `manifest.json` with the version that
-  created it): panel button (dashboard → *Backup & migration*), or from the
+  created it): panel button (*Backup* → *Full backup*), or from the
   host:
   ```sh
   docker exec <container> selfpost-backup > selfpost-backup.tar.gz
@@ -113,8 +115,8 @@ Two related but distinct operations — spec 7.5:
   known version, there'd be no way to tell which image restoring a given
   backup actually requires.
 
-- **Export/import a single domain** (dashboard → domain page → *Export
-  domain*): moves one domain — its DKIM key and its applications' **working**
+- **Export/import a single domain** (domain page → *Export domain* to write the
+  file, *Backup* → *Import a domain* to read it back in): moves one domain — its DKIM key and its applications' **working**
   SASL passwords — to a different SelfPost instance without regenerating
   anything, so DNS (the DKIM TXT record) doesn't need to change. Unlike a full
   restore, this works across different hostnames/instances.

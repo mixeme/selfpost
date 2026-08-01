@@ -6,6 +6,7 @@
 <title>{{.Title}}</title>
 <link rel="icon" href="/static/favicon.png" type="image/png">
 <script src="/static/htmx.min.js" defer></script>
+<script src="/static/panel.js" defer></script>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -75,11 +76,63 @@
   details form { margin-top: 0.6rem; }
   .credential { border-color: #f5c518; background: #fffbeb; }
   @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
+  /* Panel navigation: rendered once from this layout, so it is present on every
+     authenticated page without each content template having to include it. */
+  .nav {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+    gap: 0.4rem 1rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
+    border-bottom: 1px solid #e2e5e9;
+  }
+  @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
+  .nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: baseline; }
+  .nav .links a, .nav .links [aria-current] { padding: 0.2rem 0.5rem; border-radius: 6px; }
+  .nav .links [aria-current] {
+    font-weight: 600; color: #1b1f24; background: #e6ebf5; box-shadow: inset 0 -2px 0 #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    .nav .links [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
+  }
+  .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
+  .code-row .code { flex: 1; min-width: 0; }
+  button.copy {
+    flex: none; margin-top: 0.3rem; padding: 0.45rem 0.7rem; font-size: 0.8rem;
+    background: #eef1f5; color: #2563eb; border: 1px solid #cfd4da;
+  }
+  button.copy:hover { background: #e2e7ee; }
+  @media (prefers-color-scheme: dark) {
+    button.copy { background: #22262b !important; border-color: #2b3138 !important; }
+    button.copy:hover { background: #2b3138 !important; }
+  }
 </style>
 </head>
 <body>
 <main>
+{{if .User}}{{template "nav" .}}{{end}}
 {{template "content" .}}
 </main>
 </body>
 </html>{{end}}
+
+{{/* nav is the panel's navigation bar. It is rendered here, from the layout, so
+     every authenticated page has it without the page's own template having to
+     remember to include it; .Active names the current page so it is highlighted
+     instead of linking to itself. Unauthenticated pages (login, setup) carry no
+     .User and get no nav. */}}
+{{define "nav"}}
+<nav class="nav">
+  <div class="links">
+    {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/">Domains</a>{{end}}
+    {{if eq .Active "sendlog"}}<span aria-current="page">Send log</span>{{else}}<a href="/sendlog">Send log</a>{{end}}
+    {{if eq .Active "queue"}}<span aria-current="page">Queue</span>{{else}}<a href="/queue">Queue</a>{{end}}
+    {{if eq .Active "logtail"}}<span aria-current="page">Log</span>{{else}}<a href="/logtail">Log</a>{{end}}
+    {{if eq .Active "backup"}}<span aria-current="page">Backup</span>{{else}}<a href="/backup">Backup</a>{{end}}
+  </div>
+  <div class="session">
+    <span class="muted">{{.User}}</span>
+    {{if eq .Active "account"}}<span aria-current="page">Account</span>{{else}}<a href="/account">Account</a>{{end}}
+    <form class="inline" method="post" action="/logout">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
+</nav>
+{{end}}

@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>Account</h1>
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+<div class="card narrow">
+  <h2>Panel credentials</h2>
+  <p class="muted">These are the credentials for this control panel only.
+  Applications keep their own logins and passwords, which are not affected.</p>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <form method="post" action="/account">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username"
+           autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
+
+    <label for="current_password">Current password</label>
+    <input id="current_password" name="current_password" type="password"
+           autocomplete="current-password" required>
+
+    <label for="new_password">New password</label>
+    <input id="new_password" name="new_password" type="password" autocomplete="new-password">
+
+    <label for="new_password_confirm">Confirm new password</label>
+    <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
+
+    <button type="submit">Save changes</button>
+  </form>
+  <p class="muted">Leave both new-password fields empty to change the username
+  only. Changing the password signs out every other session; this one stays
+  signed in.</p>
+</div>
+{{end}}

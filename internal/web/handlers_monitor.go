@@ -30,6 +30,7 @@ func (s *Server) handleSendLog(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Title"] = "SelfPost — send log"
 	data["User"] = currentUser(r)
+	data["Active"] = "sendlog"
 	s.render(w, http.StatusOK, "sendlog", data)
 }
 
@@ -112,6 +113,7 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, "queue", map[string]any{
 		"Title":  "SelfPost — mail queue",
 		"User":   currentUser(r),
+		"Active": "queue",
 		"Output": out,
 		"Error":  errText,
 	})
@@ -142,10 +144,11 @@ func readQueue() (string, string) {
 func (s *Server) handleLogTail(w http.ResponseWriter, r *http.Request) {
 	lines, errText := s.readLogTail()
 	s.render(w, http.StatusOK, "logtail", map[string]any{
-		"Title": "SelfPost — mail log",
-		"User":  currentUser(r),
-		"Lines": lines,
-		"Error": errText,
+		"Title":  "SelfPost — mail log",
+		"User":   currentUser(r),
+		"Active": "logtail",
+		"Lines":  lines,
+		"Error":  errText,
 	})
 }
 

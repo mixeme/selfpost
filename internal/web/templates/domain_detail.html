@@ -1,13 +1,5 @@
 {{define "content"}}
-<div class="topbar">
-  <h1>{{.Domain.Name}}</h1>
-  <div class="actions muted">
-    <span>{{.User}}</span>
-    <form class="inline" method="post" action="/logout">
-      <button type="submit">Sign out</button>
-    </form>
-  </div>
-</div>
+<h1>{{.Domain.Name}}</h1>
 
 <a class="back" href="/">&larr; All domains</a>
 
@@ -20,9 +12,15 @@
   <p class="muted">This password is shown <strong>once only</strong> and is not
   stored. Copy it now — if it is lost, regenerate a new one.</p>
   <label>Login</label>
-  <span class="code">{{.NewCred.Login}}</span>
+  <div class="code-row">
+    <span class="code">{{.NewCred.Login}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
   <label>Password</label>
-  <span class="code">{{.NewCred.Password}}</span>
+  <div class="code-row">
+    <span class="code">{{.NewCred.Password}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
 </div>
 {{end}}
 
@@ -32,16 +30,45 @@
   It is not a secret and can be viewed at any time.</p>
 
   <label>Host / name</label>
-  <span class="code">{{.Record.Name}}</span>
+  <div class="code-row">
+    <span class="code">{{.Record.Name}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
 
   <label>Type</label>
   <span class="code">TXT</span>
 
   <label>Value</label>
-  <span class="code">{{.Record.Value}}</span>
+  <div class="code-row">
+    <span class="code">{{.Record.Value}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
 
   <p class="muted">Also configure SPF and DMARC for the domain (see the
   documentation). Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+</div>
+
+<div class="card">
+  <h2>Sending server settings</h2>
+  <p class="muted">Point the mail client or script at these settings and
+  authenticate with an application login and password from the
+  <strong>Applications</strong> section below. They are the same for every
+  domain on this server.</p>
+
+  <label>Server</label>
+  <div class="code-row">
+    <span class="code">{{.Hostname}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>Port and encryption</label>
+  <span class="code">465 — SSL/TLS (implicit){{if .SubmissionEnabled}}
+587 — STARTTLS (submission){{end}}</span>
+
+  <p class="muted">Authentication is required on every port. The username is the
+  application's login (see the table below) and the password is the one shown
+  once when that application was created or its password regenerated — if it was
+  lost, generate a new one.</p>
 </div>
 
 <div class="card">
@@ -70,13 +97,15 @@
             <summary>Edit mode</summary>
             <form method="post" action="/applications/{{.ID}}/mode">
               <label>Address mode</label>
-              <select name="mode">
+              <select name="mode" data-list-mode="{{$.List}}">
                 <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
                 <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
               </select>
-              <label>Addresses (for list mode; one per line or comma-separated)</label>
-              <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
+              <div data-addresses>
+                <label>Addresses (one per line or comma-separated)</label>
+                <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
 {{end}}{{$a}}{{end}}</textarea>
+              </div>
               <button type="submit">Save mode</button>
             </form>
           </details>
@@ -161,14 +190,16 @@
            value="{{.FormLogin}}" required>
 
     <label for="mode">Address mode</label>
-    <select id="mode" name="mode">
+    <select id="mode" name="mode" data-list-mode="{{.List}}">
       <option value="{{.Wildcard}}" {{if eq .FormMode .Wildcard}}selected{{end}}>Any address of the domain</option>
       <option value="{{.List}}" {{if eq .FormMode .List}}selected{{end}}>Specific addresses (list)</option>
     </select>
 
-    <label for="addresses">Addresses (for list mode; one per line or comma-separated)</label>
-    <textarea id="addresses" name="addresses" rows="3"
-              placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
+    <div data-addresses>
+      <label for="addresses">Addresses (one per line or comma-separated)</label>
+      <textarea id="addresses" name="addresses" rows="3"
+                placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
+    </div>
 
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     <button type="submit">Create application</button>
