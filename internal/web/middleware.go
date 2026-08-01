@@ -14,12 +14,12 @@ const usernameKey ctxKey = 0
 // username is stashed in the request context for downstream handlers.
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(sessionCookie)
-		if err != nil {
+		token, ok := s.sessionToken(r)
+		if !ok {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		username, ok := s.sessions.Lookup(c.Value)
+		username, ok := s.sessions.Lookup(token)
 		if !ok {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return

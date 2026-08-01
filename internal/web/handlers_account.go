@@ -142,12 +142,12 @@ func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 	// Keep this session usable under the new name, and — when the password
 	// changed — drop every other session so a cookie captured under the old
 	// password stops working.
-	if c, err := r.Cookie(sessionCookie); err == nil {
+	if token, ok := s.sessionToken(r); ok {
 		if renaming {
-			s.sessions.Rename(c.Value, username)
+			s.sessions.Rename(token, username)
 		}
 		if repassword {
-			s.sessions.DestroyOthers(c.Value)
+			s.sessions.DestroyOthers(token)
 		}
 	}
 
