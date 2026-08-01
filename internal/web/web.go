@@ -181,7 +181,9 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("/", s.requireAuth(authed))
 
-	return mux
+	// Security headers and the origin check wrap everything, including the
+	// unauthenticated login and setup routes (phase 14.A).
+	return s.secure(mux)
 }
 
 // redirectToStatus points the panel root at the status page, so there is one
