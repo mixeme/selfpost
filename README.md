@@ -43,6 +43,17 @@ open it to create the admin account. That username and password can be changed
 later from the panel's *Account* page (changing the password signs out every
 other session).
 
+The same link is also written to `/data/setup-token` inside the container —
+`./data/setup-token` on the host, mode `0600` — and deleted the moment setup
+completes. If this host ships its container logs to a central aggregator,
+prefer the file: the link is a bearer token valid for ten minutes, and reading
+it this way keeps it out of the log pipeline (and out of whatever retains it
+afterwards) entirely.
+
+```sh
+docker compose exec selfpost cat /data/setup-token
+```
+
 ## Reverse proxy (mandatory)
 
 SelfPost's panel speaks plain HTTP and never terminates TLS itself — a reverse
@@ -65,6 +76,17 @@ SelfPost isn't tied to a specific proxy; pick whichever fits your host:
 Apache is the recommended default because the certbot Apache plugin already
 writes plain `fullchain.pem`/`privkey.pem` files to a predictable path with no
 extra moving parts between "certificate issued" and "Postfix can read it."
+
+**The proxy needs no security configuration of its own.** The panel emits its
+own `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`,
+`X-Content-Type-Options` and `Referrer-Policy` — deliberately, so the part
+that's easy to get wrong lives in the service rather than in a config file
+somebody edits under pressure. There is exactly one thing the proxy must do:
+**pass the original `Host` header through**. All four fragments above already
+do (Apache `ProxyPreserveHost On`, nginx `proxy_set_header Host $host`, Caddy
+and Traefik by default). A proxy that rewrites `Host` instead makes the panel
+reject every form submission as cross-origin — the log says so explicitly,
+printing the `Origin` and `Host` it compared.
 
 ## DNS setup
 
