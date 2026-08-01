@@ -99,7 +99,7 @@ func loadConfig() config {
 		// matches postfix-config.sh, which enables the listener on "true" alone.
 		submissionEnabled: os.Getenv("SUBMISSION_ENABLE") == "true",
 		// Reverse-proxy addresses allowed to supply X-Forwarded-For for
-		// rate-limiting (plan.md item A.1). Empty by default: an untrusted peer's
+		// rate-limiting. Empty by default: an untrusted peer's
 		// XFF header is trivially forgeable, so it's ignored unless the panel is
 		// told which proxy to trust.
 		trustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDR")),

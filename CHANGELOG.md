@@ -41,6 +41,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   *Any address of the domain*, where the server ignores it.
 - ci: disable provenance attestation on release image push, so the ghcr.io
   manifest list shows only `linux/amd64`/`linux/arm64` (no `unknown/unknown`).
+- ci: run `go vet` and `go test ./...` on every push to `main` and every pull
+  request, not only the image build on a release tag.
 - security: optionally honour `X-Forwarded-For` for login/setup rate-limiting
   when the request's direct peer is in the new `TRUSTED_PROXY_CIDR` list,
   giving real per-client limits behind a reverse proxy instead of one global

@@ -45,7 +45,7 @@ type Config struct {
 	DBPath  string
 	Version string
 	// TrustedProxyCIDRs are the reverse-proxy addresses allowed to supply
-	// X-Forwarded-For (plan.md item A.1: TRUSTED_PROXY_CIDR). A request whose
+	// X-Forwarded-For (env TRUSTED_PROXY_CIDR). A request whose
 	// direct peer (RemoteAddr) is not in this list never has its XFF header
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
@@ -200,7 +200,7 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 // transport peer (RemoteAddr), which cannot be spoofed. If RemoteAddr matches
 // one of trustedProxies, the last entry of X-Forwarded-For is used instead —
 // that is the address the trusted proxy itself appended, so a client can't
-// forge it by sending its own XFF header (plan.md item A.1). With no trusted
+// forge it by sending its own XFF header. With no trusted
 // proxies configured, behind a reverse proxy this is the proxy's own address,
 // which is an acceptable backstop for a single-admin panel.
 func clientIP(r *http.Request, trustedProxies []*net.IPNet) string {
