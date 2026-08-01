@@ -9,8 +9,81 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// sessionCookie is the name of the panel session cookie.
-const sessionCookie = "selfpost_session"
+// The panel session cookie's two possible names. In the production shape —
+// TLS in front, so CookieSecure — it carries the __Host- prefix, which turns
+// what the cookie's attributes merely promise into something the browser
+// enforces: Secure, Path=/ and, the point of the exercise, no Domain
+// attribute, so no other host may set a cookie by this name (phase 14.B).
+// The prefix is only valid on a Secure cookie, so a development instance on
+// plain HTTP has to keep the bare name: with the prefix the browser would
+// discard the Set-Cookie outright and logging in would silently never stick.
+const (
+	sessionCookieBase     = "selfpost_session"
+	sessionCookiePrefixed = "__Host-" + sessionCookieBase
+)
+
+// sessionCookie is the session cookie's name for this deployment.
+func (s *Server) sessionCookie() string {
+	if s.cfg.CookieSecure {
+		return sessionCookiePrefixed
+	}
+	return sessionCookieBase
+}
+
+// sessionToken returns the session token the request carries, if exactly one
+// cookie of that name is present.
+//
+// It walks r.Cookies() rather than calling r.Cookie, which silently returns
+// the first match. Two cookies with the same name mean somebody other than
+// this panel set one of them — a host on the same registrable domain can,
+// with Domain=example.com, and the browser will then send both — and RFC 6265
+// makes the older one come first, so "the first match" is precisely the
+// attacker's. The value cannot be forged into a valid session, so the effect
+// is denial of service, not compromise; refusing the request and saying so in
+// the log is what makes it diagnosable instead of an endless login loop. The
+// __Host- prefix prevents this outright, but only where it applies — this
+// check also covers the plain-HTTP development shape (phase 14.B).
+func (s *Server) sessionToken(r *http.Request) (string, bool) {
+	name := s.sessionCookie()
+	var token string
+	var n int
+	for _, c := range r.Cookies() {
+		if c.Name == name {
+			n++
+			token = c.Value
+		}
+	}
+	switch n {
+	case 0:
+		return "", false
+	case 1:
+		return token, true
+	default:
+		logf("panel: %s %s carries %d cookies named %q — treating the request as signed out; "+
+			"another host on this domain is overwriting the session cookie, clear the cookies for the parent domain",
+			r.Method, r.URL.Path, n, name)
+		return "", false
+	}
+}
+
+// clearSessionCookies expires the session cookie under both names, so an
+// upgrade that switches to the __Host- prefix does not leave the old cookie
+// sitting in the browser until it is closed.
+func (s *Server) clearSessionCookies(w http.ResponseWriter) {
+	for _, name := range []string{sessionCookieBase, sessionCookiePrefixed} {
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			// The prefixed name is only accepted at all when Secure is set,
+			// including on the expiring copy.
+			Secure:   s.cfg.CookieSecure || name == sessionCookiePrefixed,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
+}
 
 // handleLogin serves the login form (GET) and authenticates (POST). Until an
 // administrator exists there is nobody to log in, so it points at setup.
@@ -80,7 +153,7 @@ func (s *Server) submitLogin(w http.ResponseWriter, r *http.Request) {
 
 	token := s.sessions.Create(admin.Username)
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookie,
+		Name:     s.sessionCookie(),
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
@@ -97,17 +170,15 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		s.sessions.Destroy(c.Value)
+	// Destroy every token presented under the session cookie's name: if a
+	// shadowing duplicate is present (see sessionToken) one of them is the
+	// real session, and a value that names no session is simply not found.
+	name := s.sessionCookie()
+	for _, c := range r.Cookies() {
+		if c.Name == name {
+			s.sessions.Destroy(c.Value)
+		}
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookie,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   s.cfg.CookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	s.clearSessionCookies(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
