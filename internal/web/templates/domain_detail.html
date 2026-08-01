@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
 
-<a class="back" href="/">&larr; All domains</a>
+<a class="back" href="/domains">&larr; All domains</a>
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 {{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
@@ -46,6 +46,36 @@
 
   <p class="muted">Also configure SPF and DMARC for the domain (see the
   documentation). Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+</div>
+
+<div class="card">
+  <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
+  <p class="muted">What DNS publishes for <strong>{{.Domain.Name}}</strong> right
+  now, checked against the key this server signs with. Results are cached for a
+  few minutes — after publishing a record, use <em>Re-check</em>.</p>
+
+  <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
+  <p class="{{if eq .DNS.DKIM.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
+  {{if .DNS.DKIM.Records}}<span class="code">{{range .DNS.DKIM.Records}}{{.}}
+{{end}}</span>{{end}}
+
+  <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
+  <p class="{{if eq .DNS.SPF.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
+  {{if .DNS.SPF.Records}}<span class="code">{{range .DNS.SPF.Records}}{{.}}
+{{end}}</span>{{end}}
+  <p class="muted">The SPF check is deliberately shallow: it looks for a
+  mechanism that literally covers this server's address and does not follow
+  <code>include:</code> or <code>redirect=</code>, so a record that authorises
+  the server through an include is reported as “cannot tell”, not as a failure.</p>
+
+  <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
+  <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
+  {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
+{{end}}</span>{{end}}
+
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
+    <button type="submit">Re-check</button>
+  </form>
 </div>
 
 <div class="card">

@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: new **Status** page — supervised processes, mail queue, TLS
+  certificate expiry, milter sockets and the server's own hostname/reverse-DNS
+  (FCrDNS) check — and it is now the panel's landing page. The local checks
+  refresh by polling; the DNS lookup is cached with a *Re-check* button.
+- panel: the domain page shows a **DNS status** card: the published DKIM record
+  compared against the key this server actually signs with, plus SPF and DMARC.
+  The SPF check is deliberately shallow — it looks for a mechanism literally
+  covering this server's address and does not follow `include:`/`redirect=`, so
+  a record that authorises the server through an include is reported as "cannot
+  tell", not as a failure.
+- panel: the domain list moved from `/` to `/domains`; `/` redirects to the
+  status page. The **Reload** button moved from the domain list to the status
+  page and now explains what it regenerates and when to use it.
+- fix: the panel could never read the mail queue in the documented deployment.
+  `postqueue` relies on its setgid-`postdrop` bit, which `no-new-privileges`
+  (set in the shipped compose file) disables, so the *Queue* screen always said
+  "Could not read the mail queue". The `panel` user is now a real member of
+  `postdrop`.
 - panel: navigation bar is now rendered once from the shared layout, so every
   authenticated page has it — including the domain page and the delete
   confirmation, which had no navigation links at all — and the current page is

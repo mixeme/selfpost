@@ -33,6 +33,7 @@ var pageFiles = map[string][]string{
 	"sendlog":       {"templates/sendlog.html", "templates/sendlog_rows.html"},
 	"queue":         {"templates/queue.html", "templates/queue_body.html"},
 	"logtail":       {"templates/logtail.html", "templates/logtail_body.html"},
+	"status":        {"templates/status.html", "templates/status_body.html"},
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -41,6 +42,7 @@ var fragmentFiles = map[string]string{
 	"sendlog_rows": "templates/sendlog_rows.html",
 	"queue_body":   "templates/queue_body.html",
 	"logtail_body": "templates/logtail_body.html",
+	"status_body":  "templates/status_body.html",
 }
 
 func loadTemplates() (*templates, error) {

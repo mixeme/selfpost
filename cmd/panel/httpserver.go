@@ -34,6 +34,9 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 		DBPath:            cfg.dbPath,
 		Version:           buildinfo.Version,
 		TrustedProxyCIDRs: cfg.trustedProxies,
+		TLSCertFile:       cfg.tlsCertFile,
+		OpenDKIMSocket:    cfg.opendkimSocket,
+		JournalSocket:     cfg.journalSocket,
 	}, cfg.setupTokenPath)
 	if err != nil {
 		return err

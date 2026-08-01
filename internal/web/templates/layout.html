@@ -92,6 +92,24 @@
   @media (prefers-color-scheme: dark) {
     .nav .links [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
   }
+  /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
+     status page and the per-domain DNS checks, so a colour means the same thing
+     everywhere. The class suffix is the check's own status value. */
+  .st {
+    display: inline-block; padding: 0.05rem 0.45rem; border-radius: 999px;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    vertical-align: middle; border: 1px solid transparent;
+  }
+  .st-ok { background: #ecfdf3; color: #067647; border-color: #abefc6; }
+  .st-warn { background: #fffaeb; color: #b54708; border-color: #fedf89; }
+  .st-error { background: #fef3f2; color: #b42318; border-color: #fecdca; }
+  .st-unknown { background: #f0f2f4; color: #6b7280; border-color: #e2e5e9; }
+  @media (prefers-color-scheme: dark) {
+    .st-ok { background: #0d2818 !important; color: #75d99b !important; border-color: #1a5336 !important; }
+    .st-warn { background: #2e2308 !important; color: #f5c86b !important; border-color: #6b5210 !important; }
+    .st-error { background: #2d1211 !important; color: #f5a29b !important; border-color: #6b201a !important; }
+    .st-unknown { background: #22262b !important; color: #9aa3ad !important; border-color: #2b3138 !important; }
+  }
   .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
   .code-row .code { flex: 1; min-width: 0; }
   button.copy {
@@ -121,7 +139,8 @@
 {{define "nav"}}
 <nav class="nav">
   <div class="links">
-    {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/">Domains</a>{{end}}
+    {{if eq .Active "status"}}<span aria-current="page">Status</span>{{else}}<a href="/status">Status</a>{{end}}
+    {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/domains">Domains</a>{{end}}
     {{if eq .Active "sendlog"}}<span aria-current="page">Send log</span>{{else}}<a href="/sendlog">Send log</a>{{end}}
     {{if eq .Active "queue"}}<span aria-current="page">Queue</span>{{else}}<a href="/queue">Queue</a>{{end}}
     {{if eq .Active "logtail"}}<span aria-current="page">Log</span>{{else}}<a href="/logtail">Log</a>{{end}}
