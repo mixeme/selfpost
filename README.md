@@ -88,6 +88,16 @@ mail lands in spam even though SelfPost delivered it correctly — DKIM passing
 doesn't help if SPF/DMARC are absent. **Whenever you add a new domain in the
 panel, add its DNS records at the same time**, not later.
 
+The panel checks both scopes for you and tells you what is actually published:
+the *Status* page verifies the server's hostname and its reverse record
+(forward-confirmed reverse DNS), and each domain's page shows a *DNS status*
+card comparing the published DKIM record against the key this server signs with,
+plus the domain's SPF and DMARC records. Results are cached for a few minutes;
+use *Re-check* right after publishing a record. The SPF check is deliberately
+shallow — it looks for a mechanism that literally covers this server's address
+and does not follow `include:` or `redirect=`, so a record that authorizes the
+server through an include is reported as "cannot tell" rather than as a failure.
+
 ## IP warmup
 
 A brand-new IP has no sending history, so receiving servers are cautious with

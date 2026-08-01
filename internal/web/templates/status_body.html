@@ -1,0 +1,65 @@
+{{define "status_body"}}
+<div id="status-body" hx-get="/status/fragment" hx-trigger="every 5s" hx-swap="outerHTML">
+  <div class="card">
+    <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
+    <p class="muted">{{.OverallHeading}}</p>
+  </div>
+
+  <div class="card">
+    <h2>Processes <span class="st st-{{.ProcessStatus}}">{{.ProcessStatus}}</span></h2>
+    {{if .ProcessError}}
+    <p class="error">Could not ask supervisord for the process list.</p>
+    {{else}}
+    <table>
+      <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+      <tbody>
+        {{range .Processes}}
+        <tr>
+          <td>{{.Name}}</td>
+          <td><span class="st st-{{.Status}}">{{.State}}</span></td>
+          <td class="muted">{{.Detail}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{end}}
+  </div>
+
+  <div class="card">
+    <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
+    {{if .QueueError}}
+    <p class="error">{{.QueueError}}</p>
+    {{else}}
+    <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}
+    <a href="/queue">Full queue</a></p>
+    {{end}}
+  </div>
+
+  <div class="card">
+    <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
+    <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
+    It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
+    {{if not .Cert.NotAfter.IsZero}}
+    <label>Expires</label>
+    <span class="code">{{.Cert.NotAfter.UTC.Format "2006-01-02 15:04 UTC"}}</span>
+    {{end}}
+    <p class="{{if eq .Cert.Status "ok"}}muted{{else}}error{{end}}">{{.Cert.Detail}}</p>
+  </div>
+
+  <div class="card">
+    <h2>Milter sockets <span class="st st-{{.SocketStatus}}">{{.SocketStatus}}</span></h2>
+    <table>
+      <thead><tr><th>Milter</th><th>Socket</th><th>State</th></tr></thead>
+      <tbody>
+        {{range .Sockets}}
+        <tr>
+          <td>{{.Name}}</td>
+          <td class="muted">{{.Path}}</td>
+          <td><span class="st st-{{.Status}}">{{.Status}}</span> {{.Detail}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

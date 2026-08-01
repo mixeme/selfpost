@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"codeberg.org/mix/selfpost/internal/app"
+	"codeberg.org/mix/selfpost/internal/dnscheck"
 	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/store"
 )
@@ -49,6 +50,15 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
+	// TLSCertFile is the certificate Postfix serves on 465/587 (spec 8), read
+	// read-only by the status page to report how much validity is left.
+	TLSCertFile string
+	// OpenDKIMSocket and JournalSocket are the two milter sockets Postfix
+	// connects to. The status page stats them: the first is required for mail
+	// to leave at all (OpenDKIM runs with default_action=tempfail), the second
+	// only for the send log (the journal-milter fails open).
+	OpenDKIMSocket string
+	JournalSocket  string
 }
 
 // Server is the panel HTTP application.
@@ -60,6 +70,7 @@ type Server struct {
 	tmpl     *templates
 	sessions *sessionStore
 	setup    *setupManager
+	dns      *dnscheck.Checker
 
 	loginLimiter *rateLimiter
 	setupLimiter *rateLimiter
@@ -83,6 +94,10 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		cfg:      cfg,
 		tmpl:     tmpl,
 		sessions: newSessionStore(),
+		// Published-DNS checks for the status page and the domain pages. The
+		// checker caches its own results, so page views do not each pay for a
+		// round of lookups (phase 13).
+		dns: dnscheck.New(),
 		// Setup: a handful of attempts per minute per IP is plenty for a
 		// legitimate admin and blunts automated probing (spec 7.6.1).
 		setupLimiter: newRateLimiter(10, time.Minute),
@@ -122,10 +137,20 @@ func (s *Server) Handler() http.Handler {
 	// Authenticated panel. Everything not matched by a more specific pattern
 	// above falls through to this sub-mux, wrapped once in the auth middleware.
 	authed := http.NewServeMux()
-	authed.HandleFunc("GET /{$}", s.handleDashboard)
+
+	// The landing page is the server status (phase 13.C): the first thing an
+	// administrator should see after logging in is whether the service is
+	// healthy, not the domain list. handleLogin still redirects to "/".
+	authed.HandleFunc("GET /{$}", redirectToStatus)
+	authed.HandleFunc("GET /status", s.handleStatus)
+	authed.HandleFunc("GET /status/fragment", s.handleStatusFragment)
+	authed.HandleFunc("POST /status/recheck", s.handleStatusRecheck)
+
+	authed.HandleFunc("GET /domains", s.handleDashboard)
 	authed.HandleFunc("POST /domains", s.handleAddDomain)
 	authed.HandleFunc("POST /domains/import", s.handleImportDomain)
 	authed.HandleFunc("GET /domains/{id}", s.handleDomainDetail)
+	authed.HandleFunc("POST /domains/{id}/dns-recheck", s.handleDomainDNSRecheck)
 	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
 	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
 	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
@@ -157,6 +182,12 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", s.requireAuth(authed))
 
 	return mux
+}
+
+// redirectToStatus points the panel root at the status page, so there is one
+// canonical URL for that content instead of two (phase 13.C).
+func redirectToStatus(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/status", http.StatusSeeOther)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

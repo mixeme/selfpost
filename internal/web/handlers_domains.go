@@ -40,14 +40,10 @@ func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status 
 // dashboardFlash maps a fixed redirect flag to a fixed message, so status text
 // after a redirect is never attacker-influenced.
 func dashboardFlash(r *http.Request) string {
-	switch {
-	case r.URL.Query().Get("reloaded") != "":
-		return "Configuration reloaded."
-	case r.URL.Query().Get("deleted") != "":
+	if r.URL.Query().Get("deleted") != "" {
 		return "Domain deleted."
-	default:
-		return ""
 	}
+	return ""
 }
 
 // handleAddDomain validates the submitted name, creates the domain (DKIM key +
@@ -101,6 +97,12 @@ func (s *Server) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Drop any cached DNS verdict for the name while it is still resolvable, so
+	// re-adding the domain later starts from a fresh check instead of a stale
+	// one from before it was removed.
+	if d, err := s.domains.Get(id); err == nil {
+		defer s.dns.Forget(d.Name)
+	}
 	if err := s.domains.Delete(id); err != nil {
 		if errors.Is(err, store.ErrDomainNotFound) {
 			http.NotFound(w, r)
@@ -110,12 +112,15 @@ func (s *Server) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/?deleted=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/domains?deleted=1", http.StatusSeeOther)
 }
 
 // handleReload re-applies both the OpenDKIM configuration and the Postfix
 // sender map on demand (spec 7.2.12). Each Resync regenerates its files from the
 // database and reloads its daemon, so the button doubles as a drift-recovery.
+// The button lives on the status page (phase 13.D): it is a "put the daemons
+// back in the state the database describes" action, which belongs with the rest
+// of the server-health screen rather than in the domain list's top bar.
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 	if err := s.domains.Resync(); err != nil {
 		logf("panel: manual reload (opendkim): %v", err)
@@ -127,7 +132,7 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "reload failed", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/?reloaded=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/status?reloaded=1", http.StatusSeeOther)
 }
 
 // lookupDomain resolves the {id} path value to a domain, writing a 404 for a

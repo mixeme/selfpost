@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/mix/selfpost/internal/dnscheck"
+	"codeberg.org/mix/selfpost/internal/domain"
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
@@ -100,6 +102,10 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		"Active": "domains",
 		"Domain": d,
 		"Record": record,
+		// What DNS actually publishes for the domain today, checked against the
+		// key this server signs with (phase 13.B). Cached by the checker, so
+		// re-rendering the page after a form post costs nothing.
+		"DNS": s.domainDNS(d, record, false),
 		// Client connection settings (the same for every domain on this
 		// instance): the hostname clients connect to, and whether the optional
 		// submission listener is enabled in this deployment.
@@ -120,6 +126,38 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),
 		"DomainRLWin":       windowOrDefault(domainRL.WindowSeconds),
 	})
+}
+
+// domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
+// records (phase 13.B). The server's own address comes from the (separately
+// cached) hostname check, so the SPF heuristic knows which IP it is looking for
+// and no extra environment variable is needed. force bypasses the cache, for the
+// Re-check button.
+func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, force bool) dnscheck.Domain {
+	srv := s.dns.Server(s.cfg.Hostname, false)
+	return s.dns.Domain(dnscheck.Query{
+		Name:         d.Name,
+		Selector:     d.DKIMSelector,
+		ExpectedDKIM: record.Value,
+		ServerIPs:    srv.IPs,
+	}, force)
+}
+
+// handleDomainDNSRecheck re-runs the domain's DNS checks ignoring the cache and
+// returns to its page, which then renders the fresh result.
+func (s *Server) handleDomainDNSRecheck(w http.ResponseWriter, r *http.Request) {
+	d, ok := s.lookupDomain(w, r)
+	if !ok {
+		return
+	}
+	record, err := s.domains.DKIMRecord(d)
+	if err != nil {
+		logf("panel: domain %d: dkim record: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.domainDNS(d, record, true)
+	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
 // intOrBlank renders a non-positive number as an empty string so an unset field
@@ -152,6 +190,8 @@ func detailFlash(r *http.Request) string {
 		return "Rate limit updated."
 	case r.URL.Query().Get("imported") != "":
 		return "Domain imported. Its DKIM DNS record is unchanged — no DNS update is needed."
+	case r.URL.Query().Get("rechecked") != "":
+		return "DNS re-checked."
 	default:
 		return ""
 	}

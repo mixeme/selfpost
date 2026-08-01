@@ -67,6 +67,17 @@ RUN groupadd --system selfpost \
  && usermod -aG selfpost opendkim \
  && usermod -aG selfpost postfix
 
+# The panel reads the mail queue with `postqueue -p` (spec 7.2.11, and the
+# status page's queue card). postqueue is setgid postdrop, which normally gives
+# it the group needed to reach Postfix's showq socket — but the documented
+# deployment runs with `no-new-privileges`, which disables setgid transitions,
+# so the panel would always see "Permission denied". Making `panel` a real
+# member of postdrop grants the same access without relying on a setgid
+# escalation the hardening deliberately forbids. postdrop membership is
+# read-side only: it does not let the panel bypass any Postfix restriction that
+# a local user does not already have through the world-executable sendmail.
+RUN usermod -aG postdrop panel
+
 # Runtime directories: milter sockets and the consolidated persistent root.
 RUN mkdir -p /run/opendkim /run/selfpost /data \
  && chown opendkim:opendkim /run/opendkim \

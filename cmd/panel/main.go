@@ -61,6 +61,13 @@ type config struct {
 	submissionEnabled bool
 	trustedProxies    []*net.IPNet
 
+	// Read-only inputs to the panel's status page: the certificate Postfix
+	// serves and the two milter sockets it connects to. The defaults mirror
+	// build/postfix-config.sh, so the status page checks exactly what Postfix
+	// was configured with.
+	tlsCertFile    string
+	opendkimSocket string
+
 	opendkimDir     string
 	dkimSelectorDef string
 
@@ -96,6 +103,9 @@ func loadConfig() config {
 		// XFF header is trivially forgeable, so it's ignored unless the panel is
 		// told which proxy to trust.
 		trustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDR")),
+
+		tlsCertFile:    envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
+		opendkimSocket: envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
 
 		// Per-domain DKIM state (spec 6). The directory layout matches what
 		// entrypoint.sh prepares (setgid, shared `selfpost` group).
