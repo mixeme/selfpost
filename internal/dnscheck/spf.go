@@ -17,8 +17,8 @@ const spfLookupBudget = 10
 
 // checkSPF reports whether the domain's SPF record authorises this server.
 //
-// This is deliberately a shallow check (see docs/implementation-plan.md, phase
-// 13.B.2): it looks for a mechanism that literally covers the server's address —
+// This is deliberately a shallow check (documented as such in the README): it
+// looks for a mechanism that literally covers the server's address —
 // ip4:/ip6:, or a/mx resolving to it — and does not recurse into include: or
 // redirect=, nor evaluate the record the way a receiver would. That is why a
 // record which does not obviously cover us but does use include: is reported as
