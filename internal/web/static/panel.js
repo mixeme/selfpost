@@ -32,6 +32,20 @@
     });
   });
 
+  // --- Confirmation on destructive forms --------------------------------
+  // Forms that delete something or invalidate a working credential carry a
+  // data-confirm message. The prompt lives here rather than in an inline
+  // onsubmit attribute because the panel's Content-Security-Policy allows no
+  // inline script (phase 14.A). The listener is delegated from the document,
+  // so it also covers markup swapped in by HTMX. With JavaScript disabled the
+  // form submits without asking — exactly as the inline handler behaved.
+  document.addEventListener("submit", function (ev) {
+    var form = ev.target.closest("form[data-confirm]");
+    if (form && !window.confirm(form.dataset.confirm)) {
+      ev.preventDefault();
+    }
+  });
+
   // --- Address list shown only in list mode -----------------------------
   // The "Addresses" field applies to list mode only; in wildcard mode the
   // server ignores it, so hiding it removes a field that does nothing. The

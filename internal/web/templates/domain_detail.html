@@ -152,18 +152,18 @@
             </form>
             {{if .HasLimit}}
             <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                  onsubmit="return confirm('Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.')">
+                  data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
               <input type="hidden" name="clear" value="1">
               <button type="submit" class="danger">Remove limit</button>
             </form>
             {{end}}
           </details>
           <form class="inline" method="post" action="/applications/{{.ID}}/password"
-                onsubmit="return confirm('Regenerate the password for {{.Login}}? The current password stops working immediately.')">
+                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
             <button type="submit">New password</button>
           </form>
           <form class="inline" method="post" action="/applications/{{.ID}}/delete"
-                onsubmit="return confirm('Delete application {{.Login}}? Its credentials stop working immediately.')">
+                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>
@@ -204,7 +204,7 @@
   </form>
   {{if .DomainHasRL}}
   <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
-        onsubmit="return confirm('Remove the domain rate limit? Only the global level-1 limit will apply.')">
+        data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
     <input type="hidden" name="clear" value="1">
     <button type="submit" class="danger">Remove limit</button>
   </form>
