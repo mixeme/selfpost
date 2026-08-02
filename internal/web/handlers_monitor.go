@@ -1,6 +1,8 @@
 package web
 
 import (
+	"errors"
+	"io/fs"
 	"net/http"
 	"strconv"
 
@@ -164,6 +166,12 @@ func (s *Server) handleLogTailBody(w http.ResponseWriter, r *http.Request) {
 func (s *Server) readLogTail() ([]string, string) {
 	lines, err := logtail.TailLines(s.cfg.MailLogPath, logTailLines)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			// Rotation renamed the file away; Postfix recreates it on reload
+			// (within about a second), so this is a normal, brief gap rather
+			// than a failure worth alarming the operator about.
+			return nil, ""
+		}
 		logf("panel: tail %s: %v", s.cfg.MailLogPath, err)
 		return nil, "Could not read the mail log."
 	}
