@@ -37,6 +37,11 @@ mv .env.example .env   # then edit SELFPOST_HOSTNAME etc.
 docker compose up -d
 ```
 
+`SELFPOST_HOSTNAME` is required — the container exits immediately with an
+explanatory error if it's unset, since it doubles as the Postfix HELO name,
+the SASL realm, and must match both the PTR record and the certificate
+CN/SAN.
+
 This starts SelfPost alone; it assumes Apache is already installed on the host
 as the reverse proxy (see below) and expects certificates at `./certs`. The
 first log line (`docker compose logs -f`) prints the one-time setup link —

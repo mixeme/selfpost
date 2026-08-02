@@ -64,6 +64,51 @@ chown opendkim:selfpost /run/opendkim
 chown panel:selfpost /run/selfpost
 chmod 2750 /run/opendkim /run/selfpost
 
+# SELFPOST_HOSTNAME is an identity, not a setting with a safe default: it must
+# simultaneously match the PTR/rDNS record, the certificate CN/SAN, and the
+# Cyrus SASL realm (spec 5.2 p.3, 8). The panel (main.go saslRealm()) and
+# postfix-config.sh each fall back independently when it's unset — to
+# `localhost` and to the container hostname respectively — so accounts get
+# written under one realm and looked up under another and authentication
+# silently fails for every application, while HELO also stops matching the
+# PTR record and mail that does go out lands in spam. No fallback can be
+# correct, so fail loudly here, before either side of that split has a chance
+# to run, rather than leave a green panel with broken mail.
+if [ -z "$SELFPOST_HOSTNAME" ]; then
+	cat >&2 <<'EOF'
+FATAL: SELFPOST_HOSTNAME is not set.
+
+This is the mail server's identity: it becomes the Postfix HELO/EHLO name,
+the Cyrus SASL realm that application passwords are looked up under, and it
+must match the TLS certificate's CN/SAN as well as this server's PTR (reverse
+DNS) record. There is no safe default — guessing any one of these wrong
+breaks authentication for every application or sends outgoing mail to spam,
+silently.
+
+Set it to the mail server's fully-qualified domain name, e.g.:
+
+    SELFPOST_HOSTNAME=mail.example.com
+
+in the .env file next to your docker-compose.yml (see deploy/.env.example).
+EOF
+	exit 1
+fi
+
+case "$SELFPOST_HOSTNAME" in
+	*[\ \	]* | *://* | *:* )
+		echo "FATAL: SELFPOST_HOSTNAME must be a bare hostname (no scheme, port, or spaces): \"$SELFPOST_HOSTNAME\"" >&2
+		echo 'Example: SELFPOST_HOSTNAME=mail.example.com' >&2
+		exit 1
+		;;
+	*.*)
+		;;
+	*)
+		echo "FATAL: SELFPOST_HOSTNAME must be a fully-qualified domain name (at least one dot): \"$SELFPOST_HOSTNAME\"" >&2
+		echo 'Example: SELFPOST_HOSTNAME=mail.example.com' >&2
+		exit 1
+		;;
+esac
+
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the
 # optional 587 service are all driven by env at run time, and re-derived on every
