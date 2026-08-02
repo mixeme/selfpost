@@ -7,3 +7,7 @@ dev/
 
 # Local Go caches / test output, if ever present.
 *.out
+
+# e2e scratch stand (generated cert, DKIM zone, sink dump, /data bind mount)
+# — recreated fresh by every `make e2e` run, never checked in.
+/test/e2e/.stage/

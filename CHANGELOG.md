@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- ci: hermetic container e2e suite (`test/e2e`, a separate Go module) gates
+  image publishing — `make e2e` locally, and `go test ./...` in `test/e2e` as
+  a required step in `release.yml` before a version tag's image is pushed.
+  It builds the real image, brings up the shipped `deploy/docker-compose.yml`
+  plus a test-only override (self-signed cert, low ports, a fake DNS zone
+  served by CoreDNS, a `smtp-sink` sink-MX) on an isolated compose project,
+  then drives the panel over HTTP exactly like an administrator: setup →
+  login → add a domain → publish the DKIM record it prints into the fake zone
+  → add an application → send over SMTP AUTH → verify the delivered message's
+  DKIM signature against the record the panel published → poll the send log
+  to `sent`. Negative coverage: no-AUTH and unauthenticated-relay rejection,
+  sender/login mismatch, the level-1 (anvil) and level-2 (panel-configured)
+  rate limits, the journal-milter's fail-open behaviour when the panel process
+  is stopped, a missing/malformed `SELFPOST_HOSTNAME` failing the container
+  fast, and a login session surviving `docker restart`. `release.yml` moved
+  off qemu to a native per-architecture build (`ubuntu-latest` /
+  `ubuntu-24.04-arm`), each gated by this suite before its tag is pushed and
+  merged into the version manifest — running the full Postfix/OpenDKIM stack
+  under emulation for the gate was impractically slow.
 - ops: `mail.log` rotation switched from `copytruncate` to rename +
   `postfix reload` (the same mechanism `postfix logrotate` itself uses),
   eliminating the up-to-one-second window in which `copytruncate` could drop

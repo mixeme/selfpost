@@ -13,7 +13,7 @@ MODULE  := codeberg.org/mix/selfpost
 LDFLAGS := -X $(MODULE)/internal/buildinfo.Version=$(VERSION)
 GOFLAGS := -trimpath
 
-.PHONY: all build vet test clean
+.PHONY: all build vet test clean e2e
 
 all: vet build
 
@@ -29,3 +29,13 @@ test:
 
 clean:
 	rm -rf bin
+
+# Hermetic container e2e (plan implementation-plan.md C.4): separate Go module
+# under test/e2e so its test-only dependencies (DKIM verification) never enter
+# this module's build graph. Builds the image fresh from this checkout, brings
+# up deploy/docker-compose.yml plus a test-only override on high ports and an
+# isolated compose project (-p selfpost-e2e) so it never collides with a real
+# deployment on the same host, then tears the stand down whether the suite
+# passed or not.
+e2e:
+	cd test/e2e && go test -v -timeout 20m ./...
