@@ -62,7 +62,7 @@ func TestSessionTokenIgnoresTheOtherName(t *testing.T) {
 }
 
 func TestRequireAuthRejectsDuplicateCookies(t *testing.T) {
-	s := &Server{cfg: Config{CookieSecure: false}, sessions: newSessionStore()}
+	s := &Server{cfg: Config{CookieSecure: false}, sessions: newTestSessionStore(t)}
 	token := s.sessions.Create("admin")
 
 	reached := false
@@ -85,7 +85,7 @@ func TestRequireAuthRejectsDuplicateCookies(t *testing.T) {
 // Signing out has to expire the cookie under both names, or the cookie left
 // over from a pre-__Host- build stays in the browser for the rest of its life.
 func TestLogoutClearsBothCookieNames(t *testing.T) {
-	s := &Server{cfg: Config{CookieSecure: true}, sessions: newSessionStore()}
+	s := &Server{cfg: Config{CookieSecure: true}, sessions: newTestSessionStore(t)}
 	token := s.sessions.Create("admin")
 
 	r := httptest.NewRequest(http.MethodPost, "http://panel.example.com/logout", nil)

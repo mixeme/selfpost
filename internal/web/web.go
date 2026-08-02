@@ -59,6 +59,10 @@ type Config struct {
 	// only for the send log (the journal-milter fails open).
 	OpenDKIMSocket string
 	JournalSocket  string
+	// SessionIdleDays is the sliding inactivity window after which a login
+	// session expires (env PANEL_SESSION_IDLE_DAYS, plan B.1). Non-positive
+	// falls back to the 7-day default.
+	SessionIdleDays int
 }
 
 // Server is the panel HTTP application.
@@ -87,13 +91,17 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 	if err != nil {
 		return nil, err
 	}
+	idleDays := cfg.SessionIdleDays
+	if idleDays <= 0 {
+		idleDays = 7
+	}
 	s := &Server{
 		store:    st,
 		domains:  domains,
 		apps:     apps,
 		cfg:      cfg,
 		tmpl:     tmpl,
-		sessions: newSessionStore(),
+		sessions: newSessionStore(st, time.Duration(idleDays)*24*time.Hour),
 		// Published-DNS checks for the status page and the domain pages. The
 		// checker caches its own results, so page views do not each pay for a
 		// round of lookups (phase 13).

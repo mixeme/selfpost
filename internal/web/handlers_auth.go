@@ -152,15 +152,24 @@ func (s *Server) submitLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := s.sessions.Create(admin.Username)
+	s.setSessionCookie(w, token)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// setSessionCookie (re)issues the session cookie with a fresh Max-Age equal
+// to the sliding idle window (plan B.1), so the browser-side expiry tracks
+// whatever the database row was just set to — at login, and again whenever
+// requireAuth extends an active session.
+func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.sessionCookie(),
 		Value:    token,
 		Path:     "/",
+		MaxAge:   s.sessions.MaxAge(),
 		HttpOnly: true,
 		Secure:   s.cfg.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // handleLogout destroys the session and clears the cookie.

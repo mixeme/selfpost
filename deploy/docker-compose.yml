@@ -39,6 +39,8 @@ services:
       # How long the send log keeps rows before the background sweep deletes
       # them (spec 7.3, 9) — the main driver of /data growth over time.
       SEND_LOG_RETENTION_DAYS: "${SEND_LOG_RETENTION_DAYS:-90}"
+      # Sliding idle timeout for the panel login session, in days (spec 7.6.6).
+      PANEL_SESSION_IDLE_DAYS: "${PANEL_SESSION_IDLE_DAYS:-7}"
     volumes:
       # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
       # sasldb2, sender map, setup token. Back this up (panel button or the
