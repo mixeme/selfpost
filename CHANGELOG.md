@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: login sessions now persist in SQLite instead of memory, so an
+  administrator's login survives a container restart or redeploy. Only the
+  SHA-256 of the session token is stored, never the token itself. The
+  absolute 12-hour TTL is replaced by a **sliding idle timeout**
+  (`PANEL_SESSION_IDLE_DAYS`, default 7 days, no absolute cap): the
+  monitoring screens' background polling does not count as activity, so a
+  forgotten open tab does not keep a session alive forever. Changing the
+  password still signs out every other session.
 - panel: security headers on every response — `Content-Security-Policy`,
   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and
   `Strict-Transport-Security` where the deployment is HTTPS-only. They are
