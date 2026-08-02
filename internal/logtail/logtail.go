@@ -245,8 +245,11 @@ func follow(ctx context.Context, path string, handle func(string)) error {
 			}
 			pos, _ := f.Seek(0, io.SeekCurrent)
 			if !os.SameFile(info, ni) || ni.Size() < pos {
-				// Rotated away or truncated: reopen from the start of the new
-				// file. Any tail of the old file was already drained above.
+				// Rotated away or truncated: the old (renamed) inode may have
+				// gained lines between the drain() above and this check, since
+				// Postfix keeps writing to it until it reloads. Drain it once
+				// more before switching so nothing in that gap is lost.
+				drain()
 				if err := openAt(0, io.SeekStart); err != nil {
 					log.Printf("log-tailer: reopen %s: %v", path, err)
 				}

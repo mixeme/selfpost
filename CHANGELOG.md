@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- ops: `mail.log` rotation switched from `copytruncate` to rename +
+  `postfix reload` (the same mechanism `postfix logrotate` itself uses),
+  eliminating the up-to-one-second window in which `copytruncate` could drop
+  in-flight delivery lines — a lost line meant a send-log row stuck at
+  `queued` forever. `logrotate-mail.conf` keeps `create 0644 root root`
+  rather than `nocreate`: verified on a live container that letting Postfix
+  recreate the file itself on reload produces `0600`, which the unprivileged
+  panel process cannot read, breaking the mail-log view until the next
+  restart. The panel's log-tailer (`internal/logtail`) re-drains the old file
+  descriptor once more right before switching to the rotated one, closing a
+  similar small window between polls; a missing `mail.log` right after
+  rotation is now a normal empty screen rather than a logged error.
 - panel: login sessions now persist in SQLite instead of memory, so an
   administrator's login survives a container restart or redeploy. Only the
   SHA-256 of the session token is stored, never the token itself. The
