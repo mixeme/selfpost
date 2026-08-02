@@ -10,8 +10,9 @@ signing, and is configured once through the panel. It is **outbound only** — i
 does not receive mail, provide mailboxes, or offer webmail.
 
 > **Status: under active development.** See [docs/specification.md](docs/specification.md)
-> for the full requirements and [docs/implementation-plan.md](docs/implementation-plan.md)
-> for the phased build plan.
+> for the full requirements, [docs/implementation-plan.md](docs/implementation-plan.md)
+> for the phased build plan, and [docs/security.md](docs/security.md) for the
+> security trade-offs that were accepted knowingly.
 
 ## Requirements (site checklist)
 
