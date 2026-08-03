@@ -30,8 +30,8 @@
     {{if .QueueError}}
     <p class="error">{{.QueueError}}</p>
     {{else}}
-    <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}
-    <a href="/queue">Full queue</a></p>
+    <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}</p>
+    <a class="btn" href="/queue">Full queue</a>
     {{end}}
   </div>
 

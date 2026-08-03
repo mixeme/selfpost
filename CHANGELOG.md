@@ -19,8 +19,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   render as bold blue text while everything else was a button, so the same
   kind of control looked like two different things, sometimes within one card.
   They are all buttons now: filled for a card's own action, compact and
-  outlined where actions cluster in a table row or the nav bar. An `<a>` is
-  once again only used for navigation.
+  outlined where actions cluster in a table row or the nav bar. The two
+  actions that are really navigations — "Delete domain" and the status page's
+  "Full queue" — are anchors carrying the same button styling. A bare link is
+  left only where it reads as part of a sentence, a table cell or the nav.
 - panel: on the domain page **Add an application** now sits directly above the
   **Applications** list — the same order the domains page uses for its own add
   form — instead of being stranded below the domain rate limit.
