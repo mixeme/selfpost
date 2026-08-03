@@ -47,7 +47,7 @@
     <span class="muted">{{.User}}</span>
     {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
     <form class="inline" method="post" action="/logout">
-      <button type="submit" class="danger">Sign out</button>
+      <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
     </form>
   </div>
 </nav>
@@ -68,3 +68,6 @@
      two drawers with handles is the picture of an archive. */}}
 {{define "icon-backup"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.75" y="1.75" width="10.5" height="12.5" rx="1.15"/><path d="M2.75 8h10.5"/><path d="M6.4 4.85h3.2M6.4 11.15h3.2"/></svg>{{end}}
 {{define "icon-account"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.4" r="2.75"/><path d="M2.9 14.25a5.1 5.1 0 0 1 10.2 0"/></svg>{{end}}
+{{/* Sign out is the one icon here that marks an action rather than a page: an
+     open door with the arrow leading out of it. */}}
+{{define "icon-sign-out"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.1 14.25H3.65a1.15 1.15 0 0 1-1.15-1.15V2.9a1.15 1.15 0 0 1 1.15-1.15H6.1"/><path d="M10.6 11.15 13.75 8 10.6 4.85"/><path d="M13.75 8H6.35"/></svg>{{end}}
