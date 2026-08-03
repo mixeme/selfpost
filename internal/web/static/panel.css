@@ -27,8 +27,16 @@ input {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
   border: 1px solid #cfd4da; border-radius: 6px; background: #fff;
 }
-button {
-  margin-top: 1.2rem; padding: 0.6rem 1.1rem; font-size: 1rem; font-weight: 600;
+/* One vocabulary for actions. Anything that performs an action looks like a
+   button; an <a> stays a plain link and is only used for navigation. Several
+   actions used to render as bold blue text instead — a POST wrapped in
+   form.inline, a <details> toggle, the delete links — which read as links and
+   left two appearances for the same kind of control. They all get the button
+   look now: filled for a card's own action, and the compact outlined variant
+   further down where actions cluster (table rows, the nav bar). */
+button, a.danger {
+  display: inline-block; margin-top: 1.2rem; padding: 0.6rem 1.1rem;
+  font: inherit; font-size: 1rem; font-weight: 600; text-decoration: none;
   color: #fff; background: #2563eb; border: 0; border-radius: 6px; cursor: pointer;
 }
 button:hover { background: #1d4ed8; }
@@ -36,12 +44,12 @@ button:hover { background: #1d4ed8; }
 .muted { color: #6b7280; }
 .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.2rem; }
 .topbar .actions { display: flex; gap: 0.9rem; align-items: baseline; }
+/* form.inline only exists so a POST can sit next to other content without a
+   form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
-form.inline button { background: none; color: #2563eb; padding: 0; margin: 0; font-weight: 600; }
-form.inline button:hover { text-decoration: underline; background: none; }
 main { max-width: 48rem; }
 .card + .card { margin-top: 1.2rem; }
-/* Two cards side by side on a wide viewport; below 60rem the columns collapse
+/* Two cards side by side on a wide viewport; below 52rem the columns collapse
    and the grid gap keeps the same vertical rhythm as .card + .card. The inner
    margin-top is cleared because the gap already spaces the pair. */
 .split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
@@ -55,7 +63,6 @@ th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e
 @media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
 td.actions { text-align: right; }
-a.danger { color: #b42318; }
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 0.85rem; background: #f0f2f4; border: 1px solid #e2e5e9; border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
 @media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
@@ -70,12 +77,14 @@ textarea { resize: vertical; }
 @media (prefers-color-scheme: dark) {
   select, textarea { background: #14171a !important; color: inherit !important; border-color: #2b3138 !important; }
 }
-button.danger { background: #b42318; }
-button.danger:hover { background: #912018; }
-form.inline button.danger { background: none; color: #b42318; }
-form.inline button.danger:hover { background: none; }
-td.actions form.inline, td.actions details { margin-left: 0.6rem; }
-details summary { cursor: pointer; color: #2563eb; font-weight: 600; }
+button.danger, a.danger { background: #b42318; }
+button.danger:hover, a.danger:hover { background: #912018; }
+td.actions form.inline, td.actions details { margin: 0.4rem 0 0 0.5rem; }
+/* The disclosure toggle is an action too, so it is drawn as a button (see the
+   compact rule below); the marker is dropped because the pressed background
+   already shows the open state. */
+td.actions summary { display: inline-block; list-style: none; cursor: pointer; }
+td.actions summary::-webkit-details-marker { display: none; }
 details form { margin-top: 0.6rem; }
 .credential { border-color: #f5c518; background: #fffbeb; }
 @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
@@ -115,12 +124,31 @@ details form { margin-top: 0.6rem; }
 }
 .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
 .code-row .code { flex: 1; min-width: 0; }
-button.copy {
-  flex: none; margin-top: 0.3rem; padding: 0.45rem 0.7rem; font-size: 0.8rem;
+/* Compact outlined button: same affordance as the filled one but quiet enough
+   that several can sit together without shouting — the Copy buttons beside a
+   value, the per-application actions in a table row, Sign out in the nav. */
+button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+  margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
+  border-radius: 6px; white-space: nowrap;
   background: #eef1f5; color: #2563eb; border: 1px solid #cfd4da;
 }
-button.copy:hover { background: #e2e7ee; }
+button.copy:hover, td.actions button:hover, td.actions summary:hover,
+td.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
+button.copy { flex: none; margin-top: 0.3rem; }
+td.actions details[open] > summary { background: #dde3ec; }
+td.actions button.danger, td.actions a.danger {
+  color: #b42318; background: #fef3f2; border-color: #fecdca;
+}
+td.actions button.danger:hover, td.actions a.danger:hover { background: #fee4e2; }
 @media (prefers-color-scheme: dark) {
-  button.copy { background: #22262b !important; border-color: #2b3138 !important; }
-  button.copy:hover { background: #2b3138 !important; }
+  button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+    background: #22262b !important; border-color: #2b3138 !important;
+  }
+  button.copy:hover, td.actions button:hover, td.actions summary:hover,
+  td.actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
+  td.actions details[open] > summary { background: #313841 !important; }
+  td.actions button.danger, td.actions a.danger {
+    color: #f5a29b !important; background: #2d1211 !important; border-color: #6b201a !important;
+  }
+  td.actions button.danger:hover, td.actions a.danger:hover { background: #3d1a18 !important; }
 }
