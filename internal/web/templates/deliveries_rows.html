@@ -1,5 +1,5 @@
-{{define "sendlog_rows"}}
-<div id="sendlog-rows" hx-get="/deliveries/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
+{{define "deliveries_rows"}}
+<div id="deliveries-rows" hx-get="/deliveries/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
      hx-trigger="every 5s" hx-swap="outerHTML">
   {{if .Rows}}
   <table>

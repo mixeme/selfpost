@@ -30,19 +30,19 @@ var pageFiles = map[string][]string{
 	"backup":        {"templates/backup.html"},
 	"domain_detail": {"templates/domain_detail.html"},
 	"domain_delete": {"templates/domain_delete.html"},
-	"sendlog":       {"templates/sendlog.html", "templates/sendlog_rows.html"},
-	"queue":         {"templates/queue.html", "templates/queue_body.html"},
-	"logtail":       {"templates/logtail.html", "templates/logtail_body.html"},
+	"deliveries":    {"templates/deliveries.html", "templates/deliveries_rows.html"},
+	"mail_queue":    {"templates/mail_queue.html", "templates/mail_queue_body.html"},
+	"system_log":    {"templates/system_log.html", "templates/system_log_body.html"},
 	"status":        {"templates/status.html", "templates/status_body.html"},
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
 // template file, for standalone rendering by the HTMX polling endpoints.
 var fragmentFiles = map[string]string{
-	"sendlog_rows": "templates/sendlog_rows.html",
-	"queue_body":   "templates/queue_body.html",
-	"logtail_body": "templates/logtail_body.html",
-	"status_body":  "templates/status_body.html",
+	"deliveries_rows": "templates/deliveries_rows.html",
+	"mail_queue_body": "templates/mail_queue_body.html",
+	"system_log_body": "templates/system_log_body.html",
+	"status_body":     "templates/status_body.html",
 }
 
 func loadTemplates() (*templates, error) {

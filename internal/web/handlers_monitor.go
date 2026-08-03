@@ -19,11 +19,12 @@ const (
 	logTailLines    = 200
 )
 
-// handleSendLog renders the send-log monitoring page: server-side filters by
-// domain/application and pagination (spec 7.3.3). The row table itself is the
-// "sendlog_rows" fragment, shared verbatim with handleSendLogRows so the
-// initial page and its HTMX-polled refreshes never diverge.
-func (s *Server) handleSendLog(w http.ResponseWriter, r *http.Request) {
+// handleDeliveries renders the Deliveries page over the send log: server-side
+// filters by domain/application and pagination (spec 7.3.3). The row table
+// itself is the "deliveries_rows" fragment, shared verbatim with
+// handleDeliveriesRows so the initial page and its HTMX-polled refreshes never
+// diverge.
+func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	data, err := s.sendLogData(r)
 	if err != nil {
 		logf("panel: send log: %v", err)
@@ -32,20 +33,20 @@ func (s *Server) handleSendLog(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Title"] = "SelfPost — deliveries"
 	data["User"] = currentUser(r)
-	data["Active"] = "sendlog"
-	s.render(w, http.StatusOK, "sendlog", data)
+	data["Active"] = "deliveries"
+	s.render(w, http.StatusOK, "deliveries", data)
 }
 
-// handleSendLogRows serves the HTMX polling fragment for the send-log table
+// handleDeliveriesRows serves the HTMX polling fragment for the delivery table
 // (spec 7.1: fragment endpoints return HTML, not JSON).
-func (s *Server) handleSendLogRows(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
 	data, err := s.sendLogData(r)
 	if err != nil {
 		logf("panel: send log rows: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.renderFragment(w, http.StatusOK, "sendlog_rows", data)
+	s.renderFragment(w, http.StatusOK, "deliveries_rows", data)
 }
 
 // sendLogData reads the domain/app filters and page number off the query
@@ -109,22 +110,22 @@ func parsePage(v string) int {
 	return n
 }
 
-// handleQueue renders the mail-queue monitoring page (spec 7.2.11).
-func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
+// handleMailQueue renders the Mail queue page (spec 7.2.11).
+func (s *Server) handleMailQueue(w http.ResponseWriter, r *http.Request) {
 	out, errText := readQueue()
-	s.render(w, http.StatusOK, "queue", map[string]any{
+	s.render(w, http.StatusOK, "mail_queue", map[string]any{
 		"Title":  "SelfPost — mail queue",
 		"User":   currentUser(r),
-		"Active": "queue",
+		"Active": "mail_queue",
 		"Output": out,
 		"Error":  errText,
 	})
 }
 
-// handleQueueBody serves the HTMX polling fragment for the queue view.
-func (s *Server) handleQueueBody(w http.ResponseWriter, r *http.Request) {
+// handleMailQueueBody serves the HTMX polling fragment for the queue view.
+func (s *Server) handleMailQueueBody(w http.ResponseWriter, r *http.Request) {
 	out, errText := readQueue()
-	s.renderFragment(w, http.StatusOK, "queue_body", map[string]any{
+	s.renderFragment(w, http.StatusOK, "mail_queue_body", map[string]any{
 		"Output": out,
 		"Error":  errText,
 	})
@@ -142,22 +143,22 @@ func readQueue() (string, string) {
 	return out, ""
 }
 
-// handleLogTail renders the mail.log monitoring page (spec 7.2.13).
-func (s *Server) handleLogTail(w http.ResponseWriter, r *http.Request) {
+// handleSystemLog renders the System log page over mail.log (spec 7.2.13).
+func (s *Server) handleSystemLog(w http.ResponseWriter, r *http.Request) {
 	lines, errText := s.readLogTail()
-	s.render(w, http.StatusOK, "logtail", map[string]any{
+	s.render(w, http.StatusOK, "system_log", map[string]any{
 		"Title":  "SelfPost — system log",
 		"User":   currentUser(r),
-		"Active": "logtail",
+		"Active": "system_log",
 		"Lines":  lines,
 		"Error":  errText,
 	})
 }
 
-// handleLogTailBody serves the HTMX polling fragment for the log-tail view.
-func (s *Server) handleLogTailBody(w http.ResponseWriter, r *http.Request) {
+// handleSystemLogBody serves the HTMX polling fragment for the log-tail view.
+func (s *Server) handleSystemLogBody(w http.ResponseWriter, r *http.Request) {
 	lines, errText := s.readLogTail()
-	s.renderFragment(w, http.StatusOK, "logtail_body", map[string]any{
+	s.renderFragment(w, http.StatusOK, "system_log_body", map[string]any{
 		"Lines": lines,
 		"Error": errText,
 	})
