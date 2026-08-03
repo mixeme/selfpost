@@ -79,10 +79,13 @@ func (s *Server) render(w http.ResponseWriter, status int, page string, data any
 	// The layout's navigation compares .Active against each item, so the key
 	// must exist on every authenticated page. Defaulting it here keeps a page
 	// that forgets it from failing to render — it simply highlights nothing.
+	// .Version, shown in the layout's footer, is supplied the same way: it is
+	// the same value on every page, so no handler should have to pass it.
 	if m, ok := data.(map[string]any); ok {
 		if _, has := m["Active"]; !has {
 			m["Active"] = ""
 		}
+		m["Version"] = s.cfg.Version
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {
