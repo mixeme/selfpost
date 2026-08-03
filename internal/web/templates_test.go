@@ -99,7 +99,7 @@ func TestNavMarksActivePage(t *testing.T) {
 	var buf bytes.Buffer
 	err = tmpl.pages["dashboard"].ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":   "admin",
-		"Active": "queue",
+		"Active": "mail_queue",
 	})
 	if err != nil {
 		t.Fatalf("execute nav: %v", err)
