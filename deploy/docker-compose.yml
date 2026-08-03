@@ -41,6 +41,10 @@ services:
       SEND_LOG_RETENTION_DAYS: "${SEND_LOG_RETENTION_DAYS:-90}"
       # Sliding idle timeout for the panel login session, in days (spec 7.6.6).
       PANEL_SESSION_IDLE_DAYS: "${PANEL_SESSION_IDLE_DAYS:-7}"
+      # Resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly, so they
+      # report what the internet sees rather than what this host's own stub
+      # resolver synthesises. Empty uses public defaults.
+      SELFPOST_DNS_RESOLVERS: "${SELFPOST_DNS_RESOLVERS:-}"
     volumes:
       # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
       # sasldb2, sender map, setup token. Back this up (panel button or the
