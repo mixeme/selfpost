@@ -94,8 +94,12 @@ details form { margin-top: 0.6rem; }
    the entries, reading as a third row of navigation. Shortening labels would buy
    the ~200px back but undo the point of naming each entry after its page. Rows
    rather than columns: a two-column grid of entries came out a third taller
-   (107px against 83px) and no easier to read. Entries stay first, in the
-   document order, so tabbing reaches the pages before Sign out. */
+   (107px against 83px) and no easier to read.
+   The session sits on top, at the right edge, and the page entries below — the
+   usual arrangement, and the layout template puts the session first so the
+   reading and tab order follow what the eye sees rather than being flipped by a
+   CSS `order`. The cost is that Sign out is the bar's first tab stop; nothing
+   activates on focus, so that is a reordering, not a hazard. */
 .nav {
   display: flex; flex-direction: column; align-items: stretch;
   gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
