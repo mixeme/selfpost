@@ -35,6 +35,16 @@
      .User and get no nav. */}}
 {{define "nav"}}
 <nav class="nav">
+  {{/* The session block is first here because it is drawn first: it is the top
+       row of the bar (see .nav in panel.css), and putting it first in the
+       document keeps the tab order matching the visual one. */}}
+  <div class="session">
+    <span class="muted">{{.User}}</span>
+    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
+    <form class="inline" method="post" action="/logout">
+      <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
+    </form>
+  </div>
   <div class="links">
     {{if eq .Active "status"}}<span aria-current="page">{{template "icon-status"}}Status</span>{{else}}<a href="/status">{{template "icon-status"}}Status</a>{{end}}
     {{if eq .Active "domains"}}<span aria-current="page">{{template "icon-domains"}}Domains</span>{{else}}<a href="/domains">{{template "icon-domains"}}Domains</a>{{end}}
@@ -42,13 +52,6 @@
     {{if eq .Active "mail_queue"}}<span aria-current="page">{{template "icon-mail-queue"}}Mail queue</span>{{else}}<a href="/mail-queue">{{template "icon-mail-queue"}}Mail queue</a>{{end}}
     {{if eq .Active "system_log"}}<span aria-current="page">{{template "icon-system-log"}}System log</span>{{else}}<a href="/system-log">{{template "icon-system-log"}}System log</a>{{end}}
     {{if eq .Active "backup"}}<span aria-current="page">{{template "icon-backup"}}Backup</span>{{else}}<a href="/backup">{{template "icon-backup"}}Backup</a>{{end}}
-  </div>
-  <div class="session">
-    <span class="muted">{{.User}}</span>
-    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
-    <form class="inline" method="post" action="/logout">
-      <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
-    </form>
   </div>
 </nav>
 {{end}}
