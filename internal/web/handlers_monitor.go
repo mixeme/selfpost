@@ -30,7 +30,7 @@ func (s *Server) handleSendLog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data["Title"] = "SelfPost — send log"
+	data["Title"] = "SelfPost — deliveries"
 	data["User"] = currentUser(r)
 	data["Active"] = "sendlog"
 	s.render(w, http.StatusOK, "sendlog", data)
@@ -146,7 +146,7 @@ func readQueue() (string, string) {
 func (s *Server) handleLogTail(w http.ResponseWriter, r *http.Request) {
 	lines, errText := s.readLogTail()
 	s.render(w, http.StatusOK, "logtail", map[string]any{
-		"Title":  "SelfPost — mail log",
+		"Title":  "SelfPost — system log",
 		"User":   currentUser(r),
 		"Active": "logtail",
 		"Lines":  lines,
