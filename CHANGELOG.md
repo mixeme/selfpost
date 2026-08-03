@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-03
+
 ### Fixed
 
 - panel: the PTR (reverse DNS) check no longer reports a correctly published
