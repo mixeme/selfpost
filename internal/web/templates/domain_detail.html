@@ -101,6 +101,11 @@
   lost, generate a new one.</p>
 </div>
 
+{{/* Applications and its create form sit side by side on a wide viewport: the
+     table is read far more often than the form, and pairing them saves scrolling
+     past the list to add one. On a narrow viewport the .split grid stacks them
+     again, list first. */}}
+<div class="split">
 <div class="card">
   <h2>Applications</h2>
   <p class="muted">Each application is a SASL login/password an app or script
@@ -172,8 +177,37 @@
     </tbody>
   </table>
   {{else}}
-  <p class="muted">No applications yet. Create one below.</p>
+  <p class="muted">No applications yet. Create the first one with the
+  <strong>Add an application</strong> form.</p>
   {{end}}
+</div>
+
+<div class="card">
+  <h2>Add an application</h2>
+  <form method="post" action="/domains/{{.Domain.ID}}/applications">
+    <label for="login">Login</label>
+    <input id="login" name="login" type="text" placeholder="prod-server"
+           autocomplete="off" autocapitalize="none" spellcheck="false"
+           value="{{.FormLogin}}" required>
+
+    <label for="mode">Address mode</label>
+    <select id="mode" name="mode" data-list-mode="{{.List}}">
+      <option value="{{.Wildcard}}" {{if eq .FormMode .Wildcard}}selected{{end}}>Any address of the domain</option>
+      <option value="{{.List}}" {{if eq .FormMode .List}}selected{{end}}>Specific addresses (list)</option>
+    </select>
+
+    <div data-addresses>
+      <label for="addresses">Addresses (one per line or comma-separated)</label>
+      <textarea id="addresses" name="addresses" rows="3"
+                placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
+    </div>
+
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <button type="submit">Create application</button>
+  </form>
+  <p class="muted">A strong password is generated and shown once. The login must
+  be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
+</div>
 </div>
 
 <div class="card">
@@ -209,33 +243,6 @@
     <button type="submit" class="danger">Remove limit</button>
   </form>
   {{end}}
-</div>
-
-<div class="card">
-  <h2>Add an application</h2>
-  <form method="post" action="/domains/{{.Domain.ID}}/applications">
-    <label for="login">Login</label>
-    <input id="login" name="login" type="text" placeholder="prod-server"
-           autocomplete="off" autocapitalize="none" spellcheck="false"
-           value="{{.FormLogin}}" required>
-
-    <label for="mode">Address mode</label>
-    <select id="mode" name="mode" data-list-mode="{{.List}}">
-      <option value="{{.Wildcard}}" {{if eq .FormMode .Wildcard}}selected{{end}}>Any address of the domain</option>
-      <option value="{{.List}}" {{if eq .FormMode .List}}selected{{end}}>Specific addresses (list)</option>
-    </select>
-
-    <div data-addresses>
-      <label for="addresses">Addresses (one per line or comma-separated)</label>
-      <textarea id="addresses" name="addresses" rows="3"
-                placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
-    </div>
-
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    <button type="submit">Create application</button>
-  </form>
-  <p class="muted">A strong password is generated and shown once. The login must
-  be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
 </div>
 
 <div class="card">

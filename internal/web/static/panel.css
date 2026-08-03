@@ -41,6 +41,13 @@ form.inline button { background: none; color: #2563eb; padding: 0; margin: 0; fo
 form.inline button:hover { text-decoration: underline; background: none; }
 main { max-width: 48rem; }
 .card + .card { margin-top: 1.2rem; }
+/* Two cards side by side on a wide viewport; below 60rem the columns collapse
+   and the grid gap keeps the same vertical rhythm as .card + .card. The inner
+   margin-top is cleared because the gap already spaces the pair. */
+.split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+.split > .card + .card { margin-top: 0; }
+.card + .split, .split + .card { margin-top: 1.2rem; }
+@media (max-width: 52rem) { .split { grid-template-columns: minmax(0, 1fr); } }
 .flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
 @media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
 table { width: 100%; border-collapse: collapse; }
