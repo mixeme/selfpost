@@ -105,7 +105,7 @@ func TestNavMarksActivePage(t *testing.T) {
 		t.Fatalf("execute nav: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `<span aria-current="page">Queue</span>`) {
+	if !strings.Contains(out, `<span aria-current="page">Mail queue</span>`) {
 		t.Errorf("active page is not marked:\n%s", out)
 	}
 	if strings.Contains(out, `href="/queue"`) {
