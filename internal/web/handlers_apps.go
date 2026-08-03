@@ -96,16 +96,26 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		return
 	}
 
+	// What DNS actually publishes for the domain today, checked against the key
+	// this server signs with (phase 13.B). Cached by the checker, so
+	// re-rendering the page after a form post costs nothing.
+	dns, srv := s.domainDNS(d, record, false)
+
 	s.render(w, status, "domain_detail", map[string]any{
 		"Title":  "SelfPost — " + d.Name,
 		"User":   currentUser(r),
 		"Active": "domains",
 		"Domain": d,
 		"Record": record,
-		// What DNS actually publishes for the domain today, checked against the
-		// key this server signs with (phase 13.B). Cached by the checker, so
-		// re-rendering the page after a form post costs nothing.
-		"DNS": s.domainDNS(d, record, false),
+		"DNS":    dns,
+		// SPF and DMARC are the operator's to write — SelfPost cannot generate
+		// them the way it generates the DKIM record — so the page shows what
+		// this server expects rather than leaving it to the documentation. The
+		// same builders phrase the suggestions in the check messages, so the
+		// page and the checks below it never recommend different records.
+		"SPFExample":   dnscheck.SPFExample(s.cfg.Hostname, srv.IPs),
+		"DMARCName":    dnscheck.DMARCRecordName(d.Name),
+		"DMARCExample": dnscheck.DMARCExample(d.Name),
 		// Client connection settings (the same for every domain on this
 		// instance): the hostname clients connect to, and whether the optional
 		// submission listener is enabled in this deployment.
@@ -131,16 +141,18 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
 // records (phase 13.B). The server's own address comes from the (separately
 // cached) hostname check, so the SPF heuristic knows which IP it is looking for
-// and no extra environment variable is needed. force bypasses the cache, for the
-// Re-check button.
-func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, force bool) dnscheck.Domain {
+// and no extra environment variable is needed. That server result is returned
+// alongside, because the page's suggested SPF record is built from the same
+// addresses. force bypasses the cache, for the Re-check button.
+func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, force bool) (dnscheck.Domain, dnscheck.Server) {
 	srv := s.dns.Server(s.cfg.Hostname, false)
 	return s.dns.Domain(dnscheck.Query{
 		Name:         d.Name,
 		Selector:     d.DKIMSelector,
 		ExpectedDKIM: record.Value,
+		Hostname:     srv.Hostname,
 		ServerIPs:    srv.IPs,
-	}, force)
+	}, force), srv
 }
 
 // handleDomainDNSRecheck re-runs the domain's DNS checks ignoring the cache and

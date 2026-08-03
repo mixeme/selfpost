@@ -47,7 +47,7 @@ func (c *Checker) checkSPF(ctx context.Context, q Query) Result {
 	case !found || len(records) == 0:
 		return Result{
 			Status: health.StatusError,
-			Detail: fmt.Sprintf("No SPF record is published for %s. Publish a TXT record such as \"v=spf1 ip4:%s -all\" — without it receivers have nothing authorising this server to send as the domain.", q.Name, ips[0]),
+			Detail: fmt.Sprintf("No SPF record is published for %s. Publish a TXT record such as %q — without it receivers have nothing authorising this server to send as the domain.", q.Name, SPFExample(q.Hostname, q.ServerIPs)),
 		}
 	case len(records) > 1:
 		return Result{

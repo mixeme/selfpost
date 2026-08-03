@@ -66,12 +66,13 @@ type Domain struct {
 
 // Query describes the domain to check. ExpectedDKIM is the TXT value the panel
 // tells the operator to publish (domain.DKIMRecord.Value), so the check
-// compares DNS against the key this server actually signs with. ServerIPs comes
-// from a preceding Server check.
+// compares DNS against the key this server actually signs with. Hostname and
+// ServerIPs identify this server and come from a preceding Server check.
 type Query struct {
 	Name         string
 	Selector     string
 	ExpectedDKIM string
+	Hostname     string
 	ServerIPs    []string
 }
 

@@ -61,7 +61,7 @@ func (c *Checker) checkDKIM(ctx context.Context, q Query) Result {
 // checkDMARC reports whether the domain publishes a DMARC policy. DMARC is not
 // required for delivery, so its absence is advice (warn), not a fault.
 func (c *Checker) checkDMARC(ctx context.Context, domainName string) Result {
-	name := "_dmarc." + domainName
+	name := DMARCRecordName(domainName)
 	txt, found, err := c.lookupTXT(ctx, name)
 	if err != nil {
 		return lookupFailed("the DMARC record", err)
@@ -76,7 +76,7 @@ func (c *Checker) checkDMARC(ctx context.Context, domainName string) Result {
 	if !found || len(records) == 0 {
 		return Result{
 			Status: health.StatusWarn,
-			Detail: fmt.Sprintf("No DMARC record at %s. Delivery works without one, but publishing at least \"v=DMARC1; p=none; rua=mailto:you@%s\" tells receivers what to do with mail that fails DKIM and gets you reports.", name, domainName),
+			Detail: fmt.Sprintf("No DMARC record at %s. Delivery works without one, but publishing at least %q tells receivers what to do with mail that fails DKIM and gets you reports.", name, DMARCExample(domainName)),
 		}
 	}
 	if len(records) > 1 {
