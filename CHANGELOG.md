@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: the domain page now shows the **SPF and DMARC records it expects**,
+  with host, value and a Copy button, next to the DKIM record it already
+  showed — previously it only said "also configure SPF and DMARC (see the
+  documentation)" and the concrete example appeared only once a check had
+  already failed. The SPF value names the addresses this server's hostname
+  resolves to (falling back to an `a:` mechanism if it does not resolve), and
+  the DNS checks below build their remediation advice from the same source, so
+  the page and its checks cannot recommend different records.
+- panel: one appearance for actions. Several controls — a POST wrapped in an
+  inline form (Re-check, Export domain, Sign out, New password…), the
+  `<details>` toggles in the applications table, the delete links — used to
+  render as bold blue text while everything else was a button, so the same
+  kind of control looked like two different things, sometimes within one card.
+  They are all buttons now: filled for a card's own action, compact and
+  outlined where actions cluster in a table row or the nav bar. An `<a>` is
+  once again only used for navigation.
+- panel: on the domain page, **Applications** and **Add an application** sit
+  side by side on a wide viewport instead of the form being stranded below the
+  domain rate limit; they stack again on a narrow one.
 - ci: hermetic container e2e suite (`test/e2e`, a separate Go module) gates
   image publishing — `make e2e` locally, and `go test ./...` in `test/e2e` as
   a required step in `release.yml` before a version tag's image is pushed.

@@ -44,8 +44,51 @@
     <button type="button" class="copy">Copy</button>
   </div>
 
-  <p class="muted">Also configure SPF and DMARC for the domain (see the
-  documentation). Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+  <p class="muted">Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+</div>
+
+<div class="card">
+  <h2>SPF and DMARC records</h2>
+  <p class="muted">These two are not generated the way the DKIM record above is —
+  they are policy, and the domain may already publish an SPF record for other
+  senders. What follows is what this server expects to see and what the checks
+  below look for. Publish both as TXT records.</p>
+
+  <label>SPF — host / name</label>
+  <div class="code-row">
+    <span class="code">{{.Domain.Name}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>SPF — value</label>
+  <div class="code-row">
+    <span class="code">{{.SPFExample}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <p class="muted">A domain may have only one SPF record. If it already has one,
+  do not add a second — add this server's mechanism to the existing record
+  instead, before its <code>all</code> term. <code>-all</code> at the end means
+  nothing else may send as the domain; use <code>~all</code> while other senders
+  are still being sorted out.</p>
+
+  <label>DMARC — host / name</label>
+  <div class="code-row">
+    <span class="code">{{.DMARCName}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>DMARC — value</label>
+  <div class="code-row">
+    <span class="code">{{.DMARCExample}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <p class="muted">Point <code>rua=</code> at a mailbox that is actually read —
+  the aggregate reports are how you find out who else sends as the domain.
+  <code>p=none</code> changes nothing about delivery, so it is safe to publish
+  straight away; tighten it to <code>p=quarantine</code> and then
+  <code>p=reject</code> once the reports come back clean.</p>
 </div>
 
 <div class="card">
