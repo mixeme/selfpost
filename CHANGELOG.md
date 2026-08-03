@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+- panel: every authenticated page now ends with the running version
+  (`SelfPost 1.1.0`) in a small footer. It is the value a backup manifest is
+  checked against on restore, and the first thing to establish when the panel
+  behaves unexpectedly. The login and setup pages deliberately do not show it.
+
 - panel: the domain page now shows the **SPF and DMARC records it expects**,
   with host, value and a Copy button, next to the DKIM record it already
   showed — previously it only said "also configure SPF and DMARC (see the

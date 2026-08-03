@@ -19,6 +19,11 @@
 <main>
 {{if .User}}{{template "nav" .}}{{end}}
 {{template "content" .}}
+{{/* The running version, on every authenticated page: it is what a backup
+     manifest is checked against on restore and the first thing to establish
+     when something behaves unexpectedly. Only for signed-in administrators —
+     the login and setup pages must not advertise it to the internet. */}}
+{{if .User}}<footer class="version">SelfPost {{.Version}}</footer>{{end}}
 </main>
 </body>
 </html>{{end}}

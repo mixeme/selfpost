@@ -3,6 +3,8 @@ package web
 import (
 	"bytes"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"path"
 	"regexp"
 	"strings"
@@ -24,6 +26,68 @@ func TestEveryPageResolvesNav(t *testing.T) {
 		if page.Lookup("nav") == nil {
 			t.Errorf("page %q does not resolve the shared nav template", name)
 		}
+	}
+}
+
+// The version comes from render(), not from each handler's data map, so the
+// footer is only correct as long as every page composes with the layout and
+// render keeps supplying the key. Both are asserted here rather than trusted.
+func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	rendered := 0
+	for name := range tmpl.pages {
+		var buf bytes.Buffer
+		err := tmpl.pages[name].ExecuteTemplate(&buf, "layout.html", map[string]any{
+			"Title": "t", "User": "admin", "Active": "", "Version": "9.9.9-test",
+		})
+		if err != nil {
+			// Pages whose content block needs more data than this cannot be
+			// rendered here; the footer is in the shared layout, so one page
+			// that does render proves it for all of them.
+			continue
+		}
+		rendered++
+		if !strings.Contains(buf.String(), "SelfPost 9.9.9-test") {
+			t.Errorf("page %q does not show the version in the layout footer", name)
+		}
+	}
+	if rendered == 0 {
+		t.Fatal("no page rendered, so the footer was never actually checked")
+	}
+
+	// Signed out (login, setup) the version must not be advertised.
+	var buf bytes.Buffer
+	if err := tmpl.pages["login"].ExecuteTemplate(&buf, "layout.html", map[string]any{
+		"Title": "t", "Active": "", "Version": "9.9.9-test",
+	}); err != nil {
+		t.Fatalf("execute login: %v", err)
+	}
+	if strings.Contains(buf.String(), "9.9.9-test") {
+		t.Errorf("the login page shows the version to unauthenticated visitors:\n%s", buf.String())
+	}
+}
+
+func TestRenderSuppliesTheVersion(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	s := &Server{tmpl: tmpl, cfg: Config{Version: "9.9.9-test"}}
+	rec := httptest.NewRecorder()
+	data := map[string]any{"Title": "t", "User": "admin"}
+	s.render(rec, http.StatusOK, "backup", data)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := data["Version"]; got != "9.9.9-test" {
+		t.Errorf("render did not supply Version (got %v)", got)
+	}
+	if !strings.Contains(rec.Body.String(), "SelfPost 9.9.9-test") {
+		t.Errorf("rendered page does not show the version:\n%s", rec.Body.String())
 	}
 }
 
