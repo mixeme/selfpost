@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- panel: the PTR (reverse DNS) check no longer reports a correctly published
+  record as wrong. The checks went through the container's own resolver, which
+  forwards to the host's systemd-resolved — and systemd-resolved answers the
+  reverse lookup of the machine's own IP from the local hostname instead of
+  asking public DNS. A server with `203.0.113.10 → selfpost.example.com` in DNS
+  was told its PTR pointed at the provider-assigned hostname. All four
+  deliverability checks (PTR, SPF, DKIM, DMARC) now query recursive resolvers
+  directly, so the panel reports what a receiving mail server actually sees.
+  Set `SELFPOST_DNS_RESOLVERS` if outbound port 53 is closed or you run your
+  own recursor; it defaults to 1.1.1.1, 8.8.8.8 and 9.9.9.9.
+
 ### Changed
 
 - panel: the three monitoring pages now live at URLs that match their nav

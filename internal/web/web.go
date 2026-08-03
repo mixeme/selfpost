@@ -63,6 +63,11 @@ type Config struct {
 	// session expires (env PANEL_SESSION_IDLE_DAYS, plan B.1). Non-positive
 	// falls back to the 7-day default.
 	SessionIdleDays int
+	// DNSResolvers are the recursive resolvers the deliverability checks query
+	// (env SELFPOST_DNS_RESOLVERS). Empty uses dnscheck.DefaultResolvers. The
+	// checks must not go through the system resolver — see dnscheck's
+	// externalResolver — so this is how a closed network points them at its own.
+	DNSResolvers []string
 }
 
 // Server is the panel HTTP application.
@@ -105,7 +110,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		// Published-DNS checks for the status page and the domain pages. The
 		// checker caches its own results, so page views do not each pay for a
 		// round of lookups (phase 13).
-		dns: dnscheck.New(),
+		dns: dnscheck.New(cfg.DNSResolvers),
 		// Setup: a handful of attempts per minute per IP is plenty for a
 		// legitimate admin and blunts automated probing (spec 7.6.1).
 		setupLimiter: newRateLimiter(10, time.Minute),

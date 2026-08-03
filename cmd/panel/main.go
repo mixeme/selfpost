@@ -23,6 +23,7 @@ import (
 
 	"codeberg.org/mix/selfpost/internal/backup"
 	"codeberg.org/mix/selfpost/internal/buildinfo"
+	"codeberg.org/mix/selfpost/internal/dnscheck"
 	"codeberg.org/mix/selfpost/internal/logtail"
 	"codeberg.org/mix/selfpost/internal/store"
 )
@@ -61,6 +62,7 @@ type config struct {
 	submissionEnabled bool
 	trustedProxies    []*net.IPNet
 	sessionIdleDays   int
+	dnsResolvers      []string
 
 	// Read-only inputs to the panel's status page: the certificate Postfix
 	// serves and the two milter sockets it connects to. The defaults mirror
@@ -107,6 +109,9 @@ func loadConfig() config {
 		// Sliding session idle timeout (spec 7.6.6, plan B.1). Non-positive/invalid
 		// falls back to the 7-day default inside internal/web.
 		sessionIdleDays: envInt("PANEL_SESSION_IDLE_DAYS", 7),
+		// Recursive resolvers the deliverability checks query directly. Empty
+		// means dnscheck's public defaults; a closed network names its own here.
+		dnsResolvers: dnscheck.ParseResolvers(os.Getenv("SELFPOST_DNS_RESOLVERS")),
 
 		tlsCertFile:    envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
 		opendkimSocket: envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
