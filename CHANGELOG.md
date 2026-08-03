@@ -31,6 +31,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   no exemption from the panel's Content-Security-Policy — and are hidden from
   screen readers, which still announce the label alone.
 
+- panel: the navigation bar is laid out as two rows on purpose — the page
+  entries, then the signed-in user, Account and Sign out along the right edge.
+  It no longer fits on one line and used to wrap on its own, which left the
+  session block sitting left-aligned under the entries as if it were more
+  navigation.
+
 ## [0.2.0] - 2026-08-03
 
 - panel: every authenticated page now ends with the running version

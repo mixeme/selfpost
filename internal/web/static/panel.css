@@ -88,13 +88,24 @@ details form { margin-top: 0.6rem; }
 @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
+/* Two deliberate rows, not one. The six page entries need about 660px and the
+   session block another 260px, against the 738px the panel is wide — so the bar
+   was wrapping on its own, and the session landed left-aligned directly under
+   the entries, reading as a third row of navigation. Shortening labels would buy
+   the ~200px back but undo the point of naming each entry after its page. Rows
+   rather than columns: a two-column grid of entries came out a third taller
+   (107px against 83px) and no easier to read. Entries stay first, in the
+   document order, so tabbing reaches the pages before Sign out. */
 .nav {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
-  gap: 0.4rem 1rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
   border-bottom: 1px solid #e2e5e9;
 }
 @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
 .nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
+/* Pushed to the far edge so the two rows read as two blocks rather than as one
+   ragged list that happened to wrap. */
+.nav .session { justify-content: flex-end; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
    rather than a run of text — that is also why the bar centres its items
    instead of aligning them on the text baseline. Account is included: it is a
