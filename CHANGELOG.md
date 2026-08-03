@@ -25,6 +25,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `/mail-queue` (was `/queue`), System log at `/system-log` (was `/logtail`).
   Bookmarks to the old paths stop working.
 
+- panel: each entry in the navigation bar now carries an icon beside its label,
+  so the bar is scannable at a glance instead of a row of similar-length words.
+  The icons are inline SVG drawn in the entry's own colour — no extra request,
+  no exemption from the panel's Content-Security-Policy — and are hidden from
+  screen readers, which still announce the label alone.
+
 ## [0.2.0] - 2026-08-03
 
 - panel: every authenticated page now ends with the running version

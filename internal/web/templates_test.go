@@ -105,7 +105,9 @@ func TestNavMarksActivePage(t *testing.T) {
 		t.Fatalf("execute nav: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `<span aria-current="page">Mail queue</span>`) {
+	// The label is checked apart from the opening tag because each entry now
+	// carries an icon between the two.
+	if !strings.Contains(out, `<span aria-current="page">`) || !strings.Contains(out, `Mail queue</span>`) {
 		t.Errorf("active page is not marked:\n%s", out)
 	}
 	if strings.Contains(out, `href="/mail-queue"`) {
@@ -129,7 +131,7 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 		t.Fatalf("execute nav: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `<span aria-current="page">Status</span>`) {
+	if !strings.Contains(out, `<span aria-current="page">`) || !strings.Contains(out, `Status</span>`) {
 		t.Errorf("the status page is not marked active:\n%s", out)
 	}
 	if !strings.Contains(out, `href="/domains"`) {

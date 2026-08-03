@@ -89,19 +89,29 @@ details form { margin-top: 0.6rem; }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
 .nav {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
   gap: 0.4rem 1rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
   border-bottom: 1px solid #e2e5e9;
 }
 @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
-.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: baseline; }
-.nav .links a, .nav .links [aria-current] { padding: 0.2rem 0.5rem; border-radius: 6px; }
-.nav .links [aria-current] {
+.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
+/* Each entry pairs an icon with its label, so the entry itself is a flex row
+   rather than a run of text — that is also why the bar centres its items
+   instead of aligning them on the text baseline. Account is included: it is a
+   page like the others and would otherwise be the one bare word in the bar. */
+.nav a, .nav [aria-current] {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.2rem 0.5rem; border-radius: 6px;
+}
+.nav [aria-current] {
   font-weight: 600; color: #1b1f24; background: #e6ebf5; box-shadow: inset 0 -2px 0 #2563eb;
 }
 @media (prefers-color-scheme: dark) {
-  .nav .links [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
+  .nav [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
 }
+/* The icons draw in the entry's own colour, so the active entry's darker text
+   and a link's blue carry through without a second rule per state. */
+.nav .icon { width: 1rem; height: 1rem; flex: none; }
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
    everywhere. The class suffix is the check's own status value. */
