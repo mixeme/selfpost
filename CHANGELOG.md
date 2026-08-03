@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- panel: Deliveries now shows the subject as text rather than as its MIME
+  encoding. A subject in any non-Latin alphabet reaches the milter as RFC 2047
+  encoded-words (`=?utf-8?Q?=D0=9F…?=`), and the panel printed that verbatim —
+  unreadable, and as one unbreakable run wide enough to push the Status column
+  outside the card. Subjects are decoded when the message is journalled and
+  capped at 200 characters; the column clips anything still too long to one
+  line, with the full text in the tooltip. Rows logged before this release keep
+  their raw string. Subjects in the legacy single-byte charsets (windows-1251,
+  koi8-r) are still stored as sent — there is no decoder for them.
+
 ## [0.3.0] - 2026-08-03
 
 ### Fixed
