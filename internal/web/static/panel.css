@@ -109,8 +109,11 @@ details form { margin-top: 0.6rem; }
 @media (prefers-color-scheme: dark) {
   .nav [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
 }
-/* The icons draw in the entry's own colour, so the active entry's darker text
-   and a link's blue carry through without a second rule per state. */
+/* Sign out carries an icon too, so it needs the same row layout; its padding
+   and colours come from the compact button rule further down. */
+.nav button { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* The icons draw in the entry's own colour, so the active entry's darker text,
+   a link's blue and Sign out's red all carry through without a rule apiece. */
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
