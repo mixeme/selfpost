@@ -16,7 +16,12 @@
 <script src="/static/panel.js" defer></script>
 </head>
 <body>
-<main>
+{{/* The page name travels onto <main> as a class so the stylesheet can size a
+     page to what it holds — the monitoring pages are wider than the panel's
+     form pages (see main.page-* in panel.css). It is .Active, already carried
+     for the navigation, rather than a second field every handler would have to
+     remember to set. */}}
+<main class="page-{{.Active}}">
 {{if .User}}{{template "nav" .}}{{end}}
 {{template "content" .}}
 {{/* The running version, on every authenticated page: it is what a backup

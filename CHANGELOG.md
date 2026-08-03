@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: the three monitoring pages — Deliveries, Mail queue, System log — are
+  now laid out wider (64rem against the 48rem the rest of the panel keeps).
+  They carry data rather than prose: the send-log's seven columns had no room
+  to breathe, and the raw `mail.log` lines wrapped every second line.
+
 ### Fixed
 
 - panel: Deliveries now shows the subject as text rather than as its MIME
@@ -16,6 +23,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   line, with the full text in the tooltip. Rows logged before this release keep
   their raw string. Subjects in the legacy single-byte charsets (windows-1251,
   koi8-r) are still stored as sent — there is no decoder for them.
+
+- panel: table cells may now break inside a word, so no single long value can
+  push a table past the edge of its card. A 40-character recipient address did
+  it just as readily as an undecoded subject: a column is at least as wide as
+  the longest unbreakable run it holds, and email addresses have nothing to
+  break on. Timestamps are exempt and stay on one line.
 
 ## [0.3.0] - 2026-08-03
 

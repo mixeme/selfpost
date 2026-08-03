@@ -9,7 +9,7 @@
     <tbody>
       {{range .Rows}}
       <tr>
-        <td class="muted">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+        <td class="time muted">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
         <td>{{.Domain}}</td>
         <td>{{.AppLogin}}</td>
         <td>{{.From}}</td>

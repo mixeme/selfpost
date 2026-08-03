@@ -50,21 +50,38 @@ button:hover, a.btn:hover { background: #1d4ed8; }
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
 main { max-width: 48rem; }
+/* 48rem is a reading measure: right for the forms and prose that make up most
+   of the panel, and the width the navigation bar's two rows were sized for. The
+   three monitoring pages hold data instead — seven columns of send-log, and raw
+   mail.log lines that are long by nature — and at that width the send-log's
+   Subject and Status were fighting over the last inch while the log pages wrapped
+   every second line. They get a wider measure; every other page keeps the narrow
+   one. The class comes from the layout, which stamps the page name onto <main>. */
+main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
 @media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; }
+/* A table column is at least as wide as the longest unbreakable run inside it,
+   and the panel's tables are full of runs with nothing to break on: email
+   addresses, domains, queue ids. One 40-character recipient was enough to widen
+   the send-log past its card and hang Status over the edge. Cells may break mid
+   word, so a column can always be squeezed to the width available. */
+th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; overflow-wrap: anywhere; }
+/* The exception: a timestamp broken across two lines is unreadable, and it is
+   short enough to never be the reason a row does not fit. */
+td.time { white-space: nowrap; }
 @media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
 td.actions { text-align: right; }
-/* Subject is the one cell whose text we do not control, and a table sizes a
-   column to its longest unbreakable run — a long subject widens the row until
-   Status hangs past the card's edge. The clamp sits on an inner block box
-   rather than the cell because max-width on a <td> is only advisory in the
-   automatic table layout; the full subject stays in the tooltip. */
+/* Subject is the one cell whose text we do not control. Breaking mid word (the
+   rule above) keeps it inside the card, but a long subject would do it by
+   growing the row several lines tall, which buries the rows around it. So the
+   subject is clipped to one line instead, with the whole of it in the tooltip.
+   The clamp sits on an inner block box rather than the cell because max-width
+   on a <td> is only advisory in the automatic table layout. */
 td.subject span {
-  display: block; max-width: 16rem;
+  display: block; max-width: 18rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
