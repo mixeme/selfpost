@@ -58,6 +58,15 @@ th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e
 @media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
 td.actions { text-align: right; }
+/* Subject is the one cell whose text we do not control, and a table sizes a
+   column to its longest unbreakable run — a long subject widens the row until
+   Status hangs past the card's edge. The clamp sits on an inner block box
+   rather than the cell because max-width on a <td> is only advisory in the
+   automatic table layout; the full subject stays in the tooltip. */
+td.subject span {
+  display: block; max-width: 16rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 0.85rem; background: #f0f2f4; border: 1px solid #e2e5e9; border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
 @media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
@@ -77,12 +86,28 @@ textarea { resize: vertical; }
 }
 button.danger, a.danger { background: #b42318; }
 button.danger:hover, a.danger:hover { background: #912018; }
-td.actions form.inline, td.actions details { margin: 0.4rem 0 0 0.5rem; }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
    compact rule below); the marker is dropped because the pressed background
    already shows the open state. */
-td.actions summary { display: inline-block; list-style: none; cursor: pointer; }
-td.actions summary::-webkit-details-marker { display: none; }
+.actions summary { display: inline-block; list-style: none; cursor: pointer; }
+.actions summary::-webkit-details-marker { display: none; }
+/* Applications are a list of blocks, not table rows. As a table it fell apart:
+   four columns of which the last held six controls — two of them <details>
+   panels with textareas — never fit the panel's 48rem. The controls wrapped
+   into a staircase, .code on the login cell grew into a slab as tall as the
+   row, and the two text cells sat on the baseline halfway down it. One block
+   per application gives the identity a line of its own and the controls a row
+   of their own, at the width they actually need. */
+.apps { list-style: none; margin: 1.2rem 0 0; padding: 0; }
+.app { padding: 0.9rem 0; border-top: 1px solid #e2e5e9; }
+.app:last-child { padding-bottom: 0; }
+@media (prefers-color-scheme: dark) { .app { border-color: #2b3138 !important; } }
+.app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+.app-addr { margin: 0.15rem 0 0; word-break: break-all; }
+.app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+/* An open panel claims a row to itself: its textareas and number inputs want
+   the block's full width, not the width of the summary that opened them. */
+.app .actions > details[open] { flex: 1 0 100%; }
 details form { margin-top: 0.6rem; }
 .credential { border-color: #f5c518; background: #fffbeb; }
 @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
@@ -152,30 +177,32 @@ details form { margin-top: 0.6rem; }
 .code-row .code { flex: 1; min-width: 0; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
    that several can sit together without shouting — the Copy buttons beside a
-   value, the per-application actions in a table row. Sign out overrides this
-   with .danger below since signing out is a deliberate, singular action. */
-button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+   value, the controls of a table row or of an application block. Sign out
+   overrides this with .danger below since signing out is a deliberate,
+   singular action. .actions is the shared hook: a cell that holds controls, or
+   the control row of an application. */
+button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
   background: #eef1f5; color: #2563eb; border: 1px solid #cfd4da;
 }
-button.copy:hover, td.actions button:hover, td.actions summary:hover,
-td.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
+button.copy:hover, .actions button:hover, .actions summary:hover,
+.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
 button.copy { flex: none; margin-top: 0.3rem; }
-td.actions details[open] > summary { background: #dde3ec; }
-td.actions button.danger, td.actions a.danger, .nav button.danger {
+.actions details[open] > summary { background: #dde3ec; }
+.actions button.danger, .actions a.danger, .nav button.danger {
   color: #b42318; background: #fef3f2; border-color: #fecdca;
 }
-td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
+.actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
 @media (prefers-color-scheme: dark) {
-  button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+  button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
     background: #22262b !important; border-color: #2b3138 !important;
   }
-  button.copy:hover, td.actions button:hover, td.actions summary:hover,
-  td.actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
-  td.actions details[open] > summary { background: #313841 !important; }
-  td.actions button.danger, td.actions a.danger, .nav button.danger {
+  button.copy:hover, .actions button:hover, .actions summary:hover,
+  .actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
+  .actions details[open] > summary { background: #313841 !important; }
+  .actions button.danger, .actions a.danger, .nav button.danger {
     color: #f5a29b !important; background: #2d1211 !important; border-color: #6b201a !important;
   }
-  td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
+  .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
 }

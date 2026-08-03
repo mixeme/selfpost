@@ -180,21 +180,15 @@
   domain (<em>wildcard</em>) or only from a fixed list of addresses.</p>
 
   {{if .Apps}}
-  <table>
-    <thead>
-      <tr><th>Login</th><th>Mode</th><th>Addresses</th><th></th></tr>
-    </thead>
-    <tbody>
-      {{range .Apps}}
-      <tr>
-        <td class="code">{{.Login}}</td>
-        <td>{{if eq .AddressMode $.Wildcard}}Any address (@{{$.Domain.Name}}){{else}}List{{end}}</td>
-        <td class="muted">
-          {{if eq .AddressMode $.Wildcard}}*@{{$.Domain.Name}}{{else}}
-            {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}
-          {{end}}
-        </td>
-        <td class="actions">
+  <ul class="apps">
+    {{range .Apps}}
+      <li class="app">
+        <p class="app-login">{{.Login}}</p>
+        <p class="app-addr muted">
+          {{if eq .AddressMode $.Wildcard}}Any address of the domain — *@{{$.Domain.Name}}
+          {{else}}Fixed list — {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}
+        </p>
+        <div class="actions">
           <details>
             <summary>Edit mode</summary>
             <form method="post" action="/applications/{{.ID}}/mode">
@@ -238,11 +232,10 @@
                 data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
             <button type="submit" class="danger">Delete</button>
           </form>
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+        </div>
+      </li>
+    {{end}}
+  </ul>
   {{else}}
   <p class="muted">No applications yet. Add one above to get started.</p>
   {{end}}

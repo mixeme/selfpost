@@ -3,6 +3,7 @@ package milter
 import (
 	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,34 @@ func TestSessionRecordsRowPerRecipient(t *testing.T) {
 	}
 	if rec.entries[1].To != "b@example.net" {
 		t.Fatalf("entry[1].To = %q", rec.entries[1].To)
+	}
+}
+
+// A subject in any non-ASCII alphabet reaches the milter as RFC 2047
+// encoded-words; the journal stores the text, not the encoding.
+func TestHeaderDecodesEncodedSubject(t *testing.T) {
+	long := strings.Repeat("я", subjectMaxRunes+10)
+
+	for _, tc := range []struct {
+		name, raw, want string
+	}{
+		{"plain", "Hello there", "Hello there"},
+		{"utf8 q", "=?utf-8?Q?=D0=9F=D1=80=D0=BE=D0=B2=D0=B5=D1=80=D0=BA=D0=B0?=", "Проверка"},
+		{"utf8 b, folded across two words", "=?utf-8?B?0J/RgNC40LLQtdGC?=\r\n =?utf-8?B?INC80LjRgA==?=", "Привет мир"},
+		// No decoder for the legacy single-byte charsets: keep the header as
+		// sent rather than losing the subject entirely.
+		{"unknown charset", "=?windows-1251?B?z/Do4uXy?=", "=?windows-1251?B?z/Do4uXy?="},
+		{"too long", long, strings.Repeat("я", subjectMaxRunes) + "…"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &session{rec: &fakeRecorder{}}
+			if _, err := s.Header("Subject", tc.raw, mods(nil)); err != nil {
+				t.Fatalf("Header: %v", err)
+			}
+			if s.subject != tc.want {
+				t.Fatalf("subject = %q, want %q", s.subject, tc.want)
+			}
+		})
 	}
 }
 
