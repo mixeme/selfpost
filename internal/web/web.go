@@ -180,12 +180,12 @@ func (s *Server) Handler() http.Handler {
 
 	// Monitoring screens (spec 7.2.11-13): each page and its HTMX polling
 	// fragment (spec 7.1 — the /rows and /body endpoints return HTML, not JSON).
-	authed.HandleFunc("GET /sendlog", s.handleSendLog)
-	authed.HandleFunc("GET /sendlog/rows", s.handleSendLogRows)
-	authed.HandleFunc("GET /queue", s.handleQueue)
-	authed.HandleFunc("GET /queue/body", s.handleQueueBody)
-	authed.HandleFunc("GET /logtail", s.handleLogTail)
-	authed.HandleFunc("GET /logtail/body", s.handleLogTailBody)
+	authed.HandleFunc("GET /deliveries", s.handleSendLog)
+	authed.HandleFunc("GET /deliveries/rows", s.handleSendLogRows)
+	authed.HandleFunc("GET /mail-queue", s.handleQueue)
+	authed.HandleFunc("GET /mail-queue/body", s.handleQueueBody)
+	authed.HandleFunc("GET /system-log", s.handleLogTail)
+	authed.HandleFunc("GET /system-log/body", s.handleLogTailBody)
 
 	mux.Handle("/", s.requireAuth(authed))
 

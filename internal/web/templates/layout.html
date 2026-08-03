@@ -38,9 +38,9 @@
   <div class="links">
     {{if eq .Active "status"}}<span aria-current="page">Status</span>{{else}}<a href="/status">Status</a>{{end}}
     {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/domains">Domains</a>{{end}}
-    {{if eq .Active "sendlog"}}<span aria-current="page">Deliveries</span>{{else}}<a href="/sendlog">Deliveries</a>{{end}}
-    {{if eq .Active "queue"}}<span aria-current="page">Mail queue</span>{{else}}<a href="/queue">Mail queue</a>{{end}}
-    {{if eq .Active "logtail"}}<span aria-current="page">System log</span>{{else}}<a href="/logtail">System log</a>{{end}}
+    {{if eq .Active "sendlog"}}<span aria-current="page">Deliveries</span>{{else}}<a href="/deliveries">Deliveries</a>{{end}}
+    {{if eq .Active "queue"}}<span aria-current="page">Mail queue</span>{{else}}<a href="/mail-queue">Mail queue</a>{{end}}
+    {{if eq .Active "logtail"}}<span aria-current="page">System log</span>{{else}}<a href="/system-log">System log</a>{{end}}
     {{if eq .Active "backup"}}<span aria-current="page">Backup</span>{{else}}<a href="/backup">Backup</a>{{end}}
   </div>
   <div class="session">

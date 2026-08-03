@@ -1,5 +1,5 @@
 {{define "sendlog_rows"}}
-<div id="sendlog-rows" hx-get="/sendlog/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
+<div id="sendlog-rows" hx-get="/deliveries/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
      hx-trigger="every 5s" hx-swap="outerHTML">
   {{if .Rows}}
   <table>
@@ -22,8 +22,8 @@
   </table>
   <p class="muted">
     Page {{.Page}}{{if .LastPage}} of {{.LastPage}}{{end}}
-    {{if .HasPrev}} &middot; <a href="/sendlog?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.PrevPage}}">&larr; Newer</a>{{end}}
-    {{if .HasNext}} &middot; <a href="/sendlog?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.NextPage}}">Older &rarr;</a>{{end}}
+    {{if .HasPrev}} &middot; <a href="/deliveries?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.PrevPage}}">&larr; Newer</a>{{end}}
+    {{if .HasNext}} &middot; <a href="/deliveries?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.NextPage}}">Older &rarr;</a>{{end}}
   </p>
   {{else}}
   <p class="muted">No messages logged yet.</p>

@@ -187,10 +187,10 @@ func (c *panelClient) setRateLimit(path, allowedIP string, maxMessages, windowSe
 	return nil
 }
 
-// sendLogRows returns the raw /sendlog/rows HTML fragment, filtered to one
+// sendLogRows returns the raw /deliveries/rows HTML fragment, filtered to one
 // domain, for polling a row's status without parsing full HTML into structs.
 func (c *panelClient) sendLogRows(domain string) (string, error) {
-	_, body, err := c.get("/sendlog/rows?domain=" + url.QueryEscape(domain))
+	_, body, err := c.get("/deliveries/rows?domain=" + url.QueryEscape(domain))
 	return body, err
 }
 

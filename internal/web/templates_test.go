@@ -108,10 +108,10 @@ func TestNavMarksActivePage(t *testing.T) {
 	if !strings.Contains(out, `<span aria-current="page">Mail queue</span>`) {
 		t.Errorf("active page is not marked:\n%s", out)
 	}
-	if strings.Contains(out, `href="/queue"`) {
+	if strings.Contains(out, `href="/mail-queue"`) {
 		t.Errorf("active page still links to itself:\n%s", out)
 	}
-	if !strings.Contains(out, `href="/sendlog"`) {
+	if !strings.Contains(out, `href="/deliveries"`) {
 		t.Errorf("inactive pages are not linked:\n%s", out)
 	}
 }
