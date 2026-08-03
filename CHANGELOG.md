@@ -5,8 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-03
+
 - panel: every authenticated page now ends with the running version
-  (`SelfPost 1.1.0`) in a small footer. It is the value a backup manifest is
+  (`SelfPost 0.2.0`) in a small footer. It is the value a backup manifest is
   checked against on restore, and the first thing to establish when the panel
   behaves unexpectedly. The login and setup pages deliberately do not show it.
 
