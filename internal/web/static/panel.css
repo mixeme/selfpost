@@ -28,18 +28,20 @@ input {
   border: 1px solid #cfd4da; border-radius: 6px; background: #fff;
 }
 /* One vocabulary for actions. Anything that performs an action looks like a
-   button; an <a> stays a plain link and is only used for navigation. Several
-   actions used to render as bold blue text instead — a POST wrapped in
-   form.inline, a <details> toggle, the delete links — which read as links and
-   left two appearances for the same kind of control. They all get the button
-   look now: filled for a card's own action, and the compact outlined variant
-   further down where actions cluster (table rows, the nav bar). */
-button, a.danger {
+   button: a <button>, or an <a> carrying .btn/.danger where the action is a
+   plain navigation (the delete confirmation page, the full queue view).
+   Several of these used to render as bold blue text instead — a POST wrapped
+   in form.inline, a <details> toggle, the delete links — which read as links
+   and left two appearances for the same kind of control. They all get the
+   button look now: filled for a card's own action, and the compact outlined
+   variant further down where actions cluster (table rows, the nav bar). Bare
+   <a> is left for links that read as part of a sentence or a list. */
+button, a.btn, a.danger {
   display: inline-block; margin-top: 1.2rem; padding: 0.6rem 1.1rem;
   font: inherit; font-size: 1rem; font-weight: 600; text-decoration: none;
   color: #fff; background: #2563eb; border: 0; border-radius: 6px; cursor: pointer;
 }
-button:hover { background: #1d4ed8; }
+button:hover, a.btn:hover { background: #1d4ed8; }
 .error { color: #b42318; margin: 0.6rem 0 0; font-weight: 600; }
 .muted { color: #6b7280; }
 .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.2rem; }
