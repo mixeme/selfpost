@@ -21,9 +21,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   They are all buttons now: filled for a card's own action, compact and
   outlined where actions cluster in a table row or the nav bar. An `<a>` is
   once again only used for navigation.
-- panel: on the domain page, **Applications** and **Add an application** sit
-  side by side on a wide viewport instead of the form being stranded below the
-  domain rate limit; they stack again on a narrow one.
+- panel: on the domain page **Add an application** now sits directly above the
+  **Applications** list — the same order the domains page uses for its own add
+  form — instead of being stranded below the domain rate limit.
 - ci: hermetic container e2e suite (`test/e2e`, a separate Go module) gates
   image publishing — `make e2e` locally, and `go test ./...` in `test/e2e` as
   a required step in `release.yml` before a version tag's image is pushed.
