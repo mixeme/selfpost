@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: the three monitoring pages now live at URLs that match their nav
+  labels — Deliveries at `/deliveries` (was `/sendlog`), Mail queue at
+  `/mail-queue` (was `/queue`), System log at `/system-log` (was `/logtail`).
+  Bookmarks to the old paths stop working.
+
 ## [0.2.0] - 2026-08-03
 
 - panel: every authenticated page now ends with the running version

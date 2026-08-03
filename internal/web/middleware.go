@@ -15,7 +15,8 @@ const usernameKey ctxKey = 0
 //
 // It also extends the sliding session (plan B.1) on activity, defined as
 // everything except a GET request carrying HX-Request: the four monitoring
-// fragments (/status/fragment, /queue/body, /logtail/body, /sendlog/rows)
+// fragments (/status/fragment, /mail-queue/body, /system-log/body,
+// /deliveries/rows)
 // poll every 5s regardless of whether anyone is looking at the tab, so
 // counting those as activity would make "N days idle" mean "N days since a
 // browser tab was last open" instead.
