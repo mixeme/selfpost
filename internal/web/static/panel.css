@@ -124,7 +124,8 @@ details form { margin-top: 0.6rem; }
 .code-row .code { flex: 1; min-width: 0; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
    that several can sit together without shouting — the Copy buttons beside a
-   value, the per-application actions in a table row, Sign out in the nav. */
+   value, the per-application actions in a table row. Sign out overrides this
+   with .danger below since signing out is a deliberate, singular action. */
 button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
@@ -134,10 +135,10 @@ button.copy:hover, td.actions button:hover, td.actions summary:hover,
 td.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
 button.copy { flex: none; margin-top: 0.3rem; }
 td.actions details[open] > summary { background: #dde3ec; }
-td.actions button.danger, td.actions a.danger {
+td.actions button.danger, td.actions a.danger, .nav button.danger {
   color: #b42318; background: #fef3f2; border-color: #fecdca;
 }
-td.actions button.danger:hover, td.actions a.danger:hover { background: #fee4e2; }
+td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
 @media (prefers-color-scheme: dark) {
   button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
     background: #22262b !important; border-color: #2b3138 !important;
@@ -145,8 +146,8 @@ td.actions button.danger:hover, td.actions a.danger:hover { background: #fee4e2;
   button.copy:hover, td.actions button:hover, td.actions summary:hover,
   td.actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
   td.actions details[open] > summary { background: #313841 !important; }
-  td.actions button.danger, td.actions a.danger {
+  td.actions button.danger, td.actions a.danger, .nav button.danger {
     color: #f5a29b !important; background: #2d1211 !important; border-color: #6b201a !important;
   }
-  td.actions button.danger:hover, td.actions a.danger:hover { background: #3d1a18 !important; }
+  td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
 }

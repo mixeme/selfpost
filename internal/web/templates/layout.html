@@ -38,16 +38,16 @@
   <div class="links">
     {{if eq .Active "status"}}<span aria-current="page">Status</span>{{else}}<a href="/status">Status</a>{{end}}
     {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/domains">Domains</a>{{end}}
-    {{if eq .Active "sendlog"}}<span aria-current="page">Send log</span>{{else}}<a href="/sendlog">Send log</a>{{end}}
-    {{if eq .Active "queue"}}<span aria-current="page">Queue</span>{{else}}<a href="/queue">Queue</a>{{end}}
-    {{if eq .Active "logtail"}}<span aria-current="page">Log</span>{{else}}<a href="/logtail">Log</a>{{end}}
+    {{if eq .Active "sendlog"}}<span aria-current="page">Deliveries</span>{{else}}<a href="/sendlog">Deliveries</a>{{end}}
+    {{if eq .Active "queue"}}<span aria-current="page">Mail queue</span>{{else}}<a href="/queue">Mail queue</a>{{end}}
+    {{if eq .Active "logtail"}}<span aria-current="page">System log</span>{{else}}<a href="/logtail">System log</a>{{end}}
     {{if eq .Active "backup"}}<span aria-current="page">Backup</span>{{else}}<a href="/backup">Backup</a>{{end}}
   </div>
   <div class="session">
     <span class="muted">{{.User}}</span>
     {{if eq .Active "account"}}<span aria-current="page">Account</span>{{else}}<a href="/account">Account</a>{{end}}
     <form class="inline" method="post" action="/logout">
-      <button type="submit">Sign out</button>
+      <button type="submit" class="danger">Sign out</button>
     </form>
   </div>
 </nav>
