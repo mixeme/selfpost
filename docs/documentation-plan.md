@@ -80,6 +80,6 @@
 
 ## 4. Гейт релиза (документация)
 
-Документационный проход **D1–D9 закрыт.** До тега релиза остаются другие пункты
-общего гейта: e2e (C.4), ревизия безопасности (D.5 в
-[implementation-plan.md](implementation-plan.md)) — см. [progress.md](progress.md).
+Документационный проход **D1–D9 закрыт.** До тега релиза остаётся общий гейт:
+e2e (готов, [development.md](development.md)) и ревизия безопасности
+([implementation-plan.md](implementation-plan.md) § D) — см. [progress.md](progress.md).

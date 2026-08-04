@@ -12,8 +12,15 @@ User install/operations: [README.md](../README.md). Product boundaries:
 ## Image and processes
 
 Single Debian slim image. `entrypoint.sh` (root) fixes `/data` ownership and
-milter socket directories, validates `SELFPOST_HOSTNAME`, then execs
-`supervisord` as PID 1.
+milter socket directories, **requires** `SELFPOST_HOSTNAME` (FQDN with at least
+one dot; no scheme, port, or spaces — invalid or empty value → `exit 1` before
+Postfix config or supervisord), then execs `supervisord` as PID 1.
+
+The hostname is not a tunable default: it must match PTR/rDNS, TLS CN/SAN, and
+SASL realm together. Soft fallbacks (`localhost` in the panel vs container ID in
+Postfix) split realms and break SMTP AUTH with a silent `535` in clients while
+the panel looks healthy. Shipped `docker-compose.yml` already requires the
+variable; the entrypoint gate catches `docker run`, custom compose, and k8s.
 
 Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
@@ -76,9 +83,31 @@ One process, three roles:
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail.
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
-   queue-id.
+   queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
+   (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
 
 Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
+
+### Log tailer and `mail.log` rotation
+
+`mail.log` lives under `/var/log` (not in `/data`). Rotation uses rename +
+`postfix reload` ([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not
+`copytruncate` — the latter can drop `status=sent` lines and leave send-log rows
+stuck at `queued`. After rename, logrotate runs `create 0644 root root` (Postfix
+recreates the file lazily on first write as mode `0600`, which the unprivileged
+panel user cannot read). `follow()` drains the old inode once more before
+switching descriptors; the panel treats a missing log file as an empty tail, not
+an error.
+
+**Known gaps (same class of loss, not fixed by rename rotation):**
+
+- **Panel restart** — `follow()` starts at end-of-file; lines written while the
+  panel was down are never parsed; in-flight send-log rows may stay `queued`.
+- **Container recreate** — `/var/log` is ephemeral; the log is lost with the
+  container.
+
+Possible follow-ups if these become painful: persist read offset across restarts,
+mount mail log under `/data`, or reconcile stuck rows via `postqueue`.
 
 ---
 
@@ -102,7 +131,26 @@ unless noted.
 | `/account` | Admin username/password |
 
 HTMX polling refreshes monitoring fragments; polling does not extend session
-idle timeout.
+idle timeout (only non-`HX-Request` GET and mutating requests count as activity).
+
+### Sessions
+
+Stored in SQLite (`sessions` table, migration `0002`): cookie holds a random
+token; the database stores **SHA-256 of the token**, not the token itself — a
+stolen DB or backup archive does not alone grant login, but a browser that still
+holds the cookie works after process restart, redeploy, or full backup restore.
+
+- **Idle timeout** — sliding window, `PANEL_SESSION_IDLE_DAYS` (default 7); no
+  absolute cap (regular use keeps the session alive indefinitely).
+- **Renewal** — DB `last_seen` and cookie `Max-Age` update at most once per hour
+  (`renewThreshold` in [internal/web/session.go](../internal/web/session.go)).
+- **Password change** — all other sessions are deleted; the current session stays
+  active ([internal/store/sessions.go](../internal/store/sessions.go),
+  [handlers_account.go](../internal/web/handlers_account.go)).
+
+Restoring an **older** backup also restores session rows: a session invalidated
+after that backup was taken can become valid again if the browser still has the
+cookie and idle timeout has not expired.
 
 ---
 
@@ -121,7 +169,8 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 (transit mail not migrated by design).
 
 **Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90);
-`mail.log` via logrotate (14 files, check every 6h, `postfix reload` on rotate).
+`mail.log` via logrotate (14 rotated files, check every 6h, rename +
+`postfix reload` in `postrotate` — see § Log tailer above).
 
 **Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
 `/data` tree; version check on restore. Stopped-container `tar` of `./data` is
