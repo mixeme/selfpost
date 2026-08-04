@@ -50,6 +50,7 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
       supervisor \
       logrotate \
       ca-certificates \
+      curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Unprivileged user for the panel process (spec 7.6.8).
@@ -103,6 +104,11 @@ RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/postfix-config.sh 
 # plus the panel on 8080. Outbound delivery dials remote MXs on 25 as a client,
 # which needs no inbound listener or EXPOSE.
 EXPOSE 8080 465 587
+
+# Liveness probe: panel HTTP plus mail-path processes (opendkim, panel, postfix).
+# Does not verify TLS, DNS, or end-to-end delivery — see README Operations.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
 
 # The entrypoint fixes /data ownership (bind mount) as root, then execs
 # supervisord, which becomes PID 1 and owns process supervision (spec 4).
