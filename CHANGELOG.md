@@ -5,7 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- The project's mark is now in use rather than only on file. The README opens
+  with the full stamp; the panel carries the compact one at the left of its
+  navigation bar, linking to the status page, and the full one above the card
+  on the two pages that have no navigation — sign-in and first-run setup. The
+  browser tab icon changes with it, from the earlier envelope drawing to the
+  stamp's small-size variant, so the tab, the panel and the README are one
+  identity. The four brand files in `docs/assets/` had their wordmark converted
+  from live text to outlines: they were set in IBM Plex Sans, which is not
+  installed on the machines that render them, and the light/semibold contrast
+  between *Self* and *Post* — the whole of the mark — collapsed into whatever
+  fallback the viewer happened to have.
+
 ### Changed
+
+- panel: the sign-in and setup pages are now a column the width of their own
+  card. Both are a single narrow card, which centred itself while the heading
+  above it stayed at the panel's left edge; adding the mark would have made
+  that three alignments on a page with four elements.
 
 - panel: the three monitoring pages — Deliveries, Mail queue, System log — are
   now laid out wider (64rem against the 48rem the rest of the panel keeps).

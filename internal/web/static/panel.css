@@ -17,6 +17,13 @@ body {
 }
 main { max-width: 42rem; margin: 0 auto; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+/* The full mark, on the two pages that have no navigation bar to carry the
+   compact one. It takes the column's width so its edges line up with the card
+   below it, capped at that column's own 24rem; height stays automatic because
+   the stamp's proportions are part of the mark and it is never scaled unevenly.
+   The subtitle stops resolving below 280px, which a 320px viewport still clears
+   once the body's padding is taken off. */
+.mark { display: block; width: 100%; max-width: 24rem; height: auto; margin-bottom: 1.4rem; }
 .card {
   background: #fff; border: 1px solid #e2e5e9; border-radius: 10px;
   padding: 1.5rem; margin: 0 auto;
@@ -58,6 +65,13 @@ main { max-width: 48rem; }
    every second line. They get a wider measure; every other page keeps the narrow
    one. The class comes from the layout, which stamps the page name onto <main>. */
 main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64rem; }
+/* The signed-out pages are a single card and nothing else, and .card.narrow
+   centres itself inside whatever holds it — so at the panel's usual width the
+   card floated in the middle while the mark and the heading stayed at the far
+   left, three alignments on a page with four elements. Narrowing the column to
+   the card's own width makes the three line up and puts the block as a whole in
+   the middle of the page. */
+main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
 @media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
@@ -149,9 +163,21 @@ details form { margin-top: 0.6rem; }
 }
 @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
 .nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
-/* Pushed to the far edge so the two rows read as two blocks rather than as one
+/* The top row: mark at one edge, session block at the other. Splitting them to
+   the edges is what makes the two rows read as two blocks rather than as one
    ragged list that happened to wrap. */
+.nav .top { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; }
 .nav .session { justify-content: flex-end; }
+/* The mark is a link, but not one of the bar's entries: it takes none of the
+   padding and rounding the entry rule below applies, so its own edge lines up
+   with the page rather than sitting half a step inside it. The stamp carries
+   about 4px of field inside the file at this size, which is what puts it level
+   with the icons of the row underneath. */
+.nav .brand { padding: 0; }
+/* width/height are on the element too, so the row reserves the space before the
+   SVG has loaded; these keep the ratio if the box is ever squeezed. The stamp's
+   proportions are part of the mark — it is never scaled unevenly. */
+.nav .brand img { display: block; width: 110px; height: auto; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
    rather than a run of text — that is also why the bar centres its items
    instead of aligning them on the text baseline. Account is included: it is a
