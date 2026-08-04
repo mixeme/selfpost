@@ -45,6 +45,10 @@ services:
       # report what the internet sees rather than what this host's own stub
       # resolver synthesises. Empty uses public defaults.
       SELFPOST_DNS_RESOLVERS: "${SELFPOST_DNS_RESOLVERS:-}"
+      # Reverse-proxy CIDRs allowed to supply X-Forwarded-For for login/setup
+      # rate-limiting. See README "Environment variables" — wrong value lets a
+      # client spoof its rate-limit key.
+      TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:-}"
     volumes:
       # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
       # sasldb2, sender map, setup token. Back this up (panel button or the

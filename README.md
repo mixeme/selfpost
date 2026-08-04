@@ -96,6 +96,51 @@ and Traefik by default). A proxy that rewrites `Host` instead makes the panel
 reject every form submission as cross-origin — the log says so explicitly,
 printing the `Origin` and `Host` it compared.
 
+## Environment variables
+
+Copy [deploy/.env.example](deploy/.env.example) to `.env` next to your
+`docker-compose.yml`. The table below lists every variable an operator is
+expected to set; defaults match the code exactly.
+
+| Variable | Purpose | Default | Set in |
+|---|---|---|---|
+| `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
+| `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
+| `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting](#rate-limiting). | `100` | `.env` |
+| `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
+| `SEND_LOG_RETENTION_DAYS` | Days of send-log history kept before the background sweep deletes rows — the main driver of `/data` growth over time. | `90` | `.env` |
+| `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: an admin who keeps coming back stays signed in indefinitely. | `7` | `.env` |
+| `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
+| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. Behind the default Apache host-network setup this is typically the Docker bridge gateway, e.g. `172.18.0.1`. | *(empty — XFF ignored)* | `.env` |
+
+TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
+[deploy/docker-compose.yml](deploy/docker-compose.yml) to match the `./certs`
+bind mount — configure the mount, not these variables.
+
+**Internal variables (not part of the operator interface).** The following are
+read by the panel or startup scripts but are not meant to be changed in a
+normal deployment; documenting them here avoids treating accidental overrides as
+supported configuration:
+
+- **Panel paths and tuning:** `SELFPOST_DATA_DIR` (`/data`), `SELFPOST_DB_PATH`
+  (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
+  (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
+  `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`), `MAIL_LOG`
+  (`/var/log/mail.log`), `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
+  (`/run/opendkim/opendkim.sock`), `OPENDKIM_DIR` (`/data/opendkim`),
+  `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
+  (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
+  `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
+  (`/data/postfix/sender_login_maps`).
+- **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
+  `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
+  `MILTER_WAIT_TIMEOUT` (`30` seconds).
+- **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — daily
+  `postfix reload` to pick up renewed certificates),
+  `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
+  hours; rotated logs are kept 14 days and each rotation triggers
+  `postfix reload`).
+
 ## DNS setup
 
 Two different scopes — don't confuse them:
@@ -136,6 +181,73 @@ a domain, increase gradually over days/weeks rather than sending everything on
 day one, and check the IP against major blocklists (Spamhaus and similar)
 before and during warmup. This is inherent to how mail reputation works on the
 public internet, not something SelfPost's configuration can shortcut.
+
+## Operations
+
+After sign-in the panel opens on **Status** — the place to answer "is the
+service healthy and will mail be accepted?"
+
+- **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
+  TLS certificate validity and expiry, milter socket presence, and a short
+  Postfix queue summary. The hostname block compares `SELFPOST_HOSTNAME`
+  against the PTR record the internet publishes for this server's IP
+  (forward-confirmed reverse DNS); use *Re-check* after changing DNS. The
+  **Reload configuration** button re-applies OpenDKIM tables and the Postfix
+  sender map from the database — use it if daemons drifted from what the panel
+  shows after manual edits under `/data`.
+- **Domains** (`/domains`) — add sending domains, inspect each domain's DKIM
+  TXT value, SPF/DMARC checks, and SASL applications. Per-domain rate limits
+  (level 2) are configured here. *Export domain* writes a single-domain archive;
+  *Import a domain* on the Backup page reads one back in.
+- **Deliveries** (`/deliveries`) — searchable send log with server-side filters
+  by domain and application. Each row shows status `queued` (accepted, not yet
+  delivered), `sent` (handed off successfully), or `rejected` (refused — for
+  example by a level-2 rate limit). Retention is controlled by
+  `SEND_LOG_RETENTION_DAYS`.
+- **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
+  trying to deliver or deferring.
+- **System log** (`/system-log`) — tail of `/var/log/mail.log` (Postfix and
+  related daemon lines). The log rotates daily (14 files kept) with a
+  `postfix reload` after each rotation; a background loop checks every six
+  hours.
+- **Backup** (`/backup`) — download a full-server backup or import a
+  single-domain export. See [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
+- **Account** (`/account`) — change the administrator username and/or password.
+  Application SASL logins are separate and are not changed here.
+
+**Sessions.** A login survives a container restart: sessions live in SQLite, not
+in memory. Expiry is a sliding idle window (`PANEL_SESSION_IDLE_DAYS`, default
+seven days) with no absolute lifetime cap — an admin who keeps using the panel
+stays signed in indefinitely. HTMX polling on the monitoring screens
+(Deliveries, Mail queue, System log, and the Status health fragment) does
+**not** count as activity, so an auto-refreshing tab left open will not keep a
+session alive forever. Changing the password signs out every other session but
+leaves the current browser signed in.
+
+**Upgrading.** Bump the pinned image tag in `docker-compose.yml` to the target
+release, then `docker compose up -d`. The backup version check requires the
+running image to match the version that created a full backup — see [Fixed image
+tag](#fixed-image-tag).
+
+## Rate limiting
+
+SelfPost applies two independent limits; both can refuse a submission, but only
+level 2 writes a `rejected` row in the send log.
+
+**Level 1 (IP backstop)** — always on, configured via `.env`:
+
+- `RATE_LIMIT_MESSAGES_PER_IP` → Postfix `smtpd_client_message_rate_limit`
+- `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
+
+This is an anvil limit per connecting client IP. It keeps working even if the
+journal-milter (level 2) is down.
+
+**Level 2 (per domain / per application)** — optional, configured in the panel
+on each domain's page or on an individual application. You set a message
+ceiling, a time window, and optionally restrict the limit to specific client
+IPs; an empty IP list means the differentiated limit does not apply. When
+exceeded, Postfix returns a 4xx and the refusal is recorded in Deliveries as
+`rejected`.
 
 ## Backup, restore, and moving a single domain
 
