@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- docs: documentation plan now targets retiring `specification.md` after D9 —
+  migration map to `product.md`, `architecture.md`, `development.md`, and
+  expanded `security.md`; D9 added to the release gate.
+
 ## [0.4.0] - 2026-08-04
 
 ### Added
