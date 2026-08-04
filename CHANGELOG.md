@@ -30,6 +30,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the longest unbreakable run it holds, and email addresses have nothing to
   break on. Timestamps are exempt and stay on one line.
 
+- panel: the Applications list on a domain page no longer comes apart. It was a
+  four-column table whose last column held six controls, two of them expanding
+  panels with textareas — far more than the width of a column, so the controls
+  broke into a staircase, the login cell grew into a block as tall as the row,
+  and the two text columns were left stranded on the baseline halfway down it.
+  An application is now a block rather than a row: the login on one line, mode
+  and addresses on the next, and the controls in a single wrapping row, with an
+  opened panel claiming the full width for its fields.
+
 ## [0.3.0] - 2026-08-03
 
 ### Fixed
