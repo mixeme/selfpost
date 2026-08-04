@@ -235,12 +235,12 @@
 <section style="border-bottom:none">
   <h2>Файлы</h2>
   <div class="files">
-    <b>docs/brand/selfpost-stamp.svg</b> — эталон, README, документация<br>
-    <b>docs/brand/selfpost-stamp-compact.svg</b> — шапка панели<br>
-    <b>docs/brand/selfpost-icon.svg</b> — аватар, фавикон от 32 px<br>
-    <b>docs/brand/selfpost-icon-16.svg</b> — фавикон 16–32 px
+    <b>docs/assets/selfpost-stamp.svg</b> — эталон, README, страницы входа панели<br>
+    <b>docs/assets/selfpost-stamp-compact.svg</b> — шапка панели<br>
+    <b>docs/assets/selfpost-icon.svg</b> — аватар, фавикон от 32 px<br>
+    <b>docs/assets/selfpost-icon-16.svg</b> — фавикон 16–32 px
   </div>
-  <div class="note"><b>Осталось одно действие.</b> В контейнере нет ни IBM Plex, ни сети, поэтому текст в файлах остался текстом. Перед коммитом его надо перевести в контуры, иначе на машине без Plex набор поедет:<br><code>inkscape --actions="select-all;object-to-path;export-filename:out.svg;export-do" in.svg</code><br>Пока в файлах прописан фолбэк <code>'IBM Plex Sans','Helvetica Neue',sans-serif</code> — не спасёт вёрстку, но не даст ей развалиться совсем.</div>
+  <div class="note"><b>Контуры сделаны.</b> Текст в четырёх файлах выше переведён в контуры по IBM Plex Sans (OFL) — шрифт на машине читателя больше не нужен, и <code>Self</code> с <code>Post</code> держат свои 200 и 600 везде. Панель отдаёт свои копии из <code>internal/web/static/</code>: <code>logo.svg</code>, <code>logo-compact.svg</code>, <code>favicon.svg</code> плюс растровый <code>favicon.png</code> 32×32 для браузеров без SVG-фавиконов — <code>go:embed</code> не дотягивается за пределы пакета, поэтому это копии, а не ссылки.<br>Макеты на этой странице остались с живым текстом: это протокол разбора знака, а не источник файлов.</div>
 </section>
 
 </div></body></html>
