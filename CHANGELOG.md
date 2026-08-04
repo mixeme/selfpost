@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- docs (D1): README *Operations* — panel screens (`/status`, domains,
+  deliveries, mail queue, system log, backup, account), upgrade procedure,
+  session behaviour (sliding idle, monitoring polls do not extend, password
+  change signs out other sessions), and `mail.log` rotation cadence.
+- docs (D1): README *Rate limiting* — level-1 anvil limits
+  (`RATE_LIMIT_MESSAGES_PER_IP`, `RATE_LIMIT_WINDOW_SECONDS`) and level-2
+  per-domain/application limits from the panel; fixes the `.env.example` link
+  that pointed at a missing section.
+- docs (D2): README environment-variable reference — public `.env` table with
+  code-accurate defaults, `TRUSTED_PROXY_CIDR` security note, explicit
+  internal-variable list; `TRUSTED_PROXY_CIDR` wired through
+  `deploy/docker-compose.yml`.
+
 ### Changed
 
 - docs: documentation plan now targets retiring `specification.md` after D9 —
