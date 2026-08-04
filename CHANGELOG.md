@@ -22,6 +22,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs (D3): README backup — stopped-container `tar` of `./data` (with live-container
+  WAL warning), `manifest.json` consumed after a matching restore.
+- docs (D4): README status banner (v1.0 implemented, links to open questions and
+  documentation pass); new *Published ports* note for 587; compose usage comment
+  corrected (TLS via `./certs` bind mount, not `.env`).
+- docs (D5): `implementation-plan.md` B.1 — password change signs out other
+  sessions only (implementation diverged from original plan; README was already
+  correct).
 - docs: documentation plan now targets retiring `specification.md` after D9 —
   migration map to `product.md`, `architecture.md`, `development.md`, and
   expanded `security.md`; D9 added to the release gate.
