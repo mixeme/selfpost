@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-04
+
 ### Added
 
 - The project's mark is now in use rather than only on file. The README opens
