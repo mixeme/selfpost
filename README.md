@@ -230,6 +230,15 @@ release, then `docker compose up -d`. The backup version check requires the
 running image to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag).
 
+**Container health.** The image declares a Docker `HEALTHCHECK` that probes
+`GET /healthz` on port 8080 (unauthenticated). It returns `200 ok` when
+OpenDKIM, the panel, and Postfix are all `RUNNING` under supervisord;
+otherwise `503 unhealthy`. This catches a dead mail path that would still leave
+the HTTP server up, but it does **not** verify TLS certificates, DNS records,
+or end-to-end delivery — use the authenticated **Status** page for that. External
+monitoring can use the same endpoint through the reverse proxy if you expose it,
+or poll `docker inspect` health state on the host.
+
 ## Rate limiting
 
 SelfPost applies two independent limits; both can refuse a submission, but only

@@ -7,7 +7,7 @@ v1.0/v1.x: открытые вопросы для согласования. Об
 (входящий релей, роль администратора домена) вынесен в
 [roadmap.md](roadmap.md).
 
-**Основа:** [specification.md](specification.md) v1.0.
+**Основа:** [product.md](product.md) v1.0.
 
 ---
 

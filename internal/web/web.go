@@ -14,6 +14,7 @@ import (
 	"codeberg.org/mix/selfpost/internal/app"
 	"codeberg.org/mix/selfpost/internal/dnscheck"
 	"codeberg.org/mix/selfpost/internal/domain"
+	"codeberg.org/mix/selfpost/internal/health"
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
@@ -207,6 +208,10 @@ func redirectToStatus(w http.ResponseWriter, r *http.Request) {
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if err := health.Liveness(); err != nil {
+		http.Error(w, "unhealthy\n", http.StatusServiceUnavailable)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok\n"))
 }

@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs (D6): Docker `HEALTHCHECK` probes `/healthz`; endpoint returns 503 unless
+  opendkim, panel, and postfix are RUNNING (`internal/health.Liveness`).
+- docs (D6): README *Container health* — scope of `/healthz` vs authenticated Status.
+- docs (D7): `cmd/panel/envdoc_test.go` — regression test that every
+  `loadConfig` and build-script env key is listed in README documentation.
+- docs (D8): `docs/architecture.md` — as-built processes, mail path, routes,
+  persistence (verified against code).
+- docs (D8): `docs/development.md` — local Go workflow, `make e2e`, dev-server
+  loop, commit/CHANGELOG protocol, agent rules.
+- docs (D9): `docs/product.md` — product purpose, assumptions, out-of-scope,
+  multi-domain model.
+- docs (D9): `docs/security.md` — self-contained mandatory security checklist
+  (former spec §7.6).
+- docs (D9): `specification.md` archived to
+  `docs/archive/specification-v1.0.md`; live docs updated (`progress.md`,
+  `implementation-plan.md`, `roadmap.md`, `documentation-plan.md`).
 - docs (D1): README *Operations* — panel screens (`/status`, domains,
   deliveries, mail queue, system log, backup, account), upgrade procedure,
   session behaviour (sliding idle, monitoring polls do not extend, password
@@ -22,6 +38,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- `/healthz` now checks supervisord mail-path processes, not HTTP alone.
+- `build/Dockerfile`: `curl` for `HEALTHCHECK`; probe on port 8080.
 - docs (D3): README backup — stopped-container `tar` of `./data` (with live-container
   WAL warning), `manifest.json` consumed after a matching restore.
 - docs (D4): README status banner (v1.0 implemented, links to open questions and
