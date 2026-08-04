@@ -11,10 +11,11 @@ SelfPost sends mail straight to the internet from your own IP, with DKIM
 signing, and is configured once through the panel. It is **outbound only** — it
 does not receive mail, provide mailboxes, or offer webmail.
 
-> **Status: under active development.** See [docs/specification.md](docs/specification.md)
-> for the full requirements, [docs/implementation-plan.md](docs/implementation-plan.md)
-> for the phased build plan, and [docs/security.md](docs/security.md) for the
-> security trade-offs that were accepted knowingly.
+> **Status: v1.0 implemented; pre-release polish in progress.** Open v1.x
+> questions: [docs/implementation-plan.md](docs/implementation-plan.md).
+> Documentation pass before the next tag:
+> [docs/documentation-plan.md](docs/documentation-plan.md). Accepted security
+> trade-offs: [docs/security.md](docs/security.md).
 
 ## Requirements (site checklist)
 
@@ -262,10 +263,20 @@ Two related but distinct operations — spec 7.5:
   ```
   **Restore** means unpacking that archive into a fresh `/data` bind mount and
   starting a container of the **exact same image version** that created it —
-  SelfPost refuses to start otherwise and tells you which tag to use. This is
-  why the compose file below pins a fixed tag rather than `:latest`: without a
-  known version, there'd be no way to tell which image restoring a given
-  backup actually requires.
+  SelfPost refuses to start otherwise and tells you which tag to use. On the
+  first successful start after restore, `manifest.json` from the archive is
+  **deleted** — it guards only that one boot, so a later in-place upgrade is
+  not blocked. This is why the compose file below pins a fixed tag rather than
+  `:latest`: without a known version, there'd be no way to tell which image
+  restoring a given backup actually requires.
+
+  **Alternative: archive `./data` while stopped.** If the service can be taken
+  offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
+  the host is safe — nothing is writing to SQLite. Do **not** tar `./data` while
+  the container is running: the database uses WAL mode and a naive copy can
+  capture an inconsistent snapshot. The panel/CLI backup remains preferable when
+  you cannot afford downtime because it takes a consistent SQLite snapshot via
+  the Backup API on a live container.
 
 - **Export/import a single domain** (domain page → *Export domain* to write the
   file, *Backup* → *Import a domain* to read it back in): moves one domain — its DKIM key and its applications' **working**
@@ -277,6 +288,13 @@ Both files are **secrets** — they contain the admin password hash (full
 backup) or working application credentials (domain export) in the clear or in
 directly reversible form. Treat them like any other credential material:
 encrypt at rest, restrict who can read them, don't email them around.
+
+## Published ports
+
+`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
+(smtps) is always active. Port **587** is published even when
+`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
+but it can look like an open port in external scans.
 
 ## Fixed image tag
 

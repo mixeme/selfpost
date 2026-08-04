@@ -11,7 +11,8 @@
 # Usage:
 #   1. Copy this file (and .env.example as .env) next to your own ./data and
 #      ./certs directories, or adjust the paths below.
-#   2. Fill in .env (hostname, at least one strong TLS_CERT/KEY path).
+#   2. Fill in .env (at minimum SELFPOST_HOSTNAME). Put PEM files in ./certs —
+#      TLS paths are fixed in this file to match that bind mount, not .env.
 #   3. docker compose up -d
 #
 # The image tag below is FIXED on purpose (spec 10 p.10, 7.5.A): backup
@@ -66,6 +67,8 @@ services:
       # the host network at 127.0.0.1:8080 (see the vhost fragment), so the
       # panel is never directly reachable from the internet without TLS.
       - "465:465"
+      # 587 is mapped even when SUBMISSION_ENABLE=false; Postfix listens only
+      # when the variable is true — see README "Published ports".
       - "587:587"
       - "127.0.0.1:8080:8080"
     # Hardening (spec 10 p.6). SelfPost's entrypoint still needs to run as
