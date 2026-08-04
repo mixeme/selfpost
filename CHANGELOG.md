@@ -38,6 +38,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs: `documentation-plan.md` marked closed (D1–D9); trimmed to package
+  checklist, code-verification method, and ongoing maintenance rules.
+- docs: `roadmap.md` — v1.x doc/deploy tail (Codeberg Quick start, compose
+  image tag at release, `docs/logo`); archived-spec references replaced with
+  `product.md` / `security.md` / `development.md`.
+- docs: `progress.md` — documentation pass closed; deferred polish in roadmap.
 - `/healthz` now checks supervisord mail-path processes, not HTTP alone.
 - `build/Dockerfile`: `curl` for `HEALTHCHECK`; probe on port 8080.
 - docs (D3): README backup — stopped-container `tar` of `./data` (with live-container
