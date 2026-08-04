@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
-<link rel="icon" href="/static/favicon.png" type="image/png">
+{{/* The tab icon is the stamp's small-size variant — the initials rather than
+     the two-line wordmark, which stops resolving below 32px (the thresholds are
+     recorded in docs/assets/selfpost-proof.html). The PNG is declared first and
+     the SVG second: a browser takes the last icon whose type it understands, so
+     vector wins wherever it is supported and the raster catches the rest. */}}
+<link rel="icon" href="/static/favicon.png" sizes="32x32">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/panel.css">
 {{/* Unless told otherwise, htmx injects a stylesheet element of its own into
      the head for the request-indicator classes. The panel uses no
@@ -40,15 +46,20 @@
      .User and get no nav. */}}
 {{define "nav"}}
 <nav class="nav">
-  {{/* The session block is first here because it is drawn first: it is the top
-       row of the bar (see .nav in panel.css), and putting it first in the
-       document keeps the tab order matching the visual one. */}}
-  <div class="session">
-    <span class="muted">{{.User}}</span>
-    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
-    <form class="inline" method="post" action="/logout">
-      <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
-    </form>
+  {{/* The top row is first here because it is drawn first (see .nav in
+       panel.css), which keeps the tab order matching the visual one. It holds
+       the mark on the left and the session block on the right; the page entries
+       follow underneath. The mark goes to /status, the page the panel opens on —
+       named outright rather than as "/", which is only a redirect to it. */}}
+  <div class="top">
+    <a class="brand" href="/status"><img src="/static/logo-compact.svg" width="110" height="50" alt="SelfPost"></a>
+    <div class="session">
+      <span class="muted">{{.User}}</span>
+      {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
+      <form class="inline" method="post" action="/logout">
+        <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
+      </form>
+    </div>
   </div>
   <div class="links">
     {{if eq .Active "status"}}<span aria-current="page">{{template "icon-status"}}Status</span>{{else}}<a href="/status">{{template "icon-status"}}Status</a>{{end}}

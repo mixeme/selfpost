@@ -1,4 +1,8 @@
 {{define "content"}}
+{{/* The full mark, on the two pages that carry no navigation: with no bar above
+     it, this is the only thing telling an administrator which service just asked
+     them for a password. */}}
+<img class="mark" src="/static/logo.svg" width="330" height="150" alt="SelfPost">
 <h1>Sign in</h1>
 <div class="card narrow">
   {{if .SetupHint}}
