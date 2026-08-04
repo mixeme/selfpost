@@ -46,19 +46,35 @@ new `loadConfig` keys must appear in README env lists
 
 ## End-to-end tests
 
-Hermetic container suite (plan C.4):
+Hermetic container suite (implemented as `test/e2e/`, separate Go module):
 
 ```sh
 make e2e
 # equivalent: cd test/e2e && go test -v -timeout 20m ./...
 ```
 
-Uses `deploy/docker-compose.yml` + `test/e2e/compose.override.yml` (high
-ports, test hostname, fake DNS zone, smtp-sink). Requires **Docker + Compose v2**
-on the machine running tests. Not included in `go test ./...` of the main module.
+**Stack:** shipped [deploy/docker-compose.yml](../deploy/docker-compose.yml) +
+[test/e2e/compose.override.yml](../test/e2e/compose.override.yml) — same
+`cap_drop`/`cap_add`/`no-new-privileges` as production. Override uses high
+ports (`20465`/`20587`/`20080`), test hostname, self-signed TLS,
+`PANEL_COOKIE_SECURE=false`, isolated compose project. Mail is hermetic: CoreDNS
+fake zone + Postfix `smtp-sink` as sink-MX; DKIM TXT is scraped from the panel
+and published into the zone so the test verifies the record the operator would
+use.
 
-CI (`release.yml`): matrix build → e2e per arch → push `ghcr.io` on tag
-`vX.Y.Z`.
+**Coverage (summary):** full bootstrap → SMTP AUTH → delivery → DKIM verify →
+send-log `queued → sent`; negatives (no AUTH, relay, sender/login mismatch, L1/L2
+limits, milter fail-open, bad `SELFPOST_HOSTNAME`, session survives
+`docker restart`). Polling with timeouts only — no fixed `sleep`.
+
+Requires **Docker + Compose v2** on the test host. Not included in `go test ./...`
+of the main module.
+
+**CI** ([release.yml](../.github/workflows/release.yml)): tag `vX.Y.Z` triggers
+`prepare` (version from tag) → native matrix `[ubuntu-latest, ubuntu-24.04-arm]`
+— build `--load`, e2e, push per-arch tag → `merge` publishes unified
+`ghcr.io/...:X.Y.Z` via `docker buildx imagetools create`. Failed e2e blocks the
+image. Ordinary pushes still run only `vet`/`test` in [test.yml](../.github/workflows/test.yml).
 
 ---
 

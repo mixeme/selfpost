@@ -38,6 +38,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs: `implementation-plan.md` trimmed to the sole open v1.x gate — pre-release
+  security review (§ D); closed B.1–C.4 material moved to as-built and ops docs.
+- docs: `architecture.md` — sessions (SQLite, idle renew, password change),
+  `mail.log` rotation (rename + `postfix reload`), `SELFPOST_HOSTNAME` startup
+  gate, log-tailer known gaps.
+- docs: `development.md` — expanded e2e stack and `release.yml` matrix workflow.
+- docs: `security.md` — accepted risks for session rows restored from backup and
+  send-log rows stuck at `queued` after panel restart or container recreate.
+- docs: `roadmap.md` — optional send-log / `mail.log` follow-ups under v1.x tail.
+- docs: `progress.md`, `documentation-plan.md` — cross-links updated for the new layout.
 - docs: `documentation-plan.md` marked closed (D1–D9); trimmed to package
   checklist, code-verification method, and ongoing maintenance rules.
 - docs: `roadmap.md` — v1.x doc/deploy tail (Codeberg Quick start, compose

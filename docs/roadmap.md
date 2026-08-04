@@ -37,6 +37,13 @@ Codeberg (`codeberg.org/mix/selfpost/raw/branch/main/deploy/...`).
 **Готово, когда:** Quick start указывает на Codeberg; тег образа в compose
 совпадает с релизом; `docs/logo` либо содержит файлы, либо отсутствует.
 
+**Send-log vs `mail.log` (опционально).** После рестарта панели или пересоздания
+контейнера строки send-log могут навсегда остаться `queued` — log-tailer не
+дочитывает пропущенный хвост, `mail.log` не в `/data`. Rename-ротация (B.2)
+это не лечит. Кандидаты, если станет больно: persist позиции чтения, volume для
+лога, сверка зависших строк через `postqueue`. As-built и принятый риск:
+[architecture.md](architecture.md) § Log tailer, [security.md](security.md).
+
 ---
 
 ## Фаза O1 (→ 2.x.x) — Входящий релей (backup-MX / пересылка) — опция/плагин
