@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs: `docs/code-review.md` — full codebase review (architecture, code quality,
+  documentation, GUI, legacy, risks) with prioritized implementation plan and
+  model routing; cross-links in `implementation-plan.md` and `progress.md`.
 - docs (D6): Docker `HEALTHCHECK` probes `/healthz`; endpoint returns 503 unless
   opendkim, panel, and postfix are RUNNING (`internal/health.Liveness`).
 - docs (D6): README *Container health* — scope of `/healthz` vs authenticated Status.
