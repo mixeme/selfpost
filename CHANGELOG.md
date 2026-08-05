@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs: `docs/code-review.md` — phase 1.5 plan for optional password encryption
+  of full backup (`.spbk`) and domain export (`.spde`); checkbox UI pattern;
+  remove session-resurrection-from-backup as accepted risk.
 - docs: `docs/code-review.md` — full codebase review (architecture, code quality,
   documentation, GUI, legacy, risks) with prioritized implementation plan and
   model routing; cross-links in `implementation-plan.md` and `progress.md`.
@@ -39,6 +42,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   internal-variable list; `TRUSTED_PROXY_CIDR` wired through
   `deploy/docker-compose.yml`.
 
+### Removed
+
+- docs: `security.md` — accepted risk «restore old backup revives session rows»
+  (not a concern in operator deployment).
+
 ### Changed
 
 - docs: `implementation-plan.md` trimmed to the sole open v1.x gate — pre-release
@@ -47,8 +55,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `mail.log` rotation (rename + `postfix reload`), `SELFPOST_HOSTNAME` startup
   gate, log-tailer known gaps.
 - docs: `development.md` — expanded e2e stack and `release.yml` matrix workflow.
-- docs: `security.md` — accepted risks for session rows restored from backup and
-  send-log rows stuck at `queued` after panel restart or container recreate.
+- docs: `security.md` — accepted risk for send-log rows stuck at `queued` after
+  panel restart or container recreate.
 - docs: `roadmap.md` — optional send-log / `mail.log` follow-ups under v1.x tail.
 - docs: `progress.md`, `documentation-plan.md` — cross-links updated for the new layout.
 - docs: `documentation-plan.md` marked closed (D1–D9); trimmed to package

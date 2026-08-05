@@ -216,15 +216,17 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 | Gap | Описание | Документировано |
 |-----|----------|-----------------|
 | Send-log `queued` forever | Log-tailer стартует с EOF; после restart пропущенный хвост не дочитывается | [security.md](security.md), [roadmap.md](roadmap.md) |
-| Session resurrection from backup | Restore старого backup + valid cookie = old session alive | [security.md](security.md) |
 | CSRF without tokens | POST без Origin/Sec-Fetch-Site пропускается | [security.md](security.md) |
 | Fail-open L2 rate limit | DB error → mail проходит | [`internal/milter/ratelimit.go`](../internal/milter/ratelimit.go) |
 | Shallow SPF check | Не следует `include:`/`redirect=` | README, `internal/dnscheck/spf.go` |
+| Plaintext backup/export at rest | DKIM-ключи, SASL, пароли приложений в cleartext `.tar.gz`/`.json` | **Mitigation:** R13 (optional encryption) |
+
+**Не риск (решение оператора):** «Session resurrection from backup» — снято из [security.md](security.md).
 
 ### Потенциальные логические нюансы (низкий приоритет)
 
 1. **Rate limit race:** `CountMessages` + `InsertQueued` не в одной транзакции — при высокой нагрузке возможен overshoot на 1 сообщение. Для differentiated limits — acceptable.
-2. **Domain export с plaintext passwords** ([`internal/domain/transfer.go`](../internal/domain/transfer.go)) — by design, но высокий риск утечки файла.
+2. **Domain export с plaintext passwords** ([`internal/domain/transfer.go`](../internal/domain/transfer.go)) — by design; **mitigation:** R13 (optional password encryption).
 3. **`macro()` dual lookup** ([`internal/milter/milter.go`](../internal/milter/milter.go)) — workaround для Postfix/go-milter; permanent, not a bug.
 
 ### Рекомендации
@@ -232,8 +234,9 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 | # | Действие | Приоритет | Модель |
 |---|----------|-----------|--------|
 | L1 | **Предрелизный security review** (§ D) — обязательный гейт | **P0** | **Fable** |
-| L2 | Send-log gap mitigation (persist read offset / reconcile stuck rows) — опционально | P2 | Opus |
-| L3 | Transaction wrap для rate limit count+insert — опционально | P3 | Opus |
+| L2 | **Шифрование бэкапа и экспорта домена** (R13) — optional, checkbox + password | P1 | **Opus** + Sonnet |
+| L3 | Send-log gap mitigation — опционально | P2 | Opus |
+| L4 | Transaction wrap для rate limit count+insert — опционально | P3 | Opus |
 
 ---
 
@@ -308,8 +311,7 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 - Fail-open journal-milter vs fail-closed OpenDKIM
 - CSRF via Origin (no tokens)
 - `__Host-` cookie + duplicate detection
-- Plaintext passwords in domain export
-- Backup session resurrection
+- Plaintext passwords in domain export → **mitigation:** R13
 - Send-log queued gap
 - SQLite single connection
 - No in-container TLS
@@ -323,7 +325,8 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 | **Почему chroot disabled в Postfix** | architecture.md | Достаточно |
 | **Порядок supervisord** (opendkim → panel → postfix) | architecture.md | Достаточно |
 | **Почему log-tailer не persist offset** | roadmap optional | Явно в architecture.md § known limitations |
-| **Import domain с plaintext password** | transfer.go comment | Достаточно для v1 |
+| **Import domain с plaintext password** | transfer.go comment | Достаточно для v1; шифрование — R13 |
+| **Plaintext full backup / domain export at rest** | handlers_backup.go | **R13:** optional AES-GCM envelope (`.spbk`/`.spde`) |
 
 **Модель:** Sonnet (дополнить security.md / architecture.md)
 
@@ -349,6 +352,7 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 | R6 | GUI: visibility-aware HTMX polling | Sonnet |
 | R7 | CONTRIBUTING.md | Sonnet |
 | R8 | ADR для CSRF policy | Sonnet |
+| R13 | Шифрование бэкапа и экспорта домена (checkbox + password) | **Opus** + Sonnet |
 
 ### v2.x (roadmap, не начинать без согласования)
 
@@ -379,6 +383,21 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 4. `make e2e` зелёный (уже готов)
 5. Sonnet: bump compose image tag + Codeberg URLs (в том же release commit)
 6. Git tag vX.Y.Z
+
+### Фаза 1.5 — Шифрование резервных копий (P1, v1.x)
+
+**Проблема:** полный бэкап и экспорт домена содержат DKIM-ключи, SASL-креды и plaintext-пароли приложений; сейчас `.tar.gz` / `.json` без шифрования.
+
+**Решение:** опциональное шифрование паролем (чекбокс «Encrypt with password»; поля password + confirm — только при включённой галочке; переключение в `panel.js`, без inline script).
+
+| Арtefact | Cleartext | Encrypted |
+|----------|-----------|-----------|
+| Полный бэкап | `.tar.gz` | `.spbk` (**S**elf**P**ost **B**ac**k**up) |
+| Экспорт домена | `.json` | `.spde` (**S**elf**P**ost **D**omain **E**xport) |
+
+**Формат:** magic `SELFPOST1`, type byte, scrypt KDF, AES-256-GCM; manifest внутри ciphertext.
+
+**Задачи:** E1 crypto envelope → E2 backup/CLI → E3 domain export/import → E4 UI (checkbox) → E5 docs + e2e. **Модель:** Opus (crypto), Sonnet (UI/docs).
 
 ### Фаза 1 — Doc/code hygiene (P1)
 
