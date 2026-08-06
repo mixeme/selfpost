@@ -176,6 +176,15 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 `/data` tree; version check on restore. Stopped-container `tar` of `./data` is
 safe (see README).
 
+**Optional encryption** of the two secret-bearing downloads
+([internal/secretfile](../internal/secretfile/secretfile.go)): password →
+scrypt → AES-256-GCM over 64 KiB chunks, each authenticated with the header,
+its counter and an end-of-stream flag (so truncation and reordering fail to
+open). Full backup `.tar.gz` → `.spbk`, domain export `.json` → `.spde`; the
+plain forms remain the default. Domain import detects the envelope by magic
+bytes; an encrypted full backup is converted back with `selfpost-backup
+-decrypt` before restore.
+
 ---
 
 ## Security (summary)

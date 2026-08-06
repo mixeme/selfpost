@@ -10,8 +10,11 @@
   start. TLS certificates and the mail queue are not included.</p>
   <p class="muted"><strong>The backup file is a secret</strong> (it contains
   private keys and credentials). Store and transfer it securely and delete it
-  once the restore succeeds.</p>
-  <form class="inline" method="post" action="/backup">
+  once the restore succeeds. Encrypting it below is the simplest way to do that:
+  the download is then a <code>.spbk</code> file that only the password opens.</p>
+  {{if .BackupErr}}<p class="error">{{.BackupErr}}</p>{{end}}
+  <form method="post" action="/backup">
+    {{template "encryptfields" .}}
     <button type="submit">Download full backup</button>
   </form>
 </div>
@@ -25,7 +28,17 @@
   {{if .ImportErr}}<p class="error">{{.ImportErr}}</p>{{end}}
   <form method="post" action="/domains/import" enctype="multipart/form-data">
     <label for="importfile">Domain export file</label>
-    <input id="importfile" name="file" type="file" accept=".json,application/json" required>
+    <input id="importfile" name="file" type="file" accept=".json,.spde,application/json" required>
+    <div class="encrypt">
+      <label class="check">
+        <input type="checkbox" data-encrypt-toggle>
+        <span>The file is encrypted (<code>.spde</code>)</span>
+      </label>
+      <div class="encrypt-fields" data-encrypt-fields>
+        <label for="importpw">Password</label>
+        <input id="importpw" name="import_password" type="password" autocomplete="off">
+      </div>
+    </div>
     <button type="submit">Import domain</button>
   </form>
 </div>

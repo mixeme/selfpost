@@ -21,14 +21,16 @@ type templates struct {
 // pageFiles maps a logical page name to its template files. Every page
 // composes with layout.html; pages that embed a polling fragment (spec 7.1)
 // list that fragment's file too, so the same {{define}} block renders both
-// the initial page and the fragment's own refresh responses identically.
+// the initial page and the fragment's own refresh responses identically. Pages
+// sharing a block of markup (the encryption fields on the two secret downloads)
+// list that partial the same way.
 var pageFiles = map[string][]string{
 	"setup":         {"templates/setup.html"},
 	"login":         {"templates/login.html"},
 	"dashboard":     {"templates/dashboard.html"},
 	"account":       {"templates/account.html"},
-	"backup":        {"templates/backup.html"},
-	"domain_detail": {"templates/domain_detail.html"},
+	"backup":        {"templates/backup.html", "templates/encrypt_fields.html"},
+	"domain_detail": {"templates/domain_detail.html", "templates/encrypt_fields.html"},
 	"domain_delete": {"templates/domain_delete.html"},
 	"deliveries":    {"templates/deliveries.html", "templates/deliveries_rows.html"},
 	"mail_queue":    {"templates/mail_queue.html", "templates/mail_queue_body.html"},

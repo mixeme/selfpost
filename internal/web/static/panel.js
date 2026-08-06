@@ -72,7 +72,38 @@
     });
   }
 
+  // --- Encryption password fields shown only when asked for --------------
+  // The backup, export and import forms carry an optional password block. It
+  // is hidden until the checkbox next to it is ticked, and cleared when it is
+  // unticked, so a password typed and then abandoned is never submitted. With
+  // JavaScript blocked the block stays visible and the forms behave exactly as
+  // the server reads them: the checkbox alone decides whether encryption
+  // happens.
+  function syncEncryptFields(box) {
+    var form = box.closest("form");
+    var fields = form && form.querySelector("[data-encrypt-fields]");
+    if (!fields) {
+      return;
+    }
+    fields.hidden = !box.checked;
+    if (!box.checked) {
+      fields.querySelectorAll("input").forEach(function (input) {
+        input.value = "";
+      });
+    }
+  }
+
+  function initEncryptFields(root) {
+    root.querySelectorAll("input[data-encrypt-toggle]").forEach(function (box) {
+      syncEncryptFields(box);
+      box.addEventListener("change", function () {
+        syncEncryptFields(box);
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initAddressFields(document);
+    initEncryptFields(document);
   });
 })();
