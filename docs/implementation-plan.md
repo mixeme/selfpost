@@ -4,9 +4,8 @@
 безопасности (§ D) выполнена 2026-08-06, релизный гейт (e2e + ревизия) открыт.
 B.1–B.3 и C.4 закрыты — as-built в [architecture.md](architecture.md),
 e2e/CI в [development.md](development.md), принятые риски в
-[security.md](security.md). Комплексное рецензирование кодовой базы и план
-доработок — [code-review.md](code-review.md). Текущее состояние и следующий
-шаг: [progress.md](progress.md). Объём 2.x.x — [roadmap.md](roadmap.md).
+[security.md](security.md). Текущее состояние и следующий шаг:
+[progress.md](progress.md). Объём 2.x.x — [roadmap.md](roadmap.md).
 
 **Основа:** [product.md](product.md) v1.0.
 
