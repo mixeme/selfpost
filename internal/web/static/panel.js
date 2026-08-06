@@ -106,4 +106,20 @@
     initAddressFields(document);
     initEncryptFields(document);
   });
+
+  // --- Skip polling while the tab is hidden ------------------------------
+  // The monitoring pages (status, mail queue, system log, deliveries) poll
+  // every 5s via hx-trigger="every 5s". htmx has a built-in way to make that
+  // conditional (an event filter, hx-trigger="every 5s [expr]"), but it
+  // evaluates the filter with `new Function`, which the panel's CSP
+  // (default-src 'self', no 'unsafe-eval') would silently break. Skipping the
+  // request here instead needs nothing beyond what the CSP already allows: a
+  // request due while the tab is hidden is simply not sent, and the next
+  // request after it becomes visible again picks up on schedule as usual.
+  document.body.addEventListener("htmx:beforeRequest", function (ev) {
+    var trigger = ev.target.getAttribute && ev.target.getAttribute("hx-trigger");
+    if (document.hidden && trigger && trigger.indexOf("every") !== -1) {
+      ev.preventDefault();
+    }
+  });
 })();
