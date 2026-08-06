@@ -142,9 +142,9 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	}
 }
 
-// Since the panel root now redirects to the status page, a link left pointing at
+// Since the panel root redirects to the status page, a link left pointing at
 // "/" silently lands on the wrong screen instead of failing — so no template may
-// contain one (phase 13.C).
+// contain one.
 func TestNoTemplateLinksToTheBareRoot(t *testing.T) {
 	forEachTemplate(t, func(name, body string) {
 		if strings.Contains(body, `href="/"`) {
@@ -154,7 +154,7 @@ func TestNoTemplateLinksToTheBareRoot(t *testing.T) {
 }
 
 // The reload action is a server-health control and lives only on the status
-// page (phase 13.D).
+// page.
 func TestReloadFormLivesOnlyOnTheStatusPage(t *testing.T) {
 	forEachTemplate(t, func(name, body string) {
 		if strings.Contains(body, `action="/reload"`) && name != "status.html" {
@@ -164,7 +164,7 @@ func TestReloadFormLivesOnlyOnTheStatusPage(t *testing.T) {
 }
 
 // The panel's Content-Security-Policy is a plain default-src 'self' with no
-// inline exemption (phase 14.A), which makes inline script and inline style a
+// inline exemption, which makes inline script and inline style a
 // failure mode rather than a style question: an onclick= handler or a
 // style="..." attribute added to a template does not error, it silently stops
 // working in the browser. Behaviour belongs in static/panel.js (triggered from

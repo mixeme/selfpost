@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// readSendLog returns every send_log row ordered by id. Phase 6 has no read
-// query yet (the monitoring UI is Phase 7), so tests read the table directly.
+// readSendLog returns every send_log row ordered by id. The monitoring UI has
+// no equivalent read query, so tests read the table directly.
 type sendLogRow struct {
 	QueueID  string
 	Domain   string

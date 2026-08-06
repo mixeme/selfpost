@@ -1,8 +1,7 @@
 // Package postfix owns the Postfix configuration files the panel edits at
-// runtime and the privileged reload that applies them (spec 5.1, 7.6.3-4). In
-// Phase 4 that is the smtpd_sender_login_maps table binding each application's
-// SASL login to the sender addresses it may use; the full relay configuration
-// lands in Phase 5.
+// runtime and the privileged reload that applies them (spec 5.1, 7.6.3-4): the
+// smtpd_sender_login_maps table binding each application's SASL login to the
+// sender addresses it may use, plus the relay configuration in main.cf.
 package postfix
 
 import (
@@ -33,8 +32,8 @@ func New(dir string) *Postfix {
 	}
 }
 
-// SenderLoginMapsPath is the absolute path of the generated map, so the Postfix
-// main.cf written in Phase 5 can point smtpd_sender_login_maps at it.
+// SenderLoginMapsPath is the absolute path of the generated map, so main.cf
+// can point smtpd_sender_login_maps at it.
 func (p *Postfix) SenderLoginMapsPath() string {
 	return p.senderLoginMapsPath
 }

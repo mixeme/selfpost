@@ -97,8 +97,8 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	}
 
 	// What DNS actually publishes for the domain today, checked against the key
-	// this server signs with (phase 13.B). Cached by the checker, so
-	// re-rendering the page after a form post costs nothing.
+	// this server signs with. Cached by the checker, so re-rendering the page
+	// after a form post costs nothing.
 	dns, srv := s.domainDNS(d, record, false)
 
 	s.render(w, status, "domain_detail", map[string]any{
@@ -139,7 +139,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 }
 
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
-// records (phase 13.B). The server's own address comes from the (separately
+// records. The server's own address comes from the (separately
 // cached) hostname check, so the SPF heuristic knows which IP it is looking for
 // and no extra environment variable is needed. That server result is returned
 // alongside, because the page's suggested SPF record is built from the same

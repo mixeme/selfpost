@@ -28,7 +28,7 @@ type SASLDB struct {
 
 // NewSASLDB builds a manager for the sasldb2 at path with the given realm. The
 // realm should match SELFPOST_HOSTNAME so the account identity lines up with
-// Postfix's SASL configuration in Phase 5.
+// Postfix's SASL configuration.
 func NewSASLDB(path, realm string) *SASLDB {
 	return &SASLDB{path: path, realm: realm, run: runSaslpasswd2, dump: dumpSASLDB}
 }

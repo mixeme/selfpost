@@ -36,7 +36,7 @@ find /data/opendkim/keys -type f -name '*.private' -exec chmod 0640 {} +
 # sasldb2 via saslpasswd2; Postfix (user `postfix`) reads it to authenticate SMTP
 # clients. Share it through the `selfpost` group the same way as the DKIM tree:
 # setgid directory so new files inherit the group, and the database itself
-# group-readable (0640). Postfix wiring to actually consult it lands in Phase 5.
+# group-readable (0640).
 mkdir -p /data/sasl
 chown -R panel:selfpost /data/sasl
 chmod 2750 /data/sasl
@@ -51,9 +51,9 @@ chown -R panel:selfpost /data/postfix
 chmod 2750 /data/postfix
 chmod 0640 /data/postfix/sender_login_maps
 
-# Milter socket directories (spec 5 p.3, 7.3). From Phase 5 Postfix (user
-# `postfix`) must actually CONNECT to both milter sockets — OpenDKIM's and the
-# panel's journal-milter — not just probe them at start-up. The sockets are
+# Milter socket directories (spec 5 p.3, 7.3). Postfix (user `postfix`) must
+# actually CONNECT to both milter sockets — OpenDKIM's and the panel's
+# journal-milter — not just probe them at start-up. The sockets are
 # created by the opendkim and panel users respectively, so bridge them to
 # `postfix` through the shared `selfpost` group: group-owned + setgid dirs mean
 # each socket created inside inherits group `selfpost`, and group-traversable

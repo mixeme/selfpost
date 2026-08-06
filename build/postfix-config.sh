@@ -106,7 +106,7 @@ postconf -e \
 	"smtpd_sender_restrictions=reject_sender_login_mismatch, permit"
 
 # Level-1 rate limit by client IP (spec 5 p.5). Backstop that keeps working even
-# if the journal-milter (level 2, Phase 8) is down.
+# if the journal-milter (level 2) is down.
 postconf -e \
 	"smtpd_client_message_rate_limit=${RATE_MSGS}" \
 	"anvil_rate_time_unit=${RATE_WINDOW}s"

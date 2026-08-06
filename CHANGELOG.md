@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- Phase 1 doc/code hygiene (`docs/code-review.md`): removed ~30 stale
+  "Phase N" / historical-staging references from code and shell-script
+  comments (`cmd/panel`, `internal/*`, `build/*`) now that v1.0 is done;
+  fixed a stale dashboard comment (`internal/web/handlers_domains.go`)
+  claiming applications/send-log were unimplemented; added a CSRF ADR to
+  `docs/security.md` (why Origin-check, not tokens); resolved `docs/logo` in
+  `docs/roadmap.md` (directory doesn't exist, criterion already met); added a
+  `gofmt -l` check to CI (`.github/workflows/test.yml`).
+
 ### Security
 
 - Pre-release security review (plan § D, model Fable, 2026-08-06): full pass

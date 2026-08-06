@@ -1,10 +1,6 @@
-// Command panel is the SelfPost control panel. In the finished product this
-// single binary combines several roles (spec 7.1): the HTTP panel server,
+// Command panel is the SelfPost control panel. This single binary combines
+// several roles (spec 7.1) as a supervised process: the HTTP panel server,
 // the journal-milter, the mail.log tailer and the rate-limit checks.
-//
-// Phase 1 wires those roles up as a supervised process with a minimal HTTP
-// stub, a journal-milter socket stub (so the Postfix start wrapper's readiness
-// probe passes) and a log-tailer stub. Real behaviour lands in later phases.
 package main
 
 import (
@@ -133,7 +129,7 @@ func loadConfig() config {
 
 // saslRealm chooses the realm new SASL accounts live under. It mirrors the
 // hostname Postfix's SASL layer uses so a client authenticating with a bare
-// login resolves to the right account (finalised in Phase 5).
+// login resolves to the right account.
 func saslRealm() string {
 	if r := os.Getenv("SASL_REALM"); r != "" {
 		return r
