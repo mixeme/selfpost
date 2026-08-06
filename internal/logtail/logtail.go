@@ -20,11 +20,14 @@ import (
 	"codeberg.org/mix/selfpost/internal/store"
 )
 
-// StatusStore is the slice of the store the log-tailer needs. *store.Store
-// satisfies it.
+// StatusStore is the slice of the store the log-tailer needs: advancing
+// delivery statuses, pruning the retention window, and remembering how far into
+// mail.log it has read. *store.Store satisfies it.
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
+	LogtailState(path string) (store.LogtailState, bool, error)
+	SaveLogtailState(path string, st store.LogtailState) error
 }
 
 // pollInterval is how often the tail loop checks for new bytes / rotation. It
@@ -73,12 +76,13 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 }
 
 // Run follows path and updates send-log statuses until ctx is cancelled, while
-// a background sweep prunes rows older than retentionDays. It returns nil on a
-// clean shutdown.
+// a background sweep prunes rows older than retentionDays. Reading resumes at
+// the offset the previous run persisted, so a restart parses the delivery lines
+// written while the panel was down. It returns nil on a clean shutdown.
 func Run(ctx context.Context, path string, st StatusStore, retentionDays int) error {
 	go retentionLoop(ctx, st, retentionDays)
 
-	return follow(ctx, path, func(line string) {
+	return follow(ctx, path, &tracker{st: st, path: path}, func(line string) {
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return
@@ -166,10 +170,11 @@ func TailLines(path string, n int) ([]string, error) {
 }
 
 // follow tails path line by line, calling handle for each complete line, until
-// ctx is cancelled. It starts at end-of-file (so a restart does not reprocess
-// history) and reopens the file when it is rotated (inode change from
+// ctx is cancelled. Where it starts is tr's decision (a persisted offset, the
+// start of a file that changed while the panel was down, or end-of-file on a
+// first ever run); it reopens the file when it is rotated (inode change from
 // logrotate's create, or truncation from copytruncate) so nothing is missed.
-func follow(ctx context.Context, path string, handle func(string)) error {
+func follow(ctx context.Context, path string, tr *tracker, handle func(string)) error {
 	var (
 		f       *os.File
 		r       *bufio.Reader
@@ -199,7 +204,7 @@ func follow(ctx context.Context, path string, handle func(string)) error {
 
 	// The container may start before Postfix has created mail.log; wait for it.
 	for {
-		if err := openAt(0, io.SeekEnd); err == nil {
+		if err := openAt(0, io.SeekStart); err == nil {
 			break
 		}
 		select {
@@ -208,6 +213,10 @@ func follow(ctx context.Context, path string, handle func(string)) error {
 		case <-time.After(pollInterval):
 		}
 	}
+	if _, err := f.Seek(tr.resume(f), io.SeekStart); err != nil {
+		log.Printf("log-tailer: seek %s: %v", path, err)
+	}
+	r.Reset(f) // the reader buffered from the pre-seek position
 	defer func() {
 		if f != nil {
 			f.Close()
@@ -231,11 +240,20 @@ func follow(ctx context.Context, path string, handle func(string)) error {
 		}
 	}
 
+	// read returns how many bytes of the open file have actually been consumed:
+	// the descriptor position less the partial line bufio handed back at EOF,
+	// which is re-read (and completed) on the next drain or the next start.
+	read := func() int64 {
+		pos, _ := f.Seek(0, io.SeekCurrent)
+		return pos - int64(len(pending))
+	}
+
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			tr.record(f, read(), true) // shutdown: the next start resumes here
 			return nil
 		case <-ticker.C:
 			drain()
@@ -252,8 +270,12 @@ func follow(ctx context.Context, path string, handle func(string)) error {
 				drain()
 				if err := openAt(0, io.SeekStart); err != nil {
 					log.Printf("log-tailer: reopen %s: %v", path, err)
+					continue
 				}
+				tr.adopt(f)
+				continue
 			}
+			tr.record(f, read(), false)
 		}
 	}
 }

@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- Log-tailer resumes where it stopped instead of jumping to end-of-file on
+  every start (phase 3, `docs/code-review.md`): the read position and a
+  fingerprint of the log's head are persisted (`logtail_state`, migration
+  `0003`), so delivery lines written while the panel was down are parsed and
+  their send-log rows no longer stay `queued` forever. A log that changed
+  identity while the panel was down is read from the start; a first-ever start,
+  with nothing stored, still begins at the end. Container recreate remains a
+  gap — `mail.log` is not in `/data` (`docs/security.md`).
+- Level-2 rate limit no longer overshoots under concurrency: messages that
+  passed the check at MAIL FROM but have not reached the send log yet are
+  counted alongside the stored rows (`internal/milter/inflight.go`), so
+  parallel SMTP sessions cannot each spend the same last slot. Slots are
+  released at end-of-message, on ABORT, and after a 10-minute TTL, so a client
+  that drops mid-transaction cannot hold one — the limiter stays fail-open.
+
 ### Changed
 
 - Phase 1 doc/code hygiene (`docs/code-review.md`): removed ~30 stale

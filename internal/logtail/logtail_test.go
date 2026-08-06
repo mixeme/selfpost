@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -77,10 +78,16 @@ func TestParseDelivery(t *testing.T) {
 	}
 }
 
-// captureStore records UpdateStatus calls for the follow integration test.
+// captureStore records UpdateStatus calls for the follow integration test and
+// keeps the persisted read offset in memory, so a "restart" in a test is a
+// second Run against the same captureStore.
 type captureStore struct {
 	mu    sync.Mutex
 	calls []string
+
+	state     store.LogtailState
+	haveState bool
+	stateErr  error
 }
 
 func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, error) {
@@ -92,10 +99,35 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
 
+func (c *captureStore) LogtailState(string) (store.LogtailState, bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.stateErr != nil {
+		return store.LogtailState{}, false, c.stateErr
+	}
+	return c.state, c.haveState, nil
+}
+
+func (c *captureStore) SaveLogtailState(_ string, st store.LogtailState) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.stateErr != nil {
+		return c.stateErr
+	}
+	c.state, c.haveState = st, true
+	return nil
+}
+
 func (c *captureStore) snapshot() []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]string(nil), c.calls...)
+}
+
+func (c *captureStore) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.calls = nil
 }
 
 // TestFollowTailsAndRotates writes delivery lines to a log file, then rotates
@@ -139,6 +171,80 @@ func TestFollowTailsAndRotates(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return after cancel")
+	}
+}
+
+// TestFollowResumesAfterRestart covers the persisted read offset: a restart
+// must parse the delivery lines written while the tailer was down (rows that
+// would otherwise stay "queued" forever), without re-parsing what it already
+// read, and must fall back to reading the whole file when the log was rotated
+// or recreated in the meantime.
+func TestFollowResumesAfterRestart(t *testing.T) {
+	old := pollInterval
+	pollInterval = 10 * time.Millisecond
+	t.Cleanup(func() { pollInterval = old })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	// A head longer than fingerprintSize, so the file stays identifiable across
+	// the restart; the lines themselves predate the first start and are ignored.
+	seed := strings.Repeat("host postfix/qmgr[1]: seed line, not a delivery\n", 20)
+	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
+		t.Fatalf("seed log: %v", err)
+	}
+
+	cs := &captureStore{}
+	stop := startRun(t, path, cs)
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
+	stop() // persists the offset past Q1
+
+	// Down: Postfix keeps delivering.
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, dsn=2.0.0, status=sent (ok)")
+
+	cs.reset()
+	stop = startRun(t, path, cs)
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q2|b@example.net|sent") })
+	if contains(cs.snapshot(), "Q1|a@example.net|sent") {
+		t.Fatal("resumed run re-parsed Q1: offset was not honoured")
+	}
+	stop()
+
+	// Down again, and this time the log is replaced (logrotate + fresh create).
+	// The stored offset belongs to a file that no longer exists, so the new one
+	// must be read from the start.
+	if err := os.WriteFile(path, []byte(strings.Repeat("host postfix/qmgr[1]: fresh log after rotation\n", 20)+
+		"host postfix/smtp[1]: Q3: to=<c@example.net>, dsn=5.1.1, status=bounced (nope)\n"), 0o644); err != nil {
+		t.Fatalf("recreate log: %v", err)
+	}
+
+	cs.reset()
+	stop = startRun(t, path, cs)
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q3|c@example.net|bounced") })
+	stop()
+}
+
+// startRun launches the tailer and returns a function that cancels it and waits
+// for a clean return, the way a panel restart bookends a run.
+func startRun(t *testing.T, path string, cs *captureStore) func() {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- Run(ctx, path, cs, 90) }()
+	// follow() opens and seeks on start; give it a moment before the caller
+	// appends, so the append is not raced by the initial open.
+	time.Sleep(50 * time.Millisecond)
+	return func() {
+		t.Helper()
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("Run did not return after cancel")
+		}
 	}
 }
 

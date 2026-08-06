@@ -81,7 +81,11 @@ One process, three roles:
    proxy only.
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
-   (`default_action=accept`) so milter failure does not stop mail.
+   (`default_action=accept`) so milter failure does not stop mail. The level-2
+   count is the stored send-log rows plus the messages this process has admitted
+   but not yet written (`internal/milter/inflight.go`), so concurrent sessions
+   cannot each spend the same last slot; a reservation is released at
+   end-of-message, on ABORT, or after a 10-minute TTL.
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
@@ -99,15 +103,23 @@ panel user cannot read). `follow()` drains the old inode once more before
 switching descriptors; the panel treats a missing log file as an empty tail, not
 an error.
 
-**Known gaps (same class of loss, not fixed by rename rotation):**
+**Read offset is persisted** (`logtail_state` table, migration `0003`): the
+tailer stores its position plus a fingerprint of the log's first 512 bytes, and
+on start resumes from it, parsing the tail written while the panel was down. If
+the fingerprint no longer matches (rotated or recreated in the meantime) it reads
+the current file from the start; re-parsing lines is harmless because
+`UpdateStatus` writes the same status onto the same row. Only a first-ever start,
+with nothing stored, begins at end-of-file, so installing the panel does not
+replay a pre-existing log.
 
-- **Panel restart** — `follow()` starts at end-of-file; lines written while the
-  panel was down are never parsed; in-flight send-log rows may stay `queued`.
+**Remaining gap:**
+
 - **Container recreate** — `/var/log` is ephemeral; the log is lost with the
-  container.
+  container, so the delivery lines for rows still `queued` are gone with it and
+  those rows stay `queued` forever.
 
-Possible follow-ups if these become painful: persist read offset across restarts,
-mount mail log under `/data`, or reconcile stuck rows via `postqueue`.
+Possible follow-ups if this becomes painful: mount the mail log under `/data`, or
+reconcile stuck rows via `postqueue`.
 
 ---
 
@@ -158,7 +170,7 @@ cookie and idle timeout has not expired.
 
 | Path | Contents |
 |---|---|
-| `selfpost.db` | SQLite: domains, apps, admin, sessions, send log, L2 limits |
+| `selfpost.db` | SQLite: domains, apps, admin, sessions, send log, L2 limits, log-tailer offset |
 | `setup-token` | First-run setup token file |
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
