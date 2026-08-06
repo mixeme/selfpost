@@ -16,8 +16,9 @@
 | Безопасность | [security.md](security.md) |
 | Исторический снимок v1.0 | [archive/specification-v1.0.md](archive/specification-v1.0.md) |
 
-Отложенная полировка v1.x (Quick start на Codeberg, тег образа в compose,
-`docs/logo`) — [roadmap.md](roadmap.md) § «v1.x — хвост документации и деплоя».
+Отложенная полировка v1.x (тег образа в compose) — [roadmap.md](roadmap.md)
+§ «v1.x — хвост документации и деплоя». Пункты про Quick start и `docs/logo`
+закрыты.
 
 ---
 

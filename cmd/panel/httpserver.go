@@ -7,17 +7,17 @@ import (
 	"net/http"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/app"
-	"codeberg.org/mix/selfpost/internal/buildinfo"
-	"codeberg.org/mix/selfpost/internal/domain"
-	"codeberg.org/mix/selfpost/internal/postfix"
-	"codeberg.org/mix/selfpost/internal/store"
-	"codeberg.org/mix/selfpost/internal/web"
+	"github.com/mixeme/selfpost/internal/app"
+	"github.com/mixeme/selfpost/internal/buildinfo"
+	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/postfix"
+	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web"
 )
 
 // serveHTTP runs the control-panel HTTP server until ctx is cancelled, using
 // the database handle shared by all roles: setup, login and the authenticated
-// panel surface (spec 7.6).
+// panel surface (security.md).
 func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	// Applications own the SASL accounts and the Postfix sender map; the domain
 	// service delegates to them when a domain (and its applications) is deleted.

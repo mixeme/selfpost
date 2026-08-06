@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 // spfLookupBudget caps how many DNS lookups one SPF evaluation may spend on

@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // handleAccount serves the administrator's own account settings: the username
-// and password chosen during setup are the only panel credentials (spec 7.6.1),
-// and until now they could be changed only by recreating the state. Changing
-// them here never touches application SASL logins, which are a separate
-// identity system (spec 5.1).
+// and password chosen during setup are the only panel credentials
+// (security.md), and until now they could be changed only by recreating the
+// state. Changing them here never touches application SASL logins, which are a
+// separate identity system (architecture.md § Mail path).
 func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -58,7 +58,7 @@ func accountFlash(r *http.Request) string {
 // is always required, so a stolen session alone cannot lock the administrator
 // out of their own panel, and the attempt is throttled on the same limiter as
 // the login form so this route cannot be used to brute-force the password past
-// that limit (spec 7.6.5).
+// that limit (security.md).
 func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 	if !s.loginLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		s.renderAccount(w, r, http.StatusTooManyRequests,

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -127,7 +127,7 @@ func (s *Server) renderLogin(w http.ResponseWriter, status int, formErr string) 
 }
 
 func (s *Server) submitLogin(w http.ResponseWriter, r *http.Request) {
-	// Brute-force throttle by client IP (spec 7.6.5).
+	// Brute-force throttle by client IP (security.md).
 	if !s.loginLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		s.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return

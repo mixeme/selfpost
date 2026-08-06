@@ -4,19 +4,20 @@ import (
 	"log"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // overLimit reports whether the message currently being received should be
-// refused under a level-2 differentiated limit (spec 7.4). It checks the
-// domain-level and application-level limits in turn; either being exceeded is
-// enough to refuse.
+// refused under a level-2 differentiated limit (README § Rate limiting). It
+// checks the domain-level and application-level limits in turn; either being
+// exceeded is enough to refuse.
 //
 // It is deliberately fail-open: any store error, or the absence of a usable
-// limit, is treated as "not over limit" so a malfunction of the level-2 limiter
-// can never block mail — Postfix's level-1 anvil limit (spec 5) remains the
-// backstop, and it does not depend on this milter at all. Only a clean count at
-// or above a configured ceiling returns true.
+// limit, is treated as "not over limit" so a malfunction of the level-2
+// limiter can never block mail — Postfix's level-1 anvil limit
+// (architecture.md § Mail path) remains the backstop, and it does not depend
+// on this milter at all. Only a clean count at or above a configured ceiling
+// returns true.
 //
 // A message that passes reserves a slot per applicable limit, released once it
 // reaches the send log (or is abandoned) — see inflight for why the stored
@@ -78,10 +79,10 @@ func (s *session) releaseReservations() {
 	s.reserved = nil
 }
 
-// recordRejected writes a send-log row for a message refused by a level-2 limit
-// (spec 7.4, "опционально фиксирует ... для видимости в UI"), so the rejection
-// shows up in the monitoring screen. Only MAIL-stage fields are known; the write
-// is best-effort and never affects the response.
+// recordRejected writes a send-log row for a message refused by a level-2
+// limit (README § Rate limiting — refusals are recorded too), so the rejection
+// shows up in the monitoring screen. Only MAIL-stage fields are known; the
+// write is best-effort and never affects the response.
 func (s *session) recordRejected() {
 	err := s.rec.InsertRejected(store.SendLogEntry{
 		Domain:   domainOf(s.from),

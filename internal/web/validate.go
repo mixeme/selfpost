@@ -7,7 +7,7 @@ import (
 )
 
 // minAdminPasswordLen is the floor for the administrator password. The panel is
-// public (spec 7.6), so this is deliberately not tiny.
+// public (security.md), so this is deliberately not tiny.
 const minAdminPasswordLen = 12
 
 const (
@@ -21,7 +21,7 @@ const (
 // weaker "any password is better than none".
 const minSecretFilePasswordLen = minAdminPasswordLen
 
-// validateUsername enforces a strict server-side whitelist (spec 7.6.2):
+// validateUsername enforces a strict server-side whitelist (security.md):
 // letters, digits, dot, dash, underscore. Client validation is never trusted.
 func validateUsername(u string) error {
 	if len(u) < minUsernameLen || len(u) > maxUsernameLen {
@@ -58,7 +58,7 @@ func normalizeDomain(name string) string {
 }
 
 // validateDomain enforces a strict server-side whitelist for sending-domain
-// names (spec 7.6.2). The result is safe to write verbatim into the OpenDKIM
+// names (security.md). The result is safe to write verbatim into the OpenDKIM
 // KeyTable/SigningTable and to use as a filesystem path segment: only
 // lower-case letters, digits, '.' and '-' are allowed, in valid DNS label
 // shape. Input must already be normalised with normalizeDomain.

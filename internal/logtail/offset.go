@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 const (

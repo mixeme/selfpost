@@ -6,23 +6,25 @@ import (
 	"time"
 )
 
-// Send-log status values (spec 7.3). "queued" is written by the journal-milter
-// when a message is accepted; the log-tailer advances it to one of the final
-// states as Postfix reports delivery per recipient.
+// Send-log status values (architecture.md § Persistence). "queued" is written
+// by the journal-milter when a message is accepted; the log-tailer advances it
+// to one of the final states as Postfix reports delivery per recipient.
 const (
 	StatusQueued   = "queued"
 	StatusSent     = "sent"
 	StatusDeferred = "deferred"
 	StatusBounced  = "bounced"
 	// StatusRejected marks a message the journal-milter refused with a 4xx under
-	// a level-2 rate limit (spec 7.4). Such a row never gets a queue-id and is
-	// excluded from the level-2 message count (it was never sent).
+	// a level-2 rate limit (README § Rate limiting). Such a row never gets a
+	// queue-id and is excluded from the level-2 message count (it was never
+	// sent).
 	StatusRejected = "rejected"
 )
 
 // SendLogEntry is a single queued send-log row. The journal-milter creates one
-// per (queue-id, recipient) pair at end-of-message (spec 7.3.3); every field
-// except the status/timestamps comes from the accepted message.
+// per (queue-id, recipient) pair at end-of-message (architecture.md §
+// Persistence); every field except the status/timestamps comes from the
+// accepted message.
 type SendLogEntry struct {
 	QueueID  string
 	Domain   string
@@ -34,8 +36,8 @@ type SendLogEntry struct {
 
 // InsertQueued records an accepted message in the send log with status
 // "queued". It is called from the journal-milter hot path, so it returns any
-// error for the caller to log rather than deciding policy here; the milter must
-// stay fail-open regardless (spec 7.3).
+// error for the caller to log rather than deciding policy here; the milter
+// must stay fail-open regardless (architecture.md § Persistence).
 func (s *Store) InsertQueued(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
@@ -51,9 +53,10 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 }
 
 // InsertRejected records a message the journal-milter refused under a level-2
-// rate limit (spec 7.4), so the rejection is visible in the send-log UI. Only
-// the fields known at MAIL FROM are set (domain, sender, app login); there is no
-// queue-id or recipient because the message was rejected before it was queued.
+// rate limit (README § Rate limiting), so the rejection is visible in the
+// send-log UI. Only the fields known at MAIL FROM are set (domain, sender, app
+// login); there is no queue-id or recipient because the message was rejected
+// before it was queued.
 func (s *Store) InsertRejected(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
@@ -88,9 +91,9 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	return n, nil
 }
 
-// SendLogRow is one row as returned to the monitoring UI (spec 7.2, 7.3.3): a
-// SendLogEntry plus the fields that only exist once a row has been written
-// (id, current status, timestamps).
+// SendLogRow is one row as returned to the monitoring UI (architecture.md §
+// Persistence): a SendLogEntry plus the fields that only exist once a row has
+// been written (id, current status, timestamps).
 type SendLogRow struct {
 	ID        int64
 	QueueID   string
@@ -111,7 +114,7 @@ type SendLogFilter struct {
 }
 
 // QuerySendLog returns send-log rows matching filter, newest first, for the
-// monitoring screen's server-side pagination (spec 7.2's send-log view).
+// monitoring screen's server-side pagination (product.md's send-log view).
 func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLogRow, error) {
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
@@ -171,10 +174,11 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 	return " WHERE " + strings.Join(clauses, " AND "), args
 }
 
-// DeleteSendLogBefore removes send-log rows created before cutoff, implementing
-// the configurable retention window (spec 7.3, SEND_LOG_RETENTION_DAYS). It
-// returns the number of rows pruned. created_at is stored as RFC3339 UTC, so a
-// lexical comparison against the same format is chronologically correct.
+// DeleteSendLogBefore removes send-log rows created before cutoff,
+// implementing the configurable retention window (architecture.md §
+// Persistence, SEND_LOG_RETENTION_DAYS). It returns the number of rows pruned.
+// created_at is stored as RFC3339 UTC, so a lexical comparison against the
+// same format is chronologically correct.
 func (s *Store) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM send_log WHERE created_at < ?`,

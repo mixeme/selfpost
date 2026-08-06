@@ -166,6 +166,67 @@ cookie and idle timeout has not expired.
 
 ---
 
+## Code layers
+
+Handlers never touch SQLite or the filesystem directly; every write that has to
+land in more than one place (SQLite row, `sasldb2` entry, Postfix map, OpenDKIM
+table) goes through a service, which is also where the rollback of a partial
+failure lives. The adapters below the services are the only code that knows
+about Postfix, OpenDKIM, DNS or the log file, which is what makes them
+substitutable in tests — `milter.Store`, `app.SenderMaps` and
+`logtail.StatusStore` are the seams the unit tests replace with fakes.
+
+```mermaid
+flowchart TB
+  subgraph cmd ["cmd — composition root"]
+    panel["panel: HTTP + journal-milter + log-tailer"]
+    backupcli["selfpost-backup CLI"]
+  end
+  subgraph web ["internal/web — HTTP surface"]
+    handlers["handlers_*.go, templates, session/security"]
+  end
+  subgraph services ["Services — multi-store operations + rollback"]
+    domainSvc["internal/domain"]
+    appSvc["internal/app"]
+  end
+  subgraph persistence ["Persistence"]
+    store["internal/store — SQLite, embedded migrations"]
+  end
+  subgraph adapters ["Adapters — the only infrastructure-aware code"]
+    postfix["internal/postfix"]
+    milterPkg["internal/milter"]
+    logtail["internal/logtail"]
+    dnscheck["internal/dnscheck"]
+    backupPkg["internal/backup"]
+    health["internal/health"]
+    secretfile["internal/secretfile"]
+  end
+  panel --> web
+  panel --> milterPkg
+  panel --> logtail
+  backupcli --> backupPkg
+  backupcli --> secretfile
+  web --> domainSvc
+  web --> appSvc
+  web --> backupPkg
+  web --> dnscheck
+  web --> health
+  web --> secretfile
+  domainSvc --> store
+  appSvc --> store
+  milterPkg --> store
+  logtail --> store
+  domainSvc --> postfix
+  appSvc --> postfix
+```
+
+The three roles inside the `panel` process (HTTP server, journal-milter,
+log-tailer goroutine) share one binary and one SQLite handle on purpose — see
+[Panel binary](#panel-binary-cmdpanel) for why, and *Persistence* below for the
+single-connection trade-off that follows from it.
+
+---
+
 ## Persistence (`/data` bind mount)
 
 | Path | Contents |

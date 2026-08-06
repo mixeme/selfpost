@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- A bounce could be recorded as a successful delivery. The log-tailer's
+  delivery-line pattern matched `status=` greedily, so it took the *last*
+  occurrence on the line — and Postfix appends the remote server's reply
+  verbatim, which the far end controls. A rejection whose reply text contained
+  `status=sent` was filed as `sent` in the send log. The pattern now takes the
+  first `status=` after the recipient, which is the real field
+  (`internal/logtail/logtail.go`); found while extending `TestParseDelivery`.
 - Log-tailer resumes where it stopped instead of jumping to end-of-file on
   every start (phase 3, `docs/code-review.md`): the read position and a
   fingerprint of the log's head are persisted (`logtail_state`, migration
@@ -24,6 +31,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- The project has a single public home: `github.com/mixeme/selfpost`. Codeberg
+  is being retired, so the Go module path moved with it — `go.mod`,
+  `test/e2e/go.mod`, every import, the `Makefile` `MODULE` variable and the
+  `-ldflags` version stamp in `build/Dockerfile` and `docs/development.md`. An
+  import path pointing at a host that is going away would break `go get` and
+  `go install` outright, which is why this is not only a documentation change.
+  README no longer lists a primary/mirror pair.
+- Code comments no longer cite the archived specification. References like
+  "spec 7.6.1" or "spec 5.1" pointed into `docs/archive/specification-v1.0.md`,
+  which is explicitly not a source of truth; each is now a reference to the
+  live document that owns the subject — `docs/architecture.md` (with section),
+  `docs/product.md`, `docs/security.md`, or the README. Comments only; no
+  behaviour is affected.
+- `docs/architecture.md` gained a *Code layers* section: a diagram of
+  handlers → services → store plus the adapters, and the reason the services
+  layer exists (multi-store writes and their rollback) — closing item A2 of
+  `docs/code-review.md`.
 - Phase 1 doc/code hygiene (`docs/code-review.md`): removed ~30 stale
   "Phase N" / historical-staging references from code and shell-script
   comments (`cmd/panel`, `internal/*`, `build/*`) now that v1.0 is done;
@@ -32,6 +56,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `docs/security.md` (why Origin-check, not tokens); resolved `docs/logo` in
   `docs/roadmap.md` (directory doesn't exist, criterion already met); added a
   `gofmt -l` check to CI (`.github/workflows/test.yml`).
+- Phase 2 GUI polish (`docs/code-review.md`): the monitoring pages stop
+  polling while their tab is hidden — the skip is done in an
+  `htmx:beforeRequest` listener (`internal/web/static/panel.js`) rather than
+  htmx's own trigger filter, which is evaluated with `new Function` and would
+  be blocked by the panel's CSP. Dark mode is now a single reassignment of CSS
+  custom properties under `prefers-color-scheme: dark` instead of a cascade of
+  `!important` overrides, and the duplicate `main { max-width }` rule is
+  consolidated into one base rule with documented per-page overrides
+  (`internal/web/static/panel.css`).
 
 ### Security
 
@@ -60,6 +93,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `-decrypt` (with `-i`/`-o`) turns a `.spbk` into the plain `.tar.gz` a
   restore unpacks. The password comes from `SELFPOST_BACKUP_PASSWORD` or
   `-password-file`, never from argv.
+- `TestParseDelivery` covers the exotic mail.log shapes the review asked for
+  (`docs/code-review.md` § 3): a `status=` quoted inside the remote reply, the
+  null recipient of a double bounce, `orig_to=` alongside `to=`, an
+  unrecognised status word, a capitalised one, and a cleanup line.
 - docs: README *Encrypting a backup or export*; `docs/security.md` §
   *Резервная копия и экспорт домена* + accepted risk (encryption is opt-in);
   `docs/architecture.md` persistence § envelope summary.

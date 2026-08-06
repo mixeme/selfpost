@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"codeberg.org/mix/selfpost/internal/secretfile"
+	"github.com/mixeme/selfpost/internal/secretfile"
 )
 
 // postForm builds the kind of request the backup and export forms submit.

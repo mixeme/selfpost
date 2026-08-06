@@ -1,8 +1,8 @@
 // Package domain owns SelfPost's sending-domain model: per-domain DKIM key
 // generation, the OpenDKIM KeyTable/SigningTable that drive signing, and the
 // orchestration that keeps the SQLite registry, the on-disk keys and OpenDKIM
-// in agreement (spec 4.1, 6). Key material lives under /data so it survives
-// container restarts (spec 6.1, 9).
+// in agreement (architecture.md § OpenDKIM). Key material lives under /data so
+// it survives container restarts (architecture.md § OpenDKIM).
 package domain
 
 import (
@@ -46,7 +46,7 @@ func writePrivateKeyPEM(path string, key *rsa.PrivateKey) error {
 
 // loadPrivateKeyPEM reads and parses a PKCS#1 RSA private key written by
 // writePrivateKeyPEM. It is used to recompute the public DNS record on demand,
-// keeping the private key file the single source of truth (spec 7.2.10).
+// keeping the private key file the single source of truth (product.md).
 func loadPrivateKeyPEM(path string) (*rsa.PrivateKey, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -63,7 +63,7 @@ func loadPrivateKeyPEM(path string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-// DKIMRecord is the DNS TXT record a user must publish for a domain (spec 7.2.10).
+// DKIMRecord is the DNS TXT record a user must publish for a domain (product.md).
 type DKIMRecord struct {
 	// Name is the record's host, e.g. "selfpost._domainkey.example.com".
 	Name string
@@ -89,7 +89,7 @@ func dkimRecord(selector, domainName string, pub *rsa.PublicKey) (DKIMRecord, er
 // writeFileAtomic writes data to path via a temp file in the same directory
 // followed by a rename, so readers only ever see the complete old or new file.
 // It is the single safe-write primitive for DKIM keys and OpenDKIM tables
-// (spec 7.6.4).
+// (security.md).
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".tmp-*")

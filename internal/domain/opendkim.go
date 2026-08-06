@@ -12,9 +12,9 @@ import (
 )
 
 // OpenDKIM manages the on-disk OpenDKIM state the panel is responsible for
-// (spec 6): per-domain signing keys under keysDir and the KeyTable/SigningTable
-// that map domains to those keys. After rewriting the tables it asks OpenDKIM to
-// reload them.
+// (architecture.md § OpenDKIM): per-domain signing keys under keysDir and the
+// KeyTable/SigningTable that map domains to those keys. After rewriting the
+// tables it asks OpenDKIM to reload them.
 type OpenDKIM struct {
 	keysDir          string
 	keyTablePath     string
@@ -50,8 +50,8 @@ func (o *OpenDKIM) keyPath(domainName, selector string) string {
 
 // EnsureKey makes sure a signing key exists for the domain. An existing key is
 // reused untouched — critical because overwriting it would silently invalidate
-// the DKIM record already published in DNS (spec 6.1). Returns whether a new key
-// was generated.
+// the DKIM record already published in DNS (architecture.md § OpenDKIM).
+// Returns whether a new key was generated.
 func (o *OpenDKIM) EnsureKey(domainName, selector string) (bool, error) {
 	if err := assertConfigSafe(domainName, selector); err != nil {
 		return false, err
@@ -77,8 +77,8 @@ func (o *OpenDKIM) EnsureKey(domainName, selector string) (bool, error) {
 	return true, nil
 }
 
-// RemoveKey deletes a domain's key directory (spec 6.5). A missing directory is
-// not an error.
+// RemoveKey deletes a domain's key directory (architecture.md § OpenDKIM). A
+// missing directory is not an error.
 func (o *OpenDKIM) RemoveKey(domainName string) error {
 	if err := assertConfigSafe(domainName, "x"); err != nil {
 		return err
@@ -89,10 +89,11 @@ func (o *OpenDKIM) RemoveKey(domainName string) error {
 	return nil
 }
 
-// ExportKey returns a domain's DKIM private key as PKCS#1 PEM, for carrying in a
-// domain export so the receiving instance signs with the same key and the DNS
-// TXT record never has to change (spec 7.5.B). It re-marshals the parsed key
-// rather than returning the raw file, so a malformed on-disk key is caught here.
+// ExportKey returns a domain's DKIM private key as PKCS#1 PEM, for carrying in
+// a domain export so the receiving instance signs with the same key and the
+// DNS TXT record never has to change (architecture.md § Persistence). It
+// re-marshals the parsed key rather than returning the raw file, so a
+// malformed on-disk key is caught here.
 func (o *OpenDKIM) ExportKey(domainName, selector string) ([]byte, error) {
 	if err := assertConfigSafe(domainName, selector); err != nil {
 		return nil, err
@@ -105,11 +106,12 @@ func (o *OpenDKIM) ExportKey(domainName, selector string) ([]byte, error) {
 	return pem.EncodeToMemory(block), nil
 }
 
-// ImportKey writes an imported DKIM private key to disk for a domain (spec
-// 7.5.B). The PEM is parsed and re-marshalled through the same writer used for
-// generated keys, so only a well-formed PKCS#1 RSA key is ever stored. Unlike
-// EnsureKey it overwrites: an import (re-)creates the domain with exactly this
-// key, which is the whole point of keeping the published DNS record valid.
+// ImportKey writes an imported DKIM private key to disk for a domain
+// (architecture.md § Persistence). The PEM is parsed and re-marshalled through
+// the same writer used for generated keys, so only a well-formed PKCS#1 RSA
+// key is ever stored. Unlike EnsureKey it overwrites: an import (re-)creates
+// the domain with exactly this key, which is the whole point of keeping the
+// published DNS record valid.
 func (o *OpenDKIM) ImportKey(domainName, selector string, pemKey []byte) error {
 	if err := assertConfigSafe(domainName, selector); err != nil {
 		return err
@@ -130,7 +132,7 @@ func (o *OpenDKIM) ImportKey(domainName, selector string, pemKey []byte) error {
 }
 
 // Record returns the published DKIM DNS record for a domain, recomputed from the
-// private key on disk (spec 7.2.10).
+// private key on disk (product.md).
 func (o *OpenDKIM) Record(domainName, selector string) (DKIMRecord, error) {
 	key, err := loadPrivateKeyPEM(o.keyPath(domainName, selector))
 	if err != nil {
@@ -140,10 +142,10 @@ func (o *OpenDKIM) Record(domainName, selector string) (DKIMRecord, error) {
 }
 
 // Rebuild regenerates KeyTable and SigningTable from the full domain set and
-// reloads OpenDKIM (spec 6.2). Full regeneration (rather than incremental
-// edits) keeps the files a pure function of the registry, so add and delete
-// share one idempotent path. Both files are written atomically before the
-// reload signal is sent.
+// reloads OpenDKIM (architecture.md § OpenDKIM). Full regeneration (rather
+// than incremental edits) keeps the files a pure function of the registry, so
+// add and delete share one idempotent path. Both files are written atomically
+// before the reload signal is sent.
 func (o *OpenDKIM) Rebuild(domains []SigningDomain) error {
 	keyTable, signingTable, err := renderTables(o.keysDir, domains)
 	if err != nil {
@@ -158,17 +160,18 @@ func (o *OpenDKIM) Rebuild(domains []SigningDomain) error {
 	return o.reload()
 }
 
-// Reload asks OpenDKIM to re-read its tables without regenerating them. It backs
-// the panel's manual reload button (spec 7.2.12).
+// Reload asks OpenDKIM to re-read its tables without regenerating them. It
+// backs the panel's manual reload button (architecture.md § Panel HTTP
+// surface).
 func (o *OpenDKIM) Reload() error {
 	return o.reload()
 }
 
 // renderTables builds the KeyTable and SigningTable byte contents for a domain
 // set, sorted by name so the output is deterministic. Every domain is
-// re-checked for shell/config-injection safety before being written (spec
-// 7.6.4) — validation upstream already guarantees this, but the table writer
-// refuses to emit anything unsafe as a hard backstop.
+// re-checked for shell/config-injection safety before being written
+// (security.md) — validation upstream already guarantees this, but the table
+// writer refuses to emit anything unsafe as a hard backstop.
 func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTable []byte, err error) {
 	sorted := append([]SigningDomain(nil), domains...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
@@ -191,9 +194,9 @@ func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTab
 
 // assertConfigSafe rejects any domain/selector value that could break out of a
 // single table line. Domains are already whitelisted to [a-z0-9.-] and selectors
-// to a similar set before they reach here (spec 7.6.2); this is defence in depth
+// to a similar set before they reach here (security.md); this is defence in depth
 // against a validation gap ever letting whitespace, a newline or a field
-// separator through into a config file (spec 7.6.4).
+// separator through into a config file (security.md).
 func assertConfigSafe(domainName, selector string) error {
 	for _, v := range []string{domainName, selector} {
 		if v == "" {
@@ -210,10 +213,10 @@ func assertConfigSafe(domainName, selector string) error {
 // OpenDKIM process SIGUSR1, which makes it re-read KeyTable/SigningTable
 // (opendkim's documented reload signal). The panel runs unprivileged and cannot
 // signal another user's process directly, so it goes through the supervisor
-// control socket, reachable via the shared `selfpost` group (spec 7.6.3, 7.6.8).
+// control socket, reachable via the shared `selfpost` group (security.md).
 //
 // Arguments are fixed literals — no user input is interpolated into the command,
-// and it never goes through a shell (spec 7.6.3).
+// and it never goes through a shell (security.md).
 func reloadViaSupervisor() error {
 	cmd := exec.Command("supervisorctl",
 		"-c", "/etc/supervisor/supervisord.conf",

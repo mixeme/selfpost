@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 const (
@@ -13,12 +13,12 @@ const (
 )
 
 // validateLogin enforces a strict server-side whitelist for the SASL login
-// (spec 7.6.2). It intentionally excludes '@': the login is stored in sasldb2,
+// (security.md). It intentionally excludes '@': the login is stored in sasldb2,
 // where '@' separates the user from the realm, so allowing it would change the
 // account's identity. Client validation is never trusted.
 //
 // The login is the one piece of user input that is passed to saslpasswd2 as a
-// command argument (never through a shell, spec 7.6.3); this whitelist is what
+// command argument (never through a shell, security.md); this whitelist is what
 // makes that safe.
 func validateLogin(login string) error {
 	if len(login) < minLoginLen || len(login) > maxLoginLen {
@@ -36,10 +36,11 @@ func validateLogin(login string) error {
 }
 
 // validateImportedPassword guards a password taken from a domain-export file
-// (spec 7.5.B) before it is written to sasldb2. Our own exports carry base64url
-// passwords, but the file is untrusted input, so we reject an empty value or one
-// containing control characters — saslpasswd2 reads the passphrase from stdin
-// and a newline would silently truncate it (spec 7.6.2).
+// (architecture.md § Persistence) before it is written to sasldb2. Our own
+// exports carry base64url passwords, but the file is untrusted input, so we
+// reject an empty value or one containing control characters — saslpasswd2
+// reads the passphrase from stdin and a newline would silently truncate it
+// (security.md).
 func validateImportedPassword(password string) error {
 	if password == "" {
 		return fmt.Errorf("imported application password is empty")
@@ -71,7 +72,7 @@ func normalizeAddress(addr string) string {
 }
 
 // validateSenderAddress enforces that a list-mode address is well-formed and,
-// critically, belongs to the application's own domain (spec 7.6.2). The domain
+// critically, belongs to the application's own domain (security.md). The domain
 // check is done here, before anything is written to a config file — not left to
 // smtpd_sender_login_maps to catch at delivery time. domain must already be a
 // validated, normalised domain name.
@@ -92,7 +93,7 @@ func validateSenderAddress(addr, domain string) error {
 
 // validateLocalPart applies a conservative whitelist to the part before '@'.
 // This is deliberately stricter than RFC 5321 (no quoted local parts) so the
-// value is always safe to write verbatim into the Postfix map (spec 7.6.4).
+// value is always safe to write verbatim into the Postfix map (security.md).
 func validateLocalPart(local string) error {
 	if local == "" {
 		return fmt.Errorf("missing the part before '@'")

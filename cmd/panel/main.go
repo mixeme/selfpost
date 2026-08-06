@@ -1,6 +1,7 @@
 // Command panel is the SelfPost control panel. This single binary combines
-// several roles (spec 7.1) as a supervised process: the HTTP panel server,
-// the journal-milter, the mail.log tailer and the rate-limit checks.
+// several roles (architecture.md § Image and processes) as a supervised
+// process: the HTTP panel server, the journal-milter, the mail.log tailer and
+// the rate-limit checks.
 package main
 
 import (
@@ -17,11 +18,11 @@ import (
 	"sync"
 	"syscall"
 
-	"codeberg.org/mix/selfpost/internal/backup"
-	"codeberg.org/mix/selfpost/internal/buildinfo"
-	"codeberg.org/mix/selfpost/internal/dnscheck"
-	"codeberg.org/mix/selfpost/internal/logtail"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/backup"
+	"github.com/mixeme/selfpost/internal/buildinfo"
+	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/logtail"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 func main() {
@@ -81,8 +82,9 @@ func loadConfig() config {
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
 		mailLog:       envDefault("MAIL_LOG", "/var/log/mail.log"),
-		// Send-log retention window (spec 7.3). Non-positive/invalid falls back
-		// to the 90-day default inside the log-tailer.
+		// Send-log retention window (architecture.md § Persistence).
+		// Non-positive/invalid falls back to the 90-day default inside the
+		// log-tailer.
 		retentionDays: envInt("SEND_LOG_RETENTION_DAYS", 90),
 
 		dataDir:        dataDir,
@@ -90,7 +92,7 @@ func loadConfig() config {
 		manifestPath:   filepath.Join(dataDir, backup.ManifestName),
 		setupTokenPath: envDefault("SELFPOST_SETUP_TOKEN_FILE", filepath.Join(dataDir, "setup-token")),
 		hostname:       os.Getenv("SELFPOST_HOSTNAME"),
-		// Secure cookies by default (spec 7.6.6); PANEL_COOKIE_SECURE=false is a
+		// Secure cookies by default (security.md); PANEL_COOKIE_SECURE=false is a
 		// development-only escape hatch for testing over plain HTTP.
 		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",
 		// Whether this deployment also runs the 587 submission listener. The
@@ -102,7 +104,7 @@ func loadConfig() config {
 		// XFF header is trivially forgeable, so it's ignored unless the panel is
 		// told which proxy to trust.
 		trustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDR")),
-		// Sliding session idle timeout (spec 7.6.6, plan B.1). Non-positive/invalid
+		// Sliding session idle timeout (security.md, plan B.1). Non-positive/invalid
 		// falls back to the 7-day default inside internal/web.
 		sessionIdleDays: envInt("PANEL_SESSION_IDLE_DAYS", 7),
 		// Recursive resolvers the deliverability checks query directly. Empty
@@ -112,15 +114,16 @@ func loadConfig() config {
 		tlsCertFile:    envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
 		opendkimSocket: envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
 
-		// Per-domain DKIM state (spec 6). The directory layout matches what
-		// entrypoint.sh prepares (setgid, shared `selfpost` group).
+		// Per-domain DKIM state (architecture.md § OpenDKIM). The directory layout
+		// matches what entrypoint.sh prepares (setgid, shared `selfpost` group).
 		opendkimDir:     envDefault("OPENDKIM_DIR", filepath.Join(dataDir, "opendkim")),
 		dkimSelectorDef: envDefault("DKIM_SELECTOR_DEFAULT", "selfpost"),
 
-		// Application SASL accounts and the Postfix sender map (spec 5.1, 9),
-		// both under /data so they survive restarts. The SASL realm defaults to
-		// the server hostname so account identities line up with Postfix's SASL
-		// configuration; it falls back to localhost outside the container.
+		// Application SASL accounts and the Postfix sender map (architecture.md §
+		// Mail path), both under /data so they survive restarts. The SASL realm
+		// defaults to the server hostname so account identities line up with
+		// Postfix's SASL configuration; it falls back to localhost outside the
+		// container.
 		saslDBPath: envDefault("SASL_DB_PATH", filepath.Join(dataDir, "sasl", "sasldb2")),
 		saslRealm:  saslRealm(),
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
@@ -191,9 +194,10 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 }
 
 // run starts the panel's three roles and blocks until a shutdown signal or the
-// first fatal error from any role. A signal triggers a clean stop of all roles;
-// a role error cancels the others and is returned so the process exits non-zero
-// (letting supervisord/Docker see the failure — spec 4).
+// first fatal error from any role. A signal triggers a clean stop of all
+// roles; a role error cancels the others and is returned so the process exits
+// non-zero (letting supervisord/Docker see the failure — architecture.md §
+// Image and processes).
 func run() error {
 	cfg := loadConfig()
 
@@ -202,10 +206,11 @@ func run() error {
 
 	log.Printf("starting selfpost panel %s", buildinfo.Version)
 
-	// Restore version guard (spec 7.5.A): if a backup was extracted into /data,
-	// its manifest version must match this binary before we touch the database,
-	// so schema/format skew between versions cannot corrupt the restored state.
-	// A match consumes the manifest; its absence is the normal (non-restore) case.
+	// Restore version guard (architecture.md § Persistence): if a backup was
+	// extracted into /data, its manifest version must match this binary before we
+	// touch the database, so schema/format skew between versions cannot corrupt
+	// the restored state. A match consumes the manifest; its absence is the
+	// normal (non-restore) case.
 	if err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version); err != nil {
 		return err
 	}

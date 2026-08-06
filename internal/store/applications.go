@@ -8,23 +8,24 @@ import (
 )
 
 // ErrLoginExists is returned when an application login is already taken. The
-// login is globally unique because it is the SASL identity Postfix authenticates
-// (one sasldb2 across all domains, spec 5.1).
+// login is globally unique because it is the SASL identity Postfix
+// authenticates (one sasldb2 across all domains, architecture.md § Mail path).
 var ErrLoginExists = errors.New("application login already exists")
 
 // ErrApplicationNotFound is returned when an application id does not exist.
 var ErrApplicationNotFound = errors.New("application not found")
 
-// Address modes (spec 4.1). Kept in sync with the CHECK constraint in the schema.
+// Address modes (product.md § Multi-domain model). Kept in sync with the CHECK
+// constraint in the schema.
 const (
 	AddressModeWildcard = "wildcard" // any address within the application's domain
 	AddressModeList     = "list"     // only the explicitly listed addresses
 )
 
-// Application is a SASL account bound to a single domain (spec 4.1, 5.1). The
-// password is never stored here — only in sasldb2, hashed — so it can be shown
-// exactly once at creation/regeneration (spec 7.6.1). Addresses is populated only
-// in 'list' mode.
+// Application is a SASL account bound to a single domain (product.md §
+// Multi-domain model). The password is never stored here — only in sasldb2,
+// hashed — so it can be shown exactly once at creation/regeneration
+// (security.md). Addresses is populated only in 'list' mode.
 type Application struct {
 	ID          int64
 	DomainID    int64
@@ -35,9 +36,9 @@ type Application struct {
 }
 
 // Binding is one sender-address → login pair, as consumed by the
-// smtpd_sender_login_maps generator (spec 5.1). For a wildcard application the
-// Address is the domain wildcard "@example.com"; for a list application there is
-// one Binding per listed address.
+// smtpd_sender_login_maps generator (architecture.md § Mail path). For a
+// wildcard application the Address is the domain wildcard "@example.com"; for
+// a list application there is one Binding per listed address.
 type Binding struct {
 	Address string
 	Login   string
@@ -45,7 +46,7 @@ type Binding struct {
 
 // AddApplication inserts an application and, in list mode, its addresses, in a
 // single transaction. The caller must have validated login and every address
-// (spec 7.6.2) beforehand; the query is parameterised regardless. A duplicate
+// (security.md) beforehand; the query is parameterised regardless. A duplicate
 // login maps to ErrLoginExists.
 func (s *Store) AddApplication(domainID int64, login, mode string, addresses []string) (Application, error) {
 	now := time.Now().UTC()
@@ -82,7 +83,7 @@ func (s *Store) AddApplication(domainID int64, login, mode string, addresses []s
 }
 
 // UpdateApplicationMode switches an application's address mode and replaces its
-// address list atomically (spec 7.2.7). The login and password are untouched.
+// address list atomically (product.md). The login and password are untouched.
 // Returns ErrApplicationNotFound if the id does not exist.
 func (s *Store) UpdateApplicationMode(id int64, mode string, addresses []string) error {
 	tx, err := s.db.Begin()
@@ -163,7 +164,7 @@ func (s *Store) GetApplication(id int64) (Application, error) {
 }
 
 // ListApplicationsByDomain returns a domain's applications ordered by login,
-// each with its address list populated (spec 7.2.6).
+// each with its address list populated (product.md).
 func (s *Store) ListApplicationsByDomain(domainID int64) ([]Application, error) {
 	rows, err := s.db.Query(
 		"SELECT id, domain_id, login, address_mode, created_at FROM applications WHERE domain_id = ? ORDER BY login",
@@ -196,8 +197,9 @@ func (s *Store) ListApplicationsByDomain(domainID int64) ([]Application, error) 
 }
 
 // ListApplicationLogins returns every application login across all domains,
-// ordered, for the send-log monitoring screen's filter dropdown (spec 7.2).
-// Logins are globally unique (spec 5.1), so no domain qualifier is needed.
+// ordered, for the send-log monitoring screen's filter dropdown (product.md).
+// Logins are globally unique (architecture.md § Mail path), so no domain
+// qualifier is needed.
 func (s *Store) ListApplicationLogins() ([]string, error) {
 	rows, err := s.db.Query("SELECT login FROM applications ORDER BY login")
 	if err != nil {
@@ -218,7 +220,7 @@ func (s *Store) ListApplicationLogins() ([]string, error) {
 
 // ListLoginsByDomain returns the SASL logins of a domain's applications. Used to
 // purge sasldb2 entries before a domain (and its applications via cascade) is
-// deleted, while the logins are still known (spec 7.2.4).
+// deleted, while the logins are still known (product.md).
 func (s *Store) ListLoginsByDomain(domainID int64) ([]string, error) {
 	rows, err := s.db.Query("SELECT login FROM applications WHERE domain_id = ? ORDER BY login", domainID)
 	if err != nil {
@@ -237,10 +239,11 @@ func (s *Store) ListLoginsByDomain(domainID int64) ([]string, error) {
 	return out, rows.Err()
 }
 
-// ListBindings returns every sender-address → login pair across all domains, the
-// raw material for the smtpd_sender_login_maps file (spec 5.1). Wildcard
-// applications yield a single "@domain" binding; list applications yield one
-// binding per address. Ordered deterministically so the generated map is stable.
+// ListBindings returns every sender-address → login pair across all domains,
+// the raw material for the smtpd_sender_login_maps file (architecture.md §
+// Mail path). Wildcard applications yield a single "@domain" binding; list
+// applications yield one binding per address. Ordered deterministically so the
+// generated map is stable.
 func (s *Store) ListBindings() ([]Binding, error) {
 	rows, err := s.db.Query(`
 		SELECT '@' || d.name, a.login
@@ -271,7 +274,7 @@ func (s *Store) ListBindings() ([]Binding, error) {
 
 // DeleteApplication removes an application and its addresses (via cascade),
 // returning the deleted application so the caller can drop its sasldb2 entry
-// (spec 7.2.8). Returns ErrApplicationNotFound if no such row existed.
+// (product.md). Returns ErrApplicationNotFound if no such row existed.
 func (s *Store) DeleteApplication(id int64) (Application, error) {
 	a, err := s.GetApplication(id)
 	if err != nil {

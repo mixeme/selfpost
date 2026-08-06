@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // fakeApps stands in for *app.Service in the domain-transfer tests: it records

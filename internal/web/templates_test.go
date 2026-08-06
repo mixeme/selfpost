@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 // The navigation is rendered from the layout, not copied into each page, so

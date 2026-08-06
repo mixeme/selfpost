@@ -22,6 +22,8 @@
 
 **Вывод:** проект готов к релизному тегу после закрытия § D ([implementation-plan.md](implementation-plan.md)) — предрелизного security review. Остальное — polish, не блокеры.
 
+**Статус на 2026-08-06:** § D закрыт, фазы 1, 1.5, 2 и 3 выполнены, добор по §§ 1/3/4 сделан. Незакрытым остаётся только то, что делается в момент резки версии: бамп тега образа в compose и сам git-тег ([roadmap.md](roadmap.md) § v1.x).
+
 ---
 
 ## 1. Архитектура и структура проекта
@@ -85,7 +87,7 @@ flowchart TB
 | # | Действие | Приоритет |
 |---|----------|-----------|
 | A1 | Оставить текущую структуру; рефакторинг пакетов — только при старте 2.x | Низкий |
-| A2 | Добавить в [architecture.md](architecture.md) диаграмму слоёв (как выше) | Низкий |
+| A2 | Добавить в [architecture.md](architecture.md) диаграмму слоёв (как выше) — **выполнено** (§ Code layers) | Низкий |
 
 **Модель:** Sonnet (документация)
 
@@ -130,14 +132,14 @@ flowchart TB
 | Файл | Замечание | Severity |
 |------|-----------|----------|
 | [`internal/web/token.go`](../internal/web/token.go) | `panic` при сбое `crypto/rand` — осознанно, документировано | Info |
-| [`internal/web/handlers_domains.go`](../internal/web/handlers_domains.go) | Stale comment: «Applications and send log arrive in later phases» — уже реализовано | Low |
-| Phase/spec references | ~50+ файлов с «Phase N», «spec 7.x» — шум для новых контрибьюторов | Low |
-| [`cmd/panel/main.go`](../cmd/panel/main.go) | Package comment всё ещё упоминает «Phase 1 stubs» | Low |
+| [`internal/web/handlers_domains.go`](../internal/web/handlers_domains.go) | Stale comment: «Applications and send log arrive in later phases» — **закрыто** (Фаза 1) | Low |
+| Phase/spec references | ~50+ файлов с «Phase N», «spec 7.x» — **закрыто**: «Phase N» в Фазе 1, ссылки на архивную спецификацию — отдельным проходом (см. § 4) | Low |
+| [`cmd/panel/main.go`](../cmd/panel/main.go) | Package comment всё ещё упоминает «Phase 1 stubs» — **закрыто** (Фаза 1) | Low |
 
 ### Потенциальные улучшения качества
 
-- Единый проход **gofmt + удаление stale phase-комментариев** (механическая работа).
-- Добавить **table-driven test** для edge cases в `parseDelivery` (exotic Postfix status values) — опционально.
+- Единый проход **gofmt + удаление stale phase-комментариев** (механическая работа) — **выполнено** (Фаза 1; `gofmt -l` теперь и в CI).
+- Добавить **table-driven test** для edge cases в `parseDelivery` (exotic Postfix status values) — **выполнено**, и проход оказался не косметическим: он вскрыл реальный баг. Шаблон разбора брал `status=` жадно, то есть **последнее** вхождение в строке, а Postfix дописывает в конец ответ удалённого сервера дословно. Отказ, в тексте ответа которого встречалось `status=sent`, попадал в журнал как доставленный. Исправлено на ленивый разбор (первое `status=` после получателя).
 
 **Модель:** Haiku (механическая чистка комментариев), Sonnet (точечные правки)
 
@@ -157,18 +159,18 @@ flowchart TB
 
 | Проблема | Где | Реальность |
 |----------|-----|------------|
-| Image tag `0.1.0` vs «v1.0» | [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) vs README | Roadmap § v1.x — bump при теге |
-| Quick start URLs | README | GitHub raw; основной repo — Codeberg |
-| `docs/logo` | roadmap | Каталог отсутствует (не «пустой») |
-| `docs/specification.md` | documentation-plan D9 | Архивирован в `docs/archive/`; ссылки в коде на «spec 7.x» устарели |
-| Phase language в коде | 50+ файлов | Docs говорят «v1.0 done», код — «Phase 14» |
-| RU/EN split | progress, roadmap, implementation-plan (RU) vs README/architecture (EN) | Намеренно, но барьер для EN-only contributors |
+| Image tag `0.1.0` vs «v1.0» | [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) vs README | **Открыто:** roadmap § v1.x — bump в релизном коммите вместе с git-тегом |
+| Quick start URLs | README | **Закрыто:** Codeberg уходит как публичная площадка, единственный дом проекта — GitHub; вместе с URL переехал и путь Go-модуля (`github.com/mixeme/selfpost`) |
+| `docs/logo` | roadmap | **Закрыто** (Фаза 1): каталог отсутствует, критерию удовлетворяет |
+| `docs/specification.md` | documentation-plan D9 | **Закрыто:** файл остаётся в `docs/archive/` как история, но ссылок на него из кода больше нет — все «spec N.x» заменены на живые документы |
+| Phase language в коде | 50+ файлов | **Закрыто** (Фаза 1) |
+| RU/EN split | progress, roadmap, implementation-plan (RU) vs README/architecture (EN) | Намеренно, но барьер для EN-only contributors; снимается вместе с `CONTRIBUTING.md` — перенесено в [roadmap.md](roadmap.md) § 2.x |
 
 ### Комментирование кода
 
 - **Высокое качество** в security-critical paths.
 - **Среднее** в CRUD handlers (делегируют в services — acceptable).
-- **Рекомендация:** заменить «spec 7.x» на ссылки на [product.md](product.md) / [security.md](security.md) § или удалить.
+- **Выполнено:** ссылки на архивную спецификацию убраны из кода целиком — не только «spec 7.x», но и «spec 4/5/6/8/9», которые страдали ровно тем же (указывали в документ, помеченный «не источник истины»). Каждая заменена на живой документ, владеющий темой: [architecture.md](architecture.md) с указанием секции, [product.md](product.md), [security.md](security.md) или README. Секция указывается там, где документ большой (architecture.md, README); для короткого `product.md` — только файл.
 
 **Модель:** Sonnet (docs sync)
 
@@ -339,20 +341,20 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 
 | # | Задача | Модель | Ref |
 |---|--------|--------|-----|
-| R0 | Security review diff v1.0.0→HEAD + checklist 7.6 | **Fable** | implementation-plan § D |
-| R1 | Bump image tag in compose при git tag | Sonnet | roadmap § v1.x |
-| R2 | Codeberg URLs в README Quick start | Sonnet | roadmap § v1.x |
+| R0 | Security review diff v1.0.0→HEAD + checklist 7.6 — **выполнено** (2026-08-06) | **Fable** | implementation-plan § D |
+| R1 | Bump image tag in compose при git tag — **открыто**, делается в релизном коммите вместе с тегом | Sonnet | roadmap § v1.x |
+| R2 | ~~Codeberg URLs в README Quick start~~ — **снято**: Codeberg уходит, GitHub остаётся единственной площадкой. Вместо перевода ссылок *на* Codeberg сделан обратный переезд: URL, лицензионные шапки SVG/HTML и путь Go-модуля | Sonnet | — |
 
 ### v1.x polish (не блокеры)
 
 | # | Задача | Модель |
 |---|--------|--------|
-| R3 | Cleanup phase-комментариев (50+ files) | Haiku |
-| R4 | Fix stale comment in handlers_domains.go | Haiku |
-| R5 | docs/logo: создать или удалить из roadmap | Haiku |
-| R6 | GUI: visibility-aware HTMX polling | Sonnet |
-| R7 | CONTRIBUTING.md | Sonnet |
-| R8 | ADR для CSRF policy | Sonnet |
+| R3 | Cleanup phase-комментариев (50+ files) — **выполнено** (Фаза 1) | Haiku |
+| R4 | Fix stale comment in handlers_domains.go — **выполнено** (Фаза 1) | Haiku |
+| R5 | docs/logo: создать или удалить из roadmap — **выполнено** (Фаза 1) | Haiku |
+| R6 | GUI: visibility-aware HTMX polling — **выполнено** (Фаза 2) | Sonnet |
+| R7 | CONTRIBUTING.md — **перенесено в 2.x** ([roadmap.md](roadmap.md)): у проекта один разработчик и нет внешнего потока PR, документ был бы без аудитории | Sonnet |
+| R8 | ADR для CSRF policy — **выполнено** (Фаза 1, [security.md](security.md)) | Sonnet |
 | R13 | Шифрование бэкапа и экспорта домена (checkbox + password) — **выполнено** | **Opus** + Sonnet |
 
 ### v2.x (roadmap, не начинать без согласования)
@@ -368,7 +370,7 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 
 - E2E готов (`test/e2e/`); release workflow matrix amd64/arm64 — **хорошо**.
 - `go vet` + `go test` на push — **достаточно** для v1.x.
-- Рекомендация: добавить `gofmt -l` check в CI (progress.md упоминает как manual step).
+- Рекомендация: добавить `gofmt -l` check в CI (progress.md упоминает как manual step) — **выполнено** (Фаза 1, [.github/workflows/test.yml](../.github/workflows/test.yml)).
 
 **Модель:** Haiku (CI one-liner)
 
@@ -378,12 +380,17 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 
 ### Фаза 0 — Гейт релиза (P0)
 
-1. Fable: `/security-review` по diff v1.0.0...HEAD
-2. Fable: ручной проход security.md checklist § 7.6
-3. Каждая finding → fix ИЛИ запись в security.md
-4. `make e2e` зелёный (уже готов)
-5. Sonnet: bump compose image tag + Codeberg URLs (в том же release commit)
-6. Git tag vX.Y.Z
+Содержательная часть закрыта 2026-08-06; остались только шаги самой резки
+версии, которые делаются по явной команде оператора.
+
+1. Fable: `/security-review` по diff v1.0.0...HEAD — **выполнено**
+2. Fable: ручной проход security.md checklist § 7.6 — **выполнено**
+3. Каждая finding → fix ИЛИ запись в security.md — **выполнено** (одна правка
+   defence-in-depth, принятые риски не пополнились)
+4. `make e2e` зелёный — **выполнено** (dev-сервер)
+5. ~~Codeberg URLs~~ — **снято**, см. R2: переезд сделан в обратную сторону, на
+   GitHub. Остаётся bump тега образа в compose — **открыто**, в релизном коммите
+6. Git tag vX.Y.Z — **открыто**, [roadmap.md](roadmap.md) § v1.x
 
 ### Фаза 1.5 — Шифрование резервных копий (P1, v1.x) — **выполнено 2026-08-06**
 
@@ -409,20 +416,29 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 
 **Задачи:** E1 crypto envelope → E2 backup/CLI → E3 domain export/import → E4 UI (checkbox) → E5 docs + e2e. **Модель:** Opus (crypto), Sonnet (UI/docs).
 
-### Фаза 1 — Doc/code hygiene (P1)
+### Фаза 1 — Doc/code hygiene (P1) — **выполнено 2026-08-06**
 
-1. Haiku: массовая замена phase-комментариев (mechanical pass)
-2. Haiku: fix handlers_domains.go stale comment
-3. Sonnet: ADR CSRF в security.md
-4. Sonnet: known limitations § в architecture.md (send-log gap)
-5. Haiku: docs/logo resolve
-6. Haiku: gofmt CI check
+1. Haiku: массовая замена phase-комментариев (mechanical pass) — **сделано**
+2. Haiku: fix handlers_domains.go stale comment — **сделано**
+3. Sonnet: ADR CSRF в security.md — **сделано**
+4. Sonnet: known limitations § в architecture.md (send-log gap) — **уже было**
+   в § Log tailer, правка не потребовалась
+5. Haiku: docs/logo resolve — **сделано**
+6. Haiku: gofmt CI check — **сделано**
 
-### Фаза 2 — GUI polish (P2, optional)
+Добор той же фазы (2026-08-06, отдельным проходом): ссылки на архивную
+спецификацию убраны из кода целиком (§ 4), добавлена диаграмма слоёв в
+architecture.md (A2), расширен `TestParseDelivery` (§ 3) — последнее вскрыло
+реальный баг разбора `status=`.
 
-1. Sonnet: HTMX visibility-aware polling (panel.js)
-2. Sonnet: CSS custom properties для dark mode
-3. Haiku: consolidate main max-width rules
+### Фаза 2 — GUI polish (P2, optional) — **выполнено 2026-08-06**
+
+1. Sonnet: HTMX visibility-aware polling (panel.js) — **сделано иначе**:
+   фильтр повешен на `htmx:beforeRequest`, а не на встроенный фильтр триггера
+   htmx — тот вычисляется через `new Function`, что CSP панели без
+   `unsafe-eval` молча ломает
+2. Sonnet: CSS custom properties для dark mode — **сделано**
+3. Haiku: consolidate main max-width rules — **сделано**
 
 ### Фаза 3 — Operational improvements (P2–P3, optional) — **выполнено 2026-08-06**
 

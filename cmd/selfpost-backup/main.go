@@ -1,6 +1,6 @@
 // Command selfpost-backup produces the full persistent-state archive from inside
 // the container, invoked via `docker exec` for scripted/cron backups — the CLI
-// equivalent of the panel's backup button (spec 7.5.A, 11.6).
+// equivalent of the panel's backup button (architecture.md § Persistence).
 //
 // By default the gzip-compressed tar is written to stdout, so the usual form is:
 //
@@ -8,7 +8,7 @@
 //
 // Use -o to write to a file instead. The resulting archive contains DKIM private
 // keys, the admin password hash and SASL credentials — treat it as a secret
-// (spec 7.5.A).
+// (architecture.md § Persistence).
 //
 // Given a password (SELFPOST_BACKUP_PASSWORD or -password-file, never an
 // argument, which would show up in the process list) the archive is written as
@@ -26,9 +26,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/backup"
-	"codeberg.org/mix/selfpost/internal/buildinfo"
-	"codeberg.org/mix/selfpost/internal/secretfile"
+	"github.com/mixeme/selfpost/internal/backup"
+	"github.com/mixeme/selfpost/internal/buildinfo"
+	"github.com/mixeme/selfpost/internal/secretfile"
 )
 
 // passwordEnv names the environment variable holding the encryption password.

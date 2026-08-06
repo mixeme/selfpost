@@ -9,21 +9,23 @@ import (
 
 // templates holds the parsed page and fragment templates. Each page is parsed
 // together with the shared base layout so {{ template "base" . }} works.
-// Fragments (HTMX polling targets, spec 7.1) are parsed standalone, without
-// the layout, so they can be swapped into an existing page as an HTML snippet
-// rather than a full document. Rendering always goes through html/template,
-// which auto-escapes all interpolated data regardless (spec 7.6.7).
+// Fragments (HTMX polling targets, architecture.md § Panel HTTP surface) are
+// parsed standalone, without the layout, so they can be swapped into an
+// existing page as an HTML snippet rather than a full document. Rendering
+// always goes through html/template, which auto-escapes all interpolated data
+// regardless (security.md).
 type templates struct {
 	pages     map[string]*template.Template
 	fragments map[string]*template.Template
 }
 
 // pageFiles maps a logical page name to its template files. Every page
-// composes with layout.html; pages that embed a polling fragment (spec 7.1)
-// list that fragment's file too, so the same {{define}} block renders both
-// the initial page and the fragment's own refresh responses identically. Pages
-// sharing a block of markup (the encryption fields on the two secret downloads)
-// list that partial the same way.
+// composes with layout.html; pages that embed a polling fragment
+// (architecture.md § Panel HTTP surface) list that fragment's file too, so the
+// same {{define}} block renders both the initial page and the fragment's own
+// refresh responses identically. Pages sharing a block of markup (the
+// encryption fields on the two secret downloads) list that partial the same
+// way.
 var pageFiles = map[string][]string{
 	"setup":         {"templates/setup.html"},
 	"login":         {"templates/login.html"},
@@ -101,7 +103,8 @@ func (s *Server) render(w http.ResponseWriter, status int, page string, data any
 }
 
 // renderFragment writes an HTMX polling fragment as a bare HTML snippet, with
-// no surrounding layout (spec 7.1: fragment endpoints return HTML, not JSON).
+// no surrounding layout (architecture.md § Panel HTTP surface: fragment
+// endpoints return HTML, not JSON).
 func (s *Server) renderFragment(w http.ResponseWriter, status int, name string, data any) {
 	tmpl, ok := s.tmpl.fragments[name]
 	if !ok {

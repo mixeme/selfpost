@@ -68,8 +68,8 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 }
 
 // testSenderLoginMismatch is plan C.4 negative check 2: an authenticated
-// application cannot send as a sender it does not own (spec 5.1 p.3,
-// reject_sender_login_mismatch) — the core anti-spoofing control.
+// application cannot send as a sender it does not own (architecture.md § Mail
+// path, reject_sender_login_mismatch) — the core anti-spoofing control.
 func testSenderLoginMismatch(t *testing.T, sc *scenario) {
 	res := attemptSend(sendAttempt{
 		authLogin: sc.appLogin, authPassword: sc.appPassword,
@@ -118,10 +118,10 @@ func testForeignRelayRejected(t *testing.T, sc *scenario) {
 }
 
 // testJournalMilterFailOpen is plan C.4 negative check 6: the journal-milter
-// is monitoring-only and fails open (spec 7.3) — stopping the panel process
-// (which owns the milter socket) must not block mail, and must not crash the
-// container (crashexit only fires on PROCESS_STATE_FATAL, a clean supervisor
-// stop is STOPPED, see build/crashexit.py).
+// is monitoring-only and fails open (architecture.md § Mail path) — stopping
+// the panel process (which owns the milter socket) must not block mail, and
+// must not crash the container (crashexit only fires on PROCESS_STATE_FATAL, a
+// clean supervisor stop is STOPPED, see build/crashexit.py).
 func testJournalMilterFailOpen(t *testing.T, sc *scenario) {
 	if _, err := h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "stop", "panel"); err != nil {
 		t.Fatalf("stop panel: %v", err)
@@ -196,12 +196,12 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 }
 
 // testLevel1RateLimit is plan C.4 negative check 4: the native Postfix anvil
-// backstop (smtpd_client_message_rate_limit, spec 5 p.5), set by the override
-// to RATE_LIMIT_MESSAGES_PER_IP=50, rejects once exceeded. It uses a dedicated
-// application with no level-2 limit of its own, and retries well past that
-// count, so the result is unambiguous regardless of how much of the shared
-// per-IP budget earlier subtests already spent (they stay well under 50
-// between them).
+// backstop (smtpd_client_message_rate_limit, README § Rate limiting), set by
+// the override to RATE_LIMIT_MESSAGES_PER_IP=50, rejects once exceeded. It
+// uses a dedicated application with no level-2 limit of its own, and retries
+// well past that count, so the result is unambiguous regardless of how much of
+// the shared per-IP budget earlier subtests already spent (they stay well
+// under 50 between them).
 func testLevel1RateLimit(t *testing.T, sc *scenario) {
 	login, password, err := sc.panel.addApplication(sc.domainID, "l1app", "wildcard", "")
 	if err != nil {

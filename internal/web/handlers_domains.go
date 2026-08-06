@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // handleDashboard is the authenticated landing page: the list of sending
 // domains with their DKIM/selector and application counts, plus the add-domain
-// form (spec 7.2.2).
+// form (product.md).
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	s.renderDashboard(w, r, http.StatusOK, "", "")
 }
@@ -48,7 +48,7 @@ func dashboardFlash(r *http.Request) string {
 
 // handleAddDomain validates the submitted name, creates the domain (DKIM key +
 // OpenDKIM reload), and redirects to the domain's page so the DNS record to
-// publish is shown (spec 7.2.3).
+// publish is shown (product.md).
 func (s *Server) handleAddDomain(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		s.renderDashboard(w, r, http.StatusBadRequest, "Invalid form submission.", "")
@@ -76,7 +76,7 @@ func (s *Server) handleAddDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteConfirm shows the cascade warning before a domain is removed: the
-// panel must explicitly state that all bound applications go with it (spec 7.2.4).
+// panel must explicitly state that all bound applications go with it (product.md).
 func (s *Server) handleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.lookupDomain(w, r)
 	if !ok {
@@ -116,11 +116,12 @@ func (s *Server) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleReload re-applies both the OpenDKIM configuration and the Postfix
-// sender map on demand (spec 7.2.12). Each Resync regenerates its files from the
-// database and reloads its daemon, so the button doubles as a drift-recovery.
-// The button lives on the status page: it is a "put the daemons
-// back in the state the database describes" action, which belongs with the rest
-// of the server-health screen rather than in the domain list's top bar.
+// sender map on demand (architecture.md § Panel HTTP surface). Each Resync
+// regenerates its files from the database and reloads its daemon, so the
+// button doubles as a drift-recovery. The button lives on the status page: it
+// is a "put the daemons back in the state the database describes" action,
+// which belongs with the rest of the server-health screen rather than in the
+// domain list's top bar.
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 	if err := s.domains.Resync(); err != nil {
 		logf("panel: manual reload (opendkim): %v", err)

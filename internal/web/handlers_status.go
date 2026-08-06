@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 // handleStatus renders the server status page: the panel's landing page and the
@@ -26,7 +26,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStatusFragment serves the HTMX polling fragment for the local checks
-// (spec 7.1: fragment endpoints return HTML, not JSON).
+// (architecture.md § Panel HTTP surface: fragment endpoints return HTML, not
+// JSON).
 func (s *Server) handleStatusFragment(w http.ResponseWriter, _ *http.Request) {
 	s.renderFragment(w, http.StatusOK, "status_body", s.statusBody())
 }
@@ -90,9 +91,10 @@ func (s *Server) statusBody() map[string]any {
 	}
 }
 
-// queueSummary reduces postqueue's listing to the one line worth showing on the
-// status page; the full listing has its own screen (spec 7.2.11). postqueue
-// prints either "Mail queue is empty" or a trailing "-- N Kbytes in M Requests."
+// queueSummary reduces postqueue's listing to the one line worth showing on
+// the status page; the full listing has its own screen (architecture.md §
+// Panel HTTP surface). postqueue prints either "Mail queue is empty" or a
+// trailing "-- N Kbytes in M Requests."
 func queueSummary(out string) string {
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {

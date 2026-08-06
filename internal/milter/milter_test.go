@@ -9,7 +9,7 @@ import (
 
 	"github.com/emersion/go-milter"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // fakeRecorder captures inserts and can be made to fail, to prove the milter

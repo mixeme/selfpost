@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 func TestParseDelivery(t *testing.T) {
@@ -59,6 +59,59 @@ func TestParseDelivery(t *testing.T) {
 		{
 			name:   "smtpd client-line ignored",
 			line:   "host postfix/smtpd[10]: 41E862C00D9E: client=unknown[203.0.113.7]",
+			wantOK: false,
+		},
+		{
+			// The remote server's reply is quoted verbatim at the end of the
+			// line and is entirely attacker-influenced text. A "status=" that
+			// appears in there must not win over the real field, or a bounce
+			// would be filed as a success.
+			name:      "status= quoted in the remote reply does not win",
+			line:      "host postfix/smtp[26]: 9F1A2C00D9E: to=<a@example.net>, relay=mx.example.net[203.0.113.9]:25, dsn=5.1.1, status=bounced (host mx.example.net said: 550 5.1.1 unknown status=sent (in reply to RCPT TO command))",
+			wantOK:    true,
+			queueID:   "9F1A2C00D9E",
+			recipient: "a@example.net",
+			status:    store.StatusBounced,
+		},
+		{
+			// Postfix logs the null sender's own delivery (double bounce) with
+			// an empty recipient. It parses, and the empty recipient simply
+			// matches no send-log row — the panel only ever records mail it
+			// accepted from an authenticated client.
+			name:      "null recipient parses with an empty address",
+			line:      "host postfix/smtp[26]: A1B2C3: to=<>, relay=none, delay=0.1, dsn=2.0.0, status=sent (250 OK)",
+			wantOK:    true,
+			queueID:   "A1B2C3",
+			recipient: "",
+			status:    store.StatusSent,
+		},
+		{
+			// An alias/virtual expansion carries orig_to= as well; the address
+			// the message was actually delivered to is the one in to=.
+			name:      "orig_to is ignored in favour of to",
+			line:      "host postfix/lmtp[26]: 4Xk9tS1abcz: to=<real@example.net>, orig_to=<alias@example.net>, relay=x, dsn=2.0.0, status=sent (ok)",
+			wantOK:    true,
+			queueID:   "4Xk9tS1abcz",
+			recipient: "real@example.net",
+			status:    store.StatusSent,
+		},
+		{
+			// Postfix's own delivery agents write these two, but neither is a
+			// final result we model: "deliverable" comes from address
+			// verification probes, and anything unrecognised is dropped rather
+			// than guessed at, leaving the row in its previous state.
+			name:   "unknown status word is not a delivery result",
+			line:   "host postfix/smtp[26]: BEEF01: to=<a@example.net>, relay=x, status=deliverable (ok)",
+			wantOK: false,
+		},
+		{
+			name:   "status matching is case-sensitive, as Postfix writes it",
+			line:   "host postfix/smtp[26]: BEEF02: to=<a@example.net>, relay=x, dsn=4.0.0, status=Deferred (connect timed out)",
+			wantOK: false,
+		},
+		{
+			name:   "cleanup message-id line ignored",
+			line:   "host postfix/cleanup[12]: BEEF03: message-id=<x@example.com>",
 			wantOK: false,
 		},
 	}

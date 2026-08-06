@@ -35,7 +35,7 @@ Or directly:
 ```sh
 go vet ./...
 go test ./...
-go build -trimpath -ldflags "-X codeberg.org/mix/selfpost/internal/buildinfo.Version=dev" -o bin/panel ./cmd/panel
+go build -trimpath -ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Version=dev" -o bin/panel ./cmd/panel
 ```
 
 **Env documentation regression:** `go test ./cmd/panel -run TestLoadConfig` —
