@@ -15,6 +15,12 @@ const (
 	maxUsernameLen = 64
 )
 
+// minSecretFilePasswordLen is the floor for the password protecting an
+// encrypted backup or domain export. Such a file is offline and can be attacked
+// at leisure, so the floor matches the administrator password's rather than the
+// weaker "any password is better than none".
+const minSecretFilePasswordLen = minAdminPasswordLen
+
 // validateUsername enforces a strict server-side whitelist (spec 7.6.2):
 // letters, digits, dot, dash, underscore. Client validation is never trusted.
 func validateUsername(u string) error {

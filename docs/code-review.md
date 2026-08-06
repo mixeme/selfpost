@@ -219,7 +219,7 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 | CSRF without tokens | POST без Origin/Sec-Fetch-Site пропускается | [security.md](security.md) |
 | Fail-open L2 rate limit | DB error → mail проходит | [`internal/milter/ratelimit.go`](../internal/milter/ratelimit.go) |
 | Shallow SPF check | Не следует `include:`/`redirect=` | README, `internal/dnscheck/spf.go` |
-| Plaintext backup/export at rest | DKIM-ключи, SASL, пароли приложений в cleartext `.tar.gz`/`.json` | **Mitigation:** R13 (optional encryption) |
+| Plaintext backup/export at rest | DKIM-ключи, SASL, пароли приложений в cleartext `.tar.gz`/`.json` | **Закрыто:** R13 — опциональное шифрование (`.spbk`/`.spde`); открытый вариант остаётся умолчанием, риск переформулирован в [security.md](security.md) |
 
 **Не риск (решение оператора):** «Session resurrection from backup» — снято из [security.md](security.md).
 
@@ -234,7 +234,7 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 | # | Действие | Приоритет | Модель |
 |---|----------|-----------|--------|
 | L1 | **Предрелизный security review** (§ D) — обязательный гейт | **P0** | **Fable** |
-| L2 | **Шифрование бэкапа и экспорта домена** (R13) — optional, checkbox + password | P1 | **Opus** + Sonnet |
+| L2 | **Шифрование бэкапа и экспорта домена** (R13) — optional, checkbox + password — **выполнено** | P1 | **Opus** + Sonnet |
 | L3 | Send-log gap mitigation — опционально | P2 | Opus |
 | L4 | Transaction wrap для rate limit count+insert — опционально | P3 | Opus |
 
@@ -352,7 +352,7 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 | R6 | GUI: visibility-aware HTMX polling | Sonnet |
 | R7 | CONTRIBUTING.md | Sonnet |
 | R8 | ADR для CSRF policy | Sonnet |
-| R13 | Шифрование бэкапа и экспорта домена (checkbox + password) | **Opus** + Sonnet |
+| R13 | Шифрование бэкапа и экспорта домена (checkbox + password) — **выполнено** | **Opus** + Sonnet |
 
 ### v2.x (roadmap, не начинать без согласования)
 
@@ -384,7 +384,16 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 5. Sonnet: bump compose image tag + Codeberg URLs (в том же release commit)
 6. Git tag vX.Y.Z
 
-### Фаза 1.5 — Шифрование резервных копий (P1, v1.x)
+### Фаза 1.5 — Шифрование резервных копий (P1, v1.x) — **выполнено 2026-08-06**
+
+Реализовано как спланировано: `internal/secretfile` (E1) → `selfpost-backup`
++ панель (E2) → экспорт/импорт домена (E3) → UI-чекбокс (E4) → docs (E5).
+Отличия от плана: конверт потоковый (64 KiB чанки AES-256-GCM с AAD
+`header+counter+last`), а не одноблочный, иначе полный бэкап пришлось бы
+держать в памяти целиком; манифест остался внутри tar, то есть внутри
+шифротекста, как и планировалось; в CLI добавлен режим `-decrypt` — без него
+зашифрованный бэкап нечем распаковать при restore. Детали —
+[progress.md](progress.md), CHANGELOG `[Unreleased]`.
 
 **Проблема:** полный бэкап и экспорт домена содержат DKIM-ключи, SASL-креды и plaintext-пароли приложений; сейчас `.tar.gz` / `.json` без шифрования.
 

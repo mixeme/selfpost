@@ -1,0 +1,23 @@
+{{/* Password fields shared by the full-backup and domain-export forms. The
+     checkbox is the switch: unticked, the download keeps its historic plain
+     form (.tar.gz / .json); ticked, the file is sealed in a password-encrypted
+     envelope (.spbk / .spde). The fields start hidden and are revealed by
+     panel.js — with JavaScript blocked they are simply always visible, and the
+     server still decides from the checkbox alone. */}}
+{{define "encryptfields"}}
+<div class="encrypt">
+  <label class="check">
+    <input type="checkbox" name="encrypt" value="1" data-encrypt-toggle>
+    <span>Encrypt with a password</span>
+  </label>
+  <div class="encrypt-fields" data-encrypt-fields>
+    <label for="encpw">Password</label>
+    <input id="encpw" name="password" type="password" autocomplete="new-password"
+           minlength="{{.MinPwLen}}" placeholder="at least {{.MinPwLen}} characters">
+    <label for="encpw2">Repeat password</label>
+    <input id="encpw2" name="password_confirm" type="password" autocomplete="new-password">
+    <p class="muted">Keep this password: without it the file cannot be opened,
+    and SelfPost does not store it anywhere.</p>
+  </div>
+</div>
+{{end}}

@@ -28,6 +28,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- Optional password encryption for the two secret-bearing downloads (plan
+  phase 1.5, `docs/code-review.md`): an *Encrypt with a password* checkbox on
+  the full-backup and domain-export forms writes a `.spbk` / `.spde` envelope
+  instead of the plain `.tar.gz` / `.json` — scrypt key derivation and
+  AES-256-GCM over 64 KiB chunks, each authenticated with the header, its
+  counter and an end-of-stream flag, so a truncated or altered file refuses to
+  open (`internal/secretfile`). Unticked, both downloads are byte-for-byte what
+  they were.
+- Domain import accepts an encrypted export: the envelope is detected by its
+  magic bytes, and a password field appears next to the file picker
+  (`internal/web/handlers_backup.go`, `templates/encrypt_fields.html`).
+- `selfpost-backup` writes encrypted archives and reads them back:
+  `-decrypt` (with `-i`/`-o`) turns a `.spbk` into the plain `.tar.gz` a
+  restore unpacks. The password comes from `SELFPOST_BACKUP_PASSWORD` or
+  `-password-file`, never from argv.
+- docs: README *Encrypting a backup or export*; `docs/security.md` §
+  *Резервная копия и экспорт домена* + accepted risk (encryption is opt-in);
+  `docs/architecture.md` persistence § envelope summary.
 - docs: `docs/roadmap.md` v1.x tail — retire `implementation-plan.md` in the
   release commit (move to `docs/archive/`, retarget its references in README,
   docs, Makefile, release workflow and the e2e test comment).

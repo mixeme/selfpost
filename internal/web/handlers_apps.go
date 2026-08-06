@@ -32,6 +32,8 @@ type detailView struct {
 	// RateLimitErr surfaces a validation error from a domain- or application-level
 	// rate-limit form (spec 7.4) as a page banner.
 	RateLimitErr string
+	// ExportErr surfaces a rejected encryption password from the export card.
+	ExportErr string
 }
 
 // appRateLimitView pairs an application with its differentiated rate-limit
@@ -131,6 +133,8 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		"Wildcard":          store.AddressModeWildcard,
 		"List":              store.AddressModeList,
 		"RateLimitErr":      view.RateLimitErr,
+		"ExportErr":         view.ExportErr,
+		"MinPwLen":          minSecretFilePasswordLen,
 		"DomainHasRL":       domainRLok && domainRL.Active(),
 		"DomainRLIPs":       strings.Join(domainRL.AllowedIPs, "\n"),
 		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),

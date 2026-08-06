@@ -296,7 +296,43 @@ Two related but distinct operations — spec 7.5:
 Both files are **secrets** — they contain the admin password hash (full
 backup) or working application credentials (domain export) in the clear or in
 directly reversible form. Treat them like any other credential material:
-encrypt at rest, restrict who can read them, don't email them around.
+restrict who can read them, don't email them around — and encrypt them, which
+SelfPost can do for you.
+
+### Encrypting a backup or export
+
+Both download forms carry an **Encrypt with a password** checkbox. Ticked, the
+file that comes down is an encrypted envelope instead of the plain archive:
+
+| Artefact | Plain | Encrypted |
+|----------|-------|-----------|
+| Full backup | `.tar.gz` | `.spbk` |
+| Domain export | `.json` | `.spde` |
+
+The key is derived from the password with scrypt and the contents are sealed
+with AES-256-GCM, in chunks, so a truncated or altered file fails to open rather
+than restoring quietly. **SelfPost does not store the password** — lose it and
+the file is unrecoverable, which is the entire point.
+
+*Import a domain* takes an encrypted export directly: tick **The file is
+encrypted** and give the password.
+
+A full backup has to be turned back into a plain archive before it can be
+unpacked into `/data`, which the CLI does with the same password:
+
+```sh
+docker exec -i <container> selfpost-backup -decrypt < backup.spbk > backup.tar.gz
+```
+
+The CLI also *writes* encrypted backups for scripted/cron use. The password
+comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>` (first line),
+never from a command-line argument, which would be visible in the process list:
+
+```sh
+docker exec -e SELFPOST_BACKUP_PASSWORD="$PW" <container> selfpost-backup > backup.spbk
+```
+
+With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
 
 ## Published ports
 
