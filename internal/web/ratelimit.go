@@ -6,7 +6,7 @@ import (
 )
 
 // rateLimiter is a simple fixed-window per-key counter used to throttle the
-// setup and login routes (spec 7.6.1, 7.6.5). Keys are client IPs. It is not a
+// setup and login routes (security.md). Keys are client IPs. It is not a
 // precise sliding window — a coarse backstop against brute-force and log noise
 // is all these routes need.
 type rateLimiter struct {

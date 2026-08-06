@@ -364,8 +364,8 @@ swap file is cheap insurance against those occasional coincident spikes.
 
 ## Repository
 
-- Primary: <https://codeberg.org/mix/selfpost>
-- Mirror: <https://github.com/mixeme/selfpost>
+<https://github.com/mixeme/selfpost> — the single home of the project: source,
+issues, releases and the `ghcr.io/mixeme/selfpost` image all live there.
 
 ## License
 

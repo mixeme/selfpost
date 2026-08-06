@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 const (

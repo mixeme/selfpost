@@ -20,7 +20,7 @@ import (
 //   - form-action 'self' keeps a form from being retargeted at another host.
 //
 // This is a second line of defence: XSS is already prevented by
-// html/template's contextual auto-escaping (spec 7.6.7).
+// html/template's contextual auto-escaping (security.md).
 const contentSecurityPolicy = "default-src 'self'; " +
 	"object-src 'none'; " +
 	"base-uri 'none'; " +

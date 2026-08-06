@@ -1,13 +1,14 @@
 // Package milter implements the SelfPost journal-milter: a lightweight milter
-// (spec 7.3) attached to Postfix's smtpd_milters alongside OpenDKIM. On the
-// receive path it reads the SASL login, From, recipients and Subject of each
-// accepted message and records one send-log row per (queue-id, recipient),
-// giving the panel a structured, filterable history that raw mail.log cannot.
+// (architecture.md § Mail path) attached to Postfix's smtpd_milters alongside
+// OpenDKIM. On the receive path it reads the SASL login, From, recipients and
+// Subject of each accepted message and records one send-log row per (queue-id,
+// recipient), giving the panel a structured, filterable history that raw
+// mail.log cannot.
 //
 // It is monitoring only: it never rejects, and every callback returns Continue
 // or Accept so a failure of this milter can never block the relay. Postfix is
 // configured with default_action=accept for this milter's socket, so even a
-// crash or hang fails open (spec 7.3).
+// crash or hang fails open (architecture.md § Mail path).
 package milter
 
 import (
@@ -21,13 +22,14 @@ import (
 
 	"github.com/emersion/go-milter"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // Store is the persistence the milter needs on the receive path: recording
-// accepted messages (spec 7.3) and, for level-2 rate limiting (spec 7.4),
-// looking up the configured limits and counting recent messages. *store.Store
-// satisfies it; tests substitute a fake.
+// accepted messages (architecture.md § Mail path) and, for level-2 rate
+// limiting (README § Rate limiting), looking up the configured limits and
+// counting recent messages. *store.Store satisfies it; tests substitute a
+// fake.
 type Store interface {
 	InsertQueued(e store.SendLogEntry) error
 	InsertRejected(e store.SendLogEntry) error
@@ -37,11 +39,11 @@ type Store interface {
 
 // session accumulates the fields of one message as the milter callbacks fire.
 // Milter macros arrive per-stage and do not accumulate, so each value is
-// captured at the stage that carries it (spec 7.3): SASL login
-// and From at MAIL, each recipient at RCPT, Subject in the headers, and the
-// queue-id at end-of-message. go-milter creates one session per connection; a
-// connection may carry several messages, so per-message fields are reset at
-// MailFrom (the start of every transaction).
+// captured at the stage that carries it (architecture.md § Mail path): SASL
+// login and From at MAIL, each recipient at RCPT, Subject in the headers, and
+// the queue-id at end-of-message. go-milter creates one session per
+// connection; a connection may carry several messages, so per-message fields
+// are reset at MailFrom (the start of every transaction).
 type session struct {
 	milter.NoOpMilter
 	rec Store
@@ -74,8 +76,8 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 // macros). This is also the earliest stage where both the sending domain (from
 // the sender) and the application (the login) are known, so the level-2 rate
 // limit is enforced here: over the limit, the message is refused with a 4xx
-// tempfail before recipients are even offered (spec 7.4). Enforcement is
-// fail-open — see overLimit.
+// tempfail before recipients are even offered (README § Rate limiting).
+// Enforcement is fail-open — see overLimit.
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.releaseReservations() // a previous transaction that ended without EOM/ABORT
 	s.from = cleanAddress(from)
@@ -161,7 +163,8 @@ func macro(m *milter.Modifier, name string) string {
 }
 
 // record writes one send-log row per recipient. Failures are logged, never
-// propagated: journalling must not affect mail acceptance (spec 7.3).
+// propagated: journalling must not affect mail acceptance (architecture.md §
+// Mail path).
 func (s *session) record(queueID string) {
 	domain := domainOf(s.from)
 	rcpts := s.rcpts
@@ -198,8 +201,9 @@ func cleanAddress(a string) string {
 }
 
 // domainOf returns the lower-cased domain of an email address, or "" if there
-// is no domain part. Sender binding guarantees the From domain equals
-// the application's domain, so this is the sending domain (spec 7.3).
+// is no domain part. Sender binding guarantees the From domain equals the
+// application's domain, so this is the sending domain (architecture.md § Mail
+// path).
 func domainOf(addr string) string {
 	if i := strings.LastIndexByte(addr, '@'); i >= 0 {
 		return strings.ToLower(addr[i+1:])

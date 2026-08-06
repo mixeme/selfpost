@@ -3,7 +3,7 @@ package domain
 import (
 	"fmt"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // Applications is the slice of the application service the domain service needs
@@ -19,18 +19,20 @@ type Applications interface {
 	// and reloads Postfix.
 	Resync() error
 	// Secret returns an application's stored password, for a domain export
-	// (spec 7.5.B).
+	// (architecture.md § Persistence).
 	Secret(login string) (string, error)
 	// ImportApplication re-creates an application (registry row + SASL account)
-	// from a domain-export file, without rebuilding the sender map (spec 7.5.B).
+	// from a domain-export file, without rebuilding the sender map
+	// (architecture.md § Persistence).
 	ImportApplication(domainID int64, login, mode string, addresses []string, password string) error
 }
 
 // Service coordinates the places a sending domain lives: the SQLite registry,
 // the on-disk DKIM keys and OpenDKIM's tables, plus — on deletion — the SASL
 // database and Postfix sender map its applications touch. Callers (the web
-// handlers) validate user input first; Service keeps the stores in agreement and
-// drives the OpenDKIM/Postfix reloads (spec 6, 7.2.2-4, 7.2.10).
+// handlers) validate user input first; Service keeps the stores in agreement
+// and drives the OpenDKIM/Postfix reloads (architecture.md § OpenDKIM,
+// product.md).
 type Service struct {
 	store    *store.Store
 	odk      *OpenDKIM
@@ -39,14 +41,15 @@ type Service struct {
 }
 
 // NewService builds the domain service. selectorDefault is the DKIM selector
-// assigned to new domains (spec 8: DKIM_SELECTOR_DEFAULT); it is
-// operator-configured, not user input. apps is used only on deletion, to clear
-// the SASL accounts and sender-map bindings of the domain's applications.
+// assigned to new domains (README § Environment variables:
+// DKIM_SELECTOR_DEFAULT); it is operator-configured, not user input. apps is
+// used only on deletion, to clear the SASL accounts and sender-map bindings of
+// the domain's applications.
 func NewService(st *store.Store, odk *OpenDKIM, apps Applications, selectorDefault string) *Service {
 	return &Service{store: st, odk: odk, apps: apps, selector: selectorDefault}
 }
 
-// List returns all domains with application counts (spec 7.2.2).
+// List returns all domains with application counts (product.md).
 func (s *Service) List() ([]store.Domain, error) {
 	return s.store.ListDomains()
 }
@@ -57,7 +60,7 @@ func (s *Service) Get(id int64) (store.Domain, error) {
 }
 
 // Add registers a new sending domain: it records the row, ensures a DKIM key
-// exists on disk, and regenerates + reloads the OpenDKIM tables (spec 7.2.3).
+// exists on disk, and regenerates + reloads the OpenDKIM tables (product.md).
 // name must already be normalised and validated by the caller. A duplicate
 // returns store.ErrDomainExists.
 //
@@ -91,7 +94,7 @@ func (s *Service) rollbackAdd(id int64) {
 	_ = s.store.DeleteDomain(id)
 }
 
-// Delete removes a domain and everything bound to it (spec 7.2.4, 6.5). The
+// Delete removes a domain and everything bound to it (product.md). The
 // order matters: the applications' SASL accounts are cleared first, while their
 // logins are still in the registry; then the registry rows (applications and
 // their addresses) go via the DB cascade; then the OpenDKIM tables and the
@@ -107,8 +110,9 @@ func (s *Service) Delete(id int64) error {
 		return fmt.Errorf("clear SASL accounts for %s: %w", d.Name, err)
 	}
 	// Drop the domain's own level-2 limit and those of its applications while the
-	// application rows still exist (the cleanup query joins them). rate_limits has
-	// no cascade of its own (ref_id is a plain integer, spec 7.4/9).
+	// application rows still exist (the cleanup query joins them). rate_limits
+	// has no cascade of its own (ref_id is a plain integer, README § Rate
+	// limiting; architecture.md § Persistence).
 	if err := s.store.DeleteRateLimitsForDomain(id); err != nil {
 		return fmt.Errorf("clear rate limits for %s: %w", d.Name, err)
 	}
@@ -129,19 +133,19 @@ func (s *Service) Delete(id int64) error {
 	return nil
 }
 
-// DKIMRecord returns the DNS TXT record to publish for a domain (spec 7.2.10).
+// DKIMRecord returns the DNS TXT record to publish for a domain (product.md).
 func (s *Service) DKIMRecord(d store.Domain) (DKIMRecord, error) {
 	return s.odk.Record(d.Name, d.DKIMSelector)
 }
 
-// RateLimit returns the domain-level differentiated rate limit (spec 7.4), and
-// whether one is configured, for the domain's edit form.
+// RateLimit returns the domain-level differentiated rate limit (README § Rate
+// limiting), and whether one is configured, for the domain's edit form.
 func (s *Service) RateLimit(domainID int64) (store.RateLimit, bool, error) {
 	return s.store.GetRateLimit(store.RateLimitScopeDomain, domainID)
 }
 
 // SaveRateLimit stores the domain-level rate limit. The caller has validated the
-// IPs and numbers (spec 7.6.2); the milter reads the row live, so no reload is
+// IPs and numbers (security.md); the milter reads the row live, so no reload is
 // needed.
 func (s *Service) SaveRateLimit(domainID int64, ips []string, maxMessages, windowSeconds int) error {
 	return s.store.SetRateLimit(store.RateLimit{
@@ -154,14 +158,15 @@ func (s *Service) SaveRateLimit(domainID int64, ips []string, maxMessages, windo
 }
 
 // ClearRateLimit removes the domain-level rate limit, falling back to level 1
-// only (spec 7.4).
+// only (README § Rate limiting).
 func (s *Service) ClearRateLimit(domainID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeDomain, domainID)
 }
 
-// Resync regenerates the OpenDKIM tables from the registry and reloads OpenDKIM.
-// It backs the manual reload button (spec 7.2.12) and doubles as a recovery path
-// if the tables ever drift from the database.
+// Resync regenerates the OpenDKIM tables from the registry and reloads
+// OpenDKIM. It backs the manual reload button (architecture.md § Panel HTTP
+// surface) and doubles as a recovery path if the tables ever drift from the
+// database.
 func (s *Service) Resync() error {
 	return s.resync()
 }

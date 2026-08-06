@@ -1,6 +1,6 @@
 // Package web implements the SelfPost control panel's HTTP surface: the
-// one-time administrator setup flow (spec 7.6.1), login/session handling
-// (spec 7.6.5-6) and the authenticated shell the later phases build on.
+// one-time administrator setup flow (security.md), login/session handling
+// (security.md) and the authenticated shell the later phases build on.
 package web
 
 import (
@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/app"
-	"codeberg.org/mix/selfpost/internal/dnscheck"
-	"codeberg.org/mix/selfpost/internal/domain"
-	"codeberg.org/mix/selfpost/internal/health"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/app"
+	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 //go:embed templates/*.html static/*
@@ -24,24 +24,26 @@ var assetsFS embed.FS
 // Config holds the panel's HTTP-facing configuration.
 type Config struct {
 	// Hostname is the server's external hostname, used to build the absolute
-	// setup link shown in the logs (spec 7.6.1, 8: SELFPOST_HOSTNAME).
+	// setup link shown in the logs (security.md; README § Environment
+	// variables for SELFPOST_HOSTNAME).
 	Hostname string
 	// CookieSecure sets the Secure attribute on the session cookie. It defaults
-	// to true (spec 7.6.6); it exists as a knob only so the panel can be tested
+	// to true (security.md); it exists as a knob only so the panel can be tested
 	// over plain HTTP in development, never for production.
 	CookieSecure bool
 	// SubmissionEnabled mirrors SUBMISSION_ENABLE: whether this deployment also
 	// runs the 587/STARTTLS submission listener next to the primary 465 one
-	// (spec 5). The panel only reports it on the domain page's connection
-	// settings; it is a deploy-time flag, not something the panel can verify.
+	// (architecture.md § Mail path). The panel only reports it on the domain
+	// page's connection settings; it is a deploy-time flag, not something the
+	// panel can verify.
 	SubmissionEnabled bool
 	// MailLogPath is where Postfix's delivery log lives, read by the mail.log
-	// monitoring view (spec 7.2.13). It is the same path the log-tailer role
-	// follows in cmd/panel.
+	// monitoring view (architecture.md § Panel HTTP surface). It is the same path
+	// the log-tailer role follows in cmd/panel.
 	MailLogPath string
 	// DataDir and DBPath locate the persistent state a full backup archives
-	// (spec 7.5.A); Version is stamped into the backup manifest. They mirror the
-	// panel's own configuration.
+	// (architecture.md § Persistence); Version is stamped into the backup
+	// manifest. They mirror the panel's own configuration.
 	DataDir string
 	DBPath  string
 	Version string
@@ -51,8 +53,9 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
-	// TLSCertFile is the certificate Postfix serves on 465/587 (spec 8), read
-	// read-only by the status page to report how much validity is left.
+	// TLSCertFile is the certificate Postfix serves on 465/587 (README §
+	// Environment variables), read read-only by the status page to report how
+	// much validity is left.
 	TLSCertFile string
 	// OpenDKIMSocket and JournalSocket are the two milter sockets Postfix
 	// connects to. The status page stats them: the first is required for mail
@@ -89,9 +92,10 @@ type Server struct {
 }
 
 // New builds the panel server. setupTokenPath is where the current setup token
-// is mirrored on disk (spec 7.6.1); domains is the sending-domain service that
-// owns DKIM keys and the OpenDKIM tables (spec 6); apps owns application SASL
-// accounts and the Postfix sender map (spec 5.1).
+// is mirrored on disk (security.md); domains is the sending-domain service
+// that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
+// apps owns application SASL accounts and the Postfix sender map
+// (architecture.md § Mail path).
 func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	tmpl, err := loadTemplates()
 	if err != nil {
@@ -113,9 +117,9 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		// round of lookups.
 		dns: dnscheck.New(cfg.DNSResolvers),
 		// Setup: a handful of attempts per minute per IP is plenty for a
-		// legitimate admin and blunts automated probing (spec 7.6.1).
+		// legitimate admin and blunts automated probing (security.md).
 		setupLimiter: newRateLimiter(10, time.Minute),
-		// Login: throttle brute-force by IP (spec 7.6.5).
+		// Login: throttle brute-force by IP (security.md).
 		loginLimiter: newRateLimiter(10, 15*time.Minute),
 
 		trustedProxies: cfg.TrustedProxyCIDRs,
@@ -125,7 +129,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 }
 
 // Start performs first-run bootstrapping: if there is no administrator yet, it
-// generates and announces the setup link (spec 7.6.1). Safe to call once at
+// generates and announces the setup link (security.md). Safe to call once at
 // server startup.
 func (s *Server) Start() error {
 	return s.setup.bootstrap()
@@ -141,7 +145,7 @@ func (s *Server) Handler() http.Handler {
 	// Vendored static assets (HTMX). Served from the embedded FS.
 	mux.Handle("/static/", http.FileServer(http.FS(assetsFS)))
 
-	// One-time administrator setup (spec 7.6.1).
+	// One-time administrator setup (security.md).
 	mux.HandleFunc("/setup/", s.handleSetup)
 
 	// Authentication.
@@ -179,13 +183,14 @@ func (s *Server) Handler() http.Handler {
 	// Administrator's own panel credentials.
 	authed.HandleFunc("/account", s.handleAccount)
 
-	// Backup and migration: the page with both actions (spec 7.5.A-B), and the
-	// full-server backup download itself.
+	// Backup and migration: the page with both actions (architecture.md §
+	// Persistence-B), and the full-server backup download itself.
 	authed.HandleFunc("GET /backup", s.handleBackupPage)
 	authed.HandleFunc("POST /backup", s.handleBackup)
 
-	// Monitoring screens (spec 7.2.11-13): each page and its HTMX polling
-	// fragment (spec 7.1 — the /rows and /body endpoints return HTML, not JSON).
+	// Monitoring screens (architecture.md § Panel HTTP surface): each page and
+	// its HTMX polling fragment (architecture.md § Panel HTTP surface — the /rows
+	// and /body endpoints return HTML, not JSON).
 	authed.HandleFunc("GET /deliveries", s.handleDeliveries)
 	authed.HandleFunc("GET /deliveries/rows", s.handleDeliveriesRows)
 	authed.HandleFunc("GET /mail-queue", s.handleMailQueue)

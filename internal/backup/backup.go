@@ -1,17 +1,18 @@
 // Package backup implements SelfPost's full-server backup and the restore
-// version guard (spec 7.5.A). A full backup is a gzip-compressed tar of the
-// consolidated persistent state under /data — the SQLite database (as a
-// consistent snapshot), the per-domain DKIM keys and the SASL database — plus a
-// manifest recording the SelfPost version that produced it. TLS certificates
-// (the reverse proxy's responsibility) and the Postfix queue are deliberately
-// excluded (spec 7.5.A).
+// version guard (architecture.md § Persistence). A full backup is a
+// gzip-compressed tar of the consolidated persistent state under /data — the
+// SQLite database (as a consistent snapshot), the per-domain DKIM keys and the
+// SASL database — plus a manifest recording the SelfPost version that produced
+// it. TLS certificates (the reverse proxy's responsibility) and the Postfix
+// queue are deliberately excluded (architecture.md § Persistence).
 //
-// Restore is intentionally not a separate code path: a backup is extracted into
-// the /data bind mount before first start, and the panel regenerates Postfix and
-// OpenDKIM from the restored SQLite state exactly as on any normal start. The
-// only restore-specific step is CheckRestore, which refuses to boot if the
-// manifest's version does not match the running binary, so schema/format skew
-// between versions cannot silently corrupt state (spec 7.5.A).
+// Restore is intentionally not a separate code path: a backup is extracted
+// into the /data bind mount before first start, and the panel regenerates
+// Postfix and OpenDKIM from the restored SQLite state exactly as on any normal
+// start. The only restore-specific step is CheckRestore, which refuses to boot
+// if the manifest's version does not match the running binary, so
+// schema/format skew between versions cannot silently corrupt state
+// (architecture.md § Persistence).
 package backup
 
 import (
@@ -39,9 +40,9 @@ const FormatFull = "selfpost-full-backup"
 const ManifestName = "manifest.json"
 
 // Manifest is the small JSON document embedded in every backup archive. Its
-// Version is the single fact that makes restore safe: the panel refuses to boot
-// a data directory whose manifest version does not match its own binary (spec
-// 7.5.A).
+// Version is the single fact that makes restore safe: the panel refuses to
+// boot a data directory whose manifest version does not match its own binary
+// (architecture.md § Persistence).
 type Manifest struct {
 	Format    string `json:"format"`
 	Version   string `json:"version"`
@@ -63,9 +64,9 @@ type Params struct {
 // written under the canonical name; the setup token is transient bootstrap
 // state; a stale manifest from a previous restore must not be re-captured (a
 // fresh one is written instead); and a "tls" directory holds the reverse
-// proxy's certificates, which are explicitly out of scope for a SelfPost backup
-// (spec 7.5.A) — excluding it keeps that guarantee even when an operator points
-// TLS_CERT_FILE inside /data.
+// proxy's certificates, which are explicitly out of scope for a SelfPost
+// backup (architecture.md § Persistence) — excluding it keeps that guarantee
+// even when an operator points TLS_CERT_FILE inside /data.
 var excludedFromArchive = map[string]bool{
 	"selfpost.db":         true,
 	"selfpost.db-wal":     true,
@@ -78,9 +79,10 @@ var excludedFromArchive = map[string]bool{
 
 // Create writes a gzip-compressed tar backup to w. Archive entries are named
 // relative to DataDir, so extracting the archive into the /data bind mount
-// reconstructs the state in place (spec 7.5.A). The SQLite database is added as
-// a consistent snapshot under "selfpost.db"; everything else under DataDir is
-// copied as-is except the entries in excludedFromArchive.
+// reconstructs the state in place (architecture.md § Persistence). The SQLite
+// database is added as a consistent snapshot under "selfpost.db"; everything
+// else under DataDir is copied as-is except the entries in
+// excludedFromArchive.
 func Create(w io.Writer, p Params) error {
 	if p.DataDir == "" || p.DBPath == "" {
 		return fmt.Errorf("backup: DataDir and DBPath are required")
@@ -254,12 +256,13 @@ func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
 	return target, cleanup, nil
 }
 
-// CheckRestore enforces the backup version guard (spec 7.5.A). If manifestPath
-// exists (a backup was extracted into the data directory), its version must
-// match binaryVersion or the panel refuses to start, telling the operator which
-// image tag to use. On a match the manifest is consumed (deleted) so it guards
-// only the first boot after a restore and never blocks a later in-place image
-// upgrade. Absence of the manifest is the normal case and returns nil.
+// CheckRestore enforces the backup version guard (architecture.md §
+// Persistence). If manifestPath exists (a backup was extracted into the data
+// directory), its version must match binaryVersion or the panel refuses to
+// start, telling the operator which image tag to use. On a match the manifest
+// is consumed (deleted) so it guards only the first boot after a restore and
+// never blocks a later in-place image upgrade. Absence of the manifest is the
+// normal case and returns nil.
 func CheckRestore(manifestPath, binaryVersion string) error {
 	data, err := os.ReadFile(manifestPath)
 	if os.IsNotExist(err) {

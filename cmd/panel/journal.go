@@ -8,14 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"codeberg.org/mix/selfpost/internal/milter"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/milter"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // serveJournal opens the journal-milter Unix socket and runs the real milter
-// (spec 7.3), recording accepted messages into the send log. Socket lifecycle
-// (creation, stale cleanup, group permissions) lives here; the protocol handler
-// lives in internal/milter.
+// (architecture.md § Mail path), recording accepted messages into the send
+// log. Socket lifecycle (creation, stale cleanup, group permissions) lives
+// here; the protocol handler lives in internal/milter.
 func serveJournal(ctx context.Context, cfg config, st *store.Store) error {
 	socketPath := cfg.journalSocket
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {

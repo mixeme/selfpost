@@ -1,9 +1,10 @@
 // Package logtail follows Postfix's mail.log and reconciles the send-log
-// delivery statuses the journal-milter could not know at receive time (spec
-// 7.3). A milter row starts life as "queued"; Postfix only decides sent /
-// deferred / bounced later, per recipient, and reports it in mail.log. This
-// package parses those lines by queue-id + recipient and advances the matching
-// rows, and prunes rows past the retention window.
+// delivery statuses the journal-milter could not know at receive time
+// (architecture.md § Persistence). A milter row starts life as "queued";
+// Postfix only decides sent / deferred / bounced later, per recipient, and
+// reports it in mail.log. This package parses those lines by queue-id +
+// recipient and advances the matching rows, and prunes rows past the retention
+// window.
 package logtail
 
 import (
@@ -17,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // StatusStore is the slice of the store the log-tailer needs: advancing
@@ -39,7 +40,7 @@ const (
 	// startup). The window itself is configurable; the cadence need not be.
 	retentionInterval = 6 * time.Hour
 	// defaultRetentionDays applies when the configured value is unset/invalid
-	// (spec 7.3).
+	// (README § Environment variables: SEND_LOG_RETENTION_DAYS).
 	defaultRetentionDays = 90
 )
 
@@ -50,7 +51,13 @@ const (
 //
 // The "<queue-id>: to=<addr>, …, status=<word>" shape is specific to the
 // delivery agents; qmgr/smtpd/cleanup lines do not match.
-var deliveryRe = regexp.MustCompile(`\b([0-9A-Za-z]+): to=<([^>]*)>,.*\bstatus=(\w+)`)
+//
+// The run before status= is lazy on purpose. Postfix appends the remote
+// server's reply verbatim, so a greedy match would take the *last* status= on
+// the line — and that one can come from the reply text, which the far end
+// controls. A bounce whose reply quoted "status=sent" would then be filed as a
+// success. The real field is always the first one after to=<…>.
+var deliveryRe = regexp.MustCompile(`\b([0-9A-Za-z]+): to=<([^>]*)>,.*?\bstatus=(\w+)`)
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
 // ok is false for lines that are not recognised delivery results.
@@ -124,10 +131,10 @@ func retentionLoop(ctx context.Context, st StatusStore, retentionDays int) {
 }
 
 // TailLines returns up to n of the most recent lines from path, for the
-// panel's mail.log monitoring view (spec 7.2.13). It is a one-shot,
-// point-in-time read on request — unrelated to the background follow loop
-// above — that reads backwards in chunks so it stays cheap against a
-// multi-megabyte log rather than reading the whole file every poll.
+// panel's mail.log monitoring view (architecture.md § Panel HTTP surface). It
+// is a one-shot, point-in-time read on request — unrelated to the background
+// follow loop above — that reads backwards in chunks so it stays cheap against
+// a multi-megabyte log rather than reading the whole file every poll.
 func TailLines(path string, n int) ([]string, error) {
 	f, err := os.Open(path)
 	if err != nil {

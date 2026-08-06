@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/backup"
-	"codeberg.org/mix/selfpost/internal/domain"
-	"codeberg.org/mix/selfpost/internal/secretfile"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/backup"
+	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/secretfile"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // maxImportBytes caps a domain-import upload. A domain export is a small JSON
@@ -30,7 +30,7 @@ func (s *Server) handleBackupPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderBackupPage draws the page; importErr surfaces a failed domain import
-// (spec 7.5.B) next to the form that produced it.
+// (architecture.md § Persistence) next to the form that produced it.
 func (s *Server) renderBackupPage(w http.ResponseWriter, r *http.Request, status int, importErr string) {
 	s.renderBackupPageWith(w, r, status, importErr, "")
 }
@@ -50,14 +50,14 @@ func (s *Server) renderBackupPageWith(w http.ResponseWriter, r *http.Request, st
 	})
 }
 
-// handleBackup streams a full-server backup as a download (spec 7.5.A). It is an
-// authenticated admin action (this handler sits behind the auth middleware). The
-// archive carries DKIM private keys, the admin password hash and SASL
-// credentials, so it is served with no-store and as an attachment to discourage
-// caching of secret material. When the operator ticks "encrypt with a
-// password", the archive is wrapped in a .spbk envelope on the way out, so the
-// file that lands on their disk — wherever it is copied afterwards — is useless
-// without the password.
+// handleBackup streams a full-server backup as a download (architecture.md §
+// Persistence). It is an authenticated admin action (this handler sits behind
+// the auth middleware). The archive carries DKIM private keys, the admin
+// password hash and SASL credentials, so it is served with no-store and as an
+// attachment to discourage caching of secret material. When the operator ticks
+// "encrypt with a password", the archive is wrapped in a .spbk envelope on the
+// way out, so the file that lands on their disk — wherever it is copied
+// afterwards — is useless without the password.
 func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	password, pwErr := secretFilePassword(r)
 	if pwErr != "" {
@@ -113,12 +113,12 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleExportDomain streams a single-domain export as a secret download (spec
-// 7.5.B). Like the full backup it is POST-only (state is not changed, but the
-// response contains the domain's DKIM private key and application passwords, so
-// it must not be prefetchable or cached). Like the full backup it can be
-// encrypted with a password, in which case the download is a .spde envelope
-// instead of plain JSON.
+// handleExportDomain streams a single-domain export as a secret download
+// (architecture.md § Persistence). Like the full backup it is POST-only (state
+// is not changed, but the response contains the domain's DKIM private key and
+// application passwords, so it must not be prefetchable or cached). Like the
+// full backup it can be encrypted with a password, in which case the download
+// is a .spde envelope instead of plain JSON.
 func (s *Server) handleExportDomain(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.lookupDomain(w, r)
 	if !ok {
@@ -175,11 +175,12 @@ func (s *Server) handleExportDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleImportDomain accepts an uploaded domain-export file and re-creates the
-// domain on this instance (spec 7.5.B). The domain name is normalised and
-// validated here (spec 7.6.2); the domain service validates the selector, each
-// login and address, and the DKIM key before writing anything. On success it
-// redirects to the new domain's page; on failure it re-renders the backup page,
-// where the import form lives, with a friendly message.
+// domain on this instance (architecture.md § Persistence). The domain name is
+// normalised and validated here (security.md); the domain service validates
+// the selector, each login and address, and the DKIM key before writing
+// anything. On success it redirects to the new domain's page; on failure it
+// re-renders the backup page, where the import form lives, with a friendly
+// message.
 func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	if err := r.ParseMultipartForm(maxImportBytes); err != nil {
@@ -243,7 +244,7 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Normalise and validate the domain name before it reaches the service, the
-	// same gate the add-domain form uses (spec 7.6.2).
+	// same gate the add-domain form uses (security.md).
 	exp.Domain = normalizeDomain(exp.Domain)
 	if err := validateDomain(exp.Domain); err != nil {
 		s.renderBackupPage(w, r, http.StatusBadRequest, "Invalid domain in export file: "+err.Error())

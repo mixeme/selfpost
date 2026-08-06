@@ -1,13 +1,13 @@
-// Package app owns application accounts (spec 4.1, 5.1): the SASL credentials in
-// sasldb2, the per-application sender address mode, and the
-// smtpd_sender_login_maps bindings that tie each login to the addresses it may
-// send from. It keeps those three stores — the SQLite registry, sasldb2 and the
-// Postfix map — in agreement and drives the Postfix reload.
+// Package app owns application accounts (product.md § Multi-domain model): the
+// SASL credentials in sasldb2, the per-application sender address mode, and
+// the smtpd_sender_login_maps bindings that tie each login to the addresses it
+// may send from. It keeps those three stores — the SQLite registry, sasldb2
+// and the Postfix map — in agreement and drives the Postfix reload.
 package app
 
 import (
-	"codeberg.org/mix/selfpost/internal/postfix"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/postfix"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // SenderMaps is the slice of the Postfix manager the application service needs:
@@ -19,7 +19,7 @@ type SenderMaps interface {
 
 // Service coordinates application state across SQLite, sasldb2 and the Postfix
 // sender_login_maps. Web handlers validate raw input first; the Service performs
-// the domain-ownership checks that must not be skipped (spec 7.6.2) and keeps
+// the domain-ownership checks that must not be skipped (security.md) and keeps
 // the stores consistent.
 type Service struct {
 	store *store.Store
@@ -33,7 +33,7 @@ func NewService(st *store.Store, sasl *SASLDB, pf SenderMaps) *Service {
 	return &Service{store: st, sasl: sasl, pf: pf}
 }
 
-// List returns a domain's applications with their address lists (spec 7.2.6).
+// List returns a domain's applications with their address lists (product.md).
 func (s *Service) List(domainID int64) ([]store.Application, error) {
 	return s.store.ListApplicationsByDomain(domainID)
 }
@@ -44,10 +44,10 @@ func (s *Service) Get(id int64) (store.Application, error) {
 }
 
 // Create adds an application to a domain: it validates the login and (in list
-// mode) that every address belongs to the domain (spec 7.6.2), generates a
+// mode) that every address belongs to the domain (security.md), generates a
 // strong password, writes the SASL account and rebuilds the sender map (spec
 // 7.2.5). The generated password is returned so the caller can show it exactly
-// once (spec 7.6.1) — it is never persisted in plaintext.
+// once (security.md) — it is never persisted in plaintext.
 //
 // The registry row is written first so its UNIQUE constraint is the sole arbiter
 // of a duplicate login (avoiding a check-then-act race and, crucially, avoiding
@@ -92,13 +92,14 @@ func (s *Service) rollbackCreate(id int64, login string) {
 	_, _ = s.store.DeleteApplication(id)
 }
 
-// ImportApplication re-creates an application from a domain-export file (spec
-// 7.5.B): it validates the login and (in list mode) that every address belongs
-// to the domain, inserts the registry row and writes the SASL account with the
-// imported password verbatim, re-keyed under this instance's realm so the
-// credential keeps working without regeneration. It deliberately does not
-// rebuild the sender map — the caller (domain import) does that once after all
-// applications are in — and returns store.ErrLoginExists if the login collides.
+// ImportApplication re-creates an application from a domain-export file
+// (architecture.md § Persistence): it validates the login and (in list mode)
+// that every address belongs to the domain, inserts the registry row and
+// writes the SASL account with the imported password verbatim, re-keyed under
+// this instance's realm so the credential keeps working without regeneration.
+// It deliberately does not rebuild the sender map — the caller (domain import)
+// does that once after all applications are in — and returns
+// store.ErrLoginExists if the login collides.
 func (s *Service) ImportApplication(domainID int64, login, mode string, rawAddresses []string, password string) error {
 	addresses, err := s.validateForDomain(domainID, login, mode, rawAddresses)
 	if err != nil {
@@ -118,14 +119,15 @@ func (s *Service) ImportApplication(domainID int64, login, mode string, rawAddre
 	return nil
 }
 
-// Secret returns an application's stored password for a domain export (spec
-// 7.5.B). See SASLDB.Secret for why this is possible and safe.
+// Secret returns an application's stored password for a domain export
+// (architecture.md § Persistence). See SASLDB.Secret for why this is possible
+// and safe.
 func (s *Service) Secret(login string) (string, error) {
 	return s.sasl.Secret(login)
 }
 
 // UpdateMode switches an application's address mode / list and rebuilds the
-// sender map (spec 7.2.7). The login and password are untouched. Addresses are
+// sender map (product.md). The login and password are untouched. Addresses are
 // re-validated against the application's domain.
 func (s *Service) UpdateMode(id int64, mode string, rawAddresses []string) error {
 	a, err := s.store.GetApplication(id)
@@ -172,22 +174,23 @@ func (s *Service) Delete(id int64) error {
 	if err := s.sasl.Delete(a.Login); err != nil {
 		return err
 	}
-	// Drop the application's level-2 limit, if any (spec 7.4); rate_limits has no
-	// cascade of its own.
+	// Drop the application's level-2 limit, if any (README § Rate limiting);
+	// rate_limits has no cascade of its own.
 	if err := s.store.DeleteRateLimit(store.RateLimitScopeApp, id); err != nil {
 		return err
 	}
 	return s.Resync()
 }
 
-// RateLimit returns the application-level differentiated rate limit (spec 7.4),
-// and whether one is configured, for the application's edit form.
+// RateLimit returns the application-level differentiated rate limit (README §
+// Rate limiting), and whether one is configured, for the application's edit
+// form.
 func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
 	return s.store.GetRateLimit(store.RateLimitScopeApp, appID)
 }
 
 // SaveRateLimit stores the application-level rate limit. The caller has validated
-// the IPs and numbers (spec 7.6.2); the milter reads the row live, so no reload
+// the IPs and numbers (security.md); the milter reads the row live, so no reload
 // is needed.
 func (s *Service) SaveRateLimit(appID int64, ips []string, maxMessages, windowSeconds int) error {
 	return s.store.SetRateLimit(store.RateLimit{
@@ -199,14 +202,15 @@ func (s *Service) SaveRateLimit(appID int64, ips []string, maxMessages, windowSe
 	})
 }
 
-// ClearRateLimit removes the application-level rate limit (spec 7.4).
+// ClearRateLimit removes the application-level rate limit (README § Rate
+// limiting).
 func (s *Service) ClearRateLimit(appID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeApp, appID)
 }
 
 // PurgeDomainSASL removes the SASL accounts of every application bound to a
 // domain. It must be called before the domain's registry rows are cascade-
-// deleted, while the logins are still known (spec 7.2.4). The registry rows and
+// deleted, while the logins are still known (product.md). The registry rows and
 // the sender map are handled by the domain deletion path; this only clears
 // sasldb2, which has no cascade of its own.
 func (s *Service) PurgeDomainSASL(domainID int64) error {
@@ -223,10 +227,10 @@ func (s *Service) PurgeDomainSASL(domainID int64) error {
 }
 
 // Resync rebuilds smtpd_sender_login_maps from the full set of application
-// bindings and reloads Postfix (spec 5.1). It is the single idempotent apply
-// path shared by create/edit/delete and is also reachable from the manual
-// reload button; it doubles as recovery if the map ever drifts from the
-// database.
+// bindings and reloads Postfix (architecture.md § Mail path). It is the single
+// idempotent apply path shared by create/edit/delete and is also reachable
+// from the manual reload button; it doubles as recovery if the map ever drifts
+// from the database.
 func (s *Service) Resync() error {
 	bindings, err := s.store.ListBindings()
 	if err != nil {
@@ -241,7 +245,7 @@ func (s *Service) Resync() error {
 
 // validateForDomain resolves the domain, validates the login and address mode,
 // and — in list mode — validates that every address belongs to the domain
-// (spec 7.6.2). It returns the cleaned address list, which is empty in wildcard
+// (security.md). It returns the cleaned address list, which is empty in wildcard
 // mode. Resolving the domain here also confirms it exists before any write.
 func (s *Service) validateForDomain(domainID int64, login, mode string, rawAddresses []string) ([]string, error) {
 	d, err := s.store.GetDomain(domainID)

@@ -23,10 +23,10 @@ COPY internal ./internal
 ENV CGO_ENABLED=0
 RUN go vet ./... \
  && go build -trimpath \
-      -ldflags "-X codeberg.org/mix/selfpost/internal/buildinfo.Version=${VERSION}" \
+      -ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Version=${VERSION}" \
       -o /out/panel ./cmd/panel \
  && go build -trimpath \
-      -ldflags "-X codeberg.org/mix/selfpost/internal/buildinfo.Version=${VERSION}" \
+      -ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Version=${VERSION}" \
       -o /out/selfpost-backup ./cmd/selfpost-backup
 
 # ---- runtime stage -----------------------------------------------------------

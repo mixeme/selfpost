@@ -7,17 +7,18 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
-// defaultRateLimitWindowSeconds is the sliding-window length used when an admin
-// sets a message ceiling but leaves the window blank (spec 7.4, matching the
-// level-1 default hour, spec 8: RATE_LIMIT_WINDOW_SECONDS).
+// defaultRateLimitWindowSeconds is the sliding-window length used when an
+// admin sets a message ceiling but leaves the window blank (README § Rate
+// limiting, matching the level-1 default hour; README § Environment variables:
+// RATE_LIMIT_WINDOW_SECONDS).
 const defaultRateLimitWindowSeconds = 3600
 
-// rateLimitInput is the validated result of a rate-limit form submission. clear
-// means "remove the differentiated limit" (spec 7.4: an empty IP binding leaves
-// only level 1).
+// rateLimitInput is the validated result of a rate-limit form submission.
+// clear means "remove the differentiated limit" (README § Rate limiting: an
+// empty IP binding leaves only level 1).
 type rateLimitInput struct {
 	clear         bool
 	ips           []string
@@ -25,10 +26,10 @@ type rateLimitInput struct {
 	windowSeconds int
 }
 
-// parseRateLimitForm validates a rate-limit submission on the server (spec
-// 7.6.2). It returns clear=true when the admin removes the limit or leaves the
-// IP binding empty; otherwise it requires a positive ceiling and window. The
-// returned error's message is safe to show to the admin.
+// parseRateLimitForm validates a rate-limit submission on the server
+// (security.md). It returns clear=true when the admin removes the limit or
+// leaves the IP binding empty; otherwise it requires a positive ceiling and
+// window. The returned error's message is safe to show to the admin.
 func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 	if err := r.ParseForm(); err != nil {
 		return rateLimitInput{}, fmt.Errorf("invalid form submission")
@@ -41,7 +42,8 @@ func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 		return rateLimitInput{}, err
 	}
 	if len(ips) == 0 {
-		// No IP binding: the differentiated limit does not apply (spec 7.4).
+		// No IP binding: the differentiated limit does not apply (README § Rate
+		// limiting).
 		return rateLimitInput{clear: true}, nil
 	}
 	maxMessages, err := parsePositiveInt(r.PostFormValue("max_messages"), 0)
@@ -57,7 +59,7 @@ func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 
 // parseIPList parses the allowed-IP field (IPs separated by newlines, commas or
 // whitespace) into a deduplicated list of canonical addresses, rejecting any
-// token that is not a valid IP (spec 7.6.2). The values are only ever stored as
+// token that is not a valid IP (security.md). The values are only ever stored as
 // SQLite parameters and compared in the milter, never written to a config file.
 func parseIPList(raw string) ([]string, error) {
 	fields := strings.FieldsFunc(raw, func(r rune) bool {
@@ -89,8 +91,9 @@ func parsePositiveInt(raw string, def int) (int, error) {
 	return strconv.Atoi(raw)
 }
 
-// handleDomainRateLimit saves or clears a domain-level differentiated rate limit
-// (spec 7.4). No reload is needed — the milter reads the row live.
+// handleDomainRateLimit saves or clears a domain-level differentiated rate
+// limit (README § Rate limiting). No reload is needed — the milter reads the
+// row live.
 func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.lookupDomain(w, r)
 	if !ok {
@@ -113,7 +116,7 @@ func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAppRateLimit saves or clears an application-level differentiated rate
-// limit (spec 7.4).
+// limit (README § Rate limiting).
 func (s *Server) handleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.lookupApplication(w, r)
 	if !ok {

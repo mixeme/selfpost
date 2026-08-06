@@ -10,11 +10,12 @@ import (
 )
 
 // SASLDB manages the Cyrus SASL account database (sasldb2) the panel maintains
-// for application credentials (spec 5.1). The panel is the only writer; Postfix
-// reads it to authenticate SMTP clients. Accounts are created and removed with
-// the standard saslpasswd2 tool ("эквивалент saslpasswd2", per the plan).
+// for application credentials (architecture.md § Mail path). The panel is the
+// only writer; Postfix reads it to authenticate SMTP clients. Accounts are
+// created and removed with the standard saslpasswd2 tool ("эквивалент
+// saslpasswd2", per the plan).
 type SASLDB struct {
-	path  string // sasldb2 file, under /data so it survives restarts (spec 9)
+	path  string // sasldb2 file, under /data so it survives restarts
 	realm string // SASL realm, so lookups match what Postfix's SASL uses
 
 	// run executes saslpasswd2. It is a field so tests can substitute a fake;
@@ -34,14 +35,14 @@ func NewSASLDB(path, realm string) *SASLDB {
 }
 
 // Set creates or updates an application's SASL account with the given password
-// (spec 5.1, 7.2.9). Used both at creation and when a password is regenerated;
-// saslpasswd2 overwrites an existing entry in place.
+// (architecture.md § Mail path). Used both at creation and when a password is
+// regenerated; saslpasswd2 overwrites an existing entry in place.
 //
 // The password is passed to saslpasswd2 on stdin (never as an argument, so it
 // cannot leak through the process table or logs). The login is passed as a
 // separate argv element after being whitelisted by validateLogin — it never
-// goes through a shell and is never interpolated into a command string (spec
-// 7.6.3).
+// goes through a shell and is never interpolated into a command string
+// (security.md).
 func (s *SASLDB) Set(login, password string) error {
 	if err := validateLogin(login); err != nil {
 		return err
@@ -60,7 +61,7 @@ func (s *SASLDB) Set(login, password string) error {
 	return nil
 }
 
-// Delete removes an application's SASL account (spec 7.2.8). A missing account
+// Delete removes an application's SASL account (product.md). A missing account
 // is not treated as an error, so deletion is idempotent and safe to retry.
 func (s *SASLDB) Delete(login string) error {
 	if err := validateLogin(login); err != nil {
@@ -79,15 +80,16 @@ func (s *SASLDB) Delete(login string) error {
 var ErrSecretNotFound = fmt.Errorf("sasl secret not found")
 
 // Secret returns an application's stored password so it can be carried in a
-// domain export and re-created verbatim on another instance (spec 7.5.B). This
-// is possible because sasldb2 keeps the SASL secret in a password-equivalent
-// form (the plaintext userPassword property, to serve challenge-response
-// mechanisms) — unlike the admin's one-way bcrypt hash (spec 7.6). The value is
-// realm-independent, so the importer can re-key it under its own realm.
+// domain export and re-created verbatim on another instance (architecture.md §
+// Persistence). This is possible because sasldb2 keeps the SASL secret in a
+// password-equivalent form (the plaintext userPassword property, to serve
+// challenge-response mechanisms) — unlike the admin's one-way bcrypt hash
+// (security.md). The value is realm-independent, so the importer can re-key it
+// under its own realm.
 //
 // It reads the database with db_dump (Berkeley DB), passing only our own file
-// path as a fixed argument (no shell, no user input — spec 7.6.3), and returns
-// ErrSecretNotFound if the login has no entry.
+// path as a fixed argument (no shell, no user input — security.md), and
+// returns ErrSecretNotFound if the login has no entry.
 func (s *SASLDB) Secret(login string) (string, error) {
 	if err := validateLogin(login); err != nil {
 		return "", err
@@ -158,7 +160,7 @@ func parseSASLSecret(dump []byte, login, realm string) (string, bool, error) {
 
 // runSaslpasswd2 executes the real saslpasswd2 with the given arguments and
 // stdin. Arguments are passed as a fixed argv (no shell), so no user input is
-// ever interpreted as a command (spec 7.6.3).
+// ever interpreted as a command (security.md).
 func runSaslpasswd2(args []string, stdin []byte) error {
 	cmd := exec.Command("saslpasswd2", args...)
 	if stdin != nil {
@@ -173,7 +175,7 @@ func runSaslpasswd2(args []string, stdin []byte) error {
 
 // dumpSASLDB runs db_dump to export the sasldb2 as key/value hex pairs. The path
 // is our own sasldb2 file (never user input) and is passed as a fixed argument
-// with no shell (spec 7.6.3).
+// with no shell (security.md).
 func dumpSASLDB(path string) ([]byte, error) {
 	cmd := exec.Command("db_dump", path)
 	out, err := cmd.CombinedOutput()

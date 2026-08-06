@@ -40,7 +40,8 @@ func readSendLog(t *testing.T, s *Store) []sendLogRow {
 func TestInsertQueuedAndUpdateStatus(t *testing.T) {
 	st := openTestStore(t)
 
-	// Two recipients on the same queue-id → two independent rows (spec 7.3.3).
+	// Two recipients on the same queue-id → two independent rows (architecture.md
+	// § Persistence).
 	for _, to := range []string{"a@example.net", "b@example.net"} {
 		if err := st.InsertQueued(SendLogEntry{
 			QueueID:  "ABC123",
