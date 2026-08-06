@@ -8,7 +8,7 @@
 # an explicit startup failure instead of a relay running blind.
 #
 # This handles cold start only. Runtime milter failures after a successful start
-# are governed by fail-open (milter_default_action), configured in Phase 5.
+# are governed by fail-open (milter_default_action).
 set -eu
 
 OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"

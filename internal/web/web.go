@@ -110,7 +110,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		sessions: newSessionStore(st, time.Duration(idleDays)*24*time.Hour),
 		// Published-DNS checks for the status page and the domain pages. The
 		// checker caches its own results, so page views do not each pay for a
-		// round of lookups (phase 13).
+		// round of lookups.
 		dns: dnscheck.New(cfg.DNSResolvers),
 		// Setup: a handful of attempts per minute per IP is plenty for a
 		// legitimate admin and blunts automated probing (spec 7.6.1).
@@ -152,7 +152,7 @@ func (s *Server) Handler() http.Handler {
 	// above falls through to this sub-mux, wrapped once in the auth middleware.
 	authed := http.NewServeMux()
 
-	// The landing page is the server status (phase 13.C): the first thing an
+	// The landing page is the server status: the first thing an
 	// administrator should see after logging in is whether the service is
 	// healthy, not the domain list. handleLogin still redirects to "/".
 	authed.HandleFunc("GET /{$}", redirectToStatus)
@@ -196,12 +196,12 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", s.requireAuth(authed))
 
 	// Security headers and the origin check wrap everything, including the
-	// unauthenticated login and setup routes (phase 14.A).
+	// unauthenticated login and setup routes.
 	return s.secure(mux)
 }
 
 // redirectToStatus points the panel root at the status page, so there is one
-// canonical URL for that content instead of two (phase 13.C).
+// canonical URL for that content instead of two.
 func redirectToStatus(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/status", http.StatusSeeOther)
 }

@@ -62,8 +62,8 @@ func TestDeleteDomainCascadesApplications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert an application + address directly (the AddApplication API lands in
-	// Phase 4); this verifies the ON DELETE CASCADE wiring now.
+	// Insert an application + address directly (bypassing the AddApplication
+	// API) to verify the ON DELETE CASCADE wiring.
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := st.db.Exec(
 		"INSERT INTO applications (domain_id, login, address_mode, created_at) VALUES (?, ?, 'wildcard', ?)",

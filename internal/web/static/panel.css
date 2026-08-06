@@ -1,6 +1,6 @@
 /* Panel stylesheet. It lives in a file rather than in a <style> block in the
    layout so the panel's Content-Security-Policy can be a plain
-   "default-src 'self'" with no inline-style exemption (phase 14.A). Any rule
+   "default-src 'self'" with no inline-style exemption. Any rule
    added here must therefore stay here: an inline style="..." attribute in a
    template is blocked by that policy and silently does nothing. */
 

@@ -36,7 +36,7 @@
   // Forms that delete something or invalidate a working credential carry a
   // data-confirm message. The prompt lives here rather than in an inline
   // onsubmit attribute because the panel's Content-Security-Policy allows no
-  // inline script (phase 14.A). The listener is delegated from the document,
+  // inline script. The listener is delegated from the document,
   // so it also covers markup swapped in by HTMX. With JavaScript disabled the
   // form submits without asking — exactly as the inline handler behaved.
   document.addEventListener("submit", function (ev) {

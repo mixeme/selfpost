@@ -8,8 +8,8 @@ import (
 )
 
 // handleStatus renders the server status page: the panel's landing page and the
-// one screen that answers "is the service healthy and will mail be accepted"
-// (phase 13.A). The cheap local checks live in the polled "status_body"
+// one screen that answers "is the service healthy and will mail be accepted".
+// The cheap local checks live in the polled "status_body"
 // fragment; the hostname/PTR lookup and the configuration reload sit outside it,
 // because neither belongs on a five-second timer.
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {

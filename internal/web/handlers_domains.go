@@ -11,7 +11,7 @@ import (
 
 // handleDashboard is the authenticated landing page: the list of sending
 // domains with their DKIM/selector and application counts, plus the add-domain
-// form (spec 7.2.2). Applications and the send log arrive in later phases.
+// form (spec 7.2.2).
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	s.renderDashboard(w, r, http.StatusOK, "", "")
 }
@@ -118,7 +118,7 @@ func (s *Server) handleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 // handleReload re-applies both the OpenDKIM configuration and the Postfix
 // sender map on demand (spec 7.2.12). Each Resync regenerates its files from the
 // database and reloads its daemon, so the button doubles as a drift-recovery.
-// The button lives on the status page (phase 13.D): it is a "put the daemons
+// The button lives on the status page: it is a "put the daemons
 // back in the state the database describes" action, which belongs with the rest
 // of the server-health screen rather than in the domain list's top bar.
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {

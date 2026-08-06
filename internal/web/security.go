@@ -8,7 +8,7 @@ import (
 // contentSecurityPolicy is the panel's CSP. Everything the pages load —
 // stylesheet, HTMX, the panel's own script, the favicon — is served from
 // /static by this same origin, and no template carries an inline <script>,
-// an inline event handler or a style="..." attribute (phase 14.A; the
+// an inline event handler or a style="..." attribute (the
 // template guard test enforces that), so 'self' needs no exemptions:
 //
 //   - default-src 'self' covers scripts, styles, images and the XHR that
@@ -38,8 +38,8 @@ const contentSecurityPolicy = "default-src 'self'; " +
 // subdomain of that domain for a year, which is not SelfPost's call to make.
 const strictTransportSecurity = "max-age=31536000"
 
-// secure wraps the whole router with the panel's two transport-level defences
-// (phase 14.A): the security response headers, and an origin check on every
+// secure wraps the whole router with the panel's two transport-level
+// defences: the security response headers, and an origin check on every
 // state-changing request.
 //
 // It sits outside the authentication middleware on purpose, so that POST
@@ -81,7 +81,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 }
 
 // originAllowed reports whether a state-changing request came from the panel's
-// own origin (phase 14.A). This is what the session cookie's
+// own origin. This is what the session cookie's
 // SameSite=Lax attribute cannot do on its own: SameSite is judged per *site*
 // (registrable domain), so a neighbouring subdomain — a CMS on the same
 // domain, a forgotten staging host — counts as same-site and its forged POST
@@ -111,9 +111,9 @@ func originAllowed(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		// Neither header. A client this old cannot be checked at all; it is
-		// let through as the risk consciously accepted for phase 14.A
-		// (single-admin panel, the administrator picks the browser). Turning
-		// this return into false is the whole of the stricter policy.
+		// let through as the risk consciously accepted (single-admin panel,
+		// the administrator picks the browser). Turning this return into
+		// false is the whole of the stricter policy.
 		return true
 	}
 	u, err := url.Parse(origin)

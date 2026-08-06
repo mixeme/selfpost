@@ -15,7 +15,7 @@
 {{/* Unless told otherwise, htmx injects a stylesheet element of its own into
      the head for the request-indicator classes. The panel uses no
      hx-indicator, and that injected element would be the one thing the
-     Content-Security-Policy (phase 14.A) has to make an exception for, so it
+     Content-Security-Policy has to make an exception for, so it
      is switched off here. */}}
 <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
 <script src="/static/htmx.min.js" defer></script>
