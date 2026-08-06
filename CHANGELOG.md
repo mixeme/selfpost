@@ -44,6 +44,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   live document that owns the subject — `docs/architecture.md` (with section),
   `docs/product.md`, `docs/security.md`, or the README. Comments only; no
   behaviour is affected.
+- `docs/code-review.md` is gone. Its plan is finished — phases 0 (bar the
+  release-commit steps), 1, 1.5, 2 and 3 are all closed — and the rest of the
+  document had become a second copy of what `architecture.md`, `security.md`
+  and the code comments already say. What was genuinely open moved to
+  `docs/roadmap.md`: splitting `internal/web` into subpackages, a consolidated
+  documentation index in the README, the adaptive polling interval for an idle
+  but visible tab, and `CONTRIBUTING.md`. The review text stays in git history
+  (`522425a`); the CHANGELOG entries below that cite it are left as written.
 - `docs/architecture.md` gained a *Code layers* section: a diagram of
   handlers → services → store plus the adapters, and the reason the services
   layer exists (multi-store writes and their rollback) — closing item A2 of
