@@ -34,8 +34,32 @@ Codeberg (`codeberg.org/mix/selfpost/raw/branch/main/deploy/...`).
 **Каталог `docs/logo`.** Пустой; либо наполнить (если нужен отдельный asset для
 внешних ссылок), либо удалить каталог, чтобы не создавать ложное ожидание.
 
+**Убрать `implementation-plan.md` — в релизном коммите.** Документ закрыт:
+уникального содержания в нём нет, § D (предрелизная ревизия безопасности)
+продублирован в [progress.md](progress.md), [security.md](security.md) и
+CHANGELOG `[Unreleased]/Security`, а разделы B.1–B.3 и C.4 вырезаны ещё в
+`22f86d1`. Держится до тега только потому, что описывает релизный гейт, пока тот
+формально не закрыт. При резке версии:
+
+1. Переместить в `docs/archive/` (рядом со `specification-v1.0.md`) — история
+   § D сохраняется, из активной документации уходит.
+2. Перецелить ссылки из кода и CI ([Makefile](../Makefile),
+   [.github/workflows/release.yml](../.github/workflows/release.yml),
+   [test/e2e/main_test.go](../test/e2e/main_test.go)) — они ссылаются на «план
+   C.4», секцию, которой в файле уже нет; актуальное описание e2e — в
+   [development.md](development.md).
+3. Перецелить ссылки из документации: [README.md](../README.md) («Open v1.x
+   questions» — открытых вопросов там нет) → [progress.md](progress.md);
+   [code-review.md](code-review.md), [security.md](security.md),
+   [documentation-plan.md](documentation-plan.md), [progress.md](progress.md) и
+   шапку этого файла → на `progress.md`/`security.md`.
+4. В [progress.md](progress.md) убрать шаг «Открыть `implementation-plan.md`» —
+   он выполнен.
+
 **Готово, когда:** Quick start указывает на Codeberg; тег образа в compose
-совпадает с релизом; `docs/logo` либо содержит файлы, либо отсутствует.
+совпадает с релизом; `docs/logo` либо содержит файлы, либо отсутствует;
+`implementation-plan.md` в `docs/archive/`, ссылок на него в активных документах
+и в коде/CI не осталось.
 
 **Send-log vs `mail.log` (опционально).** После рестарта панели или пересоздания
 контейнера строки send-log могут навсегда остаться `queued` — log-tailer не

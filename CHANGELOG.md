@@ -17,6 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs: `docs/roadmap.md` v1.x tail — retire `implementation-plan.md` in the
+  release commit (move to `docs/archive/`, retarget its references in README,
+  docs, Makefile, release workflow and the e2e test comment).
 - docs: `docs/code-review.md` — phase 1.5 plan for optional password encryption
   of full backup (`.spbk`) and domain export (`.spde`); checkbox UI pattern;
   remove session-resurrection-from-backup as accepted risk.
