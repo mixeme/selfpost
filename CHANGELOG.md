@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- Pre-release security review (plan § D, model Fable, 2026-08-06): full pass
+  over the diff from the v1.0 audit (Phase 11, `bd64e80`) to HEAD plus the
+  complete spec 7.6 checklist. No exploitable findings; one defence-in-depth
+  fix below. Accepted risks in `docs/security.md` unchanged.
+- `saslpasswd2` argv: the application login is now passed after a `--`
+  end-of-options marker (`internal/app/sasl.go`), so a login starting with
+  `-` (legal under the whitelist) can never be parsed as a flag by getopt.
+
 ### Added
 
 - docs: `docs/code-review.md` — phase 1.5 plan for optional password encryption

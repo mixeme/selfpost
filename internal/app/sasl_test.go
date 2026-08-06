@@ -39,8 +39,9 @@ func TestSASLSetPassesPasswordOnStdinNotArgv(t *testing.T) {
 	if strings.Contains(joined, secret) {
 		t.Errorf("password leaked into argv: %q", joined)
 	}
-	// Expected fixed flags and the login as its own trailing argument.
-	want := []string{"-p", "-c", "-f", "/data/sasl/sasldb2", "-u", "mail.example.com", "alerts"}
+	// Expected fixed flags and the login as its own trailing argument, behind
+	// "--" so it can never be parsed as an option.
+	want := []string{"-p", "-c", "-f", "/data/sasl/sasldb2", "-u", "mail.example.com", "--", "alerts"}
 	if len(fr.args) != len(want) {
 		t.Fatalf("args = %v, want %v", fr.args, want)
 	}
@@ -56,7 +57,7 @@ func TestSASLDeleteArgs(t *testing.T) {
 	if err := s.Delete("alerts"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
-	want := []string{"-d", "-f", "/data/sasl/sasldb2", "-u", "mail.example.com", "alerts"}
+	want := []string{"-d", "-f", "/data/sasl/sasldb2", "-u", "mail.example.com", "--", "alerts"}
 	if strings.Join(fr.args, " ") != strings.Join(want, " ") {
 		t.Errorf("delete args = %v, want %v", fr.args, want)
 	}

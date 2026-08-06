@@ -50,7 +50,10 @@ func (s *SASLDB) Set(login, password string) error {
 	// -c: create the account / set the password.
 	// -f: operate on our sasldb2 rather than the system default path.
 	// -u: the realm the account lives under.
-	args := []string{"-p", "-c", "-f", s.path, "-u", s.realm, login}
+	// --: end of options, so a login can never be parsed as a flag (the
+	//     whitelist already forbids nothing that getopt would eat, but a login
+	//     starting with '-' is legal there — this keeps it an operand).
+	args := []string{"-p", "-c", "-f", s.path, "-u", s.realm, "--", login}
 	if err := s.run(args, []byte(password)); err != nil {
 		return fmt.Errorf("saslpasswd2 set %q: %w", login, err)
 	}
@@ -63,8 +66,8 @@ func (s *SASLDB) Delete(login string) error {
 	if err := validateLogin(login); err != nil {
 		return err
 	}
-	// -d: delete the account.
-	args := []string{"-d", "-f", s.path, "-u", s.realm, login}
+	// -d: delete the account. "--" as in Set: the login is always an operand.
+	args := []string{"-d", "-f", s.path, "-u", s.realm, "--", login}
 	if err := s.run(args, nil); err != nil {
 		return fmt.Errorf("saslpasswd2 delete %q: %w", login, err)
 	}
