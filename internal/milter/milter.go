@@ -45,13 +45,18 @@ type Store interface {
 type session struct {
 	milter.NoOpMilter
 	rec Store
+	// flight is shared by every session of the process; it holds the messages
+	// that passed the level-2 check but are not in the send log yet. Nil is a
+	// valid zero value (no in-flight accounting).
+	flight *inflight
 
 	clientIP string // captured once per connection
 
-	login   string
-	from    string
-	rcpts   []string
-	subject string
+	login    string
+	from     string
+	rcpts    []string
+	subject  string
+	reserved []*reservation // level-2 slots held by the current message
 }
 
 // Connect captures the client IP, which comes from the addr parameter rather
@@ -72,6 +77,7 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 // tempfail before recipients are even offered (spec 7.4). Enforcement is
 // fail-open — see overLimit.
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
+	s.releaseReservations() // a previous transaction that ended without EOM/ABORT
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
 	s.rcpts = nil
@@ -127,7 +133,20 @@ func decodeSubject(v string) string {
 // rows are written. We accept (this milter is done) without ever rejecting.
 func (s *session) Body(m *milter.Modifier) (milter.Response, error) {
 	s.record(macro(m, "i"))
+	// The rows are in the send log now, so the stored count sees this message
+	// and its level-2 slots are no longer needed.
+	s.releaseReservations()
 	return milter.RespAccept, nil
+}
+
+// Abort ends the current transaction without an end-of-message (client RSET, or
+// Postfix rejecting the message for its own reasons). No send-log row will be
+// written, so the level-2 slots this message held must go back.
+func (s *session) Abort(m *milter.Modifier) error {
+	s.releaseReservations()
+	s.rcpts = nil
+	s.subject = ""
+	return nil
 }
 
 // macro reads a milter macro, tolerating Postfix's convention of wrapping
@@ -191,8 +210,9 @@ func domainOf(addr string) string {
 // Serve runs the journal-milter on ln until ctx is cancelled. Each connection
 // gets a fresh session bound to rec. It returns nil on a clean shutdown.
 func Serve(ctx context.Context, ln net.Listener, rec Store) error {
+	flight := &inflight{} // shared: the level-2 window spans all connections
 	srv := &milter.Server{
-		NewMilter: func() milter.Milter { return &session{rec: rec} },
+		NewMilter: func() milter.Milter { return &session{rec: rec, flight: flight} },
 		Actions:   0,                // read-only: we make no message modifications
 		Protocol:  milter.OptNoBody, // the journal needs headers/EOM, not the body
 	}

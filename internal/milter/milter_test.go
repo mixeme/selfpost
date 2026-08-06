@@ -331,6 +331,130 @@ func TestRateLimitNoIPKeyDoesNotApply(t *testing.T) {
 	}
 }
 
+// mailFromIn is mailFrom with an explicit shared in-flight registry, so a test
+// can play several concurrent SMTP sessions of one process against each other.
+func mailFromIn(t *testing.T, rec Store, fl *inflight, ip, from, login string) (*session, milter.Response) {
+	t.Helper()
+	s := &session{rec: rec, flight: fl}
+	if _, err := s.Connect("h", "tcp4", 0, net.ParseIP(ip), mods(nil)); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	resp, err := s.MailFrom(from, mods(map[string]string{"auth_authen": login}))
+	if err != nil {
+		t.Fatalf("MailFrom: %v", err)
+	}
+	return s, resp
+}
+
+func limitedRecorder(count int64) *fakeRecorder {
+	return &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": count},
+	}
+}
+
+// Messages between MAIL FROM and end-of-message are not in the send log yet, so
+// counting the stored rows alone lets concurrent sessions each pass the same
+// check and overshoot the ceiling. The last free slot may only be taken once.
+func TestRateLimitCountsInFlightMessages(t *testing.T) {
+	rec := limitedRecorder(4) // one below the ceiling of 5
+	fl := &inflight{}
+
+	if _, resp := mailFromIn(t, rec, fl, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("first message = %v, want Continue (4/5 stored)", resp)
+	}
+	// Same window, nothing written yet: the first message holds the fifth slot.
+	if _, resp := mailFromIn(t, rec, fl, limitIP, "b@example.com", "app1"); resp != milter.RespTempFail {
+		t.Fatalf("concurrent message = %v, want TempFail (would overshoot)", resp)
+	}
+	if len(rec.rejected) != 1 {
+		t.Fatalf("want one rejected send-log row, got %+v", rec.rejected)
+	}
+}
+
+// Once the message is recorded the stored count sees it, so its reservation
+// must be given back — otherwise it would be counted twice and the ceiling
+// would drift closed.
+func TestReservationReleasedAtEndOfMessage(t *testing.T) {
+	rec := limitedRecorder(4)
+	fl := &inflight{}
+
+	s, resp := mailFromIn(t, rec, fl, limitIP, "a@example.com", "app1")
+	if resp != milter.RespContinue {
+		t.Fatalf("first message = %v, want Continue", resp)
+	}
+	if _, err := s.Body(mods(map[string]string{"i": "Q1"})); err != nil {
+		t.Fatalf("Body: %v", err)
+	}
+	if n := fl.count(store.RateLimitScopeDomain+"|example.com", time.Now().Add(-time.Hour)); n != 0 {
+		t.Fatalf("in-flight count after EOM = %d, want 0", n)
+	}
+}
+
+// A transaction the client abandons (RSET, or a Postfix-side rejection) never
+// reaches the send log, so its slot must not stay claimed.
+func TestReservationReleasedOnAbort(t *testing.T) {
+	rec := limitedRecorder(4)
+	fl := &inflight{}
+
+	s, resp := mailFromIn(t, rec, fl, limitIP, "a@example.com", "app1")
+	if resp != milter.RespContinue {
+		t.Fatalf("first message = %v, want Continue", resp)
+	}
+	if err := s.Abort(mods(nil)); err != nil {
+		t.Fatalf("Abort: %v", err)
+	}
+	if _, resp := mailFromIn(t, rec, fl, limitIP, "b@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("after abort = %v, want Continue (slot released)", resp)
+	}
+}
+
+// A refused message must not leave the slots it claimed for the limits checked
+// before the one that tripped, or every refusal would tighten the ceiling.
+func TestRefusalReleasesEarlierReservation(t *testing.T) {
+	rec := &fakeRecorder{
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": activeLimit(limitIP),
+			store.RateLimitScopeApp + "|app1":           activeLimit(limitIP),
+		},
+		counts: map[string]int64{
+			store.RateLimitScopeDomain + "|example.com": 0, // domain: plenty of room
+			store.RateLimitScopeApp + "|app1":           5, // app: at the ceiling
+		},
+	}
+	fl := &inflight{}
+	if _, resp := mailFromIn(t, rec, fl, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
+		t.Fatalf("app over limit = %v, want TempFail", resp)
+	}
+	if n := fl.count(store.RateLimitScopeDomain+"|example.com", time.Now().Add(-time.Hour)); n != 0 {
+		t.Fatalf("domain reservation left behind after refusal: %d", n)
+	}
+}
+
+// The in-flight count only covers the limit's own window: a reservation older
+// than it (a session stuck mid-DATA for longer than the window) must not be
+// counted against a window it no longer belongs to.
+func TestInflightIgnoresReservationsOutsideWindow(t *testing.T) {
+	fl := &inflight{}
+	r := fl.reserve("domain|example.com")
+	r.at = time.Now().Add(-time.Minute)
+
+	if n := fl.count("domain|example.com", time.Now().Add(-time.Hour)); n != 1 {
+		t.Fatalf("count inside window = %d, want 1", n)
+	}
+	if n := fl.count("domain|example.com", time.Now().Add(-time.Second)); n != 0 {
+		t.Fatalf("count outside window = %d, want 0", n)
+	}
+	// Past the TTL the reservation is dropped even for a wide window, so a
+	// client that vanished after MAIL FROM cannot hold a slot forever.
+	r.at = time.Now().Add(-2 * reservationTTL)
+	if n := fl.count("domain|example.com", time.Now().Add(-3*reservationTTL)); n != 0 {
+		t.Fatalf("expired reservation still counted: %d", n)
+	}
+}
+
 func TestDomainOf(t *testing.T) {
 	cases := map[string]string{
 		"user@Example.COM": "example.com",

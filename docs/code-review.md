@@ -72,7 +72,7 @@ flowchart TB
 - **Layered / ports-and-adapters:** handlers → services (`domain`, `app`) → `store`; инфраструктура изолирована в адаптерах ([`internal/web/web.go`](../internal/web/web.go), [`internal/app/service.go`](../internal/app/service.go)).
 - **Composition root** в [`cmd/panel/main.go`](../cmd/panel/main.go): три роли (HTTP, journal-milter, log-tailer) в одном процессе — оправдано для single-container deployment.
 - **Interface seams** для тестов: `milter.Store`, `app.SenderMaps`, `logtail.StatusStore`.
-- **Embedded migrations** ([`internal/store/store.go`](../internal/store/store.go)) — простой, надёжный подход для 2 миграций.
+- **Embedded migrations** ([`internal/store/store.go`](../internal/store/store.go)) — простой, надёжный подход для 3 миграций.
 - **E2E как отдельный модуль** (`test/e2e/go.mod`) — не загрязняет основной модуль.
 
 ### Замечания (не блокеры)
@@ -215,7 +215,7 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 
 | Gap | Описание | Документировано |
 |-----|----------|-----------------|
-| Send-log `queued` forever | Log-tailer стартует с EOF; после restart пропущенный хвост не дочитывается | [security.md](security.md), [roadmap.md](roadmap.md) |
+| Send-log `queued` forever | **Закрыто для рестарта:** Фаза 3 — offset персистится (`logtail_state`), хвост дочитывается. Остаётся пересоздание контейнера: `mail.log` не в `/data` | [security.md](security.md), [roadmap.md](roadmap.md) |
 | CSRF without tokens | POST без Origin/Sec-Fetch-Site пропускается | [security.md](security.md) |
 | Fail-open L2 rate limit | DB error → mail проходит | [`internal/milter/ratelimit.go`](../internal/milter/ratelimit.go) |
 | Shallow SPF check | Не следует `include:`/`redirect=` | README, `internal/dnscheck/spf.go` |
@@ -235,8 +235,8 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 |---|----------|-----------|--------|
 | L1 | **Предрелизный security review** (§ D) — обязательный гейт | **P0** | **Fable** |
 | L2 | **Шифрование бэкапа и экспорта домена** (R13) — optional, checkbox + password — **выполнено** | P1 | **Opus** + Sonnet |
-| L3 | Send-log gap mitigation — опционально | P2 | Opus |
-| L4 | Transaction wrap для rate limit count+insert — опционально | P3 | Opus |
+| L3 | Send-log gap mitigation — **выполнено** (persist offset, Фаза 3) | P2 | Opus |
+| L4 | Rate limit count+insert — **выполнено** (учёт «в полёте», Фаза 3; транзакция как таковая неприменима) | P3 | Opus |
 
 ---
 
@@ -246,6 +246,7 @@ E2E покрывает: bootstrap, SMTP AUTH, DKIM, send-log lifecycle, negative
 
 - [`0001_init.sql`](../internal/store/migrations/0001_init.sql) — initial schema
 - [`0002_sessions.sql`](../internal/store/migrations/0002_sessions.sql) — sessions (plan B.1)
+- [`0003_logtail_state.sql`](../internal/store/migrations/0003_logtail_state.sql) — log-tailer read offset (Фаза 3)
 - Механизм: `PRAGMA user_version`, embedded FS, transactional apply — **чистый**, без legacy branches в коде.
 
 ### Архивная документация
@@ -360,7 +361,7 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 |---|--------|--------|
 | R9 | Inbound relay (Phase O1) | **Opus** |
 | R10 | Domain-admin role | Opus |
-| R11 | Send-log gap fix (persist offset) | Opus |
+| R11 | Send-log gap fix (persist offset) — **выполнено в Фазе 3**, из 2.x снято | Opus |
 | R12 | Split internal/web subpackages | Sonnet/Opus |
 
 ### CI/infra
@@ -423,10 +424,22 @@ Go `html/template` + HTMX polling + [`panel.css`](../internal/web/static/panel.c
 2. Sonnet: CSS custom properties для dark mode
 3. Haiku: consolidate main max-width rules
 
-### Фаза 3 — Operational improvements (P2–P3, optional)
+### Фаза 3 — Operational improvements (P2–P3, optional) — **выполнено 2026-08-06**
 
-1. Opus: send-log read offset persistence
-2. Opus: rate limit count transaction wrap
+1. Opus: send-log read offset persistence — **сделано**: `logtail_state`
+   (миграция `0003`) хранит offset + отпечаток головы лога; при совпадении
+   отпечатка чтение продолжается, при несовпадении файл читается с начала,
+   первый запуск (записи нет) — с конца, как раньше.
+2. Opus: rate limit count transaction wrap — **сделано иначе**: буквальная
+   транзакция невозможна, count живёт на MAIL FROM, insert — на end-of-message,
+   это разные стадии SMTP-транзакции. Overshoot закрыт учётом сообщений «в
+   полёте» (`internal/milter/inflight.go`): к счёту из БД добавляются
+   резервации, взятые прошедшими проверку сессиями и снимаемые после записи в
+   send-log, на ABORT или по TTL 10 минут.
+
+Остаток по send-log (не закрывается персистом offset): при пересоздании
+контейнера `mail.log` теряется вместе с ним — принятый риск в
+[security.md](security.md).
 
 ---
 

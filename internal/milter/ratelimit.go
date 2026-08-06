@@ -17,6 +17,10 @@ import (
 // can never block mail — Postfix's level-1 anvil limit (spec 5) remains the
 // backstop, and it does not depend on this milter at all. Only a clean count at
 // or above a configured ceiling returns true.
+//
+// A message that passes reserves a slot per applicable limit, released once it
+// reaches the send log (or is abandoned) — see inflight for why the stored
+// count alone is not enough.
 func (s *session) overLimit() bool {
 	if s.clientIP == "" {
 		return false // no client IP to key on; level-2 does not apply
@@ -25,6 +29,7 @@ func (s *session) overLimit() bool {
 		{store.RateLimitScopeDomain, domainOf(s.from)},
 		{store.RateLimitScopeApp, s.login},
 	}
+	var taken []*reservation
 	for _, c := range checks {
 		if c.ref == "" {
 			continue
@@ -45,13 +50,32 @@ func (s *session) overLimit() bool {
 			log.Printf("journal-milter: rate-limit count %s %q: %v (fail-open)", c.scope, c.ref, err)
 			continue
 		}
+		key := c.scope + "|" + c.ref
+		n += s.flight.count(key, since)
 		if n >= int64(rl.MaxMessages) {
 			log.Printf("journal-milter: %s %q over limit: %d/%d in %ds from %s — refusing 4xx",
 				c.scope, c.ref, n, rl.MaxMessages, rl.WindowSeconds, s.clientIP)
+			// The message is refused, so the slots claimed for the limits
+			// checked before this one must not stay claimed.
+			for _, r := range taken {
+				s.flight.release(r)
+			}
 			return true
 		}
+		taken = append(taken, s.flight.reserve(key))
 	}
+	s.reserved = append(s.reserved, taken...)
 	return false
+}
+
+// releaseReservations gives back every slot this message holds. It runs once
+// the message is in the send log (where the stored count sees it), and whenever
+// the transaction ends without getting there.
+func (s *session) releaseReservations() {
+	for _, r := range s.reserved {
+		s.flight.release(r)
+	}
+	s.reserved = nil
 }
 
 // recordRejected writes a send-log row for a message refused by a level-2 limit
