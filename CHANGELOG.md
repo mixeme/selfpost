@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-06
+
 ### Fixed
 
 - A bounce could be recorded as a successful delivery. The log-tailer's
