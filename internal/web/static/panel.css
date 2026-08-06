@@ -4,18 +4,57 @@
    added here must therefore stay here: an inline style="..." attribute in a
    template is blocked by that policy and silently does nothing. */
 
-:root { color-scheme: light dark; }
+/* Colour tokens. Light values live on :root; the dark media query below
+   reassigns the same names rather than re-declaring every rule that uses
+   them, so a rule needs !important nowhere in this file — the custom
+   property already carries the right value for the active scheme. */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9; --fg: #1b1f24;
+  --card-bg: #fff;
+  --border: #e2e5e9;       /* dividers: card, table, app, nav, code, encrypt-fields */
+  --control-border: #cfd4da; /* input, select, textarea, action buttons */
+  --input-bg: #fff;
+  --code-bg: #f0f2f4;
+  --surface-bg: #eef1f5; --surface-bg-hover: #e2e7ee; --surface-open-bg: #dde3ec;
+  --nav-active-bg: #e6ebf5;
+  --flash-bg: #ecfdf3; --flash-border: #abefc6; --flash-fg: #067647;
+  --credential-bg: #fffbeb; --credential-border: #f5c518;
+  --danger-bg: #fef3f2; --danger-border: #fecdca; --danger-fg: #b42318; --danger-bg-hover: #fee4e2;
+  --st-ok-bg: #ecfdf3; --st-ok-fg: #067647; --st-ok-border: #abefc6;
+  --st-warn-bg: #fffaeb; --st-warn-fg: #b54708; --st-warn-border: #fedf89;
+  --st-error-bg: #fef3f2; --st-error-fg: #b42318; --st-error-border: #fecdca;
+  --st-unknown-bg: #f0f2f4; --st-unknown-fg: #6b7280; --st-unknown-border: #e2e5e9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171a; --fg: #e6e8eb;
+    --card-bg: #1d2125;
+    --border: #2b3138;
+    --control-border: #2b3138;
+    --input-bg: #14171a;
+    --code-bg: #14171a;
+    --surface-bg: #22262b; --surface-bg-hover: #2b3138; --surface-open-bg: #313841;
+    --nav-active-bg: #22303f;
+    --flash-bg: #0d2818; --flash-border: #1a5336; --flash-fg: #75d99b;
+    --credential-bg: #2a2408; --credential-border: #6b5a10;
+    --danger-bg: #2d1211; --danger-border: #6b201a; --danger-fg: #f5a29b; --danger-bg-hover: #3d1a18;
+    --st-ok-bg: #0d2818; --st-ok-fg: #75d99b; --st-ok-border: #1a5336;
+    --st-warn-bg: #2e2308; --st-warn-fg: #f5c86b; --st-warn-border: #6b5210;
+    --st-error-bg: #2d1211; --st-error-fg: #f5a29b; --st-error-border: #6b201a;
+    --st-unknown-bg: #22262b; --st-unknown-fg: #9aa3ad; --st-unknown-border: #2b3138;
+  }
+}
 * { box-sizing: border-box; }
 body {
   font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  margin: 0; padding: 2rem 1rem; background: #f6f7f9; color: #1b1f24;
+  margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
 }
-@media (prefers-color-scheme: dark) {
-  body { background: #14171a; color: #e6e8eb; }
-  .card { background: #1d2125 !important; border-color: #2b3138 !important; }
-  input { background: #14171a !important; color: inherit !important; border-color: #2b3138 !important; }
-}
-main { max-width: 42rem; margin: 0 auto; }
+/* 48rem is a reading measure: right for the forms and prose that make up most
+   of the panel, and the width the navigation bar's two rows were sized for.
+   Page-specific overrides below widen or narrow it for the pages that need
+   something else. */
+main { max-width: 48rem; margin: 0 auto; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
 /* The full mark, on the two pages that have no navigation bar to carry the
    compact one. It takes the column's width so its edges line up with the card
@@ -25,14 +64,14 @@ h1 { font-size: 1.4rem; margin: 0 0 1rem; }
    once the body's padding is taken off. */
 .mark { display: block; width: 100%; max-width: 24rem; height: auto; margin-bottom: 1.4rem; }
 .card {
-  background: #fff; border: 1px solid #e2e5e9; border-radius: 10px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
   padding: 1.5rem; margin: 0 auto;
 }
 .card.narrow { max-width: 24rem; }
 label { display: block; font-weight: 600; margin: 0.9rem 0 0.3rem; }
 input {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
-  border: 1px solid #cfd4da; border-radius: 6px; background: #fff;
+  border: 1px solid var(--control-border); border-radius: 6px; background: var(--input-bg); color: inherit;
 }
 /* One vocabulary for actions. Anything that performs an action looks like a
    button: a <button>, or an <a> carrying .btn/.danger where the action is a
@@ -56,14 +95,12 @@ button:hover, a.btn:hover { background: #1d4ed8; }
 /* form.inline only exists so a POST can sit next to other content without a
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
-main { max-width: 48rem; }
-/* 48rem is a reading measure: right for the forms and prose that make up most
-   of the panel, and the width the navigation bar's two rows were sized for. The
-   three monitoring pages hold data instead — seven columns of send-log, and raw
-   mail.log lines that are long by nature — and at that width the send-log's
-   Subject and Status were fighting over the last inch while the log pages wrapped
-   every second line. They get a wider measure; every other page keeps the narrow
-   one. The class comes from the layout, which stamps the page name onto <main>. */
+/* The three monitoring pages hold data instead of prose — seven columns of
+   send-log, and raw mail.log lines that are long by nature — and at the
+   default measure the send-log's Subject and Status were fighting over the
+   last inch while the log pages wrapped every second line. They get a wider
+   measure; every other page keeps the default one. The class comes from the
+   layout, which stamps the page name onto <main>. */
 main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64rem; }
 /* The signed-out pages are a single card and nothing else, and .card.narrow
    centres itself inside whatever holds it — so at the panel's usual width the
@@ -73,19 +110,17 @@ main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64
    the middle of the page. */
 main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
-.flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
-@media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
+.flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
 table { width: 100%; border-collapse: collapse; }
 /* A table column is at least as wide as the longest unbreakable run inside it,
    and the panel's tables are full of runs with nothing to break on: email
    addresses, domains, queue ids. One 40-character recipient was enough to widen
    the send-log past its card and hang Status over the edge. Cells may break mid
    word, so a column can always be squeezed to the width available. */
-th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; overflow-wrap: anywhere; }
+th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 /* The exception: a timestamp broken across two lines is unreadable, and it is
    short enough to never be the reason a row does not fit. */
 td.time { white-space: nowrap; }
-@media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
 td.actions { text-align: right; }
 /* Subject is the one cell whose text we do not control. Breaking mid word (the
@@ -99,8 +134,7 @@ td.subject span {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.85rem; background: #f0f2f4; border: 1px solid #e2e5e9; border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
-@media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
+        font-size: 0.85rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
 h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
 .back { display: inline-block; margin-bottom: 1rem; }
 /* Build version, closing every authenticated page. Quiet on purpose: it is
@@ -108,13 +142,10 @@ h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
 .version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: #6b7280; }
 select, textarea {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
-  border: 1px solid #cfd4da; border-radius: 6px; background: #fff; color: inherit;
+  border: 1px solid var(--control-border); border-radius: 6px; background: var(--input-bg); color: inherit;
   font-family: inherit;
 }
 textarea { resize: vertical; }
-@media (prefers-color-scheme: dark) {
-  select, textarea { background: #14171a !important; color: inherit !important; border-color: #2b3138 !important; }
-}
 button.danger, a.danger { background: #b42318; }
 button.danger:hover, a.danger:hover { background: #912018; }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
@@ -124,15 +155,14 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .actions summary::-webkit-details-marker { display: none; }
 /* Applications are a list of blocks, not table rows. As a table it fell apart:
    four columns of which the last held six controls — two of them <details>
-   panels with textareas — never fit the panel's 48rem. The controls wrapped
-   into a staircase, .code on the login cell grew into a slab as tall as the
-   row, and the two text cells sat on the baseline halfway down it. One block
-   per application gives the identity a line of its own and the controls a row
-   of their own, at the width they actually need. */
+   panels with textareas — never fit the panel's default width. The controls
+   wrapped into a staircase, .code on the login cell grew into a slab as tall
+   as the row, and the two text cells sat on the baseline halfway down it. One
+   block per application gives the identity a line of its own and the
+   controls a row of their own, at the width they actually need. */
 .apps { list-style: none; margin: 1.2rem 0 0; padding: 0; }
-.app { padding: 0.9rem 0; border-top: 1px solid #e2e5e9; }
+.app { padding: 0.9rem 0; border-top: 1px solid var(--border); }
 .app:last-child { padding-bottom: 0; }
-@media (prefers-color-scheme: dark) { .app { border-color: #2b3138 !important; } }
 .app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
 .app-addr { margin: 0.15rem 0 0; word-break: break-all; }
 .app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
@@ -140,8 +170,7 @@ button.danger:hover, a.danger:hover { background: #912018; }
    the block's full width, not the width of the summary that opened them. */
 .app .actions > details[open] { flex: 1 0 100%; }
 details form { margin-top: 0.6rem; }
-.credential { border-color: #f5c518; background: #fffbeb; }
-@media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
+.credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
 /* Two deliberate rows, not one. The six page entries need about 660px and the
@@ -159,9 +188,8 @@ details form { margin-top: 0.6rem; }
 .nav {
   display: flex; flex-direction: column; align-items: stretch;
   gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
-  border-bottom: 1px solid #e2e5e9;
+  border-bottom: 1px solid var(--border);
 }
-@media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
 .nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
 /* The top row: mark at one edge, session block at the other. Splitting them to
    the edges is what makes the two rows read as two blocks rather than as one
@@ -187,10 +215,7 @@ details form { margin-top: 0.6rem; }
   padding: 0.2rem 0.5rem; border-radius: 6px;
 }
 .nav [aria-current] {
-  font-weight: 600; color: #1b1f24; background: #e6ebf5; box-shadow: inset 0 -2px 0 #2563eb;
-}
-@media (prefers-color-scheme: dark) {
-  .nav [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
+  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 0 -2px 0 #2563eb;
 }
 /* Sign out carries an icon too, so it needs the same row layout; its padding
    and colours come from the compact button rule further down. */
@@ -206,16 +231,10 @@ details form { margin-top: 0.6rem; }
   font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   vertical-align: middle; border: 1px solid transparent;
 }
-.st-ok { background: #ecfdf3; color: #067647; border-color: #abefc6; }
-.st-warn { background: #fffaeb; color: #b54708; border-color: #fedf89; }
-.st-error { background: #fef3f2; color: #b42318; border-color: #fecdca; }
-.st-unknown { background: #f0f2f4; color: #6b7280; border-color: #e2e5e9; }
-@media (prefers-color-scheme: dark) {
-  .st-ok { background: #0d2818 !important; color: #75d99b !important; border-color: #1a5336 !important; }
-  .st-warn { background: #2e2308 !important; color: #f5c86b !important; border-color: #6b5210 !important; }
-  .st-error { background: #2d1211 !important; color: #f5a29b !important; border-color: #6b201a !important; }
-  .st-unknown { background: #22262b !important; color: #9aa3ad !important; border-color: #2b3138 !important; }
-}
+.st-ok { background: var(--st-ok-bg); color: var(--st-ok-fg); border-color: var(--st-ok-border); }
+.st-warn { background: var(--st-warn-bg); color: var(--st-warn-fg); border-color: var(--st-warn-border); }
+.st-error { background: var(--st-error-bg); color: var(--st-error-fg); border-color: var(--st-error-border); }
+.st-unknown { background: var(--st-unknown-bg); color: var(--st-unknown-fg); border-color: var(--st-unknown-border); }
 .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
 .code-row .code { flex: 1; min-width: 0; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
@@ -227,28 +246,16 @@ details form { margin-top: 0.6rem; }
 button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
-  background: #eef1f5; color: #2563eb; border: 1px solid #cfd4da;
+  background: var(--surface-bg); color: #2563eb; border: 1px solid var(--control-border);
 }
 button.copy:hover, .actions button:hover, .actions summary:hover,
-.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
+.actions a.danger:hover, .nav button:hover { background: var(--surface-bg-hover); }
 button.copy { flex: none; margin-top: 0.3rem; }
-.actions details[open] > summary { background: #dde3ec; }
+.actions details[open] > summary { background: var(--surface-open-bg); }
 .actions button.danger, .actions a.danger, .nav button.danger {
-  color: #b42318; background: #fef3f2; border-color: #fecdca;
+  color: var(--danger-fg); background: var(--danger-bg); border-color: var(--danger-border);
 }
-.actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
-@media (prefers-color-scheme: dark) {
-  button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
-    background: #22262b !important; border-color: #2b3138 !important;
-  }
-  button.copy:hover, .actions button:hover, .actions summary:hover,
-  .actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
-  .actions details[open] > summary { background: #313841 !important; }
-  .actions button.danger, .actions a.danger, .nav button.danger {
-    color: #f5a29b !important; background: #2d1211 !important; border-color: #6b201a !important;
-  }
-  .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
-}
+.actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: var(--danger-bg-hover); }
 
 /* The optional "encrypt this download" block on the backup, export and import
    forms. Its label is the one checkbox in the panel, so it opts out of the
@@ -263,8 +270,7 @@ button.copy { flex: none; margin-top: 0.3rem; }
 }
 .encrypt label.check input { width: auto; margin: 0; }
 .encrypt-fields {
-  margin-left: 1.6rem; padding-left: 0.9rem; border-left: 2px solid #e2e5e9;
+  margin-left: 1.6rem; padding-left: 0.9rem; border-left: 2px solid var(--border);
 }
 .encrypt-fields label { margin-top: 0.7rem; }
 .encrypt-fields .muted { margin: 0.5rem 0 0; font-size: 0.85rem; }
-@media (prefers-color-scheme: dark) { .encrypt-fields { border-color: #2b3138 !important; } }
