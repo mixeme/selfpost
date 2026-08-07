@@ -1,4 +1,6 @@
-![SelfPost](docs/assets/selfpost-stamp.svg)
+<p align="center">
+  <img src="docs/assets/selfpost-stamp.svg" alt="SelfPost" width="440">
+</p>
 
 # SelfPost
 
