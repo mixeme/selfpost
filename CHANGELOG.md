@@ -52,6 +52,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- The stamp's `SELF-HOSTED SMTP RELAY` line is set at 11.5/0.15 instead of
+  7.2/2.8, and no longer carries `opacity=".78"`. At the old size its stems
+  rasterised to about half a device pixel, so more than half its ink landed
+  as antialiasing — the typical pixel reached 2.1:1 against the brown rather
+  than the 7.3:1 the two colours are worth, and none reached full strength.
+  The line keeps its footprint and its monospaced cells: the width the
+  tracking was spending went to the glyphs, whose cap height rises from 5.2
+  to 8.3. The mark is used at 330px on the login and setup pages, which is
+  where this was worst. `internal/web/static/logo.svg` is a copy of
+  `docs/assets/selfpost-stamp.svg` and both carry the change, as does the
+  proof sheet the outlines are drawn from.
 - The delivery log lists what identifies a message and nothing else: time,
   sender, recipient, subject, status. Domain and application, which were a
   column each, remain the log's two filters and now appear per message on the
