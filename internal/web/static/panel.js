@@ -102,9 +102,72 @@
     });
   }
 
+  // --- Section index follows the page -----------------------------------
+  // The long pages list their own sections in the navigation column (the
+  // "sections" template). Marking the one currently in view turns that list
+  // from an index into a position, which is the whole point of it on a page
+  // nine cards tall. The links work without any of this; only the highlight
+  // depends on it.
+  //
+  // Each pass looks its targets up by id rather than holding on to elements
+  // found once: the status page replaces its cards wholesale every five
+  // seconds (hx-swap on #status-body), and anything remembered here would be
+  // measuring boxes that had left the document.
+  var sectionLinks = [];
+
+  function markCurrentSection() {
+    var current = null;
+    sectionLinks.forEach(function (link) {
+      var target = document.getElementById(link.hash.slice(1));
+      // The section in view is the last one whose top has passed the reading
+      // line; the links are in document order, so the last match wins.
+      if (target && target.getBoundingClientRect().top <= 100) {
+        current = link;
+      }
+    });
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+      // At the foot of the page there is no scroll left to bring the last
+      // cards up to the reading line, so without this they could never be
+      // marked however far down you are — and the last card of the domain
+      // page is the one that deletes it.
+      current = sectionLinks[sectionLinks.length - 1];
+    } else if (!current) {
+      // Above the first heading nothing has been passed yet, and the page is
+      // still on its first section.
+      current = sectionLinks[0];
+    }
+    sectionLinks.forEach(function (link) {
+      link.classList.toggle("current", link === current);
+    });
+  }
+
+  function initSectionIndex() {
+    sectionLinks = Array.prototype.slice.call(
+      document.querySelectorAll(".sections a[href^='#']")
+    );
+    if (!sectionLinks.length) {
+      return;
+    }
+    var pending = false;
+    // Scroll fires far more often than the highlight can change, so the work
+    // is collapsed onto the next frame.
+    window.addEventListener("scroll", function () {
+      if (pending) {
+        return;
+      }
+      pending = true;
+      window.requestAnimationFrame(function () {
+        pending = false;
+        markCurrentSection();
+      });
+    }, { passive: true });
+    markCurrentSection();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initAddressFields(document);
     initEncryptFields(document);
+    initSectionIndex();
   });
 
   // --- Skip polling while the tab is hidden ------------------------------

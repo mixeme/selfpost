@@ -7,7 +7,7 @@
 {{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
 
 {{if .NewCred}}
-<div class="card credential">
+<div class="card credential" id="new-credential">
   <h2>New application password</h2>
   <p class="muted">This password is shown <strong>once only</strong> and is not
   stored. Copy it now — if it is lost, regenerate a new one.</p>
@@ -24,7 +24,7 @@
 </div>
 {{end}}
 
-<div class="card">
+<div class="card" id="dkim">
   <h2>DKIM DNS record</h2>
   <p class="muted">Publish this TXT record in the DNS for <strong>{{.Domain.Name}}</strong>.
   It is not a secret and can be viewed at any time.</p>
@@ -47,7 +47,7 @@
   <p class="muted">Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
 </div>
 
-<div class="card">
+<div class="card" id="spf-dmarc">
   <h2>SPF and DMARC records</h2>
   <p class="muted">These two are not generated the way the DKIM record above is —
   they are policy, and the domain may already publish an SPF record for other
@@ -91,7 +91,7 @@
   <code>p=reject</code> once the reports come back clean.</p>
 </div>
 
-<div class="card">
+<div class="card" id="dns-status">
   <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
   <p class="muted">What DNS publishes for <strong>{{.Domain.Name}}</strong> right
   now, checked against the key this server signs with. Results are cached for a
@@ -121,7 +121,7 @@
   </form>
 </div>
 
-<div class="card">
+<div class="card" id="settings">
   <h2>Sending server settings</h2>
   <p class="muted">Point the mail client or script at these settings and
   authenticate with an application login and password from the
@@ -146,7 +146,7 @@
 
 {{/* Create form above the list, the same order the domains page uses for
      "Add a sending domain" above "Domains". */}}
-<div class="card">
+<div class="card" id="add-application">
   <h2>Add an application</h2>
   <form method="post" action="/domains/{{.Domain.ID}}/applications">
     <label for="login">Login</label>
@@ -173,7 +173,7 @@
   be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
 </div>
 
-<div class="card">
+<div class="card" id="applications">
   <h2>Applications</h2>
   <p class="muted">Each application is a SASL login/password an app or script
   uses to send mail as this domain. A login may send from any address of the
@@ -241,7 +241,7 @@
   {{end}}
 </div>
 
-<div class="card">
+<div class="card" id="rate-limit">
   <h2>Sending rate limit (domain)</h2>
   <p class="muted">Optional level-2 limit (spec 7.4): cap how many messages this
   domain may send from its expected client IP(s) within a time window, summed
@@ -276,7 +276,7 @@
   {{end}}
 </div>
 
-<div class="card">
+<div class="card" id="export">
   <h2>Export domain</h2>
   <p class="muted">Download this domain to move it to another SelfPost instance:
   its DKIM key, selector and every application with its working password. On
@@ -292,10 +292,33 @@
   </form>
 </div>
 
-<div class="card">
+<div class="card" id="danger">
   <h2>Danger zone</h2>
   <p class="muted">Deleting this domain also deletes its DKIM key and every
   application bound to it.</p>
   <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
+</div>
+{{end}}
+
+{{/* The domain page's section index, shown in the navigation column (see the
+     "sections" block in layout.html). This is the panel's longest page — the
+     DNS records to publish, the checks on them, the applications and two rate
+     limits — and setting a domain up means going back and forth between them.
+     The freshly generated password is only listed while it is on the page: it
+     is the one card that is not always there, and the one nothing should scroll
+     away from silently. */}}
+{{define "sections"}}
+<div class="sections">
+  <p class="sections-title">On this page</p>
+  {{if .NewCred}}<a href="#new-credential">New application password</a>{{end}}
+  <a href="#dkim">DKIM DNS record</a>
+  <a href="#spf-dmarc">SPF and DMARC records</a>
+  <a href="#dns-status">DNS status</a>
+  <a href="#settings">Sending server settings</a>
+  <a href="#add-application">Add an application</a>
+  <a href="#applications">Applications</a>
+  <a href="#rate-limit">Sending rate limit</a>
+  <a href="#export">Export domain</a>
+  <a href="#danger">Danger zone</a>
 </div>
 {{end}}

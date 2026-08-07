@@ -21,6 +21,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   — no `/proc` outside Linux — leave the card in place showing "unknown". The
   usage bars are `<meter>` elements: the panel's CSP has no inline-style
   exemption, so a bar's length has to travel on an attribute.
+- An index of the current page's own sections in the navigation column, for the
+  two pages long enough to need one: the domain page (nine cards, from the DNS
+  records to publish down to the danger zone) and the status page (eight). Each
+  card carries an id and the page's template defines the list
+  (`{{define "sections"}}`); every other page defines nothing and shows no
+  index. `panel.js` marks the section currently in view, looking its targets up
+  by id on each pass so the status page swapping its cards out every five
+  seconds cannot leave it measuring boxes that have left the document. The
+  links are plain fragment links and work with JavaScript blocked; only the
+  highlight needs it.
+
+### Changed
+
+- The panel's navigation is a column down the left edge instead of a bar across
+  the top. As a bar it did not fit on one row — six page entries and the
+  session block against the panel's width — and had to be split into two,
+  costing the top of every page; standing it up removes the compromise, gives
+  the entries one left edge to scan down, and leaves room under them for the
+  section index above. It is sticky, so both lists stay in view on the long
+  pages, and the current entry is marked down its leading edge rather than
+  underlined. Below the width the two columns need, it lies back down into the
+  wrapping rows it used to be — no drawer and no hamburger, since six entries
+  fit. The markup now lists the blocks in the order they are drawn, so the tab
+  order follows the eye instead of starting at Sign out.
 
 ## [0.5.0] - 2026-08-06
 

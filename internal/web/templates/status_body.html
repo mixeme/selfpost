@@ -1,11 +1,11 @@
 {{define "status_body"}}
 <div id="status-body" hx-get="/status/fragment" hx-trigger="every 5s" hx-swap="outerHTML">
-  <div class="card">
+  <div class="card" id="overall">
     <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
     <p class="muted">{{.OverallHeading}}</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="processes">
     <h2>Processes <span class="st st-{{.ProcessStatus}}">{{.ProcessStatus}}</span></h2>
     {{if .ProcessError}}
     <p class="error">Could not ask supervisord for the process list.</p>
@@ -25,7 +25,7 @@
     {{end}}
   </div>
 
-  <div class="card">
+  <div class="card" id="machine">
     <h2>Machine <span class="st st-{{.Machine.Status}}">{{.Machine.Status}}</span></h2>
     <p class="muted">Processor, memory and network of the machine this container
     runs on, read from the kernel's counters. CPU and throughput are rates, so
@@ -72,7 +72,7 @@
     </table>
   </div>
 
-  <div class="card">
+  <div class="card" id="queue">
     <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
     {{if .QueueError}}
     <p class="error">{{.QueueError}}</p>
@@ -82,7 +82,7 @@
     {{end}}
   </div>
 
-  <div class="card">
+  <div class="card" id="certificate">
     <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
     <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
     It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
@@ -93,7 +93,7 @@
     <p class="{{if eq .Cert.Status "ok"}}muted{{else}}error{{end}}">{{.Cert.Detail}}</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="sockets">
     <h2>Milter sockets <span class="st st-{{.SocketStatus}}">{{.SocketStatus}}</span></h2>
     <table>
       <thead><tr><th>Milter</th><th>Socket</th><th>State</th></tr></thead>

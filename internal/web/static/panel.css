@@ -50,11 +50,16 @@ body {
   font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
 }
+/* The two columns — navigation on the left, page on the right — centred as a
+   pair. The navigation is a fixed width and the page keeps the measure it had:
+   the column is added beside the content, not taken out of it. */
+.shell { display: flex; justify-content: center; align-items: flex-start; gap: 1.75rem; }
 /* 48rem is a reading measure: right for the forms and prose that make up most
-   of the panel, and the width the navigation bar's two rows were sized for.
-   Page-specific overrides below widen or narrow it for the pages that need
-   something else. */
-main { max-width: 48rem; margin: 0 auto; }
+   of the panel. Page-specific overrides below widen or narrow it for the pages
+   that need something else. No auto margins: inside the shell they would eat
+   the free space and push the navigation column off to the far edge, so the
+   centring is the shell's job (justify-content above). */
+main { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 48rem; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
 /* The full mark, on the two pages that have no navigation bar to carry the
    compact one. It takes the column's width so its edges line up with the card
@@ -173,56 +178,115 @@ details form { margin-top: 0.6rem; }
 .credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
-/* Two deliberate rows, not one. The six page entries need about 660px and the
-   session block another 260px, against the 738px the panel is wide — so the bar
-   was wrapping on its own, and the session landed left-aligned directly under
-   the entries, reading as a third row of navigation. Shortening labels would buy
-   the ~200px back but undo the point of naming each entry after its page. Rows
-   rather than columns: a two-column grid of entries came out a third taller
-   (107px against 83px) and no easier to read.
-   The session sits on top, at the right edge, and the page entries below — the
-   usual arrangement, and the layout template puts the session first so the
-   reading and tab order follow what the eye sees rather than being flipped by a
-   CSS `order`. The cost is that Sign out is the bar's first tab stop; nothing
-   activates on focus, so that is a reordering, not a hazard. */
+/* A column down the left edge rather than a bar across the top. The six page
+   entries need about 660px and the session block another 260px, against the
+   738px the panel was wide, so as a bar it had to be split over two rows — and
+   even then it cost the top of every page. Standing it up removes that: the
+   entries share one left edge to scan down, the session sits at the foot where
+   it is out of the way, and there is room between them for the current page's
+   own sections (.sections below), which is what makes the long pages navigable.
+   Sticky, so both lists stay in view while the page scrolls past them. The
+   layout template lists the blocks in the order they are drawn, so reading and
+   tab order follow the eye without a CSS `order`. */
 .nav {
-  display: flex; flex-direction: column; align-items: stretch;
-  gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--border);
+  position: sticky; top: 2rem; align-self: flex-start;
+  flex: none; width: 13.5rem;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.75rem;
+  /* A viewport shorter than the column would otherwise cut off whatever hangs
+     below the fold — with no page scroll left to reach it, since the column is
+     stuck to the viewport. */
+  max-height: calc(100vh - 4rem); overflow-y: auto;
 }
-.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
-/* The top row: mark at one edge, session block at the other. Splitting them to
-   the edges is what makes the two rows read as two blocks rather than as one
-   ragged list that happened to wrap. */
-.nav .top { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; }
-.nav .session { justify-content: flex-end; }
-/* The mark is a link, but not one of the bar's entries: it takes none of the
+.nav .links, .nav .session { display: flex; flex-direction: column; gap: 0.1rem; }
+/* The session is the column's last block and the only one that is not
+   navigation, so it is ruled off from the entries above it. */
+.nav .session { padding-top: 0.75rem; border-top: 1px solid var(--border); }
+/* The signed-in administrator's name: a label above the two controls, not one
+   of them. It may be long and there is nothing to break it on, so it is allowed
+   to break mid word rather than widen the column. */
+.nav .session .muted { padding: 0 0.6rem; font-size: 0.85rem; overflow-wrap: anywhere; }
+/* The mark is a link, but not one of the column's entries: it takes none of the
    padding and rounding the entry rule below applies, so its own edge lines up
-   with the page rather than sitting half a step inside it. The stamp carries
-   about 4px of field inside the file at this size, which is what puts it level
-   with the icons of the row underneath. */
+   with the entries' icons rather than sitting half a step inside them. */
 .nav .brand { padding: 0; }
 /* width/height are on the element too, so the row reserves the space before the
    SVG has loaded; these keep the ratio if the box is ever squeezed. The stamp's
    proportions are part of the mark — it is never scaled unevenly. */
 .nav .brand img { display: block; width: 110px; height: auto; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
-   rather than a run of text — that is also why the bar centres its items
-   instead of aligning them on the text baseline. Account is included: it is a
-   page like the others and would otherwise be the one bare word in the bar. */
+   rather than a run of text — that is also why the entries centre their items
+   instead of aligning them on the text baseline. In the column the entry fills
+   the width, so the whole strip is the click target and the hover and active
+   backgrounds read as one stack of bars. Account is included: it is a page like
+   the others and would otherwise be the one bare word in the column. */
+/* No underline: in a row the entries were separated by space alone and the
+   underline was what marked them as links, but a column of them reads as a
+   list of links already, and eight underlines down the left edge is a lot of
+   line for no added meaning. The hover background carries the affordance. */
 .nav a, .nav [aria-current] {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.2rem 0.5rem; border-radius: 6px;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.6rem; border-radius: 6px; text-decoration: none;
 }
+.nav a:hover { background: var(--surface-bg); }
+/* The marker moved with the bar: a rule under the entry made sense in a row,
+   where the entries sat side by side; standing up, the current entry is marked
+   down its leading edge, which is the edge every entry shares. */
 .nav [aria-current] {
-  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 0 -2px 0 #2563eb;
+  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 2px 0 0 #2563eb;
 }
 /* Sign out carries an icon too, so it needs the same row layout; its padding
    and colours come from the compact button rule further down. */
-.nav button { display: inline-flex; align-items: center; gap: 0.4rem; }
+.nav button { display: flex; align-items: center; gap: 0.5rem; }
 /* The icons draw in the entry's own colour, so the active entry's darker text,
    a link's blue and Sign out's red all carry through without a rule apiece. */
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
+/* The current page's own sections, listed under the page entries. The domain
+   page and the status page are eight and nine cards tall, and the only way to
+   the card you came for was to scroll past all the ones you did not. Only pages
+   that long carry an index — it comes from the page's own "sections" template
+   (see layout.html), so a page with two cards renders nothing here. */
+.sections {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding-top: 0.75rem; border-top: 1px solid var(--border);
+}
+.sections-title {
+  margin: 0 0 0.25rem 0.6rem;
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #6b7280;
+}
+/* Quieter and a step in from the page entries: this is an index of one page,
+   subordinate to the list of pages above it. */
+.nav .sections a {
+  padding: 0.2rem 0.6rem 0.2rem 0.9rem;
+  font-size: 0.85rem; color: #6b7280; text-decoration: none;
+}
+.nav .sections a:hover { color: var(--fg); }
+/* panel.js marks the section the page is scrolled to. Without JavaScript
+   nothing is marked and the list is still a working index. */
+.nav .sections a.current { color: var(--fg); font-weight: 600; background: var(--nav-active-bg); }
+/* Jumping to a card should not leave it touching the top edge of the window. */
+.card[id] { scroll-margin-top: 1rem; }
+/* Below the width the two columns need (13.5rem of navigation, 1.75rem of gap
+   and the 48rem measure, plus the body's padding), the column lies back down
+   into a bar above the page — the same wrapping rows it used to be. A drawer
+   behind a hamburger would save more height, but it would need script to open,
+   and the panel's navigation is six entries: they fit. */
+@media (max-width: 66rem) {
+  .shell { flex-direction: column; align-items: stretch; gap: 1.2rem; }
+  main { margin: 0 auto; }
+  .nav {
+    position: static; width: auto; max-height: none; overflow-y: visible;
+    flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.2rem;
+    padding-bottom: 0.6rem; border-bottom: 1px solid var(--border);
+  }
+  /* Each block keeps its own group of entries together and wraps as one; the
+     rules that separated the blocks vertically become the space between them. */
+  .nav .links, .nav .session, .nav .sections {
+    flex-direction: row; flex-wrap: wrap; align-items: center;
+    gap: 0.2rem 0.6rem; padding-top: 0; border-top: 0;
+  }
+  .sections-title { margin: 0; }
+}
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
    everywhere. The class suffix is the check's own status value. */
