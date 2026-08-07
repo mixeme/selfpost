@@ -106,8 +106,10 @@
   // The domain-import file decides for itself whether it is encrypted (the
   // server checks the envelope magic, not a checkbox), so the panel offers
   // the password field the same way: reveal it for a .spde file, hide and
-  // clear it for a plain .json one. An unrecognised name leaves the field
-  // visible rather than guessing wrong and hiding a password the file needs.
+  // clear it for a plain .json one. With no file chosen yet there is nothing
+  // to ask a password for, so the field stays hidden until a file names it.
+  // An unrecognised name leaves the field visible rather than guessing wrong
+  // and hiding a password the file needs.
   function syncImportPasswordField(input) {
     var form = input.closest("form");
     var fields = form && form.querySelector("[data-import-password-fields]");
@@ -115,7 +117,7 @@
       return;
     }
     var name = (input.files && input.files[0] && input.files[0].name || "").toLowerCase();
-    var hide = name !== "" && /\.json$/.test(name);
+    var hide = name === "" || /\.json$/.test(name);
     fields.hidden = hide;
     if (hide) {
       fields.querySelectorAll("input").forEach(function (pw) {
