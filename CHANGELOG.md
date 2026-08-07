@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- A page per delivery (`/deliveries/{id}`), reached from the *Details* link on
+  every send-log row. It carries what the log itself no longer shows — the
+  sending domain, the application the message was submitted under, the Postfix
+  queue id to search the system log for, when the status was last reported —
+  so the journal can grow fields without the table having to find columns for
+  them. *Back* returns to the page and filters the row was opened from, rebuilt
+  from the log's own parameters only.
+
 - A **DNS** badge in the domain list, one per row, carrying the same
   ok/warn/error/unknown vocabulary as the rest of the panel: the worst of that
   domain's DKIM, SPF and DMARC checks, so a domain whose records were never
@@ -44,6 +52,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- The delivery log lists what identifies a message and nothing else: time,
+  sender, recipient, subject, status. Domain and application, which were a
+  column each, remain the log's two filters and now appear per message on the
+  delivery page. The two dropped columns were the widest thing in the table
+  after the addresses, and both repeat down the page whenever a filter is set.
+- Subjects are decoded for display as well as on the way in, so the rows the
+  journal-milter recorded before it decoded them itself — the ones an operator
+  is most likely to still be reading — show their text rather than
+  `=?utf-8?Q?…?=`. The decoder moved to `internal/mailhdr` and is shared by the
+  milter and the panel; it is idempotent, so a row decoded once passes through
+  unchanged.
 - The panel's navigation is a column down the left edge instead of a bar across
   the top. As a bar it did not fit on one row — six page entries and the
   session block against the panel's width — and had to be split into two,
