@@ -22,12 +22,13 @@
   {{if .Domains}}
   <table>
     <thead>
-      <tr><th>Domain</th><th>Selector</th><th>Apps</th><th></th></tr>
+      <tr><th>Domain</th><th>DNS</th><th>Selector</th><th>Apps</th><th></th></tr>
     </thead>
     <tbody>
       {{range .Domains}}
       <tr>
         <td><a href="/domains/{{.ID}}">{{.Name}}</a></td>
+        <td><a class="st st-{{.DNS}}" href="/domains/{{.ID}}#dns-status">{{.DNS}}</a></td>
         <td class="muted">{{.DKIMSelector}}</td>
         <td>{{.AppCount}}</td>
         <td class="actions"><a class="danger" href="/domains/{{.ID}}/delete">Delete</a></td>
@@ -35,6 +36,9 @@
       {{end}}
     </tbody>
   </table>
+  <p class="muted">The <em>DNS</em> badge is the worst of the domain's DKIM, SPF
+  and DMARC checks. Results are cached for a few minutes; open a domain for the
+  details and a <em>Re-check</em> button.</p>
   {{else}}
   <p class="muted">No domains yet. Add one above to get started.</p>
   {{end}}

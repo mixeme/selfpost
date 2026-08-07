@@ -5,9 +5,19 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 
+	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/store"
 )
+
+// domainRow is one line of the domain list: the stored domain plus the rolled-up
+// verdict of its published DNS records, so the operator sees which domains still
+// need a record published without opening each one.
+type domainRow struct {
+	store.Domain
+	DNS health.Status
+}
 
 // handleDashboard is the authenticated landing page: the list of sending
 // domains with their DKIM/selector and application counts, plus the add-domain
@@ -30,11 +40,41 @@ func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status 
 		"Title":    "SelfPost",
 		"User":     currentUser(r),
 		"Active":   "domains",
-		"Domains":  domains,
+		"Domains":  s.domainRows(domains),
 		"Error":    formErr,
 		"FormName": formName,
 		"Flash":    dashboardFlash(r),
 	})
+}
+
+// domainRows attaches each domain's DNS verdict to its row. The checks run
+// concurrently rather than one after another: each carries its own timeout, so
+// in series a dead resolver would multiply that wait by the number of domains
+// and the list would look hung. The checker caches results for a few minutes,
+// so a repeat view of the list costs no lookups at all, and it is the same
+// cache the domain page fills — opening a domain after the list is free.
+func (s *Server) domainRows(domains []store.Domain) []domainRow {
+	rows := make([]domainRow, len(domains))
+	var wg sync.WaitGroup
+	for i, d := range domains {
+		rows[i] = domainRow{Domain: d, DNS: health.StatusUnknown}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			record, err := s.domains.DKIMRecord(d)
+			if err != nil {
+				// Without the expected key there is nothing to compare DNS
+				// against; leave the row unknown rather than accusing the
+				// domain of a misconfiguration this server caused.
+				logf("panel: dashboard: domain %d: dkim record: %v", d.ID, err)
+				return
+			}
+			dns, _ := s.domainDNS(d, record, false)
+			rows[i].DNS = dns.Overall
+		}()
+	}
+	wg.Wait()
+	return rows
 }
 
 // dashboardFlash maps a fixed redirect flag to a fixed message, so status text
