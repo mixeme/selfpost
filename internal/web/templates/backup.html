@@ -28,16 +28,10 @@
   {{if .ImportErr}}<p class="error">{{.ImportErr}}</p>{{end}}
   <form method="post" action="/domains/import" enctype="multipart/form-data">
     <label for="importfile">Domain export file</label>
-    <input id="importfile" name="file" type="file" accept=".json,.spde,application/json" required>
-    <div class="encrypt">
-      <label class="check">
-        <input type="checkbox" data-encrypt-toggle>
-        <span>The file is encrypted (<code>.spde</code>)</span>
-      </label>
-      <div class="encrypt-fields" data-encrypt-fields>
-        <label for="importpw">Password</label>
-        <input id="importpw" name="import_password" type="password" autocomplete="off">
-      </div>
+    <input id="importfile" name="file" type="file" accept=".json,.spde,application/json" required data-import-file>
+    <div class="encrypt-fields" data-import-password-fields>
+      <label for="importpw">Password</label>
+      <input id="importpw" name="import_password" type="password" autocomplete="off">
     </div>
     <button type="submit">Import domain</button>
   </form>

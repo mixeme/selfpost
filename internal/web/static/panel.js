@@ -102,6 +102,37 @@
     });
   }
 
+  // --- Import password field shown based on the chosen file's extension ---
+  // The domain-import file decides for itself whether it is encrypted (the
+  // server checks the envelope magic, not a checkbox), so the panel offers
+  // the password field the same way: reveal it for a .spde file, hide and
+  // clear it for a plain .json one. An unrecognised name leaves the field
+  // visible rather than guessing wrong and hiding a password the file needs.
+  function syncImportPasswordField(input) {
+    var form = input.closest("form");
+    var fields = form && form.querySelector("[data-import-password-fields]");
+    if (!fields) {
+      return;
+    }
+    var name = (input.files && input.files[0] && input.files[0].name || "").toLowerCase();
+    var hide = name !== "" && /\.json$/.test(name);
+    fields.hidden = hide;
+    if (hide) {
+      fields.querySelectorAll("input").forEach(function (pw) {
+        pw.value = "";
+      });
+    }
+  }
+
+  function initImportPasswordField(root) {
+    root.querySelectorAll("input[data-import-file]").forEach(function (input) {
+      syncImportPasswordField(input);
+      input.addEventListener("change", function () {
+        syncImportPasswordField(input);
+      });
+    });
+  }
+
   // --- Section index follows the page -----------------------------------
   // The long pages list their own sections in the navigation column (the
   // "sections" template). Marking the one currently in view turns that list
@@ -167,6 +198,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     initAddressFields(document);
     initEncryptFields(document);
+    initImportPasswordField(document);
     initSectionIndex();
   });
 
