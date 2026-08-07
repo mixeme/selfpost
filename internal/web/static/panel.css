@@ -335,20 +335,24 @@ button.copy { flex: none; margin-top: 0.3rem; }
 }
 .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: var(--danger-bg-hover); }
 
-/* The optional "encrypt this download" block on the backup, export and import
-   forms. Its label is the one checkbox in the panel, so it opts out of the
+/* The optional "encrypt this download" block on the backup and export forms.
+   Its label is the one checkbox in the panel, so it opts out of the
    block-level label rule above and sits on one line with its box; the fields it
    reveals are indented under it to read as its consequence rather than as three
    more fields of the form. panel.js hides the inner block until the box is
    ticked (and empties it when unticked); without JavaScript everything stays
-   visible, which the server handles identically. */
+   visible, which the server handles identically. The import form reuses the
+   same indented .encrypt-fields look for its password field, but reveals it
+   by file extension instead of a checkbox (see panel.js). */
 .encrypt { margin-top: 1.2rem; }
 .encrypt label.check {
   display: flex; align-items: center; gap: 0.5rem; margin: 0; font-weight: 600;
 }
 .encrypt label.check input { width: auto; margin: 0; }
 .encrypt-fields {
-  margin-left: 1.6rem; padding-left: 0.9rem; border-left: 2px solid var(--border);
+  margin-top: 1.2rem; margin-left: 1.6rem; padding-left: 0.9rem;
+  border-left: 2px solid var(--border);
 }
+.encrypt .encrypt-fields { margin-top: 0; }
 .encrypt-fields label { margin-top: 0.7rem; }
 .encrypt-fields .muted { margin: 0.5rem 0 0; font-size: 0.85rem; }

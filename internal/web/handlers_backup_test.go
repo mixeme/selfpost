@@ -117,6 +117,7 @@ func TestBackupPageOffersEncryption(t *testing.T) {
 	for _, want := range []string{
 		`name="encrypt"`, `name="password"`, `name="password_confirm"`,
 		`name="import_password"`, "data-encrypt-toggle", "data-encrypt-fields",
+		"data-import-password-fields",
 		fmt.Sprintf("at least %d characters", minSecretFilePasswordLen),
 		"The two passwords do not match.",
 	} {
