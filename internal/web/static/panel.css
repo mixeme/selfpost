@@ -336,6 +336,11 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .st-warn { background: var(--st-warn-bg); color: var(--st-warn-fg); border-color: var(--st-warn-border); }
 .st-error { background: var(--st-error-bg); color: var(--st-error-fg); border-color: var(--st-error-border); }
 .st-unknown { background: var(--st-unknown-bg); color: var(--st-unknown-fg); border-color: var(--st-unknown-border); }
+/* In the domain list the badge is also the link to that domain's DNS section,
+   so it must not pick up the link colour and underline that would fight with
+   the badge's own palette. */
+a.st, a.st:hover { color: inherit; text-decoration: none; }
+a.st:hover { filter: brightness(1.08); }
 /* Usage bars on the status page's machine card. <meter> rather than a div sized
    from the reading, because the CSP forbids inline styles (see the note at the
    top of this file) and a bar's length has to travel on an attribute. The

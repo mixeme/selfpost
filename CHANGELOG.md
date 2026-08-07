@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- A **DNS** badge in the domain list, one per row, carrying the same
+  ok/warn/error/unknown vocabulary as the rest of the panel: the worst of that
+  domain's DKIM, SPF and DMARC checks, so a domain whose records were never
+  published is visible without opening it. The badge links to that domain's
+  DNS status card. The checks run concurrently across the listed domains —
+  each carries its own timeout, and in series a dead resolver would multiply
+  that wait by the number of domains — and share the checker's cache with the
+  domain page, so a repeat view costs no lookups. A domain whose DKIM key
+  cannot be read stays "unknown" rather than being reported as misconfigured,
+  since the missing half is this server's.
 - Machine metrics on the status page: a **Machine** card reporting the
   processor (busy percentage, core count, load average), memory and swap, and
   network throughput and totals per interface, read from the kernel's counters
