@@ -190,7 +190,13 @@ service healthy and will mail be accepted?"
 
 - **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
   TLS certificate validity and expiry, milter socket presence, and a short
-  Postfix queue summary. The hostname block compares `SELFPOST_HOSTNAME`
+  Postfix queue summary. The **Machine** card adds the resource usage of the
+  host underneath — processor (with the load average), memory and swap, and
+  per-interface network throughput and totals — read from the kernel's
+  counters; CPU and throughput are measured between refreshes, so they appear
+  one refresh after the page opens. A fully busy processor or a machine out of
+  memory is a warning here, because both delay or kill the mail path;
+  throughput is only reported. The hostname block compares `SELFPOST_HOSTNAME`
   against the PTR record the internet publishes for this server's IP
   (forward-confirmed reverse DNS); use *Re-check* after changing DNS. The
   **Reload configuration** button re-applies OpenDKIM tables and the Postfix

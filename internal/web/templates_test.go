@@ -211,12 +211,68 @@ func TestLayoutReferencesOnlyEmbeddedAssets(t *testing.T) {
 }
 
 func TestStatusPageRendersEveryCheck(t *testing.T) {
+	out := renderStatusPage(t, statusPageData())
+	for _, want := range []string{
+		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
+		"203.0.113.10 → no PTR record", `action="/reload"`,
+		`hx-get="/status/fragment"`, `class="st st-error"`,
+		// The machine card: the bars carry their reading in an attribute
+		// (the CSP rules out sizing them with a style), and the figures are
+		// printed beside them for anything that does not render a meter.
+		`<meter value="12"`, `<meter value="50"`,
+		"load average 0.31, 0.24, 0.19", "2.0 GiB used of 4.0 GiB",
+		"eth0: 1.0 MiB in, 512.0 KiB out",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("status page is missing %q", want)
+		}
+	}
+}
+
+// A machine whose counters could not be read — no /proc, or a first reading
+// with nothing to compare against — must leave the card in place with its rows
+// blank, the same way an unreachable supervisord costs one line and not the
+// page.
+func TestStatusPageWithoutMachineMetrics(t *testing.T) {
+	data := statusPageData()
+	data["Machine"] = health.Machine{
+		CPU:     health.CPU{Status: health.StatusUnknown, Detail: "The kernel's processor counters (/proc/stat) could not be read here."},
+		Memory:  health.Memory{Status: health.StatusUnknown, Detail: "The kernel's memory counters (/proc/meminfo) could not be read here."},
+		Network: health.Network{Status: health.StatusUnknown, Detail: "The kernel's network counters (/proc/net/dev) could not be read here."},
+		Status:  health.StatusUnknown,
+	}
+
+	out := renderStatusPage(t, data)
+	if strings.Contains(out, "<meter") {
+		t.Error("a bar was drawn for a reading that does not exist")
+	}
+	for _, want := range []string{
+		`<h2>Machine <span class="st st-unknown">`,
+		"/proc/stat", "/proc/meminfo", "/proc/net/dev",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("degraded machine card is missing %q", want)
+		}
+	}
+}
+
+func renderStatusPage(t *testing.T, data map[string]any) string {
+	t.Helper()
 	tmpl, err := loadTemplates()
 	if err != nil {
 		t.Fatalf("loadTemplates: %v", err)
 	}
 	var buf bytes.Buffer
-	err = tmpl.pages["status"].ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := tmpl.pages["status"].ExecuteTemplate(&buf, "layout.html", data); err != nil {
+		t.Fatalf("execute status page: %v", err)
+	}
+	return buf.String()
+}
+
+// statusPageData is one plausible reading of every check the status page shows,
+// so a test can render the page and vary the one part it is about.
+func statusPageData() map[string]any {
+	return map[string]any{
 		"Title":  "SelfPost — status",
 		"User":   "admin",
 		"Active": "status",
@@ -232,6 +288,26 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 			NotAfter: time.Now().Add(30 * 24 * time.Hour), DaysLeft: 30,
 			Status: health.StatusOK, Detail: "Valid for another 30 day(s).",
 		},
+		"Machine": health.Machine{
+			CPU: health.CPU{
+				Measured: true, BusyPct: 12.4, Cores: 4,
+				Load: [3]float64{0.31, 0.24, 0.19}, HasLoad: true,
+				Status: health.StatusOK, Detail: "4 core(s) · load average 0.31, 0.24, 0.19",
+			},
+			Memory: health.Memory{
+				Measured: true, TotalBytes: 4 << 30, UsedBytes: 2 << 30, UsedPct: 50,
+				Status: health.StatusOK, Detail: "2.0 GiB used of 4.0 GiB; 2.0 GiB available to new work.",
+			},
+			Network: health.Network{
+				Measured: true, RxRate: 2048, TxRate: 1024,
+				Interfaces: []health.Interface{
+					{Name: "eth0", RxBytes: 1 << 20, TxBytes: 1 << 19, RxRate: 2048, TxRate: 1024, Measured: true},
+				},
+				Status: health.StatusOK,
+			},
+			Window: 5 * time.Second,
+			Status: health.StatusOK,
+		},
 		"Sockets": []health.Socket{
 			{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening."},
 		},
@@ -244,19 +320,6 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 			Detail:  "No address has a reverse record.",
 			Records: []string{"203.0.113.10 → no PTR record"},
 		},
-	})
-	if err != nil {
-		t.Fatalf("execute status page: %v", err)
-	}
-	out := buf.String()
-	for _, want := range []string{
-		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
-		"203.0.113.10 → no PTR record", `action="/reload"`,
-		`hx-get="/status/fragment"`, `class="st st-error"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("status page is missing %q", want)
-		}
 	}
 }
 

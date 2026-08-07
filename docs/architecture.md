@@ -133,7 +133,7 @@ unless noted.
 | `/healthz` | Liveness (no auth) |
 | `/setup/*` | One-time admin bootstrap |
 | `/login`, `/logout` | Session auth |
-| `/status` | Process, cert, socket, PTR checks |
+| `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
 | `/deliveries` | Send log with filters |
 | `/mail-queue` | Postfix queue view |

@@ -40,7 +40,7 @@ func (s *Server) handleStatusRecheck(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/status?rechecked=1", http.StatusSeeOther)
 }
 
-// statusBody collects the four local checks the fragment renders. Each one
+// statusBody collects the local checks the fragment renders. Each one
 // reports its own problem rather than failing the page, so a broken component
 // costs one line and not the whole screen.
 func (s *Server) statusBody() map[string]any {
@@ -75,7 +75,13 @@ func (s *Server) statusBody() map[string]any {
 		socketStatus = health.Worst(socketStatus, sock.Status)
 	}
 
-	overall := health.Worst(procStatus, queueStatus, cert.Status, socketStatus)
+	// Resource usage of the machine underneath. It is graded like the rest —
+	// a processor that is fully busy or a machine out of memory delays or
+	// kills the mail path — so it counts towards the headline verdict, and
+	// its rates are measured against the previous poll (internal/health).
+	machine := s.machine.Sample()
+
+	overall := health.Worst(procStatus, queueStatus, cert.Status, socketStatus, machine.Status)
 	return map[string]any{
 		"Processes":      procs,
 		"ProcessError":   procErr != nil,
@@ -83,6 +89,7 @@ func (s *Server) statusBody() map[string]any {
 		"QueueSummary":   queueSummary(queueText),
 		"QueueError":     queueErr,
 		"QueueStatus":    queueStatus,
+		"Machine":        machine,
 		"Cert":           cert,
 		"Sockets":        sockets,
 		"SocketStatus":   socketStatus,

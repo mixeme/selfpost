@@ -26,6 +26,53 @@
   </div>
 
   <div class="card">
+    <h2>Machine <span class="st st-{{.Machine.Status}}">{{.Machine.Status}}</span></h2>
+    <p class="muted">Processor, memory and network of the machine this container
+    runs on, read from the kernel's counters. CPU and throughput are rates, so
+    they describe{{if .Machine.WindowText}} the {{.Machine.WindowText}}{{end}}
+    since the previous refresh rather than this instant.</p>
+    <table>
+      <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="metric">CPU</td>
+          <td class="metric">
+            {{if .Machine.CPU.Measured}}
+            <meter value="{{.Machine.CPU.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.CPU.BusyText}}</meter>
+            {{.Machine.CPU.BusyText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">{{.Machine.CPU.Detail}}</td>
+        </tr>
+        <tr>
+          <td class="metric">Memory</td>
+          <td class="metric">
+            {{if .Machine.Memory.Measured}}
+            <meter value="{{.Machine.Memory.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.Memory.PctText}}</meter>
+            {{.Machine.Memory.PctText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">{{.Machine.Memory.Detail}}</td>
+        </tr>
+        <tr>
+          <td class="metric">Network</td>
+          <td class="metric">
+            {{if .Machine.Network.Measured}}
+            ↓ {{.Machine.Network.InRateText}}<br>↑ {{.Machine.Network.OutRateText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">
+            {{range .Machine.Network.Interfaces}}
+            <div>{{.Name}}: {{.InText}} in, {{.OutText}} out{{if .Measured}} (↓ {{.InRateText}} ↑ {{.OutRateText}}){{end}}</div>
+            {{end}}
+            {{if .Machine.Network.Detail}}<div>{{.Machine.Network.Detail}}</div>{{end}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
     {{if .QueueError}}
     <p class="error">{{.QueueError}}</p>
