@@ -55,7 +55,7 @@
        the column: the mark, the panel's pages, the current page's own sections,
        and the session last. The mark goes to /status, the page the panel opens
        on — named outright rather than as "/", which is only a redirect to it. */}}
-  <a class="brand" href="/status"><img src="/static/logo-compact.svg" width="110" height="50" alt="SelfPost"></a>
+  <a class="brand" href="/status"><img src="/static/logo-compact.svg" width="220" height="100" alt="SelfPost"></a>
   <div class="links">
     {{if eq .Active "status"}}<span aria-current="page">{{template "icon-status"}}Status</span>{{else}}<a href="/status">{{template "icon-status"}}Status</a>{{end}}
     {{if eq .Active "domains"}}<span aria-current="page">{{template "icon-domains"}}Domains</span>{{else}}<a href="/domains">{{template "icon-domains"}}Domains</a>{{end}}
