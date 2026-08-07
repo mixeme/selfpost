@@ -52,6 +52,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- The mark's small-size variant — the tab icon and the `SP` initials it
+  carries — sets its S in Medium where the wordmark sets it in ExtraLight.
+  Against the P's SemiBold the ExtraLight S is a 0.90 stem against 3.40,
+  which at 16px is a quarter of a pixel against most of one, so the pair
+  rasterised to a P with a smudge beside it. Medium gives up the
+  Self/Post weight play, which needs more pixels than this variant exists
+  to work in, in exchange for both letters being there. The variants big
+  enough to carry the contrast keep it. `favicon.png` is regenerated to
+  match, and the outlines are IBM Plex Sans as before — the same
+  font-size, letter-spacing and baseline, with only the S's weight moved.
 - The stamp's `SELF-HOSTED SMTP RELAY` line is set at 11.5/0.15 instead of
   7.2/2.8, and no longer carries `opacity=".78"`. At the old size its stems
   rasterised to about half a device pixel, so more than half its ink landed
