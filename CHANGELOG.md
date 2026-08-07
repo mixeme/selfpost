@@ -45,6 +45,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   wrapping rows it used to be — no drawer and no hamburger, since six entries
   fit. The markup now lists the blocks in the order they are drawn, so the tab
   order follows the eye instead of starting at Sign out.
+- An application's mode and rate-limit fields open under its row of controls
+  instead of inside it. Both panels were `<details>`, so each opened where its
+  own toggle sat and cut the row of four in half, pushing New password and
+  Delete below a block of fields — the buttons moved every time a panel was
+  opened or closed. The toggle is now a hidden checkbox with its label drawn as
+  the button, and the panel is the last child of the row, so the four controls
+  keep their places and what a panel reveals is laid out beneath all of them.
+  It stays keyboard-reachable and, being pure CSS, still works with JavaScript
+  blocked, as the disclosure did. Inside a panel the submit buttons take the
+  ordinary form spacing back from the compact row style that was leaving them
+  flush against the field above, and Save limit and Remove limit — two posts,
+  hence two forms — share one row, the first button bound to its form by the
+  `form` attribute rather than by sitting inside it.
 
 ## [0.5.0] - 2026-08-06
 
