@@ -82,7 +82,7 @@ input {
    button: a <button>, or an <a> carrying .btn/.danger where the action is a
    plain navigation (the delete confirmation page, the full queue view).
    Several of these used to render as bold blue text instead — a POST wrapped
-   in form.inline, a <details> toggle, the delete links — which read as links
+   in form.inline, a disclosure toggle, the delete links — which read as links
    and left two appearances for the same kind of control. They all get the
    button look now: filled for a card's own action, and the compact outlined
    variant further down where actions cluster (table rows, the nav bar). Bare
@@ -154,10 +154,9 @@ textarea { resize: vertical; }
 button.danger, a.danger { background: #b42318; }
 button.danger:hover, a.danger:hover { background: #912018; }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
-   compact rule below); the marker is dropped because the pressed background
+   compact rule below); it carries no marker because the pressed background
    already shows the open state. */
-.actions summary { display: inline-block; list-style: none; cursor: pointer; }
-.actions summary::-webkit-details-marker { display: none; }
+.actions > label.toggle { display: inline-block; cursor: pointer; }
 /* Applications are a list of blocks, not table rows. As a table it fell apart:
    four columns of which the last held six controls — two of them <details>
    panels with textareas — never fit the panel's default width. The controls
@@ -171,10 +170,41 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
 .app-addr { margin: 0.15rem 0 0; word-break: break-all; }
 .app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
-/* An open panel claims a row to itself: its textareas and number inputs want
-   the block's full width, not the width of the summary that opened them. */
-.app .actions > details[open] { flex: 1 0 100%; }
-details form { margin-top: 0.6rem; }
+/* Mode and rate limit open under the whole row rather than inside it. As
+   <details> the panel sat where its summary was, so opening one cut the row of
+   four controls in half and pushed the rest below a block of fields — the
+   buttons moved every time a panel opened or closed. The panels are therefore
+   the last children of the row, and the checkbox that opens each one is
+   visually hidden earlier in the row with its label drawn as the button. The
+   checkbox stays in the tab order and keeps its focus ring on the label, so it
+   works from the keyboard, and being pure CSS it also works with JavaScript
+   blocked, as <details> did. */
+.app .actions > .panel-toggle {
+  position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none;
+}
+.app .actions > .panel { display: none; flex: 1 0 100%; }
+.app .actions > .t-mode:checked ~ .panel-mode,
+.app .actions > .t-limit:checked ~ .panel-limit { display: block; }
+.app .actions > .t-mode:checked ~ .for-mode,
+.app .actions > .t-limit:checked ~ .for-limit { background: var(--surface-open-bg); }
+.app .actions > .t-mode:focus-visible ~ .for-mode,
+.app .actions > .t-limit:focus-visible ~ .for-limit { outline: 2px solid #2563eb; outline-offset: 2px; }
+.panel form { margin-top: 0.6rem; }
+/* A panel's own submit is a form button, not one of the controls in the row
+   above, so it takes back the spacing the compact .actions rule zeroes out:
+   without it Save sits flush against the field it saves and against the
+   Remove button under it, reading as one stack of edges. */
+.app .actions > .panel button { margin-top: 0.9rem; }
+/* Where a panel has two of them (save the limit, remove it) they share one row
+   under the fields, which the row itself spaces off instead of each button.
+   The buttons align on their tops rather than stretching: one of the two is
+   wrapped in a form, and that wrapper's margin would otherwise make the row
+   taller than a button and stretch the unwrapped one to match it. */
+.app .actions > .panel .panel-buttons {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem; margin-top: 0.9rem;
+}
+.app .actions > .panel .panel-buttons button,
+.app .actions > .panel .panel-buttons form { margin-top: 0; }
 .credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
@@ -321,15 +351,14 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    overrides this with .danger below since signing out is a deliberate,
    singular action. .actions is the shared hook: a cell that holds controls, or
    the control row of an application. */
-button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
+button.copy, .actions button, .actions > label.toggle, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
   background: var(--surface-bg); color: #2563eb; border: 1px solid var(--control-border);
 }
-button.copy:hover, .actions button:hover, .actions summary:hover,
+button.copy:hover, .actions button:hover, .actions > label.toggle:hover,
 .actions a.danger:hover, .nav button:hover { background: var(--surface-bg-hover); }
 button.copy { flex: none; margin-top: 0.3rem; }
-.actions details[open] > summary { background: var(--surface-open-bg); }
 .actions button.danger, .actions a.danger, .nav button.danger {
   color: var(--danger-fg); background: var(--danger-bg); border-color: var(--danger-border);
 }

@@ -188,9 +188,26 @@
           {{if eq .AddressMode $.Wildcard}}Any address of the domain — *@{{$.Domain.Name}}
           {{else}}Fixed list — {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}
         </p>
+        <!-- The two panels are opened by a checkbox and a label rather than by
+             <details>, so that the controls stay a single row of buttons and
+             what a panel reveals is laid out under all four of them instead of
+             splitting the row in two. The checkbox precedes both its label and
+             its panel, which is what lets the CSS alone show them (no script
+             involved) — see .panel-toggle in panel.css. -->
         <div class="actions">
-          <details>
-            <summary>Edit mode</summary>
+          <input class="panel-toggle t-mode" id="mode-{{.ID}}" type="checkbox">
+          <label class="toggle for-mode" for="mode-{{.ID}}">Edit mode</label>
+          <input class="panel-toggle t-limit" id="limit-{{.ID}}" type="checkbox">
+          <label class="toggle for-limit" for="limit-{{.ID}}">Rate limit{{if .HasLimit}} (active){{end}}</label>
+          <form class="inline" method="post" action="/applications/{{.ID}}/password"
+                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
+            <button type="submit">New password</button>
+          </form>
+          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
+                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+          <div class="panel panel-mode">
             <form method="post" action="/applications/{{.ID}}/mode">
               <label>Address mode</label>
               <select name="mode" data-list-mode="{{$.List}}">
@@ -204,34 +221,32 @@
               </div>
               <button type="submit">Save mode</button>
             </form>
-          </details>
-          <details>
-            <summary>Rate limit{{if .HasLimit}} (active){{end}}</summary>
-            <form method="post" action="/applications/{{.ID}}/ratelimit">
+          </div>
+          <div class="panel panel-limit">
+            <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
               <label>Expected client IPs (one per line or comma-separated)</label>
               <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
               <label>Message limit</label>
               <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
               <label>Window (seconds)</label>
               <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
-              <button type="submit">Save limit</button>
             </form>
-            {{if .HasLimit}}
-            <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                  data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
-              <input type="hidden" name="clear" value="1">
-              <button type="submit" class="danger">Remove limit</button>
-            </form>
-            {{end}}
-          </details>
-          <form class="inline" method="post" action="/applications/{{.ID}}/password"
-                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
-            <button type="submit">New password</button>
-          </form>
-          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
-                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
-            <button type="submit" class="danger">Delete</button>
-          </form>
+            <!-- Saving and removing the limit are two posts, so they are two
+                 forms and could not share a line while the Save button sat
+                 inside the block form above. It is bound to that form by id
+                 instead (the form attribute, no script involved), which lets
+                 both buttons stand together in one row under the fields. -->
+            <div class="panel-buttons">
+              <button type="submit" form="rl-{{.ID}}">Save limit</button>
+              {{if .HasLimit}}
+              <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
+                    data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
+                <input type="hidden" name="clear" value="1">
+                <button type="submit" class="danger">Remove limit</button>
+              </form>
+              {{end}}
+            </div>
+          </div>
         </div>
       </li>
     {{end}}
