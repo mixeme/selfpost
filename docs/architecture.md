@@ -136,6 +136,7 @@ unless noted.
 | `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
 | `/deliveries` | Send log with filters |
+| `/deliveries/{id}` | One send-log row in full |
 | `/mail-queue` | Postfix queue view |
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |

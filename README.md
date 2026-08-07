@@ -207,9 +207,13 @@ service healthy and will mail be accepted?"
   (level 2) are configured here. *Export domain* writes a single-domain archive;
   *Import a domain* on the Backup page reads one back in.
 - **Deliveries** (`/deliveries`) — searchable send log with server-side filters
-  by domain and application. Each row shows status `queued` (accepted, not yet
+  by domain and application. A row identifies its message and nothing more —
+  time, sender, recipient, subject and status `queued` (accepted, not yet
   delivered), `sent` (handed off successfully), or `rejected` (refused — for
-  example by a level-2 rate limit). Retention is controlled by
+  example by a level-2 rate limit); *Details* opens that row's own page
+  (`/deliveries/{id}`) with the sending domain, the application it was
+  submitted under, the Postfix queue id to search the system log for, and when
+  the status was last reported. Retention is controlled by
   `SEND_LOG_RETENTION_DAYS`.
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
   trying to deliver or deferring.

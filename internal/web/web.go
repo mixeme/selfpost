@@ -198,6 +198,7 @@ func (s *Server) Handler() http.Handler {
 	// and /body endpoints return HTML, not JSON).
 	authed.HandleFunc("GET /deliveries", s.handleDeliveries)
 	authed.HandleFunc("GET /deliveries/rows", s.handleDeliveriesRows)
+	authed.HandleFunc("GET /deliveries/{id}", s.handleDelivery)
 	authed.HandleFunc("GET /mail-queue", s.handleMailQueue)
 	authed.HandleFunc("GET /mail-queue/body", s.handleMailQueueBody)
 	authed.HandleFunc("GET /system-log", s.handleSystemLog)
