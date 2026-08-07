@@ -58,6 +58,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   flush against the field above, and Save limit and Remove limit — two posts,
   hence two forms — share one row, the first button bound to its form by the
   `form` attribute rather than by sitting inside it.
+- The mark at the head of the navigation column takes the column's full width
+  instead of the 110px it kept from the bar. In a row that size was all there
+  was room for; in a column it left the mark ending halfway across, with no
+  edge shared with anything below it. At the column's width its edges line up
+  with the page entries under it, as the full mark already does with the card
+  beneath it on the signed-out pages. Where the column lies back down into a
+  bar it returns to the compact size, which is what fits beside the entries.
 
 ## [0.5.0] - 2026-08-06
 

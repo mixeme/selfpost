@@ -239,10 +239,13 @@ button.danger:hover, a.danger:hover { background: #912018; }
    padding and rounding the entry rule below applies, so its own edge lines up
    with the entries' icons rather than sitting half a step inside them. */
 .nav .brand { padding: 0; }
-/* width/height are on the element too, so the row reserves the space before the
-   SVG has loaded; these keep the ratio if the box is ever squeezed. The stamp's
-   proportions are part of the mark — it is never scaled unevenly. */
-.nav .brand img { display: block; width: 110px; height: auto; }
+/* The mark takes the column's full width, so its edges line up with the entries
+   below it rather than ending halfway across — the same way .mark fills the
+   card column on the pages that carry no navigation. width/height are on the
+   element too, so the column reserves the right height before the SVG has
+   loaded; height stays automatic because the stamp's proportions are part of
+   the mark — it is never scaled unevenly. */
+.nav .brand img { display: block; width: 100%; height: auto; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
    rather than a run of text — that is also why the entries centre their items
    instead of aligning them on the text baseline. In the column the entry fills
@@ -309,6 +312,10 @@ button.danger:hover, a.danger:hover { background: #912018; }
     flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.2rem;
     padding-bottom: 0.6rem; border-bottom: 1px solid var(--border);
   }
+  /* Lying down there is no column for the mark to span, and at its full width
+     it would take a row to itself above the entries, so it goes back to the
+     compact size it had — enough to read beside them. */
+  .nav .brand img { width: 110px; }
   /* Each block keeps its own group of entries together and wraps as one; the
      rules that separated the blocks vertically become the space between them. */
   .nav .links, .nav .session, .nav .sections {
