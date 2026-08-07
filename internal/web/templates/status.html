@@ -5,7 +5,7 @@
 
 {{template "status_body" .}}
 
-<div class="card">
+<div class="card" id="hostname">
   <h2>Hostname and reverse DNS <span class="st st-{{.PTR.Status}}">{{.PTR.Status}}</span></h2>
   <p class="muted">Receiving servers check that the name this server announces
   resolves to its address <em>and</em> that the address resolves back to the same
@@ -29,7 +29,7 @@
   </form>
 </div>
 
-<div class="card">
+<div class="card" id="configuration">
   <h2>Configuration</h2>
   <p class="muted">Regenerates the OpenDKIM and Postfix configuration from the
   database and reloads both daemons. Use it if you edited the files by hand,
@@ -39,5 +39,24 @@
   <form class="inline" method="post" action="/reload">
     <button type="submit">Reload configuration</button>
   </form>
+</div>
+{{end}}
+
+{{/* The status page's section index, shown in the navigation column (see the
+     "sections" block in layout.html). The first six cards are the ones the
+     polling fragment replaces every five seconds; their ids are part of
+     status_body.html and do not change with the reading, so the links here hold
+     across a refresh. */}}
+{{define "sections"}}
+<div class="sections">
+  <p class="sections-title">On this page</p>
+  <a href="#overall">Overall</a>
+  <a href="#processes">Processes</a>
+  <a href="#machine">Machine</a>
+  <a href="#queue">Mail queue</a>
+  <a href="#certificate">TLS certificate</a>
+  <a href="#sockets">Milter sockets</a>
+  <a href="#hostname">Hostname and reverse DNS</a>
+  <a href="#configuration">Configuration</a>
 </div>
 {{end}}
