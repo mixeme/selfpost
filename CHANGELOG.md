@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- Machine metrics on the status page: a **Machine** card reporting the
+  processor (busy percentage, core count, load average), memory and swap, and
+  network throughput and totals per interface, read from the kernel's counters
+  in `/proc` (`internal/health/machine.go`). CPU and throughput are differences
+  between two readings, so they are measured against the previous poll of the
+  status fragment and reported as still being measured until a second reading
+  exists — a page opened after a long idle stretch re-baselines rather than
+  presenting that stretch as the current load. A fully busy processor (≥90%)
+  warns and an exhausted machine (≥97% of memory in use) errors, both counting
+  towards the page's headline verdict, since either delays or kills the mail
+  path; throughput is reported and never graded. Counters that cannot be read
+  — no `/proc` outside Linux — leave the card in place showing "unknown". The
+  usage bars are `<meter>` elements: the panel's CSP has no inline-style
+  exemption, so a bar's length has to travel on an attribute.
+
 ## [0.5.0] - 2026-08-06
 
 ### Fixed
