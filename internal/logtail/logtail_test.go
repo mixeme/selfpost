@@ -465,7 +465,7 @@ func TestSplitTimestamp(t *testing.T) {
 		stamp, rest string
 	}{
 		{
-			name:  "postlogd, which is what this server writes",
+			name:  "RFC 3339, which maillog_file_format selects on Postfix 3.9 and up",
 			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
 			stamp: "2026-08-03 05:15:52",
 			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
@@ -483,10 +483,19 @@ func TestSplitTimestamp(t *testing.T) {
 			rest:  "mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
 		},
 		{
-			name:  "syslog's traditional format, padded day",
+			name:  "syslog's traditional format, space-padded day",
 			line:  "Aug  3 05:15:52 mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
 			stamp: "Aug  3 05:15:52",
 			rest:  "mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
+		},
+		{
+			// Copied off the live relay (Postfix 3.7, which has no
+			// maillog_file_format), so this is the shape the panel actually
+			// meets: zero-padded day, and the host is the container's name.
+			name:  "syslog's traditional format as the live relay writes it",
+			line:  "Aug 08 07:26:41 selfpost postfix/master[231]: daemon started -- version 3.7.11, configuration /etc/postfix",
+			stamp: "Aug 08 07:26:41",
+			rest:  "selfpost postfix/master[231]: daemon started -- version 3.7.11, configuration /etc/postfix",
 		},
 		{
 			name:  "unrecognised head keeps the whole line",

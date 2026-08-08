@@ -170,7 +170,7 @@ func (c *panelClient) addApplication(domainID, login, mode, addresses string) (a
 	return appLogin, password, nil
 }
 
-// setRateLimit saves a level-2 differentiated limit (README § Rate limiting)
+// setRateLimit saves a level-2 differentiated limit (guide § Rate limiting)
 // on either a domain (/domains/{id}/ratelimit) or an application
 // (/applications/{id}/ratelimit).
 func (c *panelClient) setRateLimit(path, allowedIP string, maxMessages, windowSeconds int) error {

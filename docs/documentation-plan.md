@@ -9,7 +9,7 @@
 
 | Дом | Файл |
 |---|---|
-| Пользовательская поставка | [README.md](../README.md) |
+| Пользовательская поставка | [README.md](../README.md) + [guide.md](guide.md) |
 | Границы продукта | [product.md](product.md) |
 | As-built устройство | [architecture.md](architecture.md) |
 | Процесс разработки | [development.md](development.md) |
@@ -28,10 +28,11 @@
 
 | Артефакт | Состояние |
 |---|---|
-| [README.md](../README.md) | Установка, площадка, DNS, прогрев IP, эксплуатация, rate limiting, env, бэкап, репозиторий, образ, лицензия |
+| [README.md](../README.md) | Краткий обзор, требования, quick start, ссылки на документацию, reference deploy, лицензия |
+| [guide.md](guide.md) | Прокси, env, DNS, прогрев IP, эксплуатация, rate limiting, бэкап, порты, тег образа |
 | [LICENSE](../LICENSE) | AGPL-3.0, полный текст |
 | [deploy/docker-compose.yml](../deploy/docker-compose.yml) + прокси | Apache + nginx/Caddy/Traefik в [deploy/](../deploy/) |
-| [deploy/.env.example](../deploy/.env.example) | Публичные переменные; полный справочник в README |
+| [deploy/.env.example](../deploy/.env.example) | Публичные переменные; полный справочник в [guide.md](guide.md) |
 | [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog |
 
 ### Рабочие документы
@@ -57,12 +58,12 @@
 | Сессии | [internal/store/sessions.go](../internal/store/sessions.go), [internal/web/session.go](../internal/web/session.go) |
 | Ротация лога, reload | [build/logrotate-mail.conf](../build/logrotate-mail.conf), [build/logrotate-loop.sh](../build/logrotate-loop.sh), [build/postfix-cert-reload.sh](../build/postfix-cert-reload.sh) |
 | Деплой | [deploy/docker-compose.yml](../deploy/docker-compose.yml), [build/Dockerfile](../build/Dockerfile) |
-| Чеклист README | таблица «Поставляемое пользователю» выше |
+| Чеклист README | таблица «Поставляемое пользователю» выше; детали — [guide.md](guide.md) |
 | Продукт, out of scope | [product.md](product.md) |
 | As-built | [architecture.md](architecture.md) |
 | Обязательная безопасность | [security.md](security.md) |
 
-Порядок: перечислить фактическое в коде → найти в README / `architecture.md`.
+Порядок: перечислить фактическое в коде → найти в [guide.md](guide.md) / `architecture.md`.
 Перед каждым тегом — короткий проход по этой таблице, не полная ревизия текста.
 
 ---
@@ -70,7 +71,7 @@
 ## 3. Правила поддержки
 
 1. **Правило шага:** новая/переименованная env-переменная, маршрут панели или
-   наблюдаемое поведение почтового тракта закрываются вместе с README /
+   наблюдаемое поведение почтового тракта закрываются вместе с [guide.md](guide.md) /
    `.env.example` и записью в CHANGELOG (протокол — [progress.md](progress.md)).
 2. **Регресс env (D7):** [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go) —
    падает на недокументированном ключе `loadConfig` или build-скриптов.

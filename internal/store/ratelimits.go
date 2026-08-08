@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Rate-limit scopes (README § Rate limiting). A level-2 limit is attached
+// Rate-limit scopes (guide § Rate limiting). A level-2 limit is attached
 // either to a domain (counted across all its applications and IPs) or to a
 // single application.
 const (
@@ -17,7 +17,7 @@ const (
 	RateLimitScopeApp    = "application"
 )
 
-// RateLimit is a differentiated level-2 rate limit (README § Rate limiting):
+// RateLimit is a differentiated level-2 rate limit (guide § Rate limiting):
 // an optional set of expected client IPs plus a message ceiling over a sliding
 // window, attached to a domain or an application. It is enforced in the
 // journal-milter; level 1 (Postfix anvil, architecture.md § Mail path) is the
@@ -27,7 +27,7 @@ const (
 // Both the IP binding and the ceiling are optional in the schema, but a limit
 // is only enforced when it is Active(): the design deliberately allows an
 // admin to leave the IP binding empty for apps that send from changing IPs, in
-// which case only level 1 protects them (README § Rate limiting).
+// which case only level 1 protects them (guide § Rate limiting).
 type RateLimit struct {
 	Scope         string
 	RefID         int64
@@ -38,7 +38,7 @@ type RateLimit struct {
 
 // Active reports whether the limit is fully configured and should be enforced.
 // A missing IP binding, ceiling or window leaves the differentiated limit
-// inert (README § Rate limiting): the IP binding is what scopes the limit to a
+// inert (guide § Rate limiting): the IP binding is what scopes the limit to a
 // known sender.
 func (r RateLimit) Active() bool {
 	return len(r.AllowedIPs) > 0 && r.MaxMessages > 0 && r.WindowSeconds > 0
@@ -153,7 +153,7 @@ func (s *Store) RateLimit(scope, ref string) (RateLimit, bool, error) {
 
 // CountMessages returns how many distinct messages the reference (a domain
 // name or an application login) has queued since t, for the level-2 sliding
-// window (README § Rate limiting). It counts distinct queue-ids — one message
+// window (guide § Rate limiting). It counts distinct queue-ids — one message
 // with many recipients is one message, matching level 1's per-message
 // semantics — and excludes rows that were themselves rejected by a limit (they
 // were never sent). It reuses the send log the journal already writes (README

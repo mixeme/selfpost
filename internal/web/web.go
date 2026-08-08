@@ -24,7 +24,7 @@ var assetsFS embed.FS
 // Config holds the panel's HTTP-facing configuration.
 type Config struct {
 	// Hostname is the server's external hostname, used to build the absolute
-	// setup link shown in the logs (security.md; README § Environment
+	// setup link shown in the logs (security.md; guide § Environment
 	// variables for SELFPOST_HOSTNAME).
 	Hostname string
 	// CookieSecure sets the Secure attribute on the session cookie. It defaults
@@ -53,7 +53,7 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
-	// TLSCertFile is the certificate Postfix serves on 465/587 (README §
+	// TLSCertFile is the certificate Postfix serves on 465/587 (guide §
 	// Environment variables), read read-only by the status page to report how
 	// much validity is left.
 	TLSCertFile string

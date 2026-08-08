@@ -27,7 +27,7 @@ import (
 
 // Store is the persistence the milter needs on the receive path: recording
 // accepted messages (architecture.md § Mail path) and, for level-2 rate
-// limiting (README § Rate limiting), looking up the configured limits and
+// limiting (guide § Rate limiting), looking up the configured limits and
 // counting recent messages. *store.Store satisfies it; tests substitute a
 // fake.
 type Store interface {
@@ -76,7 +76,7 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 // macros). This is also the earliest stage where both the sending domain (from
 // the sender) and the application (the login) are known, so the level-2 rate
 // limit is enforced here: over the limit, the message is refused with a 4xx
-// tempfail before recipients are even offered (README § Rate limiting).
+// tempfail before recipients are even offered (guide § Rate limiting).
 // Enforcement is fail-open — see overLimit.
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.releaseReservations() // a previous transaction that ended without EOM/ABORT

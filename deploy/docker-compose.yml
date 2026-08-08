@@ -5,7 +5,7 @@
 # installed on the HOST (the target audience for this project typically runs
 # Apache there already — spec 10.5) and reverse-proxies HTTPS for the panel;
 # it is not containerised here. See ../apache/selfpost-vhost.conf for a ready
-# vhost fragment, and the "Reverse proxy" section of ../../README.md for the
+# vhost fragment, and docs/guide.md "Reverse proxy" for the
 # certbot steps that produce the PEM files this compose file mounts.
 #
 # Usage:
@@ -47,7 +47,7 @@ services:
       # resolver synthesises. Empty uses public defaults.
       SELFPOST_DNS_RESOLVERS: "${SELFPOST_DNS_RESOLVERS:-}"
       # Reverse-proxy CIDRs allowed to supply X-Forwarded-For for login/setup
-      # rate-limiting. See README "Environment variables" — wrong value lets a
+      # rate-limiting. See docs/guide.md "Environment variables" — wrong value lets a
       # client spoof its rate-limit key.
       TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:-}"
     volumes:
@@ -68,7 +68,7 @@ services:
       # panel is never directly reachable from the internet without TLS.
       - "465:465"
       # 587 is mapped even when SUBMISSION_ENABLE=false; Postfix listens only
-      # when the variable is true — see README "Published ports".
+      # when the variable is true — see docs/guide.md "Published ports".
       - "587:587"
       - "127.0.0.1:8080:8080"
     # Hardening (spec 10 p.6). SelfPost's entrypoint still needs to run as

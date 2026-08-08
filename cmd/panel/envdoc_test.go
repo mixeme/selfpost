@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// documentedPublic matches the README "Environment variables" table.
+// documentedPublic matches docs/guide.md "Environment variables" table.
 var documentedPublic = []string{
 	"SELFPOST_HOSTNAME",
 	"SUBMISSION_ENABLE",
@@ -17,7 +17,7 @@ var documentedPublic = []string{
 	"TRUSTED_PROXY_CIDR",
 }
 
-// documentedInternal matches README "Internal variables (not part of the operator interface)".
+// documentedInternal matches guide.md "Internal variables (not part of the operator interface)".
 var documentedInternal = []string{
 	"SELFPOST_DATA_DIR",
 	"SELFPOST_DB_PATH",
@@ -105,7 +105,7 @@ func TestLoadConfigKeysDocumented(t *testing.T) {
 	doc := documentedKeys()
 	for _, key := range loadConfigKeys {
 		if !slices.Contains(doc, key) {
-			t.Errorf("loadConfig reads %s but it is not listed in README public, internal, or compose-fixed env docs", key)
+			t.Errorf("loadConfig reads %s but it is not listed in guide.md public, internal, or compose-fixed env docs", key)
 		}
 	}
 }
@@ -114,7 +114,7 @@ func TestBuildScriptKeysDocumented(t *testing.T) {
 	doc := documentedKeys()
 	for _, key := range buildScriptKeys {
 		if !slices.Contains(doc, key) {
-			t.Errorf("build scripts read %s but it is not listed in README env documentation", key)
+			t.Errorf("build scripts read %s but it is not listed in guide.md env documentation", key)
 		}
 	}
 }
@@ -127,7 +127,7 @@ func TestDocumentedKeysAreRead(t *testing.T) {
 
 	for _, key := range documentedKeys() {
 		if !slices.Contains(read, key) {
-			t.Errorf("README documents %s but no code in loadConfig or build scripts reads it", key)
+			t.Errorf("guide.md documents %s but no code in loadConfig or build scripts reads it", key)
 		}
 	}
 }

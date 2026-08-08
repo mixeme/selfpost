@@ -40,7 +40,7 @@ const (
 	// startup). The window itself is configurable; the cadence need not be.
 	retentionInterval = 6 * time.Hour
 	// defaultRetentionDays applies when the configured value is unset/invalid
-	// (README § Environment variables: SEND_LOG_RETENTION_DAYS).
+	// (guide § Environment variables: SEND_LOG_RETENTION_DAYS).
 	defaultRetentionDays = 90
 )
 
@@ -280,12 +280,19 @@ func isQueueIDByte(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z'
 }
 
-// Timestamps at the head of a mail.log line. The first is what Postfix's own
-// postlogd writes, which is what this server runs (maillog_file in
-// build/postfix-config.sh) — RFC 3339 down to microseconds and with an offset.
-// The second is syslog's traditional format, for a deployment that routes the
-// log through syslogd instead; it carries no year and no zone, which is why it
-// is not the one being matched first.
+// Timestamps at the head of a mail.log line, in the two formats postlogd
+// writes (maillog_file in build/postfix-config.sh).
+//
+// syslogStampRe is the one that matches in practice today: the format is
+// controlled by maillog_file_format, which arrived in Postfix 3.9, and the
+// image is built on Debian's 3.7 — where the parameter does not exist and the
+// only format is syslog's traditional one. It carries no year and no zone, so
+// the stamp shown is a wall clock and nothing more, which is all this column
+// claims to be.
+//
+// isoStampRe is for the RFC 3339 format that same parameter selects once the
+// base image carries a Postfix new enough to offer it. Matching it first costs
+// one failed anchor per line and means the upgrade needs no change here.
 var (
 	isoStampRe    = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s`)
 	syslogStampRe = regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})\s`)
