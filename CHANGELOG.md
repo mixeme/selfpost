@@ -39,6 +39,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and outcome are the line under it, so what the message was and how it ended
   are both on the first line. The page takes the whole column rather than the
   reading measure, as the other three monitoring pages already did.
+- `docs/development.md` restructured into stack, dependencies, build, release,
+  testing, and CI; agent rules moved to `.cursor/rules/agent-rules.mdc`;
+  dev-host-specific workflow and `example.com` references removed from docs.
 
 ## [0.6.0] - 2026-08-08
 
@@ -617,5 +620,5 @@ of `docs/implementation-plan.md`).
 - Security pass against spec 7.6 (exec safety, config-write sanitization,
   server-side validation, rate limiting, session/cookie hardening, output
   escaping, non-root panel) — full compliance, no code changes required.
-- Live production deployment on `selfpost.example.com` with a real Let's
-  Encrypt certificate; end-to-end delivery confirmed (DKIM pass, SPF pass).
+- Live production deployment with a real Let's Encrypt certificate;
+  end-to-end delivery confirmed (DKIM pass, SPF pass).

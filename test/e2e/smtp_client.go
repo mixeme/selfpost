@@ -9,8 +9,8 @@ import (
 )
 
 // smtpsAddr is where compose.override.yml publishes the primary implicit-TLS
-// submission port (465 in the shipped compose, remapped here to stay off the
-// dev server's real ports).
+// submission port (465 in the shipped compose, remapped here to avoid clashing
+// with a local deployment on the same host).
 const smtpsAddr = "127.0.0.1:20465"
 
 // sendAttempt is one SMTP transaction against the stand. An empty authLogin
