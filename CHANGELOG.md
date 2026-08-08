@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-08
+
 ### Added
 
 - A page per delivery (`/deliveries/{id}`), reached from the *Details* link on
@@ -131,6 +133,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   with the page entries under it, as the full mark already does with the card
   beneath it on the signed-out pages. Where the column lies back down into a
   bar it returns to the compact size, which is what fits beside the entries.
+- The import card reads the file's extension instead of asking whether the file
+  is encrypted. The checkbox was a question the server never consulted — it
+  decides from the envelope's magic bytes — so the answer could only be wrong.
+  Choosing a `.spde` file reveals the password field and a `.json` file hides
+  it; an unrecognised extension reveals it, and with no file chosen the field
+  stays hidden, since there is nothing yet for a password to open. With
+  JavaScript blocked the field is shown, so an encrypted import still works.
 
 ## [0.5.0] - 2026-08-06
 
