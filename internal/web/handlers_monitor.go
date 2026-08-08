@@ -85,7 +85,7 @@ func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
-	lines, logNote := s.deliveryLog(row)
+	logRows, logNote := s.deliveryLog(row)
 	s.render(w, http.StatusOK, "delivery", map[string]any{
 		"Title":  "SelfPost — delivery",
 		"User":   currentUser(r),
@@ -97,8 +97,8 @@ func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
 		"Events": deliveryEvents(row),
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
-		"LogLines": lines,
-		"LogNote":  logNote,
+		"LogRows": logRows,
+		"LogNote": logNote,
 		// Where the row came from, so "Back" returns to the page and filters
 		// the operator was looking at rather than the top of an unfiltered log.
 		"BackURL": deliveriesBackURL(r),
@@ -207,13 +207,23 @@ func deliveryEvents(row store.SendLogRow) []deliveryEvent {
 	}
 }
 
-// deliveryLog reads the mail.log lines Postfix wrote about one message. The
-// second return value is what to say when there are none: every reason for an
-// empty result here is an ordinary one — the message never reached the queue,
-// or its lines have aged out of the log — so none of them is an error on the
-// page. Only a log that cannot be read at all is reported as a fault, and that
-// one is logged for the operator as well.
-func (s *Server) deliveryLog(row store.SendLogRow) ([]string, string) {
+// deliveryLogRow is one mail.log line split for the table on the delivery
+// page: when it was written, and what it says. Time is empty for a line whose
+// head is not a timestamp the log format recognises — the line still shows, in
+// full, under Message.
+type deliveryLogRow struct {
+	Time string
+	Text string
+}
+
+// deliveryLog reads the mail.log lines Postfix wrote about one message and
+// splits each into the two columns the page shows it in. The second return
+// value is what to say when there are none: every reason for an empty result
+// here is an ordinary one — the message never reached the queue, or its lines
+// have aged out of the log — so none of them is an error on the page. Only a
+// log that cannot be read at all is reported as a fault, and that one is
+// logged for the operator as well.
+func (s *Server) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) {
 	if row.QueueID == "" {
 		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
 	}
@@ -228,7 +238,12 @@ func (s *Server) deliveryLog(row store.SendLogRow) ([]string, string) {
 		// left to show is the normal end state, not a fault.
 		return nil, "Nothing for this queue id in the current mail log. Its lines have most likely been rotated away."
 	}
-	return lines, ""
+	out := make([]deliveryLogRow, len(lines))
+	for i, line := range lines {
+		stamp, rest := logtail.SplitTimestamp(line)
+		out[i] = deliveryLogRow{Time: stamp, Text: rest}
+	}
+	return out, ""
 }
 
 // deliveriesBackURL rebuilds the delivery-log URL a detail page was opened

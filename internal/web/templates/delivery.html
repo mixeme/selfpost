@@ -98,9 +98,25 @@
   message's queue id are shown; the whole log is on the
   <a href="/system-log">System log</a> page.</p>
 
-  {{if .LogLines}}
-  <span class="code">{{range .LogLines}}{{.}}
-{{end}}</span>
+  {{if .LogRows}}
+  {{/* Two columns, the way the send log itself is a table: the times down one
+       edge are what the message's pace is read off — the seconds between the
+       connection and the reply — and lining them up is what makes that
+       readable. A line whose head was not a timestamp keeps its whole text in
+       the second column and leaves the first empty. */}}
+  <table class="log">
+    <thead>
+      <tr><th>Time</th><th>Message</th></tr>
+    </thead>
+    <tbody>
+      {{range .LogRows}}
+      <tr>
+        <td class="time muted">{{if .Time}}{{.Time}}{{else}}—{{end}}</td>
+        <td class="log-text">{{.Text}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
   {{else}}
   <p class="muted">{{.LogNote}}</p>
   {{end}}

@@ -454,3 +454,64 @@ func TestQueueLinesReadsABoundedTail(t *testing.T) {
 		t.Errorf("got %d lines, want only the one inside the budget:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 }
+
+// The delivery page shows a message's lines as a table of when and what, so the
+// timestamp has to come off the head of the line — in either of the two formats
+// a mail log arrives in — and nothing may be lost doing it.
+func TestSplitTimestamp(t *testing.T) {
+	cases := []struct {
+		name        string
+		line        string
+		stamp, rest string
+	}{
+		{
+			name:  "postlogd, which is what this server writes",
+			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+		},
+		{
+			name:  "no fractional seconds, zone as Z",
+			line:  "2026-08-03T05:15:52Z mail postfix/qmgr[10]: 4A1B2C3D: removed",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail postfix/qmgr[10]: 4A1B2C3D: removed",
+		},
+		{
+			name:  "no zone at all",
+			line:  "2026-08-03T05:15:52 mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
+		},
+		{
+			name:  "syslog's traditional format, padded day",
+			line:  "Aug  3 05:15:52 mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
+			stamp: "Aug  3 05:15:52",
+			rest:  "mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
+		},
+		{
+			name:  "unrecognised head keeps the whole line",
+			line:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+			stamp: "",
+			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+		},
+		{
+			// A date-like run that is not the head of the line is not a stamp.
+			name:  "date inside the text is left alone",
+			line:  "mail postfix/smtp[26]: ABC: 220 mx.example.net ready at 2026-08-03T05:15:52+00:00",
+			stamp: "",
+			rest:  "mail postfix/smtp[26]: ABC: 220 mx.example.net ready at 2026-08-03T05:15:52+00:00",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stamp, rest := SplitTimestamp(c.line)
+			if stamp != c.stamp || rest != c.rest {
+				t.Errorf("SplitTimestamp(%q) = (%q, %q), want (%q, %q)", c.line, stamp, rest, c.stamp, c.rest)
+			}
+			// Whatever the split, the line's own text survives it whole.
+			if !strings.Contains(c.line, rest) {
+				t.Errorf("the text column is not part of the line it came from: %q", rest)
+			}
+		})
+	}
+}

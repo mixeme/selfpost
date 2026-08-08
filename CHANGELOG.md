@@ -10,7 +10,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - A **Delivery log** on each delivery's page (`/deliveries/{id}`): the
   `mail.log` lines Postfix wrote about that message, oldest first — the
   connection to the receiving server, its reply, and the status that reply was
-  filed as. The queue id was printed on this page as something to go and search
+  filed as. It is a table of two columns, when and what, so the seconds between
+  the connection and the reply line up down one edge; the timestamp is the
+  log's own wall clock without its microseconds and offset, and a line whose
+  head is not a timestamp keeps its whole text under *Message*
+  (`logtail.SplitTimestamp`, which reads both postlogd's format and syslog's).
+  The queue id was printed on this page as something to go and search
   the system log for by hand; the search is done for the operator instead
   (`logtail.QueueLines`). The read is a bounded tail of the current log and
   matches only lines carrying this message's queue id, anchored so a shorter id
