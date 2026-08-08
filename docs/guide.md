@@ -6,6 +6,7 @@ overview and quick start, see [README.md](../README.md).
 ## Table of contents
 
 - [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
+- [Local trial](#local-trial)
 - [Environment variables](#environment-variables)
 - [DNS setup](#dns-setup)
 - [IP warmup](#ip-warmup)
@@ -49,6 +50,34 @@ do (Apache `ProxyPreserveHost On`, nginx `proxy_set_header Host $host`, Caddy
 and Traefik by default). A proxy that rewrites `Host` instead makes the panel
 reject every form submission as cross-origin — the log says so explicitly,
 printing the `Origin` and `Host` it compared.
+
+## Local trial
+
+The [README quick start](../README.md#try-it-locally) runs a single container
+with `PANEL_COOKIE_SECURE=false` and port 8080 published on localhost. No
+reverse proxy, no `./certs` bind mount — Postfix still starts, but the Status
+page will report missing TLS material until you mount PEM files at
+`/etc/postfix/tls/fullchain.pem` and `privkey.pem`.
+
+**What works:** the full panel — setup, domains, applications, deliveries view,
+mail queue, system log. **What does not:** reliable outbound delivery to the
+public internet (no PTR, no real DNS for your domains, port 25 may be blocked
+on your network, HELO does not match anything receivers trust).
+
+To exercise SMTP locally as well, generate a throwaway self-signed certificate
+and mount it before `docker run`:
+
+```sh
+mkdir -p /tmp/selfpost-certs
+openssl req -x509 -newkey rsa:2048 \
+  -keyout /tmp/selfpost-certs/privkey.pem \
+  -out /tmp/selfpost-certs/fullchain.pem \
+  -days 1 -nodes -subj '/CN=mail.local.test'
+```
+
+Add `-v /tmp/selfpost-certs:/etc/postfix/tls:ro` to the `docker run` command
+(and keep `SELFPOST_HOSTNAME=mail.local.test` so it matches the certificate CN).
+Clients must skip TLS verification — the cert is not from a public CA.
 
 ## Environment variables
 
