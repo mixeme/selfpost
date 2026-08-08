@@ -290,10 +290,10 @@ restore. Stopped-container `tar` of `./data` is safe (see guide).
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
 scrypt → AES-256-GCM over 64 KiB chunks, each authenticated with the header,
 its counter and an end-of-stream flag (so truncation and reordering fail to
-open). Full backup `.tar.gz` → `.spbk`, domain export `.json` → `.spde`; the
-plain forms remain the default. Domain import detects the envelope by magic
-bytes; an encrypted full backup is converted back with `selfpost-backup
--decrypt` before restore.
+open). Full backup `.tar.gz` → `.spbk` (SelfPost backup), domain export
+`.json` → `.spde` (SelfPost domain export); the plain forms remain the
+default. Domain import detects the envelope by magic bytes; an encrypted full
+backup is converted back with `selfpost-backup -decrypt` before restore.
 
 ---
 

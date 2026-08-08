@@ -11,7 +11,8 @@
   <p class="muted"><strong>The backup file is a secret</strong> (it contains
   private keys and credentials). Store and transfer it securely and delete it
   once the restore succeeds. Encrypting it below is the simplest way to do that:
-  the download is then a <code>.spbk</code> file that only the password opens.</p>
+  the download is then a <code>.spbk</code> file (SelfPost backup) that only
+  the password opens.</p>
   {{if .BackupErr}}<p class="error">{{.BackupErr}}</p>{{end}}
   <form method="post" action="/backup">
     {{template "encryptfields" .}}
@@ -22,9 +23,10 @@
 <div class="card">
   <h2>Import a domain</h2>
   <p class="muted">Move a single domain here from another SelfPost instance using
-  a domain export file (from that domain's page). Its DKIM key and application
-  passwords come across, so the published DNS record needs no change. The export
-  file is a secret, like a full backup.</p>
+  a domain export file (from that domain's page) — plain <code>.json</code> or
+  encrypted <code>.spde</code> (SelfPost domain export). Its DKIM key and
+  application passwords come across, so the published DNS record needs no
+  change. The export file is a secret, like a full backup.</p>
   {{if .ImportErr}}<p class="error">{{.ImportErr}}</p>{{end}}
   <form method="post" action="/domains/import" enctype="multipart/form-data">
     <label for="importfile">Domain export file</label>

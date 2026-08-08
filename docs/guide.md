@@ -332,8 +332,11 @@ file that comes down is an encrypted envelope instead of the plain archive:
 
 | Artefact | Plain | Encrypted |
 |----------|-------|-----------|
-| Full backup | `.tar.gz` | `.spbk` |
-| Domain export | `.json` | `.spde` |
+| Full backup | `.tar.gz` | `.spbk` (**S**elf**P**ost **b**ac**k**up) |
+| Domain export | `.json` | `.spde` (**S**elf**P**ost **d**omain **e**xport) |
+
+The suffixes are for the operator only — the server detects an encrypted file
+by its magic bytes (`SELFPOST1`), not by the extension.
 
 The key is derived from the password with scrypt and the contents are sealed
 with AES-256-GCM, in chunks, so a truncated or altered file fails to open rather

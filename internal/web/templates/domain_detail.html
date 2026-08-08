@@ -299,7 +299,7 @@
   <p class="muted"><strong>The export file is a secret</strong> — it contains the
   private DKIM key and application passwords. Transfer it securely and delete it
   after the import, or encrypt it below and move a <code>.spde</code> file
-  instead; the import form asks for the password.</p>
+  (SelfPost domain export) instead; the import form asks for the password.</p>
   {{if .ExportErr}}<p class="error">{{.ExportErr}}</p>{{end}}
   <form method="post" action="/domains/{{.Domain.ID}}/export">
     {{template "encryptfields" .}}

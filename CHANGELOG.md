@@ -51,6 +51,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- Document what `.spbk` and `.spde` stand for (SelfPost backup / SelfPost domain
+  export) in the operator guide, security notes, architecture, and the Backup /
+  Export panel copy.
 - Docs aligned with the code: setup URL is `/setup/<token>` (README and
   guide; local trial rewrites the printed `https://<hostname>/…` link to
   `http://127.0.0.1:8080/…`); domain import uses the file extension / magic
