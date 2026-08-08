@@ -75,28 +75,59 @@ See [DNS setup](docs/guide.md#dns-setup) in the operator guide.
 
 ## Quick start
 
+> **First boot — create the admin account.** On a fresh container SelfPost prints
+> a **one-time setup URL** (valid ten minutes). Open it in a browser to choose
+> the administrator username and password. Until you do, the panel has no login.
+> How to read the link depends on the path below; production deploy:
+> [step 3](#3-start-selfpost).
+
+### Try it locally
+
+One container, panel at `http://127.0.0.1:8080` — no reverse proxy, no TLS
+files, no compose files. Good for clicking through the UI on your machine;
+outbound mail will not reach the real internet without DNS, PTR, and port 25.
+
 ```sh
-mkdir -p selfpost && cd selfpost
-curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/docker-compose.yml
-curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/.env.example
-mv .env.example .env   # then edit SELFPOST_HOSTNAME etc.
-docker compose up -d
+docker run --rm -d --name selfpost-try \
+  -p 127.0.0.1:8080:8080 \
+  -e SELFPOST_HOSTNAME=mail.local.test \
+  -e PANEL_COOKIE_SECURE=false \
+  -v selfpost-try-data:/data \
+  ghcr.io/mixeme/selfpost:0.1.0
 ```
 
-`SELFPOST_HOSTNAME` is required — bare FQDN only (e.g. `mail.example.com`). It
-is the Postfix HELO name, the SASL realm, and must match the PTR record and
-certificate CN/SAN.
+**Get the setup URL** (pick one):
 
-This starts SelfPost only. You still need a reverse proxy with TLS certificates
-bind-mounted at `./certs` — see [Reference deploy](#reference-deploy) and the
-[reverse-proxy section](docs/guide.md#reverse-proxy-mandatory) in the operator
-guide.
+```sh
+docker logs selfpost-try 2>&1 | grep -m1 'http'
+```
 
-On first start, `docker compose logs -f` prints a one-time setup link to create
-the admin account. The same link is also in `./data/setup-token` on the host —
-see [Operations → First-time setup link](docs/guide.md#operations).
+```sh
+docker exec selfpost-try cat /data/setup-token
+```
+
+Open the printed `http://…/setup?token=…` link before it expires.
+
+When finished:
+
+```sh
+docker rm -f selfpost-try && docker volume rm selfpost-try-data
+```
+
+More detail (limitations, optional throwaway TLS for local SMTP): [Local
+trial](docs/guide.md#local-trial) in the operator guide.
+
+### Deploy for real use
+
+Step-by-step production deploy (compose, reverse proxy, TLS, DNS):
+[Reference deploy](#reference-deploy).
 
 ## Reference deploy
+
+Production layout: one `docker-compose.yml`, a `.env`, persistent `./data`, and
+TLS PEM files at `./certs` (read by Postfix on 465/587). The panel is reached
+only through a reverse proxy on 443 — port 8080 is bound to localhost in the
+default compose file.
 
 | Artefact | Path |
 |---|---|
@@ -107,10 +138,127 @@ see [Operations → First-time setup link](docs/guide.md#operations).
 | Caddy | [deploy/caddy/](deploy/caddy/) |
 | Traefik | [deploy/traefik/](deploy/traefik/) |
 
-The compose file maps ports **465** (always) and **587** (when
-`SUBMISSION_ENABLE=true`). TLS certificate paths inside the container are fixed
-to match the `./certs` bind mount. Bump the pinned image tag deliberately when
+### 1. Fetch the base files
+
+```sh
+mkdir -p selfpost/data selfpost/certs && cd selfpost
+curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/docker-compose.yml
+curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/.env.example
+cp .env.example .env
+```
+
+Edit `.env` — at minimum set `SELFPOST_HOSTNAME` to your mail hostname (bare
+FQDN, e.g. `mail.example.com`). It must match the PTR record you request from
+your provider and the certificate your proxy will obtain.
+
+### 2. Reverse proxy and TLS
+
+Pick one proxy. In every case the proxy terminates HTTPS for the panel; the
+same certificate must end up under `./certs` as `fullchain.pem` and
+`privkey.pem` so Postfix can serve it on 465 (and 587 if enabled). The proxy
+must **pass the original `Host` header** — details and rationale:
+[Reverse proxy](docs/guide.md#reverse-proxy-mandatory).
+
+**Apache (recommended, on the host).** Install Apache with `ssl`, `proxy`, and
+`proxy_http` enabled. Copy
+[deploy/apache/selfpost-vhost.conf](deploy/apache/selfpost-vhost.conf) into your
+vhost directory, replace `mail.example.com` with your hostname, enable the site,
+then issue a certificate:
+
+```sh
+sudo certbot --apache -d mail.example.com
+```
+
+Point `./certs` at the PEM files certbot wrote (symlink is fine):
+
+```sh
+ln -s /etc/letsencrypt/live/mail.example.com certs
+```
+
+**nginx (containerised).** From the `deploy/` directory, merge the nginx
+fragment and issue the first certificate before nginx can serve HTTPS:
+
+```sh
+docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
+  run --rm certbot certonly --webroot -w /var/www/certbot \
+  -d mail.example.com --email you@example.com --agree-tos --no-eff-email
+
+docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
+```
+
+Edit [deploy/nginx/nginx.conf.example](deploy/nginx/nginx.conf.example) and
+replace `mail.example.com` first. The fragment bind-mounts certbot's output into
+both nginx and SelfPost.
+
+**Caddy (containerised, automatic ACME).** Edit
+[deploy/caddy/Caddyfile](deploy/caddy/Caddyfile) and the `<hostname>` placeholders
+in [deploy/caddy/docker-compose.caddy.yml](deploy/caddy/docker-compose.caddy.yml),
+then:
+
+```sh
+docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
+```
+
+Verify Caddy's on-disk cert path for your version before relying on the
+default mount — see the comment at the top of the Caddy compose fragment.
+
+**Traefik (containerised).** Edit the `Host(...)` label and ACME email in
+[deploy/traefik/docker-compose.traefik.yml](deploy/traefik/docker-compose.traefik.yml),
+start the stack, then extract PEM files for Postfix whenever Traefik issues or
+renews a certificate:
+
+```sh
+docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
+./traefik/extract-cert.sh ./traefik/letsencrypt/acme.json mail.example.com ./traefik/extracted-certs
+```
+
+Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
+
+### 3. Start SelfPost
+
+If you used Apache on the host (step 2, first option), start only the base
+compose file from your `selfpost/` directory:
+
+```sh
+docker compose up -d
+```
+
+The nginx/Caddy/Traefik fragments from step 2 already include `docker compose up
+-d` — skip this if you ran one of those.
+
+**Get the setup URL** — open it in a browser to create the admin account
+([first boot](#quick-start)):
+
+```sh
+docker compose logs selfpost 2>&1 | grep -m1 'http'
+```
+
+```sh
+cat ./data/setup-token
+```
+
+The file is deleted as soon as setup completes. If logs are shipped to a
+central aggregator, prefer `cat ./data/setup-token` so the bearer token does
+not enter the log pipeline.
+
+### 4. DNS and sending
+
+Before sending real mail:
+
+1. Confirm PTR/rDNS for the server IP points at `SELFPOST_HOSTNAME` (Status
+   page → *Re-check*).
+2. For each domain you add in the panel, publish SPF, DKIM, and DMARC at the
+   same time ([DNS setup](docs/guide.md#dns-setup)).
+3. Warm up a new IP gradually ([IP warmup](docs/guide.md#ip-warmup)).
+
+### Ports and upgrades
+
+The compose file maps **465** (always) and **587** (when
+`SUBMISSION_ENABLE=true`). Bump the pinned image tag deliberately when
 upgrading — never use `:latest` ([why](docs/guide.md#fixed-image-tag)).
+
+Optional variables (`TRUSTED_PROXY_CIDR`, rate limits, retention): see
+[Environment variables](docs/guide.md#environment-variables).
 
 ## License
 
