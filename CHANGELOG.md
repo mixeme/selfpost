@@ -59,6 +59,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   is visible but idle, and no requests while the tab is hidden. Scheduling
   lives in `panel.js` (`data-poll` markers) instead of `hx-trigger="every …"`,
   which would need `unsafe-eval` under the panel's CSP.
+- Documentation package consolidated into `docs/development.md`: Documentation
+  map, user-facing deliverables, maintenance rules, and code-to-prose
+  verification table (from closed `documentation-plan.md`); resuming work,
+  model routing, commits, and phase closure (from closed `progress.md`).
+  `docs/archive/` removed — history is git + CHANGELOG. README Documentation
+  index lists operator docs plus the internal roadmap. Agent rules point at
+  `development.md`.
 - The delivery page is laid out in two columns: what the journal recorded on
   the left, what happened to the message on the right, and the delivery log at
   full width under both. The facts the page used to stack one per line — domain,
@@ -72,7 +79,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   testing, and CI; agent rules moved to `.cursor/rules/agent-rules.mdc`;
   dev-host-specific workflow and `example.com` references removed from docs.
 - `docs/development.md` and `.cursor/rules/agent-rules.mdc` translated to
-  English; `progress.md` and `roadmap.md` remain Russian (internal tracker).
+  English; `roadmap.md` remains Russian (internal tracker).
 
 ## [0.6.0] - 2026-08-08
 

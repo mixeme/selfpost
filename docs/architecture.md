@@ -2,7 +2,7 @@
 
 **Source of truth:** the code tree, not historical specs. Synchronise this file
 when env keys, routes, or mail-path behaviour change. Verification method:
-[documentation-plan.md](documentation-plan.md) §2.
+[development.md](development.md) § «Verifying docs against code».
 
 User install/operations: [README.md](../README.md), [guide.md](guide.md). Product boundaries:
 [product.md](product.md).

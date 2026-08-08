@@ -1,10 +1,40 @@
 # SelfPost — development
 
-**What this file is.** How to build, test, and ship changes. Current sprint
-state lives in [progress.md](progress.md) — read that first after `/clear`.
+**What this file is.** How to build, test, document, and ship changes. Open
+work for v1.x and 2.x lives in [roadmap.md](roadmap.md) (and, until the tag,
+[v1.x-closure-plan.md](v1.x-closure-plan.md)). Product boundaries:
+[product.md](product.md). As-built layout: [architecture.md](architecture.md).
 
-Product boundaries: [product.md](product.md). As-built layout:
-[architecture.md](architecture.md).
+---
+
+## Resuming work
+
+After `/clear` or a fresh chat:
+
+1. Read this file (process, docs rules, model routing).
+2. Open [roadmap.md](roadmap.md) for open work; until `v1.0.0`, also
+   [v1.x-closure-plan.md](v1.x-closure-plan.md) for the remaining closure
+   checklist. Accepted risks — [security.md](security.md); as-built —
+   [architecture.md](architecture.md).
+3. Skim [product.md](product.md) if scope is in doubt.
+4. Continue from the next unchecked step in the active plan.
+
+History of closed phases is in `git log` and [CHANGELOG.md](../CHANGELOG.md),
+not duplicated here.
+
+---
+
+## Model routing
+
+| Kind of work | Model | Examples |
+|---|---|---|
+| Security, infra, file permissions, Postfix/`postqueue`, open-relay risk | **Opus** | `mail.log` under `/data`, entrypoint permissions, queue reconcile |
+| UI / JS / CSS, templates, documentation (English), README | **Sonnet** | adaptive polling, this file's Documentation section |
+| Trivial mechanics: retarget links, grep, compose bump, CHANGELOG cut | **Haiku** | Makefile / release.yml comment fixes, deleting closed plan files |
+| Security **review** (not authorship) | **Fable** | pre-release checklist pass ([implementation-plan.md](implementation-plan.md) § D — done) |
+
+Default rule: risk-critical → Opus; UI / docs / boilerplate → Sonnet; trivial
+mechanics → Haiku. Reviewers must not be the author of the code under review.
 
 ---
 
@@ -100,7 +130,23 @@ Image and processes.
 
 ---
 
-## Release build
+## Commits and release build
+
+Commit on every meaningful step (a working sub-feature, a green build, end of a
+phase) — not every file save, and not only at phase end. Minimum: one commit per
+closed phase, plus intermediate commits for coherent sub-steps. Branch `main`
+unless a separate branch is requested. Push / PR only on explicit request.
+
+Commit messages end with
+`Co-Authored-By: Claude <model> <noreply@anthropic.com>` for the model that did
+the step (e.g. `Claude Sonnet 4.6`).
+
+Every such step also updates [CHANGELOG.md](../CHANGELOG.md) under
+`[Unreleased]` (Keep a Changelog). On an explicit version cut, rename
+`[Unreleased]` to `[X.Y.Z] - date` and open a fresh empty `[Unreleased]`. Image
+tag / push only on explicit request (see `release.yml`).
+
+### Release image
 
 The release image is published **only on tag** `vX.Y.Z` (not on every push to
 `main`). The tag is the single source of version: it drives the image tag and
@@ -113,10 +159,23 @@ The release image is published **only on tag** `vX.Y.Z` (not on every push to
 3. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
    and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
 4. Update the pinned tag in
-   [deploy/docker-compose.yml](../deploy/docker-compose.yml) (see
-   [roadmap.md](roadmap.md) § «v1.x — documentation and deploy tail»).
+   [deploy/docker-compose.yml](../deploy/docker-compose.yml) in the **same**
+   commit as the tag (see [roadmap.md](roadmap.md) § «v1.x — documentation and
+   deploy tail»).
 
 Ordinary commits **do not** publish an image.
+
+---
+
+## Phase closure
+
+Before `/clear` at the end of a finished step:
+
+1. Update [roadmap.md](roadmap.md) (and the active plan checklist, if any): what
+   changed, what is next.
+2. Check the applicable «Done when…» criteria.
+3. Append [CHANGELOG.md](../CHANGELOG.md) under `[Unreleased]`.
+4. Make the final commit for the step (when the user asks for a commit).
 
 ---
 
@@ -199,3 +258,74 @@ emulation for e2e is impractical. E2e first, then push — the registry receives
 the bytes that passed the gate.
 
 A failed e2e **blocks** image publication.
+
+---
+
+## Documentation
+
+History of deleted plans lives in git and [CHANGELOG.md](../CHANGELOG.md).
+There is no `docs/archive/` directory.
+
+### Documentation map
+
+| Home | File |
+|---|---|
+| Operator install / quick start | [README.md](../README.md) |
+| Operator guide | [guide.md](guide.md) |
+| Product boundaries | [product.md](product.md) |
+| As-built design | [architecture.md](architecture.md) |
+| Development process (this file) | [development.md](development.md) |
+| Security requirements and accepted risks | [security.md](security.md) |
+| Internal roadmap (v1.x tail, 2.x) | [roadmap.md](roadmap.md) |
+| Release history | [CHANGELOG.md](../CHANGELOG.md) |
+
+`implementation-plan.md` remains only until the release cut (describes the
+closed release gate); delete it in the release commit. Temporary
+[v1.x-closure-plan.md](v1.x-closure-plan.md) goes away with that cut too.
+
+### User-facing deliverables
+
+| Artefact | Role |
+|---|---|
+| [README.md](../README.md) | Overview, requirements, quick start, docs index, reference deploy, licence |
+| [guide.md](guide.md) | Proxy, env, DNS, IP warmup, operations, rate limiting, backup, ports, image tag |
+| [LICENSE](../LICENSE) | AGPL-3.0 full text |
+| [deploy/docker-compose.yml](../deploy/docker-compose.yml) + proxies | Apache + nginx/Caddy/Traefik under [deploy/](../deploy/) |
+| [deploy/.env.example](../deploy/.env.example) | Public env template; full reference in [guide.md](guide.md) |
+| [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog |
+
+Out of scope for v1.x: `CONTRIBUTING.md`, man pages, a separate docs site
+(candidates in [roadmap.md](roadmap.md)).
+
+### Maintaining documentation
+
+1. **Step rule:** a new or renamed env key, panel route, or observable mail-path
+   behaviour ships together with [guide.md](guide.md) / `.env.example` and a
+   CHANGELOG entry (see [§ Commits and release build](#commits-and-release-build)).
+2. **Env regression:** [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)
+   fails on an undocumented `loadConfig` or build-script key.
+3. **New gaps** go into [roadmap.md](roadmap.md) (or the active plan file), not
+   silent drive-by edits.
+
+### Verifying docs against code
+
+Every claim in the docs has a **source of truth in the tree**; verify from code
+to prose.
+
+| Claim class | Source of truth |
+|---|---|
+| Env keys and defaults | `loadConfig` — [cmd/panel/main.go](../cmd/panel/main.go); `${VAR:-…}` in [build/](../build/) |
+| Mail path | [build/postfix-config.sh](../build/postfix-config.sh) |
+| Panel routes | [internal/web/web.go](../internal/web/web.go) |
+| Backup / restore, domain export | [internal/backup/](../internal/backup/), [cmd/selfpost-backup/](../cmd/selfpost-backup/) |
+| Sessions | [internal/store/sessions.go](../internal/store/sessions.go), [internal/web/session.go](../internal/web/session.go) |
+| Log rotation, reload | [build/logrotate-mail.conf](../build/logrotate-mail.conf), [build/logrotate-loop.sh](../build/logrotate-loop.sh), [build/postfix-cert-reload.sh](../build/postfix-cert-reload.sh) |
+| Deploy | [deploy/docker-compose.yml](../deploy/docker-compose.yml), [build/Dockerfile](../build/Dockerfile) |
+| Operator checklist | [§ User-facing deliverables](#user-facing-deliverables); detail — [guide.md](guide.md) |
+| Product / out of scope | [product.md](product.md) |
+| As-built | [architecture.md](architecture.md) |
+| Mandatory security | [security.md](security.md) |
+
+Order: list what the code actually does → find it in [guide.md](guide.md) /
+`architecture.md`. Before every tag, a short pass over this table — not a full
+prose rewrite.

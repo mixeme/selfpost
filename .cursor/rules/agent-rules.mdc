@@ -17,8 +17,8 @@ alwaysApply: true
 8. Check licence compatibility of new Go dependencies (permissive or GPL-family for
    AGPL-3.0).
 
-Model routing — `docs/progress.md` § «Model by task type». Pre-release security
+Model routing — `docs/development.md` § «Model routing». Pre-release security
 **review** (not authorship) — Fable.
 
-Commit protocol, CHANGELOG, and phase closure — `docs/progress.md` § «Commits»
-and «Phase closure protocol».
+Commit protocol, CHANGELOG, and phase closure — `docs/development.md` §
+«Commits and release build» and «Phase closure».

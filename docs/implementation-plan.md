@@ -5,7 +5,8 @@
 B.1–B.3 и C.4 закрыты — as-built в [architecture.md](architecture.md),
 e2e/CI в [development.md](development.md), принятые риски в
 [security.md](security.md). Текущее состояние и следующий шаг:
-[progress.md](progress.md). Объём 2.x.x — [roadmap.md](roadmap.md).
+[roadmap.md](roadmap.md) и [v1.x-closure-plan.md](v1.x-closure-plan.md).
+Объём 2.x.x — [roadmap.md](roadmap.md).
 
 **Основа:** [product.md](product.md) v1.0.
 

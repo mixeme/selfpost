@@ -36,7 +36,8 @@ send log and DNS checks in the panel, encrypted backups.
 | [Product boundaries](docs/product.md) | Purpose, deployment assumptions, out-of-scope items, multi-domain model |
 | [Architecture](docs/architecture.md) | As-built technical design |
 | [Security](docs/security.md) | Accepted security trade-offs and requirements |
-| [Development](docs/development.md) | Building, testing, and contributing |
+| [Development](docs/development.md) | Building, testing, docs rules, model routing, commits |
+| [Roadmap](docs/roadmap.md) | Open work (v1.x tail, 2.x) — internal, Russian |
 | [CHANGELOG](CHANGELOG.md) | Release history |
 
 Repository: <https://github.com/mixeme/selfpost> — source, issues, releases, and
