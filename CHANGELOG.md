@@ -42,6 +42,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - `docs/development.md` restructured into stack, dependencies, build, release,
   testing, and CI; agent rules moved to `.cursor/rules/agent-rules.mdc`;
   dev-host-specific workflow and `example.com` references removed from docs.
+- `docs/development.md` and `.cursor/rules/agent-rules.mdc` translated to
+  English; `progress.md` and `roadmap.md` remain Russian (internal tracker).
 
 ## [0.6.0] - 2026-08-08
 
