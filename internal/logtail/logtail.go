@@ -280,6 +280,37 @@ func isQueueIDByte(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z'
 }
 
+// Timestamps at the head of a mail.log line. The first is what Postfix's own
+// postlogd writes, which is what this server runs (maillog_file in
+// build/postfix-config.sh) — RFC 3339 down to microseconds and with an offset.
+// The second is syslog's traditional format, for a deployment that routes the
+// log through syslogd instead; it carries no year and no zone, which is why it
+// is not the one being matched first.
+var (
+	isoStampRe    = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s`)
+	syslogStampRe = regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})\s`)
+)
+
+// SplitTimestamp separates the timestamp at the head of a mail.log line from
+// the rest of it, so a page can put the two in their own columns. The stamp
+// comes back without its fractional seconds and zone offset — five decimal
+// places of microsecond are the widest part of the column and the least worth
+// reading — but is otherwise the log's own wall clock, not converted: what is
+// on the page is what is in the file.
+//
+// A line whose head is not a timestamp this recognises comes back whole, as
+// rest, with an empty stamp. Nothing is ever dropped: the point of showing the
+// log is that it says what it says.
+func SplitTimestamp(line string) (stamp, rest string) {
+	if m := isoStampRe.FindStringSubmatch(line); m != nil {
+		return m[1] + " " + m[2], strings.TrimSpace(line[len(m[0]):])
+	}
+	if m := syslogStampRe.FindStringSubmatch(line); m != nil {
+		return m[1], strings.TrimSpace(line[len(m[0]):])
+	}
+	return "", line
+}
+
 // follow tails path line by line, calling handle for each complete line, until
 // ctx is cancelled. Where it starts is tr's decision (a persisted offset, the
 // start of a file that changed while the panel was down, or end-of-file on a

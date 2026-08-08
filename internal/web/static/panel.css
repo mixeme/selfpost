@@ -468,6 +468,22 @@ h1.subject { overflow-wrap: anywhere; }
 .event-time { margin: 0; font-size: 0.75rem; color: #6b7280; }
 .event-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.15rem 0 0; font-weight: 600; }
 .event-detail { margin: 0.2rem 0 0; font-size: 0.9rem; }
+/* A message's own mail.log lines, as a table of when and what. The time column
+   is sized to its content — width:1% is as narrow as the automatic layout will
+   take a column, which with the nowrap on td.time settles on exactly the stamp
+   — so everything left over goes to the text, which is the column that needs
+   it. */
+table.log { margin-top: 1rem; }
+table.log th:first-child, table.log td.time { width: 1%; }
+/* The log's own text: monospace, because it is full of addresses, response
+   codes and identifiers that are compared character by character rather than
+   read as words. pre-wrap keeps the spacing a server's reply was written with
+   while still letting a long line wrap inside the cell instead of widening it
+   (the th/td rule above allows the break). */
+table.log td.log-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem; white-space: pre-wrap;
+}
 /* Compact outlined button: same affordance as the filled one but quiet enough
    that several can sit together without shouting — the Copy buttons beside a
    value, the controls of a table row or of an application block. Sign out
