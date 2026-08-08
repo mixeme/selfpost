@@ -144,7 +144,7 @@
   //
   // Each pass looks its targets up by id rather than holding on to elements
   // found once: the status page replaces its cards wholesale every five
-  // seconds (hx-swap on #status-body), and anything remembered here would be
+  // seconds (adaptive polling on #status-body), and anything remembered here would be
   // measuring boxes that had left the document.
   var sectionLinks = [];
 
@@ -204,19 +204,95 @@
     initSectionIndex();
   });
 
-  // --- Skip polling while the tab is hidden ------------------------------
-  // The monitoring pages (status, mail queue, system log, deliveries) poll
-  // every 5s via hx-trigger="every 5s". htmx has a built-in way to make that
-  // conditional (an event filter, hx-trigger="every 5s [expr]"), but it
-  // evaluates the filter with `new Function`, which the panel's CSP
-  // (default-src 'self', no 'unsafe-eval') would silently break. Skipping the
-  // request here instead needs nothing beyond what the CSP already allows: a
-  // request due while the tab is hidden is simply not sent, and the next
-  // request after it becomes visible again picks up on schedule as usual.
+  // --- Adaptive monitoring polling ---------------------------------------
+  // The four monitoring fragments carry data-poll and hx-trigger="load" for
+  // the first fetch only. panel.js schedules the rest: 5 s while the operator
+  // is active on the page, 30 s when the tab is visible but idle, and nothing
+  // while the tab is hidden. hx-trigger="every Ns [expr]" could express some
+  // of that, but the filter is evaluated with `new Function`, which the
+  // panel's CSP (default-src 'self', no 'unsafe-eval') would silently break.
+  var pollActiveMs = 5000;
+  var pollIdleMs = 30000;
+  // No pointer/keyboard/scroll input for this long → treat the tab as idle.
+  var userIdleMs = 30000;
+  var lastActivity = Date.now();
+  var pollTimers = Object.create(null);
+
+  ["mousedown", "mousemove", "keydown", "scroll", "touchstart"].forEach(function (evt) {
+    document.addEventListener(evt, function () {
+      lastActivity = Date.now();
+    }, { passive: true });
+  });
+
+  function pollDelayMs() {
+    return Date.now() - lastActivity < userIdleMs ? pollActiveMs : pollIdleMs;
+  }
+
+  function triggerPoll(el) {
+    htmx.ajax("GET", el.getAttribute("hx-get"), {
+      target: "#" + el.id,
+      swap: el.getAttribute("hx-swap") || "outerHTML"
+    });
+  }
+
+  function schedulePoll(el) {
+    if (!el || !el.id || !el.hasAttribute("data-poll")) {
+      return;
+    }
+    if (pollTimers[el.id]) {
+      clearTimeout(pollTimers[el.id]);
+      delete pollTimers[el.id];
+    }
+    if (document.hidden) {
+      return;
+    }
+    var id = el.id;
+    pollTimers[id] = setTimeout(function () {
+      delete pollTimers[id];
+      var current = document.getElementById(id);
+      if (!current || !current.hasAttribute("data-poll")) {
+        return;
+      }
+      if (document.hidden) {
+        schedulePoll(current);
+        return;
+      }
+      triggerPoll(current);
+    }, pollDelayMs());
+  }
+
+  function onPollElementReady(el) {
+    if (!el || !el.hasAttribute("data-poll")) {
+      return;
+    }
+    // Swapped-in markup still carries hx-trigger="load"; strip it so htmx does
+    // not issue a duplicate GET on top of the response we just received.
+    el.removeAttribute("hx-trigger");
+    schedulePoll(el);
+  }
+
+  document.body.addEventListener("htmx:afterSwap", function (ev) {
+    onPollElementReady(ev.detail.elt);
+  });
+
+  document.body.addEventListener("htmx:responseError", function (ev) {
+    onPollElementReady(ev.detail.elt);
+  });
+
   document.body.addEventListener("htmx:beforeRequest", function (ev) {
-    var trigger = ev.target.getAttribute && ev.target.getAttribute("hx-trigger");
-    if (document.hidden && trigger && trigger.indexOf("every") !== -1) {
+    if (document.hidden && ev.target.hasAttribute && ev.target.hasAttribute("data-poll")) {
       ev.preventDefault();
     }
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      Object.keys(pollTimers).forEach(function (id) {
+        clearTimeout(pollTimers[id]);
+        delete pollTimers[id];
+      });
+      return;
+    }
+    document.querySelectorAll("[data-poll]").forEach(schedulePoll);
   });
 })();

@@ -30,6 +30,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- Monitoring screens (status, mail queue, system log, deliveries) use adaptive
+  HTMX polling: 5 s while the operator is active on the page, 30 s when the tab
+  is visible but idle, and no requests while the tab is hidden. Scheduling
+  lives in `panel.js` (`data-poll` markers) instead of `hx-trigger="every …"`,
+  which would need `unsafe-eval` under the panel's CSP.
 - The delivery page is laid out in two columns: what the journal recorded on
   the left, what happened to the message on the right, and the delivery log at
   full width under both. The facts the page used to stack one per line — domain,
