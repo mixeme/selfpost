@@ -1,5 +1,5 @@
 {{define "status_body"}}
-<div id="status-body" hx-get="/status/fragment" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="status-body" data-poll hx-get="/status/fragment" hx-trigger="load" hx-swap="outerHTML">
   <div class="card" id="overall">
     <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
     <p class="muted">{{.OverallHeading}}</p>

@@ -153,8 +153,11 @@ unless noted.
 | `/backup` | Full backup download, domain import |
 | `/account` | Admin username/password |
 
-HTMX polling refreshes monitoring fragments; polling does not extend session
-idle timeout (only non-`HX-Request` GET and mutating requests count as activity).
+HTMX polling refreshes monitoring fragments (5 s while the operator is active on
+the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
+`panel.js` via `data-poll`, not `hx-trigger="every …"`); polling does not extend
+session idle timeout (only non-`HX-Request` GET and mutating requests count as
+activity).
 
 ### Sessions
 

@@ -17,7 +17,7 @@ const usernameKey ctxKey = 0
 // everything except a GET request carrying HX-Request: the four monitoring
 // fragments (/status/fragment, /mail-queue/body, /system-log/body,
 // /deliveries/rows)
-// poll every 5s regardless of whether anyone is looking at the tab, so
+// poll on a timer regardless of whether anyone is looking at the tab, so
 // counting those as activity would make "N days idle" mean "N days since a
 // browser tab was last open" instead.
 func (s *Server) requireAuth(next http.Handler) http.Handler {
