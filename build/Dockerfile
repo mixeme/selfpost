@@ -105,7 +105,7 @@ RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/postfix-config.sh 
 EXPOSE 8080 465 587
 
 # Liveness probe: panel HTTP plus mail-path processes (opendkim, panel, postfix).
-# Does not verify TLS, DNS, or end-to-end delivery — see README Operations.
+# Does not verify TLS, DNS, or end-to-end delivery — see docs/guide.md Operations.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
 

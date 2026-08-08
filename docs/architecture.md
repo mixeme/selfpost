@@ -4,7 +4,7 @@
 when env keys, routes, or mail-path behaviour change. Verification method:
 [documentation-plan.md](documentation-plan.md) §2.
 
-User install/operations: [README.md](../README.md). Product boundaries:
+User install/operations: [README.md](../README.md), [guide.md](guide.md). Product boundaries:
 [product.md](product.md).
 
 ---
@@ -258,7 +258,7 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 
 **Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
 `/data` tree; version check on restore. Stopped-container `tar` of `./data` is
-safe (see README).
+safe (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
@@ -280,5 +280,5 @@ origin check, no CSRF tokens) are documented there separately.
 
 ## Configuration
 
-Public and internal env vars: [README § Environment variables](../README.md#environment-variables).
+Public and internal env vars: [guide § Environment variables](guide.md#environment-variables).
 Regression test: [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go).

@@ -39,7 +39,7 @@ go build -trimpath -ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Ve
 ```
 
 **Env documentation regression:** `go test ./cmd/panel -run TestLoadConfig` —
-new `loadConfig` keys must appear in README env lists
+new `loadConfig` keys must appear in guide.md env lists
 ([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
 
 ---

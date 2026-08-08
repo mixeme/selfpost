@@ -8,7 +8,7 @@ import (
 )
 
 // overLimit reports whether the message currently being received should be
-// refused under a level-2 differentiated limit (README § Rate limiting). It
+// refused under a level-2 differentiated limit (guide § Rate limiting). It
 // checks the domain-level and application-level limits in turn; either being
 // exceeded is enough to refuse.
 //
@@ -80,7 +80,7 @@ func (s *session) releaseReservations() {
 }
 
 // recordRejected writes a send-log row for a message refused by a level-2
-// limit (README § Rate limiting — refusals are recorded too), so the rejection
+// limit (guide § Rate limiting — refusals are recorded too), so the rejection
 // shows up in the monitoring screen. Only MAIL-stage fields are known; the
 // write is best-effort and never affects the response.
 func (s *session) recordRejected() {

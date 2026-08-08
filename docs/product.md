@@ -2,8 +2,9 @@
 
 **What this file is.** Stable product definition for SelfPost v1.0: purpose,
 deployment assumptions, explicit out-of-scope items, and the multi-domain
-model. User-facing install and operations live in [README.md](../README.md);
-as-built technical detail in [architecture.md](architecture.md).
+model. User-facing overview in [README.md](../README.md); install and operations
+in [guide.md](guide.md); as-built technical detail in
+[architecture.md](architecture.md).
 
 ---
 

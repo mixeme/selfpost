@@ -17,7 +17,7 @@ const (
 	StatusDeferred = "deferred"
 	StatusBounced  = "bounced"
 	// StatusRejected marks a message the journal-milter refused with a 4xx under
-	// a level-2 rate limit (README § Rate limiting). Such a row never gets a
+	// a level-2 rate limit (guide § Rate limiting). Such a row never gets a
 	// queue-id and is excluded from the level-2 message count (it was never
 	// sent).
 	StatusRejected = "rejected"
@@ -55,7 +55,7 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 }
 
 // InsertRejected records a message the journal-milter refused under a level-2
-// rate limit (README § Rate limiting), so the rejection is visible in the
+// rate limit (guide § Rate limiting), so the rejection is visible in the
 // send-log UI. Only the fields known at MAIL FROM are set (domain, sender, app
 // login); there is no queue-id or recipient because the message was rejected
 // before it was queued.

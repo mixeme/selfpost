@@ -11,13 +11,13 @@ import (
 )
 
 // defaultRateLimitWindowSeconds is the sliding-window length used when an
-// admin sets a message ceiling but leaves the window blank (README § Rate
-// limiting, matching the level-1 default hour; README § Environment variables:
+// admin sets a message ceiling but leaves the window blank (guide § Rate
+// limiting, matching the level-1 default hour; guide § Environment variables:
 // RATE_LIMIT_WINDOW_SECONDS).
 const defaultRateLimitWindowSeconds = 3600
 
 // rateLimitInput is the validated result of a rate-limit form submission.
-// clear means "remove the differentiated limit" (README § Rate limiting: an
+// clear means "remove the differentiated limit" (guide § Rate limiting: an
 // empty IP binding leaves only level 1).
 type rateLimitInput struct {
 	clear         bool
@@ -42,7 +42,7 @@ func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 		return rateLimitInput{}, err
 	}
 	if len(ips) == 0 {
-		// No IP binding: the differentiated limit does not apply (README § Rate
+		// No IP binding: the differentiated limit does not apply (guide § Rate
 		// limiting).
 		return rateLimitInput{clear: true}, nil
 	}
@@ -92,7 +92,7 @@ func parsePositiveInt(raw string, def int) (int, error) {
 }
 
 // handleDomainRateLimit saves or clears a domain-level differentiated rate
-// limit (README § Rate limiting). No reload is needed — the milter reads the
+// limit (guide § Rate limiting). No reload is needed — the milter reads the
 // row live.
 func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.lookupDomain(w, r)
@@ -116,7 +116,7 @@ func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAppRateLimit saves or clears an application-level differentiated rate
-// limit (README § Rate limiting).
+// limit (guide § Rate limiting).
 func (s *Server) handleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.lookupApplication(w, r)
 	if !ok {
