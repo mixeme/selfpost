@@ -19,6 +19,24 @@ does not receive mail, provide mailboxes, or offer webmail.
 > [docs/documentation-plan.md](docs/documentation-plan.md). Accepted security
 > trade-offs: [docs/security.md](docs/security.md).
 
+## Table of contents
+
+- [Requirements (site checklist)](#requirements-site-checklist)
+- [Quick start](#quick-start)
+- [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
+- [Environment variables](#environment-variables)
+- [DNS setup](#dns-setup)
+- [IP warmup](#ip-warmup)
+- [Operations](#operations)
+- [Rate limiting](#rate-limiting)
+- [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain)
+  - [Encrypting a backup or export](#encrypting-a-backup-or-export)
+- [Published ports](#published-ports)
+- [Fixed image tag](#fixed-image-tag)
+- [Machine requirements](#machine-requirements)
+- [Repository](#repository)
+- [License](#license)
+
 ## Requirements (site checklist)
 
 Providing these is the operator's job, not a feature of SelfPost — the panel
