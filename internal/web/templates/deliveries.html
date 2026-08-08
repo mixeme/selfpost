@@ -1,7 +1,8 @@
 {{/* The send log is six columns of addresses, subjects and timestamps, so this
      page takes the whole column rather than the reading measure (see the "wide"
-     block in layout.html). A single delivery's page carries prose and keeps the
-     measure, which is why this is declared per page and not per page name. */}}
+     block in layout.html). It is declared per page rather than per page name
+     because how wide a page needs to be is a property of that page, not of the
+     navigation entry several pages share. */}}
 {{define "wide"}}wide{{end}}
 
 {{define "content"}}

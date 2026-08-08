@@ -225,7 +225,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadTemplates: %v", err)
 	}
-	wide := map[string]bool{"deliveries": true, "mail_queue": true, "system_log": true}
+	wide := map[string]bool{"deliveries": true, "delivery": true, "mail_queue": true, "system_log": true}
 	for name, page := range tmpl.pages {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
@@ -236,7 +236,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		case wide[name] && got != "wide":
 			t.Errorf("page %q no longer declares itself wide (%q); its data falls back to the reading measure", name, got)
 		case !wide[name] && got != "":
-			t.Errorf("page %q declares itself %q; only the pages that are tables of data or raw log lines take the whole column", name, got)
+			t.Errorf("page %q declares itself %q; only the pages that are tables of data, raw log lines or side-by-side cards take the whole column", name, got)
 		}
 	}
 }

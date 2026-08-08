@@ -121,6 +121,16 @@ replay a pre-existing log.
 Possible follow-ups if this becomes painful: mount the mail log under `/data`, or
 reconcile stuck rows via `postqueue`.
 
+**Two one-shot reads** sit beside the follow loop and are unrelated to it, both
+serving panel pages on request: `TailLines` (the last *n* lines, for
+`/system-log`) and `QueueLines` (the lines carrying one queue-id, for
+`/deliveries/{id}`). `QueueLines` scans a bounded tail of the current file —
+finding a message's lines means reading rather than seeking — and matches the id
+anchored on the character before it, since queue ids are hexadecimal runs and a
+shorter one is regularly the tail of a longer one. Send-log rows outlive the log
+(retention 90 days, rotation 14 files), so an empty result is the expected end
+state for an older message and the page reports it as such, not as a failure.
+
 ---
 
 ## Panel HTTP surface
@@ -136,7 +146,7 @@ unless noted.
 | `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
 | `/deliveries` | Send log with filters |
-| `/deliveries/{id}` | One send-log row in full |
+| `/deliveries/{id}` | One send-log row in full, with its `mail.log` lines |
 | `/mail-queue` | Postfix queue view |
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |

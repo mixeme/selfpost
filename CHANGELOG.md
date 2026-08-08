@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- A **Delivery log** on each delivery's page (`/deliveries/{id}`): the
+  `mail.log` lines Postfix wrote about that message, oldest first — the
+  connection to the receiving server, its reply, and the status that reply was
+  filed as. The queue id was printed on this page as something to go and search
+  the system log for by hand; the search is done for the operator instead
+  (`logtail.QueueLines`). The read is a bounded tail of the current log and
+  matches only lines carrying this message's queue id, anchored so a shorter id
+  is not found inside a longer one. Send-log rows outlive `mail.log` — retention
+  is ninety days, rotation keeps fourteen files — so a message with no lines
+  left says so rather than reporting a failure.
+- A **History** block on the same page: the journal's two timestamps stated as
+  the steps they stand for — accepted and queued, then delivered, deferred,
+  bounced, or refused before queueing — each with the status it reached in the
+  panel's own ok/warn/error/unknown badge vocabulary. A message still queued
+  shows the delivery report it is waiting for as a step that has not happened.
+
+### Changed
+
+- The delivery page is laid out in two columns: what the journal recorded on
+  the left, what happened to the message on the right, and the delivery log at
+  full width under both. The facts the page used to stack one per line — domain,
+  application, queue id, journal id and the two timestamps — are a grid of tiles
+  instead, since a page of mostly empty rows was what the full-width stack came
+  to for six short values. The subject heads the page and the sender, recipient
+  and outcome are the line under it, so what the message was and how it ended
+  are both on the first line. The page takes the whole column rather than the
+  reading measure, as the other three monitoring pages already did.
+
 ## [0.6.0] - 2026-08-08
 
 ### Added
