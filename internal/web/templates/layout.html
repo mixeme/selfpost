@@ -28,11 +28,14 @@
 <div class="shell">
 {{if .User}}{{template "nav" .}}{{end}}
 {{/* The page name travels onto <main> as a class so the stylesheet can size a
-     page to what it holds — the monitoring pages are wider than the panel's
-     form pages (see main.page-* in panel.css). It is .Active, already carried
-     for the navigation, rather than a second field every handler would have to
-     remember to set. */}}
-<main class="page-{{.Active}}">
+     page to what it holds — the signed-out pages are narrower than the rest
+     (see main.page-* in panel.css). It is .Active, already carried for the
+     navigation, rather than a second field every handler would have to
+     remember to set. The "wide" block beside it is how a page made of data
+     asks for the whole column instead of the reading measure; it is the page's
+     own declaration rather than a name in the stylesheet, since .Active cannot
+     tell the send log from a single delivery's page. */}}
+<main class="page-{{.Active}} {{template "wide" .}}">
 {{template "content" .}}
 {{/* The running version, on every authenticated page: it is what a backup
      manifest is checked against on restore and the first thing to establish
@@ -84,6 +87,14 @@
      this one, so its definition replaces this empty one; a page that defines
      nothing keeps it and renders no index. */}}
 {{define "sections"}}{{end}}
+
+{{/* Whether the page takes the column whole. Empty here, so a page is held to
+     the reading measure unless it says otherwise; the three pages that are
+     tables of data or raw log lines redefine this as the word "wide", which
+     lands in <main>'s class list (see main.wide in panel.css). Same mechanism
+     as "sections" above: each page's template file is parsed after this one,
+     so its definition replaces the empty one. */}}
+{{define "wide"}}{{end}}
 
 {{/* Navigation icons. Inline SVG rather than an icon font or sprite file: they
      inherit the link's colour through currentColor, cost no extra request, and

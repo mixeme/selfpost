@@ -52,6 +52,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- Every panel page is laid out in one column of the same width, so moving
+  between them no longer shifts the navigation and the cards sideways. The
+  column used to be the 48rem reading measure, which the send log, the mail
+  queue and the system log widened to 64rem for their tables — and since the
+  navigation and the page are centred as a pair, that difference moved
+  everything on screen on the way between two pages. The column is now 64rem
+  throughout, with the reading measure kept inside it: a page's heading, cards,
+  back link and version footer are held to 48rem and centred in the column,
+  and the three pages made of data opt out and take the column whole. Which
+  pages those are is declared by the page itself (a `wide` block in its
+  template, the same mechanism as the section index) rather than derived from
+  the navigation entry, so a single delivery's page — prose, but filed under
+  the send log — keeps the measure. The scrollbar's width is now reserved on
+  every page as well: without it a short page and a long one were laid out in
+  viewports differing by that width, which moved the same things again.
+
 - The mark's small-size variant — the tab icon and the `SP` initials it
   carries — sets its S in Medium where the wordmark sets it in ExtraLight.
   Against the P's SemiBold the ExtraLight S is a 0.90 stem against 3.40,
