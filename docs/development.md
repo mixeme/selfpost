@@ -44,7 +44,7 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 |---|---|
 | **Go** | 1.26+ (`go.mod`); `CGO_ENABLED=0` — pure Go, static linking |
 | **SQLite** | `modernc.org/sqlite` (pure Go, no cgo) |
-| **Build** | [Makefile](../Makefile): `vet`, `test`, `build`, `e2e` |
+| **Build** | [Makefile](../Makefile): primary targets `vet`, `test`, `build`, `e2e` (also `all`, `clean`) |
 | **Container** | Docker + Compose v2 on the dev host and in CI |
 | **Image (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile) |
 | **Image (runtime)** | `debian:bookworm-slim` + Postfix, OpenDKIM, supervisord, SASL, logrotate |
@@ -163,7 +163,11 @@ The release image is published **only on tag** `vX.Y.Z` (not on every push to
    commit as the tag (see [roadmap.md](roadmap.md) § «v1.x — documentation and
    deploy tail»).
 
-Ordinary commits **do not** publish an image.
+Ordinary commits **do not** publish an image. Intermediate CHANGELOG version
+cuts (`0.2.0`…`0.6.0`) document history on `main`; the compose pin and the only
+git release tag may lag until an explicit image publish (today: compose
+`0.1.0`, tag `v0.0.1` — see [roadmap.md](roadmap.md) § «v1.x — documentation
+and deploy tail»).
 
 ---
 
@@ -200,8 +204,8 @@ go test ./...
 
 ### Env documentation regression
 
-`go test ./cmd/panel -run TestLoadConfig` — every new `loadConfig` key must
-appear in the env lists in [guide.md](guide.md)
+`go test ./cmd/panel -run 'TestLoadConfigKeysDocumented|TestBuildScriptKeysDocumented|TestDocumentedKeysAreRead'`
+— every new `loadConfig` key must appear in the env lists in [guide.md](guide.md)
 ([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
 
 ### End-to-end (container suite)

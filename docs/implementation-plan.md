@@ -27,5 +27,6 @@ e2e/CI в [development.md](development.md), принятые риски в
 whitelist'ом), не могло быть разобрано getopt как флаг
 ([internal/app/sasl.go](../internal/app/sasl.go)). Принятые риски в
 [security.md](security.md) не пополнились — существующие записи (origin-check
-fallback, отсутствие CSRF-токенов, send-log gap) покрывают всё найденное.
-Сводка ревизии — в записи `Security` CHANGELOG `[Unreleased]`.
+fallback, отсутствие CSRF-токенов, ложно-отрицательный `bounced` при сверке
+с `postqueue`) покрывают всё найденное.
+Сводка ревизии — в записи `Security` CHANGELOG `[0.5.0]`.

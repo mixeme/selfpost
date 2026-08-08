@@ -105,7 +105,10 @@ docker logs selfpost-try 2>&1 | grep -m1 'http'
 docker exec selfpost-try cat /data/setup-token
 ```
 
-Open the printed `http://…/setup?token=…` link before it expires.
+The printed URL is `https://mail.local.test/setup/<token>`. For this local
+trial rewrite it to `http://127.0.0.1:8080/setup/<token>` (same path token;
+`PANEL_COOKIE_SECURE=false` so the cookie works over plain HTTP). Open it
+before it expires.
 
 When finished:
 

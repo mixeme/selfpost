@@ -59,6 +59,12 @@ reverse proxy, no `./certs` bind mount — Postfix still starts, but the Status
 page will report missing TLS material until you mount PEM files at
 `/etc/postfix/tls/fullchain.pem` and `privkey.pem`.
 
+The one-time setup link is always printed as
+`https://<SELFPOST_HOSTNAME>/setup/<token>` (and written the same way to
+`/data/setup-token`). For a local trial that means rewriting the host and
+scheme to `http://127.0.0.1:8080/setup/<token>` — the path token is what
+matters; the hostname in the printed URL is not reachable as written.
+
 **What works:** the full panel — setup, domains, applications, deliveries view,
 mail queue, system log. **What does not:** reliable outbound delivery to the
 public internet (no PTR, no real DNS for your domains, port 25 may be blocked
@@ -116,15 +122,17 @@ supported configuration:
   `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
   (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
   `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
-  (`/data/postfix/sender_login_maps`).
+  (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel
+  always writes `<POSTFIX_DIR>/sender_login_maps`, so overriding this env alone
+  desyncs the map Postfix reads from the file the panel maintains).
 - **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
   `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
   `MILTER_WAIT_TIMEOUT` (`30` seconds).
 - **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — daily
   `postfix reload` to pick up renewed certificates),
   `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
-  hours; rotated logs are kept 14 days and each rotation triggers
-  `postfix reload`).
+  hours; logrotate keeps 14 rotated files on a daily schedule, and each
+  rotation triggers `postfix reload`).
 
 ## DNS setup
 
@@ -212,8 +220,9 @@ service healthy and will mail be accepted?"
   hours. It lives in the data volume, so it survives a container recreate along
   with the rest of the state — `./data/log/` on the host — but it is *not*
   included in backups: it is diagnostics, not state.
-- **Backup** (`/backup`) — download a full-server backup or import a
-  single-domain export. See [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
+- **Backup** (`/backup`) — download a full-server backup; the same page hosts
+  the domain-import form (`POST /domains/import`). See
+  [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
 - **Account** (`/account`) — change the administrator username and/or password.
   Application SASL logins are separate and are not changed here.
 
@@ -243,9 +252,10 @@ or poll `docker inspect` health state on the host.
 **First-time setup link.** On first start the one-time setup URL is printed in
 the container log (`docker compose logs -f`) and written to `/data/setup-token`
 inside the container — `./data/setup-token` on the host, mode `0600` — then
-deleted when setup completes. The link is a bearer token valid for ten minutes.
-If this host ships container logs to a central aggregator, prefer reading the
-file:
+deleted when setup completes. The link is
+`https://<SELFPOST_HOSTNAME>/setup/<token>` (path token, not a query string),
+valid for ten minutes. If this host ships container logs to a central
+aggregator, prefer reading the file:
 
 ```sh
 docker compose exec selfpost cat /data/setup-token
@@ -273,10 +283,11 @@ exceeded, Postfix returns a 4xx and the refusal is recorded in Deliveries as
 
 ## Backup, restore, and moving a single domain
 
-Two related but distinct operations — spec 7.5:
+Two related but distinct operations
+([architecture.md](architecture.md) § Persistence):
 
-- **Full backup** (whole `/data`: SQLite, all domains' DKIM keys, all
-  applications' SASL credentials, `manifest.json` with the version that
+- **Full backup** (whole `/data` except `log/`: SQLite, all domains' DKIM keys,
+  all applications' SASL credentials, `manifest.json` with the version that
   created it): panel button (*Backup* → *Full backup*), or from the
   host:
   ```sh
@@ -329,8 +340,10 @@ with AES-256-GCM, in chunks, so a truncated or altered file fails to open rather
 than restoring quietly. **SelfPost does not store the password** — lose it and
 the file is unrecoverable, which is the entire point.
 
-*Import a domain* takes an encrypted export directly: tick **The file is
-encrypted** and give the password.
+*Import a domain* takes an encrypted export directly: choose a `.spde` file and
+the password field appears (driven by the file extension in the browser; the
+server also detects the envelope by its magic bytes). A plain `.json` export
+needs no password.
 
 A full backup has to be turned back into a plain archive before it can be
 unpacked into `/data`, which the CLI does with the same password:
@@ -359,10 +372,12 @@ but it can look like an open port in external scans.
 ## Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. This is a direct consequence of the backup
-version check above: the panel binary's embedded version and the image tag
-that produced it are the same value by construction (the release CI stamps
-both from one git tag — see `.github/workflows/release.yml`), so pinning the
-tag is what makes "restore into the same version" a checkable fact rather than
+deliberately never `:latest`. Until the `v1.0.0` cut the shipped pin is still
+`0.1.0` — intermediate CHANGELOG sections (`0.2.0`…`0.6.0`) record development
+cuts and do not imply a published image of that tag. Pinning matters because of
+the backup version check above: the panel binary's embedded version and the
+image tag that produced it are the same value by construction (the release CI
+stamps both from one git tag — see `.github/workflows/release.yml`), so the
+pin is what makes "restore into the same version" a checkable fact rather than
 a guess. Upgrade by bumping the tag deliberately, not by riding a moving
 target.

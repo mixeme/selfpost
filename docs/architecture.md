@@ -26,7 +26,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
 | Program | User | Priority | Role |
 |---|---|---|---|
-| `opendkim` | opendkim | 100 | DKIM signing milter |
+| `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
 | `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer goroutine |
 | `postfix` | root (wrapper) | 300 | MTA — started only after both milter sockets exist |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
@@ -151,8 +151,10 @@ state for an older message and the page reports it as such, not as a failure.
 
 ## Panel HTTP surface
 
-Route table: [internal/web/web.go](../internal/web/web.go). Authenticated
-unless noted.
+Canonical routes: [internal/web/web.go](../internal/web/web.go). Authenticated
+unless noted. The table below is a summary — HTMX fragment endpoints
+(`/status/fragment`, `/deliveries/rows`, `/mail-queue/body`,
+`/system-log/body`, …) and every POST variant live in `web.go`.
 
 | Route | Purpose |
 |---|---|
@@ -161,12 +163,13 @@ unless noted.
 | `/login`, `/logout` | Session auth |
 | `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
+| `/domains/import` | Domain import (`POST`; form on the Backup page) |
 | `/deliveries` | Send log with filters |
 | `/deliveries/{id}` | One send-log row in full, with its `mail.log` lines |
 | `/mail-queue` | Postfix queue view |
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |
-| `/backup` | Full backup download, domain import |
+| `/backup` | Full backup download (page also hosts the import form) |
 | `/account` | Admin username/password |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
@@ -198,10 +201,12 @@ cookie and idle timeout has not expired.
 
 ## Code layers
 
-Handlers never touch SQLite or the filesystem directly; every write that has to
-land in more than one place (SQLite row, `sasldb2` entry, Postfix map, OpenDKIM
-table) goes through a service, which is also where the rollback of a partial
-failure lives. The adapters below the services are the only code that knows
+Multi-store writes that must land in more than one place (SQLite row,
+`sasldb2` entry, Postfix map, OpenDKIM table) go through a service, which is
+also where the rollback of a partial failure lives. Handlers may call
+`store` directly for single-table reads and simple writes (sessions, admin,
+send-log queries); the first-run setup-token file is read and written in
+`web` itself. The adapters below the services are the only code that knows
 about Postfix, OpenDKIM, DNS or the log file, which is what makes them
 substitutable in tests — `milter.Store`, `app.SenderMaps` and
 `logtail.StatusStore` are the seams the unit tests replace with fakes.
@@ -236,6 +241,7 @@ flowchart TB
   panel --> logtail
   backupcli --> backupPkg
   backupcli --> secretfile
+  web --> store
   web --> domainSvc
   web --> appSvc
   web --> backupPkg

@@ -51,6 +51,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- Docs aligned with the code: setup URL is `/setup/<token>` (README and
+  guide; local trial rewrites the printed `https://<hostname>/…` link to
+  `http://127.0.0.1:8080/…`); domain import uses the file extension / magic
+  bytes for the password field, not an "encrypted" checkbox; architecture
+  layering and route table match `web`→`store` and `POST /domains/import`;
+  OpenDKIM drops to `opendkim` via `UserID`; guide drops the archived
+  "spec 7.5" pointer, clarifies `POSTFIX_SENDER_LOGIN_MAPS` vs panel writes,
+  and states logrotate keeps 14 daily files. Intermediate CHANGELOG cuts vs
+  the still-pinned compose `0.1.0` image are called out in the guide and
+  `development.md`. Roadmap / implementation-plan point at CHANGELOG
+  `[0.5.0]` Security and refreshed `internal/web` size / symbol links.
 - Full backups no longer carry `/data/log`. It is Postfix's raw log plus its
   fourteen rotated copies — diagnostic output rather than state to restore, and
   otherwise by far the largest thing in the archive.
