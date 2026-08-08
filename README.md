@@ -213,9 +213,13 @@ service healthy and will mail be accepted?"
   time, sender, recipient, subject and status `queued` (accepted, not yet
   delivered), `sent` (handed off successfully), or `rejected` (refused — for
   example by a level-2 rate limit); *Details* opens that row's own page
-  (`/deliveries/{id}`) with the sending domain, the application it was
-  submitted under, the Postfix queue id to search the system log for, and when
-  the status was last reported. Retention is controlled by
+  (`/deliveries/{id}`). That page carries the sending domain, the application it
+  was submitted under, the Postfix queue id and the journal id, beside the
+  message's history — when it was accepted and what Postfix later reported for
+  the recipient — and, under both, the `mail.log` lines for its queue id: the
+  connection to the receiving server, the server's reply, and the status that
+  reply was filed as. Rows outlive `mail.log`, so an older message's lines may
+  have rotated away; the page says so. Retention is controlled by
   `SEND_LOG_RETENTION_DAYS`.
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
   trying to deliver or deferring.

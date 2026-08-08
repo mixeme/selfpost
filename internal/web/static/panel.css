@@ -81,12 +81,14 @@ main { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 64rem; }
    floating in the middle — the misalignment that gave login and setup their own
    narrow column (main.page-login further down). */
 main > * { max-width: 48rem; margin-left: auto; margin-right: auto; }
-/* The three monitoring pages are the ones that opt out: six columns of send
-   log, and raw mail.log lines that are long by nature, which at the measure
-   left Subject and Status fighting over the last inch and wrapped every second
-   log line. The class is declared by the page itself (the "wide" block in
-   layout.html) rather than derived from the page name, since a delivery's own
-   page is prose and shares the send log's name in the navigation. */
+/* The four monitoring pages are the ones that opt out: six columns of send
+   log, raw mail.log lines that are long by nature — which at the measure left
+   Subject and Status fighting over the last inch and wrapped every second log
+   line — and a single delivery's page, which stands two cards side by side over
+   a block of those same log lines. The class is declared by the page itself
+   (the "wide" block in layout.html) rather than derived from the page name: a
+   page's name is the navigation entry it belongs under, which several pages
+   share, and how wide a page needs to be is a property of that page alone. */
 main.wide > * { max-width: none; }
 /* Longhands, not the margin shorthand: the shorthand would re-zero the auto
    side margins above and pin the heading to the column's edge, a measure's
@@ -390,6 +392,82 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
 .metric { white-space: nowrap; }
 .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
 .code-row .code { flex: 1; min-width: 0; }
+
+/* Two cards abreast, on the one page that has a pair of them worth reading
+   together (a delivery's facts beside its history). auto-fit with a minimum
+   rather than a media query: the pair falls into one column exactly when a
+   column would drop below the width its content needs, which is also what
+   happens inside the narrow column the navigation lies down at. */
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1.2rem; margin-top: 1.2rem;
+}
+/* The gap already spaces the cards inside the grid; the general .card + .card
+   rule would add a second gap's worth on top of it, and only to the second
+   card, which in one column reads as an uneven stack. The blocks around the
+   grid keep their spacing from it instead. */
+.split > .card + .card { margin-top: 0; }
+.split + .card { margin-top: 1.2rem; }
+/* The subject heads a delivery's page, and it is the one heading in the panel
+   whose text we do not control: it may be a hundred characters with nothing to
+   break on. It wraps to as many lines as it needs (this is the page's name, not
+   a table cell to clip) but never widens the column. */
+h1.subject { overflow-wrap: anywhere; }
+/* The line under it: sender, recipient and outcome. Wrapping rather than
+   clipping, since either address may be long and both are the point. The
+   vertical margins are longhands for the reason given at the h1 rule above —
+   the shorthand would re-zero the auto side margins that keep a page's blocks
+   centred on the measure. It sits close under the heading: the two are one
+   statement of what this page is about. */
+.route {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+  margin-top: -0.5rem; margin-bottom: 1rem;
+}
+.route .addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; overflow-wrap: anywhere; }
+.route .arrow { color: #6b7280; }
+/* A card's short facts, as a grid of tiles rather than the label-over-value
+   stack the rest of the panel uses. That stack is right for the pages where a
+   value is a DNS record or a password to copy — one per line, full width — and
+   wrong for six values of a few characters each, which down a narrow column
+   would be a page of mostly empty rows. Same auto-fit as .split: as many
+   columns as fit, and one when nothing else does. */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.5rem; margin-top: 1rem; }
+.fact { min-width: 0; padding: 0.5rem 0.7rem; border-radius: 8px; background: var(--surface-bg); }
+.fact-label {
+  display: block; font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280;
+}
+/* Nothing here is guaranteed to have a space in it — domains, logins and queue
+   ids are all one run — so a value may break mid word rather than push its tile
+   wider than the column it shares. */
+.fact-value { display: block; margin-top: 0.1rem; overflow-wrap: anywhere; }
+.fact-value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+/* A message's history: the steps down a line, each with the time it happened,
+   the status it reached and what that means. The line is the list's own left
+   border and the dots sit on top of it, so nothing has to be positioned against
+   a fixed row height — a step's text is two lines or five depending on what
+   there is to say about it. */
+.timeline { list-style: none; display: flex; flex-direction: column; gap: 1.1rem;
+            margin: 1rem 0 0; padding: 0.2rem 0 0.2rem 1.4rem; border-left: 2px solid var(--border); }
+.event { position: relative; min-width: 0; }
+.event::before {
+  content: ""; position: absolute; left: -1.85rem; top: 0.3rem;
+  width: 0.65rem; height: 0.65rem; border-radius: 50%;
+  background: var(--card-bg); border: 2px solid var(--control-border);
+}
+/* The dot carries the step's own verdict, in the same four colours as the badge
+   beside it — so the shape of the history is readable down the line alone. */
+.event.lvl-ok::before { border-color: var(--st-ok-fg); background: var(--st-ok-bg); }
+.event.lvl-warn::before { border-color: var(--st-warn-fg); background: var(--st-warn-bg); }
+.event.lvl-error::before { border-color: var(--st-error-fg); background: var(--st-error-bg); }
+/* The step that has not happened yet — a queued message's delivery report — is
+   the one hollow dot, and its text is quiet: it is what to expect, not a record
+   of anything. */
+.event.pending { opacity: 0.7; }
+.event.pending::before { background: var(--card-bg); border-style: dashed; }
+.event-time { margin: 0; font-size: 0.75rem; color: #6b7280; }
+.event-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.15rem 0 0; font-weight: 600; }
+.event-detail { margin: 0.2rem 0 0; font-size: 0.9rem; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
    that several can sit together without shouting — the Copy buttons beside a
    value, the controls of a table row or of an application block. Sign out

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/mailhdr"
@@ -15,10 +16,12 @@ import (
 
 // sendLogPageSize bounds each send-log page (product.md's monitoring screens
 // call for pagination); logTailLines bounds how much of mail.log the log view
-// shows per refresh.
+// shows per refresh, and deliveryLogLines how many of one message's own lines
+// its page shows.
 const (
-	sendLogPageSize = 50
-	logTailLines    = 200
+	sendLogPageSize  = 50
+	logTailLines     = 200
+	deliveryLogLines = 200
 )
 
 // handleDeliveries renders the Deliveries page over the send log: server-side
@@ -57,6 +60,13 @@ func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
 // how it ended — and every remaining field (domain, application, queue id, when
 // the status was last reported) lives here, one page per row, so widening the
 // journal never costs the table a column.
+//
+// The page answers the question the log raises rather than restating it: what
+// the journal recorded, in what order it happened, and what Postfix itself
+// wrote about the message. So it is three blocks — the message's own facts and
+// its history side by side, and the mail.log lines for its queue id under both.
+// The queue id used to be printed here as something to go and search the system
+// log for by hand; the search is done for the operator instead.
 func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
@@ -75,15 +85,150 @@ func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
+	lines, logNote := s.deliveryLog(row)
 	s.render(w, http.StatusOK, "delivery", map[string]any{
 		"Title":  "SelfPost — delivery",
 		"User":   currentUser(r),
 		"Active": "deliveries",
 		"Row":    row,
+		// The status in the panel's own badge vocabulary, so the headline reads
+		// the same way as every other health signal in the panel.
+		"Level":  deliveryLevel(row.Status),
+		"Events": deliveryEvents(row),
+		// The mail.log lines for this message, and — when there are none — the
+		// reason, which is a normal outcome rather than a failure.
+		"LogLines": lines,
+		"LogNote":  logNote,
 		// Where the row came from, so "Back" returns to the page and filters
 		// the operator was looking at rather than the top of an unfiltered log.
 		"BackURL": deliveriesBackURL(r),
 	})
+}
+
+// deliveryLevel maps a send-log status onto the ok/warn/error/unknown badge
+// vocabulary the status page and the DNS checks already use (see .st in
+// panel.css), so a colour means the same thing on every page: delivered is the
+// good outcome, deferred is not settled yet, and the two refusals are failures.
+// A queued row is "unknown" rather than "warn" — nothing has gone wrong, it is
+// simply that nothing has been reported.
+func deliveryLevel(status string) string {
+	switch status {
+	case store.StatusSent:
+		return "ok"
+	case store.StatusDeferred:
+		return "warn"
+	case store.StatusBounced, store.StatusRejected:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
+// deliveryEvent is one step of a message's history, as the timeline on the
+// delivery page draws it. At is zero for the step that has not happened yet —
+// the delivery report a queued message is still waiting for.
+type deliveryEvent struct {
+	At     time.Time
+	Level  string // ok / warn / error / unknown, as deliveryLevel returns
+	Status string // the send-log status value this step reached
+	Title  string
+	Detail string
+}
+
+// deliveryEvents turns a row's two timestamps into the history the page shows.
+// The journal keeps no event table — a row is created when the message is
+// accepted and updated once when Postfix reports the attempt — so the two
+// timestamps *are* the history, and stating them as steps is what makes a row
+// whose created_at and updated_at differ by six hours legible as "queued for
+// six hours, then delivered" rather than as two dates in a list of fields.
+func deliveryEvents(row store.SendLogRow) []deliveryEvent {
+	// A rejected message has no second step, and its first one is not an
+	// acceptance: the journal-milter refused it, so Postfix never queued it.
+	if row.Status == store.StatusRejected {
+		return []deliveryEvent{{
+			At:     row.CreatedAt,
+			Level:  "error",
+			Status: store.StatusRejected,
+			Title:  "Refused before queueing",
+			Detail: "The journal-milter refused the message under a rate limit. It was never queued, so there is no queue id and Postfix never attempted delivery.",
+		}}
+	}
+
+	events := []deliveryEvent{{
+		At:     row.CreatedAt,
+		Level:  "unknown",
+		Status: store.StatusQueued,
+		Title:  "Accepted and queued",
+		Detail: "Postfix accepted the message over an authenticated submission and the journal-milter recorded it. Delivery to the recipient had not been attempted yet.",
+	}}
+
+	switch row.Status {
+	case store.StatusQueued:
+		// The step that has not happened. Drawn as an open dot with no time.
+		return append(events, deliveryEvent{
+			Level:  "unknown",
+			Status: store.StatusQueued,
+			Title:  "Waiting for a delivery report",
+			Detail: "Postfix has not reported an attempt for this recipient yet. The Mail queue page shows what it is still holding.",
+		})
+	case store.StatusSent:
+		return append(events, deliveryEvent{
+			At:     row.UpdatedAt,
+			Level:  "ok",
+			Status: store.StatusSent,
+			Title:  "Delivered",
+			Detail: "The receiving server accepted the message. That is as far as this server can see — what the recipient's mailbox then did with it is not reported back.",
+		})
+	case store.StatusDeferred:
+		return append(events, deliveryEvent{
+			At:     row.UpdatedAt,
+			Level:  "warn",
+			Status: store.StatusDeferred,
+			Title:  "Deferred, will be retried",
+			Detail: "The receiving server could not take the message yet. Postfix keeps it queued and retries until it is delivered or the queue lifetime runs out.",
+		})
+	case store.StatusBounced:
+		return append(events, deliveryEvent{
+			At:     row.UpdatedAt,
+			Level:  "error",
+			Status: store.StatusBounced,
+			Title:  "Bounced",
+			Detail: "Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after the queue lifetime. The reason is in the delivery log below.",
+		})
+	default:
+		// A status the log-tailer learns to write before this switch does.
+		return append(events, deliveryEvent{
+			At:     row.UpdatedAt,
+			Level:  deliveryLevel(row.Status),
+			Status: row.Status,
+			Title:  "Status reported",
+			Detail: "The last state Postfix reported for this recipient.",
+		})
+	}
+}
+
+// deliveryLog reads the mail.log lines Postfix wrote about one message. The
+// second return value is what to say when there are none: every reason for an
+// empty result here is an ordinary one — the message never reached the queue,
+// or its lines have aged out of the log — so none of them is an error on the
+// page. Only a log that cannot be read at all is reported as a fault, and that
+// one is logged for the operator as well.
+func (s *Server) deliveryLog(row store.SendLogRow) ([]string, string) {
+	if row.QueueID == "" {
+		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
+	}
+	lines, err := logtail.QueueLines(s.cfg.MailLogPath, row.QueueID, deliveryLogLines)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		logf("panel: delivery log %s: %v", row.QueueID, err)
+		return nil, "Could not read the mail log."
+	}
+	if len(lines) == 0 {
+		// Send-log rows outlive mail.log: retention is ninety days by default
+		// and rotation keeps fourteen files, so an older message having nothing
+		// left to show is the normal end state, not a fault.
+		return nil, "Nothing for this queue id in the current mail log. Its lines have most likely been rotated away."
+	}
+	return lines, ""
 }
 
 // deliveriesBackURL rebuilds the delivery-log URL a detail page was opened

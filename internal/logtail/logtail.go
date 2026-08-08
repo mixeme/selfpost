@@ -176,6 +176,110 @@ func TailLines(path string, n int) ([]string, error) {
 	return lines, nil
 }
 
+// queueScanBytes bounds how far back QueueLines reads. A message's own lines
+// are a handful, but they are scattered through everything else the mail path
+// logged around them, so finding them means reading rather than seeking. The
+// budget is what keeps that read bounded on a log that has grown for a day:
+// beyond it the answer is "not in the part of the log still on disk", which is
+// the same answer rotation gives and is reported the same way. It is a var so
+// tests can shrink it, the way pollInterval above is.
+var queueScanBytes int64 = 4 << 20
+
+// QueueLines returns the mail.log lines Postfix wrote about one queue id,
+// oldest first and at most n of them, for a single delivery's page
+// (architecture.md § Panel HTTP surface). It reads the tail of the log the way
+// TailLines does — one-shot, on request, unrelated to the follow loop above —
+// but keeps only the lines belonging to this message instead of the last n of
+// everything.
+//
+// A message older than the tail scanned, or older than the current log file,
+// comes back empty rather than as an error: send-log rows outlive mail.log
+// (retention is ninety days by default, rotation keeps fourteen files), so a
+// row with nothing left to show for it is expected.
+func QueueLines(path, queueID string, n int) ([]string, error) {
+	// No queue-id, no lines: a message the milter refused was never queued, so
+	// there is nothing to match on and every line would be someone else's.
+	if queueID == "" || n <= 0 {
+		return nil, nil
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	// Forward from the start of the budget rather than backwards in chunks:
+	// the lines are wanted oldest first, and the whole budget is read either
+	// way, so reading it in order costs nothing and keeps them in order.
+	start := info.Size() - queueScanBytes
+	if start < 0 {
+		start = 0
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return nil, err
+	}
+
+	sc := bufio.NewScanner(f)
+	// A Postfix line carrying a long remote reply can pass the scanner's default
+	// 64KB token; without a bigger ceiling that one line would end the scan and
+	// silently truncate the answer.
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	// Reading into the middle of the file lands mid-line; that fragment is
+	// dropped rather than reported as a line of its own.
+	if start > 0 && sc.Scan() {
+		_ = sc.Text()
+	}
+
+	var lines []string
+	for sc.Scan() {
+		line := sc.Text()
+		if !mentionsQueueID(line, queueID) {
+			continue
+		}
+		lines = append(lines, line)
+		// Keep the latest n rather than stopping at the first n: what a message
+		// did last is what its page is opened for.
+		if len(lines) > n {
+			lines = lines[1:]
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return lines, nil
+}
+
+// mentionsQueueID reports whether a mail.log line is about queueID. Postfix
+// writes the id followed by a colon ("… postfix/smtp[26]: 41E862C00D9E: to=…"),
+// and the match is anchored on the character before it so a shorter id is not
+// found inside a longer one — queue ids are hexadecimal, and one being the tail
+// of another is ordinary, not unlikely.
+func mentionsQueueID(line, queueID string) bool {
+	needle := queueID + ":"
+	for i := 0; i <= len(line)-len(needle); {
+		j := strings.Index(line[i:], needle)
+		if j < 0 {
+			return false
+		}
+		j += i
+		if j == 0 || !isQueueIDByte(line[j-1]) {
+			return true
+		}
+		i = j + 1
+	}
+	return false
+}
+
+func isQueueIDByte(b byte) bool {
+	return b >= '0' && b <= '9' || b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z'
+}
+
 // follow tails path line by line, calling handle for each complete line, until
 // ctx is cancelled. Where it starts is tr's decision (a persisted offset, the
 // start of a file that changed while the panel was down, or end-of-file on a

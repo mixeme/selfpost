@@ -1,55 +1,108 @@
+{{/* One message's page. It takes the whole column rather than the reading
+     measure (see the "wide" block in layout.html): the two cards below stand
+     side by side, and under them are raw mail.log lines, which are long by
+     nature and were the reason the send log opted out too. */}}
+{{define "wide"}}wide{{end}}
+
 {{define "content"}}
-<h1>Delivery</h1>
+{{/* The subject is the page's name — it is what the message was about, and
+     what an operator arriving from the log is holding in their head. The route
+     under it is the other half of the identity: who it was from and who it was
+     for, with the outcome badged on the end so the answer is on the first line
+     of the page rather than somewhere in the cards below. */}}
+<h1 class="subject">{{if .Row.Subject}}{{.Row.Subject}}{{else}}(no subject){{end}}</h1>
+<p class="route">
+  <span class="addr">{{.Row.From}}</span>
+  <span class="arrow" aria-hidden="true">&rarr;</span>
+  <span class="addr">{{if .Row.To}}{{.Row.To}}{{else}}—{{end}}</span>
+  <span class="st st-{{.Level}}">{{.Row.Status}}</span>
+</p>
 
 <a class="back" href="{{.BackURL}}">&larr; Back to deliveries</a>
 
-<div class="card">
-  <h2>Message</h2>
-  <p class="muted">One recipient of one message, as the journal-milter recorded
-  it when Postfix accepted it. The delivery log lists these; everything the list
-  has no room for is here.</p>
+{{/* The two columns: what was recorded on the left, in what order it happened
+     on the right. They are a pair — the facts are only worth reading against
+     the history and the history only means anything for a known message — so
+     they are read together rather than one after the other (.split in
+     panel.css lays them down into one column when there is no room). */}}
+<div class="split">
+  <div class="card" id="message">
+    <h2>Message</h2>
+    <p class="muted">What the journal recorded as Postfix accepted this
+    message. The delivery log lists only what identifies a row at a glance;
+    everything the table has no column for is here.</p>
 
-  <label>Time</label>
-  <span class="code">{{.Row.CreatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
+    <div class="facts">
+      <div class="fact">
+        <span class="fact-label">Domain</span>
+        <span class="fact-value">{{if .Row.Domain}}{{.Row.Domain}}{{else}}—{{end}}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-label">Application</span>
+        <span class="fact-value">{{if .Row.AppLogin}}{{.Row.AppLogin}}{{else}}—{{end}}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-label">Accepted</span>
+        <span class="fact-value">{{.Row.CreatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
+      </div>
+      <div class="fact">
+        <span class="fact-label">Status reported</span>
+        <span class="fact-value">{{.Row.UpdatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
+      </div>
+      {{/* The queue id is monospace because it is an identifier to compare
+           character by character against a log line, not a word to read. */}}
+      <div class="fact">
+        <span class="fact-label">Queue id</span>
+        <span class="fact-value mono">{{if .Row.QueueID}}{{.Row.QueueID}}{{else}}—{{end}}</span>
+      </div>
+      <div class="fact">
+        <span class="fact-label">Journal id</span>
+        <span class="fact-value mono">{{.Row.ID}}</span>
+      </div>
+    </div>
 
-  <label>From</label>
-  <span class="code">{{.Row.From}}</span>
+    {{if not .Row.QueueID}}
+    <p class="muted">A message with no queue id was refused before Postfix
+    queued it — under a level-2 rate limit — so it has no delivery attempt to
+    show.</p>
+    {{end}}
+  </div>
 
-  <label>To</label>
-  <span class="code">{{if .Row.To}}{{.Row.To}}{{else}}—{{end}}</span>
+  <div class="card" id="history">
+    <h2>History</h2>
+    <p class="muted">A row is written when the message is accepted and updated
+    once when Postfix reports the attempt for this recipient, so these are the
+    two moments the journal knows about — not a trace of the SMTP conversation,
+    which is in the delivery log below.</p>
 
-  <label>Subject</label>
-  <span class="code">{{if .Row.Subject}}{{.Row.Subject}}{{else}}—{{end}}</span>
-
-  <label>Status</label>
-  <span class="code">{{.Row.Status}}</span>
+    <ol class="timeline">
+      {{range .Events}}
+      <li class="event lvl-{{.Level}}{{if .At.IsZero}} pending{{end}}">
+        <p class="event-time">{{if .At.IsZero}}not yet{{else}}{{.At.Format "2006-01-02 15:04:05"}} UTC{{end}}</p>
+        <p class="event-title"><span class="st st-{{.Level}}">{{.Status}}</span> {{.Title}}</p>
+        <p class="event-detail muted">{{.Detail}}</p>
+      </li>
+      {{end}}
+    </ol>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Origin</h2>
-  <p class="muted">Which sending domain and which application's SASL account the
-  message was submitted under — the two filters the delivery log offers.</p>
+{{/* Under both, at the column's full width: what Postfix itself wrote. The
+     queue id used to be printed on this page as something to go and search the
+     system log for by hand — this is that search, already done. */}}
+<div class="card" id="delivery-log">
+  <h2>Delivery log</h2>
+  <p class="muted">The lines Postfix wrote about this message in
+  <code>mail.log</code>, oldest first — the connection to the receiving server,
+  its reply, and the status that reply was filed as. Only lines carrying this
+  message's queue id are shown; the whole log is on the
+  <a href="/system-log">System log</a> page.</p>
 
-  <label>Domain</label>
-  <span class="code">{{if .Row.Domain}}{{.Row.Domain}}{{else}}—{{end}}</span>
-
-  <label>Application</label>
-  <span class="code">{{if .Row.AppLogin}}{{.Row.AppLogin}}{{else}}—{{end}}</span>
-</div>
-
-<div class="card">
-  <h2>Handling</h2>
-  <p class="muted">Postfix's own identifiers for this message. The queue id is
-  what to search the system log for; a rejected message never got one, because
-  it was refused before it was queued.</p>
-
-  <label>Queue id</label>
-  <span class="code">{{if .Row.QueueID}}{{.Row.QueueID}}{{else}}—{{end}}</span>
-
-  <label>Status last reported</label>
-  <span class="code">{{.Row.UpdatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
-
-  <label>Journal id</label>
-  <span class="code">{{.Row.ID}}</span>
+  {{if .LogLines}}
+  <span class="code">{{range .LogLines}}{{.}}
+{{end}}</span>
+  {{else}}
+  <p class="muted">{{.LogNote}}</p>
+  {{end}}
 </div>
 {{end}}
