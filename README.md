@@ -78,10 +78,7 @@ See [DNS setup](docs/guide.md#dns-setup) in the operator guide.
 > **First boot — create the admin account.** On a fresh container SelfPost prints
 > a **one-time setup URL** (valid ten minutes). Open it in a browser to choose
 > the administrator username and password. Until you do, the panel has no login.
-> How to read the link depends on the path below; production deploy:
-> [step 3](#3-start-selfpost).
-
-### Try it locally
+> Production deploy: [step 3](#3-start-selfpost).
 
 One container, panel at `http://127.0.0.1:8080` — no reverse proxy, no TLS
 files, no compose files. Good for clicking through the UI on your machine;
@@ -116,11 +113,6 @@ docker rm -f selfpost-try && docker volume rm selfpost-try-data
 
 More detail (limitations, optional throwaway TLS for local SMTP): [Local
 trial](docs/guide.md#local-trial) in the operator guide.
-
-### Deploy for real use
-
-Step-by-step production deploy (compose, reverse proxy, TLS, DNS):
-[Reference deploy](#reference-deploy).
 
 ## Reference deploy
 

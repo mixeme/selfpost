@@ -53,7 +53,7 @@ printing the `Origin` and `Host` it compared.
 
 ## Local trial
 
-The [README quick start](../README.md#try-it-locally) runs a single container
+The [README quick start](../README.md#quick-start) runs a single container
 with `PANEL_COOKIE_SECURE=false` and port 8080 published on localhost. No
 reverse proxy, no `./certs` bind mount — Postfix still starts, but the Status
 page will report missing TLS material until you mount PEM files at
