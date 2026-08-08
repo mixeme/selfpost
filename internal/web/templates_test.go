@@ -215,6 +215,32 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	}
 }
 
+// Whether a page takes the whole column or the reading measure is declared by
+// the page's own "wide" block (see layout.html), which the layout stamps into
+// <main>'s class list. A page that loses the block does not fail to render — it
+// silently comes back at the measure, with its table squeezed into two thirds
+// of the column — so the set is asserted here, in both directions.
+func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	wide := map[string]bool{"deliveries": true, "mail_queue": true, "system_log": true}
+	for name, page := range tmpl.pages {
+		var buf bytes.Buffer
+		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
+			t.Fatalf("execute the wide block of %s: %v", name, err)
+		}
+		got := strings.TrimSpace(buf.String())
+		switch {
+		case wide[name] && got != "wide":
+			t.Errorf("page %q no longer declares itself wide (%q); its data falls back to the reading measure", name, got)
+		case !wide[name] && got != "":
+			t.Errorf("page %q declares itself %q; only the pages that are tables of data or raw log lines take the whole column", name, got)
+		}
+	}
+}
+
 // Since the panel root redirects to the status page, a link left pointing at
 // "/" silently lands on the wrong screen instead of failing — so no template may
 // contain one.
