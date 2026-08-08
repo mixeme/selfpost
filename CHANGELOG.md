@@ -28,8 +28,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   panel's own ok/warn/error/unknown badge vocabulary. A message still queued
   shows the delivery report it is waiting for as a step that has not happened.
 
+### Fixed
+
+- A send-log row could stay `queued` forever after the container was recreated.
+  `mail.log` moved from the ephemeral `/var/log` into the data volume
+  (`/data/log/mail.log`, `./data/log/` on the host), so the delivery lines that
+  resolve a queued row now outlive the container the same way the journal does.
+  `postlogd` writes the file as user `postfix` and the unprivileged panel reads
+  it through the shared `selfpost` group (directory `2750`, file `0640`,
+  re-normalised on every start); logrotate creates each new file the same way.
+  Existing deployments need no action beyond the upgrade — the directory is
+  created on first start — but the log written by the previous image is gone
+  with its container, and the tailer starts the new file from its end.
+- A row whose delivery lines are gone for good is no longer left `queued`
+  indefinitely: every five minutes the tailer compares rows still queued from
+  more than two minutes ago against `postqueue -p`, and marks `bounced` those
+  whose message Postfix no longer holds — it will never report on them again.
+  The sweep waits until the tailer has read the log to its end (on a restart the
+  log itself holds the answer) and does nothing at all if the queue cannot be
+  listed, so a message merely in flight, or a `postqueue` that fails, never
+  closes a row.
+
 ### Changed
 
+- Full backups no longer carry `/data/log`. It is Postfix's raw log plus its
+  fourteen rotated copies — diagnostic output rather than state to restore, and
+  otherwise by far the largest thing in the archive.
 - Monitoring screens (status, mail queue, system log, deliveries) use adaptive
   HTMX polling: 5 s while the operator is active on the page, 30 s when the tab
   is visible but idle, and no requests while the tab is hidden. Scheduling

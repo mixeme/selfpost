@@ -81,13 +81,16 @@ git-тег `vX.Y.Z`; `implementation-plan.md` в `docs/archive/`, ссылок �
 осознанно не делать.~~ **Закрыто (v1.x-closure Фаза 1):** адаптивный интервал
 5 с / 30 с / 0 (скрытая вкладка) в `panel.js` через `data-poll`.
 
-**Send-log vs `mail.log` (частично закрыто).** Persist позиции чтения сделан
-(таблица `logtail_state`, миграция `0003`): после
-рестарта панели log-tailer дочитывает пропущенный хвост. Остаётся пересоздание
-контейнера — `mail.log` не в `/data` и теряется вместе с ним, такие строки
-навсегда останутся `queued`. Кандидаты, если станет больно: volume для лога,
-сверка зависших строк через `postqueue`. As-built и принятый риск:
-[architecture.md](architecture.md) § Log tailer, [security.md](security.md).
+**Send-log vs `mail.log`.** ~~Persist позиции чтения сделан (таблица
+`logtail_state`, миграция `0003`): после рестарта панели log-tailer дочитывает
+пропущенный хвост. Остаётся пересоздание контейнера — `mail.log` не в `/data` и
+теряется вместе с ним, такие строки навсегда останутся `queued`. Кандидаты, если
+станет больно: volume для лога, сверка зависших строк через `postqueue`.~~
+**Закрыто (v1.x-closure Фаза 2):** сделаны оба кандидата — `mail.log` переехал в
+`/data/log/`, а строки, чьи delivery-строки потеряны безвозвратно, закрываются
+сверкой с `postqueue -p` (grace 2 мин → `bounced`). As-built и оставшийся риск
+(ложный `bounced`): [architecture.md](architecture.md) § Log tailer,
+[security.md](security.md).
 
 ---
 

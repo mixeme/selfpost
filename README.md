@@ -52,7 +52,8 @@ missing PTR record for you. Details: [Operator guide](docs/guide.md).
 - Docker + Compose v2 on the host
 - A reverse proxy in front of the panel (SelfPost never terminates HTTPS itself)
 - Rough sizing: **1 vCPU**, **512 MB–1 GB RAM**, **8–10 GB disk** (send log and
-  rotated `mail.log` are the main growth drivers)
+  rotated `mail.log` are the main growth drivers; both sit in the `./data`
+  volume, and both are capped — 90 days and 14 files by default)
 
 ### Network and IP
 

@@ -45,10 +45,18 @@ SASLDB_PATH="${SASL_DB_PATH:-/data/sasl/sasldb2}"
 # when a client library needs STARTTLS on 587 instead of implicit TLS on 465).
 SUBMISSION_ENABLE="${SUBMISSION_ENABLE:-false}"
 
+# Delivery log, written by postlogd and read by the panel's log-tailer. It lives
+# under the persistent /data (not the ephemeral /var/log) so the delivery lines
+# for messages still marked "queued" survive a container recreate — without
+# them those rows could never be resolved (architecture.md § Log tailer). The
+# default must match cmd/panel/main.go's MAIL_LOG; entrypoint.sh creates the
+# directory and the file with the ownership postlogd writes and the panel reads.
+MAIL_LOG_PATH="${MAIL_LOG:-/data/log/mail.log}"
+
 # --- main.cf -----------------------------------------------------------------
 postconf -e \
 	"myhostname=${HOSTNAME_VALUE}" \
-	"maillog_file=/var/log/mail.log" \
+	"maillog_file=${MAIL_LOG_PATH}" \
 	"mydestination=" \
 	"relayhost=" \
 	"inet_interfaces=all" \

@@ -109,7 +109,9 @@ supported configuration:
   (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
   (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
   `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`), `MAIL_LOG`
-  (`/var/log/mail.log`), `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
+  (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
+  here has to be matched in `build/postfix-config.sh`),
+  `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
   (`/run/opendkim/opendkim.sock`), `OPENDKIM_DIR` (`/data/opendkim`),
   `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
   (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
@@ -191,8 +193,9 @@ service healthy and will mail be accepted?"
 - **Deliveries** (`/deliveries`) — searchable send log with server-side filters
   by domain and application. A row identifies its message and nothing more —
   time, sender, recipient, subject and status `queued` (accepted, not yet
-  delivered), `sent` (handed off successfully), or `rejected` (refused — for
-  example by a level-2 rate limit); *Details* opens that row's own page
+  delivered), `sent` (handed off successfully), `deferred` (Postfix is retrying),
+  `bounced` (final failure), or `rejected` (refused — for example by a level-2
+  rate limit); *Details* opens that row's own page
   (`/deliveries/{id}`). That page carries the sending domain, the application it
   was submitted under, the Postfix queue id and the journal id, beside the
   message's history — when it was accepted and what Postfix later reported for
@@ -203,10 +206,12 @@ service healthy and will mail be accepted?"
   `SEND_LOG_RETENTION_DAYS`.
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
   trying to deliver or deferring.
-- **System log** (`/system-log`) — tail of `/var/log/mail.log` (Postfix and
+- **System log** (`/system-log`) — tail of `/data/log/mail.log` (Postfix and
   related daemon lines). The log rotates daily (14 files kept) with a
   `postfix reload` after each rotation; a background loop checks every six
-  hours.
+  hours. It lives in the data volume, so it survives a container recreate along
+  with the rest of the state — `./data/log/` on the host — but it is *not*
+  included in backups: it is diagnostics, not state.
 - **Backup** (`/backup`) — download a full-server backup or import a
   single-domain export. See [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
 - **Account** (`/account`) — change the administrator username and/or password.
@@ -288,7 +293,10 @@ Two related but distinct operations — spec 7.5:
 
   **Alternative: archive `./data` while stopped.** If the service can be taken
   offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
-  the host is safe — nothing is writing to SQLite. Do **not** tar `./data` while
+  the host is safe — nothing is writing to SQLite. Unlike the panel/CLI backup
+  this sweeps in `./data/log/` too, which is Postfix's raw log and usually the
+  bulk of the archive; add `--exclude=./data/log` if you only want the state.
+  Do **not** tar `./data` while
   the container is running: the database uses WAL mode and a naive copy can
   capture an inconsistent snapshot. The panel/CLI backup remains preferable when
   you cannot afford downtime because it takes a consistent SQLite snapshot via
