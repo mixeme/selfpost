@@ -1,198 +1,201 @@
-# SelfPost — разработка
+# SelfPost — development
 
-**Что это.** Как собрать, проверить и выкатить изменения. Текущий спринт —
-[progress.md](progress.md) (читать первым после `/clear`).
+**What this file is.** How to build, test, and ship changes. Current sprint
+state lives in [progress.md](progress.md) — read that first after `/clear`.
 
-Границы продукта: [product.md](product.md). As-built устройство:
+Product boundaries: [product.md](product.md). As-built layout:
 [architecture.md](architecture.md).
 
 ---
 
-## Технологический стек и инструменты
+## Technology stack and tools
 
-| Компонент | Версия / заметки |
+| Component | Version / notes |
 |---|---|
-| **Go** | 1.26+ (`go.mod`); `CGO_ENABLED=0` — чистый Go, статическая линковка |
-| **SQLite** | `modernc.org/sqlite` (pure Go, без cgo) |
-| **Сборка** | [Makefile](../Makefile): `vet`, `test`, `build`, `e2e` |
-| **Контейнер** | Docker + Compose v2 на хосте разработки и в CI |
-| **Образ (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile) |
-| **Образ (runtime)** | `debian:bookworm-slim` + Postfix, OpenDKIM, supervisord, SASL, logrotate |
+| **Go** | 1.26+ (`go.mod`); `CGO_ENABLED=0` — pure Go, static linking |
+| **SQLite** | `modernc.org/sqlite` (pure Go, no cgo) |
+| **Build** | [Makefile](../Makefile): `vet`, `test`, `build`, `e2e` |
+| **Container** | Docker + Compose v2 on the dev host and in CI |
+| **Image (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile) |
+| **Image (runtime)** | `debian:bookworm-slim` + Postfix, OpenDKIM, supervisord, SASL, logrotate |
 | **CI** | GitHub Actions — [.github/workflows/](../.github/workflows/) |
-| **Реестр образов** | `ghcr.io/mixeme/selfpost` |
+| **Image registry** | `ghcr.io/mixeme/selfpost` |
 
-**Структура репозитория** (кратко; детали процессов — в [architecture.md](architecture.md)):
+**Repository layout** (brief; process details in [architecture.md](architecture.md)):
 
-- `cmd/panel` — HTTP-панель + journal-milter + log-tailer
-- `cmd/selfpost-backup` — CLI бэкапа (`docker exec … selfpost-backup`)
-- `internal/` — доменная логика, store, web, health
+- `cmd/panel` — HTTP panel + journal-milter + log-tailer
+- `cmd/selfpost-backup` — backup CLI (`docker exec … selfpost-backup`)
+- `internal/` — domain logic, store, web, health
 - `build/` — Dockerfile, supervisord, Postfix/OpenDKIM, entrypoint
-- `deploy/` — `docker-compose.yml`, примеры прокси, `.env.example`
-- `test/e2e/` — **отдельный Go-модуль**; контейнерные интеграционные тесты
+- `deploy/` — `docker-compose.yml`, proxy examples, `.env.example`
+- `test/e2e/` — **separate Go module**; container integration tests
 
 ---
 
-## Внешние библиотеки
+## External libraries
 
-Проект — **AGPL-3.0** ([LICENSE](../LICENSE)). Новые Go-зависимости — только
-permissive или GPL-family (см. [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
+The project is **AGPL-3.0** ([LICENSE](../LICENSE)). New Go dependencies must
+be permissive or GPL-family (see
+[.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
 
-### Основной модуль (`go.mod`)
+### Main module (`go.mod`)
 
-| Пакет | Версия | Репозиторий | Лицензия |
+| Package | Version | Repository | License |
 |---|---|---|---|
 | `github.com/emersion/go-milter` | v0.4.1 | <https://github.com/emersion/go-milter> | BSD-2-Clause |
 | `golang.org/x/crypto` | v0.54.0 | <https://github.com/golang/crypto> | BSD-3-Clause |
-| `modernc.org/sqlite` | v1.53.0 | <https://gitlab.com/cznic/sqlite> (зеркало: <https://github.com/modernc-org/sqlite>) | BSD-3-Clause |
+| `modernc.org/sqlite` | v1.53.0 | <https://gitlab.com/cznic/sqlite> (mirror: <https://github.com/modernc-org/sqlite>) | BSD-3-Clause |
 
-Транзитивные зависимости — `go mod graph` / `go.sum`; все indirect в дереве
-совместимы с AGPL-3.0.
+Transitive dependencies — `go mod graph` / `go.sum`; all indirect packages in
+the tree are AGPL-3.0-compatible.
 
-### Модуль e2e (`test/e2e/go.mod`)
+### E2e module (`test/e2e/go.mod`)
 
-| Пакет | Версия | Репозиторий | Лицензия |
+| Package | Version | Repository | License |
 |---|---|---|---|
 | `github.com/emersion/go-msgauth` | v0.6.8 | <https://github.com/emersion/go-msgauth> | BSD-2-Clause |
 
-Тестовый модуль не входит в граф основного `go build` и не попадает в образ.
+The test module is not part of the main `go build` graph and is not shipped in
+the image.
 
-### Пакеты Debian в runtime-образе
+### Debian packages in the runtime image
 
-Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate` и др. —
-из репозиториев Debian bookworm; лицензии — в `copyright` соответствующих
-пакетов на <https://packages.debian.org/bookworm/>.
+Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
+from Debian bookworm repositories; licenses are in each package's `copyright`
+file on <https://packages.debian.org/bookworm/>.
 
 ---
 
-## Сборка исполняемого файла и образа
+## Building binaries and the image
 
-### Локальные бинарники
+### Local binaries
 
-Требуется Go 1.26+ и `CGO_ENABLED=0`.
+Requires Go 1.26+ and `CGO_ENABLED=0`.
 
 ```sh
-make build        # bin/panel, bin/selfpost-backup (VERSION=dev по умолчанию)
+make build        # bin/panel, bin/selfpost-backup (VERSION=dev by default)
 make build VERSION=1.0.0
 ```
 
-Или напрямую:
+Or directly:
 
 ```sh
 go build -trimpath -ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Version=dev" -o bin/panel ./cmd/panel
 ```
 
-Версия вшивается в оба бинарники через `-ldflags` и **должна совпадать с тегом
-Docker-образа** — restore проверяет совместимость версий бэкапа.
+The version is stamped into both binaries via `-ldflags` and **must match the
+Docker image tag** — restore checks backup version compatibility.
 
-### Docker-образ
+### Docker image
 
-Из корня репозитория:
+From the repository root:
 
 ```sh
 docker build -f build/Dockerfile -t selfpost:dev --build-arg VERSION=dev .
 ```
 
-В Dockerfile: build stage (`go vet`, `go build` с `VERSION`), runtime stage
-(Debian + почтовый стек). См. [architecture.md](architecture.md) § Image and
-processes.
+The Dockerfile has a build stage (`go vet`, `go build` with `VERSION`) and a
+runtime stage (Debian + mail stack). See [architecture.md](architecture.md) §
+Image and processes.
 
 ---
 
-## Сборка релиза
+## Release build
 
-Релизный образ публикуется **только по тегу** `vX.Y.Z` (не на каждый push в
-`main`). Тег — единственный источник версии: из него берутся тег образа и
-`-ldflags` в бинарниках, чтобы они не расходились.
+The release image is published **only on tag** `vX.Y.Z` (not on every push to
+`main`). The tag is the single source of version: it drives the image tag and
+`-ldflags` in the binaries so they cannot drift apart.
 
-**Шаги (по явному запросу):**
+**Steps (on explicit request):**
 
-1. Закрыть `[Unreleased]` в [CHANGELOG.md](../CHANGELOG.md).
-2. Создать и запушить git-тег `vX.Y.Z`.
-3. Workflow [release.yml](../.github/workflows/release.yml) собирает, гейтит
-   e2e и публикует `ghcr.io/mixeme/selfpost:X.Y.Z`.
-4. Обновить закреплённый тег в [deploy/docker-compose.yml](../deploy/docker-compose.yml)
-   (см. [roadmap.md](roadmap.md) § «v1.x — хвост документации и деплоя»).
+1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md).
+2. Create and push git tag `vX.Y.Z`.
+3. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
+   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
+4. Update the pinned tag in
+   [deploy/docker-compose.yml](../deploy/docker-compose.yml) (see
+   [roadmap.md](roadmap.md) § «v1.x — documentation and deploy tail»).
 
-Обычные коммиты **не** публикуют образ.
+Ordinary commits **do not** publish an image.
 
 ---
 
-## Тестирование
+## Testing
 
-### Статический анализ и unit-тесты
+### Static analysis and unit tests
 
-Основной модуль (`go test ./...`); e2e — отдельный модуль, см. ниже.
+Main module (`go test ./...`); e2e is a separate module — see below.
 
 ```sh
 make vet          # go vet ./...
 make test         # go test ./...
 ```
 
-Или напрямую:
+Or directly:
 
 ```sh
-gofmt -l .        # в CI — fail при расхождении
+gofmt -l .        # in CI — fails on drift
 go vet ./...
 go test ./...
 ```
 
-### Регресс документации env
+### Env documentation regression
 
-`go test ./cmd/panel -run TestLoadConfig` — каждый новый ключ `loadConfig`
-должен появиться в списках env в [guide.md](guide.md)
+`go test ./cmd/panel -run TestLoadConfig` — every new `loadConfig` key must
+appear in the env lists in [guide.md](guide.md)
 ([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
 
-### End-to-end (контейнерный suite)
+### End-to-end (container suite)
 
-Отдельный Go-модуль `test/e2e/`; **не** входит в `go test ./...` основного
-модуля.
+Separate Go module `test/e2e/`; **not** included in the main module's
+`go test ./...`.
 
 ```sh
 make e2e
-# то же: cd test/e2e && go test -v -timeout 20m ./...
+# same as: cd test/e2e && go test -v -timeout 20m ./...
 ```
 
-**Стек:** [deploy/docker-compose.yml](../deploy/docker-compose.yml) +
-[test/e2e/compose.override.yml](../test/e2e/compose.override.yml) — те же
-`cap_drop`/`cap_add`/`no-new-privileges`, что в production. Override: высокие
-порты (`20465`/`20587`/`20080`), тестовый hostname, self-signed TLS,
-`PANEL_COOKIE_SECURE=false`, изолированный compose-проект. Почта герметична:
-CoreDNS (fake zone) + Postfix `smtp-sink` как sink-MX; DKIM TXT скрапится с
-панели и публикуется в зону — тест проверяет записи, которые оператор реально
-использует.
+**Stack:** [deploy/docker-compose.yml](../deploy/docker-compose.yml) +
+[test/e2e/compose.override.yml](../test/e2e/compose.override.yml) — same
+`cap_drop`/`cap_add`/`no-new-privileges` as production. Override: high ports
+(`20465`/`20587`/`20080`), test hostname, self-signed TLS,
+`PANEL_COOKIE_SECURE=false`, isolated compose project. Mail is hermetic:
+CoreDNS (fake zone) + Postfix `smtp-sink` as sink-MX; DKIM TXT is scraped from
+the panel and published into the zone — the test verifies the records an
+operator would actually use.
 
-**Покрытие (сводка):** bootstrap → SMTP AUTH → доставка → DKIM verify →
-send-log `queued → sent`; негативы (без AUTH, relay, sender/login mismatch,
-L1/L2 лимиты, fail-open milter, неверный `SELFPOST_HOSTNAME`, сессия после
-`docker restart`). Только polling с таймаутами — без фиксированных `sleep`.
+**Coverage (summary):** bootstrap → SMTP AUTH → delivery → DKIM verify →
+send-log `queued → sent`; negatives (no AUTH, relay, sender/login mismatch,
+L1/L2 limits, milter fail-open, bad `SELFPOST_HOSTNAME`, session survives
+`docker restart`). Polling with timeouts only — no fixed `sleep`.
 
-Требует **Docker + Compose v2** на машине, где гоняется suite.
+Requires **Docker + Compose v2** on the machine running the suite.
 
 ---
 
 ## CI
 
-Workflows в [.github/workflows/](../.github/workflows/). Что именно гоняется —
-в [§ Тестирование](#тестирование) выше.
+Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
+[§ Testing](#testing) above.
 
-### `test.yml` — каждый push и PR в `main`
+### `test.yml` — every push and PR to `main`
 
-`gofmt -l` → `go vet ./...` → `go test ./...` (основной модуль, без e2e).
+`gofmt -l` → `go vet ./...` → `go test ./...` (main module, no e2e).
 
-### `release.yml` — push тега `vX.Y.Z` или `workflow_dispatch`
+### `release.yml` — push of tag `vX.Y.Z` or `workflow_dispatch`
 
 ```
-prepare (версия из тега)
+prepare (version from tag)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
-      → docker build --load (VERSION из тега)
+      → docker build --load (VERSION from tag)
       → e2e (test/e2e)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
-      → docker buildx imagetools create → единый манифест X.Y.Z
+      → docker buildx imagetools create → unified manifest X.Y.Z
 ```
 
-Нативная матрица per-arch (без QEMU): полный стек Postfix/OpenDKIM под
-эмуляцией для e2e непрактичен. Сначала e2e, затем push — в registry попадают
-байты, прошедшие гейт.
+Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under
+emulation for e2e is impractical. E2e first, then push — the registry receives
+the bytes that passed the gate.
 
-Провал e2e **блокирует** публикацию образа.
+A failed e2e **blocks** image publication.
