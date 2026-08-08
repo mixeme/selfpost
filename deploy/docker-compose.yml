@@ -54,6 +54,9 @@ services:
       # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
       # sasldb2, sender map, setup token. Back this up (panel button or the
       # selfpost-backup CLI) before you touch it directly.
+      # Postfix's mail.log is here too (./data/log, rotated daily, 14 files
+      # kept) so the delivery lines that resolve a queued send-log row survive
+      # a container recreate; it is diagnostics and is left out of backups.
       - ./data:/data
       # Read-only: SelfPost only ever reads certificates, never manages them
       # (spec 10 p.2). Point this at wherever your reverse-proxy/certbot

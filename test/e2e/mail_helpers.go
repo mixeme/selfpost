@@ -74,7 +74,7 @@ var connectFromPattern = regexp.MustCompile(`connect from [^\[]*\[([0-9a-fA-F.:]
 // lastSMTPClientIP reads mail.log inside the selfpost container and returns
 // the most recent address Postfix's smtpd logged a connection from.
 func lastSMTPClientIP(s *stack) (string, error) {
-	out, err := s.execIn("selfpost", "tail", "-n", "200", "/var/log/mail.log")
+	out, err := s.execIn("selfpost", "tail", "-n", "200", "/data/log/mail.log")
 	if err != nil {
 		return "", err
 	}

@@ -95,6 +95,58 @@ func TestUpdateStatusRecipientCaseInsensitive(t *testing.T) {
 	}
 }
 
+// The reconcile sweep asks for the rows old enough that Postfix should have
+// reported on them by now. A message accepted moments ago is simply in flight,
+// and one the milter refused never reached the queue at all, so neither is the
+// sweep's business.
+func TestListQueuedOlderThan(t *testing.T) {
+	st := openTestStore(t)
+
+	for _, e := range []SendLogEntry{
+		{QueueID: "OLD1", To: "stale@example.net"},
+		{QueueID: "NEW1", To: "fresh@example.net"},
+	} {
+		if err := st.InsertQueued(e); err != nil {
+			t.Fatalf("InsertQueued: %v", err)
+		}
+	}
+	// A row the milter refused: no queue-id, and a status the sweep never sees.
+	if err := st.InsertRejected(SendLogEntry{To: "refused@example.net"}); err != nil {
+		t.Fatalf("InsertRejected: %v", err)
+	}
+	// A row that has already been delivered, aged the same as the stale one.
+	if err := st.InsertQueued(SendLogEntry{QueueID: "DONE1", To: "done@example.net"}); err != nil {
+		t.Fatalf("InsertQueued: %v", err)
+	}
+	if _, err := st.UpdateStatus("DONE1", "done@example.net", StatusSent); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+
+	cutoff := time.Now().UTC().Add(-2 * time.Minute)
+	backdate(t, st, "OLD1", cutoff.Add(-time.Hour))
+	backdate(t, st, "DONE1", cutoff.Add(-time.Hour))
+
+	got, err := st.ListQueuedOlderThan(cutoff)
+	if err != nil {
+		t.Fatalf("ListQueuedOlderThan: %v", err)
+	}
+	if len(got) != 1 || got[0] != (QueuedDelivery{QueueID: "OLD1", To: "stale@example.net"}) {
+		t.Fatalf("got %+v, want only the stale queued row", got)
+	}
+}
+
+// backdate rewrites a row's acceptance time, so a test can age it past a cutoff
+// without waiting.
+func backdate(t *testing.T, s *Store, queueID string, at time.Time) {
+	t.Helper()
+	if _, err := s.db.Exec(
+		`UPDATE send_log SET created_at = ? WHERE queue_id = ?`,
+		at.UTC().Format(time.RFC3339), queueID,
+	); err != nil {
+		t.Fatalf("backdate %s: %v", queueID, err)
+	}
+}
+
 func TestUpdateStatusNoMatch(t *testing.T) {
 	st := openTestStore(t)
 	if err := st.InsertQueued(SendLogEntry{QueueID: "Q1", To: "a@example.net"}); err != nil {

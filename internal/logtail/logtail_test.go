@@ -2,6 +2,7 @@ package logtail
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -142,6 +143,10 @@ type captureStore struct {
 	state     store.LogtailState
 	haveState bool
 	stateErr  error
+
+	// queued is what ListQueuedOlderThan returns, for the reconcile sweep.
+	queued    []store.QueuedDelivery
+	queuedErr error
 }
 
 func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, error) {
@@ -152,6 +157,12 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 }
 
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
+
+func (c *captureStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.queued, c.queuedErr
+}
 
 func (c *captureStore) LogtailState(string) (store.LogtailState, bool, error) {
 	c.mu.Lock()
@@ -333,6 +344,73 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatal("condition not met within timeout")
+}
+
+// stubQueue makes the reconcile sweep answer from a fixed list of queue ids
+// instead of a running Postfix, or fail if err is non-nil.
+func stubQueue(t *testing.T, err error, ids ...string) *int {
+	t.Helper()
+	calls := 0
+	old := queueIDs
+	queueIDs = func() (map[string]struct{}, error) {
+		calls++
+		if err != nil {
+			return nil, err
+		}
+		set := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		return set, nil
+	}
+	t.Cleanup(func() { queueIDs = old })
+	return &calls
+}
+
+// A row stays "queued" forever when its delivery lines are gone for good. The
+// queue is what settles it: a message Postfix still holds is simply in flight
+// and must be left alone, while one it no longer holds will never be reported
+// on and is closed.
+func TestReconcileClosesOnlyWhatPostfixNoLongerHolds(t *testing.T) {
+	stubQueue(t, nil, "STILLQ")
+
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{QueueID: "STILLQ", To: "inflight@example.net"},
+		{QueueID: "GONEQ", To: "lost@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC())
+
+	got := cs.snapshot()
+	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.StatusBounced {
+		t.Fatalf("got %v, want only the message Postfix dropped closed as bounced", got)
+	}
+}
+
+// A queue that cannot be listed says nothing about any message — treating the
+// failure as an empty queue would close every stale row at once.
+func TestReconcileLeavesRowsAloneWhenTheQueueCannotBeRead(t *testing.T) {
+	stubQueue(t, errors.New("postqueue: Permission denied"))
+
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{QueueID: "GONEQ", To: "lost@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC())
+
+	if got := cs.snapshot(); len(got) != 0 {
+		t.Fatalf("got %v, want no row touched", got)
+	}
+}
+
+// With nothing stale to explain there is no reason to shell out to postqueue at
+// all — which is the normal state of a relay that is keeping up.
+func TestReconcileSkipsTheQueueWhenNoRowIsStuck(t *testing.T) {
+	calls := stubQueue(t, nil)
+
+	reconcile(&captureStore{}, time.Now().UTC())
+
+	if *calls != 0 {
+		t.Fatalf("queue listed %d time(s), want none", *calls)
+	}
 }
 
 // A delivery's page shows what Postfix wrote about that one message, so the

@@ -81,7 +81,10 @@ func loadConfig() config {
 	return config{
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
-		mailLog:       envDefault("MAIL_LOG", "/var/log/mail.log"),
+		// Postfix's delivery log, under /data so the lines that resolve a
+		// "queued" send-log row outlive the container. The default must match
+		// maillog_file in build/postfix-config.sh.
+		mailLog: envDefault("MAIL_LOG", "/data/log/mail.log"),
 		// Send-log retention window (architecture.md § Persistence).
 		// Non-positive/invalid falls back to the 90-day default inside the
 		// log-tailer.

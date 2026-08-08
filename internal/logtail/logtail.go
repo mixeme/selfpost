@@ -16,16 +16,20 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 )
 
 // StatusStore is the slice of the store the log-tailer needs: advancing
-// delivery statuses, pruning the retention window, and remembering how far into
-// mail.log it has read. *store.Store satisfies it.
+// delivery statuses, finding the rows still waiting for one, pruning the
+// retention window, and remembering how far into mail.log it has read.
+// *store.Store satisfies it.
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
+	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
 	LogtailState(path string) (store.LogtailState, bool, error)
 	SaveLogtailState(path string, st store.LogtailState) error
@@ -35,6 +39,10 @@ type StatusStore interface {
 // is a var so tests can shorten it.
 var pollInterval = time.Second
 
+// queueIDs lists the messages Postfix currently holds, for the reconcile sweep.
+// It is a var so tests can answer without a running Postfix.
+var queueIDs = postfix.QueueIDs
+
 const (
 	// retentionInterval is how often the retention sweep runs (also once at
 	// startup). The window itself is configurable; the cadence need not be.
@@ -42,6 +50,13 @@ const (
 	// defaultRetentionDays applies when the configured value is unset/invalid
 	// (guide § Environment variables: SEND_LOG_RETENTION_DAYS).
 	defaultRetentionDays = 90
+	// reconcileInterval is how often the sweep compares stuck rows against the
+	// Postfix queue, and reconcileGrace how long a row is left alone first.
+	// The grace covers the ordinary lag between the milter writing the row and
+	// Postfix logging the result — seconds, generously rounded up — so a
+	// message merely in flight is never touched.
+	reconcileInterval = 5 * time.Minute
+	reconcileGrace    = 2 * time.Minute
 )
 
 // deliveryRe matches a Postfix delivery line and captures queue-id, recipient
@@ -89,7 +104,14 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 func Run(ctx context.Context, path string, st StatusStore, retentionDays int) error {
 	go retentionLoop(ctx, st, retentionDays)
 
-	return follow(ctx, path, &tracker{st: st, path: path}, func(line string) {
+	// The reconcile sweep must not run against a backlog the tailer has not
+	// read yet: on a restart the log holds the very lines that resolve the rows
+	// the sweep would otherwise close. follow() closes this once it has read to
+	// end-of-file for the first time.
+	caughtUp := make(chan struct{})
+	go reconcileLoop(ctx, st, caughtUp)
+
+	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, func(line string) {
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return
@@ -98,6 +120,75 @@ func Run(ctx context.Context, path string, st StatusStore, retentionDays int) er
 			log.Printf("log-tailer: update %s/%s -> %s: %v", queueID, recipient, status, err)
 		}
 	})
+}
+
+// reconcileLoop periodically closes send-log rows Postfix has stopped working
+// on (architecture.md § Log tailer). It starts only once the tailer has caught
+// up with the log, and then leaves the first sweep a full interval away, so a
+// restart resolves rows from the log — the accurate source — before the sweep
+// gets to guess at whatever the log could not explain.
+func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-caughtUp:
+	}
+
+	t := time.NewTicker(reconcileInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			reconcile(st, time.Now().UTC().Add(-reconcileGrace))
+		}
+	}
+}
+
+// reconcile marks as bounced every row still "queued" from before cutoff whose
+// message Postfix no longer holds.
+//
+// A row reaches this state only when its delivery lines are gone for good — the
+// log rotated past its fourteen files while the panel was down, or was deleted
+// — since the log itself now outlives the container. Postfix having dropped the
+// message means it will never report anything more about it, so the row can
+// only be closed on an assumption; it is closed as a failure rather than a
+// success because a delivery the panel cannot evidence must not be shown as
+// one. Rows whose message is still in the queue, and every row when the queue
+// cannot be listed at all, are left exactly as they are.
+func reconcile(st StatusStore, cutoff time.Time) {
+	rows, err := st.ListQueuedOlderThan(cutoff)
+	if err != nil {
+		log.Printf("log-tailer: reconcile: list queued rows: %v", err)
+		return
+	}
+	if len(rows) == 0 {
+		return
+	}
+
+	held, err := queueIDs()
+	if err != nil {
+		// No listing is no information: closing rows now would be a guess made
+		// against nothing.
+		log.Printf("log-tailer: reconcile: read postfix queue: %v", err)
+		return
+	}
+
+	var closed int
+	for _, row := range rows {
+		if _, still := held[row.QueueID]; still {
+			continue
+		}
+		if _, err := st.UpdateStatus(row.QueueID, row.To, store.StatusBounced); err != nil {
+			log.Printf("log-tailer: reconcile: close %s/%s: %v", row.QueueID, row.To, err)
+			continue
+		}
+		closed++
+	}
+	if closed > 0 {
+		log.Printf("log-tailer: reconcile: closed %d row(s) Postfix no longer holds and never reported", closed)
+	}
 }
 
 // retentionLoop prunes expired send-log rows immediately and then periodically.
@@ -323,7 +414,11 @@ func SplitTimestamp(line string) (stamp, rest string) {
 // start of a file that changed while the panel was down, or end-of-file on a
 // first ever run); it reopens the file when it is rotated (inode change from
 // logrotate's create, or truncation from copytruncate) so nothing is missed.
-func follow(ctx context.Context, path string, tr *tracker, handle func(string)) error {
+//
+// caughtUp is closed after the first read that reaches end-of-file, which is
+// the point where every line the panel missed while it was down has been
+// handled.
+func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{}, handle func(string)) error {
 	var (
 		f       *os.File
 		r       *bufio.Reader
@@ -397,6 +492,8 @@ func follow(ctx context.Context, path string, tr *tracker, handle func(string)) 
 		return pos - int64(len(pending))
 	}
 
+	var once sync.Once
+
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
@@ -406,6 +503,7 @@ func follow(ctx context.Context, path string, tr *tracker, handle func(string)) 
 			return nil
 		case <-ticker.C:
 			drain()
+			once.Do(func() { close(caughtUp) })
 			ni, err := os.Stat(path)
 			if err != nil {
 				continue // file briefly gone mid-rotation; try again next tick

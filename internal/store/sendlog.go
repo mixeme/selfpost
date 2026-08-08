@@ -93,6 +93,45 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	return n, nil
 }
 
+// QueuedDelivery is a send-log row still waiting for a delivery result,
+// reduced to what the log-tailer's reconcile sweep needs to look it up in the
+// Postfix queue and, failing that, to close it (architecture.md § Log tailer).
+type QueuedDelivery struct {
+	QueueID string
+	To      string
+}
+
+// ListQueuedOlderThan returns the rows still marked "queued" that were accepted
+// before cutoff — old enough that Postfix should long since have reported a
+// result for them. Rows without a queue-id are skipped: the milter refused
+// those before Postfix ever saw the message, so the queue has nothing to say
+// about them.
+//
+// created_at is stored as RFC3339 UTC, so a lexical comparison against the same
+// format is chronologically correct.
+func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
+	rows, err := s.db.Query(
+		`SELECT queue_id, to_addr FROM send_log
+		 WHERE status = ? AND queue_id <> '' AND created_at < ?
+		 ORDER BY id`,
+		StatusQueued, cutoff.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list queued send_log rows: %w", err)
+	}
+	defer rows.Close()
+
+	var out []QueuedDelivery
+	for rows.Next() {
+		var d QueuedDelivery
+		if err := rows.Scan(&d.QueueID, &d.To); err != nil {
+			return nil, fmt.Errorf("scan queued send_log row: %w", err)
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // SendLogRow is one row as returned to the monitoring UI (architecture.md §
 // Persistence): a SendLogEntry plus the fields that only exist once a row has
 // been written (id, current status, timestamps).

@@ -63,10 +63,12 @@ type Params struct {
 // The live database files are replaced by a consistent VACUUM INTO snapshot
 // written under the canonical name; the setup token is transient bootstrap
 // state; a stale manifest from a previous restore must not be re-captured (a
-// fresh one is written instead); and a "tls" directory holds the reverse
-// proxy's certificates, which are explicitly out of scope for a SelfPost
-// backup (architecture.md § Persistence) — excluding it keeps that guarantee
-// even when an operator points TLS_CERT_FILE inside /data.
+// fresh one is written instead); a "tls" directory holds the reverse proxy's
+// certificates, which are explicitly out of scope for a SelfPost backup
+// (architecture.md § Persistence) — excluding it keeps that guarantee even when
+// an operator points TLS_CERT_FILE inside /data; and "log" is Postfix's raw
+// delivery log plus its fourteen rotated files, which is diagnostic output, not
+// state to restore, and by far the largest thing under /data.
 var excludedFromArchive = map[string]bool{
 	"selfpost.db":         true,
 	"selfpost.db-wal":     true,
@@ -74,6 +76,7 @@ var excludedFromArchive = map[string]bool{
 	"selfpost.db-journal": true,
 	"setup-token":         true,
 	"tls":                 true,
+	"log":                 true,
 	ManifestName:          true,
 }
 

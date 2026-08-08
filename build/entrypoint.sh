@@ -11,8 +11,10 @@ set -e
 chown panel:panel /data
 # Restored backups or previously-created state may contain panel-owned files
 # under /data; make sure they stay writable without disturbing anything that a
-# later phase deliberately hands to another service.
-find /data -mindepth 1 -maxdepth 1 ! -user panel -exec chown -R panel:panel {} +
+# later phase deliberately hands to another service. /data/log is exempt: it is
+# deliberately owned by postfix (postlogd writes the delivery log there) and is
+# normalised on its own below.
+find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log -exec chown -R panel:panel {} +
 
 # DKIM key tree (spec 6, 9). The panel (user `panel`) generates keys and writes
 # the OpenDKIM tables; OpenDKIM (user `opendkim`) must read them. Normalise the
@@ -50,6 +52,23 @@ mkdir -p /data/postfix
 chown -R panel:selfpost /data/postfix
 chmod 2750 /data/postfix
 chmod 0640 /data/postfix/sender_login_maps
+
+# Delivery log (architecture.md § Log tailer). postlogd writes it as user
+# `postfix`; the panel reads it for the log-tailer and the System log page. It
+# lives under /data — not the ephemeral /var/log — so the delivery lines that
+# resolve a "queued" send-log row survive a container recreate.
+#
+# postlogd creates a missing log itself, but at 0600, which the unprivileged
+# panel cannot read; so create it here (and re-normalise an existing one, plus
+# whatever logrotate left behind) at 0640 owned postfix:selfpost. The setgid
+# directory keeps the shared group on anything created inside it later, and
+# 2750 keeps it group-traversable but not group-writable — logrotate refuses to
+# rotate a log whose directory is writable by a non-root group.
+mkdir -p /data/log
+[ -e /data/log/mail.log ] || : > /data/log/mail.log
+chown -R postfix:selfpost /data/log
+chmod 2750 /data/log
+find /data/log -type f -exec chmod 0640 {} +
 
 # Milter socket directories (spec 5 p.3, 7.3). Postfix (user `postfix`) must
 # actually CONNECT to both milter sockets — OpenDKIM's and the panel's

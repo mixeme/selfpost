@@ -94,10 +94,20 @@ Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
 
 ### Log tailer and `mail.log` rotation
 
-`mail.log` lives under `/var/log` (not in `/data`). Rotation uses rename +
-`postfix reload` ([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not
-`copytruncate` — the latter can drop `status=sent` lines and leave send-log rows
-stuck at `queued`. After rename, logrotate runs `create 0644 root root` (Postfix
+`mail.log` lives at `/data/log/mail.log` — inside the persistent bind mount, so
+the delivery lines that resolve a `queued` send-log row are not lost when the
+container is recreated. `postlogd` writes it as user `postfix`; the panel reads
+it through the shared `selfpost` group (directory `2750 postfix:selfpost`, file
+`0640`, both normalised on every start by
+[build/entrypoint.sh](../build/entrypoint.sh)). The path is one default in two
+places, `maillog_file` in [build/postfix-config.sh](../build/postfix-config.sh)
+and `MAIL_LOG` in [cmd/panel/main.go](../cmd/panel/main.go). Backups exclude
+`log/`: it is diagnostic output, not state to restore.
+
+Rotation uses rename + `postfix reload`
+([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not `copytruncate` —
+the latter can drop `status=sent` lines and leave send-log rows stuck at
+`queued`. After rename, logrotate runs `create 0640 postfix selfpost` (postlogd
 recreates the file lazily on first write as mode `0600`, which the unprivileged
 panel user cannot read). `follow()` drains the old inode once more before
 switching descriptors; the panel treats a missing log file as an empty tail, not
@@ -112,14 +122,20 @@ the current file from the start; re-parsing lines is harmless because
 with nothing stored, begins at end-of-file, so installing the panel does not
 replay a pre-existing log.
 
-**Remaining gap:**
-
-- **Container recreate** — `/var/log` is ephemeral; the log is lost with the
-  container, so the delivery lines for rows still `queued` are gone with it and
-  those rows stay `queued` forever.
-
-Possible follow-ups if this becomes painful: mount the mail log under `/data`, or
-reconcile stuck rows via `postqueue`.
+**Queue reconcile** is the backstop for what the log cannot explain at all: a
+row still `queued` more than two minutes after it was accepted, whose queue id
+`postqueue -p` no longer lists, is marked `bounced` (swept every five minutes,
+[internal/logtail](../internal/logtail/logtail.go),
+[postfix.QueueIDs](../internal/postfix/queue.go)). Postfix having dropped the
+message means nothing more will ever be reported about it, so the row can only
+be closed on an assumption, and it is closed as a failure because a delivery the
+panel cannot evidence must not be shown as one. Three things keep the sweep from
+guessing where it need not: it starts only after the tailer has read to
+end-of-file once (on a restart the log itself holds the answer), the two-minute
+grace covers messages merely in flight, and a `postqueue` that cannot be read
+leaves every row untouched rather than closing them all. Now that the log
+survives the container, reaching this path means the lines are gone for good —
+rotated past fourteen files while the panel was down, or deleted.
 
 **Two one-shot reads** sit beside the follow loop and are unrelated to it, both
 serving panel pages on request: `TailLines` (the last *n* lines, for
@@ -250,6 +266,7 @@ single-connection trade-off that follows from it.
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
+| `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
 
 Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
@@ -260,8 +277,8 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 `postfix reload` in `postrotate` — see § Log tailer above).
 
 **Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
-`/data` tree; version check on restore. Stopped-container `tar` of `./data` is
-safe (see guide).
+`/data` tree, minus `log/`, the setup token and any `tls/`; version check on
+restore. Stopped-container `tar` of `./data` is safe (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
