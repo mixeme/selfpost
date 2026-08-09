@@ -1,8 +1,9 @@
 # SelfPost — development
 
 **What this file is.** How to build, test, document, and ship changes. Open
-work for 2.x lives in [roadmap.md](roadmap.md). Product boundaries:
-[product.md](product.md). As-built layout: [architecture.md](architecture.md).
+work after 1.0 (1.x+) lives in [roadmap.md](roadmap.md) and linked
+[plans/](plans/). Product boundaries: [product.md](product.md). As-built layout:
+[architecture.md](architecture.md).
 
 ---
 
@@ -11,10 +12,12 @@ work for 2.x lives in [roadmap.md](roadmap.md). Product boundaries:
 After `/clear` or a fresh chat:
 
 1. Read this file (process, docs rules, model routing).
-2. Open [roadmap.md](roadmap.md) for open work. Accepted risks —
-   [security.md](security.md); as-built — [architecture.md](architecture.md).
+2. Open [roadmap.md](roadmap.md) for the index of open work; follow the linked
+   plan file for the active item. Accepted risks — [security.md](security.md);
+   as-built — [architecture.md](architecture.md).
 3. Skim [product.md](product.md) if scope is in doubt.
-4. Continue from the next unchecked step in the active plan.
+4. Continue from the next unchecked step in the **active** plan file (not the
+   roadmap index).
 
 History of closed phases is in `git log` and [CHANGELOG.md](../CHANGELOG.md),
 not duplicated here.
@@ -273,7 +276,8 @@ There is no `docs/archive/` directory.
 | As-built design | [architecture.md](architecture.md) |
 | Development process (this file) | [development.md](development.md) |
 | Security requirements and accepted risks | [security.md](security.md) |
-| Internal roadmap (2.x) | [roadmap.md](roadmap.md) |
+| Internal roadmap (1.x+) | [roadmap.md](roadmap.md) |
+| Active design plans | [plans/](plans/) |
 | Release history | [CHANGELOG.md](../CHANGELOG.md) |
 
 ### User-facing deliverables

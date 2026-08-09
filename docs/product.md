@@ -53,8 +53,11 @@ Explicitly excluded to prevent scope creep:
 - A custom MTA — Postfix is used as-is
 - Dovecot or a full mail stack for SASL — Cyrus SASL (`sasldb2`) only
 
-Future line **2.x.x** (optional inbound relay, domain-admin role) is tracked in
-[roadmap.md](roadmap.md) and requires explicit approval before implementation.
+Agreed **1.x+** extensions (optional inbound relay, domain-admin role) are
+tracked in [roadmap.md](roadmap.md) and [plans/](plans/). Inbound relay targets
+a 1.x MINOR bump by default; a 2.x major remains possible pending
+implementation. Items still marked *candidate* in the roadmap require explicit
+approval before coding.
 
 ---
 

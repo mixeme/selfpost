@@ -37,7 +37,7 @@ send log and DNS checks in the panel, encrypted backups.
 | [Architecture](docs/architecture.md) | As-built technical design |
 | [Security](docs/security.md) | Accepted security trade-offs and requirements |
 | [Development](docs/development.md) | Building, testing, docs rules, model routing, commits |
-| [Roadmap](docs/roadmap.md) | Open work (v1.x tail, 2.x) — internal, Russian |
+| [Roadmap](docs/roadmap.md) | Open work (1.x+) — internal, Russian |
 | [CHANGELOG](CHANGELOG.md) | Release history |
 
 Repository: <https://github.com/mixeme/selfpost> — source, issues, releases, and
