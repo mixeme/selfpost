@@ -1,100 +1,121 @@
-# Дорожная карта: открытая работа (1.x+)
+# Roadmap: open work (1.x+)
 
-**Статус:** внутренний трекер расширений границ v1.0 после явного согласования
-([product.md](product.md), [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
-Детальный дизайн — в [plans/](plans/). Пункты со статусом `кандидат` требуют OK
-до кодирования.
+**Status:** a working tracker of extensions to the v1.0 boundary, each taken up
+only after explicit agreement ([product.md](product.md),
+[.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)). Detailed
+design lives in [plans/](plans/). Items marked `candidate` need an OK before
+any code is written.
 
-**Версионирование:** по умолчанию SemVer MINOR в линии **1.x+** (`1.1.0`…), если
-дефолты и миграции совместимы с `1.0.0`. Major `2.x` — только при явном breaking.
+**Reading this from outside the project:** nothing here is a commitment or a
+release promise. There are no dates, the order is a recommendation rather than
+a schedule, and an item can be dropped or reshaped once its plan is written.
+What the project *will not* do is a separate question, answered in
+[product.md](product.md) — an item's absence from this file does not mean it is
+planned but unlisted.
 
-**Процесс:** [development.md](development.md). История закрытых фаз — в `git log`
-и [CHANGELOG.md](../CHANGELOG.md).
+**Versioning:** SemVer MINOR in the **1.x+** line by default (`1.1.0`…), as long
+as defaults and migrations stay compatible with `1.0.0`. A major `2.x` only for
+an explicit break.
+
+**Process:** [development.md](development.md). The history of closed phases is
+in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
-## Индекс
+## Index
 
-| ID | Тема | Статус | План |
+| ID | Topic | Status | Plan |
 |---|---|---|---|
-| web-split | Разбиение `internal/web` | **согласовано** | [plans/web-split.md](plans/web-split.md) |
-| domain-admin | Роль администратора домена | **согласовано** | [plans/domain-admin.md](plans/domain-admin.md) |
-| inbound-relay | Входящий релей (backup-MX / пересылка) | **согласовано** | [plans/inbound-relay.md](plans/inbound-relay.md) |
-| contributing | `CONTRIBUTING.md` | кандидат | — |
+| web-split | Splitting `internal/web` | **agreed** | [plans/web-split.md](plans/web-split.md) |
+| domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
+| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| contributing | `CONTRIBUTING.md` | candidate | — |
 
-**Рекомендуемый порядок** (не обязателен): **web-split → domain-admin →
-inbound-relay** — сначала разрез пакета, затем сквозная авторизация роли, затем
-новый вертикальный срез входящего релея. Отклонение допустимо; жёстких фаз нет.
+**Recommended order** (not binding): **web-split → domain-admin →
+inbound-relay** — first the package split, then role-wide authorisation, then
+the new vertical slice of the inbound relay. Deviating is allowed; there are no
+hard phases here.
 
-После `/clear` — пункт со статусом `согласовано` или `в работе`, затем чеклист в
-linked plan.
+After a context reset, pick an item marked `agreed` or `in progress`, then work
+the checklist in its linked plan.
 
 ---
 
 ## inbound-relay
 
-**Цель:** опциональный приём почты на порт 25 для явно настроенных доменов и
-пересылка на upstream (backup-MX / relay-forwarder). По умолчанию выключено
-(`INBOUND_RELAY_ENABLE=false`); исходящий тракт без флага не меняется.
+**Goal:** optional acceptance of mail on port 25 for explicitly configured
+domains, forwarded to an upstream (backup-MX / relay-forwarder). Off by default
+(`INBOUND_RELAY_ENABLE=false`); without the flag the outbound path is
+unchanged.
 
-**Граница:** расширение v1.0 — [product.md](product.md) исключает приём входящей
-почты и mailbox'ы. Это relay/forward, не IMAP/POP3/webmail; антиспам-движок — вне
-образа, только точка подключения.
+**Boundary:** an extension of v1.0 — [product.md](product.md) excludes inbound
+mail and mailboxes. This is relay/forward, not IMAP/POP3/webmail; an anti-spam
+engine stays outside the image, only the attachment point is provided.
 
-**Готово, когда:** см. критерии в [plans/inbound-relay.md](plans/inbound-relay.md).
+**Done when:** see the criteria in
+[plans/inbound-relay.md](plans/inbound-relay.md).
 
-**Зависимости / риски:** готовый исходящий тракт; open relay/backscatter;
-расширение поверхности атаки (порт 25 на приём). Модель: Opus.
-**Порядок:** рекомендуется после [web-split](plans/web-split.md) и
+**Dependencies / risks:** a finished outbound path; open relay and backscatter;
+a wider attack surface (port 25 accepting mail).
+**Order:** recommended after [web-split](plans/web-split.md) and
 [domain-admin](plans/domain-admin.md).
-**Версия:** целевой bump `1.x`; возможен `2.x` — уточнить по итогам реализации.
+**Version:** target bump `1.x`; `2.x` possible — to be settled once the
+implementation lands.
 
 ---
 
 ## domain-admin
 
-**Цель:** роль с доступом к одному или нескольким назначенным доменам
-(перечень задаёт глобальный администратор) — приложения, DKIM/DNS, журнал
-отправки по каждому из них; без глобальных операций (добавление доменов, полный
-бэкап, очередь, `mail.log`).
+**Goal:** a role with access to one or several assigned domains (the list is
+set by the global administrator) — applications, DKIM/DNS, and the send log for
+each of them; without global operations (adding domains, full backup, the
+queue, `mail.log`).
 
-**Граница:** расширение v1.0 — [product.md](product.md) фиксирует одного
-администратора. Не вторая копия всевластного админа, а ограниченный доступ к
-назначенным доменам (одному или нескольким).
+**Boundary:** an extension of v1.0 — [product.md](product.md) fixes a single
+administrator. Not a second all-powerful admin, but limited access to the
+assigned domains (one or several).
 
-**Готово, когда:** см. [plans/domain-admin.md](plans/domain-admin.md).
+**Done when:** see [plans/domain-admin.md](plans/domain-admin.md).
 
-**Зависимости / риски:** таблица пользователей, роль в сессии, авторизация в
-каждом хендлере, setup/бэкап. **Порядок:** рекомендуется после
-[web-split](plans/web-split.md), до [inbound-relay](plans/inbound-relay.md).
-**Версия:** `1.x` MINOR при совместимой миграции текущего админа в глобального.
+**Dependencies / risks:** a users table, the role in the session, authorisation
+in every handler, setup and backup. **Order:** recommended after
+[web-split](plans/web-split.md), before
+[inbound-relay](plans/inbound-relay.md).
+**Version:** `1.x` MINOR, given a compatible migration of the current
+administrator into a global one.
 
 ---
 
 ## web-split
 
-**Цель:** осознанно разрезать `internal/web` (или зафиксировать плоский пакет)
-перед ростом от inbound-relay и domain-admin.
+**Goal:** deliberately split `internal/web` (or settle on keeping the package
+flat) before it grows under inbound-relay and domain-admin.
 
-**Граница:** внутренний рефакторинг; поведение панели для оператора не меняется.
+**Boundary:** an internal refactor; the panel's behaviour for the operator does
+not change.
 
-**Готово, когда:** пакет разрезан по выбранной схеме или зафиксировано, что
-остаётся плоским — см. [plans/web-split.md](plans/web-split.md).
+**Done when:** the package is split along the chosen scheme, or it is settled
+that it stays flat — see [plans/web-split.md](plans/web-split.md).
 
-**Зависимости / риски:** экспорт пакетно-приватного API. **Порядок:** рекомендуется
-**первым** среди согласованных фич (до domain-admin и inbound-relay).
-**Версия:** `1.x`, сам по себе breaking не тянет.
+**Dependencies / risks:** exporting a package-private API. **Order:**
+recommended **first** among the agreed features (before domain-admin and
+inbound-relay).
+**Version:** `1.x`; on its own it does not force a break.
 
 ---
 
 ## contributing
 
-**Цель:** `CONTRIBUTING.md` в корне — dev loop, проверки перед PR, протокол
-коммитов; [development.md](development.md) ссылается, не дублирует.
+**Goal:** `CONTRIBUTING.md` in the root — the dev loop, the checks to run
+before a PR, the commit protocol; [development.md](development.md) links to it
+rather than repeating it.
 
-**Граница:** документация процесса; уместна при внешнем потоке PR.
+**Boundary:** process documentation; worth writing once there is an external
+flow of PRs.
 
-**Готово, когда:** файл в корне; development.md не дублирует его.
+**Done when:** the file is in the root and development.md does not duplicate
+it.
 
-**Зависимости / риски:** пока один разработчик и нет PR — низкий приоритет.
-**Версия:** без значения для semver.
+**Dependencies / risks:** with a single developer and no PRs, this is low
+priority.
+**Version:** no bearing on semver.

@@ -21,6 +21,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   unchanged: same requirements, same accepted risks, same ADR. The reviewing
   model is no longer named in the text; the fact that a pre-release review ran,
   and its date, stay.
+- [docs/roadmap.md](docs/roadmap.md) is now in English, with a short note on
+  how to read it from outside the project: nothing in it is a commitment, there
+  are no dates, and the stated order is a recommendation. The model assigned to
+  an item is no longer recorded there. The README row no longer calls the file
+  internal and Russian, because it is neither.
 - The two remaining Russian source comments are in English:
   `deploy/traefik/extract-cert.sh` (quote from spec 10.3) and
   `internal/app/sasl.go`, where the quotation from the closed plan is dropped
