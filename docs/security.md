@@ -1,177 +1,193 @@
-# Безопасность
+# Security
 
-**Что здесь.** (1) **Обязательные требования** — чеклист, который v1.0 обязан
-выполнять; полный аудит на v1.0 пройден. Предрелизная ревизия (план § D,
-модель Fable, 2026-08-06) прошла по всему дифу от аудита v1.0 (Фаза 11) до
-HEAD и по чек-листу целиком: эксплуатируемых находок нет; одна правка
-defence-in-depth — `--` перед логином в argv `saslpasswd2`
-([internal/app/sasl.go](../internal/app/sasl.go)). (2) **Принятые риски** —
-сознательные отступления сверх обязательного, чтобы решение не потерялось.
+**What is here.** (1) **Mandatory requirements** — the checklist v1.0 has to
+meet; the full v1.0 audit passed. The pre-release review (plan § D, 2026-08-06)
+covered the whole diff from the v1.0 audit (Phase 11) to HEAD and the checklist
+in full: no exploitable findings; one defence-in-depth change — `--` before the
+login in the `saslpasswd2` argv
+([internal/app/sasl.go](../internal/app/sasl.go)). (2) **Accepted risks** —
+deliberate departures beyond the mandatory, recorded so the decision is not
+lost.
 
-Hardening сверх обязательного (security-заголовки, проверка origin, cookie
-`__Host-` с обнаружением дублей — Фаза 14) закрыт; история — в
-[CHANGELOG.md](../CHANGELOG.md) и `git log`.
+Hardening beyond the mandatory (security headers, origin checking, `__Host-`
+cookie with duplicate detection — Phase 14) is done; the history is in
+[CHANGELOG.md](../CHANGELOG.md) and `git log`.
 
-Продуктовые границы: [product.md](product.md). Устройство as-built:
+Product boundaries: [product.md](product.md). As-built design:
 [architecture.md](architecture.md).
 
 ---
 
-## Обязательные требования
+## Mandatory requirements
 
-Панель публична из интернета — пункты ниже **не опциональны**.
+The panel is exposed to the internet — the items below are **not optional**.
 
-### Первичная инициализация администратора
+### First-run administrator setup
 
-- Одноразовая secret-ссылка `/setup/<token>`, **не** env с готовым хэшем пароля.
-- Токен ≥128 бит (`crypto/rand`); дублируется в `/data/setup-token`.
-- Срок жизни токена — **10 минут**; после истечения или рестарта без завершённой
-  настройки — перегенерация и новый вывод в лог.
-- Rate limiting на `/setup/<token>` по IP, отдельно от логина.
-- Сравнение токена — **константное по времени** (`subtle.ConstantTimeCompare`).
-- Неудачные попытки **не** инвалидируют токен досрочно (защита от DoS настройки).
-- После создания администратора — токен навсегда недействителен, `/setup/*` → 404.
-- Пароль администратора — только bcrypt (или argon2) в SQLite; без plaintext/MD5.
-- `PANEL_USERNAME` / `PANEL_PASSWORD_HASH` в env **не используются**.
+- A one-time secret link `/setup/<token>`, **not** an env variable holding a
+  ready-made password hash.
+- Token ≥128 bits (`crypto/rand`); mirrored to `/data/setup-token`.
+- Token lifetime — **10 minutes**; after expiry, or after a restart with setup
+  unfinished, it is regenerated and logged again.
+- Rate limiting on `/setup/<token>` per IP, separate from login.
+- Token comparison is **constant-time** (`subtle.ConstantTimeCompare`).
+- Failed attempts do **not** invalidate the token early (protects setup from
+  being DoS-ed).
+- Once the administrator exists the token is void forever, `/setup/*` → 404.
+- The administrator password is bcrypt (or argon2) in SQLite only; no plaintext
+  and no MD5.
+- `PANEL_USERNAME` / `PANEL_PASSWORD_HASH` in env are **not used**.
 
-### SASL-пароли приложений
+### Application SASL passwords
 
-- Панель **генерирует** пароль при создании/перевыпуске, показывает **один раз**.
-- В `sasldb2` — в форме, требуемой SASL (не plaintext в панели); утерян — только
-  перевыпуск.
+- The panel **generates** the password on creation or reissue and shows it
+  **once**.
+- In `sasldb2` it is stored in the form SASL requires (not plaintext held by the
+  panel); a lost password can only be reissued.
 
-### Ввод и конфигурация
+### Input and configuration
 
-- Серверная валидация email/доменов (whitelist символов); клиентская не считается
-  защитой.
-- Режим «список адресов» — каждый адрес принадлежит домену приложения до записи.
-- `postfix reload` и любой `exec` — **без** shell-интерполяции пользовательского
-  ввода; аргументы отдельными элементами.
-- Запись в конфиг-файлы — с экранированием (нет инъекции директив Postfix).
+- Server-side validation of addresses and domains (character whitelist);
+  client-side validation does not count as protection.
+- In address-list mode every address is checked to belong to the application's
+  domain before it is written.
+- `postfix reload` and any `exec` run **without** shell interpolation of user
+  input; arguments are passed as separate elements.
+- Writes to config files are escaped (no injection of Postfix directives).
 
-### Аутентификация и сессии
+### Authentication and sessions
 
-- Rate limiting на логин (по IP, с блокировкой/задержкой).
-- Сессии: криптографически случайный токен; cookie `HttpOnly`, `Secure`, `SameSite`.
-- Сессии в SQLite (SHA-256 токена, не сам токен); скользящий idle
-  (`PANEL_SESSION_IDLE_DAYS`).
+- Rate limiting on login (per IP, with lockout or delay).
+- Sessions: cryptographically random token; cookie `HttpOnly`, `Secure`,
+  `SameSite`.
+- Sessions live in SQLite (SHA-256 of the token, not the token itself); sliding
+  idle timeout (`PANEL_SESSION_IDLE_DAYS`).
 
-### Вывод и процесс
+### Output and process
 
-- Рендер через `html/template` с автоэкранированием (очередь, лог, журнал, темы).
-- Процесс панели **не root** (`user=panel` в supervisord); доступ к путям через
-  группу `selfpost` и минимальные права.
+- Rendering goes through `html/template` with auto-escaping (queue, log,
+  journal, themes).
+- The panel process is **not root** (`user=panel` in supervisord); path access
+  is granted through the `selfpost` group with minimal permissions.
 
-### Почтовый тракт (связанное с безопасностью)
+### Mail path (security-relevant)
 
-- **Не open relay** — только SASL; `reject_unauth_destination`;
+- **Not an open relay** — SASL only; `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
-- TLS обязателен до передачи кредов (465 wrapper / 587 `encrypt`).
-- `TRUSTED_PROXY_CIDR` — только явно доверенные прокси для `X-Forwarded-For`
-  при rate-limit логина; пусто = XFF игнорируется.
+- TLS is mandatory before credentials are transmitted (465 wrapper / 587
+  `encrypt`).
+- `TRUSTED_PROXY_CIDR` — only explicitly trusted proxies may supply
+  `X-Forwarded-For` for login rate limiting; empty means XFF is ignored.
 
-### Резервная копия и экспорт домена
+### Backup and domain export
 
-- Оба файла — секреты: полный бэкап несёт DKIM-ключи, `sasldb2` и хеш пароля
-  админа; экспорт домена — DKIM-ключ и **рабочие** пароли приложений открытым
-  текстом (иначе перенос без пересоздания кредов невозможен).
-- Оба скачивания можно зашифровать паролем (чекбокс в форме): scrypt
-  (N=2¹⁵, r=8, p=1) → AES-256-GCM, поток из 64 KiB чанков, каждый
-  аутентифицирован заголовком, номером и флагом конца потока — обрезанный или
-  подменённый файл не открывается вместо тихого восстановления «хвоста».
-  Формат и обёртка: [internal/secretfile](../internal/secretfile/secretfile.go).
-- Расширения: `.spbk` (**S**elf**P**ost **b**ac**k**up — полный бэкап),
-  `.spde` (**S**elf**P**ost **d**omain **e**xport — экспорт домена);
-  незашифрованные остаются `.tar.gz` / `.json`. Импорт домена определяет
-  шифрование по magic файла, а не по расширению.
-- Пароль нигде не сохраняется: восстановить файл без него нельзя. Пароль в CLI —
-  только через `SELFPOST_BACKUP_PASSWORD` или `-password-file`, никогда
-  аргументом (список процессов читается любым процессом контейнера).
-- Минимальная длина пароля — как у пароля администратора (12): файл лежит
-  offline и подбирается без ограничений по времени.
+- Both files are secrets: a full backup carries DKIM keys, `sasldb2`, and the
+  administrator's password hash; a domain export carries the DKIM key and
+  **working** application passwords in the clear (otherwise a transfer without
+  recreating credentials would be impossible).
+- Both downloads can be encrypted with a password (a checkbox on the form):
+  scrypt (N=2¹⁵, r=8, p=1) → AES-256-GCM, streamed in 64 KiB chunks, each
+  authenticated with the header, the chunk number, and an end-of-stream flag —
+  a truncated or substituted file fails to open instead of silently restoring a
+  partial "tail". Format and wrapper:
+  [internal/secretfile](../internal/secretfile/secretfile.go).
+- Extensions: `.spbk` (**S**elf**P**ost **b**ac**k**up — full backup), `.spde`
+  (**S**elf**P**ost **d**omain **e**xport — domain export); unencrypted files
+  stay `.tar.gz` / `.json`. Domain import detects encryption by the file's magic
+  bytes, not by extension.
+- The password is never stored: without it the file cannot be recovered. In the
+  CLI the password comes only from `SELFPOST_BACKUP_PASSWORD` or
+  `-password-file`, never as an argument (the process list is readable by any
+  process in the container).
+- Minimum password length matches the administrator password (12): the file
+  sits offline and can be attacked without a time limit.
 
 ---
 
-## Принятые риски
+## Accepted risks
 
-Принятый риск — решение с условием возврата, а не отложенная задача из
-дорожной карты.
+An accepted risk is a decision with a condition for revisiting it, not a
+deferred item from the roadmap.
 
-- **`POST` без `Sec-Fetch-Site` и без `Origin` пропускается.**
-  Клиент, не посылающий ни одного из двух — по-настоящему старый браузер или
-  webview с замороженным движком, — остаётся уязвим к CSRF с любого сайта.
-  Принято сознательно: панель однопользовательская, админ выбирает браузер
-  сам, а строгий режим не «защитил бы» такой клиент, а просто сломал бы в нём
-  панель. Ужесточение — одна строка в `originAllowed`
-  ([internal/web/security.go](../internal/web/security.go)): вернуть `false`
-  вместо `true` в ветке «нет обоих заголовков».
-- **CSRF-токены, привязанные к сессии, не делаются.** Проверка origin
-  закрывает соседний поддомен, но зависит от поведения браузера; токен — нет.
-  Цена — скрытое поле примерно в двух десятках форм. Триггером вернуться к
-  вопросу считать появление требования «устойчиво независимо от браузера».
-  От XSS внутри самой панели не спас бы и токен: код, исполняющийся в origin
-  панели, отправит запрос сам — против этого работают автоэкранирование
-  `html/template` и CSP, поэтому шаблоны не должны содержать
-  inline-скриптов и inline-стилей.
-- **Шифрование бэкапа и экспорта — опция, а не умолчание.** Галочка снята —
-  файл скачивается открытым, как в 1.0. Иначе оператор, у которого нет места
-  для хранения пароля, потерял бы возможность сделать бэкап вообще, а
-  безвозвратно нерасшифровываемый архив хуже незашифрованного: пароль SelfPost
-  не хранит. Триггером сделать шифрование обязательным считать появление
-  второго администратора (тогда «кто скачал» перестаёт быть одним человеком).
-- **Строка журнала, оставшаяся без delivery-строк, закрывается как `bounced`, а
-  не как есть.** Риск «вечный `queued`» снят: `mail.log` переехал в
-  `/data/log/` и переживает пересоздание контейнера, а log-tailer сохраняет
-  позицию чтения (`logtail_state`, миграция `0003`), так что после старта хвост
-  дочитывается. Остаток — строки, delivery-строки которых потеряны
-  безвозвратно (лог провернулся дальше 14 файлов, пока панель лежала, либо был
-  удалён): сверка с `postqueue -p` видит, что письма в очереди нет, и через
-  2 минуты grace ставит `bounced`. Если письмо на самом деле ушло, статус
-  окажется ложно-отрицательным. Принято сознательно: доставка, которую панель
-  не может подтвердить, не должна показываться как подтверждённая, а вечный
-  `queued` не отличим от «висит прямо сейчас». Сверка не срабатывает, пока
-  tailer не дочитал лог до конца, и не трогает ничего, если `postqueue` не
-  читается. См. [architecture.md](architecture.md) § Log tailer.
-- **Доступ к `mail.log` из-под непривилегированной панели.** Каталог
-  `/data/log` — `2750 postfix:selfpost`, файл — `0640`: пишет `postlogd`
-  (пользователь `postfix`), читает панель по общей группе `selfpost`, миру файл
-  недоступен. Лог содержит envelope-адреса и IP клиентов, но не тела и не
-  заголовки писем; в бэкап он не попадает (`log/` исключён), чтобы выгрузка
-  оставалась состоянием, а не диагностикой.
+- **A `POST` with neither `Sec-Fetch-Site` nor `Origin` is allowed through.**
+  A client that sends neither — a genuinely old browser, or a webview with a
+  frozen engine — stays vulnerable to CSRF from any site. Accepted
+  deliberately: the panel is single-user, the administrator picks the browser,
+  and a strict mode would not "protect" such a client, it would simply break the
+  panel in it. Tightening is one line in `originAllowed`
+  ([internal/web/security.go](../internal/web/security.go)): return `false`
+  instead of `true` in the "neither header present" branch.
+- **Session-bound CSRF tokens are not implemented.** The origin check closes the
+  neighbouring-subdomain case but depends on browser behaviour; a token does
+  not. The price is a hidden field in roughly two dozen forms. The trigger to
+  revisit is a requirement for protection that holds regardless of the browser.
+  A token would not save the panel from XSS inside it either: code executing in
+  the panel's origin sends the request itself — against that, `html/template`
+  auto-escaping and CSP do the work, which is why templates must contain no
+  inline scripts and no inline styles.
+- **Encrypting backups and exports is an option, not the default.** With the
+  checkbox cleared the file downloads in the clear, as in 1.0. Otherwise an
+  operator with nowhere to keep a password would lose the ability to take a
+  backup at all, and a permanently undecryptable archive is worse than an
+  unencrypted one: SelfPost does not store the password. The trigger to make
+  encryption mandatory is a second administrator (at which point "who
+  downloaded it" stops being one person).
+- **A journal row left without delivery lines is closed as `bounced` rather
+  than left as it is.** The "forever `queued`" risk is gone: `mail.log` moved to
+  `/data/log/` and survives container recreation, and the log tailer keeps its
+  read position (`logtail_state`, migration `0003`), so the tail is read after a
+  start. What remains are rows whose delivery lines are lost for good (the log
+  rotated past 14 files while the panel was down, or was deleted): the
+  reconciliation against `postqueue -p` sees the message is not in the queue and
+  after a 2-minute grace marks it `bounced`. If the message did in fact go out,
+  the status is a false negative. Accepted deliberately: a delivery the panel
+  cannot confirm must not be shown as confirmed, and a permanent `queued` is
+  indistinguishable from "in flight right now". Reconciliation does not run
+  until the tailer has read the log to the end, and touches nothing if
+  `postqueue` is unreadable. See [architecture.md](architecture.md) § Log
+  tailer.
+- **Access to `mail.log` from the unprivileged panel.** The `/data/log`
+  directory is `2750 postfix:selfpost` and the file is `0640`: `postlogd` (user
+  `postfix`) writes, the panel reads through the shared `selfpost` group, and
+  the file is inaccessible to others. The log holds envelope addresses and
+  client IPs, but neither message bodies nor headers; it is excluded from
+  backups (`log/` is skipped) so that a dump stays state rather than
+  diagnostics.
 
-## ADR: CSRF через проверку Origin, без токенов
+## ADR: CSRF via origin checking, without tokens
 
-**Контекст.** Панель — формы (`POST`) с cookie-сессией; классическая CSRF-
-поверхность. Нужен способ отличить запрос со страницы панели от запроса,
-инициированного сторонним сайтом в браузере залогиненного админа.
+**Context.** The panel is forms (`POST`) with a cookie session — the classic
+CSRF surface. What is needed is a way to tell a request from the panel's own
+page apart from one initiated by a third-party site in the logged-in
+administrator's browser.
 
-**Решение.** `originAllowed` в
-[internal/web/security.go](../internal/web/security.go) сверяет `Sec-Fetch-Site`
-(если браузер его шлёт) либо `Origin` (fallback) с хостом панели; запрос без
-обоих заголовков **пропускается**, а не отклоняется. Токенов, привязанных к
-сессии и встроенных в формы, нет.
+**Decision.** `originAllowed` in
+[internal/web/security.go](../internal/web/security.go) checks `Sec-Fetch-Site`
+(when the browser sends it) or `Origin` (fallback) against the panel's host; a
+request carrying neither header is **allowed through** rather than rejected.
+There are no session-bound tokens embedded in forms.
 
-**Почему не токены.** Панель однопользовательская (один администратор на
-инстанс) — модель угроз не включает межпользовательский CSRF внутри самой
-панели, только внешний сайт, заставляющий браузер админа отправить запрос.
-Origin-проверка закрывает это без изменения ни одного шаблона: токен потребовал
-бы скрытого поля примерно в двух десятках форм и синхронизации при каждой
-новой форме, а от XSS внутри панели токен всё равно не защищает — код,
-исполняющийся в origin панели, читает токен и отправляет запрос сам. От XSS
-защищают автоэкранирование `html/template` и CSP, поэтому это отдельная линия
-обороны, не CSRF-токен.
+**Why not tokens.** The panel is single-user (one administrator per instance) —
+the threat model does not include cross-user CSRF inside the panel itself, only
+an external site making the administrator's browser send a request. The origin
+check covers that without touching a single template: a token would need a
+hidden field in roughly two dozen forms and synchronisation with every new form,
+and it would still not protect against XSS inside the panel — code executing in
+the panel's origin reads the token and sends the request itself. XSS is handled
+by `html/template` auto-escaping and CSP, so that is a separate line of defence,
+not a CSRF token.
 
-**Компромисс.** Клиент, не посылающий ни `Sec-Fetch-Site`, ни `Origin`
-(по-настоящему старый браузер или webview с замороженным движком), остаётся
-уязвим — см. «Принятые риски» выше. Это осознанный выбор в пользу не ломать
-панель в таком клиенте ценой узкой остаточной поверхности.
+**Trade-off.** A client that sends neither `Sec-Fetch-Site` nor `Origin` (a
+genuinely old browser, or a webview with a frozen engine) stays vulnerable — see
+"Accepted risks" above. This is a deliberate choice not to break the panel in
+such a client, at the price of a narrow residual surface.
 
-**Пересмотр, если:** появится требование защиты, не зависящей от поведения
-браузера, или панель станет многопользовательской.
+**Revisit if:** a requirement appears for protection that does not depend on
+browser behaviour, or the panel becomes multi-user.
 
-## Как этот список пополняется
+## How this list grows
 
-Предрелизная проверка на уязвимости (модель Fable; история — CHANGELOG
-`[0.5.0]` Security) закрывает каждую находку одним из двух способов: правка до
-тега — либо запись сюда, с обоснованием и условием возврата, как у пунктов выше.
-Третьего варианта («посмотрели и ладно») нет.
+The pre-release vulnerability review (history — CHANGELOG `[0.5.0]` Security)
+closes every finding in one of two ways: a fix before the tag, or an entry here
+with its rationale and its condition for revisiting, like the items above.
+There is no third option ("we looked at it and moved on").

@@ -15,6 +15,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- [docs/security.md](docs/security.md) is now in English, matching the rest of
+  the published docs — it is linked from the README table and from
+  `SECURITY.md`, so a reader following either landed in Russian. Content is
+  unchanged: same requirements, same accepted risks, same ADR. The reviewing
+  model is no longer named in the text; the fact that a pre-release review ran,
+  and its date, stay.
+- The two remaining Russian source comments are in English:
+  `deploy/traefik/extract-cert.sh` (quote from spec 10.3) and
+  `internal/app/sasl.go`, where the quotation from the closed plan is dropped
+  rather than translated — rendered in English it restated the sentence it was
+  attached to.
 - The panel's **Account** entry is now called **Settings** — nav link, page
   heading, and browser title. The route stays `/account`, so existing links
   and bookmarks are unaffected.
