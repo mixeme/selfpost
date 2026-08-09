@@ -30,7 +30,7 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 // field after a rejected submission; the password fields are never repopulated.
 func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername string) {
 	s.render(w, status, "account", map[string]any{
-		"Title":        "SelfPost — account",
+		"Title":        "SelfPost — settings",
 		"User":         currentUser(r),
 		"Active":       "account",
 		"FormUsername": formUsername,

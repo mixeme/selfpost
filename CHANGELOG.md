@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- The panel's **Account** entry is now called **Settings** — nav link, page
+  heading, and browser title. The route stays `/account`, so existing links
+  and bookmarks are unaffected.
+
 ### Fixed
 
 - Release CI: retry `docker push` / `imagetools create` on transient GHCR

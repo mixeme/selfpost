@@ -70,7 +70,7 @@
   {{template "sections" .}}
   <div class="session">
     <span class="muted">{{.User}}</span>
-    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Account</span>{{else}}<a href="/account">{{template "icon-account"}}Account</a>{{end}}
+    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Settings</span>{{else}}<a href="/account">{{template "icon-account"}}Settings</a>{{end}}
     <form class="inline" method="post" action="/logout">
       <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
     </form>
