@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- `SECURITY.md` — how to report a vulnerability privately (GitHub private
+  vulnerability reporting, `public@mixeme.ru` as fallback), which releases get
+  fixes, and what is in and out of scope for a relay. No response time is
+  promised. Without it a finder's default move is a public issue, which
+  discloses a relay flaw to everyone the moment it is filed.
+
 ### Changed
 
 - The panel's **Account** entry is now called **Settings** — nav link, page
