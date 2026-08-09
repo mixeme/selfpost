@@ -7,7 +7,7 @@ name: release
 # can never drift apart (the invariant restore's version check in spec 7.5.A
 # depends on).
 #
-# Native per-architecture builds (plan implementation-plan.md C.4), not qemu:
+# Native per-architecture builds (see docs/development.md), not qemu:
 # running the full Postfix/OpenDKIM stack under emulation for the e2e gate
 # below is impractically slow. Each arch builds, e2e-gates and pushes its own
 # tag on its own native runner; a merge job then combines them into the one
@@ -68,7 +68,7 @@ jobs:
           go-version: "1.26"
           cache-dependency-path: test/e2e/go.sum
 
-      - name: e2e (gates publishing — see docs/implementation-plan.md C.4)
+      - name: e2e (gates publishing — see docs/development.md)
         run: cd test/e2e && go test -v -timeout 20m ./...
 
       - name: Log in to ghcr.io

@@ -23,8 +23,26 @@ HOSTNAME_VALUE="${SELFPOST_HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # TLS material supplied by the reverse-proxy through a read-only bind mount
 # (spec 5.2). The relay requires TLS on 465; if these files are absent the
 # master still starts but TLS handshakes on 465 fail until they appear.
-TLS_CERT="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
-TLS_KEY="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
+#
+# Postfix insists the private key is root-owned and mode 0600. The bind mount
+# is often :ro and owned by the host user (e2e TempDir / CI runner UID), so
+# copy into a writable internal dir and normalise ownership before postconf
+# and `postfix check`.
+TLS_CERT_SRC="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
+TLS_KEY_SRC="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
+TLS_INTERNAL_DIR=/etc/postfix/tls-internal
+TLS_CERT="$TLS_CERT_SRC"
+TLS_KEY="$TLS_KEY_SRC"
+if [ -f "$TLS_CERT_SRC" ] && [ -f "$TLS_KEY_SRC" ]; then
+	mkdir -p "$TLS_INTERNAL_DIR"
+	cp -f "$TLS_CERT_SRC" "$TLS_INTERNAL_DIR/fullchain.pem"
+	cp -f "$TLS_KEY_SRC" "$TLS_INTERNAL_DIR/privkey.pem"
+	chown root:root "$TLS_INTERNAL_DIR/fullchain.pem" "$TLS_INTERNAL_DIR/privkey.pem"
+	chmod 0644 "$TLS_INTERNAL_DIR/fullchain.pem"
+	chmod 0600 "$TLS_INTERNAL_DIR/privkey.pem"
+	TLS_CERT="$TLS_INTERNAL_DIR/fullchain.pem"
+	TLS_KEY="$TLS_INTERNAL_DIR/privkey.pem"
+fi
 
 # Level-1 rate limit (native Postfix anvil, spec 5 p.5 / 7.4). Conservative
 # defaults, sensible during IP warm-up (spec 10).
@@ -54,13 +72,22 @@ SUBMISSION_ENABLE="${SUBMISSION_ENABLE:-false}"
 MAIL_LOG_PATH="${MAIL_LOG:-/data/log/mail.log}"
 
 # --- main.cf -----------------------------------------------------------------
+# maillog_file lives under the persistent /data bind mount (architecture.md §
+# Log tailer). Postfix's default maillog_file_prefixes are only /var and
+# /dev/stdout — without /data, `postfix check` rejects the path.
 postconf -e \
 	"myhostname=${HOSTNAME_VALUE}" \
 	"maillog_file=${MAIL_LOG_PATH}" \
+	"maillog_file_prefixes=/var,/dev/stdout,/data" \
 	"mydestination=" \
 	"relayhost=" \
 	"inet_interfaces=all" \
 	"inet_protocols=all"
+
+# postlogd is mandatory whenever maillog_file is set (MAILLOG_README). Debian's
+# stock master.cf usually has it; pin it explicitly so a stripped/upgraded
+# image cannot lose the service.
+postconf -M "postlog/unix-dgram=postlog unix-dgram n - n - 1 postlogd"
 
 # This is an outbound relay: no local delivery, no per-user aliases. Empty
 # these so a misfiled recipient never gets delivered locally.
@@ -189,4 +216,12 @@ EOF
 
 # Validate the generated configuration; fail loudly if postconf produced
 # anything Postfix rejects, before the wrapper tries to start it.
-postfix check
+set +e
+check_out=$(postfix check 2>&1)
+ec=$?
+set -e
+if [ "$ec" -ne 0 ]; then
+	echo "postfix-config: postfix check failed exit $ec" >&2
+	printf '%s\n' "$check_out" >&2
+	exit "$ec"
+fi

@@ -45,7 +45,10 @@ func checkSupervisorProcesses(s *stack) error {
 		}
 		return true, nil
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("%w\n==== selfpost logs ====\n%s", err, s.logs("selfpost"))
+	}
+	return nil
 }
 
 func parseSupervisorStatus(out string) map[string]string {

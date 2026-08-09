@@ -1,8 +1,7 @@
 # SelfPost — development
 
 **What this file is.** How to build, test, document, and ship changes. Open
-work for v1.x and 2.x lives in [roadmap.md](roadmap.md) (and, until the tag,
-[v1.x-closure-plan.md](v1.x-closure-plan.md)). Product boundaries:
+work for 2.x lives in [roadmap.md](roadmap.md). Product boundaries:
 [product.md](product.md). As-built layout: [architecture.md](architecture.md).
 
 ---
@@ -12,10 +11,8 @@ work for v1.x and 2.x lives in [roadmap.md](roadmap.md) (and, until the tag,
 After `/clear` or a fresh chat:
 
 1. Read this file (process, docs rules, model routing).
-2. Open [roadmap.md](roadmap.md) for open work; until `v1.0.0`, also
-   [v1.x-closure-plan.md](v1.x-closure-plan.md) for the remaining closure
-   checklist. Accepted risks — [security.md](security.md); as-built —
-   [architecture.md](architecture.md).
+2. Open [roadmap.md](roadmap.md) for open work. Accepted risks —
+   [security.md](security.md); as-built — [architecture.md](architecture.md).
 3. Skim [product.md](product.md) if scope is in doubt.
 4. Continue from the next unchecked step in the active plan.
 
@@ -31,7 +28,7 @@ not duplicated here.
 | Security, infra, file permissions, Postfix/`postqueue`, open-relay risk | **Opus** | `mail.log` under `/data`, entrypoint permissions, queue reconcile |
 | UI / JS / CSS, templates, documentation (English), README | **Sonnet** | adaptive polling, this file's Documentation section |
 | Trivial mechanics: retarget links, grep, compose bump, CHANGELOG cut | **Haiku** | Makefile / release.yml comment fixes, deleting closed plan files |
-| Security **review** (not authorship) | **Fable** | pre-release checklist pass ([implementation-plan.md](implementation-plan.md) § D — done) |
+| Security **review** (not authorship) | **Fable** | pre-release checklist (CHANGELOG `[0.5.0]` Security / [security.md](security.md) — done) |
 
 Default rule: risk-critical → Opus; UI / docs / boilerplate → Sonnet; trivial
 mechanics → Haiku. Reviewers must not be the author of the code under review.
@@ -154,20 +151,16 @@ The release image is published **only on tag** `vX.Y.Z` (not on every push to
 
 **Steps (on explicit request):**
 
-1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md).
-2. Create and push git tag `vX.Y.Z`.
+1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pinned
+   tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
+   local-trial image references) in the **same** release commit.
+2. Create and push git tag `vX.Y.Z` on that commit.
 3. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
    and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
-4. Update the pinned tag in
-   [deploy/docker-compose.yml](../deploy/docker-compose.yml) in the **same**
-   commit as the tag (see [roadmap.md](roadmap.md) § «v1.x — documentation and
-   deploy tail»).
 
-Ordinary commits **do not** publish an image. Intermediate CHANGELOG version
-cuts (`0.2.0`…`0.6.0`) document history on `main`; the compose pin and the only
-git release tag may lag until an explicit image publish (today: compose
-`0.1.0`, tag `v0.0.1` — see [roadmap.md](roadmap.md) § «v1.x — documentation
-and deploy tail»).
+Ordinary commits **do not** publish an image. The compose pin and the git tag
+must match (`1.0.0` / `v1.0.0` for the first published release). Intermediate
+CHANGELOG sections (`0.2.0`…`0.6.0`) record development history before that cut.
 
 ---
 
@@ -280,12 +273,8 @@ There is no `docs/archive/` directory.
 | As-built design | [architecture.md](architecture.md) |
 | Development process (this file) | [development.md](development.md) |
 | Security requirements and accepted risks | [security.md](security.md) |
-| Internal roadmap (v1.x tail, 2.x) | [roadmap.md](roadmap.md) |
+| Internal roadmap (2.x) | [roadmap.md](roadmap.md) |
 | Release history | [CHANGELOG.md](../CHANGELOG.md) |
-
-`implementation-plan.md` remains only until the release cut (describes the
-closed release gate); delete it in the release commit. Temporary
-[v1.x-closure-plan.md](v1.x-closure-plan.md) goes away with that cut too.
 
 ### User-facing deliverables
 

@@ -11,84 +11,25 @@
 решением.
 
 **Основа:** [product.md](product.md) v1.0. Процесс и правила документации —
-[development.md](development.md). Несделанное для v1.0/v1.x до тега — в
-[implementation-plan.md](implementation-plan.md) и
-[v1.x-closure-plan.md](v1.x-closure-plan.md). Хвост закрытого
-документационного прохода (D1–D9) — в секции ниже.
+[development.md](development.md). История закрытых фаз v1.x — в `git log` и
+[CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
 ## v1.x — хвост документации и деплоя
 
-**Статус:** не блокирует релизный тег; бывший хвост закрытого
-документационного прохода (D1–D9). Делать по желанию или в релизном коммите,
-где указано. Сводка чек-листов до тега —
-[v1.x-closure-plan.md](v1.x-closure-plan.md).
+**Статус: закрыто** в релизе `1.0.0` / git-тег `v1.0.0`
+(`ghcr.io/mixeme/selfpost:1.0.0`). План закрытия и `implementation-plan.md`
+удалены — история в git и CHANGELOG; `docs/archive/` не храним.
 
-**Тег образа в compose + git tag — один релизный коммит (R1).** В
-[deploy/docker-compose.yml](../deploy/docker-compose.yml) поле `image:` бампить
-до версии релиза **в том же коммите**, что и git-тег `vX.Y.Z` — не раньше.
-Сейчас там `0.1.0`, то есть отстаёт от целевой версии; несовпадение мешает
-только до первого выката по тегу. Сам тег — последний шаг релизного гейта:
-содержательная часть (e2e C.4, ревизия § D) закрыта, режется по явной команде
-оператора ([development.md](development.md) § Commits and release build). После
-тега `release.yml` собирает и публикует `ghcr.io/mixeme/selfpost:X.Y.Z`,
-поэтому compose с новым тегом и сам тег обязаны появиться вместе — иначе
-compose неделю ссылается на несуществующий образ.
+| Тема | Итог |
+|---|---|
+| Адаптивный опрос мониторинга | 5 с / 30 с / 0 (скрытая вкладка) в `panel.js` |
+| `mail.log` + reconcile | `/data/log/mail.log`; сверка с `postqueue -p` |
+| Docs consolidation | процесс в [development.md](development.md); README Documentation |
+| Compose pin + git tag | `1.0.0` / `v1.0.0` в одном релизном коммите |
 
-**Убрать `implementation-plan.md` — в релизном коммите.** Документ закрыт:
-уникального содержания в нём нет, § D (предрелизная ревизия безопасности)
-продублирован в [security.md](security.md) и CHANGELOG `[0.5.0]/Security`,
-а разделы B.1–B.3 и C.4 вырезаны ещё в `22f86d1`. Держится до тега только
-потому, что описывает релизный гейт, пока тот формально не закрыт. При резке
-версии:
-
-1. Удалить файл (история § D — в git и CHANGELOG; `docs/archive/` не храним).
-2. Перецелить ссылки из кода и CI ([Makefile](../Makefile),
-   [.github/workflows/release.yml](../.github/workflows/release.yml),
-   [test/e2e/main_test.go](../test/e2e/main_test.go)) — они ссылаются на «план
-   C.4», секцию, которой в файле уже нет; актуальное описание e2e — в
-   [development.md](development.md).
-3. Перецелить оставшиеся ссылки из документации на
-   [development.md](development.md) / [security.md](security.md) /
-   [roadmap.md](roadmap.md).
-4. Удалить [v1.x-closure-plan.md](v1.x-closure-plan.md) в том же или следующем
-   коммите.
-
-**Готово, когда:** тег образа в compose совпадает с релизом и рядом стоит
-git-тег `vX.Y.Z`; `implementation-plan.md` и `v1.x-closure-plan.md` удалены,
-ссылок на них в активных документах и в коде/CI не осталось.
-
-(Закрыто и действия не требует: `docs/logo` как каталога нет — критерию «либо
-содержит файлы, либо отсутствует» удовлетворяет; Quick start в
-[README.md](../README.md) тянет `docker-compose.yml` и `.env.example` с
-`raw.githubusercontent.com` — это и есть единственная площадка проекта, зеркал
-больше нет.)
-
-**Сводный индекс документации в README.** ~~Ссылки на `docs/` разбросаны по
-тексту README…~~ **Закрыто (v1.x-closure Фаза 3):** секция Documentation в
-[README.md](../README.md) — единый список operator docs + roadmap.
-
-**Опрос мониторинга у открытой, но незанятой вкладки.** ~~Скрытая вкладка уже не
-опрашивает сервер (фильтр на `htmx:beforeRequest` в
-[panel.js](../internal/web/static/panel.js)). Остаток: вкладка на переднем
-плане, с которой не работают, всё равно ходит раз в 5 с. Кандидат — адаптивный
-интервал (5 с при активности, 30 с при простое) по `htmx:afterRequest` без
-изменения `hx-trigger`. Ценность низкая: нагрузка — один SQL-запрос и рендер
-фрагмента, так что это скорее гигиена, чем экономия. Допустимый исход —
-осознанно не делать.~~ **Закрыто (v1.x-closure Фаза 1):** адаптивный интервал
-5 с / 30 с / 0 (скрытая вкладка) в `panel.js` через `data-poll`.
-
-**Send-log vs `mail.log`.** ~~Persist позиции чтения сделан (таблица
-`logtail_state`, миграция `0003`): после рестарта панели log-tailer дочитывает
-пропущенный хвост. Остаётся пересоздание контейнера — `mail.log` не в `/data` и
-теряется вместе с ним, такие строки навсегда останутся `queued`. Кандидаты, если
-станет больно: volume для лога, сверка зависших строк через `postqueue`.~~
-**Закрыто (v1.x-closure Фаза 2):** сделаны оба кандидата — `mail.log` переехал в
-`/data/log/`, а строки, чьи delivery-строки потеряны безвозвратно, закрываются
-сверкой с `postqueue -p` (grace 2 мин → `bounced`). As-built и оставшийся риск
-(ложный `bounced`): [architecture.md](architecture.md) § Log tailer,
-[security.md](security.md).
+Открытая работа дальше — только секции 2.x ниже.
 
 ---
 

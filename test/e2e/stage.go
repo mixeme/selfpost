@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -23,7 +24,7 @@ const selfpostHostname = "mail.e2e.test"
 // CoreDNS is authoritative for, and the sink-MX's dump directory. Called once
 // per run before `docker compose up`, so every run starts from a clean slate.
 func prepareStage(s *stack) error {
-	if err := os.RemoveAll(s.stageDir); err != nil {
+	if err := removeAllBestEffort(s.stageDir); err != nil {
 		return fmt.Errorf("clean stage dir: %w", err)
 	}
 	dirs := []string{"data", "certs", "dns-stage", "mail-stage"}
@@ -46,6 +47,17 @@ func prepareStage(s *stack) error {
 		return fmt.Errorf("write Corefile: %w", err)
 	}
 	return writeZone(s.stageDir, nil)
+}
+
+// removeAllBestEffort deletes path; if a previous run left container-UID files
+// on the bind mount, a root alpine one-shot removes them first.
+func removeAllBestEffort(path string) error {
+	if err := os.RemoveAll(path); err == nil {
+		return nil
+	}
+	_ = exec.Command("docker", "run", "--rm", "-v", path+":/wipe", "alpine:3.20",
+		"sh", "-c", "rm -rf /wipe/..?* /wipe/.[!.]* /wipe/*").Run()
+	return os.RemoveAll(path)
 }
 
 // writeSelfSignedCert generates a throwaway RSA key + self-signed certificate

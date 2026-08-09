@@ -375,12 +375,11 @@ but it can look like an open port in external scans.
 ## Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. Until the `v1.0.0` cut the shipped pin is still
-`0.1.0` — intermediate CHANGELOG sections (`0.2.0`…`0.6.0`) record development
-cuts and do not imply a published image of that tag. Pinning matters because of
-the backup version check above: the panel binary's embedded version and the
-image tag that produced it are the same value by construction (the release CI
-stamps both from one git tag — see `.github/workflows/release.yml`), so the
-pin is what makes "restore into the same version" a checkable fact rather than
-a guess. Upgrade by bumping the tag deliberately, not by riding a moving
-target.
+deliberately never `:latest`. The current pin is `1.0.0`. Intermediate
+CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
+image was published. Pinning matters because of the backup version check above:
+the panel binary's embedded version and the image tag that produced it are the
+same value by construction (the release CI stamps both from one git tag — see
+`.github/workflows/release.yml`), so the pin is what makes "restore into the
+same version" a checkable fact rather than a guess. Upgrade by bumping the tag
+deliberately, not by riding a moving target.

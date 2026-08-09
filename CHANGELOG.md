@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-09
+
 ### Added
 
 - A **Delivery log** on each delivery's page (`/deliveries/{id}`): the
@@ -30,6 +32,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- Postfix config: copy TLS cert/key from the (often `:ro`, host-owned) mount
+  into `/etc/postfix/tls-internal` as `root:root` before `postconf` /
+  `postfix check`. Bind-mounted keys owned by the CI/host UID made
+  `postfix check` fail and the container exit before supervisord started.
+- Postfix config: allow `maillog_file` under `/data` via
+  `maillog_file_prefixes=/var,/dev/stdout,/data`, and pin the `postlog`
+  master.cf service. After mail.log moved to `/data/log`, `postfix check`
+  fatally rejected the path (default prefixes are only `/var` and
+  `/dev/stdout`) and often left stderr/mail.log empty.
+- E2e: read `/data/setup-token` via `docker compose exec` (file is `0600`
+  panel-owned; host `ReadFile` got permission denied on CI). Reclaim `/data`
+  ownership before TempDir/stage cleanup so panel/postfix UIDs do not fail
+  Go's `RemoveAll`.
+- Entrypoint: check `SELFPOST_HOSTNAME` before `/data` setup (so a bad identity
+  fails with the FATAL text, not an earlier `set -e` abort), and `chmod 755
+  /data` after chown so OpenDKIM/Postfix can traverse bind mounts that arrive
+  as mode `0700` (Go `TempDir`, some host umasks) — otherwise KeyTable is
+  unreachable and the container crash-loops. E2e stand uses `restart: "no"` and
+  surfaces selfpost logs from the supervisor readiness check.
+- E2e gate: wait for host-published `/healthz` before panel setup, and stop
+  ordered `TestE2E` subtests after a failure so a nil panel client cannot panic
+  and mask the real error (release CI on both amd64 and arm64).
 - A send-log row could stay `queued` forever after the container was recreated.
   `mail.log` moved from the ephemeral `/var/log` into the data volume
   (`/data/log/mail.log`, `./data/log/` on the host), so the delivery lines that
@@ -61,10 +85,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   layering and route table match `web`→`store` and `POST /domains/import`;
   OpenDKIM drops to `opendkim` via `UserID`; guide drops the archived
   "spec 7.5" pointer, clarifies `POSTFIX_SENDER_LOGIN_MAPS` vs panel writes,
-  and states logrotate keeps 14 daily files. Intermediate CHANGELOG cuts vs
-  the still-pinned compose `0.1.0` image are called out in the guide and
-  `development.md`. Roadmap / implementation-plan point at CHANGELOG
-  `[0.5.0]` Security and refreshed `internal/web` size / symbol links.
+  and states logrotate keeps 14 daily files. Intermediate CHANGELOG cuts from
+  before the published `1.0.0` image are called out in the guide and
+  `development.md`. Roadmap points at CHANGELOG `[0.5.0]` Security and
+  refreshed `internal/web` size / symbol links.
 - Full backups no longer carry `/data/log`. It is Postfix's raw log plus its
   fourteen rotated copies — diagnostic output rather than state to restore, and
   otherwise by far the largest thing in the archive.
@@ -94,6 +118,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   dev-host-specific workflow and `example.com` references removed from docs.
 - `docs/development.md` and `.cursor/rules/agent-rules.mdc` translated to
   English; `roadmap.md` remains Russian (internal tracker).
+- Deploy pin and local-trial image tag set to `ghcr.io/mixeme/selfpost:1.0.0`
+  (compose and git tag `v1.0.0` cut together). Retired
+  `docs/implementation-plan.md` and `docs/v1.x-closure-plan.md`; Makefile,
+  `release.yml`, and e2e comments point at `docs/development.md`. Roadmap
+  v1.x documentation/deploy tail closed.
 
 ## [0.6.0] - 2026-08-08
 

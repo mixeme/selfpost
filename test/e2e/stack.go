@@ -106,6 +106,14 @@ func (s *stack) down() {
 	_, _ = s.compose("down", "-v", "--remove-orphans")
 }
 
+// reclaimData chowns/chmods the /data bind mount from inside the still-running
+// selfpost container so the host test user can delete it afterwards. Files
+// written as panel/postfix (setup-token 0600, opendkim tree, sqlite) otherwise
+// leave EACCES on TempDir/stage cleanup (CI hostname-gate + prepareStage).
+func (s *stack) reclaimData() {
+	_, _ = s.execIn("selfpost", "sh", "-c", "chown -R root:root /data && chmod -R a+rwX /data")
+}
+
 // logs returns a service's combined stdout/stderr, for failure diagnostics.
 func (s *stack) logs(service string) string {
 	out, _ := s.compose("logs", "--no-color", service)

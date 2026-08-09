@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -39,22 +37,48 @@ func newPanelClient() (*panelClient, error) {
 	}}, nil
 }
 
-// readSetupToken reads the one-time setup URL SelfPost wrote to /data (bind
-// mounted at stageDir/data/setup-token) and returns just the token.
-func readSetupToken(stageDir string) (string, error) {
-	var raw []byte
-	err := waitFor("setup-token to appear", 30*time.Second, 300*time.Millisecond, func() (bool, error) {
-		b, err := os.ReadFile(filepath.Join(stageDir, "data", "setup-token"))
+// waitForPanelReady polls the host-published panel port until /healthz
+// returns 200. Supervisor reporting the panel process RUNNING is not enough:
+// the setup-token file is written in Start() before ListenAndServe, and
+// Docker's host-port publish can lag the in-container bind — either race
+// makes the first setup POST fail and leaves sc.panel nil for later steps.
+func waitForPanelReady() error {
+	client := &http.Client{Timeout: 2 * time.Second}
+	return waitFor("panel /healthz on "+panelBaseURL, 60*time.Second, 200*time.Millisecond, func() (bool, error) {
+		resp, err := client.Get(panelBaseURL + "/healthz")
 		if err != nil {
 			return false, err
 		}
-		raw = b
-		return len(b) > 0, nil
+		defer resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return false, fmt.Errorf("status %d", resp.StatusCode)
+		}
+		return true, nil
+	})
+}
+
+// readSetupToken reads the one-time setup URL from /data/setup-token inside
+// the running selfpost container. The file is mode 0600 owned by the panel
+// UID (security.md / setup.go); on a typical CI bind mount that is not the
+// host runner's UID, so a host-side os.ReadFile returns permission denied
+// even though the panel already wrote the token (CI: setup_and_login).
+// Reading via compose exec matches docs/guide.md ("docker compose exec
+// selfpost cat /data/setup-token").
+func readSetupToken(s *stack) (string, error) {
+	var raw string
+	err := waitFor("setup-token to appear", 30*time.Second, 300*time.Millisecond, func() (bool, error) {
+		out, err := s.execIn("selfpost", "cat", "/data/setup-token")
+		if err != nil {
+			return false, err
+		}
+		raw = out
+		return strings.TrimSpace(out) != "", nil
 	})
 	if err != nil {
 		return "", err
 	}
-	u, err := url.Parse(strings.TrimSpace(string(raw)))
+	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return "", fmt.Errorf("parse setup token file: %w", err)
 	}
