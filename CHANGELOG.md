@@ -395,7 +395,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   null recipient of a double bounce, `orig_to=` alongside `to=`, an
   unrecognised status word, a capitalised one, and a cleanup line.
 - docs: README *Encrypting a backup or export*; `docs/security.md` §
-  *Резервная копия и экспорт домена* + accepted risk (encryption is opt-in);
+  *Backup and domain export* + accepted risk (encryption is opt-in);
   `docs/architecture.md` persistence § envelope summary.
 - docs: `docs/roadmap.md` v1.x tail — retire `implementation-plan.md` in the
   release commit (move to `docs/archive/`, retarget its references in README,
