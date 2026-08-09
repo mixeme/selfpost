@@ -375,7 +375,7 @@ but it can look like an open port in external scans.
 ## Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.0.0`. Intermediate
+deliberately never `:latest`. The current pin is `1.1.0`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check above:
 the panel binary's embedded version and the image tag that produced it are the

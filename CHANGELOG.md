@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-09
+
+A documentation and packaging release: no change to the mail path, the
+database, or the on-disk layout. Upgrading is a tag bump.
+
 ### Added
 
 - `SECURITY.md` — how to report a vulnerability privately (GitHub private
@@ -12,59 +17,62 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   fixes, and what is in and out of scope for a relay. No response time is
   promised. Without it a finder's default move is a public issue, which
   discloses a relay flaw to everyone the moment it is filed.
+- [docs/plans/](docs/plans/) — one document per agreed extension: the optional
+  inbound relay, the domain-admin role, and splitting the oversized `web`
+  package. Each states scope, open questions, and what has to be true before
+  coding starts. [docs/roadmap.md](docs/roadmap.md) is restructured around them
+  as a 1.x+ tracker instead of a 2.x wishlist, and now says how to read it from
+  outside the project: nothing in it is a commitment, there are no dates, and
+  the stated order is a recommendation.
 
 ### Changed
 
+- The panel's **Account** entry is now called **Settings** — nav link, page
+  heading, browser title, and the operator guide. The route stays `/account`,
+  so existing links and bookmarks are unaffected.
+- The signed-in name in the panel's nav is now labelled `User:`, so it reads as
+  the current account rather than as a stray word above the Settings link.
+- [docs/product.md](docs/product.md) reframes the future line: the inbound
+  relay and the domain-admin role are agreed **1.x+** extensions tracked in the
+  roadmap and the plans, with the inbound relay targeting a MINOR bump by
+  default and a 2.x major still possible pending implementation. Only items the
+  roadmap still marks *candidate* need explicit approval before coding. It
+  previously put the whole line behind a 2.x.x that nothing had committed to.
 - [docs/security.md](docs/security.md) is now in English, matching the rest of
   the published docs — it is linked from the README table and from
   `SECURITY.md`, so a reader following either landed in Russian. Content is
   unchanged: same requirements, same accepted risks, same ADR. The reviewing
   model is no longer named in the text; the fact that a pre-release review ran,
-  and its date, stay.
+  and its date, stay. The roadmap and the plans are in English for the same
+  reason, and neither records the model assigned to an item any more.
+- The README documentation table now points at `SECURITY.md` for reporting a
+  vulnerability, and the `docs/security.md` row is renamed *Security design* —
+  with two files a reader could reasonably call "security", the table said
+  which is which only by accident. The roadmap row no longer calls the file
+  internal and Russian, because it is neither. `development.md` lists
+  `SECURITY.md` among the user-facing deliverables.
 - `docs/development.md` records the decision on authorship: SelfPost is written
   by AI agents under a maintainer's direction and the project discloses that,
   so the `Co-Authored-By` trailers, the model routing table, and the agent
   rules file all stay. Written down to settle the question rather than have it
   reopened at each release.
-- The README documentation table now points at `SECURITY.md` for reporting a
-  vulnerability, and the `docs/security.md` row is renamed *Security design* —
-  with two files a reader could reasonably call "security", the table said
-  which is which only by accident. `development.md` lists `SECURITY.md` among
-  the user-facing deliverables and no longer calls the roadmap internal.
-- [docs/roadmap.md](docs/roadmap.md) is now in English, with a short note on
-  how to read it from outside the project: nothing in it is a commitment, there
-  are no dates, and the stated order is a recommendation. The model assigned to
-  an item is no longer recorded there. The README row no longer calls the file
-  internal and Russian, because it is neither.
-- The three plans under [docs/plans/](docs/plans/) are now in English, matching
-  the roadmap that links to them. The model assigned to a plan is no longer
-  recorded in it. Package sizes quoted in `web-split.md` were re-checked
-  against the tree and still hold (50 files, 25 `.go`, ~4300 lines).
 - The two remaining Russian source comments are in English:
   `deploy/traefik/extract-cert.sh` (quote from spec 10.3) and
   `internal/app/sasl.go`, where the quotation from the closed plan is dropped
   rather than translated — rendered in English it restated the sentence it was
-  attached to.
-- The panel's **Account** entry is now called **Settings** — nav link, page
-  heading, and browser title. The route stays `/account`, so existing links
-  and bookmarks are unaffected.
-- The signed-in name in the panel's nav is now labelled `User:`, so it reads as
-  the current account rather than as a stray word above the Settings link.
+  attached to. The Cyrillic that remains is test data, where it is the point.
 
 ### Fixed
 
 - The panel's static assets are served with a content ETag and
   `Cache-Control: no-cache`. They are embedded in the binary, so their
-  modification times are the zero value and no `Last-Modified` was sent;
-  with no validator at all the browser guessed how long to keep them, which
-  is why a tab kept showing the previous favicon after the new mark shipped.
-  Each asset is now hashed once at startup, so an unchanged one costs a
-  bodyless 304 and a changed one is picked up on the next load. Caches
-  populated before this change still hold their copy — there is nothing for
-  the browser to revalidate against — so the old favicon survives one more
-  clear.
-- Release CI: retry `docker push` / `imagetools create` on transient GHCR
-  `unknown blob` (and similar) errors after layers already uploaded.
+  modification times are the zero value and no `Last-Modified` was sent; with
+  no validator at all the browser was free to guess how long to keep them,
+  which is why a tab kept showing the previous favicon after the new mark
+  shipped. Each asset is now hashed once at startup, so an unchanged one costs
+  a bodyless 304 and a changed one is picked up on the next load. A browser
+  that cached an asset *before* this release still has nothing to revalidate
+  against, so that one copy has to be cleared by hand.
 
 ## [1.0.0] - 2026-08-09
 
@@ -115,6 +123,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - E2e gate: wait for host-published `/healthz` before panel setup, and stop
   ordered `TestE2E` subtests after a failure so a nil panel client cannot panic
   and mask the real error (release CI on both amd64 and arm64).
+- Release CI: retry `docker push` / `imagetools create` on transient GHCR
+  `unknown blob` (and similar) errors after layers already uploaded.
 - A send-log row could stay `queued` forever after the container was recreated.
   `mail.log` moved from the ephemeral `/var/log` into the data volume
   (`/data/log/mail.log`, `./data/log/` on the host), so the delivery lines that
