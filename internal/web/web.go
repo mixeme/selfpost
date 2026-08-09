@@ -147,8 +147,9 @@ func (s *Server) Handler() http.Handler {
 	// Health check stays unauthenticated for the container/orchestrator.
 	mux.HandleFunc("/healthz", handleHealth)
 
-	// Vendored static assets (HTMX). Served from the embedded FS.
-	mux.Handle("/static/", http.FileServer(http.FS(assetsFS)))
+	// Vendored static assets (HTMX). Served from the embedded FS, with a
+	// content ETag so a replaced asset survives the browser cache (static.go).
+	mux.Handle("/static/", staticHandler())
 
 	// One-time administrator setup (security.md).
 	mux.HandleFunc("/setup/", s.handleSetup)
