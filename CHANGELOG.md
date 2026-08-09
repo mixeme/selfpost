@@ -10,6 +10,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - The panel's **Account** entry is now called **Settings** — nav link, page
   heading, and browser title. The route stays `/account`, so existing links
   and bookmarks are unaffected.
+- The signed-in name in the panel's nav is now labelled `User:`, so it reads as
+  the current account rather than as a stray word above the Settings link.
 
 ### Fixed
 
