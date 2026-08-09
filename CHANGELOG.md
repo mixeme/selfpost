@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- Release CI: retry `docker push` / `imagetools create` on transient GHCR
+  `unknown blob` (and similar) errors after layers already uploaded.
+
 ## [1.0.0] - 2026-08-09
 
 ### Added

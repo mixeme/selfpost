@@ -79,9 +79,35 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push per-arch tag
+        # GHCR sometimes rejects the final manifest with "unknown blob" after
+        # every layer reports Pushed (registry race / overwrite of the same
+        # version tag). Retries are idempotent for identical local bytes.
         run: |
-          docker tag selfpost:e2e "ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}"
-          docker push "ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}"
+          set -euo pipefail
+          image="ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}"
+          docker tag selfpost:e2e "$image"
+          attempt=1
+          max=4
+          backoff=15
+          while true; do
+            set +e
+            out=$(docker push "$image" 2>&1)
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
+              printf '%s\n' "$out"
+              exit 0
+            fi
+            printf '%s\n' "$out" >&2
+            if [ "$attempt" -ge "$max" ] || ! grep -qiE 'unknown blob|blob unknown|blob upload invalid|manifest unknown|received unexpected HTTP status: 5[0-9]{2}|429 Too Many Requests|temporarily unavailable' <<<"$out"; then
+              echo "::error::docker push failed for ${image} (attempt ${attempt}/${max}, exit ${rc})" >&2
+              exit "$rc"
+            fi
+            echo "::warning::transient GHCR error pushing ${image} (attempt ${attempt}/${max}); retry in ${backoff}s" >&2
+            sleep "$backoff"
+            attempt=$((attempt + 1))
+            backoff=$((backoff * 2))
+          done
 
   merge:
     needs: [prepare, build]
@@ -97,8 +123,32 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge per-arch tags into the version manifest
+        # Same GHCR "unknown blob" class of failure can hit imagetools create
+        # when assembling the multi-arch version tag.
         run: |
-          docker buildx imagetools create \
-            -t "ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}" \
-            "ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-amd64" \
-            "ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-arm64"
+          set -euo pipefail
+          version_tag="ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}"
+          amd64="ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-amd64"
+          arm64="ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-arm64"
+          attempt=1
+          max=4
+          backoff=15
+          while true; do
+            set +e
+            out=$(docker buildx imagetools create -t "$version_tag" "$amd64" "$arm64" 2>&1)
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
+              printf '%s\n' "$out"
+              exit 0
+            fi
+            printf '%s\n' "$out" >&2
+            if [ "$attempt" -ge "$max" ] || ! grep -qiE 'unknown blob|blob unknown|blob upload invalid|manifest unknown|received unexpected HTTP status: 5[0-9]{2}|429 Too Many Requests|temporarily unavailable' <<<"$out"; then
+              echo "::error::imagetools create failed for ${version_tag} (attempt ${attempt}/${max}, exit ${rc})" >&2
+              exit "$rc"
+            fi
+            echo "::warning::transient GHCR error merging ${version_tag} (attempt ${attempt}/${max}); retry in ${backoff}s" >&2
+            sleep "$backoff"
+            attempt=$((attempt + 1))
+            backoff=$((backoff * 2))
+          done
