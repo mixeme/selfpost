@@ -35,10 +35,13 @@ send log and DNS checks in the panel, encrypted backups.
 | [**Operator guide**](docs/guide.md) | Reverse proxy, environment variables, DNS, IP warmup, panel operations, rate limiting, backup/restore, ports, image tag |
 | [Product boundaries](docs/product.md) | Purpose, deployment assumptions, out-of-scope items, multi-domain model |
 | [Architecture](docs/architecture.md) | As-built technical design |
-| [Security](docs/security.md) | Accepted security trade-offs and requirements |
+| [Security design](docs/security.md) | Mandatory requirements, accepted risks, the CSRF ADR |
 | [Development](docs/development.md) | Building, testing, docs rules, model routing, commits |
 | [Roadmap](docs/roadmap.md) | Open work (1.x+) — direction, not commitments |
 | [CHANGELOG](CHANGELOG.md) | Release history |
+
+Found a vulnerability? Do not open an issue — [SECURITY.md](SECURITY.md) has
+the private reporting channel and the scope.
 
 Repository: <https://github.com/mixeme/selfpost> — source, issues, releases, and
 the `ghcr.io/mixeme/selfpost` image.

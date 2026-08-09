@@ -276,7 +276,7 @@ There is no `docs/archive/` directory.
 | As-built design | [architecture.md](architecture.md) |
 | Development process (this file) | [development.md](development.md) |
 | Security requirements and accepted risks | [security.md](security.md) |
-| Internal roadmap (1.x+) | [roadmap.md](roadmap.md) |
+| Roadmap (1.x+) | [roadmap.md](roadmap.md) |
 | Active design plans | [plans/](plans/) |
 | Release history | [CHANGELOG.md](../CHANGELOG.md) |
 
@@ -286,6 +286,7 @@ There is no `docs/archive/` directory.
 |---|---|
 | [README.md](../README.md) | Overview, requirements, quick start, docs index, reference deploy, licence |
 | [guide.md](guide.md) | Proxy, env, DNS, IP warmup, operations, rate limiting, backup, ports, image tag |
+| [SECURITY.md](../SECURITY.md) | Private reporting channel, supported versions, scope |
 | [LICENSE](../LICENSE) | AGPL-3.0 full text |
 | [deploy/docker-compose.yml](../deploy/docker-compose.yml) + proxies | Apache + nginx/Caddy/Traefik under [deploy/](../deploy/) |
 | [deploy/.env.example](../deploy/.env.example) | Public env template; full reference in [guide.md](guide.md) |

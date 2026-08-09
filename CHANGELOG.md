@@ -21,6 +21,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   unchanged: same requirements, same accepted risks, same ADR. The reviewing
   model is no longer named in the text; the fact that a pre-release review ran,
   and its date, stay.
+- The README documentation table now points at `SECURITY.md` for reporting a
+  vulnerability, and the `docs/security.md` row is renamed *Security design* —
+  with two files a reader could reasonably call "security", the table said
+  which is which only by accident. `development.md` lists `SECURITY.md` among
+  the user-facing deliverables and no longer calls the roadmap internal.
 - [docs/roadmap.md](docs/roadmap.md) is now in English, with a short note on
   how to read it from outside the project: nothing in it is a commitment, there
   are no dates, and the stated order is a recommendation. The model assigned to
