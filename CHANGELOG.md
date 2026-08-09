@@ -53,6 +53,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- The panel's static assets are served with a content ETag and
+  `Cache-Control: no-cache`. They are embedded in the binary, so their
+  modification times are the zero value and no `Last-Modified` was sent;
+  with no validator at all the browser guessed how long to keep them, which
+  is why a tab kept showing the previous favicon after the new mark shipped.
+  Each asset is now hashed once at startup, so an unchanged one costs a
+  bodyless 304 and a changed one is picked up on the next load. Caches
+  populated before this change still hold their copy — there is nothing for
+  the browser to revalidate against — so the old favicon survives one more
+  clear.
 - Release CI: retry `docker push` / `imagetools create` on transient GHCR
   `unknown blob` (and similar) errors after layers already uploaded.
 
