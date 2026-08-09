@@ -1,52 +1,56 @@
-# План: web-split (разбиение `internal/web`)
+# Plan: web-split (splitting `internal/web`)
 
-**Статус:** согласовано  
-**Версия:** `1.x`; внутренний рефакторинг, сам по себе breaking не тянет.
+**Status:** agreed  
+**Version:** `1.x`; an internal refactor, it does not force a break on its own.
 
 ---
 
-## Что это
+## What this is
 
-`internal/web` — самый крупный пакет проекта: ~50 файлов (включая шаблоны и
-static), ~25 `.go` / ~4000 строк Go, в одной плоскости лежат хендлеры всех
-разделов панели, сессии, security-заголовки, проверка Origin, валидация форм и
-рендер шаблонов.
+`internal/web` is the project's largest package: ~50 files (templates and
+static assets included), ~25 `.go` files and ~4000 lines of Go, with the
+handlers for every panel section, sessions, security headers, origin checking,
+form validation and template rendering all sitting in one flat namespace.
 
-Кандидаты на выделение — `web/handlers` и `web/auth`, либо разрез по доменам
-панели.
+The candidates to split out are `web/handlers` and `web/auth`, or a cut along
+the panel's own domains.
 
-## Почему сейчас
+## Why now
 
-На нынешнем размере плоский пакет читается: имена файлов (`handlers_domains.go`,
-`handlers_apps.go`, `handlers_monitor.go`) работают не хуже каталогов, а
-разбиение потянуло бы за собой экспорт того, что сейчас пакетно-приватно, — то
-есть расширение внутреннего API ради косметики.
+At its current size the flat package reads fine: the file names
+(`handlers_domains.go`, `handlers_apps.go`, `handlers_monitor.go`) do the work
+directories would, and splitting would force exporting what is package-private
+today — widening the internal API for cosmetics.
 
-Смысл появляется, когда пакет начнёт расти: **domain-admin** и **inbound-relay**
-добавляют в него код — роль приносит авторизацию в каждый хендлер, входящий
-релей — отдельные страницы и хендлеры входящих доменов. Рефакторинг дешевле
-делать перед этим ростом, чем после.
+It starts to pay off once the package grows: **domain-admin** and
+**inbound-relay** both add code to it — the role brings authorisation into
+every handler, the inbound relay brings its own pages and handlers for inbound
+domains. The refactor is cheaper before that growth than after it.
 
-## Рекомендуемый порядок
+## Recommended order
 
-**web-split → domain-admin → inbound-relay** (см. [roadmap](../roadmap.md)).
+**web-split → domain-admin → inbound-relay** (see the
+[roadmap](../roadmap.md)).
 
-1. **web-split** — заложить структуру пакета (в т.ч. место под `web/auth`), пока
-   нет сквозных правок от роли и новых inbound-хендлеров.
-2. **domain-admin** — авторизация в каждом хендлере опирается на уже выбранную
-   схему пакета.
-3. **inbound-relay** — новый вертикальный срез; проще добавить в уже разрезанный
-   пакет, чем рефакторить вместе с двумя предыдущими фичами.
+1. **web-split** — lay down the package structure (including a place for
+   `web/auth`) while there are no cross-cutting edits from the role and no new
+   inbound handlers.
+2. **domain-admin** — authorisation in every handler builds on a package layout
+   already chosen.
+3. **inbound-relay** — a new vertical slice; easier to add to an already split
+   package than to refactor alongside the two features before it.
 
-Порядок рекомендация, не блокер.
+The order is a recommendation, not a blocker.
 
-## Готово, когда
+## Done when
 
-Решение принято осознанно в момент старта работ — либо пакет разрезан по
-выбранной схеме, либо зафиксировано, что он остаётся плоским. После разрезки:
-`build`/`vet`/`test` зелёные, поведение панели неизменно.
+The decision is made deliberately when the work starts — either the package is
+split along the chosen scheme, or it is settled that it stays flat. After a
+split: `build`/`vet`/`test` green, the panel's behaviour unchanged.
 
-## Риски
+## Risks
 
-- Преждевременное разбиение — лишний внутренний API и churn без выгоды;
-- откладывание до после роста — сложнее рефакторинг в перемешку с фичами.
+- Splitting too early — a superfluous internal API and churn with nothing to
+  show for it;
+- leaving it until after the growth — a harder refactor, tangled up with the
+  features.

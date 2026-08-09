@@ -1,70 +1,72 @@
-# План: domain-admin (роль администратора домена)
+# Plan: domain-admin (domain administrator role)
 
-**Статус:** согласовано  
-**Версия:** целевой bump **1.x** MINOR при совместимой миграции текущего админа
-в глобального.  
-**Порядок:** рекомендуется после [web-split](web-split.md), до
+**Status:** agreed  
+**Version:** target bump **1.x** MINOR, given a compatible migration of the
+current administrator into a global one.  
+**Order:** recommended after [web-split](web-split.md), before
 [inbound-relay](inbound-relay.md).
 
 ---
 
-## Что это
+## What this is
 
-Сейчас в панели ровно один субъект: `requireAuth` — булев гейт, а не роль
-([web.go](../../internal/web/web.go) — обёртка
-`mux.Handle("/", s.requireAuth(authed))`), сессия не несёт ничего, кроме факта
-входа.
+Today the panel has exactly one subject: `requireAuth` is a boolean gate, not a
+role ([web.go](../../internal/web/web.go) — the
+`mux.Handle("/", s.requireAuth(authed))` wrapper), and the session carries
+nothing beyond the fact of being signed in.
 
-Роль выдаёт доступ к **явно назначенным доменам** (одному или нескольким);
-перечень доменов определяет **глобальный администратор**. Для каждого домена из
-списка:
+The role grants access to **explicitly assigned domains** (one or several); the
+list of domains is set by the **global administrator**. For each domain on that
+list:
 
-- приложения этого домена (создание, режим отправителя, перегенерация пароля,
-  удаление, свой L2-лимит);
-- DKIM/DNS-статус домена;
-- журнал отправки, отфильтрованный по домену — фильтр в журнале уже есть
+- that domain's applications (creation, sender mode, password regeneration,
+  deletion, its own L2 limit);
+- the domain's DKIM/DNS status;
+- the send log filtered to the domain — the filter already exists in the log
   ([sendLogData](../../internal/web/handlers_monitor.go)).
 
-Вне роли остаётся то, что глобально по своей природе:
+What stays outside the role is what is global by nature:
 
-- добавление и удаление доменов;
-- создание domain-admin пользователей и назначение им доменов;
+- adding and removing domains;
+- creating domain-admin users and assigning domains to them;
 - `/reload`;
-- полный бэкап (это весь `/data` вместе с `sasldb2`, то есть все домены
-  сразу);
-- очередь и хвост `mail.log` — они серверные и к домену не привязаны.
+- the full backup (that is all of `/data` including `sasldb2`, i.e. every
+  domain at once);
+- the queue and the `mail.log` tail — those are server-wide and not tied to a
+  domain.
 
-## Почему расширение v1.0
+## Why this extends v1.0
 
-[product.md](../product.md) относит «несколько пользователей панели, роли» к
-out of scope (один администратор). Появление второго субъекта — сознательное
-расширение границ проекта, как и inbound-relay.
+[product.md](../product.md) puts "multiple panel users, roles" out of scope
+(one administrator). A second subject is a deliberate widening of the project's
+boundary, as inbound-relay is.
 
-Цена — уровня фазы, а не патча:
+The cost is phase-sized, not patch-sized:
 
-- таблица пользователей и их привязка к доменам;
-- роль в сессии;
-- авторизация в каждом хендлере (а не только на маршруте — сейчас `{id}`/`{aid}`
-  не сверяются ни с чем, кроме существования);
-- пересмотр первичного setup'а и смены пароля под нескольких пользователей;
-- учёт нового субъекта в бэкапе и экспорте домена.
+- a users table and their binding to domains;
+- the role in the session;
+- authorisation in every handler (not only on the route — today `{id}`/`{aid}`
+  are checked for nothing beyond existence);
+- reworking first-run setup and password change for several users;
+- accounting for the new subject in backup and domain export.
 
-*(Прежняя формулировка этого пункта — «2FA и несколько администраторов» —
-заменена: 2FA снята с рассмотрения, а «несколько администраторов» уточнено до
-одной конкретной роли, потому что нужна не вторая копия всевластного админа, а
-ограниченный доступ владельца одного или нескольких доменов — перечень задаёт
-глобальный администратор.)*
+*(The earlier wording of this item — "2FA and multiple administrators" — has
+been replaced: 2FA is off the table, and "multiple administrators" is narrowed
+to one specific role, because what is needed is not a second all-powerful admin
+but limited access for the owner of one or several domains, with the list set
+by the global administrator.)*
 
-## Готово, когда
+## Done when
 
-- Глобальный администратор и domain-admin с разными правами работают через
-  панель; domain-admin не может выйти за пределы **назначенных** доменов;
-- текущий единственный админ мигрирует в глобального без потери доступа;
-- бэкап/восстановление учитывает пользователей и привязки;
-- `build`/`vet`/`test`/образ зелёные.
+- A global administrator and a domain-admin with different rights both work
+  through the panel; the domain-admin cannot reach past the **assigned**
+  domains;
+- the current single admin migrates into a global one without losing access;
+- backup/restore accounts for users and their bindings;
+- `build`/`vet`/`test`/image green.
 
-## Риски
+## Risks
 
-- Неполная проверка `{id}`/`{aid}` в хендлерах — утечка доступа к чужому
-  домену;
-- breaking setup/бэкап — тогда semver major, не 1.x.
+- An incomplete `{id}`/`{aid}` check in a handler — access leaking to someone
+  else's domain;
+- breaking setup or backup — that would be a semver major, not 1.x.

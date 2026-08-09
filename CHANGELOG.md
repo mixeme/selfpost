@@ -26,6 +26,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   are no dates, and the stated order is a recommendation. The model assigned to
   an item is no longer recorded there. The README row no longer calls the file
   internal and Russian, because it is neither.
+- The three plans under [docs/plans/](docs/plans/) are now in English, matching
+  the roadmap that links to them. The model assigned to a plan is no longer
+  recorded in it. Package sizes quoted in `web-split.md` were re-checked
+  against the tree and still hold (50 files, 25 `.go`, ~4300 lines).
 - The two remaining Russian source comments are in English:
   `deploy/traefik/extract-cert.sh` (quote from spec 10.3) and
   `internal/app/sasl.go`, where the quotation from the closed plan is dropped

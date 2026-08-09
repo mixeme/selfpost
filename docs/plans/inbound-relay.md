@@ -1,159 +1,168 @@
-# План: inbound-relay (входящий релей)
+# Plan: inbound-relay (inbound relay)
 
-**Статус:** согласовано  
-**Версия:** целевой bump **1.x** MINOR; **возможен 2.x** — требует уточнения по
-итогам реализации (не фиксировать major заранее).  
-**Модель:** Opus (инфра/безопасность, риск open relay).  
-**Порядок:** рекомендуется после [web-split](web-split.md) и
+**Status:** agreed  
+**Version:** target bump **1.x** MINOR; **`2.x` possible** — to be settled once
+the implementation lands (do not fix a major in advance).  
+**Order:** recommended after [web-split](web-split.md) and
 [domain-admin](domain-admin.md).
 
 ---
 
-## Цель
+## Goal
 
-Возможность принимать почту на порт 25 для явно настроенных доменов и пересылать
-её на заданный вышестоящий backend (роль backup-MX / relay-forwarder), **как
-выключаемый по умолчанию модуль**, не затрагивающий поведение и поверхность
-атаки базового исходящего релея.
+The ability to accept mail on port 25 for explicitly configured domains and
+forward it to a given upstream backend (a backup-MX / relay-forwarder role), as
+a **module disabled by default** that changes neither the behaviour nor the
+attack surface of the base outbound relay.
 
-## Зачем это нужно (сценарии)
+## What it is for (scenarios)
 
-- **Backup-MX** — принять почту, когда основной почтовый сервер домена временно
-  недоступен, и передать её, когда он вернётся.
-- **Фронт для сервера без внешнего IP** — у оператора есть свой почтовый сервер,
-  который по каким-то причинам **сам не может принимать почту из интернета**
-  (нет статического/внешнего IP, за NAT, серый адрес, закрытый порт 25 на
-  входящую и т.п.). SelfPost с публичным IP и корректным PTR выступает
-  публичным входным узлом для домена (MX указывает на него) и пересылает почту
-  на этот внутренний/недоступный извне сервер.
+- **Backup-MX** — accept mail while the domain's primary mail server is
+  temporarily unreachable, and hand it over when it comes back.
+- **A front for a server without a public IP** — the operator runs their own
+  mail server which, for whatever reason, **cannot accept mail from the
+  internet itself** (no static or public IP, behind NAT, a private address,
+  inbound port 25 blocked, and so on). SelfPost, with a public IP and a correct
+  PTR, acts as the domain's public entry node (the MX points at it) and
+  forwards mail to that internal or otherwise unreachable server.
 
-## Граница объёма (критично — что это НЕ)
+## Scope boundary (critical — what this is NOT)
 
-- **ЭТО:** приём на 25 для доменов из явного списка + пересылка (relay/forward)
-  на upstream (`relay_domains` + `transport_maps` + `relay_recipient_maps`).
-  Postfix здесь — чистый пересыльщик, без локальной доставки.
-- **ЭТО НЕ (out of scope, [product.md](../product.md)):** локальная доставка в
-  почтовые ящики, IMAP/POP3, webmail, Dovecot. Никаких mailbox'ов. SelfPost
-  также **не реализует и не тянет в свой образ** движок антиспама/антивируса
-  (rspamd/ClamAV) — но, в отличие от прежней формулировки, и **не**
-  перекладывает фильтрацию на backend (см. блок «Антиспам» ниже): предоставляет
-  точку подключения внешнего фильтра.
+- **IT IS:** acceptance on 25 for domains from an explicit list, plus
+  forwarding (relay/forward) to an upstream (`relay_domains` +
+  `transport_maps` + `relay_recipient_maps`). Postfix here is a pure forwarder,
+  with no local delivery.
+- **IT IS NOT (out of scope, [product.md](../product.md)):** local delivery to
+  mailboxes, IMAP/POP3, webmail, Dovecot. No mailboxes at all. SelfPost also
+  **neither implements nor bundles** an anti-spam or anti-virus engine
+  (rspamd/ClamAV) — but, unlike the earlier wording, it does **not** push
+  filtering onto the backend either (see the "Anti-spam" section below): it
+  provides an attachment point for an external filter.
 
-## Почему как опция/плагин
+## Why as an option / plugin
 
-- Приём на порт 25 меняет модель угроз (open relay для входящей, backscatter,
-  spam-ingress). Поэтому по умолчанию **выключено** флагом env
-  `INBOUND_RELAY_ENABLE=false`; включение — осознанный шаг оператора.
-- Изоляция: отдельные таблицы SQLite, отдельные хендлеры/страницы панели,
-  отдельная ветка генерации конфига. При выключенном флаге входной listener,
-  таблицы и UI отсутствуют — базовый исходящий тракт байт-в-байт неизменен.
+- Accepting on port 25 changes the threat model (open relay for inbound,
+  backscatter, spam ingress). So it is **off** by default behind the
+  `INBOUND_RELAY_ENABLE=false` env flag; turning it on is a deliberate step by
+  the operator.
+- Isolation: separate SQLite tables, separate panel handlers and pages, a
+  separate branch of config generation. With the flag off, the inbound
+  listener, the tables and the UI are absent — the base outbound path is
+  byte-for-byte unchanged.
 
-## Что делать
+## What to do
 
-- Env-флаг `INBOUND_RELAY_ENABLE` (default false); при `true` — генерировать
-  входной сервис и его конфиг из состояния панели тем же путём, что остальной
-  конфиг (`postfix-config.sh`).
-- **`master.cf`:** входной `smtp inet` на 25 для приёма из интернета (сейчас 25
-  используется только на исходящую доставку). Отдельный от 465/587: на 25 **не**
-  предлагается SASL и **не** разрешается отправка наружу — только приём для
-  `relay_domains`.
-- **Анти-open-relay для входящей (обязательно):**
-  `smtpd_relay_restrictions`/`smtpd_recipient_restrictions` входного smtpd
-  принимают почту **только** для доменов из `relay_domains` и **только** для
-  известных получателей (`relay_recipient_maps`); всё прочее —
-  `reject_unauth_destination`/`reject_unlisted_recipient`. Открытый релей и приём
-  «для кого угодно» невозможны.
-- **Backscatter:** предпочтительно знать валидных получателей (reject unknown
-  recipient на этапе RCPT), чтобы не порождать bounce на несуществующие адреса.
-- **Панель управляет:** список входящих доменов; для каждого — upstream
-  destination (`host:port`, транспорт), опциональный список валидных
-  получателей, опциональный TLS к upstream. Строгая валидация домена/хоста/порта
-  (whitelist), injection-safe запись map-файлов (как `sender_login_maps` в Фазе
-  4), `os/exec` без shell ([security.md](../security.md)).
-- **Милтеры:** OpenDKIM на входящем тракте не нужен (чужую входящую не
-  подписываем). journal-milter опционально переиспользовать для журнала входящих
-  (доп. работа) либо на первом этапе оставить входящий без него; поведение
-  fail-open сохраняется.
-- **Rate-limit/размер:** грубый лимит по client IP (`anvil`, как L1) и
-  `message_size_limit` на входном smtpd.
+- The `INBOUND_RELAY_ENABLE` env flag (default false); when `true`, generate
+  the inbound service and its config from panel state the same way the rest of
+  the config is generated (`postfix-config.sh`).
+- **`master.cf`:** an inbound `smtp inet` on 25 for accepting from the internet
+  (today 25 is used only for outbound delivery). Separate from 465/587: on 25
+  SASL is **not** offered and sending outwards is **not** allowed — inbound
+  only, for `relay_domains`.
+- **Anti-open-relay for inbound (mandatory):** the inbound smtpd's
+  `smtpd_relay_restrictions` / `smtpd_recipient_restrictions` accept mail
+  **only** for domains in `relay_domains` and **only** for known recipients
+  (`relay_recipient_maps`); everything else gets
+  `reject_unauth_destination` / `reject_unlisted_recipient`. An open relay, or
+  accepting "for anyone", is impossible.
+- **Backscatter:** knowing the valid recipients is preferable (reject unknown
+  recipient at RCPT stage) so that bounces to non-existent addresses are never
+  generated.
+- **The panel manages:** the list of inbound domains; for each one the upstream
+  destination (`host:port`, transport), an optional list of valid recipients,
+  and optional TLS to the upstream. Strict validation of domain, host and port
+  (whitelist), injection-safe writing of map files (as with
+  `sender_login_maps` in Phase 4), `os/exec` without a shell
+  ([security.md](../security.md)).
+- **Milters:** OpenDKIM is not needed on the inbound path (we do not sign
+  someone else's inbound mail). The journal-milter can optionally be reused for
+  an inbound journal (extra work), or the inbound path can go without it in the
+  first stage; fail-open behaviour is preserved.
+- **Rate limit / size:** a coarse per-client-IP limit (`anvil`, as L1) and
+  `message_size_limit` on the inbound smtpd.
 
-## Антиспам (важная, но опциональная возможность)
+## Anti-spam (important, but optional)
 
-Это ценная опция, но она **не обязательна**: часть операторов вполне устроит
-**слепая пересылка без фильтрации** — например, когда backend сам умеет
-фильтровать по содержимому, стоит доверенный upstream, или объём/риск невелик.
-Поэтому антиспам-хук по умолчанию **выключен** (пустой
-`INBOUND_ANTISPAM_MILTER`), и входящий релей полностью работоспособен без него.
+This is a valuable option, but it is **not mandatory**: some operators will be
+perfectly served by **blind forwarding without filtering** — when the backend
+can filter on content itself, when the upstream is trusted, or when the volume
+and risk are low. So the anti-spam hook is **off** by default (an empty
+`INBOUND_ANTISPAM_MILTER`), and the inbound relay is fully functional without
+it.
 
-Важно другое — где фильтрация возможна технически: при «слепом» relay целевой
-backend видит подключающимся IP адрес **SelfPost**, а не исходного отправителя,
-поэтому на backend'е ломается всё, что завязано на origin IP (DNSBL/репутация
-проверяются против IP SelfPost, SPF даёт fail — SelfPost не входит в SPF
-домена-отправителя). **Единственная точка, где ещё виден настоящий client IP —
-входной хоп на SelfPost**; поэтому тем, кому фильтрация нужна, она должна быть
-*подключаема именно здесь*, а не переложена на backend, который эту информацию
-уже потерял.
+What matters is something else: where filtering is technically possible. With a
+"blind" relay the destination backend sees **SelfPost's** address as the
+connecting IP, not the original sender's, so everything on the backend that
+depends on the origin IP breaks (DNSBL and reputation are checked against
+SelfPost's IP; SPF returns fail, since SelfPost is not in the sending domain's
+SPF). **The only point where the real client IP is still visible is the inbound
+hop at SelfPost** — so for those who need filtering, it has to be *attachable
+right here*, not delegated to a backend that has already lost the information.
 
-Дизайн подключения:
+The attachment design:
 
-- **Движок антиспама — отдельный опциональный контейнер** (rspamd и т.п.),
-  который оператор запускает **только если нужна эта опция** (тот же принцип,
-  что reverse-proxy — отдельный контейнер вне образа SelfPost). SelfPost его
-  **не содержит и не запускает** — образ и принцип «один контейнер, три
-  процесса» неизменны, [product.md](../product.md) out of scope не нарушается
-  (SelfPost не реализует антиспам).
-- **SelfPost предоставляет точку подключения:** milter-хук на входном smtpd.
-  Адрес движка задаётся env (например,
-  `INBOUND_ANTISPAM_MILTER=inet:antispam:11332`, пусто → хук выключен) и
-  добавляется в `smtpd_milters` **только входного** тракта (не на 465/587).
-  Postfix передаёт milter'у настоящий client IP/HELO/PTR — фильтр видит
-  истинный origin. `milter_default_action` для этого milter'а — конфигурируемый
-  (fail-open vs tempfail); дефолт определить при реализации.
-- **Нативный backstop без зависимостей:** на том же входном хопе доступны
-  средства Postfix по origin IP — `reject_rbl_client` (DNSBL), проверки
-  HELO/PTR — работают даже без внешнего контейнера. Плюс сохранение
-  аутентификации для downstream через ARC/`Received` там, где часть фильтрации
-  всё же остаётся на backend.
-- **docker-compose:** задокументировать опциональный фрагмент antispam-сайдкара
-  (как альтернативные фрагменты reverse-proxy) — контейнер поднимается вместе со
-  стеком только при включённой опции.
-- **Персистентность:** новые таблицы и map-файлы под `/data` — попадают в полный
-  бэкап автоматически (Фаза 9). Экспорт/импорт домена можно расширить входящей
-  конфигурацией — опционально, пометить.
-- **DNS-документация:** для входящего домена нужна `MX`-запись, указывающая на
-  сервер (в отличие от исходящего, где MX не требуется) — отразить в разделе DNS
-  README.
+- **The anti-spam engine is a separate optional container** (rspamd or
+  similar), which the operator runs **only if this option is wanted** (the same
+  principle as the reverse proxy — a separate container outside the SelfPost
+  image). SelfPost **neither contains nor starts it** — the image and the "one
+  container, three processes" principle are unchanged, and
+  [product.md](../product.md)'s out-of-scope list is not violated (SelfPost
+  does not implement anti-spam).
+- **SelfPost provides the attachment point:** a milter hook on the inbound
+  smtpd. The engine's address is set via env (for example,
+  `INBOUND_ANTISPAM_MILTER=inet:antispam:11332`, empty → the hook is off) and
+  is added to `smtpd_milters` for the **inbound path only** (not on 465/587).
+  Postfix passes the milter the real client IP, HELO and PTR — the filter sees
+  the true origin. `milter_default_action` for that milter is configurable
+  (fail-open vs tempfail); the default is to be decided during implementation.
+- **A native backstop with no dependencies:** on that same inbound hop,
+  Postfix's own origin-IP facilities are available — `reject_rbl_client`
+  (DNSBL) and HELO/PTR checks — and they work even without an external
+  container. Plus preserving authentication results for downstream through ARC
+  or `Received`, where part of the filtering does remain on the backend.
+- **docker-compose:** document an optional anti-spam sidecar fragment (like the
+  alternative reverse-proxy fragments) — the container comes up with the stack
+  only when the option is enabled.
+- **Persistence:** new tables and map files under `/data` — they land in the
+  full backup automatically (Phase 9). Domain export/import can be extended
+  with the inbound configuration — optional, to be flagged.
+- **DNS documentation:** an inbound domain needs an `MX` record pointing at the
+  server (unlike outbound, where no MX is required) — to be reflected in the
+  README's DNS section.
 
-## Безопасность
+## Security
 
-[security.md](../security.md): валидация ввода на сервере, экранирование записи
-в конфиги, `exec` без интерполяции, никакого open relay, защита от backscatter.
+[security.md](../security.md): server-side input validation, escaped writes to
+config files, `exec` without interpolation, no open relay, protection against
+backscatter.
 
-## Готово, когда
+## Done when
 
-При `INBOUND_RELAY_ENABLE=true` и настроенном домене письмо на порт 25 для этого
-домена пересылается на заданный upstream; почта для ненастроенных
-доменов/получателей отклоняется (не open relay, не backscatter); при заданном
-`INBOUND_ANTISPAM_MILTER` входящая проходит через внешний фильтр с настоящим
-origin IP (проверено сайдкар-контейнером), при пустом — хук не мешает; при
-`INBOUND_RELAY_ENABLE=false` — входной порт/таблицы/UI отсутствуют, базовый
-исходящий релей неизменён; `build`/`vet`/`test`/образ зелёные.
+With `INBOUND_RELAY_ENABLE=true` and a configured domain, mail arriving on port
+25 for that domain is forwarded to the given upstream; mail for unconfigured
+domains or recipients is rejected (not an open relay, no backscatter); with
+`INBOUND_ANTISPAM_MILTER` set, inbound mail passes through the external filter
+with the real origin IP (verified with a sidecar container), and with it empty
+the hook stays out of the way; with `INBOUND_RELAY_ENABLE=false` the inbound
+port, tables and UI are absent and the base outbound relay is unchanged;
+`build`/`vet`/`test`/image green.
 
-## Риски
+## Risks
 
-- open relay/backscatter — снимается `relay_domains` + `relay_recipient_maps` +
-  `reject_unauth_destination`;
-- потеря origin IP для фильтрации на backend'е при пересылке — снимается
-  milter-хуком антиспама + нативным DNSBL на входном хопе, где origin IP ещё
-  виден;
-- порт 25 на приём расширяет поверхность атаки (по умолчанию выключено);
-- semver: при несовместимости контракта (порты, бэкап, поведение без флага) —
-  возможен major `2.x`; решение после реализации.
+- open relay / backscatter — removed by `relay_domains` +
+  `relay_recipient_maps` + `reject_unauth_destination`;
+- the loss of the origin IP for filtering on the backend when forwarding —
+  removed by the anti-spam milter hook plus native DNSBL on the inbound hop,
+  where the origin IP is still visible;
+- port 25 accepting mail widens the attack surface (off by default);
+- semver: if the contract turns out incompatible (ports, backup, behaviour with
+  the flag off) a major `2.x` is possible; the decision comes after the
+  implementation.
 
-**Внешняя зависимость деплоя:** опциональный antispam-контейнер — вне образа
-SelfPost, поднимается оператором при включении опции.
+**External deployment dependency:** the optional anti-spam container — outside
+the SelfPost image, brought up by the operator when the option is enabled.
 
-## Зависимости
+## Dependencies
 
-Готовый исходящий тракт (уже реализован). Согласование получено — см. статус
-выше.
+A finished outbound path (already implemented). Agreement obtained — see the
+status above.
