@@ -24,6 +24,34 @@ not duplicated here.
 
 ---
 
+## Authorship and disclosure
+
+**Decided, not open for re-litigation.** SelfPost is written by AI agents under
+a maintainer's direction, and the project says so rather than hiding it.
+
+Concretely, this is what "says so" means, and none of it is an oversight to be
+tidied away later:
+
+- `Co-Authored-By: Claude <model>` trailers stay in commit messages, including
+  the ~140 commits that predate v1.0.
+- The model routing table below is public, in a file the README links to.
+- [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc) ships in
+  the repository.
+- Process notes written for an agent — "after a context reset, pick an item
+  marked `agreed`" in [roadmap.md](roadmap.md) — stay as they are.
+
+**Why not quietly drop it.** Once the trailers are in the history, removing the
+routing table or the rules file would not conceal authorship, it would only
+make the project look like it was trying to. Partial concealment reads worse
+than the plain statement, and the plain statement costs nothing: the code is
+reviewed, tested, and shipped under the same rules either way, and the
+[security design](security.md) records what was audited and what was accepted.
+
+**Revisit if:** the disclosure ever conflicts with the licence or a downstream
+obligation — not because the convention around AI authorship shifts.
+
+---
+
 ## Model routing
 
 | Kind of work | Model | Examples |

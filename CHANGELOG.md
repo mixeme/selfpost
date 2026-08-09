@@ -21,6 +21,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   unchanged: same requirements, same accepted risks, same ADR. The reviewing
   model is no longer named in the text; the fact that a pre-release review ran,
   and its date, stay.
+- `docs/development.md` records the decision on authorship: SelfPost is written
+  by AI agents under a maintainer's direction and the project discloses that,
+  so the `Co-Authored-By` trailers, the model routing table, and the agent
+  rules file all stay. Written down to settle the question rather than have it
+  reopened at each release.
 - The README documentation table now points at `SECURITY.md` for reporting a
   vulnerability, and the `docs/security.md` row is renamed *Security design* —
   with two files a reader could reasonably call "security", the table said
