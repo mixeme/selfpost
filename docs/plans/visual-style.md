@@ -191,10 +191,13 @@ Nothing here blocks the item; each is written down so it is not rediscovered.
    All three need a running Postfix, so they are a test-server check, not a
    local one. `table.log` is the only restyled component with no screenshot
    behind it.
-4. **CSP and the font ETags were verified locally from saved files**, where no
-   policy header is served at all. That the panel's own `default-src 'self'`
-   admits the WOFF2 files, and that they come back with a validator, is a
-   test-server check.
+4. ~~**CSP and the font ETags**~~ — **done** on the test server at
+   `1.1.0-post.669f928`. The policy is unchanged
+   (`default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self';
+   frame-ancestors 'none'`) and admits all three fonts, which come back as
+   `font/woff2` with `Cache-Control: no-cache` and a content ETag: a matching
+   `If-None-Match` gets 304, a stale one gets the bytes. The signed-out page
+   renders in Plex over the network.
 5. **`font-display: swap` has never been observed** — every render had the fonts
    already on disk. Worth one cold load over the network to see how long the
    system stack is on screen.
