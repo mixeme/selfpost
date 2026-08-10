@@ -20,6 +20,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - panel: `/` redirects domain administrators to `/domains`; global users still
   land on `/status`. Navigation hides global-only sections for domain
   administrators.
+- panel: **visual style** brought in line with the SelfPost mark — brick accent
+  and warm paper in place of the blue-on-cool-grey defaults, IBM Plex Sans and
+  IBM Plex Mono served by the panel itself, squarer corners, and column
+  headings, status badges and small labels set in the mono face. Light and dark
+  schemes both keep their contrast; no page, control or workflow changed. A page
+  whose only card is the narrow one now takes its heading and footer down to the
+  card's width instead of splitting them across the wider measure. The three
+  WOFF2 files add ~76 KB to the image and are served from the panel's own origin,
+  so the Content-Security-Policy is unchanged (`default-src 'self'`).
 
 ## [1.1.0] - 2026-08-10
 

@@ -2,7 +2,36 @@
    layout so the panel's Content-Security-Policy can be a plain
    "default-src 'self'" with no inline-style exemption. Any rule
    added here must therefore stay here: an inline style="..." attribute in a
-   template is blocked by that policy and silently does nothing. */
+   template is blocked by that policy and silently does nothing.
+
+   The palette and the type below come from the mark's own approval sheet
+   (docs/assets/selfpost-proof.html) — brick, warm paper, IBM Plex. Before it
+   the panel was a default blue-on-cool-grey admin theme with the stamp pasted
+   onto it, and the two read as different pieces of work. */
+
+/* The fonts ship with the panel rather than being asked for by name. Two
+   reasons, and the second is the one that matters. A named family resolves to
+   whatever the operator's machine has, so the mark — Plex converted to
+   outlines — would be the only Plex on the page. And ui-monospace is Consolas,
+   SF Mono or DejaVu Sans Mono depending on that machine, each with its own
+   advance width: the six-column send log and the mail.log tables would lay out
+   differently for every operator. Served from the panel's own origin, so the
+   policy above already covers them and needs no font-src of its own.
+   One variable file for the sans (100–700 in 46 KB, less than the four static
+   weights it replaces); mono has no variable release, so it is two files.
+   swap, so a cold load shows the system stack for a frame instead of nothing. */
+@font-face {
+  font-family: "IBM Plex Sans"; font-style: normal; font-weight: 100 700;
+  font-display: swap; src: url("/static/ibm-plex-sans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400;
+  font-display: swap; src: url("/static/ibm-plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono"; font-style: normal; font-weight: 600;
+  font-display: swap; src: url("/static/ibm-plex-mono-600.woff2") format("woff2");
+}
 
 /* Colour tokens. Light values live on :root; the dark media query below
    reassigns the same names rather than re-declaring every rule that uses
@@ -10,39 +39,57 @@
    property already carries the right value for the active scheme. */
 :root {
   color-scheme: light dark;
-  --bg: #f6f7f9; --fg: #1b1f24;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #f4f2ed; --fg: #12161c;
+  --muted: #6b7684;        /* secondary text: .muted, th, timestamps, footers */
   --card-bg: #fff;
-  --border: #e2e5e9;       /* dividers: card, table, app, nav, code, encrypt-fields */
-  --control-border: #cfd4da; /* input, select, textarea, action buttons */
+  --border: #dedcd7;       /* dividers: card, table, app, nav, code, encrypt-fields */
+  --control-border: #cbc8c1; /* input, select, textarea, action buttons */
   --input-bg: #fff;
-  --code-bg: #f0f2f4;
-  --surface-bg: #eef1f5; --surface-bg-hover: #e2e7ee; --surface-open-bg: #dde3ec;
-  --nav-active-bg: #e6ebf5;
-  --flash-bg: #ecfdf3; --flash-border: #abefc6; --flash-fg: #067647;
-  --credential-bg: #fffbeb; --credential-border: #f5c518;
-  --danger-bg: #fef3f2; --danger-border: #fecdca; --danger-fg: #b42318; --danger-bg-hover: #fee4e2;
-  --st-ok-bg: #ecfdf3; --st-ok-fg: #067647; --st-ok-border: #abefc6;
-  --st-warn-bg: #fffaeb; --st-warn-fg: #b54708; --st-warn-border: #fedf89;
-  --st-error-bg: #fef3f2; --st-error-fg: #b42318; --st-error-border: #fecdca;
-  --st-unknown-bg: #f0f2f4; --st-unknown-fg: #6b7280; --st-unknown-border: #e2e5e9;
+  --code-bg: #efede9;
+  --surface-bg: #eae7e0; --surface-bg-hover: #e0dcd3; --surface-open-bg: #d8d3c8;
+  --nav-active-bg: #ede4de;
+  /* Brick, the mark's own colour, is the panel's accent — but as two values,
+     not one. A filled control carries --accent-fill with white on it; a link or
+     an active entry carries --accent-text, because the fill on a page
+     background is a colour to sit behind text, not to be text. In the light
+     scheme the two coincide. */
+  --accent-fill: #7a3b2e; --accent-fill-hover: #632f25; --accent-text: #7a3b2e;
+  --on-accent: #fff;
+  --flash-bg: #edf6ef; --flash-border: #c2e0cc; --flash-fg: #2c6b43;
+  --credential-bg: #fcf6e4; --credential-border: #e0c874;
+  --danger-fill: #b42318; --danger-fill-hover: #912018;
+  --danger-bg: #fbedea; --danger-border: #efccc4; --danger-fg: #b42318; --danger-bg-hover: #f7dfda;
+  --st-ok-bg: #edf6ef; --st-ok-fg: #2c6b43; --st-ok-border: #c2e0cc;
+  --st-warn-bg: #fbf2e2; --st-warn-fg: #8a5510; --st-warn-border: #ebd5a6;
+  --st-error-bg: #fbedea; --st-error-fg: #b42318; --st-error-border: #efccc4;
+  --st-unknown-bg: #efede9; --st-unknown-fg: #6b7684; --st-unknown-border: #dedcd7;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14171a; --fg: #e6e8eb;
-    --card-bg: #1d2125;
-    --border: #2b3138;
-    --control-border: #2b3138;
-    --input-bg: #14171a;
-    --code-bg: #14171a;
-    --surface-bg: #22262b; --surface-bg-hover: #2b3138; --surface-open-bg: #313841;
-    --nav-active-bg: #22303f;
-    --flash-bg: #0d2818; --flash-border: #1a5336; --flash-fg: #75d99b;
-    --credential-bg: #2a2408; --credential-border: #6b5a10;
-    --danger-bg: #2d1211; --danger-border: #6b201a; --danger-fg: #f5a29b; --danger-bg-hover: #3d1a18;
-    --st-ok-bg: #0d2818; --st-ok-fg: #75d99b; --st-ok-border: #1a5336;
-    --st-warn-bg: #2e2308; --st-warn-fg: #f5c86b; --st-warn-border: #6b5210;
-    --st-error-bg: #2d1211; --st-error-fg: #f5a29b; --st-error-border: #6b201a;
-    --st-unknown-bg: #22262b; --st-unknown-fg: #9aa3ad; --st-unknown-border: #2b3138;
+    --bg: #16181b; --fg: #e9e6e0;
+    --muted: #9aa1a9;
+    --card-bg: #1d2024;
+    --border: #2c2f34;
+    --control-border: #3a3e44;
+    --input-bg: #14161a;
+    --code-bg: #14161a;
+    --surface-bg: #23262b; --surface-bg-hover: #2c3036; --surface-open-bg: #343941;
+    --nav-active-bg: #2a1f1b;
+    /* Brick as drawn is about 2:1 against this background — a link nobody can
+       read. The fill lightens just enough to keep white on it above 4.5:1
+       (6.9:1 as set), and the text value lightens further to clear the same bar
+       as text on the page. This is where the two values earn their keep. */
+    --accent-fill: #8e4535; --accent-fill-hover: #a0503e; --accent-text: #ce7b66;
+    --flash-bg: #132318; --flash-border: #22452f; --flash-fg: #7fcb9b;
+    --credential-bg: #26210d; --credential-border: #5e5013;
+    --danger-fill: #9b2c22; --danger-fill-hover: #b0342a;
+    --danger-bg: #2a1412; --danger-border: #5e2721; --danger-fg: #eb9b92; --danger-bg-hover: #381a17;
+    --st-ok-bg: #132318; --st-ok-fg: #7fcb9b; --st-ok-border: #22452f;
+    --st-warn-bg: #2a2109; --st-warn-fg: #e5be72; --st-warn-border: #5e4b12;
+    --st-error-bg: #2a1412; --st-error-fg: #eb9b92; --st-error-border: #5e2721;
+    --st-unknown-bg: #23262b; --st-unknown-fg: #9aa1a9; --st-unknown-border: #2c2f34;
   }
 }
 * { box-sizing: border-box; }
@@ -54,7 +101,7 @@
    read as the layout jumping. */
 html { scrollbar-gutter: stable; }
 body {
-  font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font: 400 15px/1.5 var(--font-sans);
   margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
 }
 /* The two columns — navigation on the left, page on the right — centred as a
@@ -93,7 +140,11 @@ main.wide > * { max-width: none; }
 /* Longhands, not the margin shorthand: the shorthand would re-zero the auto
    side margins above and pin the heading to the column's edge, a measure's
    worth to the left of the card under it. */
-h1 { font-size: 1.4rem; margin-top: 0; margin-bottom: 1rem; }
+/* Light rather than bold, which is the sheet's own setting for the name and
+   the one thing a variable font makes free. It is the page's title, not an
+   alarm: the size already says which line is the heading, and at 700 it shouted
+   over the card under it. */
+h1 { font-size: 1.5rem; font-weight: 300; letter-spacing: -0.01em; margin-top: 0; margin-bottom: 1rem; }
 /* The full mark, on the two pages that have no navigation bar to carry the
    compact one. It takes the column's width so its edges line up with the card
    below it, capped at that column's own 24rem; height stays automatic because
@@ -101,15 +152,19 @@ h1 { font-size: 1.4rem; margin-top: 0; margin-bottom: 1rem; }
    The subtitle stops resolving below 280px, which a 320px viewport still clears
    once the body's padding is taken off. */
 .mark { display: block; width: 100%; max-width: 24rem; height: auto; margin-bottom: 1.4rem; }
+/* The radius comes down from 10px across the panel: the mark is a stamp with a
+   square edge and a hairline, and a card rounded like a phone widget sat in
+   front of it as a different kind of object. 6px on the containers, 5px on the
+   controls inside them. */
 .card {
-  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px;
   padding: 1.5rem; margin: 0 auto;
 }
 .card.narrow { max-width: 24rem; }
 label { display: block; font-weight: 600; margin: 0.9rem 0 0.3rem; }
 input {
-  width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
-  border: 1px solid var(--control-border); border-radius: 6px; background: var(--input-bg); color: inherit;
+  width: 100%; padding: 0.55rem 0.7rem; font-family: inherit; font-size: 1rem;
+  border: 1px solid var(--control-border); border-radius: 5px; background: var(--input-bg); color: inherit;
 }
 /* One vocabulary for actions. Anything that performs an action looks like a
    button: a <button>, or an <a> carrying .btn/.danger where the action is a
@@ -123,25 +178,35 @@ input {
 button, a.btn, a.danger {
   display: inline-block; margin-top: 1.2rem; padding: 0.6rem 1.1rem;
   font: inherit; font-size: 1rem; font-weight: 600; text-decoration: none;
-  color: #fff; background: #2563eb; border: 0; border-radius: 6px; cursor: pointer;
+  color: var(--on-accent); background: var(--accent-fill); border: 0; border-radius: 5px; cursor: pointer;
 }
-button:hover, a.btn:hover { background: #1d4ed8; }
-.error { color: #b42318; margin: 0.6rem 0 0; font-weight: 600; }
-.muted { color: #6b7280; }
+button:hover, a.btn:hover { background: var(--accent-fill-hover); }
+.error { color: var(--danger-fg); margin: 0.6rem 0 0; font-weight: 600; }
+.muted { color: var(--muted); }
+/* Links take the accent. The panel never set a colour here and ran on the
+   browser's own blue, which passed unnoticed while the accent was itself blue;
+   against brick it left every domain name and back link belonging to a palette
+   the panel no longer uses. The controls that are links dressed as buttons
+   (a.btn, a.danger, a.st) all carry a class and out-specify this. */
+a { color: var(--accent-text); }
 .topbar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.2rem; }
 .topbar .actions { display: flex; gap: 0.9rem; align-items: baseline; }
 /* form.inline only exists so a POST can sit next to other content without a
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
-/* The signed-out pages are a single card and nothing else, and .card.narrow
-   centres itself inside whatever holds it — so at the panel's usual width the
+/* A page whose card is the narrow one takes the column down with it. .card.narrow
+   centres itself inside whatever holds it, so at the panel's usual width the
    card floated in the middle while the mark and the heading stayed at the far
-   left, three alignments on a page with four elements. Narrowing the column to
-   the card's own width makes the three line up and puts the block as a whole in
-   the middle of the page. */
-main.page-login, main.page-setup { max-width: 24rem; }
+   left — three alignments on a page with four elements. Narrowing the column to
+   the card's own width lines the three up and puts the block as a whole in the
+   middle of the page.
+   Named by what the page holds rather than by which page it is: it was written
+   for login and setup, and Settings and the user form have the same single
+   narrow card and had the same split heading — a list of page names would have
+   had to be remembered and extended by every page added since. */
+main:has(> .card.narrow) { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
-.flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
+.flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1.2rem; }
 table { width: 100%; border-collapse: collapse; }
 /* A table column is at least as wide as the longest unbreakable run inside it,
    and the panel's tables are full of runs with nothing to break on: email
@@ -152,7 +217,15 @@ th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(
 /* The exception: a timestamp broken across two lines is unreadable, and it is
    short enough to never be the reason a row does not fit. */
 td.time { white-space: nowrap; }
-th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
+/* Column headings are set in the mono face: they are labels for machine data
+   rather than prose, and the wider tracking a small monospaced capital wants
+   also holds them apart from the first row of values. Same treatment on the
+   other two small all-caps labels in the panel (.sections-title, .fact-label),
+   so a heading of that size reads as one thing wherever it appears. */
+th {
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+}
 td.actions { text-align: right; }
 /* Subject is the one cell whose text we do not control. Breaking mid word (the
    rule above) keeps it inside the card, but a long subject would do it by
@@ -164,9 +237,11 @@ td.subject span {
   display: block; max-width: 18rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.85rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
-h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+.code { display: block; white-space: pre-wrap; word-break: break-all; font-family: var(--font-mono);
+        font-size: 0.85rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
+/* Semibold, not the browser's bold: a card's title sits a step under the page's
+   own heading, and 700 against a 300 h1 read as the louder of the two. */
+h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.4rem; }
 /* The back link is a block so it takes the measure and lines up with the
    heading above it and the card below: auto side margins centre a block, but
    they do nothing for an inline-block, which would have stayed at the column's
@@ -176,20 +251,20 @@ h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
 .back { display: block; margin-bottom: 1rem; }
 /* Build version, closing every authenticated page. Quiet on purpose: it is
    reference material, not something to read on the way past. */
-.version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: #6b7280; line-height: 1.45; }
+.version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
 .version a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .version a:hover { color: var(--fg); }
-/* The signed-out column is 24rem; a right-aligned multi-link notice wraps
-   into a ragged edge, so centre it there. */
-main.page-login .version, main.page-setup .version { text-align: center; }
+/* The narrow column is 24rem; a right-aligned multi-link notice wraps into a
+   ragged edge, so centre it there. */
+main:has(> .card.narrow) .version { text-align: center; }
 select, textarea {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
-  border: 1px solid var(--control-border); border-radius: 6px; background: var(--input-bg); color: inherit;
+  border: 1px solid var(--control-border); border-radius: 5px; background: var(--input-bg); color: inherit;
   font-family: inherit;
 }
 textarea { resize: vertical; }
-button.danger, a.danger { background: #b42318; }
-button.danger:hover, a.danger:hover { background: #912018; }
+button.danger, a.danger { background: var(--danger-fill); }
+button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
    compact rule below); it carries no marker because the pressed background
    already shows the open state. */
@@ -204,7 +279,7 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .apps { list-style: none; margin: 1.2rem 0 0; padding: 0; }
 .app { padding: 0.9rem 0; border-top: 1px solid var(--border); }
 .app:last-child { padding-bottom: 0; }
-.app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+.app-login { margin: 0; font-family: var(--font-mono); font-weight: 600; }
 .app-addr { margin: 0.15rem 0 0; word-break: break-all; }
 .app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
 /* Mode and rate limit open under the whole row rather than inside it. As
@@ -225,7 +300,7 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .app .actions > .t-mode:checked ~ .for-mode,
 .app .actions > .t-limit:checked ~ .for-limit { background: var(--surface-open-bg); }
 .app .actions > .t-mode:focus-visible ~ .for-mode,
-.app .actions > .t-limit:focus-visible ~ .for-limit { outline: 2px solid #2563eb; outline-offset: 2px; }
+.app .actions > .t-limit:focus-visible ~ .for-limit { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
 .panel form { margin-top: 0.6rem; }
 /* A panel's own submit is a form button, not one of the controls in the row
    above, so it takes back the spacing the compact .actions rule zeroes out:
@@ -293,16 +368,21 @@ button.danger:hover, a.danger:hover { background: #912018; }
    underline was what marked them as links, but a column of them reads as a
    list of links already, and eight underlines down the left edge is a lot of
    line for no added meaning. The hover background carries the affordance. */
+/* The entries are page text, not accented links: a column of eight brick rows
+   would leave nothing for the current one to stand out from — that is what the
+   active entry's colour is for. */
 .nav a, .nav [aria-current] {
   display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.35rem 0.6rem; border-radius: 6px; text-decoration: none;
+  padding: 0.35rem 0.6rem; border-radius: 5px; text-decoration: none;
+  color: var(--fg);
 }
 .nav a:hover { background: var(--surface-bg); }
 /* The marker moved with the bar: a rule under the entry made sense in a row,
    where the entries sat side by side; standing up, the current entry is marked
    down its leading edge, which is the edge every entry shares. */
 .nav [aria-current] {
-  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 2px 0 0 #2563eb;
+  font-weight: 600; color: var(--accent-text); background: var(--nav-active-bg);
+  box-shadow: inset 2px 0 0 var(--accent-fill);
 }
 /* Sign out carries an icon too, so it needs the same row layout; its padding
    and colours come from the compact button rule further down. */
@@ -321,14 +401,15 @@ button.danger:hover, a.danger:hover { background: #912018; }
 }
 .sections-title {
   margin: 0 0 0.25rem 0.6rem;
-  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  color: #6b7280;
+  font-family: var(--font-mono);
+  font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted);
 }
 /* Quieter and a step in from the page entries: this is an index of one page,
    subordinate to the list of pages above it. */
 .nav .sections a {
   padding: 0.2rem 0.6rem 0.2rem 0.9rem;
-  font-size: 0.85rem; color: #6b7280; text-decoration: none;
+  font-size: 0.85rem; color: var(--muted); text-decoration: none;
 }
 .nav .sections a:hover { color: var(--fg); }
 /* panel.js marks the section the page is scrolled to. Without JavaScript
@@ -367,9 +448,14 @@ button.danger:hover, a.danger:hover { background: #912018; }
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
    everywhere. The class suffix is the check's own status value. */
+/* Mono and squared off rather than a bold uppercase pill: the badge carries a
+   value the server produced (ok, warn, delivered, bounced), and the mono face
+   is where the panel puts machine output everywhere else. Uppercasing it was
+   the pill's own emphasis — dropped with the pill, since the colour already
+   says how loud the badge is. */
 .st {
-  display: inline-block; padding: 0.05rem 0.45rem; border-radius: 999px;
-  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.02em;
   vertical-align: middle; border: 1px solid transparent;
 }
 .st-ok { background: var(--st-ok-bg); color: var(--st-ok-fg); border-color: var(--st-ok-border); }
@@ -428,8 +514,8 @@ h1.subject { overflow-wrap: anywhere; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
   margin-top: -0.5rem; margin-bottom: 1rem;
 }
-.route .addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; overflow-wrap: anywhere; }
-.route .arrow { color: #6b7280; }
+.route .addr { font-family: var(--font-mono); font-size: 0.9rem; overflow-wrap: anywhere; }
+.route .arrow { color: var(--muted); }
 /* A card's short facts, as a grid of tiles rather than the label-over-value
    stack the rest of the panel uses. That stack is right for the pages where a
    value is a DNS record or a password to copy — one per line, full width — and
@@ -437,16 +523,16 @@ h1.subject { overflow-wrap: anywhere; }
    would be a page of mostly empty rows. Same auto-fit as .split: as many
    columns as fit, and one when nothing else does. */
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.5rem; margin-top: 1rem; }
-.fact { min-width: 0; padding: 0.5rem 0.7rem; border-radius: 8px; background: var(--surface-bg); }
+.fact { min-width: 0; padding: 0.5rem 0.7rem; border-radius: 6px; background: var(--surface-bg); }
 .fact-label {
-  display: block; font-size: 0.7rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280;
+  display: block; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
 }
 /* Nothing here is guaranteed to have a space in it — domains, logins and queue
    ids are all one run — so a value may break mid word rather than push its tile
    wider than the column it shares. */
 .fact-value { display: block; margin-top: 0.1rem; overflow-wrap: anywhere; }
-.fact-value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.fact-value.mono { font-family: var(--font-mono); font-size: 0.85rem; }
 /* A message's history: the steps down a line, each with the time it happened,
    the status it reached and what that means. The line is the list's own left
    border and the dots sit on top of it, so nothing has to be positioned against
@@ -470,7 +556,7 @@ h1.subject { overflow-wrap: anywhere; }
    of anything. */
 .event.pending { opacity: 0.7; }
 .event.pending::before { background: var(--card-bg); border-style: dashed; }
-.event-time { margin: 0; font-size: 0.75rem; color: #6b7280; }
+.event-time { margin: 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
 .event-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.15rem 0 0; font-weight: 600; }
 .event-detail { margin: 0.2rem 0 0; font-size: 0.9rem; }
 /* A message's own mail.log lines, as a table of when and what. The time column
@@ -486,7 +572,7 @@ table.log th:first-child, table.log td.time { width: 1%; }
    while still letting a long line wrap inside the cell instead of widening it
    (the th/td rule above allows the break). */
 table.log td.log-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem; white-space: pre-wrap;
 }
 /* Compact outlined button: same affordance as the filled one but quiet enough
@@ -497,8 +583,8 @@ table.log td.log-text {
    the control row of an application. */
 button.copy, .actions button, .actions > label.toggle, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
-  border-radius: 6px; white-space: nowrap;
-  background: var(--surface-bg); color: #2563eb; border: 1px solid var(--control-border);
+  border-radius: 5px; white-space: nowrap;
+  background: var(--surface-bg); color: var(--accent-text); border: 1px solid var(--control-border);
 }
 button.copy:hover, .actions button:hover, .actions > label.toggle:hover,
 .actions a.danger:hover, .nav button:hover { background: var(--surface-bg-hover); }

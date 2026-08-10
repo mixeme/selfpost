@@ -11,21 +11,28 @@ Corresponding Source for the published releases is at:
 If you modify SelfPost and let users interact with it over a network,
 AGPL-3.0 §13 requires you to offer them the Corresponding Source of
 your modified version. Update the Source link in the panel footer
-(internal/web/templates/layout.html) so it points at your sources.
+(internal/web/view/templates/layout.html) so it points at your sources.
 
 Third-party software included in this distribution
 ----------------------------------------------------
 
-htmx 2.0.4 (internal/web/static/htmx.min.js)
+htmx 2.0.4 (internal/web/view/static/htmx.min.js)
   Copyright (c) Big Sky Software
   Licence: Zero-Clause BSD (0BSD)
   https://github.com/bigskysoftware/htmx
 
-IBM Plex Sans / IBM Plex Mono (wordmarks in SVG logos only)
+IBM Plex Sans / IBM Plex Mono
   Copyright © 2017 IBM Corp., with Reserved Font Name "Plex"
   Licence: SIL Open Font License 1.1
-  The shipped SVGs use outlined paths derived from these fonts; the
-  font files themselves are not distributed.
+  https://github.com/IBM/plex
+  Distributed unmodified as three latin-subset WOFF2 files served by the
+  control panel:
+    internal/web/view/static/ibm-plex-sans.woff2      (variable, 100-700)
+    internal/web/view/static/ibm-plex-mono-400.woff2
+    internal/web/view/static/ibm-plex-mono-600.woff2
+  Subsetting and WOFF2 packaging by Fontsource (fontsource.org), from
+  the Google Fonts distribution. The wordmarks in the shipped SVG logos
+  are outlined paths derived from the same fonts.
 
 Go module dependencies are listed with their licences in
 docs/development.md § External libraries. Debian packages in the
