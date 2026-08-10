@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>Panel users</h1>
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+<div class="card">
+  <p><a href="/users/new">Create user</a></p>
+  {{if .Users}}
+  <table>
+    <thead>
+      <tr><th>Username</th><th>Role</th><th>Domains</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Users}}
+      <tr>
+        <td>{{.User.Username}}</td>
+        <td>{{if eq .User.Role "global"}}Global{{else}}Domain admin{{end}}</td>
+        <td class="muted">{{if eq .User.Role "global"}}All{{else}}{{range $i, $n := .DomainNames}}{{if $i}}, {{end}}{{$n}}{{end}}{{end}}</td>
+        <td class="actions"><a href="/users/{{.User.ID}}">Edit</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No panel users besides the global administrator yet.</p>
+  {{end}}
+</div>
+{{end}}

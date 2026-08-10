@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -38,7 +39,9 @@ func (h *Handlers) HandleDeliveries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data["Title"] = "SelfPost — deliveries"
-	data["User"] = auth.CurrentUser(r)
+	for k, v := range h.pageBase(r) {
+		data[k] = v
+	}
 	data["Active"] = "deliveries"
 	h.view.Render(w, http.StatusOK, "deliveries", data)
 }
@@ -85,12 +88,29 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	p, ok := h.principal(r)
+	if !ok {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !p.IsGlobal() {
+		allowed, err := h.assignedDomains(p)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if !domainNameSet(allowed)[row.Domain] {
+			http.NotFound(w, r)
+			return
+		}
+	}
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
 	logRows, logNote := h.deliveryLog(row)
 	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
 		"Title":  "SelfPost — delivery",
 		"User":   auth.CurrentUser(r),
 		"Active": "deliveries",
+		"IsGlobal": p.IsGlobal(),
 		"Row":    row,
 		// The status in the panel's own badge vocabulary, so the headline reads
 		// the same way as every other health signal in the panel.
@@ -269,11 +289,31 @@ func deliveriesBackURL(r *http.Request) string {
 // string, queries the store, and assembles everything the template needs
 // (filter dropdown options plus the current selection, rows, and pagination).
 func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
+	p, ok := h.principal(r)
+	if !ok {
+		return nil, errors.New("no principal")
+	}
 	q := r.URL.Query()
 	filter := store.SendLogFilter{
 		Domain:   q.Get("domain"),
 		AppLogin: q.Get("app"),
 	}
+
+	assigned, err := h.assignedDomains(p)
+	if err != nil {
+		return nil, err
+	}
+	allowedNames := domainNameSet(assigned)
+
+	if !p.IsGlobal() {
+		if filter.Domain != "" && !allowedNames[filter.Domain] {
+			filter.Domain = ""
+		}
+		if filter.Domain == "" && len(assigned) == 1 {
+			filter.Domain = assigned[0].Name
+		}
+	}
+
 	page := parsePage(q.Get("p"))
 
 	total, err := h.store.CountSendLog(filter)
@@ -284,23 +324,33 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Decode on the way out as well as on the way in: rows the journal-milter
-	// wrote before it decoded subjects itself still hold the raw header, and
-	// they are the ones an operator is most likely to be looking at.
 	for i := range rows {
 		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
 	}
-	domains, err := h.store.ListDomains()
-	if err != nil {
-		return nil, err
+
+	domainNames := make([]string, 0, len(assigned))
+	for _, d := range assigned {
+		domainNames = append(domainNames, d.Name)
 	}
-	domainNames := make([]string, len(domains))
-	for i, d := range domains {
-		domainNames[i] = d.Name
+
+	loginSet := make(map[string]bool)
+	for _, d := range assigned {
+		apps, err := h.store.ListApplicationsByDomain(d.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range apps {
+			loginSet[a.Login] = true
+		}
 	}
-	logins, err := h.store.ListApplicationLogins()
-	if err != nil {
-		return nil, err
+	logins := make([]string, 0, len(loginSet))
+	for login := range loginSet {
+		logins = append(logins, login)
+	}
+	sort.Strings(logins)
+
+	if !p.IsGlobal() && filter.AppLogin != "" && !loginSet[filter.AppLogin] {
+		filter.AppLogin = ""
 	}
 
 	lastPage := 1
@@ -335,18 +385,25 @@ func parsePage(v string) int {
 // HandleMailQueue renders the Mail queue page (architecture.md § Panel HTTP
 // surface).
 func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	out, errText := readQueue()
 	h.view.Render(w, http.StatusOK, "mail_queue", map[string]any{
-		"Title":  "SelfPost — mail queue",
-		"User":   auth.CurrentUser(r),
-		"Active": "mail_queue",
-		"Output": out,
-		"Error":  errText,
+		"Title":    "SelfPost — mail queue",
+		"User":     auth.CurrentUser(r),
+		"Active":   "mail_queue",
+		"IsGlobal": true,
+		"Output":   out,
+		"Error":    errText,
 	})
 }
 
 // HandleMailQueueBody serves the HTMX polling fragment for the queue view.
 func (h *Handlers) HandleMailQueueBody(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	out, errText := readQueue()
 	h.view.RenderFragment(w, http.StatusOK, "mail_queue_body", map[string]any{
 		"Output": out,
@@ -369,18 +426,25 @@ func readQueue() (string, string) {
 // HandleSystemLog renders the System log page over mail.log (architecture.md §
 // Panel HTTP surface).
 func (h *Handlers) HandleSystemLog(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	lines, errText := h.readLogTail()
 	h.view.Render(w, http.StatusOK, "system_log", map[string]any{
-		"Title":  "SelfPost — system log",
-		"User":   auth.CurrentUser(r),
-		"Active": "system_log",
-		"Lines":  lines,
-		"Error":  errText,
+		"Title":    "SelfPost — system log",
+		"User":     auth.CurrentUser(r),
+		"Active":   "system_log",
+		"IsGlobal": true,
+		"Lines":    lines,
+		"Error":    errText,
 	})
 }
 
 // HandleSystemLogBody serves the HTMX polling fragment for the log-tail view.
 func (h *Handlers) HandleSystemLogBody(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	lines, errText := h.readLogTail()
 	h.view.RenderFragment(w, http.StatusOK, "system_log_body", map[string]any{
 		"Lines": lines,

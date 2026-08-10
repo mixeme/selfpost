@@ -13,7 +13,6 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/store"
-	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
@@ -28,6 +27,9 @@ const maxImportBytes = 1 << 20 // 1 MiB
 // and the domain import are separate actions with different risk, so each gets
 // its own card here rather than sharing a block on the domain list.
 func (h *Handlers) HandleBackupPage(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	h.renderBackupPage(w, r, http.StatusOK, "")
 }
 
@@ -42,14 +44,13 @@ func (h *Handlers) renderBackupPage(w http.ResponseWriter, r *http.Request, stat
 // password), importErr to the import card, so neither message appears under the
 // wrong form.
 func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, status int, importErr, backupErr string) {
-	h.view.Render(w, status, "backup", map[string]any{
-		"Title":     "SelfPost — backup",
-		"User":      auth.CurrentUser(r),
-		"Active":    "backup",
-		"ImportErr": importErr,
-		"BackupErr": backupErr,
-		"MinPwLen":  validate.MinSecretFilePasswordLen,
-	})
+	data := h.pageBase(r)
+	data["Title"] = "SelfPost — backup"
+	data["Active"] = "backup"
+	data["ImportErr"] = importErr
+	data["BackupErr"] = backupErr
+	data["MinPwLen"] = validate.MinSecretFilePasswordLen
+	h.view.Render(w, status, "backup", data)
 }
 
 // HandleBackup streams a full-server backup as a download (architecture.md §
@@ -61,6 +62,9 @@ func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, 
 // way out, so the file that lands on their disk — wherever it is copied
 // afterwards — is useless without the password.
 func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	password, pwErr := secretFilePassword(r)
 	if pwErr != "" {
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
@@ -184,6 +188,9 @@ func (h *Handlers) HandleExportDomain(w http.ResponseWriter, r *http.Request) {
 // re-renders the backup page, where the import form lives, with a friendly
 // message.
 func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	if err := r.ParseMultipartForm(maxImportBytes); err != nil {
 		h.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file (too large or not a valid upload).")

@@ -10,7 +10,6 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/store"
-	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
@@ -104,13 +103,12 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with. Cached by the checker, so re-rendering the page
 	// after a form post costs nothing.
-	admin, err := h.store.GetAdmin()
+	profileEmail, err := h.store.GlobalDMARCReportEmail()
 	if err != nil {
-		logf("panel: domain %d: get admin: %v", d.ID, err)
+		logf("panel: domain %d: global dmarc email: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	profileEmail := admin.DMARCReportEmail
 	reportEmail := dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail)
 	dns, srv := h.domainDNS(d, record, profileEmail, false)
 	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
@@ -134,52 +132,43 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		dmarcSource = "settings"
 	}
 
-	h.view.Render(w, status, "domain_detail", map[string]any{
-		"Title":  "SelfPost — " + d.Name,
-		"User":   auth.CurrentUser(r),
-		"Active": "domains",
-		"Domain": d,
-		"Record": record,
-		"DNS":    dns,
-		// SPF and DMARC are the operator's to write — SelfPost cannot generate
-		// them the way it generates the DKIM record — so the page shows what
-		// this server expects rather than leaving it to the documentation. The
-		// same builders phrase the suggestions in the check messages, so the
-		// page and the checks below it never recommend different records.
-		"SPFExample":   dnscheck.SPFExample(h.cfg.Hostname, srv.IPs),
-		"DMARCName":    dnscheck.DMARCRecordName(d.Name),
-		"DMARCExample":      dnscheck.DMARCExample(reportEmail),
-		"DMARCSource":       dmarcSource,
-		"ProfileDMARCEmail": profileEmail,
-		"ResolvedDMARCEmail": reportEmail,
-		"DMARCRuaMode":      dmarcMode,
-		"DMARCRuaCustom":    dmarcCustom,
-		"ReportAuthName":    reportAuthName,
-		"ReportAuthValue":   reportAuthValue,
-		"NeedsReportAuth":   needsReportAuth,
-		"SameDomainRUA":     reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name),
-		// Client connection settings (the same for every domain on this
-		// instance): the hostname clients connect to, and whether the optional
-		// submission listener is enabled in this deployment.
-		"Hostname":          h.cfg.Hostname,
-		"SubmissionEnabled": h.cfg.SubmissionEnabled,
-		"Apps":              appViews,
-		"Error":             view.FormErr,
-		"FormLogin":         view.FormLogin,
-		"FormMode":          view.FormMode,
-		"FormAddrs":         view.FormAddrs,
-		"NewCred":           view.NewCred,
-		"Flash":             detailFlash(r),
-		"Wildcard":          store.AddressModeWildcard,
-		"List":              store.AddressModeList,
-		"RateLimitErr":      view.RateLimitErr,
-		"ExportErr":         view.ExportErr,
-		"MinPwLen":          validate.MinSecretFilePasswordLen,
-		"DomainHasRL":       domainRLok && domainRL.Active(),
-		"DomainRLIPs":       strings.Join(domainRL.AllowedIPs, "\n"),
-		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),
-		"DomainRLWin":       windowOrDefault(domainRL.WindowSeconds),
-	})
+	data := h.pageBase(r)
+	data["Title"] = "SelfPost — " + d.Name
+	data["Active"] = "domains"
+	data["Domain"] = d
+	data["Record"] = record
+	data["DNS"] = dns
+	data["SPFExample"] = dnscheck.SPFExample(h.cfg.Hostname, srv.IPs)
+	data["DMARCName"] = dnscheck.DMARCRecordName(d.Name)
+	data["DMARCExample"] = dnscheck.DMARCExample(reportEmail)
+	data["DMARCSource"] = dmarcSource
+	data["ProfileDMARCEmail"] = profileEmail
+	data["ResolvedDMARCEmail"] = reportEmail
+	data["DMARCRuaMode"] = dmarcMode
+	data["DMARCRuaCustom"] = dmarcCustom
+	data["ReportAuthName"] = reportAuthName
+	data["ReportAuthValue"] = reportAuthValue
+	data["NeedsReportAuth"] = needsReportAuth
+	data["SameDomainRUA"] = reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name)
+	data["Hostname"] = h.cfg.Hostname
+	data["SubmissionEnabled"] = h.cfg.SubmissionEnabled
+	data["Apps"] = appViews
+	data["Error"] = view.FormErr
+	data["FormLogin"] = view.FormLogin
+	data["FormMode"] = view.FormMode
+	data["FormAddrs"] = view.FormAddrs
+	data["NewCred"] = view.NewCred
+	data["Flash"] = detailFlash(r)
+	data["Wildcard"] = store.AddressModeWildcard
+	data["List"] = store.AddressModeList
+	data["RateLimitErr"] = view.RateLimitErr
+	data["ExportErr"] = view.ExportErr
+	data["MinPwLen"] = validate.MinSecretFilePasswordLen
+	data["DomainHasRL"] = domainRLok && domainRL.Active()
+	data["DomainRLIPs"] = strings.Join(domainRL.AllowedIPs, "\n")
+	data["DomainRLMax"] = intOrBlank(domainRL.MaxMessages)
+	data["DomainRLWin"] = windowOrDefault(domainRL.WindowSeconds)
+	h.view.Render(w, status, "domain_detail", data)
 }
 
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
@@ -213,13 +202,13 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	admin, err := h.store.GetAdmin()
+	profileEmail, err := h.store.GlobalDMARCReportEmail()
 	if err != nil {
-		logf("panel: domain %d: get admin: %v", d.ID, err)
+		logf("panel: domain %d: global dmarc email: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	h.domainDNS(d, record, admin.DMARCReportEmail, true)
+	h.domainDNS(d, record, profileEmail, true)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
@@ -385,6 +374,11 @@ func (h *Handlers) lookupApplication(w http.ResponseWriter, r *http.Request) (st
 		}
 		logf("panel: get application %d: %v", id, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return store.Application{}, false
+	}
+	p, ok := h.principal(r)
+	if !ok || !p.CanAccessApp(a) {
+		http.NotFound(w, r)
 		return store.Application{}, false
 	}
 	return a, true

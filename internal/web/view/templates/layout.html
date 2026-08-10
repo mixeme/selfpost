@@ -64,14 +64,19 @@
        the column: the mark, the panel's pages, the current page's own sections,
        and the session last. The mark goes to /status, the page the panel opens
        on — named outright rather than as "/", which is only a redirect to it. */}}
-  <a class="brand" href="/status"><img src="/static/logo-compact.svg" width="220" height="100" alt="SelfPost"></a>
+  <a class="brand" href="{{if .IsGlobal}}/status{{else}}/domains{{end}}"><img src="/static/logo-compact.svg" width="220" height="100" alt="SelfPost"></a>
   <div class="links">
+    {{if .IsGlobal}}
     {{if eq .Active "status"}}<span aria-current="page">{{template "icon-status"}}Status</span>{{else}}<a href="/status">{{template "icon-status"}}Status</a>{{end}}
+    {{end}}
     {{if eq .Active "domains"}}<span aria-current="page">{{template "icon-domains"}}Domains</span>{{else}}<a href="/domains">{{template "icon-domains"}}Domains</a>{{end}}
     {{if eq .Active "deliveries"}}<span aria-current="page">{{template "icon-deliveries"}}Deliveries</span>{{else}}<a href="/deliveries">{{template "icon-deliveries"}}Deliveries</a>{{end}}
+    {{if .IsGlobal}}
     {{if eq .Active "mail_queue"}}<span aria-current="page">{{template "icon-mail-queue"}}Mail queue</span>{{else}}<a href="/mail-queue">{{template "icon-mail-queue"}}Mail queue</a>{{end}}
     {{if eq .Active "system_log"}}<span aria-current="page">{{template "icon-system-log"}}System log</span>{{else}}<a href="/system-log">{{template "icon-system-log"}}System log</a>{{end}}
     {{if eq .Active "backup"}}<span aria-current="page">{{template "icon-backup"}}Backup</span>{{else}}<a href="/backup">{{template "icon-backup"}}Backup</a>{{end}}
+    {{if eq .Active "users"}}<span aria-current="page">{{template "icon-account"}}Users</span>{{else}}<a href="/users">{{template "icon-account"}}Users</a>{{end}}
+    {{end}}
   </div>
   {{template "sections" .}}
   <div class="session">

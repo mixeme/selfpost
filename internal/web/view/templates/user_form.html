@@ -1,0 +1,38 @@
+{{define "content"}}
+<h1>{{if .IsEdit}}Edit user{{else}}Create user{{end}}</h1>
+
+<div class="card narrow">
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <form method="post" action="{{if .IsEdit}}/users/{{.UserID}}{{else}}/users/new{{end}}">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username"
+           autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
+
+    <label for="password">Password{{if .IsEdit}} (leave empty to keep){{end}}</label>
+    <input id="password" name="password" type="password" autocomplete="new-password" {{if not .IsEdit}}required{{end}}>
+
+    <label for="role">Role</label>
+    <select id="role" name="role">
+      <option value="domain_admin" {{if eq .FormRole "domain_admin"}}selected{{end}}>Domain administrator</option>
+      <option value="global" {{if eq .FormRole "global"}}selected{{end}}>Global administrator</option>
+    </select>
+
+    <fieldset id="domain-pick">
+      <legend>Assigned domains</legend>
+      <p class="muted">Required for domain administrators.</p>
+      {{range .Domains}}
+      <label class="checkbox">
+        <input type="checkbox" name="domain_ids" value="{{.ID}}" {{if index $.FormDomains .ID}}checked{{end}}>
+        {{.Name}}
+      </label>
+      {{end}}
+    </fieldset>
+
+    <button type="submit">{{if .IsEdit}}Save{{else}}Create{{end}}</button>
+    {{if .IsEdit}}
+    <button type="submit" name="action" value="delete" class="danger">Delete user</button>
+    {{end}}
+  </form>
+  <p class="muted"><a href="/users">Back to users</a></p>
+</div>
+{{end}}

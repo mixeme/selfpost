@@ -29,27 +29,31 @@ func (h *Handlers) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) renderDashboard(w http.ResponseWriter, r *http.Request, status int, formErr, formName string) {
-	domains, err := h.domains.List()
+	p, ok := h.principal(r)
+	if !ok {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	domains, err := h.assignedDomains(p)
 	if err != nil {
 		logf("panel: dashboard: list domains: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	h.view.Render(w, status, "dashboard", map[string]any{
-		"Title":    "SelfPost",
-		"User":     auth.CurrentUser(r),
-		"Active":   "domains",
-		"Domains":  h.domainRows(domains),
-		"Error":    formErr,
-		"FormName": formName,
-		"Flash":    dashboardFlash(r),
-	})
+	data := h.pageBase(r)
+	data["Title"] = "SelfPost"
+	data["Active"] = "domains"
+	data["Domains"] = h.domainRows(domains)
+	data["Error"] = formErr
+	data["FormName"] = formName
+	data["Flash"] = dashboardFlash(r)
+	h.view.Render(w, status, "dashboard", data)
 }
 
 func (h *Handlers) domainRows(domains []store.Domain) []domainRow {
 	profileEmail := ""
-	if admin, err := h.store.GetAdmin(); err == nil {
-		profileEmail = admin.DMARCReportEmail
+	if email, err := h.store.GlobalDMARCReportEmail(); err == nil {
+		profileEmail = email
 	}
 	rows := make([]domainRow, len(domains))
 	var wg sync.WaitGroup
@@ -82,6 +86,9 @@ func dashboardFlash(r *http.Request) string {
 // OpenDKIM reload), and redirects to the domain's page so the DNS record to
 // publish is shown (product.md).
 func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		h.renderDashboard(w, r, http.StatusBadRequest, "Invalid form submission.", "")
 		return
@@ -109,6 +116,9 @@ func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
 
 // HandleDeleteConfirm shows the cascade warning before a domain is removed.
 func (h *Handlers) HandleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
@@ -118,11 +128,15 @@ func (h *Handlers) HandleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 		"User":   auth.CurrentUser(r),
 		"Active": "domains",
 		"Domain": d,
+		"IsGlobal": true,
 	})
 }
 
 // HandleDeleteDomain performs the deletion and returns to the domain list.
 func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	id, ok := parseDomainID(w, r)
 	if !ok {
 		return
@@ -145,6 +159,9 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 // HandleReload re-applies both the OpenDKIM configuration and the Postfix
 // sender map on demand (architecture.md § Panel HTTP surface).
 func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	if err := h.domains.Resync(); err != nil {
 		logf("panel: manual reload (opendkim): %v", err)
 		http.Error(w, "reload failed", http.StatusInternalServerError)
@@ -171,6 +188,11 @@ func (h *Handlers) lookupDomain(w http.ResponseWriter, r *http.Request) (store.D
 		}
 		logf("panel: get domain %d: %v", id, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return store.Domain{}, false
+	}
+	p, ok := h.principal(r)
+	if !ok || !p.CanAccessDomain(d.ID) {
+		http.NotFound(w, r)
 		return store.Domain{}, false
 	}
 	return d, true

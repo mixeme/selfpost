@@ -207,8 +207,9 @@ func TestNavMarksActivePage(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	err = engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
-		"User":   "admin",
-		"Active": "mail_queue",
+		"User":     "admin",
+		"Active":   "mail_queue",
+		"IsGlobal": true,
 	})
 	if err != nil {
 		t.Fatalf("execute nav: %v", err)
@@ -234,8 +235,9 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	if err := engine.Page("status").ExecuteTemplate(&buf, "nav", map[string]any{
-		"User":   "admin",
-		"Active": "status",
+		"User":     "admin",
+		"Active":   "status",
+		"IsGlobal": true,
 	}); err != nil {
 		t.Fatalf("execute nav: %v", err)
 	}

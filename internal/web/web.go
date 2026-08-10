@@ -129,7 +129,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/logout", s.auth.HandleLogout)
 
 	authed := http.NewServeMux()
-	authed.HandleFunc("GET /{$}", redirectToStatus)
+	authed.HandleFunc("GET /{$}", redirectHome)
 	authed.HandleFunc("GET /status", h.HandleStatus)
 	authed.HandleFunc("GET /status/fragment", h.HandleStatusFragment)
 	authed.HandleFunc("POST /status/recheck", h.HandleStatusRecheck)
@@ -153,6 +153,12 @@ func (s *Server) Handler() http.Handler {
 
 	authed.HandleFunc("/account", h.HandleAccount)
 
+	authed.HandleFunc("GET /users", h.HandleUsers)
+	authed.HandleFunc("GET /users/new", h.HandleUserNew)
+	authed.HandleFunc("POST /users/new", h.HandleUserNew)
+	authed.HandleFunc("GET /users/{uid}", h.HandleUserEdit)
+	authed.HandleFunc("POST /users/{uid}", h.HandleUserEdit)
+
 	authed.HandleFunc("GET /backup", h.HandleBackupPage)
 	authed.HandleFunc("POST /backup", h.HandleBackup)
 
@@ -168,7 +174,12 @@ func (s *Server) Handler() http.Handler {
 	return s.secure(mux)
 }
 
-func redirectToStatus(w http.ResponseWriter, r *http.Request) {
+func redirectHome(w http.ResponseWriter, r *http.Request) {
+	p, ok := auth.PrincipalFromRequest(r)
+	if ok && !p.IsGlobal() {
+		http.Redirect(w, r, "/domains", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/status", http.StatusSeeOther)
 }
 

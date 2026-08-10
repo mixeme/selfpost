@@ -9,23 +9,33 @@ import (
 )
 
 func (h *Handlers) HandleStatus(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	data := h.statusBody()
 	srv := h.dns.Server(h.cfg.Hostname, false)
 
 	data["Title"] = "SelfPost — status"
 	data["User"] = auth.CurrentUser(r)
 	data["Active"] = "status"
+	data["IsGlobal"] = true
 	data["Flash"] = statusFlash(r)
 	data["Hostname"] = h.cfg.Hostname
 	data["PTR"] = srv.PTR
 	h.view.Render(w, http.StatusOK, "status", data)
 }
 
-func (h *Handlers) HandleStatusFragment(w http.ResponseWriter, _ *http.Request) {
+func (h *Handlers) HandleStatusFragment(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	h.view.RenderFragment(w, http.StatusOK, "status_body", h.statusBody())
 }
 
 func (h *Handlers) HandleStatusRecheck(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
 	h.dns.Server(h.cfg.Hostname, true)
 	http.Redirect(w, r, "/status?rechecked=1", http.StatusSeeOther)
 }

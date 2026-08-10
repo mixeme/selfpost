@@ -23,6 +23,7 @@
     <label for="new_password_confirm">Confirm new password</label>
     <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
 
+    {{if .ShowDMARC}}
     <h3>DMARC aggregate reports</h3>
     <p class="muted">Optional default <code>rua=</code> address for every sending
     domain (can be overridden per domain). Use a mailbox on a domain that
@@ -58,11 +59,12 @@
 {{end}}</span>{{end}}
     {{end}}
     {{end}}
+    {{end}}
 
     <button type="submit">Save changes</button>
   </form>
   <p class="muted">Leave both new-password fields empty to change the username
-  or DMARC address only. Changing the password signs out every other session;
+  {{if .ShowDMARC}}or DMARC address {{end}}only. Changing the password signs out every other session;
   this one stays signed in.</p>
 </div>
 {{end}}

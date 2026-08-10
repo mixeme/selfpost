@@ -3,6 +3,7 @@
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
+{{if .IsGlobal}}
 <div class="card">
   <h2>Add a sending domain</h2>
   <form method="post" action="/domains">
@@ -16,6 +17,7 @@
   <p class="muted">A DKIM key is generated for the domain; you then publish the
   shown DNS record. Adding a domain does not create an application.</p>
 </div>
+{{end}}
 
 <div class="card">
   <h2>Domains</h2>
@@ -31,7 +33,7 @@
         <td><a class="st st-{{.DNS}}" href="/domains/{{.ID}}#dns-status">{{.DNS}}</a></td>
         <td class="muted">{{.DKIMSelector}}</td>
         <td>{{.AppCount}}</td>
-        <td class="actions"><a class="danger" href="/domains/{{.ID}}/delete">Delete</a></td>
+        {{if $.IsGlobal}}<td class="actions"><a class="danger" href="/domains/{{.ID}}/delete">Delete</a></td>{{else}}<td></td>{{end}}
       </tr>
       {{end}}
     </tbody>

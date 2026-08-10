@@ -14,21 +14,22 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HandleAccount serves the administrator's own account settings: the username
-// and password chosen during setup are the only panel credentials
-// (security.md), and until now they could be changed only by recreating the
-// state. Changing them here never touches application SASL logins, which are a
-// separate identity system (architecture.md § Mail path).
+// HandleAccount serves the signed-in user's account settings.
 func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		admin, err := h.store.GetAdmin()
-		if err != nil {
-			logf("panel: account: get admin failed: %v", err)
+		p, ok := h.principal(r)
+		if !ok {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.renderAccount(w, r, http.StatusOK, "", admin.Username, admin.DMARCReportEmail)
+		u, err := h.store.GetUser(p.ID)
+		if err != nil {
+			logf("panel: account: get user failed: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		h.renderAccount(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, p.IsGlobal())
 	case http.MethodPost:
 		h.submitAccount(w, r)
 	default:
@@ -37,33 +38,30 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// renderAccount draws the settings form. formUsername and formDMARCEmail
-// repopulate fields after a rejected submission; password fields are never
-// repopulated.
-func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string) {
+func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string, showDMARC bool) {
 	var reportAuth dnscheck.Result
-	if hub := dnscheck.EmailDomain(formDMARCEmail); hub != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		reportAuth = h.dns.ReportAuth(ctx, hub)
-		cancel()
+	if showDMARC && formDMARCEmail != "" {
+		if hub := dnscheck.EmailDomain(formDMARCEmail); hub != "" {
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			reportAuth = h.dns.ReportAuth(ctx, hub)
+			cancel()
+		}
 	}
-	h.view.Render(w, status, "account", map[string]any{
-		"Title":              "SelfPost — settings",
-		"User":               auth.CurrentUser(r),
-		"Active":             "account",
-		"FormUsername":       formUsername,
-		"FormDMARCEmail":     formDMARCEmail,
-		"ReportAuthName":     dnscheck.ReportAuthRecordName(dnscheck.EmailDomain(formDMARCEmail)),
-		"ReportAuthExample":  dnscheck.ReportAuthExample(),
-		"ReportAuthDNS":      reportAuth,
-		"ReportAuthHub":      dnscheck.EmailDomain(formDMARCEmail),
-		"Error":              formErr,
-		"Flash":              accountFlash(r),
-	})
+	data := h.pageBase(r)
+	data["Title"] = "SelfPost — settings"
+	data["Active"] = "account"
+	data["FormUsername"] = formUsername
+	data["FormDMARCEmail"] = formDMARCEmail
+	data["ShowDMARC"] = showDMARC
+	data["ReportAuthName"] = dnscheck.ReportAuthRecordName(dnscheck.EmailDomain(formDMARCEmail))
+	data["ReportAuthExample"] = dnscheck.ReportAuthExample()
+	data["ReportAuthDNS"] = reportAuth
+	data["ReportAuthHub"] = dnscheck.EmailDomain(formDMARCEmail)
+	data["Error"] = formErr
+	data["Flash"] = accountFlash(r)
+	h.view.Render(w, status, "account", data)
 }
 
-// accountFlash maps a fixed redirect flag to a fixed message, so status text
-// after a redirect is never attacker-influenced.
 func accountFlash(r *http.Request) string {
 	switch r.URL.Query().Get("updated") {
 	case "username":
@@ -85,19 +83,28 @@ func accountFlash(r *http.Request) string {
 	}
 }
 
-// submitAccount applies a username and/or password change. The current password
-// is always required, so a stolen session alone cannot lock the administrator
-// out of their own panel, and the attempt is throttled on the same limiter as
-// the login form so this route cannot be used to brute-force the password past
-// that limit (security.md).
 func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	if !h.auth.AllowLoginAttempt(r) {
+		p, _ := h.principal(r)
 		h.renderAccount(w, r, http.StatusTooManyRequests,
-			"Too many attempts. Please wait and try again.", auth.CurrentUser(r), "")
+			"Too many attempts. Please wait and try again.", auth.CurrentUser(r), "", p.IsGlobal())
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		h.renderAccount(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "")
+		p, _ := h.principal(r)
+		h.renderAccount(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "", p.IsGlobal())
+		return
+	}
+
+	p, ok := h.principal(r)
+	if !ok {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	user, err := h.store.GetUser(p.ID)
+	if err != nil {
+		logf("panel: account: get user failed: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
@@ -106,73 +113,76 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	password := r.PostFormValue("new_password")
 	confirm := r.PostFormValue("new_password_confirm")
 	dmarcEmail := strings.TrimSpace(r.PostFormValue("dmarc_report_email"))
-
-	admin, err := h.store.GetAdmin()
-	if err != nil {
-		logf("panel: account: get admin failed: %v", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	if !p.IsGlobal() {
+		dmarcEmail = user.DMARCReportEmail
 	}
 	if username == "" {
-		username = admin.Username
+		username = user.Username
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(current)); err != nil {
-		h.renderAccount(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail)
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
+		h.renderAccount(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail, p.IsGlobal())
 		return
 	}
 
-	renaming := username != admin.Username
+	renaming := username != user.Username
 	if renaming {
 		if err := validate.Username(username); err != nil {
-			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
+			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
 			return
 		}
 	}
 
-	if err := validate.Email(dmarcEmail); err != nil {
-		h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
-		return
+	if p.IsGlobal() {
+		if err := validate.Email(dmarcEmail); err != nil {
+			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, true)
+			return
+		}
 	}
 
-	emailChanging := dmarcEmail != admin.DMARCReportEmail
+	emailChanging := p.IsGlobal() && dmarcEmail != user.DMARCReportEmail
 
 	repassword := password != "" || confirm != ""
 	if repassword {
 		if password != confirm {
-			h.renderAccount(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail)
+			h.renderAccount(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail, p.IsGlobal())
 			return
 		}
 		if err := validate.AdminPassword(password); err != nil {
-			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
+			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
 			return
 		}
 	}
 	if !renaming && !repassword && !emailChanging {
 		h.renderAccount(w, r, http.StatusBadRequest,
-			"Nothing to change: enter a new username, password, or DMARC report address.", username, dmarcEmail)
+			"Nothing to change: enter a new username, password, or DMARC report address.", username, dmarcEmail, p.IsGlobal())
 		return
 	}
 
-	hash := admin.PasswordHash
+	hash := user.PasswordHash
 	if repassword {
 		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			logf("panel: account: hashing password failed: %v", err)
 			h.renderAccount(w, r, http.StatusInternalServerError,
-				"Internal error. Please try again.", username, dmarcEmail)
+				"Internal error. Please try again.", username, dmarcEmail, p.IsGlobal())
 			return
 		}
 		hash = string(newHash)
 	}
 
-	if err := h.store.UpdateAdmin(username, hash, dmarcEmail); err != nil {
-		logf("panel: account: update admin failed: %v", err)
+	if err := h.store.UpdateUser(user.ID, username, hash, dmarcEmail); err != nil {
+		logf("panel: account: update user failed: %v", err)
 		msg := "Could not save the changes. Please check the logs and try again."
-		if errors.Is(err, store.ErrNoAdmin) {
-			msg = "There is no administrator account to update."
+		if errors.Is(err, store.ErrUserNotFound) {
+			msg = "There is no user account to update."
 		}
-		h.renderAccount(w, r, http.StatusInternalServerError, msg, username, dmarcEmail)
+		if errors.Is(err, store.ErrUserExists) {
+			msg = "That username is already in use."
+			h.renderAccount(w, r, http.StatusConflict, msg, username, dmarcEmail, p.IsGlobal())
+			return
+		}
+		h.renderAccount(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, p.IsGlobal())
 		return
 	}
 
@@ -185,7 +195,7 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logf("panel: administrator account updated (username: %t, password: %t, dmarc email: %t)", renaming, repassword, emailChanging)
+	logf("panel: user %d account updated (username: %t, password: %t, dmarc email: %t)", user.ID, renaming, repassword, emailChanging)
 	http.Redirect(w, r, "/account?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
 }
 

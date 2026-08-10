@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- panel: **domain-admin role** — global administrators manage panel users and
+  assign domains; domain administrators see only their domains (applications,
+  DKIM/DNS, per-domain DMARC, deliveries, export, L2 limits). Status, full
+  backup, mail queue, system log, domain add/delete, and `/reload` stay
+  global-only. SQLite migration `0005_panel_users` migrates the single
+  administrator into a global user; sessions and full backup restore carry users
+  and domain bindings.
+
+### Changed
+
+- panel: `/` redirects domain administrators to `/domains`; global users still
+  land on `/status`. Navigation hides global-only sections for domain
+  administrators.
+
 ## [1.1.0] - 2026-08-10
 
 The first MINOR after 1.0.0: send-only DMARC guidance in the panel, AGPL

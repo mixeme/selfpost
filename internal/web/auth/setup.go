@@ -33,7 +33,7 @@ func newSetupManager(st *store.Store, hostname, tokenPath string) *setupManager 
 }
 
 func (m *setupManager) bootstrap() error {
-	done, err := m.store.AdminExists()
+	done, err := m.store.UserExists()
 	if err != nil {
 		return err
 	}
@@ -48,9 +48,9 @@ func (m *setupManager) bootstrap() error {
 }
 
 func (m *setupManager) activeToken() (string, bool) {
-	done, err := m.store.AdminExists()
+	done, err := m.store.UserExists()
 	if err != nil {
-		logf("panel: setup: admin check failed: %v", err)
+		logf("panel: setup: user check failed: %v", err)
 		return "", false
 	}
 	if done {
