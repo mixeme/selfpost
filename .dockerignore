@@ -7,5 +7,4 @@ docs
 bin
 *.exe
 README.md
-LICENSE
 Makefile
