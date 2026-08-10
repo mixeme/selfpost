@@ -157,6 +157,48 @@ accent:
   ETag test grows to cover the three font files.
 - No `style=` attribute anywhere in `templates/` — the CSP would drop it.
 
+## What is done
+
+The restyle itself landed in `652f1fe`, with the table-wrapping fixes it
+surfaced in `f44f533`. Every page in the order above was rendered in both
+schemes from a panel running locally and checked: the signed-out pair, the
+domain list empty and with three domains, the whole domain page (credential
+card, DKIM/SPF/DMARC, DNS status, applications, rate limit, export, danger
+zone), the delete confirmation, the send log with rows, a single delivery,
+status, mail queue, system log, backup, settings, users and the user form.
+
+Two of those need standing in for what the container provides: `supervisorctl`,
+`saslpasswd2` and `postmap` stubs on `PATH`, `postfix/`, `opendkim/keys/` and
+`sasl/` created inside the data dir by hand, and rows seeded into `send_log` —
+without them the domain, application and send-log pages do not exist locally.
+
+## Outstanding
+
+Nothing here blocks the item; each is written down so it is not rediscovered.
+
+1. **Send-log status is bare text**, while every other status in the panel is a
+   `.st` badge. Making it one is not a repaint: it needs a mapping from
+   `sent`/`queued`/`deferred`/`bounced` onto the four badge colours, which is a
+   judgement about severity (is `deferred` a warning?) rather than a style.
+   **Needs a decision before it is written.**
+2. **The panel overflows horizontally at 375px** — `main` and its cards render
+   wider than the window and the page scrolls sideways. Reproduced with the
+   stylesheet at `f59befd` too, so it predates this work; tracked separately.
+   Removing the navigation does not fix it, so it is in `main`/`.card`, not in
+   the bar the `@media (max-width: 66rem)` block lies down.
+3. **Three views were only ever seen empty**: the mail queue with entries, the
+   system log with lines, and a delivery's own `mail.log` lines (`table.log`).
+   All three need a running Postfix, so they are a test-server check, not a
+   local one. `table.log` is the only restyled component with no screenshot
+   behind it.
+4. **CSP and the font ETags were verified locally from saved files**, where no
+   policy header is served at all. That the panel's own `default-src 'self'`
+   admits the WOFF2 files, and that they come back with a validator, is a
+   test-server check.
+5. **`font-display: swap` has never been observed** — every render had the fonts
+   already on disk. Worth one cold load over the network to see how long the
+   system stack is on screen.
+
 ## Done when
 
 - The panel and the mark read as one design in both schemes, at the reading
@@ -165,6 +207,8 @@ accent:
 - Fonts are served from the panel's own origin under the unchanged CSP, and the
   image works with no network access.
 - `NOTICE` credits IBM Plex (OFL-1.1); build, vet and tests are green.
+- The three views in **Outstanding** 3 are seen with real data on the test
+  server, and 4 is confirmed there.
 
 ## Risks
 
