@@ -26,16 +26,14 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Plan |
 |---|---|---|---|
-| domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
-| visual-style | Panel visual style | **agreed** | [plans/visual-style.md](plans/visual-style.md) |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | logrotate-mode | `mail.log` stops rotating in some builds | candidate | [plans/logrotate-mode.md](plans/logrotate-mode.md) |
 
-**Recommended order** (not binding): **domain-admin →
-inbound-relay** — role-wide authorisation first, then the inbound relay vertical
-slice. Deviating is allowed; there are no hard phases here.
+**Recommended order** (not binding): **inbound-relay** first among agreed
+items — it is the largest remaining 1.x+ extension. Candidates need explicit
+agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the checklist in its linked plan.
@@ -58,30 +56,8 @@ engine stays outside the image, only the attachment point is provided.
 
 **Dependencies / risks:** a finished outbound path; open relay and backscatter;
 a wider attack surface (port 25 accepting mail).
-**Order:** recommended after [domain-admin](plans/domain-admin.md).
 **Version:** target bump `1.x`; `2.x` possible — to be settled once the
 implementation lands.
-
----
-
-## domain-admin
-
-**Goal:** a role with access to one or several assigned domains (the list is
-set by the global administrator) — applications, DKIM/DNS, and the send log for
-each of them; without global operations (adding domains, full backup, the
-queue, `mail.log`).
-
-**Boundary:** an extension of v1.0 — [product.md](product.md) fixes a single
-administrator. Not a second all-powerful admin, but limited access to the
-assigned domains (one or several).
-
-**Done when:** see [plans/domain-admin.md](plans/domain-admin.md).
-
-**Dependencies / risks:** a users table, the role in the session, authorisation
-in every handler, setup and backup. **Order:** recommended **before**
-[inbound-relay](plans/inbound-relay.md).
-**Version:** `1.x` MINOR, given a compatible migration of the current
-administrator into a global one.
 
 ---
 
@@ -99,30 +75,6 @@ it.
 
 **Dependencies / risks:** with a single developer and no PRs, this is low
 priority.
-**Version:** no bearing on semver.
-
----
-
-## visual-style
-
-**Goal:** refresh the control panel's visual design — typography, colour tokens,
-spacing, and component styling — without changing operator workflows or panel
-behaviour.
-
-**Boundary:** presentation only (`panel.css`, templates, static assets); no new
-features. Styling must stay compatible with the panel CSP — rules live in
-`panel.css`, not inline (see [security.md](security.md) and the stylesheet
-header).
-
-**Done when:** see [plans/visual-style.md](plans/visual-style.md). The agreed
-direction is the mark's own — brick, warm paper, IBM Plex — taken from
-[assets/selfpost-proof.html](assets/selfpost-proof.html); light and dark schemes
-remain supported; readability and contrast are preserved.
-
-**Dependencies / risks:** CSP constraints on how styles are applied (rules in
-`panel.css`, never inline); visual regression across pages; the accent colour
-must not read as a status badge.
-**Order:** independent of the feature items; may be taken up between them.
 **Version:** no bearing on semver.
 
 ---
@@ -150,4 +102,3 @@ source of truth for `rua=` in DNS guidance.
 inbound-relay depending on how port 25 acceptance is structured.
 
 **Version:** `1.x` MINOR.
-

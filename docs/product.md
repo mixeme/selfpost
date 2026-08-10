@@ -47,17 +47,19 @@ Explicitly excluded to prevent scope creep:
 
 - Inbound mail (IMAP/POP3, mailboxes, delivery to user inboxes)
 - Webmail
-- Multi-user panel / organisations / roles — one administrator; managing
-  **multiple sending domains** is in scope (see below)
+- Organisations / tenancy beyond global + domain-admin roles; managing
+  **multiple sending domains** under one global administrator is in scope (see
+  below)
 - Inbound antispam/antivirus (rspamd, ClamAV, etc.)
 - A custom MTA — Postfix is used as-is
 - Dovecot or a full mail stack for SASL — Cyrus SASL (`sasldb2`) only
 
-Agreed **1.x+** extensions (optional inbound relay, domain-admin role) are
-tracked in [roadmap.md](roadmap.md) and [plans/](plans/). Inbound relay targets
-a 1.x MINOR bump by default; a 2.x major remains possible pending
-implementation. Items still marked *candidate* in the roadmap require explicit
-approval before coding.
+The **domain-admin** role ships in the current line (global administrator plus
+domain administrators with assigned domains). The optional **inbound relay** is
+the main agreed **1.x+** extension still on the
+[roadmap](roadmap.md) — it targets a 1.x MINOR bump by default; a 2.x major
+remains possible pending implementation. Items marked *candidate* in the
+roadmap require explicit approval before coding.
 
 ---
 
@@ -102,5 +104,6 @@ Adding a domain does **not** create an application automatically.
 - **Delete domain** — removes DKIM key and **all** its applications.
 - **Delete application** — removes only that app's SASL and map entries.
 
-This is not multi-tenancy (one admin); it is one owner operating several
-sending domains with independent application credentials.
+This is not multi-tenancy; it is one owner (or a small team with global and
+domain-scoped roles) operating several sending domains with independent
+application credentials.

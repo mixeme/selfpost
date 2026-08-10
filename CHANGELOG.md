@@ -37,6 +37,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   The three
   WOFF2 files add ~76 KB to the image and are served from the panel's own origin,
   so the Content-Security-Policy is unchanged (`default-src 'self'`).
+- docs: [roadmap.md](docs/roadmap.md) and [product.md](docs/product.md) no
+  longer list domain-admin or visual-style as open work — both ship in this line.
+  Completed plan files (`domain-admin`, `visual-style`, `web-split`) are
+  removed; history stays in git and the entries above. Inbound relay is the
+  main agreed 1.x+ item left on the roadmap.
 
 ## [1.1.0] - 2026-08-10
 

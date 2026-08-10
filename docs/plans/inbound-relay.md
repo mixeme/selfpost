@@ -3,8 +3,9 @@
 **Status:** agreed  
 **Version:** target bump **1.x** MINOR; **`2.x` possible** — to be settled once
 the implementation lands (do not fix a major in advance).  
-**Order:** recommended after [web-split](web-split.md) and
-[domain-admin](domain-admin.md).
+**Order:** recommended next among agreed 1.x+ items (after `internal/web` split
+and the domain-admin role, both shipped — see [CHANGELOG](../CHANGELOG.md)
+`[1.1.0]` and `[Unreleased]`).
 
 ---
 
