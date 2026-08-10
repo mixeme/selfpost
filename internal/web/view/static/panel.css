@@ -391,8 +391,9 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
   font-weight: 600; color: var(--accent-text); background: var(--nav-active-bg);
   box-shadow: inset 2px 0 0 var(--accent-fill);
 }
-/* Sign out carries an icon too, so it needs the same row layout; its padding
-   and colours come from the compact button rule further down. */
+/* Sign out carries an icon too, so it needs the same row layout; its colours
+   come from the compact button rule further down, and its type is put back to
+   the column's beside it (see the rule after that one). */
 .nav button { display: flex; align-items: center; gap: 0.5rem; }
 /* The icons draw in the entry's own colour, so the active entry's darker text,
    a link's blue and Sign out's red all carry through without a rule apiece. */
@@ -600,6 +601,17 @@ button.copy { flex: none; margin-top: 0.3rem; }
   color: var(--danger-fg); background: var(--danger-bg); border-color: var(--danger-border);
 }
 .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: var(--danger-bg-hover); }
+/* Sign out takes the compact button's colours but not its type. The rule above
+   is written for controls that cluster — a row of them beside a value or in a
+   table cell — where 0.8rem/600 is what keeps four of them from shouting. In
+   the navigation column it has no cluster to belong to: it stands under
+   Settings, among entries set 0.95rem/400, and being smaller and heavier than
+   every word around it made it read as a different kind of object rather than
+   as the last item of the list. Type and padding go back to the entries';
+   the red, the border and the background stay, and are what say it acts. */
+.nav button {
+  padding: 0.35rem 0.6rem; font-size: 0.95rem; font-weight: 400;
+}
 
 /* The optional "encrypt this download" block on the backup and export forms.
    Its label is the one checkbox in the panel, so it opts out of the
