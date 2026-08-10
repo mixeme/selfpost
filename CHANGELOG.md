@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-08-09
+## [1.0.1] - 2026-08-09
 
 A documentation and packaging release: no change to the mail path, the
 database, or the on-disk layout. Upgrading is a tag bump.

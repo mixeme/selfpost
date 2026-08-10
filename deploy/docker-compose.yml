@@ -22,7 +22,7 @@
 
 services:
   selfpost:
-    image: ghcr.io/mixeme/selfpost:1.1.0
+    image: ghcr.io/mixeme/selfpost:1.0.1
     restart: unless-stopped
     environment:
       SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"
