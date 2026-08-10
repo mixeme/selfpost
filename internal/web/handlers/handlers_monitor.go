@@ -145,6 +145,17 @@ func deliveryLevel(status string) string {
 	}
 }
 
+// sendLogRow is a row of the send log as the table draws it: the stored row
+// plus the badge level its status maps onto. The level is carried rather than
+// derived in the template because deliveryLevel is the one place that decides
+// what a status means — the delivery page already reads it, and a second
+// mapping written in the template or the stylesheet would be free to drift
+// from it.
+type sendLogRow struct {
+	store.SendLogRow
+	Level string // ok / warn / error / unknown, as deliveryLevel returns
+}
+
 // deliveryEvent is one step of a message's history, as the timeline on the
 // delivery page draws it. At is zero for the step that has not happened yet —
 // the delivery report a queued message is still waiting for.
@@ -324,8 +335,10 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	view := make([]sendLogRow, len(rows))
 	for i := range rows {
 		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
+		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
 	}
 
 	domainNames := make([]string, 0, len(assigned))
@@ -358,7 +371,7 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 		lastPage = int((total + sendLogPageSize - 1) / sendLogPageSize)
 	}
 	return map[string]any{
-		"Rows":          rows,
+		"Rows":          view,
 		"FilterDomains": domainNames,
 		"FilterApps":    logins,
 		"FilterDomain":  filter.Domain,

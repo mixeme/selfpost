@@ -28,7 +28,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   whose only card is the narrow one now takes its heading and footer down to the
   card's width instead of splitting them across the wider measure, and the send
   log stops breaking `Details` and `deferred` across two lines when a row is
-  tight. The three
+  tight.
+- panel: the send log's **status is a badge**, in the same ok/warn/error/unknown
+  colours the status page and the DNS checks use, instead of the one place in
+  the panel where a status was bare text. The mapping is the one the delivery
+  page already applied — `sent` is ok, `deferred` a warning, `bounced` and
+  `rejected` errors, `queued` unknown because nothing has gone wrong yet.
+  The three
   WOFF2 files add ~76 KB to the image and are served from the panel's own origin,
   so the Content-Security-Policy is unchanged (`default-src 'self'`).
 

@@ -13,7 +13,7 @@
         <td>{{.From}}</td>
         <td>{{.To}}</td>
         <td class="subject"><span title="{{.Subject}}">{{.Subject}}</span></td>
-        <td class="status">{{.Status}}</td>
+        <td class="status"><span class="st st-{{.Level}}">{{.Status}}</span></td>
         <td class="actions"><a href="/deliveries/{{.ID}}?domain={{$.FilterDomain}}&app={{$.FilterApp}}&p={{$.Page}}">Details</a></td>
       </tr>
       {{end}}
