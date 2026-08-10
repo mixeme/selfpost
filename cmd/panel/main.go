@@ -2,6 +2,9 @@
 // several roles (architecture.md § Image and processes) as a supervised
 // process: the HTTP panel server, the journal-milter, the mail.log tailer and
 // the rate-limit checks.
+//
+// Copyright (C) 2026 Mikhail Yenuchenko
+// SPDX-License-Identifier: AGPL-3.0-only
 package main
 
 import (

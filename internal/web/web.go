@@ -147,6 +147,10 @@ func (s *Server) Handler() http.Handler {
 	// Health check stays unauthenticated for the container/orchestrator.
 	mux.HandleFunc("/healthz", handleHealth)
 
+	// AGPL Appropriate Legal Notices: the licence text itself, reachable
+	// without a session so the login and setup footers can link to it.
+	mux.HandleFunc("/license", s.handleLicense)
+
 	// Vendored static assets (HTMX). Served from the embedded FS, with a
 	// content ETag so a replaced asset survives the browser cache (static.go).
 	mux.Handle("/static/", staticHandler())

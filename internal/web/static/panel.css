@@ -176,7 +176,12 @@ h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
 .back { display: block; margin-bottom: 1rem; }
 /* Build version, closing every authenticated page. Quiet on purpose: it is
    reference material, not something to read on the way past. */
-.version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: #6b7280; }
+.version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: #6b7280; line-height: 1.45; }
+.version a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.version a:hover { color: var(--fg); }
+/* The signed-out column is 24rem; a right-aligned multi-link notice wraps
+   into a ragged edge, so centre it there. */
+main.page-login .version, main.page-setup .version { text-align: center; }
 select, textarea {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
   border: 1px solid var(--control-border); border-radius: 6px; background: var(--input-bg); color: inherit;

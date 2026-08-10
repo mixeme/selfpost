@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- AGPL packaging hygiene: [NOTICE](NOTICE) names the copyright holder and the
+  bundled third-party works (htmx 0BSD, IBM Plex OFL in outlined logos); the
+  panel footer on every page — including login and setup — shows copyright, a
+  link to `/license` (embedded AGPL text), a Source link to the public
+  repository, and "No warranty"; the runtime image ships `LICENSE` and
+  `NOTICE` under `/usr/share/doc/selfpost/`. `docs/development.md` now lists
+  the vendored htmx asset beside the Go module licences.
+
 ## [1.0.1] - 2026-08-09
 
 A documentation and packaging release: no change to the mail path, the

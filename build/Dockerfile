@@ -86,6 +86,10 @@ RUN mkdir -p /run/opendkim /run/selfpost /data \
 COPY --from=build /out/panel /usr/local/bin/panel
 COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 
+# Licence text shipped with the image (AGPL-3.0 conveyance). The panel also
+# serves the same text at /license from an embedded copy.
+COPY LICENSE NOTICE /usr/share/doc/selfpost/
+
 COPY build/opendkim.conf /etc/opendkim.conf
 COPY build/logrotate-mail.conf /etc/logrotate.d/mail
 COPY build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh

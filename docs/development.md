@@ -92,8 +92,9 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 
 ## External libraries
 
-The project is **AGPL-3.0** ([LICENSE](../LICENSE)). New Go dependencies must
-be permissive or GPL-family (see
+The project is **AGPL-3.0** ([LICENSE](../LICENSE)). Copyright holder and
+third-party notices: [NOTICE](../NOTICE). New Go dependencies must be
+permissive or GPL-family (see
 [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
 
 ### Main module (`go.mod`)
@@ -106,6 +107,12 @@ be permissive or GPL-family (see
 
 Transitive dependencies — `go mod graph` / `go.sum`; all indirect packages in
 the tree are AGPL-3.0-compatible.
+
+### Vendored front-end
+
+| Asset | Version | Repository | License |
+|---|---|---|---|
+| `internal/web/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
 
 ### E2e module (`test/e2e/go.mod`)
 
@@ -121,6 +128,8 @@ the image.
 Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
 from Debian bookworm repositories; licenses are in each package's `copyright`
 file on <https://packages.debian.org/bookworm/>.
+The image also ships [LICENSE](../LICENSE) and [NOTICE](../NOTICE) under
+`/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license`.
 
 ---
 
@@ -316,6 +325,7 @@ There is no `docs/archive/` directory.
 | [guide.md](guide.md) | Proxy, env, DNS, IP warmup, operations, rate limiting, backup, ports, image tag |
 | [SECURITY.md](../SECURITY.md) | Private reporting channel, supported versions, scope |
 | [LICENSE](../LICENSE) | AGPL-3.0 full text |
+| [NOTICE](../NOTICE) | Copyright holder and third-party attributions |
 | [deploy/docker-compose.yml](../deploy/docker-compose.yml) + proxies | Apache + nginx/Caddy/Traefik under [deploy/](../deploy/) |
 | [deploy/.env.example](../deploy/.env.example) | Public env template; full reference in [guide.md](guide.md) |
 | [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog |

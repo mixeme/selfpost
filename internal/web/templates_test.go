@@ -105,16 +105,28 @@ func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
 // The version comes from render(), not from each handler's data map, so the
 // footer is only correct as long as every page composes with the layout and
 // render keeps supplying the key. Both are asserted here rather than trusted.
+// Appropriate Legal Notices (copyright, licence, source, no warranty) must
+// appear on every page, including the signed-out ones.
 func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 	tmpl, err := loadTemplates()
 	if err != nil {
 		t.Fatalf("loadTemplates: %v", err)
+	}
+	legalBits := []string{
+		"Copyright © 2026 Mikhail Yenuchenko",
+		`href="/license"`,
+		"License (AGPL-3.0)",
+		`href="https://github.com/mixeme/selfpost"`,
+		"Source",
+		"No warranty",
 	}
 	rendered := 0
 	for name := range tmpl.pages {
 		var buf bytes.Buffer
 		err := tmpl.pages[name].ExecuteTemplate(&buf, "layout.html", map[string]any{
 			"Title": "t", "User": "admin", "Active": "", "Version": "9.9.9-test",
+			"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
+			"SourceURL": "https://github.com/mixeme/selfpost",
 		})
 		if err != nil {
 			// Pages whose content block needs more data than this cannot be
@@ -123,23 +135,38 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 			continue
 		}
 		rendered++
-		if !strings.Contains(buf.String(), "SelfPost 9.9.9-test") {
+		out := buf.String()
+		if !strings.Contains(out, "SelfPost 9.9.9-test") {
 			t.Errorf("page %q does not show the version in the layout footer", name)
+		}
+		for _, want := range legalBits {
+			if !strings.Contains(out, want) {
+				t.Errorf("page %q is missing legal notice %q", name, want)
+			}
 		}
 	}
 	if rendered == 0 {
 		t.Fatal("no page rendered, so the footer was never actually checked")
 	}
 
-	// Signed out (login, setup) the version must not be advertised.
+	// Signed out (login, setup) the version must not be advertised, but the
+	// Appropriate Legal Notices must still be present.
 	var buf bytes.Buffer
 	if err := tmpl.pages["login"].ExecuteTemplate(&buf, "layout.html", map[string]any{
 		"Title": "t", "Active": "", "Version": "9.9.9-test",
+		"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
+		"SourceURL": "https://github.com/mixeme/selfpost",
 	}); err != nil {
 		t.Fatalf("execute login: %v", err)
 	}
-	if strings.Contains(buf.String(), "9.9.9-test") {
-		t.Errorf("the login page shows the version to unauthenticated visitors:\n%s", buf.String())
+	out := buf.String()
+	if strings.Contains(out, "9.9.9-test") {
+		t.Errorf("the login page shows the version to unauthenticated visitors:\n%s", out)
+	}
+	for _, want := range legalBits {
+		if !strings.Contains(out, want) {
+			t.Errorf("login page is missing legal notice %q", want)
+		}
 	}
 }
 
@@ -159,8 +186,18 @@ func TestRenderSuppliesTheVersion(t *testing.T) {
 	if got := data["Version"]; got != "9.9.9-test" {
 		t.Errorf("render did not supply Version (got %v)", got)
 	}
-	if !strings.Contains(rec.Body.String(), "SelfPost 9.9.9-test") {
-		t.Errorf("rendered page does not show the version:\n%s", rec.Body.String())
+	if got := data["Copyright"]; got != "Copyright © 2026 Mikhail Yenuchenko" {
+		t.Errorf("render did not supply Copyright (got %v)", got)
+	}
+	if got := data["SourceURL"]; got != "https://github.com/mixeme/selfpost" {
+		t.Errorf("render did not supply SourceURL (got %v)", got)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "SelfPost 9.9.9-test") {
+		t.Errorf("rendered page does not show the version:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/license"`) || !strings.Contains(body, "No warranty") {
+		t.Errorf("rendered page is missing Appropriate Legal Notices:\n%s", body)
 	}
 }
 

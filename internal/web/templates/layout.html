@@ -37,11 +37,17 @@
      tell the send log from a single delivery's page. */}}
 <main class="page-{{.Active}} {{template "wide" .}}">
 {{template "content" .}}
-{{/* The running version, on every authenticated page: it is what a backup
-     manifest is checked against on restore and the first thing to establish
-     when something behaves unexpectedly. Only for signed-in administrators —
-     the login and setup pages must not advertise it to the internet. */}}
-{{if .User}}<footer class="version">SelfPost {{.Version}}</footer>{{end}}
+{{/* Appropriate Legal Notices (AGPL-3.0): copyright, how to read the licence,
+     where the Corresponding Source is, and that there is no warranty. Shown
+     on every page, including login/setup — those are interactive UIs too.
+     The running version stays signed-in only: it is what a backup manifest is
+     checked against on restore, and must not be advertised to the internet. */}}
+<footer class="version">
+  {{if .User}}SelfPost {{.Version}} · {{end}}{{.Copyright}} ·
+  <a href="/license">License (AGPL-3.0)</a> ·
+  <a href="{{.SourceURL}}">Source</a> ·
+  No warranty
+</footer>
 </main>
 </div>
 </body>
