@@ -26,7 +26,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   headings, status badges and small labels set in the mono face. Light and dark
   schemes both keep their contrast; no page, control or workflow changed. A page
   whose only card is the narrow one now takes its heading and footer down to the
-  card's width instead of splitting them across the wider measure. The three
+  card's width instead of splitting them across the wider measure, and the send
+  log stops breaking `Details` and `deferred` across two lines when a row is
+  tight. The three
   WOFF2 files add ~76 KB to the image and are served from the panel's own origin,
   so the Content-Security-Policy is unchanged (`default-src 'self'`).
 

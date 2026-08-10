@@ -214,9 +214,11 @@ table { width: 100%; border-collapse: collapse; }
    the send-log past its card and hang Status over the edge. Cells may break mid
    word, so a column can always be squeezed to the width available. */
 th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
-/* The exception: a timestamp broken across two lines is unreadable, and it is
-   short enough to never be the reason a row does not fit. */
-td.time { white-space: nowrap; }
+/* The exceptions: a timestamp broken across two lines is unreadable, and so is
+   a send-log status — "deferred" was being hyphenless-broken into "deferre" and
+   "d" whenever the row was tight. Both are short enough to never be the reason
+   a row does not fit. */
+td.time, td.status { white-space: nowrap; }
 /* Column headings are set in the mono face: they are labels for machine data
    rather than prose, and the wider tracking a small monospaced capital wants
    also holds them apart from the first row of values. Same treatment on the
@@ -226,7 +228,12 @@ th {
   font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
 }
-td.actions { text-align: right; }
+/* The controls at the end of a row are short and fixed — Details, Delete — and
+   the cell is the last one, so it is the one the automatic layout squeezes
+   first: in the send log it was breaking "Details" after "Detail". Holding it
+   on one line costs the row nothing and hands the width back to the status
+   column, which was wrapping single words for the same reason. */
+td.actions { text-align: right; white-space: nowrap; }
 /* Subject is the one cell whose text we do not control. Breaking mid word (the
    rule above) keeps it inside the card, but a long subject would do it by
    growing the row several lines tall, which buries the rows around it. So the
