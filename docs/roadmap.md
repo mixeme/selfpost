@@ -30,6 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
+| visual-style | Обновление визуального стиля | candidate | — |
 
 **Recommended order** (not binding): **web-split → domain-admin →
 inbound-relay** — first the package split, then role-wide authorisation, then
@@ -118,4 +119,26 @@ it.
 
 **Dependencies / risks:** with a single developer and no PRs, this is low
 priority.
+**Version:** no bearing on semver.
+
+---
+
+## visual-style
+
+**Goal:** refresh the control panel's visual design — typography, colour tokens,
+spacing, and component styling — without changing operator workflows or panel
+behaviour.
+
+**Boundary:** presentation only (`panel.css`, templates, static assets); no new
+features. Styling must stay compatible with the panel CSP — rules live in
+`panel.css`, not inline (see [security.md](security.md) and the stylesheet
+header).
+
+**Done when:** the panel reflects an agreed visual direction (starting
+reference: [assets/selfpost-proof.html](assets/selfpost-proof.html)); light and
+dark schemes remain supported; readability and contrast are preserved.
+
+**Dependencies / risks:** CSP constraints on how styles are applied; visual
+regression across pages; low priority relative to functional work — take up
+after explicit agreement, independently of the feature roadmap order.
 **Version:** no bearing on semver.

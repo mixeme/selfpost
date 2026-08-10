@@ -14,6 +14,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   repository, and "No warranty"; the runtime image ships `LICENSE` and
   `NOTICE` under `/usr/share/doc/selfpost/`. `docs/development.md` now lists
   the vendored htmx asset beside the Go module licences.
+- [docs/roadmap.md](docs/roadmap.md) — candidate item **visual-style** (panel
+  visual refresh: typography, colour tokens, spacing, and component styling
+  without behaviour changes). Starting reference:
+  [docs/assets/selfpost-proof.html](docs/assets/selfpost-proof.html). No semver
+  impact; explicit agreement required before coding, like other candidates.
 
 ## [1.0.1] - 2026-08-09
 
