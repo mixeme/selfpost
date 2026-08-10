@@ -29,7 +29,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
-| visual-style | Обновление визуального стиля | candidate | — |
+| visual-style | Panel visual style | **agreed** | [plans/visual-style.md](plans/visual-style.md) |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 
 **Recommended order** (not binding): **domain-admin →
@@ -113,13 +113,15 @@ features. Styling must stay compatible with the panel CSP — rules live in
 `panel.css`, not inline (see [security.md](security.md) and the stylesheet
 header).
 
-**Done when:** the panel reflects an agreed visual direction (starting
-reference: [assets/selfpost-proof.html](assets/selfpost-proof.html)); light and
-dark schemes remain supported; readability and contrast are preserved.
+**Done when:** see [plans/visual-style.md](plans/visual-style.md). The agreed
+direction is the mark's own — brick, warm paper, IBM Plex — taken from
+[assets/selfpost-proof.html](assets/selfpost-proof.html); light and dark schemes
+remain supported; readability and contrast are preserved.
 
-**Dependencies / risks:** CSP constraints on how styles are applied; visual
-regression across pages; low priority relative to functional work — take up
-after explicit agreement, independently of the feature roadmap order.
+**Dependencies / risks:** CSP constraints on how styles are applied (rules in
+`panel.css`, never inline); visual regression across pages; the accent colour
+must not read as a status badge.
+**Order:** independent of the feature items; may be taken up between them.
 **Version:** no bearing on semver.
 
 ---
