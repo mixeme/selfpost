@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 	"github.com/mixeme/selfpost/internal/mailhdr"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
 )
 
 // sendLogPageSize bounds each send-log page (product.md's monitoring screens
@@ -24,38 +25,38 @@ const (
 	deliveryLogLines = 200
 )
 
-// handleDeliveries renders the Deliveries page over the send log: server-side
+// HandleDeliveries renders the Deliveries page over the send log: server-side
 // filters by domain/application and pagination (architecture.md §
 // Persistence). The row table itself is the "deliveries_rows" fragment, shared
-// verbatim with handleDeliveriesRows so the initial page and its HTMX-polled
+// verbatim with HandleDeliveriesRows so the initial page and its HTMX-polled
 // refreshes never diverge.
-func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
-	data, err := s.sendLogData(r)
+func (h *Handlers) HandleDeliveries(w http.ResponseWriter, r *http.Request) {
+	data, err := h.sendLogData(r)
 	if err != nil {
 		logf("panel: send log: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	data["Title"] = "SelfPost — deliveries"
-	data["User"] = currentUser(r)
+	data["User"] = auth.CurrentUser(r)
 	data["Active"] = "deliveries"
-	s.render(w, http.StatusOK, "deliveries", data)
+	h.view.Render(w, http.StatusOK, "deliveries", data)
 }
 
-// handleDeliveriesRows serves the HTMX polling fragment for the delivery table
+// HandleDeliveriesRows serves the HTMX polling fragment for the delivery table
 // (architecture.md § Panel HTTP surface: fragment endpoints return HTML, not
 // JSON).
-func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
-	data, err := s.sendLogData(r)
+func (h *Handlers) HandleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
+	data, err := h.sendLogData(r)
 	if err != nil {
 		logf("panel: send log rows: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.renderFragment(w, http.StatusOK, "deliveries_rows", data)
+	h.view.RenderFragment(w, http.StatusOK, "deliveries_rows", data)
 }
 
-// handleDelivery renders one send-log row in full. The log itself carries only
+// HandleDelivery renders one send-log row in full. The log itself carries only
 // what identifies a message at a glance — when, who to and from, what about,
 // how it ended — and every remaining field (domain, application, queue id, when
 // the status was last reported) lives here, one page per row, so widening the
@@ -67,13 +68,13 @@ func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
 // its history side by side, and the mail.log lines for its queue id under both.
 // The queue id used to be printed here as something to go and search the system
 // log for by hand; the search is done for the operator instead.
-func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return
 	}
-	row, err := s.store.GetSendLog(id)
+	row, err := h.store.GetSendLog(id)
 	if err != nil {
 		// A row pruned on the retention window is gone, not broken.
 		if errors.Is(err, store.ErrSendLogNotFound) {
@@ -85,10 +86,10 @@ func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
-	logRows, logNote := s.deliveryLog(row)
-	s.render(w, http.StatusOK, "delivery", map[string]any{
+	logRows, logNote := h.deliveryLog(row)
+	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
 		"Title":  "SelfPost — delivery",
-		"User":   currentUser(r),
+		"User":   auth.CurrentUser(r),
 		"Active": "deliveries",
 		"Row":    row,
 		// The status in the panel's own badge vocabulary, so the headline reads
@@ -223,11 +224,11 @@ type deliveryLogRow struct {
 // have aged out of the log — so none of them is an error on the page. Only a
 // log that cannot be read at all is reported as a fault, and that one is
 // logged for the operator as well.
-func (s *Server) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) {
+func (h *Handlers) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) {
 	if row.QueueID == "" {
 		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
 	}
-	lines, err := logtail.QueueLines(s.cfg.MailLogPath, row.QueueID, deliveryLogLines)
+	lines, err := logtail.QueueLines(h.cfg.MailLogPath, row.QueueID, deliveryLogLines)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		logf("panel: delivery log %s: %v", row.QueueID, err)
 		return nil, "Could not read the mail log."
@@ -267,7 +268,7 @@ func deliveriesBackURL(r *http.Request) string {
 // sendLogData reads the domain/app filters and page number off the query
 // string, queries the store, and assembles everything the template needs
 // (filter dropdown options plus the current selection, rows, and pagination).
-func (s *Server) sendLogData(r *http.Request) (map[string]any, error) {
+func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	q := r.URL.Query()
 	filter := store.SendLogFilter{
 		Domain:   q.Get("domain"),
@@ -275,11 +276,11 @@ func (s *Server) sendLogData(r *http.Request) (map[string]any, error) {
 	}
 	page := parsePage(q.Get("p"))
 
-	total, err := s.store.CountSendLog(filter)
+	total, err := h.store.CountSendLog(filter)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
+	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +290,7 @@ func (s *Server) sendLogData(r *http.Request) (map[string]any, error) {
 	for i := range rows {
 		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
 	}
-	domains, err := s.store.ListDomains()
+	domains, err := h.store.ListDomains()
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +298,7 @@ func (s *Server) sendLogData(r *http.Request) (map[string]any, error) {
 	for i, d := range domains {
 		domainNames[i] = d.Name
 	}
-	logins, err := s.store.ListApplicationLogins()
+	logins, err := h.store.ListApplicationLogins()
 	if err != nil {
 		return nil, err
 	}
@@ -331,23 +332,23 @@ func parsePage(v string) int {
 	return n
 }
 
-// handleMailQueue renders the Mail queue page (architecture.md § Panel HTTP
+// HandleMailQueue renders the Mail queue page (architecture.md § Panel HTTP
 // surface).
-func (s *Server) handleMailQueue(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
 	out, errText := readQueue()
-	s.render(w, http.StatusOK, "mail_queue", map[string]any{
+	h.view.Render(w, http.StatusOK, "mail_queue", map[string]any{
 		"Title":  "SelfPost — mail queue",
-		"User":   currentUser(r),
+		"User":   auth.CurrentUser(r),
 		"Active": "mail_queue",
 		"Output": out,
 		"Error":  errText,
 	})
 }
 
-// handleMailQueueBody serves the HTMX polling fragment for the queue view.
-func (s *Server) handleMailQueueBody(w http.ResponseWriter, r *http.Request) {
+// HandleMailQueueBody serves the HTMX polling fragment for the queue view.
+func (h *Handlers) HandleMailQueueBody(w http.ResponseWriter, r *http.Request) {
 	out, errText := readQueue()
-	s.renderFragment(w, http.StatusOK, "mail_queue_body", map[string]any{
+	h.view.RenderFragment(w, http.StatusOK, "mail_queue_body", map[string]any{
 		"Output": out,
 		"Error":  errText,
 	})
@@ -365,30 +366,30 @@ func readQueue() (string, string) {
 	return out, ""
 }
 
-// handleSystemLog renders the System log page over mail.log (architecture.md §
+// HandleSystemLog renders the System log page over mail.log (architecture.md §
 // Panel HTTP surface).
-func (s *Server) handleSystemLog(w http.ResponseWriter, r *http.Request) {
-	lines, errText := s.readLogTail()
-	s.render(w, http.StatusOK, "system_log", map[string]any{
+func (h *Handlers) HandleSystemLog(w http.ResponseWriter, r *http.Request) {
+	lines, errText := h.readLogTail()
+	h.view.Render(w, http.StatusOK, "system_log", map[string]any{
 		"Title":  "SelfPost — system log",
-		"User":   currentUser(r),
+		"User":   auth.CurrentUser(r),
 		"Active": "system_log",
 		"Lines":  lines,
 		"Error":  errText,
 	})
 }
 
-// handleSystemLogBody serves the HTMX polling fragment for the log-tail view.
-func (s *Server) handleSystemLogBody(w http.ResponseWriter, r *http.Request) {
-	lines, errText := s.readLogTail()
-	s.renderFragment(w, http.StatusOK, "system_log_body", map[string]any{
+// HandleSystemLogBody serves the HTMX polling fragment for the log-tail view.
+func (h *Handlers) HandleSystemLogBody(w http.ResponseWriter, r *http.Request) {
+	lines, errText := h.readLogTail()
+	h.view.RenderFragment(w, http.StatusOK, "system_log_body", map[string]any{
 		"Lines": lines,
 		"Error": errText,
 	})
 }
 
-func (s *Server) readLogTail() ([]string, string) {
-	lines, err := logtail.TailLines(s.cfg.MailLogPath, logTailLines)
+func (h *Handlers) readLogTail() ([]string, string) {
+	lines, err := logtail.TailLines(h.cfg.MailLogPath, logTailLines)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			// Rotation renamed the file away; Postfix recreates it on reload
@@ -396,7 +397,7 @@ func (s *Server) readLogTail() ([]string, string) {
 			// than a failure worth alarming the operator about.
 			return nil, ""
 		}
-		logf("panel: tail %s: %v", s.cfg.MailLogPath, err)
+		logf("panel: tail %s: %v", h.cfg.MailLogPath, err)
 		return nil, "Could not read the mail log."
 	}
 	return lines, ""

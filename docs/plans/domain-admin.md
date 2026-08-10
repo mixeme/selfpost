@@ -23,7 +23,7 @@ list:
   deletion, its own L2 limit);
 - the domain's DKIM/DNS status;
 - the send log filtered to the domain — the filter already exists in the log
-  ([sendLogData](../../internal/web/handlers_monitor.go)).
+  ([sendLogData](../../internal/web/handlers/handlers_monitor.go)).
 
 What stays outside the role is what is global by nature:
 

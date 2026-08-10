@@ -112,7 +112,7 @@ the tree are AGPL-3.0-compatible.
 
 | Asset | Version | Repository | License |
 |---|---|---|---|
-| `internal/web/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
+| `internal/web/view/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
 
 ### E2e module (`test/e2e/go.mod`)
 
@@ -354,7 +354,7 @@ to prose.
 | Mail path | [build/postfix-config.sh](../build/postfix-config.sh) |
 | Panel routes | [internal/web/web.go](../internal/web/web.go) |
 | Backup / restore, domain export | [internal/backup/](../internal/backup/), [cmd/selfpost-backup/](../cmd/selfpost-backup/) |
-| Sessions | [internal/store/sessions.go](../internal/store/sessions.go), [internal/web/session.go](../internal/web/session.go) |
+| Sessions | [internal/store/sessions.go](../internal/store/sessions.go), [internal/web/auth/session.go](../internal/web/auth/session.go) |
 | Log rotation, reload | [build/logrotate-mail.conf](../build/logrotate-mail.conf), [build/logrotate-loop.sh](../build/logrotate-loop.sh), [build/postfix-cert-reload.sh](../build/postfix-cert-reload.sh) |
 | Deploy | [deploy/docker-compose.yml](../deploy/docker-compose.yml), [build/Dockerfile](../build/Dockerfile) |
 | Operator checklist | [§ User-facing deliverables](#user-facing-deliverables); detail — [guide.md](guide.md) |

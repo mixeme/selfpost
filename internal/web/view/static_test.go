@@ -1,4 +1,4 @@
-package web
+package view
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ func serveStatic(path string, headers map[string]string) *httptest.ResponseRecor
 		r.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
-	staticHandler().ServeHTTP(rec, r)
+	StaticHandler().ServeHTTP(rec, r)
 	return rec
 }
 

@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"bytes"
@@ -13,6 +13,8 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
 // maxImportBytes caps a domain-import upload. A domain export is a small JSON
@@ -22,35 +24,35 @@ import (
 // covers both forms.
 const maxImportBytes = 1 << 20 // 1 MiB
 
-// handleBackupPage renders the backup/migration screen: the full-server backup
+// HandleBackupPage renders the backup/migration screen: the full-server backup
 // and the domain import are separate actions with different risk, so each gets
 // its own card here rather than sharing a block on the domain list.
-func (s *Server) handleBackupPage(w http.ResponseWriter, r *http.Request) {
-	s.renderBackupPage(w, r, http.StatusOK, "")
+func (h *Handlers) HandleBackupPage(w http.ResponseWriter, r *http.Request) {
+	h.renderBackupPage(w, r, http.StatusOK, "")
 }
 
 // renderBackupPage draws the page; importErr surfaces a failed domain import
 // (architecture.md § Persistence) next to the form that produced it.
-func (s *Server) renderBackupPage(w http.ResponseWriter, r *http.Request, status int, importErr string) {
-	s.renderBackupPageWith(w, r, status, importErr, "")
+func (h *Handlers) renderBackupPage(w http.ResponseWriter, r *http.Request, status int, importErr string) {
+	h.renderBackupPageWith(w, r, status, importErr, "")
 }
 
 // renderBackupPageWith is renderBackupPage with the second of the page's two
 // error slots: backupErr belongs to the full-backup card (a rejected encryption
 // password), importErr to the import card, so neither message appears under the
 // wrong form.
-func (s *Server) renderBackupPageWith(w http.ResponseWriter, r *http.Request, status int, importErr, backupErr string) {
-	s.render(w, status, "backup", map[string]any{
+func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, status int, importErr, backupErr string) {
+	h.view.Render(w, status, "backup", map[string]any{
 		"Title":     "SelfPost — backup",
-		"User":      currentUser(r),
+		"User":      auth.CurrentUser(r),
 		"Active":    "backup",
 		"ImportErr": importErr,
 		"BackupErr": backupErr,
-		"MinPwLen":  minSecretFilePasswordLen,
+		"MinPwLen":  validate.MinSecretFilePasswordLen,
 	})
 }
 
-// handleBackup streams a full-server backup as a download (architecture.md §
+// HandleBackup streams a full-server backup as a download (architecture.md §
 // Persistence). It is an authenticated admin action (this handler sits behind
 // the auth middleware). The archive carries DKIM private keys, the admin
 // password hash and SASL credentials, so it is served with no-store and as an
@@ -58,10 +60,10 @@ func (s *Server) renderBackupPageWith(w http.ResponseWriter, r *http.Request, st
 // "encrypt with a password", the archive is wrapped in a .spbk envelope on the
 // way out, so the file that lands on their disk — wherever it is copied
 // afterwards — is useless without the password.
-func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	password, pwErr := secretFilePassword(r)
 	if pwErr != "" {
-		s.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
+		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
 		return
 	}
 
@@ -99,9 +101,9 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := backup.Create(sink, backup.Params{
-		DataDir: s.cfg.DataDir,
-		DBPath:  s.cfg.DBPath,
-		Version: s.cfg.Version,
+		DataDir: h.cfg.DataDir,
+		DBPath:  h.cfg.DBPath,
+		Version: h.cfg.Version,
 	}); err != nil {
 		logf("panel: full backup failed: %v", err)
 		return
@@ -113,26 +115,26 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleExportDomain streams a single-domain export as a secret download
+// HandleExportDomain streams a single-domain export as a secret download
 // (architecture.md § Persistence). Like the full backup it is POST-only (state
 // is not changed, but the response contains the domain's DKIM private key and
 // application passwords, so it must not be prefetchable or cached). Like the
 // full backup it can be encrypted with a password, in which case the download
 // is a .spde envelope instead of plain JSON.
-func (s *Server) handleExportDomain(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
+func (h *Handlers) HandleExportDomain(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
 	password, pwErr := secretFilePassword(r)
 	if pwErr != "" {
-		s.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:  store.AddressModeWildcard,
 			ExportErr: pwErr,
 		})
 		return
 	}
-	exp, err := s.domains.Export(d.ID)
+	exp, err := h.domains.Export(d.ID)
 	if err != nil {
 		logf("panel: export domain %d: %v", d.ID, err)
 		http.Error(w, "export failed", http.StatusInternalServerError)
@@ -174,22 +176,22 @@ func (s *Server) handleExportDomain(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-// handleImportDomain accepts an uploaded domain-export file and re-creates the
+// HandleImportDomain accepts an uploaded domain-export file and re-creates the
 // domain on this instance (architecture.md § Persistence). The domain name is
 // normalised and validated here (security.md); the domain service validates
 // the selector, each login and address, and the DKIM key before writing
 // anything. On success it redirects to the new domain's page; on failure it
 // re-renders the backup page, where the import form lives, with a friendly
 // message.
-func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	if err := r.ParseMultipartForm(maxImportBytes); err != nil {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file (too large or not a valid upload).")
+		h.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file (too large or not a valid upload).")
 		return
 	}
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "Choose a domain export file to import.")
+		h.renderBackupPage(w, r, http.StatusBadRequest, "Choose a domain export file to import.")
 		return
 	}
 	defer file.Close()
@@ -201,7 +203,7 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	head := make([]byte, secretfile.MagicLen)
 	n, err := io.ReadFull(file, head)
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file.")
+		h.renderBackupPage(w, r, http.StatusBadRequest, "Could not read the uploaded file.")
 		return
 	}
 	source := io.MultiReader(bytes.NewReader(head[:n]), file)
@@ -209,16 +211,16 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 
 	if secretfile.HasMagic(head[:n]) {
 		if password == "" {
-			s.renderBackupPage(w, r, http.StatusBadRequest, "That file is encrypted — enter the password it was exported with.")
+			h.renderBackupPage(w, r, http.StatusBadRequest, "That file is encrypted — enter the password it was exported with.")
 			return
 		}
 		env, err := secretfile.NewReader(source, password)
 		if err != nil {
-			s.renderBackupPage(w, r, http.StatusBadRequest, decryptErrorMessage(err))
+			h.renderBackupPage(w, r, http.StatusBadRequest, decryptErrorMessage(err))
 			return
 		}
 		if env.Type() != secretfile.TypeDomainExport {
-			s.renderBackupPage(w, r, http.StatusBadRequest, "That file is an encrypted "+env.Type().String()+", not a domain export.")
+			h.renderBackupPage(w, r, http.StatusBadRequest, "That file is an encrypted "+env.Type().String()+", not a domain export.")
 			return
 		}
 		// Read the whole plaintext first: authentication of the last chunk is
@@ -226,12 +228,12 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 		// accept a truncated document before ever reaching it.
 		plain, err := io.ReadAll(env)
 		if err != nil {
-			s.renderBackupPage(w, r, http.StatusBadRequest, decryptErrorMessage(err))
+			h.renderBackupPage(w, r, http.StatusBadRequest, decryptErrorMessage(err))
 			return
 		}
 		source = bytes.NewReader(plain)
 	} else if password != "" {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "That file is not encrypted — leave the password empty.")
+		h.renderBackupPage(w, r, http.StatusBadRequest, "That file is not encrypted — leave the password empty.")
 		return
 	}
 
@@ -239,23 +241,23 @@ func (s *Server) handleImportDomain(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(source)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&exp); err != nil {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "That file is not a valid SelfPost domain export.")
+		h.renderBackupPage(w, r, http.StatusBadRequest, "That file is not a valid SelfPost domain export.")
 		return
 	}
 
 	// Normalise and validate the domain name before it reaches the service, the
 	// same gate the add-domain form uses (security.md).
-	exp.Domain = normalizeDomain(exp.Domain)
-	if err := validateDomain(exp.Domain); err != nil {
-		s.renderBackupPage(w, r, http.StatusBadRequest, "Invalid domain in export file: "+err.Error())
+	exp.Domain = validate.NormalizeDomain(exp.Domain)
+	if err := validate.Domain(exp.Domain); err != nil {
+		h.renderBackupPage(w, r, http.StatusBadRequest, "Invalid domain in export file: "+err.Error())
 		return
 	}
 
-	d, err := s.domains.Import(exp)
+	d, err := h.domains.Import(exp)
 	if err != nil {
 		logf("panel: import domain %q: %v", exp.Domain, err)
 		status, msg := importErrorMessage(err)
-		s.renderBackupPage(w, r, status, msg)
+		h.renderBackupPage(w, r, status, msg)
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?imported=1", d.ID), http.StatusSeeOther)
@@ -276,8 +278,8 @@ func secretFilePassword(r *http.Request) (password, errMsg string) {
 		return "", ""
 	}
 	password = r.PostFormValue("password")
-	if len([]rune(password)) < minSecretFilePasswordLen {
-		return "", fmt.Sprintf("The encryption password must be at least %d characters.", minSecretFilePasswordLen)
+	if len([]rune(password)) < validate.MinSecretFilePasswordLen {
+		return "", fmt.Sprintf("The encryption password must be at least %d characters.", validate.MinSecretFilePasswordLen)
 	}
 	if password != r.PostFormValue("password_confirm") {
 		return "", "The two passwords do not match."

@@ -1,4 +1,4 @@
-package web
+package auth
 
 import (
 	"crypto/subtle"
@@ -32,8 +32,6 @@ func newSetupManager(st *store.Store, hostname, tokenPath string) *setupManager 
 	return &setupManager{store: st, hostname: hostname, tokenPath: tokenPath}
 }
 
-// bootstrap runs once at startup. If setup is already complete it clears any
-// stale token file; otherwise it mints and announces the first token.
 func (m *setupManager) bootstrap() error {
 	done, err := m.store.AdminExists()
 	if err != nil {
@@ -49,9 +47,6 @@ func (m *setupManager) bootstrap() error {
 	return nil
 }
 
-// activeToken returns the current valid setup token, regenerating and
-// re-announcing it if none exists or it has expired. It returns ("", false)
-// once setup is complete — callers must treat that as "route gone" (404).
 func (m *setupManager) activeToken() (string, bool) {
 	done, err := m.store.AdminExists()
 	if err != nil {
@@ -69,10 +64,6 @@ func (m *setupManager) activeToken() (string, bool) {
 	return m.token, true
 }
 
-// validate reports whether provided matches the active token, using a
-// constant-time comparison to avoid leaking a correct prefix via timing
-// (security.md). A mismatch does NOT regenerate or invalidate the token: failed
-// attempts must not let an attacker DoS a legitimate setup (security.md).
 func (m *setupManager) validate(provided string) bool {
 	token, ok := m.activeToken()
 	if !ok {
@@ -81,8 +72,6 @@ func (m *setupManager) validate(provided string) bool {
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(token)) == 1
 }
 
-// complete marks setup as finished: the admin row now exists, so drop the
-// in-memory token and remove the on-disk copy.
 func (m *setupManager) complete() {
 	m.mu.Lock()
 	m.token = ""
@@ -91,16 +80,12 @@ func (m *setupManager) complete() {
 	m.clearTokenFile()
 }
 
-// regenerateLocked mints a fresh token, announces it and mirrors it to disk.
-// Caller holds m.mu.
 func (m *setupManager) regenerateLocked() {
-	m.token = randomToken(16) // 128 bits of entropy (security.md)
+	m.token = randomToken(16)
 	m.expiresAt = time.Now().Add(setupTokenTTL)
 	m.announce(m.token)
 }
 
-// announce prints the setup link to the container log and writes it to the
-// token file so it can be read either way (security.md).
 func (m *setupManager) announce(token string) {
 	url := m.setupURL(token)
 	logf("panel: ==================================================================")
@@ -112,7 +97,6 @@ func (m *setupManager) announce(token string) {
 	if m.tokenPath == "" {
 		return
 	}
-	// 0600: the token is a bearer secret for creating the admin.
 	if err := os.WriteFile(m.tokenPath, []byte(url+"\n"), 0o600); err != nil {
 		logf("panel: setup: could not write token file %s: %v", m.tokenPath, err)
 	}

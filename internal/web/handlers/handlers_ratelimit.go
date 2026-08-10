@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"fmt"
@@ -10,15 +10,8 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 )
 
-// defaultRateLimitWindowSeconds is the sliding-window length used when an
-// admin sets a message ceiling but leaves the window blank (guide § Rate
-// limiting, matching the level-1 default hour; guide § Environment variables:
-// RATE_LIMIT_WINDOW_SECONDS).
 const defaultRateLimitWindowSeconds = 3600
 
-// rateLimitInput is the validated result of a rate-limit form submission.
-// clear means "remove the differentiated limit" (guide § Rate limiting: an
-// empty IP binding leaves only level 1).
 type rateLimitInput struct {
 	clear         bool
 	ips           []string
@@ -26,10 +19,6 @@ type rateLimitInput struct {
 	windowSeconds int
 }
 
-// parseRateLimitForm validates a rate-limit submission on the server
-// (security.md). It returns clear=true when the admin removes the limit or
-// leaves the IP binding empty; otherwise it requires a positive ceiling and
-// window. The returned error's message is safe to show to the admin.
 func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 	if err := r.ParseForm(); err != nil {
 		return rateLimitInput{}, fmt.Errorf("invalid form submission")
@@ -42,8 +31,6 @@ func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 		return rateLimitInput{}, err
 	}
 	if len(ips) == 0 {
-		// No IP binding: the differentiated limit does not apply (guide § Rate
-		// limiting).
 		return rateLimitInput{clear: true}, nil
 	}
 	maxMessages, err := parsePositiveInt(r.PostFormValue("max_messages"), 0)
@@ -57,10 +44,6 @@ func parseRateLimitForm(r *http.Request) (rateLimitInput, error) {
 	return rateLimitInput{ips: ips, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
 }
 
-// parseIPList parses the allowed-IP field (IPs separated by newlines, commas or
-// whitespace) into a deduplicated list of canonical addresses, rejecting any
-// token that is not a valid IP (security.md). The values are only ever stored as
-// SQLite parameters and compared in the milter, never written to a config file.
 func parseIPList(raw string) ([]string, error) {
 	fields := strings.FieldsFunc(raw, func(r rune) bool {
 		return r == '\n' || r == '\r' || r == ',' || r == ' ' || r == '\t' || r == ';'
@@ -81,8 +64,6 @@ func parseIPList(raw string) ([]string, error) {
 	return out, nil
 }
 
-// parsePositiveInt parses a trimmed integer field, returning def when it is
-// blank. A non-numeric value returns an error.
 func parsePositiveInt(raw string, def int) (int, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -91,23 +72,20 @@ func parsePositiveInt(raw string, def int) (int, error) {
 	return strconv.Atoi(raw)
 }
 
-// handleDomainRateLimit saves or clears a domain-level differentiated rate
-// limit (guide § Rate limiting). No reload is needed — the milter reads the
-// row live.
-func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
+func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
 	in, err := parseRateLimitForm(r)
 	if err != nil {
-		s.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
 			RateLimitErr: err.Error(),
 		})
 		return
 	}
-	if err := s.applyRateLimit(in, s.domains.SaveRateLimit, s.domains.ClearRateLimit, d.ID); err != nil {
+	if err := h.applyRateLimit(in, h.domains.SaveRateLimit, h.domains.ClearRateLimit, d.ID); err != nil {
 		logf("panel: domain %d: save rate limit: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -115,27 +93,25 @@ func (s *Server) handleDomainRateLimit(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?ratelimit=1", d.ID), http.StatusSeeOther)
 }
 
-// handleAppRateLimit saves or clears an application-level differentiated rate
-// limit (guide § Rate limiting).
-func (s *Server) handleAppRateLimit(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.lookupApplication(w, r)
+func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.lookupApplication(w, r)
 	if !ok {
 		return
 	}
-	d, err := s.domains.Get(a.DomainID)
+	d, err := h.domains.Get(a.DomainID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	in, err := parseRateLimitForm(r)
 	if err != nil {
-		s.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
 			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),
 		})
 		return
 	}
-	if err := s.applyRateLimit(in, s.apps.SaveRateLimit, s.apps.ClearRateLimit, a.ID); err != nil {
+	if err := h.applyRateLimit(in, h.apps.SaveRateLimit, h.apps.ClearRateLimit, a.ID); err != nil {
 		logf("panel: application %d: save rate limit: %v", a.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -143,9 +119,7 @@ func (s *Server) handleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?ratelimit=1", a.DomainID), http.StatusSeeOther)
 }
 
-// applyRateLimit dispatches a validated input to the save or clear method of the
-// relevant service, keyed by the domain or application id.
-func (s *Server) applyRateLimit(
+func (h *Handlers) applyRateLimit(
 	in rateLimitInput,
 	save func(id int64, ips []string, maxMessages, windowSeconds int) error,
 	clear func(id int64) error,

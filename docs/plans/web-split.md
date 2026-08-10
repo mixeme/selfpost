@@ -1,6 +1,6 @@
 # Plan: web-split (splitting `internal/web`)
 
-**Status:** agreed  
+**Status:** done (see [CHANGELOG](../CHANGELOG.md) `[Unreleased]`)  
 **Version:** `1.x`; an internal refactor, it does not force a break on its own.
 
 ---
@@ -42,11 +42,25 @@ domains. The refactor is cheaper before that growth than after it.
 
 The order is a recommendation, not a blocker.
 
+## Chosen scheme
+
+**Horizontal split into four packages** (decided at implementation):
+
+```
+internal/web/          # Config, Server, New, Handler — composition root; security.go
+internal/web/view/     # embed templates/static, render/renderFragment, staticHandler
+internal/web/auth/     # session, login/logout/setup, requireAuth, currentUser
+internal/web/validate/ # shared form validation (avoids auth ↔ handlers import cycle)
+internal/web/handlers/ # all authenticated page handlers (handlers_*.go)
+```
+
+`cmd/panel` keeps importing only `internal/web`. Subpackages are not exported
+beyond what the composition root needs.
+
 ## Done when
 
-The decision is made deliberately when the work starts — either the package is
-split along the chosen scheme, or it is settled that it stays flat. After a
-split: `build`/`vet`/`test` green, the panel's behaviour unchanged.
+The package is split along the scheme above. After the split: `build`/`vet`/`test`
+green, the panel's behaviour unchanged.
 
 ## Risks
 

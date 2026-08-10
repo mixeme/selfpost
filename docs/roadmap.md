@@ -26,17 +26,15 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Plan |
 |---|---|---|---|
-| web-split | Splitting `internal/web` | **agreed** | [plans/web-split.md](plans/web-split.md) |
 | domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | visual-style | Обновление визуального стиля | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 
-**Recommended order** (not binding): **web-split → domain-admin →
-inbound-relay** — first the package split, then role-wide authorisation, then
-the new vertical slice of the inbound relay. Deviating is allowed; there are no
-hard phases here.
+**Recommended order** (not binding): **domain-admin →
+inbound-relay** — role-wide authorisation first, then the inbound relay vertical
+slice. Deviating is allowed; there are no hard phases here.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the checklist in its linked plan.
@@ -59,8 +57,7 @@ engine stays outside the image, only the attachment point is provided.
 
 **Dependencies / risks:** a finished outbound path; open relay and backscatter;
 a wider attack surface (port 25 accepting mail).
-**Order:** recommended after [web-split](plans/web-split.md) and
-[domain-admin](plans/domain-admin.md).
+**Order:** recommended after [domain-admin](plans/domain-admin.md).
 **Version:** target bump `1.x`; `2.x` possible — to be settled once the
 implementation lands.
 
@@ -80,29 +77,10 @@ assigned domains (one or several).
 **Done when:** see [plans/domain-admin.md](plans/domain-admin.md).
 
 **Dependencies / risks:** a users table, the role in the session, authorisation
-in every handler, setup and backup. **Order:** recommended after
-[web-split](plans/web-split.md), before
+in every handler, setup and backup. **Order:** recommended **before**
 [inbound-relay](plans/inbound-relay.md).
 **Version:** `1.x` MINOR, given a compatible migration of the current
 administrator into a global one.
-
----
-
-## web-split
-
-**Goal:** deliberately split `internal/web` (or settle on keeping the package
-flat) before it grows under inbound-relay and domain-admin.
-
-**Boundary:** an internal refactor; the panel's behaviour for the operator does
-not change.
-
-**Done when:** the package is split along the chosen scheme, or it is settled
-that it stays flat — see [plans/web-split.md](plans/web-split.md).
-
-**Dependencies / risks:** exporting a package-private API. **Order:**
-recommended **first** among the agreed features (before domain-admin and
-inbound-relay).
-**Version:** `1.x`; on its own it does not force a break.
 
 ---
 

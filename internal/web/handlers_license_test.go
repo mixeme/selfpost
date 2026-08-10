@@ -10,10 +10,9 @@ import (
 )
 
 func TestLicenseHandlerServesAGPL(t *testing.T) {
-	s := &Server{}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/license", nil)
-	s.handleLicense(rec, req)
+	handleLicense(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -32,10 +31,9 @@ func TestLicenseHandlerServesAGPL(t *testing.T) {
 }
 
 func TestLicenseHandlerRejectsNonGET(t *testing.T) {
-	s := &Server{}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/license", nil)
-	s.handleLicense(rec, req)
+	handleLicense(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405", rec.Code)
 	}

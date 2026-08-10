@@ -1,4 +1,4 @@
-package web
+package auth
 
 import (
 	"crypto/sha256"
@@ -22,10 +22,7 @@ const renewThreshold = time.Hour
 // cookie.
 type sessionStore struct {
 	store *store.Store
-	// idle is the sliding inactivity window (PANEL_SESSION_IDLE_DAYS). There is
-	// no absolute cap: an administrator who keeps coming back stays signed in
-	// indefinitely, deliberately.
-	idle time.Duration
+	idle  time.Duration
 }
 
 func newSessionStore(st *store.Store, idle time.Duration) *sessionStore {
@@ -51,10 +48,6 @@ func (s *sessionStore) Create(username string) string {
 	if err := s.store.CreateSession(hashToken(token), username, now.Add(s.idle)); err != nil {
 		logf("panel: session: create failed: %v", err)
 	}
-	// Opportunistic cleanup: a session nobody ever came back to otherwise sits
-	// in the table forever. Piggybacking on Create (the one write every login
-	// already pays for) avoids a dedicated background sweep for what is, on a
-	// single-admin panel, a handful of rows at most.
 	if _, err := s.store.DeleteExpiredSessions(now); err != nil {
 		logf("panel: session: prune expired failed: %v", err)
 	}
@@ -86,10 +79,7 @@ func (s *sessionStore) Lookup(token string) (string, bool) {
 }
 
 // Touch extends a session's sliding expiry if it has been at least
-// renewThreshold since the last extension, and reports whether it did so —
-// the caller uses that to decide whether the response needs a fresh
-// Set-Cookie. It assumes the caller has just confirmed the session is valid
-// (e.g. via Lookup); it does nothing for a token that no longer exists.
+// renewThreshold since the last extension, and reports whether it did so.
 func (s *sessionStore) Touch(token string) bool {
 	hash := hashToken(token)
 	row, found, err := s.store.LookupSession(hash)
@@ -100,8 +90,6 @@ func (s *sessionStore) Touch(token string) bool {
 	if !found {
 		return false
 	}
-	// expiresAt = lastRenewal + idle, so this recovers when the session was
-	// last extended without a separate column.
 	lastRenewal := row.ExpiresAt.Add(-s.idle)
 	now := time.Now()
 	if now.Sub(lastRenewal) < renewThreshold {
@@ -114,19 +102,14 @@ func (s *sessionStore) Touch(token string) bool {
 	return true
 }
 
-// Rename updates the username carried by a session, keeping its expiry. It is
-// used when the administrator renames their own account so the current
-// session keeps working under the new name.
+// Rename updates the username carried by a session, keeping its expiry.
 func (s *sessionStore) Rename(token, username string) {
 	if err := s.store.RenameSession(hashToken(token), username); err != nil {
 		logf("panel: session: rename failed: %v", err)
 	}
 }
 
-// DestroyOthers invalidates every session except keep. It is called when the
-// administrator changes their password: a stolen cookie issued under the old
-// password must stop working, while the admin performing the change stays
-// signed in.
+// DestroyOthers invalidates every session except keep.
 func (s *sessionStore) DestroyOthers(keep string) {
 	if err := s.store.DeleteOtherSessions(hashToken(keep)); err != nil {
 		logf("panel: session: destroy others failed: %v", err)

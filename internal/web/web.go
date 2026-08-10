@@ -4,27 +4,25 @@
 package web
 
 import (
-	"embed"
 	"log"
 	"net"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/legal"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/handlers"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
-
-//go:embed templates/*.html static/*
-var assetsFS embed.FS
 
 // Config holds the panel's HTTP-facing configuration.
 type Config struct {
 	// Hostname is the server's external hostname, used to build the absolute
-	// setup link shown in the logs (security.md; guide В§ Environment
+	// setup link shown in the logs (security.md; guide § Environment
 	// variables for SELFPOST_HOSTNAME).
 	Hostname string
 	// CookieSecure sets the Secure attribute on the session cookie. It defaults
@@ -33,16 +31,16 @@ type Config struct {
 	CookieSecure bool
 	// SubmissionEnabled mirrors SUBMISSION_ENABLE: whether this deployment also
 	// runs the 587/STARTTLS submission listener next to the primary 465 one
-	// (architecture.md В§ Mail path). The panel only reports it on the domain
+	// (architecture.md § Mail path). The panel only reports it on the domain
 	// page's connection settings; it is a deploy-time flag, not something the
 	// panel can verify.
 	SubmissionEnabled bool
 	// MailLogPath is where Postfix's delivery log lives, read by the mail.log
-	// monitoring view (architecture.md В§ Panel HTTP surface). It is the same path
+	// monitoring view (architecture.md § Panel HTTP surface). It is the same path
 	// the log-tailer role follows in cmd/panel.
 	MailLogPath string
 	// DataDir and DBPath locate the persistent state a full backup archives
-	// (architecture.md В§ Persistence); Version is stamped into the backup
+	// (architecture.md § Persistence); Version is stamped into the backup
 	// manifest. They mirror the panel's own configuration.
 	DataDir string
 	DBPath  string
@@ -53,7 +51,7 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
-	// TLSCertFile is the certificate Postfix serves on 465/587 (guide В§
+	// TLSCertFile is the certificate Postfix serves on 465/587 (guide §
 	// Environment variables), read read-only by the status page to report how
 	// much validity is left.
 	TLSCertFile string
@@ -69,156 +67,107 @@ type Config struct {
 	SessionIdleDays int
 	// DNSResolvers are the recursive resolvers the deliverability checks query
 	// (env SELFPOST_DNS_RESOLVERS). Empty uses dnscheck.DefaultResolvers. The
-	// checks must not go through the system resolver вЂ” see dnscheck's
-	// externalResolver вЂ” so this is how a closed network points them at its own.
+	// checks must not go through the system resolver — see dnscheck's
+	// externalResolver — so this is how a closed network points them at its own.
 	DNSResolvers []string
 }
 
 // Server is the panel HTTP application.
 type Server struct {
-	store    *store.Store
-	domains  *domain.Service
-	apps     *app.Service
 	cfg      Config
-	tmpl     *templates
-	sessions *sessionStore
-	setup    *setupManager
-	dns      *dnscheck.Checker
-	// machine reads the host's CPU, memory and network counters for the
-	// status page. It has to be one shared sampler for the whole server:
-	// CPU and throughput are differences between successive readings, so a
-	// per-request sampler would never have a previous one to subtract.
-	machine health.MachineSampler
-
-	loginLimiter *rateLimiter
-	setupLimiter *rateLimiter
-
-	trustedProxies []*net.IPNet
+	auth     *auth.Module
+	handlers *handlers.Handlers
 }
 
 // New builds the panel server. setupTokenPath is where the current setup token
 // is mirrored on disk (security.md); domains is the sending-domain service
-// that owns DKIM keys and the OpenDKIM tables (architecture.md В§ OpenDKIM);
+// that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
 // apps owns application SASL accounts and the Postfix sender map
-// (architecture.md В§ Mail path).
+// (architecture.md § Mail path).
 func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config, setupTokenPath string) (*Server, error) {
-	tmpl, err := loadTemplates()
+	v, err := view.New(cfg.Version)
 	if err != nil {
 		return nil, err
 	}
-	idleDays := cfg.SessionIdleDays
-	if idleDays <= 0 {
-		idleDays = 7
-	}
-	s := &Server{
-		store:    st,
-		domains:  domains,
-		apps:     apps,
-		cfg:      cfg,
-		tmpl:     tmpl,
-		sessions: newSessionStore(st, time.Duration(idleDays)*24*time.Hour),
-		// Published-DNS checks for the status page and the domain pages. The
-		// checker caches its own results, so page views do not each pay for a
-		// round of lookups.
-		dns: dnscheck.New(cfg.DNSResolvers),
-		// Setup: a handful of attempts per minute per IP is plenty for a
-		// legitimate admin and blunts automated probing (security.md).
-		setupLimiter: newRateLimiter(10, time.Minute),
-		// Login: throttle brute-force by IP (security.md).
-		loginLimiter: newRateLimiter(10, 15*time.Minute),
-
-		trustedProxies: cfg.TrustedProxyCIDRs,
-	}
-	s.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
-	return s, nil
+	a := auth.New(st, auth.Config{
+		CookieSecure:      cfg.CookieSecure,
+		Hostname:          cfg.Hostname,
+		SessionIdleDays:   cfg.SessionIdleDays,
+		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
+	}, v, setupTokenPath)
+	h := handlers.New(st, domains, apps, handlers.Config{
+		Hostname:          cfg.Hostname,
+		SubmissionEnabled: cfg.SubmissionEnabled,
+		MailLogPath:       cfg.MailLogPath,
+		DataDir:           cfg.DataDir,
+		DBPath:            cfg.DBPath,
+		Version:           cfg.Version,
+		TLSCertFile:       cfg.TLSCertFile,
+		OpenDKIMSocket:    cfg.OpenDKIMSocket,
+		JournalSocket:     cfg.JournalSocket,
+	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
+	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }
 
 // Start performs first-run bootstrapping: if there is no administrator yet, it
 // generates and announces the setup link (security.md). Safe to call once at
 // server startup.
 func (s *Server) Start() error {
-	return s.setup.bootstrap()
+	return s.auth.Bootstrap()
 }
 
 // Handler returns the panel's HTTP handler (router).
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	h := s.handlers
 
-	// Health check stays unauthenticated for the container/orchestrator.
 	mux.HandleFunc("/healthz", handleHealth)
+	mux.HandleFunc("/license", handleLicense)
+	mux.Handle("/static/", view.StaticHandler())
+	mux.HandleFunc("/setup/", s.auth.HandleSetup)
+	mux.HandleFunc("/login", s.auth.HandleLogin)
+	mux.HandleFunc("/logout", s.auth.HandleLogout)
 
-	// AGPL Appropriate Legal Notices: the licence text itself, reachable
-	// without a session so the login and setup footers can link to it.
-	mux.HandleFunc("/license", s.handleLicense)
-
-	// Vendored static assets (HTMX). Served from the embedded FS, with a
-	// content ETag so a replaced asset survives the browser cache (static.go).
-	mux.Handle("/static/", staticHandler())
-
-	// One-time administrator setup (security.md).
-	mux.HandleFunc("/setup/", s.handleSetup)
-
-	// Authentication.
-	mux.HandleFunc("/login", s.handleLogin)
-	mux.HandleFunc("/logout", s.handleLogout)
-
-	// Authenticated panel. Everything not matched by a more specific pattern
-	// above falls through to this sub-mux, wrapped once in the auth middleware.
 	authed := http.NewServeMux()
-
-	// The landing page is the server status: the first thing an
-	// administrator should see after logging in is whether the service is
-	// healthy, not the domain list. handleLogin still redirects to "/".
 	authed.HandleFunc("GET /{$}", redirectToStatus)
-	authed.HandleFunc("GET /status", s.handleStatus)
-	authed.HandleFunc("GET /status/fragment", s.handleStatusFragment)
-	authed.HandleFunc("POST /status/recheck", s.handleStatusRecheck)
+	authed.HandleFunc("GET /status", h.HandleStatus)
+	authed.HandleFunc("GET /status/fragment", h.HandleStatusFragment)
+	authed.HandleFunc("POST /status/recheck", h.HandleStatusRecheck)
 
-	authed.HandleFunc("GET /domains", s.handleDashboard)
-	authed.HandleFunc("POST /domains", s.handleAddDomain)
-	authed.HandleFunc("POST /domains/import", s.handleImportDomain)
-	authed.HandleFunc("GET /domains/{id}", s.handleDomainDetail)
-	authed.HandleFunc("POST /domains/{id}/dns-recheck", s.handleDomainDNSRecheck)
-	authed.HandleFunc("GET /domains/{id}/delete", s.handleDeleteConfirm)
-	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
-	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
-	authed.HandleFunc("POST /domains/{id}/ratelimit", s.handleDomainRateLimit)
-	authed.HandleFunc("POST /domains/{id}/dmarc", s.handleDomainDMARC)
-	authed.HandleFunc("POST /domains/{id}/export", s.handleExportDomain)
-	authed.HandleFunc("POST /applications/{aid}/mode", s.handleUpdateAppMode)
-	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
-	authed.HandleFunc("POST /applications/{aid}/ratelimit", s.handleAppRateLimit)
-	authed.HandleFunc("POST /applications/{aid}/delete", s.handleDeleteApplication)
-	authed.HandleFunc("POST /reload", s.handleReload)
+	authed.HandleFunc("GET /domains", h.HandleDashboard)
+	authed.HandleFunc("POST /domains", h.HandleAddDomain)
+	authed.HandleFunc("POST /domains/import", h.HandleImportDomain)
+	authed.HandleFunc("GET /domains/{id}", h.HandleDomainDetail)
+	authed.HandleFunc("POST /domains/{id}/dns-recheck", h.HandleDomainDNSRecheck)
+	authed.HandleFunc("GET /domains/{id}/delete", h.HandleDeleteConfirm)
+	authed.HandleFunc("POST /domains/{id}/delete", h.HandleDeleteDomain)
+	authed.HandleFunc("POST /domains/{id}/applications", h.HandleAddApplication)
+	authed.HandleFunc("POST /domains/{id}/ratelimit", h.HandleDomainRateLimit)
+	authed.HandleFunc("POST /domains/{id}/dmarc", h.HandleDomainDMARC)
+	authed.HandleFunc("POST /domains/{id}/export", h.HandleExportDomain)
+	authed.HandleFunc("POST /applications/{aid}/mode", h.HandleUpdateAppMode)
+	authed.HandleFunc("POST /applications/{aid}/password", h.HandleRegenPassword)
+	authed.HandleFunc("POST /applications/{aid}/ratelimit", h.HandleAppRateLimit)
+	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
+	authed.HandleFunc("POST /reload", h.HandleReload)
 
-	// Administrator's own panel credentials.
-	authed.HandleFunc("/account", s.handleAccount)
+	authed.HandleFunc("/account", h.HandleAccount)
 
-	// Backup and migration: the page with both actions (architecture.md В§
-	// Persistence-B), and the full-server backup download itself.
-	authed.HandleFunc("GET /backup", s.handleBackupPage)
-	authed.HandleFunc("POST /backup", s.handleBackup)
+	authed.HandleFunc("GET /backup", h.HandleBackupPage)
+	authed.HandleFunc("POST /backup", h.HandleBackup)
 
-	// Monitoring screens (architecture.md В§ Panel HTTP surface): each page and
-	// its HTMX polling fragment (architecture.md В§ Panel HTTP surface вЂ” the /rows
-	// and /body endpoints return HTML, not JSON).
-	authed.HandleFunc("GET /deliveries", s.handleDeliveries)
-	authed.HandleFunc("GET /deliveries/rows", s.handleDeliveriesRows)
-	authed.HandleFunc("GET /deliveries/{id}", s.handleDelivery)
-	authed.HandleFunc("GET /mail-queue", s.handleMailQueue)
-	authed.HandleFunc("GET /mail-queue/body", s.handleMailQueueBody)
-	authed.HandleFunc("GET /system-log", s.handleSystemLog)
-	authed.HandleFunc("GET /system-log/body", s.handleSystemLogBody)
+	authed.HandleFunc("GET /deliveries", h.HandleDeliveries)
+	authed.HandleFunc("GET /deliveries/rows", h.HandleDeliveriesRows)
+	authed.HandleFunc("GET /deliveries/{id}", h.HandleDelivery)
+	authed.HandleFunc("GET /mail-queue", h.HandleMailQueue)
+	authed.HandleFunc("GET /mail-queue/body", h.HandleMailQueueBody)
+	authed.HandleFunc("GET /system-log", h.HandleSystemLog)
+	authed.HandleFunc("GET /system-log/body", h.HandleSystemLogBody)
 
-	mux.Handle("/", s.requireAuth(authed))
-
-	// Security headers and the origin check wrap everything, including the
-	// unauthenticated login and setup routes.
+	mux.Handle("/", s.auth.RequireAuth(authed))
 	return s.secure(mux)
 }
 
-// redirectToStatus points the panel root at the status page, so there is one
-// canonical URL for that content instead of two.
 func redirectToStatus(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/status", http.StatusSeeOther)
 }
@@ -233,44 +182,20 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ok\n"))
 }
 
-// clientIP extracts the peer IP for rate-limiting. By default it is the
-// transport peer (RemoteAddr), which cannot be spoofed. If RemoteAddr matches
-// one of trustedProxies, the last entry of X-Forwarded-For is used instead вЂ”
-// that is the address the trusted proxy itself appended, so a client can't
-// forge it by sending its own XFF header. With no trusted
-// proxies configured, behind a reverse proxy this is the proxy's own address,
-// which is an acceptable backstop for a single-admin panel.
-func clientIP(r *http.Request, trustedProxies []*net.IPNet) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
+func handleLicense(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
-
-	if len(trustedProxies) > 0 {
-		if peer := net.ParseIP(host); peer != nil && ipInAny(peer, trustedProxies) {
-			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-				parts := strings.Split(xff, ",")
-				if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
-					return ip.String()
-				}
-			}
-		}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
 	}
-
-	return host
+	_, _ = w.Write(legal.License)
 }
 
-func ipInAny(ip net.IP, nets []*net.IPNet) bool {
-	for _, n := range nets {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-// logf is a thin wrapper so handlers log with a consistent prefix.
 func logf(format string, args ...any) {
 	log.Printf(format, args...)
 }
-

@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"errors"
@@ -10,6 +10,8 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
 // newCred carries a freshly generated login/password to the template so it can
@@ -48,28 +50,28 @@ type appRateLimitView struct {
 	WindowVal string // window seconds, defaulted when unset
 }
 
-// handleDomainDetail shows a single domain: its DKIM DNS record (product.md)
+// HandleDomainDetail shows a single domain: its DKIM DNS record (product.md)
 // and its applications with the controls to add, edit, delete and re-issue
 // credentials (product.md).
-func (s *Server) handleDomainDetail(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
+func (h *Handlers) HandleDomainDetail(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
-	s.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
 }
 
 // renderDomainDetail renders the domain page. view supplies request-specific
 // extras (form error/values, a one-time credential); everything else is loaded
 // fresh from the stores so the page always reflects committed state.
-func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, status int, d store.Domain, view detailView) {
-	record, err := s.domains.DKIMRecord(d)
+func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, status int, d store.Domain, view detailView) {
+	record, err := h.domains.DKIMRecord(d)
 	if err != nil {
 		logf("panel: domain %d: dkim record: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	apps, err := s.apps.List(d.ID)
+	apps, err := h.apps.List(d.ID)
 	if err != nil {
 		logf("panel: domain %d: list applications: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -77,7 +79,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	}
 	appViews := make([]appRateLimitView, 0, len(apps))
 	for _, a := range apps {
-		rl, ok, err := s.apps.RateLimit(a.ID)
+		rl, ok, err := h.apps.RateLimit(a.ID)
 		if err != nil {
 			logf("panel: application %d: rate limit: %v", a.ID, err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
@@ -92,7 +94,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		})
 	}
 
-	domainRL, domainRLok, err := s.domains.RateLimit(d.ID)
+	domainRL, domainRLok, err := h.domains.RateLimit(d.ID)
 	if err != nil {
 		logf("panel: domain %d: rate limit: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -102,7 +104,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with. Cached by the checker, so re-rendering the page
 	// after a form post costs nothing.
-	admin, err := s.store.GetAdmin()
+	admin, err := h.store.GetAdmin()
 	if err != nil {
 		logf("panel: domain %d: get admin: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -110,7 +112,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	}
 	profileEmail := admin.DMARCReportEmail
 	reportEmail := dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail)
-	dns, srv := s.domainDNS(d, record, profileEmail, false)
+	dns, srv := h.domainDNS(d, record, profileEmail, false)
 	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
 	dmarcMode := "inherit"
 	dmarcCustom := ""
@@ -132,9 +134,9 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		dmarcSource = "settings"
 	}
 
-	s.render(w, status, "domain_detail", map[string]any{
+	h.view.Render(w, status, "domain_detail", map[string]any{
 		"Title":  "SelfPost — " + d.Name,
-		"User":   currentUser(r),
+		"User":   auth.CurrentUser(r),
 		"Active": "domains",
 		"Domain": d,
 		"Record": record,
@@ -144,7 +146,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		// this server expects rather than leaving it to the documentation. The
 		// same builders phrase the suggestions in the check messages, so the
 		// page and the checks below it never recommend different records.
-		"SPFExample":   dnscheck.SPFExample(s.cfg.Hostname, srv.IPs),
+		"SPFExample":   dnscheck.SPFExample(h.cfg.Hostname, srv.IPs),
 		"DMARCName":    dnscheck.DMARCRecordName(d.Name),
 		"DMARCExample":      dnscheck.DMARCExample(reportEmail),
 		"DMARCSource":       dmarcSource,
@@ -159,8 +161,8 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		// Client connection settings (the same for every domain on this
 		// instance): the hostname clients connect to, and whether the optional
 		// submission listener is enabled in this deployment.
-		"Hostname":          s.cfg.Hostname,
-		"SubmissionEnabled": s.cfg.SubmissionEnabled,
+		"Hostname":          h.cfg.Hostname,
+		"SubmissionEnabled": h.cfg.SubmissionEnabled,
 		"Apps":              appViews,
 		"Error":             view.FormErr,
 		"FormLogin":         view.FormLogin,
@@ -172,7 +174,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		"List":              store.AddressModeList,
 		"RateLimitErr":      view.RateLimitErr,
 		"ExportErr":         view.ExportErr,
-		"MinPwLen":          minSecretFilePasswordLen,
+		"MinPwLen":          validate.MinSecretFilePasswordLen,
 		"DomainHasRL":       domainRLok && domainRL.Active(),
 		"DomainRLIPs":       strings.Join(domainRL.AllowedIPs, "\n"),
 		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),
@@ -186,9 +188,9 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 // and no extra environment variable is needed. That server result is returned
 // alongside, because the page's suggested SPF record is built from the same
 // addresses. force bypasses the cache, for the Re-check button.
-func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, profileEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
-	srv := s.dns.Server(s.cfg.Hostname, false)
-	return s.dns.Domain(dnscheck.Query{
+func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, profileEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
+	srv := h.dns.Server(h.cfg.Hostname, false)
+	return h.dns.Domain(dnscheck.Query{
 		Name:             d.Name,
 		Selector:         d.DKIMSelector,
 		ExpectedDKIM:     record.Value,
@@ -198,26 +200,26 @@ func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, profileEmai
 	}, force), srv
 }
 
-// handleDomainDNSRecheck re-runs the domain's DNS checks ignoring the cache and
+// HandleDomainDNSRecheck re-runs the domain's DNS checks ignoring the cache and
 // returns to its page, which then renders the fresh result.
-func (s *Server) handleDomainDNSRecheck(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
+func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
-	record, err := s.domains.DKIMRecord(d)
+	record, err := h.domains.DKIMRecord(d)
 	if err != nil {
 		logf("panel: domain %d: dkim record: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	admin, err := s.store.GetAdmin()
+	admin, err := h.store.GetAdmin()
 	if err != nil {
 		logf("panel: domain %d: get admin: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.domainDNS(d, record, admin.DMARCReportEmail, true)
+	h.domainDNS(d, record, admin.DMARCReportEmail, true)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
@@ -260,17 +262,17 @@ func detailFlash(r *http.Request) string {
 	}
 }
 
-// handleAddApplication creates an application on a domain and renders the page
+// HandleAddApplication creates an application on a domain and renders the page
 // back with the generated password shown once (product.md, security.md). Because the
 // password cannot be recovered later, this deliberately renders inline rather
 // than redirecting.
-func (s *Server) handleAddApplication(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.lookupDomain(w, r)
+func (h *Handlers) HandleAddApplication(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.renderDomainDetail(w, r, http.StatusBadRequest, d,
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d,
 			detailView{FormErr: "Invalid form submission.", FormMode: store.AddressModeWildcard})
 		return
 	}
@@ -284,25 +286,25 @@ func (s *Server) handleAddApplication(w http.ResponseWriter, r *http.Request) {
 		FormAddrs: r.PostFormValue("addresses"),
 	}
 
-	a, password, err := s.apps.Create(d.ID, login, mode, addrs)
+	a, password, err := h.apps.Create(d.ID, login, mode, addrs)
 	if err != nil {
 		repopulate.FormErr = applicationErrorMessage(err)
 		status := http.StatusBadRequest
 		if errors.Is(err, store.ErrLoginExists) {
 			status = http.StatusConflict
 		}
-		s.renderDomainDetail(w, r, status, d, repopulate)
+		h.renderDomainDetail(w, r, status, d, repopulate)
 		return
 	}
-	s.renderDomainDetail(w, r, http.StatusCreated, d, detailView{
+	h.renderDomainDetail(w, r, http.StatusCreated, d, detailView{
 		FormMode: store.AddressModeWildcard,
 		NewCred:  &newCred{Login: a.Login, Password: password},
 	})
 }
 
-// handleUpdateAppMode switches an application's address mode / list (product.md).
-func (s *Server) handleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.lookupApplication(w, r)
+// HandleUpdateAppMode switches an application's address mode / list (product.md).
+func (h *Handlers) HandleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.lookupApplication(w, r)
 	if !ok {
 		return
 	}
@@ -313,13 +315,13 @@ func (s *Server) handleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
 	mode := r.PostFormValue("mode")
 	addrs := splitAddresses(r.PostFormValue("addresses"))
 
-	if err := s.apps.UpdateMode(a.ID, mode, addrs); err != nil {
-		d, derr := s.domains.Get(a.DomainID)
+	if err := h.apps.UpdateMode(a.ID, mode, addrs); err != nil {
+		d, derr := h.domains.Get(a.DomainID)
 		if derr != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		s.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormErr:  fmt.Sprintf("Could not update %s: %s", a.Login, applicationErrorMessage(err)),
 			FormMode: store.AddressModeWildcard,
 		})
@@ -328,38 +330,38 @@ func (s *Server) handleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?modeupdated=1", a.DomainID), http.StatusSeeOther)
 }
 
-// handleRegenPassword issues a new password for an application and shows it once
+// HandleRegenPassword issues a new password for an application and shows it once
 // (product.md, security.md). Rendered inline, like creation, so the password is visible.
-func (s *Server) handleRegenPassword(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.lookupApplication(w, r)
+func (h *Handlers) HandleRegenPassword(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.lookupApplication(w, r)
 	if !ok {
 		return
 	}
-	d, err := s.domains.Get(a.DomainID)
+	d, err := h.domains.Get(a.DomainID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	password, err := s.apps.RegeneratePassword(a.ID)
+	password, err := h.apps.RegeneratePassword(a.ID)
 	if err != nil {
 		logf("panel: regenerate password for application %d: %v", a.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.renderDomainDetail(w, r, http.StatusOK, d, detailView{
+	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{
 		FormMode: store.AddressModeWildcard,
 		NewCred:  &newCred{Login: a.Login, Password: password},
 	})
 }
 
-// handleDeleteApplication removes an application and returns to its domain page
+// HandleDeleteApplication removes an application and returns to its domain page
 // (product.md).
-func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.lookupApplication(w, r)
+func (h *Handlers) HandleDeleteApplication(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.lookupApplication(w, r)
 	if !ok {
 		return
 	}
-	if err := s.apps.Delete(a.ID); err != nil {
+	if err := h.apps.Delete(a.ID); err != nil {
 		logf("panel: delete application %d: %v", a.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -369,13 +371,13 @@ func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request)
 
 // lookupApplication resolves the {aid} path value to an application, writing a
 // 404 for a bad id or missing application.
-func (s *Server) lookupApplication(w http.ResponseWriter, r *http.Request) (store.Application, bool) {
+func (h *Handlers) lookupApplication(w http.ResponseWriter, r *http.Request) (store.Application, bool) {
 	id, err := strconv.ParseInt(r.PathValue("aid"), 10, 64)
 	if err != nil || id <= 0 {
 		http.NotFound(w, r)
 		return store.Application{}, false
 	}
-	a, err := s.apps.Get(id)
+	a, err := h.apps.Get(id)
 	if err != nil {
 		if errors.Is(err, store.ErrApplicationNotFound) {
 			http.NotFound(w, r)

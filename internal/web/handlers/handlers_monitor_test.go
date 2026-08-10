@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"net/http"
@@ -16,9 +16,9 @@ import (
 // recreate it on reload (spec B.2); a missing file in that window is a normal,
 // transient gap, not an operator-facing failure.
 func TestReadLogTailMissingFileIsNotAnError(t *testing.T) {
-	s := &Server{cfg: Config{MailLogPath: filepath.Join(t.TempDir(), "mail.log")}}
+	h := &Handlers{cfg: Config{MailLogPath: filepath.Join(t.TempDir(), "mail.log")}}
 
-	lines, errText := s.readLogTail()
+	lines, errText := h.readLogTail()
 	if lines != nil {
 		t.Errorf("lines = %v, want nil", lines)
 	}
@@ -31,9 +31,9 @@ func TestReadLogTailMissingFileIsNotAnError(t *testing.T) {
 // when, from, to, subject and status, and links each row to the page carrying
 // the rest. A column added back here is one the table has no width for.
 func TestDeliveryLogShowsOnlyTheIdentifyingColumns(t *testing.T) {
-	s, row := serverWithDelivery(t)
+	h, row := serverWithDelivery(t)
 
-	out := getBody(t, s.handleDeliveries, "/deliveries")
+	out := getBody(t, h.HandleDeliveries, "/deliveries")
 	for _, want := range []string{
 		row.CreatedAt.Format("2006-01-02 15:04:05"),
 		"noreply@bs.example.ru", "public@example.ru",
@@ -56,11 +56,11 @@ func TestDeliveryLogShowsOnlyTheIdentifyingColumns(t *testing.T) {
 // decoded them, and those rows are still in the send log. Decoding on the way
 // out is what keeps them readable, so the encoding must not survive to the page.
 func TestDeliveryLogDecodesStoredEncodedSubjects(t *testing.T) {
-	s, _ := serverWithDelivery(t)
+	h, _ := serverWithDelivery(t)
 
 	for name, out := range map[string]string{
-		"log":  getBody(t, s.handleDeliveries, "/deliveries"),
-		"rows": getBody(t, s.handleDeliveriesRows, "/deliveries/rows"),
+		"log":  getBody(t, h.HandleDeliveries, "/deliveries"),
+		"rows": getBody(t, h.HandleDeliveriesRows, "/deliveries/rows"),
 	} {
 		if strings.Contains(out, "=?utf-8?Q?") {
 			t.Errorf("%s shows the subject's MIME encoding instead of its text:\n%s", name, out)
@@ -74,9 +74,9 @@ func TestDeliveryLogDecodesStoredEncodedSubjects(t *testing.T) {
 // Everything the log dropped has to be somewhere, and that somewhere is the
 // per-row page — including for a row still holding an encoded subject.
 func TestDeliveryPageShowsWhatTheLogOmits(t *testing.T) {
-	s, row := serverWithDelivery(t)
+	h, row := serverWithDelivery(t)
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID)+"?domain=bs.example.ru&p=2")
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID)+"?domain=bs.example.ru&p=2")
 	for _, want := range []string{
 		"bs.example.ru", "Queuer3C", "4A1B2C3D", "Проверка",
 		"noreply@bs.example.ru", "public@example.ru", "sent",
@@ -95,9 +95,9 @@ func TestDeliveryPageShowsWhatTheLogOmits(t *testing.T) {
 // journal holds, stated as the steps they stand for, so a row is readable as
 // what happened to the message rather than as a list of fields.
 func TestDeliveryPageTellsTheMessagesHistory(t *testing.T) {
-	s, row := serverWithDelivery(t)
+	h, row := serverWithDelivery(t)
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
 	for _, want := range []string{
 		"Accepted and queued", "Delivered",
 		row.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -121,19 +121,19 @@ func TestDeliveryPageTellsTheMessagesHistory(t *testing.T) {
 // for is drawn as one that has not happened rather than dated with the moment
 // the row was written.
 func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
-	s, _ := serverWithDelivery(t)
-	if err := s.store.InsertQueued(store.SendLogEntry{
+	h, _ := serverWithDelivery(t)
+	if err := h.store.InsertQueued(store.SendLogEntry{
 		QueueID: "7F7F7F7F", Domain: "bs.example.ru", AppLogin: "Queuer3C",
 		From: "noreply@bs.example.ru", To: "waiting@example.ru", Subject: "Still going",
 	}); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
-	rows, err := s.store.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{}, 1, 0)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(rows[0].ID))
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(rows[0].ID))
 	for _, want := range []string{"Waiting for a delivery report", "pending", "not yet"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery page does not mark the message as still waiting (%q):\n%s", want, out)
@@ -146,14 +146,14 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 // lines — as a table of when and what, so the seconds between the connection
 // and the reply line up down one edge.
 func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
-	s, row := serverWithDelivery(t)
-	s.cfg.MailLogPath = writeMailLog(t,
+	h, row := serverWithDelivery(t)
+	h.cfg.MailLogPath = writeMailLog(t,
 		"2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]",
 		"2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)",
 		"2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)",
 	)
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
 	for _, want := range []string{
 		"<th>Time</th>", "<th>Message</th>",
 		// The stamp is split off into its own cell, without the microseconds
@@ -174,10 +174,10 @@ func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 // A line whose head is not a timestamp still has to show in full; the format is
 // the log's, not ours, and a line we cannot split is a line we must not drop.
 func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
-	s, row := serverWithDelivery(t)
-	s.cfg.MailLogPath = writeMailLog(t, "host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status=sent (250 OK)")
+	h, row := serverWithDelivery(t)
+	h.cfg.MailLogPath = writeMailLog(t, "host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status=sent (250 OK)")
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
 	if !strings.Contains(out, "host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;, status=sent (250 OK)") {
 		t.Errorf("an unstamped log line did not survive the split into columns:\n%s", out)
 	}
@@ -186,10 +186,10 @@ func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
 // Rows outlive mail.log, and a message the milter refused never reached the
 // queue at all. Neither is a fault, so neither may render as an error.
 func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
-	s, row := serverWithDelivery(t)
-	s.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
+	h, row := serverWithDelivery(t)
+	h.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
 
-	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
 	if !strings.Contains(out, "rotated away") {
 		t.Errorf("delivery page does not explain the empty delivery log:\n%s", out)
 	}
@@ -201,13 +201,13 @@ func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
 // Send-log rows are pruned on the retention window, so a bookmarked delivery
 // that no longer exists is a 404, not a 500.
 func TestDeliveryPageNotFound(t *testing.T) {
-	s, _ := serverWithDelivery(t)
+	h, _ := serverWithDelivery(t)
 
 	for _, path := range []string{"/deliveries/999999", "/deliveries/abc", "/deliveries/0"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.SetPathValue("id", strings.TrimPrefix(path, "/deliveries/"))
-		s.handleDelivery(rec, req)
+		h.HandleDelivery(rec, req)
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("GET %s = %d, want 404", path, rec.Code)
 		}
@@ -216,7 +216,7 @@ func TestDeliveryPageNotFound(t *testing.T) {
 
 // serverWithDelivery builds a panel over a store holding one delivery, written
 // the way the journal-milter wrote them before it decoded subjects itself.
-func serverWithDelivery(t *testing.T) (*Server, store.SendLogRow) {
+func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -242,11 +242,7 @@ func serverWithDelivery(t *testing.T) (*Server, store.SendLogRow) {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
 
-	tmpl, err := loadTemplates()
-	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
-	}
-	return &Server{store: st, tmpl: tmpl, cfg: Config{Version: "test"}}, rows[0]
+	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, rows[0]
 }
 
 // getBody runs one handler over a GET and returns the page it wrote, failing

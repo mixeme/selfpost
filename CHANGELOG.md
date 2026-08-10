@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- `internal/web` split into subpackages (`web/view`, `web/auth`, `web/validate`,
+  `web/handlers`); the composition root (`web.New`, `web.Config`, `Server.Handler`)
+  is unchanged for `cmd/panel`. Templates and static assets moved under
+  `internal/web/view/`.
+
 ### Added
 
 - panel: DMARC guidance for send-only relays — the suggested `_dmarc` record

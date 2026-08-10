@@ -1,4 +1,4 @@
-package web
+package view
 
 import (
 	"crypto/sha256"
@@ -39,7 +39,7 @@ func buildStaticETags() map[string]string {
 	return etags
 }
 
-// staticHandler serves the embedded assets under /static/ with a content ETag.
+// StaticHandler serves the embedded assets under /static/ with a content ETag.
 //
 // Cache-Control is no-cache rather than a max-age: it lets the browser keep the
 // copy but requires it to revalidate, so an asset that changed is picked up on
@@ -47,7 +47,7 @@ func buildStaticETags() map[string]string {
 // handful of small files on a single-operator panel that trade is the right way
 // round — correctness after a deploy matters more than saving the round trip.
 // http.ServeContent answers the conditional request from the ETag we set here.
-func staticHandler() http.Handler {
+func StaticHandler() http.Handler {
 	files := http.FileServer(http.FS(assetsFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if etag, ok := staticETags[path.Clean(r.URL.Path)]; ok {

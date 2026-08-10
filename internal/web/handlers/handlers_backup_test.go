@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/secretfile"
+	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
 // postForm builds the kind of request the backup and export forms submit.
@@ -24,8 +25,8 @@ func postForm(values url.Values) *http.Request {
 // the archive is sealed — and leaving the box unticked has to keep producing
 // the plain archive earlier versions produced.
 func TestSecretFilePassword(t *testing.T) {
-	long := strings.Repeat("x", minSecretFilePasswordLen)
-	short := strings.Repeat("x", minSecretFilePasswordLen-1)
+	long := strings.Repeat("x", validate.MinSecretFilePasswordLen)
+	short := strings.Repeat("x", validate.MinSecretFilePasswordLen-1)
 
 	tests := []struct {
 		name     string
@@ -104,13 +105,9 @@ func TestDecryptErrorMessage(t *testing.T) {
 // forgets to include the partial (or the data it needs) loses the option
 // silently, since the plain download still works.
 func TestBackupPageOffersEncryption(t *testing.T) {
-	tmpl, err := loadTemplates()
-	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
-	}
-	s := &Server{tmpl: tmpl, cfg: Config{Version: "test"}}
+	h := &Handlers{view: mustView(t), cfg: Config{Version: "test"}}
 	rec := httptest.NewRecorder()
-	s.renderBackupPageWith(rec, httptest.NewRequest(http.MethodGet, "/backup", nil),
+	h.renderBackupPageWith(rec, httptest.NewRequest(http.MethodGet, "/backup", nil),
 		http.StatusOK, "", "The two passwords do not match.")
 
 	body := rec.Body.String()
@@ -118,7 +115,7 @@ func TestBackupPageOffersEncryption(t *testing.T) {
 		`name="encrypt"`, `name="password"`, `name="password_confirm"`,
 		`name="import_password"`, "data-encrypt-toggle", "data-encrypt-fields",
 		"data-import-password-fields",
-		fmt.Sprintf("at least %d characters", minSecretFilePasswordLen),
+		fmt.Sprintf("at least %d characters", validate.MinSecretFilePasswordLen),
 		"The two passwords do not match.",
 	} {
 		if !strings.Contains(body, want) {

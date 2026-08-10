@@ -1,4 +1,4 @@
-package web
+package view
 
 import (
 	"bytes"
@@ -18,11 +18,11 @@ import (
 // every page template must resolve it. This is what makes "the nav is on every
 // authenticated page" a structural property instead of a checklist item.
 func TestEveryPageResolvesNav(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
-	for name, page := range tmpl.pages {
+	for name, page := range engine.Pages() {
 		if page.Lookup("nav") == nil {
 			t.Errorf("page %q does not resolve the shared nav template", name)
 		}
@@ -37,16 +37,16 @@ func TestEveryPageResolvesNav(t *testing.T) {
 // asserted here: the long pages produce a list, and a page that defines nothing
 // produces nothing at all.
 func TestSectionIndexIsOnTheLongPagesOnly(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	// Anchors the index links to, taken from the page's own cards.
 	wantAnchors := map[string]string{
 		"status":        `href="#certificate"`,
 		"domain_detail": `href="#danger"`,
 	}
-	for name, page := range tmpl.pages {
+	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		// The domain page's index hides the freshly generated credential entry
 		// unless one is on the page, so the data map carries the key it reads.
@@ -68,15 +68,15 @@ func TestSectionIndexIsOnTheLongPagesOnly(t *testing.T) {
 // nothing about rendering the page says so. Every anchor the index offers must
 // name an element the same page defines an id for.
 func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	// The pages that carry an index; both are checked with a credential shown,
 	// which is the domain page's one conditional entry.
 	for _, name := range []string{"status", "domain_detail"} {
 		var index bytes.Buffer
-		if err := tmpl.pages[name].ExecuteTemplate(&index, "sections", map[string]any{"NewCred": true}); err != nil {
+		if err := engine.Page(name).ExecuteTemplate(&index, "sections", map[string]any{"NewCred": true}); err != nil {
 			t.Fatalf("execute sections for %q: %v", name, err)
 		}
 		// The cards are spread over the page's template files, so the ids are
@@ -108,9 +108,9 @@ func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
 // Appropriate Legal Notices (copyright, licence, source, no warranty) must
 // appear on every page, including the signed-out ones.
 func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("9.9.9-test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	legalBits := []string{
 		"Copyright © 2026 Mikhail Yenuchenko",
@@ -121,9 +121,9 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 		"No warranty",
 	}
 	rendered := 0
-	for name := range tmpl.pages {
+	for name := range engine.Pages() {
 		var buf bytes.Buffer
-		err := tmpl.pages[name].ExecuteTemplate(&buf, "layout.html", map[string]any{
+		err := engine.Page(name).ExecuteTemplate(&buf, "layout.html", map[string]any{
 			"Title": "t", "User": "admin", "Active": "", "Version": "9.9.9-test",
 			"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
 			"SourceURL": "https://github.com/mixeme/selfpost",
@@ -152,7 +152,7 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 	// Signed out (login, setup) the version must not be advertised, but the
 	// Appropriate Legal Notices must still be present.
 	var buf bytes.Buffer
-	if err := tmpl.pages["login"].ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := engine.Page("login").ExecuteTemplate(&buf, "layout.html", map[string]any{
 		"Title": "t", "Active": "", "Version": "9.9.9-test",
 		"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
 		"SourceURL": "https://github.com/mixeme/selfpost",
@@ -171,14 +171,13 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 }
 
 func TestRenderSuppliesTheVersion(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("9.9.9-test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
-	s := &Server{tmpl: tmpl, cfg: Config{Version: "9.9.9-test"}}
 	rec := httptest.NewRecorder()
 	data := map[string]any{"Title": "t", "User": "admin"}
-	s.render(rec, http.StatusOK, "backup", data)
+	engine.Render(rec, http.StatusOK, "backup", data)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -202,12 +201,12 @@ func TestRenderSuppliesTheVersion(t *testing.T) {
 }
 
 func TestNavMarksActivePage(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	err = tmpl.pages["dashboard"].ExecuteTemplate(&buf, "nav", map[string]any{
+	err = engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":   "admin",
 		"Active": "mail_queue",
 	})
@@ -229,12 +228,12 @@ func TestNavMarksActivePage(t *testing.T) {
 }
 
 func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := tmpl.pages["status"].ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("status").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":   "admin",
 		"Active": "status",
 	}); err != nil {
@@ -258,12 +257,12 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 // silently comes back at the measure, with its table squeezed into two thirds
 // of the column — so the set is asserted here, in both directions.
 func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	wide := map[string]bool{"deliveries": true, "delivery": true, "mail_queue": true, "system_log": true}
-	for name, page := range tmpl.pages {
+	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
 			t.Fatalf("execute the wide block of %s: %v", name, err)
@@ -394,12 +393,12 @@ func TestStatusPageWithoutMachineMetrics(t *testing.T) {
 
 func renderStatusPage(t *testing.T, data map[string]any) string {
 	t.Helper()
-	tmpl, err := loadTemplates()
+	engine, err := New("test")
 	if err != nil {
-		t.Fatalf("loadTemplates: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := tmpl.pages["status"].ExecuteTemplate(&buf, "layout.html", data); err != nil {
+	if err := engine.Page("status").ExecuteTemplate(&buf, "layout.html", data); err != nil {
 		t.Fatalf("execute status page: %v", err)
 	}
 	return buf.String()
@@ -460,7 +459,7 @@ func statusPageData() map[string]any {
 }
 
 // dnscheckResult mirrors dnscheck.Result's shape for the template test, so the
-// web package's template tests do not depend on the checker's constructor.
+// view package's template tests do not depend on the checker's constructor.
 type dnscheckResult struct {
 	Status  health.Status
 	Detail  string

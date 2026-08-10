@@ -1,4 +1,5 @@
-package web
+// Package validate holds shared server-side form validation for the panel.
+package validate
 
 import (
 	"fmt"
@@ -6,24 +7,24 @@ import (
 	"unicode"
 )
 
-// minAdminPasswordLen is the floor for the administrator password. The panel is
+// MinAdminPasswordLen is the floor for the administrator password. The panel is
 // public (security.md), so this is deliberately not tiny.
-const minAdminPasswordLen = 12
+const MinAdminPasswordLen = 12
 
 const (
 	minUsernameLen = 3
 	maxUsernameLen = 64
 )
 
-// minSecretFilePasswordLen is the floor for the password protecting an
+// MinSecretFilePasswordLen is the floor for the password protecting an
 // encrypted backup or domain export. Such a file is offline and can be attacked
 // at leisure, so the floor matches the administrator password's rather than the
 // weaker "any password is better than none".
-const minSecretFilePasswordLen = minAdminPasswordLen
+const MinSecretFilePasswordLen = MinAdminPasswordLen
 
-// validateUsername enforces a strict server-side whitelist (security.md):
-// letters, digits, dot, dash, underscore. Client validation is never trusted.
-func validateUsername(u string) error {
+// Username enforces a strict server-side whitelist (security.md): letters,
+// digits, dot, dash, underscore. Client validation is never trusted.
+func Username(u string) error {
 	if len(u) < minUsernameLen || len(u) > maxUsernameLen {
 		return fmt.Errorf("username must be %d-%d characters", minUsernameLen, maxUsernameLen)
 	}
@@ -35,11 +36,11 @@ func validateUsername(u string) error {
 	return nil
 }
 
-// validateAdminPassword enforces a minimum length. Composition rules beyond
-// length tend to reduce entropy in practice, so length is the sole gate.
-func validateAdminPassword(p string) error {
-	if len(p) < minAdminPasswordLen {
-		return fmt.Errorf("password must be at least %d characters", minAdminPasswordLen)
+// AdminPassword enforces a minimum length. Composition rules beyond length tend
+// to reduce entropy in practice, so length is the sole gate.
+func AdminPassword(p string) error {
+	if len(p) < MinAdminPasswordLen {
+		return fmt.Errorf("password must be at least %d characters", MinAdminPasswordLen)
 	}
 	return nil
 }
@@ -50,23 +51,19 @@ func isASCIILetterOrDigit(r rune) bool {
 
 const maxDomainLen = 253 // RFC 1035 limit on a fully-qualified name
 
-// normalizeDomain lower-cases and trims a domain name. Domain names are
+// NormalizeDomain lower-cases and trims a domain name. Domain names are
 // case-insensitive, and the generated OpenDKIM tables/keys use the canonical
 // lower-case form, so we normalise before both validation and storage.
-func normalizeDomain(name string) string {
+func NormalizeDomain(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// validateDomain enforces a strict server-side whitelist for sending-domain
-// names (security.md). The result is safe to write verbatim into the OpenDKIM
+// Domain enforces a strict server-side whitelist for sending-domain names
+// (security.md). The result is safe to write verbatim into the OpenDKIM
 // KeyTable/SigningTable and to use as a filesystem path segment: only
 // lower-case letters, digits, '.' and '-' are allowed, in valid DNS label
-// shape. Input must already be normalised with normalizeDomain.
-//
-// This is deliberately stricter than "any string DNS might accept" — no
-// leading/trailing dots or hyphens, no empty or over-long labels, and at least
-// two labels so single-word hostnames cannot be registered as sending domains.
-func validateDomain(name string) error {
+// shape. Input must already be normalised with NormalizeDomain.
+func Domain(name string) error {
 	if name == "" {
 		return fmt.Errorf("domain is required")
 	}
@@ -78,14 +75,14 @@ func validateDomain(name string) error {
 		return fmt.Errorf("domain must include at least one dot (e.g. example.com)")
 	}
 	for _, label := range labels {
-		if err := validateDomainLabel(label); err != nil {
+		if err := domainLabel(label); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateDomainLabel(label string) error {
+func domainLabel(label string) error {
 	if len(label) == 0 {
 		return fmt.Errorf("domain must not contain an empty label")
 	}
@@ -109,20 +106,20 @@ func validateDomainLabel(label string) error {
 // freemailDomains lists public mail hosts that cannot publish _report._dmarc
 // authorisation for third-party sending domains.
 var freemailDomains = map[string]struct{}{
-	"gmail.com":       {},
-	"googlemail.com":  {},
-	"outlook.com":     {},
-	"hotmail.com":     {},
-	"live.com":        {},
-	"yahoo.com":       {},
-	"icloud.com":      {},
-	"me.com":          {},
-	"proton.me":       {},
-	"protonmail.com":  {},
+	"gmail.com":      {},
+	"googlemail.com": {},
+	"outlook.com":    {},
+	"hotmail.com":    {},
+	"live.com":       {},
+	"yahoo.com":      {},
+	"icloud.com":     {},
+	"me.com":         {},
+	"proton.me":      {},
+	"protonmail.com": {},
 }
 
-// validateEmail checks a DMARC rua= mailbox. Empty is allowed (policy-only).
-func validateEmail(addr string) error {
+// Email checks a DMARC rua= mailbox. Empty is allowed (policy-only).
+func Email(addr string) error {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
 		return nil
@@ -132,8 +129,8 @@ func validateEmail(addr string) error {
 		return fmt.Errorf("enter a valid email address")
 	}
 	local := addr[:at]
-	domain := normalizeDomain(addr[at+1:])
-	if err := validateDomain(domain); err != nil {
+	domain := NormalizeDomain(addr[at+1:])
+	if err := Domain(domain); err != nil {
 		return fmt.Errorf("email domain is invalid: %w", err)
 	}
 	for _, r := range local {

@@ -1,4 +1,4 @@
-package web
+package auth
 
 import (
 	"sync"
@@ -6,9 +6,7 @@ import (
 )
 
 // rateLimiter is a simple fixed-window per-key counter used to throttle the
-// setup and login routes (security.md). Keys are client IPs. It is not a
-// precise sliding window — a coarse backstop against brute-force and log noise
-// is all these routes need.
+// setup and login routes (security.md). Keys are client IPs.
 type rateLimiter struct {
 	max    int
 	window time.Duration
@@ -30,8 +28,6 @@ func newRateLimiter(max int, window time.Duration) *rateLimiter {
 	}
 }
 
-// Allow records an attempt for key and reports whether it is within the limit.
-// The current window is reset lazily once it elapses.
 func (r *rateLimiter) Allow(key string) bool {
 	now := time.Now()
 	r.mu.Lock()
@@ -50,9 +46,6 @@ func (r *rateLimiter) Allow(key string) bool {
 	return true
 }
 
-// sweep drops expired buckets so the map cannot grow without bound. Called
-// under the lock while a window is being reset, which is often enough given the
-// low request volume of these routes.
 func (r *rateLimiter) sweep(now time.Time) {
 	for k, b := range r.buckets {
 		if now.After(b.windowEnds) {

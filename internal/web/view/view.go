@@ -1,24 +1,26 @@
-package web
+// Package view embeds the panel's HTML templates and static assets and renders
+// pages and HTMX polling fragments.
+package view
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 
 	"github.com/mixeme/selfpost/internal/legal"
 )
 
-// templates holds the parsed page and fragment templates. Each page is parsed
-// together with the shared base layout so {{ template "base" . }} works.
-// Fragments (HTMX polling targets, architecture.md § Panel HTTP surface) are
-// parsed standalone, without the layout, so they can be swapped into an
-// existing page as an HTML snippet rather than a full document. Rendering
-// always goes through html/template, which auto-escapes all interpolated data
-// regardless (security.md).
-type templates struct {
+//go:embed templates/*.html static/*
+var assetsFS embed.FS
+
+// Engine holds parsed page and fragment templates.
+type Engine struct {
 	pages     map[string]*template.Template
 	fragments map[string]*template.Template
+	version   string
 }
 
 // pageFiles maps a logical page name to its template files. Every page
@@ -52,10 +54,12 @@ var fragmentFiles = map[string]string{
 	"status_body":     "templates/status_body.html",
 }
 
-func loadTemplates() (*templates, error) {
-	t := &templates{
+// New parses embedded templates. version is stamped into every page footer.
+func New(version string) (*Engine, error) {
+	e := &Engine{
 		pages:     make(map[string]*template.Template),
 		fragments: make(map[string]*template.Template),
+		version:   version,
 	}
 	for name, files := range pageFiles {
 		patterns := append([]string{"templates/layout.html"}, files...)
@@ -63,22 +67,33 @@ func loadTemplates() (*templates, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
 		}
-		t.pages[name] = tmpl
+		e.pages[name] = tmpl
 	}
 	for name, file := range fragmentFiles {
 		tmpl, err := template.ParseFS(assetsFS, file)
 		if err != nil {
 			return nil, fmt.Errorf("parse fragment %s: %w", name, err)
 		}
-		t.fragments[name] = tmpl
+		e.fragments[name] = tmpl
 	}
-	return t, nil
+	return e, nil
 }
 
-// render writes a page using the base layout. Rendering to a buffer first means
+// Page returns a parsed page template by logical name. It is exported for
+// template guard tests that assert structural properties across all pages.
+func (e *Engine) Page(name string) *template.Template {
+	return e.pages[name]
+}
+
+// Pages returns all parsed page templates keyed by logical name.
+func (e *Engine) Pages() map[string]*template.Template {
+	return e.pages
+}
+
+// Render writes a page using the base layout. Rendering to a buffer first means
 // a template error yields a clean 500 instead of a half-written page.
-func (s *Server) render(w http.ResponseWriter, status int, page string, data any) {
-	tmpl, ok := s.tmpl.pages[page]
+func (e *Engine) Render(w http.ResponseWriter, status int, page string, data any) {
+	tmpl, ok := e.pages[page]
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
@@ -92,13 +107,13 @@ func (s *Server) render(w http.ResponseWriter, status int, page string, data any
 		if _, has := m["Active"]; !has {
 			m["Active"] = ""
 		}
-		m["Version"] = s.cfg.Version
+		m["Version"] = e.version
 		m["Copyright"] = legal.CopyrightLine
 		m["SourceURL"] = legal.SourceURL
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {
-		logf("panel: render %s: %v", page, err)
+		log.Printf("panel: render %s: %v", page, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -107,18 +122,18 @@ func (s *Server) render(w http.ResponseWriter, status int, page string, data any
 	_, _ = buf.WriteTo(w)
 }
 
-// renderFragment writes an HTMX polling fragment as a bare HTML snippet, with
+// RenderFragment writes an HTMX polling fragment as a bare HTML snippet, with
 // no surrounding layout (architecture.md § Panel HTTP surface: fragment
 // endpoints return HTML, not JSON).
-func (s *Server) renderFragment(w http.ResponseWriter, status int, name string, data any) {
-	tmpl, ok := s.tmpl.fragments[name]
+func (e *Engine) RenderFragment(w http.ResponseWriter, status int, name string, data any) {
+	tmpl, ok := e.fragments[name]
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		logf("panel: render fragment %s: %v", name, err)
+		log.Printf("panel: render fragment %s: %v", name, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
