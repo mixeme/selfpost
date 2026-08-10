@@ -194,17 +194,19 @@ a { color: var(--accent-text); }
 /* form.inline only exists so a POST can sit next to other content without a
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
-/* A page whose card is the narrow one takes the column down with it. .card.narrow
-   centres itself inside whatever holds it, so at the panel's usual width the
+/* The signed-out pages are a single card and nothing else, and .card.narrow
+   centres itself inside whatever holds it — so at the panel's usual width the
    card floated in the middle while the mark and the heading stayed at the far
-   left — three alignments on a page with four elements. Narrowing the column to
-   the card's own width lines the three up and puts the block as a whole in the
-   middle of the page.
-   Named by what the page holds rather than by which page it is: it was written
-   for login and setup, and Settings and the user form have the same single
-   narrow card and had the same split heading — a list of page names would have
-   had to be remembered and extended by every page added since. */
-main:has(> .card.narrow) { max-width: 24rem; }
+   left, three alignments on a page with four elements. Narrowing the column to
+   the card's own width makes the three line up and puts the block as a whole in
+   the middle of the page.
+   By page name and not by "the page holds a narrow card", which is what this
+   briefly was. Settings and the user form hold one too, and narrowing their
+   column moves the navigation sideways with it — the shell centres the column
+   and the page as a pair, so 296px of it, measured. Their heading and card are
+   still not aligned with each other; that is worth fixing on its own terms and
+   not by making every page's chrome move. */
+main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1.2rem; }
 table { width: 100%; border-collapse: collapse; }
@@ -261,9 +263,9 @@ h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 0.4rem; }
 .version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
 .version a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .version a:hover { color: var(--fg); }
-/* The narrow column is 24rem; a right-aligned multi-link notice wraps into a
-   ragged edge, so centre it there. */
-main:has(> .card.narrow) .version { text-align: center; }
+/* The signed-out column is 24rem; a right-aligned multi-link notice wraps
+   into a ragged edge, so centre it there. */
+main.page-login .version, main.page-setup .version { text-align: center; }
 select, textarea {
   width: 100%; padding: 0.55rem 0.7rem; font-size: 1rem;
   border: 1px solid var(--control-border); border-radius: 5px; background: var(--input-bg); color: inherit;
@@ -461,9 +463,19 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
    is where the panel puts machine output everywhere else. Uppercasing it was
    the pill's own emphasis — dropped with the pill, since the colour already
    says how loud the badge is. */
+/* line-height 1 and the padding doing the centring, rather than the 1.5 the
+   badge would inherit from the body. In a tall line box a word of lowercase
+   with no descender — ok, warn, unknown — sits above the optical centre of the
+   space around it, and inside a bordered box that reads as text stuck to the
+   top. With the box hugging the line, the padding is what centres the word, and
+   it is uneven on purpose: the extra tenth at the top pays for the descender
+   space every line box reserves below the baseline and these words rarely use.
+   The one that does use it, queued, keeps the same box — the tail hangs into
+   the bottom padding rather than growing the badge. */
 .st {
-  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px;
-  font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.02em;
+  display: inline-block; padding: 0.28rem 0.45rem 0.2rem; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; line-height: 1;
+  letter-spacing: 0.02em;
   vertical-align: middle; border: 1px solid transparent;
 }
 .st-ok { background: var(--st-ok-bg); color: var(--st-ok-fg); border-color: var(--st-ok-border); }
