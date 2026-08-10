@@ -31,6 +31,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | visual-style | Panel visual style | **agreed** | [plans/visual-style.md](plans/visual-style.md) |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
+| logrotate-mode | `mail.log` stops rotating in some builds | candidate | [plans/logrotate-mode.md](plans/logrotate-mode.md) |
 
 **Recommended order** (not binding): **domain-admin →
 inbound-relay** — role-wide authorisation first, then the inbound relay vertical
