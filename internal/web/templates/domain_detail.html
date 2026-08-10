@@ -51,8 +51,10 @@
   <h2>SPF and DMARC records</h2>
   <p class="muted">These two are not generated the way the DKIM record above is —
   they are policy, and the domain may already publish an SPF record for other
-  senders. What follows is what this server expects to see and what the checks
-  below look for. Publish both as TXT records.</p>
+  senders. SelfPost is a send-only relay — most operators have no inbox on the
+  sending domain, so the suggested DMARC record omits <code>rua=</code> unless a
+  report address is configured below or in <a href="/account">Settings</a>.
+  Publish both as TXT records.</p>
 
   <label>SPF — host / name</label>
   <div class="code-row">
@@ -68,9 +70,23 @@
 
   <p class="muted">A domain may have only one SPF record. If it already has one,
   do not add a second — add this server's mechanism to the existing record
-  instead, before its <code>all</code> term. <code>-all</code> at the end means
-  nothing else may send as the domain; use <code>~all</code> while other senders
-  are still being sorted out.</p>
+  instead, before its <code>all</code> term.</p>
+
+  <form method="post" action="/domains/{{.Domain.ID}}/dmarc">
+    <label for="dmarc_rua_mode">DMARC aggregate reports (rua=)</label>
+    <select id="dmarc_rua_mode" name="dmarc_rua_mode">
+      <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
+      <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
+      <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
+    </select>
+
+    <label for="dmarc_rua_email">Custom report address</label>
+    <input id="dmarc_rua_email" name="dmarc_rua_email" type="email"
+           autocapitalize="none" spellcheck="false" value="{{.DMARCRuaCustom}}"
+           placeholder="reports@your-mail-domain.com">
+
+    <button type="submit">Save DMARC report settings</button>
+  </form>
 
   <label>DMARC — host / name</label>
   <div class="code-row">
@@ -78,17 +94,36 @@
     <button type="button" class="copy">Copy</button>
   </div>
 
-  <label>DMARC — value</label>
+  <label>DMARC — value{{if eq .DMARCSource "settings"}} <span class="muted">(from Settings)</span>{{else if eq .DMARCSource "custom"}} <span class="muted">(custom)</span>{{else if eq .DMARCSource "none"}} <span class="muted">(no reports)</span>{{end}}</label>
   <div class="code-row">
     <span class="code">{{.DMARCExample}}</span>
     <button type="button" class="copy">Copy</button>
   </div>
 
-  <p class="muted">Point <code>rua=</code> at a mailbox that is actually read —
-  the aggregate reports are how you find out who else sends as the domain.
-  <code>p=none</code> changes nothing about delivery, so it is safe to publish
-  straight away; tighten it to <code>p=quarantine</code> and then
-  <code>p=reject</code> once the reports come back clean.</p>
+  {{if .SameDomainRUA}}
+  <p class="error">The report address is on this sending domain. SelfPost does
+  not receive inbound mail — use a mailbox elsewhere or wait for in-panel report
+  reception in a future release.</p>
+  {{end}}
+
+  {{if .NeedsReportAuth}}
+  <label>Report authorization — host / name</label>
+  <div class="code-row">
+    <span class="code">{{.ReportAuthName}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>Report authorization — value</label>
+  <div class="code-row">
+    <span class="code">{{.ReportAuthValue}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+  {{end}}
+
+  <p class="muted"><code>p=none</code> changes nothing about delivery. Omit
+  <code>rua=</code> on a send-only domain, or point it at a mailbox that
+  receives inbound mail. Tighten to <code>p=quarantine</code> and then
+  <code>p=reject</code> once aggregate reports look clean.</p>
 </div>
 
 <div class="card" id="dns-status">
@@ -115,6 +150,13 @@
   <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
   {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
 {{end}}</span>{{end}}
+
+  {{if .DNS.DMARCReportAuth.Status}}
+  <label>Report authorization <span class="st st-{{.DNS.DMARCReportAuth.Status}}">{{.DNS.DMARCReportAuth.Status}}</span></label>
+  <p class="{{if eq .DNS.DMARCReportAuth.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARCReportAuth.Detail}}</p>
+  {{if .DNS.DMARCReportAuth.Records}}<span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
+{{end}}</span>{{end}}
+  {{end}}
 
   <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
     <button type="submit">Re-check</button>

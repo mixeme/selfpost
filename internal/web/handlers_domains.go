@@ -54,6 +54,10 @@ func (s *Server) renderDashboard(w http.ResponseWriter, r *http.Request, status 
 // so a repeat view of the list costs no lookups at all, and it is the same
 // cache the domain page fills — opening a domain after the list is free.
 func (s *Server) domainRows(domains []store.Domain) []domainRow {
+	profileEmail := ""
+	if admin, err := s.store.GetAdmin(); err == nil {
+		profileEmail = admin.DMARCReportEmail
+	}
 	rows := make([]domainRow, len(domains))
 	var wg sync.WaitGroup
 	for i, d := range domains {
@@ -69,7 +73,7 @@ func (s *Server) domainRows(domains []store.Domain) []domainRow {
 				logf("panel: dashboard: domain %d: dkim record: %v", d.ID, err)
 				return
 			}
-			dns, _ := s.domainDNS(d, record, false)
+			dns, _ := s.domainDNS(d, record, profileEmail, false)
 			rows[i].DNS = dns.Overall
 		}()
 	}

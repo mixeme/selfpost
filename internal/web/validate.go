@@ -105,3 +105,47 @@ func validateDomainLabel(label string) error {
 	}
 	return nil
 }
+
+// freemailDomains lists public mail hosts that cannot publish _report._dmarc
+// authorisation for third-party sending domains.
+var freemailDomains = map[string]struct{}{
+	"gmail.com":       {},
+	"googlemail.com":  {},
+	"outlook.com":     {},
+	"hotmail.com":     {},
+	"live.com":        {},
+	"yahoo.com":       {},
+	"icloud.com":      {},
+	"me.com":          {},
+	"proton.me":       {},
+	"protonmail.com":  {},
+}
+
+// validateEmail checks a DMARC rua= mailbox. Empty is allowed (policy-only).
+func validateEmail(addr string) error {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return nil
+	}
+	at := strings.LastIndex(addr, "@")
+	if at <= 0 || at >= len(addr)-1 {
+		return fmt.Errorf("enter a valid email address")
+	}
+	local := addr[:at]
+	domain := normalizeDomain(addr[at+1:])
+	if err := validateDomain(domain); err != nil {
+		return fmt.Errorf("email domain is invalid: %w", err)
+	}
+	for _, r := range local {
+		if r > unicode.MaxASCII {
+			return fmt.Errorf("email address must be ASCII")
+		}
+		if !isASCIILetterOrDigit(r) && r != '.' && r != '-' && r != '_' && r != '+' {
+			return fmt.Errorf("email address contains invalid characters")
+		}
+	}
+	if _, blocked := freemailDomains[domain]; blocked {
+		return fmt.Errorf("use an address on a domain you control; public mail hosts cannot receive authorised DMARC reports")
+	}
+	return nil
+}

@@ -12,9 +12,10 @@ var ErrNoAdmin = errors.New("no administrator account")
 
 // Admin is the single panel administrator (security.md).
 type Admin struct {
-	Username     string
-	PasswordHash string
-	CreatedAt    time.Time
+	Username         string
+	PasswordHash     string
+	DMARCReportEmail string // default rua= for all sending domains; empty = none
+	CreatedAt        time.Time
 }
 
 // AdminExists reports whether the administrator account has been created. This
@@ -47,10 +48,10 @@ func (s *Store) CreateAdmin(username, passwordHash string) error {
 // SASL logins applications authenticate with, which live in their own table.
 // ErrNoAdmin is returned if setup has not happened yet, so a change can never
 // silently create an account.
-func (s *Store) UpdateAdmin(username, passwordHash string) error {
+func (s *Store) UpdateAdmin(username, passwordHash, dmarcReportEmail string) error {
 	res, err := s.db.Exec(
-		"UPDATE admin SET username = ?, password_hash = ? WHERE id = 1",
-		username, passwordHash,
+		"UPDATE admin SET username = ?, password_hash = ?, dmarc_report_email = ? WHERE id = 1",
+		username, passwordHash, dmarcReportEmail,
 	)
 	if err != nil {
 		return fmt.Errorf("update admin: %w", err)
@@ -71,8 +72,8 @@ func (s *Store) GetAdmin() (Admin, error) {
 		a         Admin
 		createdAt string
 	)
-	err := s.db.QueryRow("SELECT username, password_hash, created_at FROM admin WHERE id = 1").
-		Scan(&a.Username, &a.PasswordHash, &createdAt)
+	err := s.db.QueryRow("SELECT username, password_hash, dmarc_report_email, created_at FROM admin WHERE id = 1").
+		Scan(&a.Username, &a.PasswordHash, &a.DMARCReportEmail, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Admin{}, ErrNoAdmin
 	}

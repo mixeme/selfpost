@@ -31,6 +31,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | visual-style | Обновление визуального стиля | candidate | — |
+| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 
 **Recommended order** (not binding): **web-split → domain-admin →
 inbound-relay** — first the package split, then role-wide authorisation, then
@@ -142,3 +143,30 @@ dark schemes remain supported; readability and contrast are preserved.
 regression across pages; low priority relative to functional work — take up
 after explicit agreement, independently of the feature roadmap order.
 **Version:** no bearing on semver.
+
+---
+
+## dmarc-reports
+
+**Goal:** SelfPost receives DMARC aggregate reports (RFC 7489) on SMTP,
+parses the gzip/XML payloads, and shows pass/fail summaries in the panel — so
+the operator does not need an external DMARC service or a separate mailbox
+workflow.
+
+**Boundary:** an extension of v1.0 — not IMAP/webmail and not a general
+inbound relay. A dedicated inbound path for report messages only; forensic
+reports (`ruf=`) out of scope for v1.
+
+**Done when:** see [plans/dmarc-reports.md](plans/dmarc-reports.md).
+
+**Dependencies / risks:** inbound SMTP in the image (may share infrastructure
+with [inbound-relay](plans/inbound-relay.md) but must not require backup-MX);
+storage and retention of parsed summaries; the `admin.dmarc_report_email` and
+`domains.dmarc_rua` settings added in the DMARC template work must stay the
+source of truth for `rua=` in DNS guidance.
+
+**Order:** after the DMARC `rua=` settings ship; may follow or overlap with
+inbound-relay depending on how port 25 acceptance is structured.
+
+**Version:** `1.x` MINOR.
+

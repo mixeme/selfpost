@@ -1,6 +1,7 @@
 package dnscheck
 
 import (
+	"database/sql"
 	"net"
 	"strings"
 )
@@ -15,6 +16,13 @@ import (
 // DMARCRecordName is the name a DMARC record is published at. (SPF has no such
 // helper: it is published at the domain itself.)
 func DMARCRecordName(domainName string) string { return "_dmarc." + domainName }
+
+// ReportAuthRecordName is where a report-receiving domain authorises external
+// DMARC aggregate destinations (RFC 7489 §7.1).
+func ReportAuthRecordName(hubDomain string) string { return "_report._dmarc." + hubDomain }
+
+// ReportAuthExample is the TXT value a hub domain publishes to accept reports.
+func ReportAuthExample() string { return "v=DMARC1;" }
 
 // SPFExample is the SPF record this server expects for a sending domain: the
 // addresses its mail actually leaves from, and "-all" to say that nothing else
@@ -40,10 +48,44 @@ func SPFExample(hostname string, serverIPs []string) string {
 	return "v=spf1 " + strings.Join(mechanisms, " ") + " -all"
 }
 
-// DMARCExample is the least a domain should publish: monitoring only, with an
-// address the aggregate reports go to. p=none is deliberate — it changes
-// nothing about delivery, so it is safe to publish before the reports have
-// shown that DKIM and SPF pass everywhere.
-func DMARCExample(domainName string) string {
-	return "v=DMARC1; p=none; rua=mailto:dmarc@" + domainName
+// ResolveDMARCRua picks the rua= mailbox for a sending domain: per-domain
+// override wins, then the administrator profile, then policy-only (empty).
+func ResolveDMARCRua(domainRua sql.NullString, profileEmail string) string {
+	if domainRua.Valid {
+		return domainRua.String
+	}
+	return profileEmail
+}
+
+// EmailDomain returns the lower-case domain part of addr, or "" when invalid.
+func EmailDomain(addr string) string {
+	addr = strings.TrimSpace(addr)
+	at := strings.LastIndex(addr, "@")
+	if at < 0 || at == len(addr)-1 {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(addr[at+1:]))
+}
+
+// DMARCExample is the DMARC TXT record this server suggests for a sending
+// domain. p=none is deliberate — it changes nothing about delivery. rua= is
+// included only when reportEmail is set; SelfPost is send-only and most
+// operators have no inbox on the sending domain itself.
+func DMARCExample(reportEmail string) string {
+	base := "v=DMARC1; p=none"
+	if reportEmail == "" {
+		return base
+	}
+	return base + "; rua=mailto:" + reportEmail
+}
+
+// ExternalReportAuth reports whether the hub domain must publish a
+// _report._dmarc authorisation for aggregate reports sent to reportEmail from
+// sendingDomain.
+func ExternalReportAuth(sendingDomain, reportEmail string) (name, value string, ok bool) {
+	hub := EmailDomain(reportEmail)
+	if hub == "" || strings.EqualFold(hub, sendingDomain) {
+		return "", "", false
+	}
+	return ReportAuthRecordName(hub), ReportAuthExample(), true
 }

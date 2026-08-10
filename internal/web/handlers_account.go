@@ -1,10 +1,13 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,7 +20,13 @@ import (
 func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		s.renderAccount(w, r, http.StatusOK, "", currentUser(r))
+		admin, err := s.store.GetAdmin()
+		if err != nil {
+			logf("panel: account: get admin failed: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		s.renderAccount(w, r, http.StatusOK, "", admin.Username, admin.DMARCReportEmail)
 	case http.MethodPost:
 		s.submitAccount(w, r)
 	default:
@@ -26,16 +35,28 @@ func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// renderAccount draws the settings form. formUsername repopulates the username
-// field after a rejected submission; the password fields are never repopulated.
-func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername string) {
+// renderAccount draws the settings form. formUsername and formDMARCEmail
+// repopulate fields after a rejected submission; password fields are never
+// repopulated.
+func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string) {
+	var reportAuth dnscheck.Result
+	if hub := dnscheck.EmailDomain(formDMARCEmail); hub != "" {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		reportAuth = s.dns.ReportAuth(ctx, hub)
+		cancel()
+	}
 	s.render(w, status, "account", map[string]any{
-		"Title":        "SelfPost — settings",
-		"User":         currentUser(r),
-		"Active":       "account",
-		"FormUsername": formUsername,
-		"Error":        formErr,
-		"Flash":        accountFlash(r),
+		"Title":              "SelfPost — settings",
+		"User":               currentUser(r),
+		"Active":             "account",
+		"FormUsername":       formUsername,
+		"FormDMARCEmail":     formDMARCEmail,
+		"ReportAuthName":     dnscheck.ReportAuthRecordName(dnscheck.EmailDomain(formDMARCEmail)),
+		"ReportAuthExample":  dnscheck.ReportAuthExample(),
+		"ReportAuthDNS":      reportAuth,
+		"ReportAuthHub":      dnscheck.EmailDomain(formDMARCEmail),
+		"Error":              formErr,
+		"Flash":              accountFlash(r),
 	})
 }
 
@@ -49,6 +70,14 @@ func accountFlash(r *http.Request) string {
 		return "Password changed. Any other signed-in sessions were signed out."
 	case "both":
 		return "Username and password changed. Any other signed-in sessions were signed out."
+	case "email":
+		return "DMARC report address updated."
+	case "username-email":
+		return "Username and DMARC report address updated."
+	case "password-email":
+		return "Password and DMARC report address updated. Any other signed-in sessions were signed out."
+	case "all":
+		return "Settings updated. Any other signed-in sessions were signed out."
 	default:
 		return ""
 	}
@@ -62,11 +91,11 @@ func accountFlash(r *http.Request) string {
 func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 	if !s.loginLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		s.renderAccount(w, r, http.StatusTooManyRequests,
-			"Too many attempts. Please wait and try again.", currentUser(r))
+			"Too many attempts. Please wait and try again.", currentUser(r), "")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.renderAccount(w, r, http.StatusBadRequest, "Invalid form submission.", currentUser(r))
+		s.renderAccount(w, r, http.StatusBadRequest, "Invalid form submission.", currentUser(r), "")
 		return
 	}
 
@@ -74,6 +103,7 @@ func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 	current := r.PostFormValue("current_password")
 	password := r.PostFormValue("new_password")
 	confirm := r.PostFormValue("new_password_confirm")
+	dmarcEmail := strings.TrimSpace(r.PostFormValue("dmarc_report_email"))
 
 	admin, err := s.store.GetAdmin()
 	if err != nil {
@@ -86,34 +116,39 @@ func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(current)); err != nil {
-		s.renderAccount(w, r, http.StatusUnauthorized, "Current password is incorrect.", username)
+		s.renderAccount(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail)
 		return
 	}
 
 	renaming := username != admin.Username
 	if renaming {
 		if err := validateUsername(username); err != nil {
-			s.renderAccount(w, r, http.StatusBadRequest, err.Error(), username)
+			s.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
 			return
 		}
 	}
 
-	// An empty pair of new-password fields means "leave the password alone", so
-	// the username can be changed on its own.
+	if err := validateEmail(dmarcEmail); err != nil {
+		s.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
+		return
+	}
+
+	emailChanging := dmarcEmail != admin.DMARCReportEmail
+
 	repassword := password != "" || confirm != ""
 	if repassword {
 		if password != confirm {
-			s.renderAccount(w, r, http.StatusBadRequest, "New passwords do not match.", username)
+			s.renderAccount(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail)
 			return
 		}
 		if err := validateAdminPassword(password); err != nil {
-			s.renderAccount(w, r, http.StatusBadRequest, err.Error(), username)
+			s.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail)
 			return
 		}
 	}
-	if !renaming && !repassword {
+	if !renaming && !repassword && !emailChanging {
 		s.renderAccount(w, r, http.StatusBadRequest,
-			"Nothing to change: enter a new username, a new password, or both.", username)
+			"Nothing to change: enter a new username, password, or DMARC report address.", username, dmarcEmail)
 		return
 	}
 
@@ -123,25 +158,22 @@ func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logf("panel: account: hashing password failed: %v", err)
 			s.renderAccount(w, r, http.StatusInternalServerError,
-				"Internal error. Please try again.", username)
+				"Internal error. Please try again.", username, dmarcEmail)
 			return
 		}
 		hash = string(newHash)
 	}
 
-	if err := s.store.UpdateAdmin(username, hash); err != nil {
+	if err := s.store.UpdateAdmin(username, hash, dmarcEmail); err != nil {
 		logf("panel: account: update admin failed: %v", err)
 		msg := "Could not save the changes. Please check the logs and try again."
 		if errors.Is(err, store.ErrNoAdmin) {
 			msg = "There is no administrator account to update."
 		}
-		s.renderAccount(w, r, http.StatusInternalServerError, msg, username)
+		s.renderAccount(w, r, http.StatusInternalServerError, msg, username, dmarcEmail)
 		return
 	}
 
-	// Keep this session usable under the new name, and — when the password
-	// changed — drop every other session so a cookie captured under the old
-	// password stops working.
 	if token, ok := s.sessionToken(r); ok {
 		if renaming {
 			s.sessions.Rename(token, username)
@@ -151,18 +183,25 @@ func (s *Server) submitAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logf("panel: administrator account updated (username changed: %t, password changed: %t)", renaming, repassword)
-	http.Redirect(w, r, "/account?updated="+updatedFlag(renaming, repassword), http.StatusSeeOther)
+	logf("panel: administrator account updated (username: %t, password: %t, dmarc email: %t)", renaming, repassword, emailChanging)
+	http.Redirect(w, r, "/account?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
 }
 
-// updatedFlag names what changed, for the fixed post-redirect flash message.
-func updatedFlag(renamed, repassword bool) string {
+func updatedFlag(renamed, repassword, emailChanged bool) string {
 	switch {
+	case renamed && repassword && emailChanged:
+		return "all"
+	case renamed && emailChanged:
+		return "username-email"
+	case repassword && emailChanged:
+		return "password-email"
 	case renamed && repassword:
 		return "both"
 	case renamed:
 		return "username"
-	default:
+	case repassword:
 		return "password"
+	default:
+		return "email"
 	}
 }

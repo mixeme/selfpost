@@ -293,7 +293,7 @@ func TestDMARC(t *testing.T) {
 				txt["_dmarc.example.com"] = c.record
 			}
 			f := &fakeResolver{txt: txt}
-			got := newTestChecker(f).checkDMARC(context.Background(), "example.com")
+			got := newTestChecker(f).checkDMARC(context.Background(), Query{Name: "example.com"})
 			if got.Status != c.want {
 				t.Errorf("status = %q, want %q (%s)", got.Status, c.want, got.Detail)
 			}
@@ -303,7 +303,7 @@ func TestDMARC(t *testing.T) {
 
 func TestDMARCNonePolicyIsExplained(t *testing.T) {
 	f := &fakeResolver{txt: map[string][]string{"_dmarc.example.com": {"v=DMARC1; p=none"}}}
-	got := newTestChecker(f).checkDMARC(context.Background(), "example.com")
+	got := newTestChecker(f).checkDMARC(context.Background(), Query{Name: "example.com"})
 	if !strings.Contains(got.Detail, "monitoring only") {
 		t.Errorf("p=none is not explained: %s", got.Detail)
 	}
@@ -355,5 +355,22 @@ func TestForgetDropsTheCachedDomain(t *testing.T) {
 	c.Domain(q, false)
 	if f.lookups == before {
 		t.Error("Forget did not drop the cached result")
+	}
+}
+
+func TestReportAuth(t *testing.T) {
+	f := &fakeResolver{txt: map[string][]string{"_report._dmarc.hub.example": {"v=DMARC1;"}}}
+	got := newTestChecker(f).checkReportAuth(context.Background(), "hub.example")
+	if got.Status != health.StatusOK {
+		t.Fatalf("status = %q (%s)", got.Status, got.Detail)
+	}
+
+	f = &fakeResolver{}
+	got = newTestChecker(f).checkReportAuth(context.Background(), "hub.example")
+	if got.Status != health.StatusWarn {
+		t.Fatalf("missing = %q, want warn", got.Status)
+	}
+	if !strings.Contains(got.Detail, ReportAuthExample()) {
+		t.Errorf("advice %q should cite %q", got.Detail, ReportAuthExample())
 	}
 }

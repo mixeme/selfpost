@@ -23,10 +23,46 @@
     <label for="new_password_confirm">Confirm new password</label>
     <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
 
+    <h3>DMARC aggregate reports</h3>
+    <p class="muted">Optional default <code>rua=</code> address for every sending
+    domain (can be overridden per domain). Use a mailbox on a domain that
+    receives inbound mail. SelfPost is send-only today; a future release will
+    be able to receive reports in the panel itself.</p>
+
+    <label for="dmarc_report_email">Default report address</label>
+    <input id="dmarc_report_email" name="dmarc_report_email" type="email"
+           autocomplete="email" autocapitalize="none" spellcheck="false"
+           value="{{.FormDMARCEmail}}" placeholder="reports@your-mail-domain.com">
+
+    {{if .FormDMARCEmail}}
+    <p class="muted">When <code>rua=</code> points at another domain, that hub
+    domain must publish a report-authorisation record so receivers will deliver
+    the XML aggregates.</p>
+
+    <label>Report authorization — host / name</label>
+    <div class="code-row">
+      <span class="code">{{.ReportAuthName}}</span>
+      <button type="button" class="copy">Copy</button>
+    </div>
+
+    <label>Report authorization — value</label>
+    <div class="code-row">
+      <span class="code">{{.ReportAuthExample}}</span>
+      <button type="button" class="copy">Copy</button>
+    </div>
+
+    {{if .ReportAuthDNS.Status}}
+    <label>Report authorization DNS <span class="st st-{{.ReportAuthDNS.Status}}">{{.ReportAuthDNS.Status}}</span></label>
+    <p class="{{if eq .ReportAuthDNS.Status "ok"}}muted{{else}}error{{end}}">{{.ReportAuthDNS.Detail}}</p>
+    {{if .ReportAuthDNS.Records}}<span class="code">{{range .ReportAuthDNS.Records}}{{.}}
+{{end}}</span>{{end}}
+    {{end}}
+    {{end}}
+
     <button type="submit">Save changes</button>
   </form>
   <p class="muted">Leave both new-password fields empty to change the username
-  only. Changing the password signs out every other session; this one stays
-  signed in.</p>
+  or DMARC address only. Changing the password signs out every other session;
+  this one stays signed in.</p>
 </div>
 {{end}}

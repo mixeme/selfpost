@@ -24,6 +24,7 @@ type Domain struct {
 	ID           int64
 	Name         string
 	DKIMSelector string
+	DMARCRua     sql.NullString // NULL = inherit profile; Valid+empty = no reports
 	CreatedAt    time.Time
 	AppCount     int
 }
@@ -54,7 +55,7 @@ func (s *Store) AddDomain(name, selector string) (Domain, error) {
 // ordered by name.
 func (s *Store) ListDomains() ([]Domain, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.name, d.dkim_selector, d.created_at,
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
 		ORDER BY d.name`)
@@ -78,7 +79,7 @@ func (s *Store) ListDomains() ([]Domain, error) {
 // ErrDomainNotFound.
 func (s *Store) GetDomain(id int64) (Domain, error) {
 	row := s.db.QueryRow(`
-		SELECT d.id, d.name, d.dkim_selector, d.created_at,
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
 		WHERE d.id = ?`, id)
@@ -120,7 +121,7 @@ func scanDomain(r scanRow) (Domain, error) {
 		d         Domain
 		createdAt string
 	)
-	if err := r.Scan(&d.ID, &d.Name, &d.DKIMSelector, &createdAt, &d.AppCount); err != nil {
+	if err := r.Scan(&d.ID, &d.Name, &d.DKIMSelector, &d.DMARCRua, &createdAt, &d.AppCount); err != nil {
 		return Domain{}, err
 	}
 	d.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
@@ -136,4 +137,22 @@ func isUniqueViolation(err error) bool {
 		return code == sqlite3.SQLITE_CONSTRAINT_UNIQUE || code == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY
 	}
 	return false
+}
+
+// UpdateDomainDMARCRua sets how this domain resolves its DMARC rua= destination.
+// NULL means inherit the administrator profile; Valid with an empty string means
+// policy-only with no aggregate reports for this domain.
+func (s *Store) UpdateDomainDMARCRua(id int64, rua sql.NullString) error {
+	res, err := s.db.Exec("UPDATE domains SET dmarc_rua = ? WHERE id = ?", rua, id)
+	if err != nil {
+		return fmt.Errorf("update domain dmarc rua: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update domain dmarc rua rows: %w", err)
+	}
+	if n == 0 {
+		return ErrDomainNotFound
+	}
+	return nil
 }

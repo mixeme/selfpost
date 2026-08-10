@@ -1,4 +1,4 @@
-// Package web implements the SelfPost control panel's HTTP surface: the
+﻿// Package web implements the SelfPost control panel's HTTP surface: the
 // one-time administrator setup flow (security.md), login/session handling
 // (security.md) and the authenticated shell the later phases build on.
 package web
@@ -24,7 +24,7 @@ var assetsFS embed.FS
 // Config holds the panel's HTTP-facing configuration.
 type Config struct {
 	// Hostname is the server's external hostname, used to build the absolute
-	// setup link shown in the logs (security.md; guide § Environment
+	// setup link shown in the logs (security.md; guide В§ Environment
 	// variables for SELFPOST_HOSTNAME).
 	Hostname string
 	// CookieSecure sets the Secure attribute on the session cookie. It defaults
@@ -33,16 +33,16 @@ type Config struct {
 	CookieSecure bool
 	// SubmissionEnabled mirrors SUBMISSION_ENABLE: whether this deployment also
 	// runs the 587/STARTTLS submission listener next to the primary 465 one
-	// (architecture.md § Mail path). The panel only reports it on the domain
+	// (architecture.md В§ Mail path). The panel only reports it on the domain
 	// page's connection settings; it is a deploy-time flag, not something the
 	// panel can verify.
 	SubmissionEnabled bool
 	// MailLogPath is where Postfix's delivery log lives, read by the mail.log
-	// monitoring view (architecture.md § Panel HTTP surface). It is the same path
+	// monitoring view (architecture.md В§ Panel HTTP surface). It is the same path
 	// the log-tailer role follows in cmd/panel.
 	MailLogPath string
 	// DataDir and DBPath locate the persistent state a full backup archives
-	// (architecture.md § Persistence); Version is stamped into the backup
+	// (architecture.md В§ Persistence); Version is stamped into the backup
 	// manifest. They mirror the panel's own configuration.
 	DataDir string
 	DBPath  string
@@ -53,7 +53,7 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
-	// TLSCertFile is the certificate Postfix serves on 465/587 (guide §
+	// TLSCertFile is the certificate Postfix serves on 465/587 (guide В§
 	// Environment variables), read read-only by the status page to report how
 	// much validity is left.
 	TLSCertFile string
@@ -69,8 +69,8 @@ type Config struct {
 	SessionIdleDays int
 	// DNSResolvers are the recursive resolvers the deliverability checks query
 	// (env SELFPOST_DNS_RESOLVERS). Empty uses dnscheck.DefaultResolvers. The
-	// checks must not go through the system resolver — see dnscheck's
-	// externalResolver — so this is how a closed network points them at its own.
+	// checks must not go through the system resolver вЂ” see dnscheck's
+	// externalResolver вЂ” so this is how a closed network points them at its own.
 	DNSResolvers []string
 }
 
@@ -98,9 +98,9 @@ type Server struct {
 
 // New builds the panel server. setupTokenPath is where the current setup token
 // is mirrored on disk (security.md); domains is the sending-domain service
-// that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
+// that owns DKIM keys and the OpenDKIM tables (architecture.md В§ OpenDKIM);
 // apps owns application SASL accounts and the Postfix sender map
-// (architecture.md § Mail path).
+// (architecture.md В§ Mail path).
 func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	tmpl, err := loadTemplates()
 	if err != nil {
@@ -183,6 +183,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /domains/{id}/delete", s.handleDeleteDomain)
 	authed.HandleFunc("POST /domains/{id}/applications", s.handleAddApplication)
 	authed.HandleFunc("POST /domains/{id}/ratelimit", s.handleDomainRateLimit)
+	authed.HandleFunc("POST /domains/{id}/dmarc", s.handleDomainDMARC)
 	authed.HandleFunc("POST /domains/{id}/export", s.handleExportDomain)
 	authed.HandleFunc("POST /applications/{aid}/mode", s.handleUpdateAppMode)
 	authed.HandleFunc("POST /applications/{aid}/password", s.handleRegenPassword)
@@ -193,13 +194,13 @@ func (s *Server) Handler() http.Handler {
 	// Administrator's own panel credentials.
 	authed.HandleFunc("/account", s.handleAccount)
 
-	// Backup and migration: the page with both actions (architecture.md §
+	// Backup and migration: the page with both actions (architecture.md В§
 	// Persistence-B), and the full-server backup download itself.
 	authed.HandleFunc("GET /backup", s.handleBackupPage)
 	authed.HandleFunc("POST /backup", s.handleBackup)
 
-	// Monitoring screens (architecture.md § Panel HTTP surface): each page and
-	// its HTMX polling fragment (architecture.md § Panel HTTP surface — the /rows
+	// Monitoring screens (architecture.md В§ Panel HTTP surface): each page and
+	// its HTMX polling fragment (architecture.md В§ Panel HTTP surface вЂ” the /rows
 	// and /body endpoints return HTML, not JSON).
 	authed.HandleFunc("GET /deliveries", s.handleDeliveries)
 	authed.HandleFunc("GET /deliveries/rows", s.handleDeliveriesRows)
@@ -234,7 +235,7 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 // clientIP extracts the peer IP for rate-limiting. By default it is the
 // transport peer (RemoteAddr), which cannot be spoofed. If RemoteAddr matches
-// one of trustedProxies, the last entry of X-Forwarded-For is used instead —
+// one of trustedProxies, the last entry of X-Forwarded-For is used instead вЂ”
 // that is the address the trusted proxy itself appended, so a client can't
 // forge it by sending its own XFF header. With no trusted
 // proxies configured, behind a reverse proxy this is the proxy's own address,
@@ -272,3 +273,4 @@ func ipInAny(ip net.IP, nets []*net.IPNet) bool {
 func logf(format string, args ...any) {
 	log.Printf(format, args...)
 }
+

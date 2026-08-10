@@ -102,7 +102,35 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with. Cached by the checker, so re-rendering the page
 	// after a form post costs nothing.
-	dns, srv := s.domainDNS(d, record, false)
+	admin, err := s.store.GetAdmin()
+	if err != nil {
+		logf("panel: domain %d: get admin: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	profileEmail := admin.DMARCReportEmail
+	reportEmail := dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail)
+	dns, srv := s.domainDNS(d, record, profileEmail, false)
+	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
+	dmarcMode := "inherit"
+	dmarcCustom := ""
+	if d.DMARCRua.Valid {
+		if d.DMARCRua.String == "" {
+			dmarcMode = "none"
+		} else {
+			dmarcMode = "custom"
+			dmarcCustom = d.DMARCRua.String
+		}
+	}
+	dmarcSource := "policy"
+	switch {
+	case dmarcMode == "custom":
+		dmarcSource = "custom"
+	case dmarcMode == "none":
+		dmarcSource = "none"
+	case profileEmail != "":
+		dmarcSource = "settings"
+	}
 
 	s.render(w, status, "domain_detail", map[string]any{
 		"Title":  "SelfPost — " + d.Name,
@@ -118,7 +146,16 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		// page and the checks below it never recommend different records.
 		"SPFExample":   dnscheck.SPFExample(s.cfg.Hostname, srv.IPs),
 		"DMARCName":    dnscheck.DMARCRecordName(d.Name),
-		"DMARCExample": dnscheck.DMARCExample(d.Name),
+		"DMARCExample":      dnscheck.DMARCExample(reportEmail),
+		"DMARCSource":       dmarcSource,
+		"ProfileDMARCEmail": profileEmail,
+		"ResolvedDMARCEmail": reportEmail,
+		"DMARCRuaMode":      dmarcMode,
+		"DMARCRuaCustom":    dmarcCustom,
+		"ReportAuthName":    reportAuthName,
+		"ReportAuthValue":   reportAuthValue,
+		"NeedsReportAuth":   needsReportAuth,
+		"SameDomainRUA":     reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name),
 		// Client connection settings (the same for every domain on this
 		// instance): the hostname clients connect to, and whether the optional
 		// submission listener is enabled in this deployment.
@@ -149,14 +186,15 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 // and no extra environment variable is needed. That server result is returned
 // alongside, because the page's suggested SPF record is built from the same
 // addresses. force bypasses the cache, for the Re-check button.
-func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, force bool) (dnscheck.Domain, dnscheck.Server) {
+func (s *Server) domainDNS(d store.Domain, record domain.DKIMRecord, profileEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
 	srv := s.dns.Server(s.cfg.Hostname, false)
 	return s.dns.Domain(dnscheck.Query{
-		Name:         d.Name,
-		Selector:     d.DKIMSelector,
-		ExpectedDKIM: record.Value,
-		Hostname:     srv.Hostname,
-		ServerIPs:    srv.IPs,
+		Name:             d.Name,
+		Selector:         d.DKIMSelector,
+		ExpectedDKIM:     record.Value,
+		Hostname:         srv.Hostname,
+		ServerIPs:        srv.IPs,
+		DMARCReportEmail: dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail),
 	}, force), srv
 }
 
@@ -173,7 +211,13 @@ func (s *Server) handleDomainDNSRecheck(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.domainDNS(d, record, true)
+	admin, err := s.store.GetAdmin()
+	if err != nil {
+		logf("panel: domain %d: get admin: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	s.domainDNS(d, record, admin.DMARCReportEmail, true)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
@@ -205,6 +249,8 @@ func detailFlash(r *http.Request) string {
 		return "Application address mode updated."
 	case r.URL.Query().Get("ratelimit") != "":
 		return "Rate limit updated."
+	case r.URL.Query().Get("dmarc") != "":
+		return "DMARC report settings updated."
 	case r.URL.Query().Get("imported") != "":
 		return "Domain imported. Its DKIM DNS record is unchanged — no DNS update is needed."
 	case r.URL.Query().Get("rechecked") != "":
