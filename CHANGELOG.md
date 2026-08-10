@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-10
+
+The first MINOR after 1.0.0: send-only DMARC guidance in the panel, AGPL
+packaging on every page, and an internal split of `internal/web` ahead of
+domain-admin work. Upgrading runs one SQLite migration (empty defaults;
+existing DNS guidance is unchanged until you set a report address).
+
 ### Changed
 
 - `internal/web` split into subpackages (`web/view`, `web/auth`, `web/validate`,
@@ -40,12 +47,6 @@ database, or the on-disk layout. Upgrading is a tag bump.
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - `SECURITY.md` — how to report a vulnerability privately (GitHub private
   vulnerability reporting, `public@mixeme.ru` as fallback), which releases get
   fixes, and what is in and out of scope for a relay. No response time is
@@ -112,12 +113,6 @@ database, or the on-disk layout. Upgrading is a tag bump.
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - A **Delivery log** on each delivery's page (`/deliveries/{id}`): the
   `mail.log` lines Postfix wrote about that message, oldest first — the
   connection to the receiving server, its reply, and the status that reply was
@@ -239,12 +234,6 @@ database, or the on-disk layout. Upgrading is a tag bump.
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - A page per delivery (`/deliveries/{id}`), reached from the *Details* link on
   every send-log row. It carries what the log itself no longer shows — the
   sending domain, the application the message was submitted under, the Postfix
@@ -460,12 +449,6 @@ database, or the on-disk layout. Upgrading is a tag bump.
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - Optional password encryption for the two secret-bearing downloads (plan
   phase 1.5, `docs/code-review.md`): an *Encrypt with a password* checkbox on
   the full-backup and domain-export forms writes a `.spbk` / `.spde` envelope
@@ -567,12 +550,6 @@ database, or the on-disk layout. Upgrading is a tag bump.
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - The project's mark is now in use rather than only on file. The README opens
   with the full stamp; the panel carries the compact one at the left of its
   navigation bar, linking to the status page, and the full one above the card
@@ -805,12 +782,6 @@ of `docs/implementation-plan.md`).
 
 ### Added
 
-- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
-  is now `p=none` without `rua=` by default; *Settings* and each domain page
-  let you configure an optional aggregate-report address (profile default plus
-  per-domain inherit / none / custom). When `rua=` targets another domain, the
-  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
-  Domain export/import carries per-domain overrides.
 - Panel (Go, single static binary) with SQLite persistence, one-time
   crypto-random setup link, bcrypt admin auth, session cookies.
 - Domain management with per-domain DKIM (RSA-2048, generated in pure Go) and

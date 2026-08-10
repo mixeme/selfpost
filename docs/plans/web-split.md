@@ -1,6 +1,6 @@
 # Plan: web-split (splitting `internal/web`)
 
-**Status:** done (see [CHANGELOG](../CHANGELOG.md) `[Unreleased]`)  
+**Status:** done (see [CHANGELOG](../CHANGELOG.md) `[1.1.0]`)  
 **Version:** `1.x`; an internal refactor, it does not force a break on its own.
 
 ---
