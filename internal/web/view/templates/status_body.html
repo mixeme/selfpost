@@ -72,25 +72,27 @@
     </table>
   </div>
 
-  <div class="card" id="queue">
-    <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
-    {{if .QueueError}}
-    <p class="error">{{.QueueError}}</p>
-    {{else}}
-    <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}</p>
-    <a class="btn" href="/mail-queue">Full queue</a>
-    {{end}}
-  </div>
+  <div class="split">
+    <div class="card" id="queue">
+      <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
+      {{if .QueueError}}
+      <p class="error">{{.QueueError}}</p>
+      {{else}}
+      <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}</p>
+      <a class="btn" href="/mail-queue">Full queue</a>
+      {{end}}
+    </div>
 
-  <div class="card" id="certificate">
-    <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
-    <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
-    It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
-    {{if not .Cert.NotAfter.IsZero}}
-    <label>Expires</label>
-    <span class="code">{{.Cert.NotAfter.UTC.Format "2006-01-02 15:04 UTC"}}</span>
-    {{end}}
-    <p class="{{if eq .Cert.Status "ok"}}muted{{else}}error{{end}}">{{.Cert.Detail}}</p>
+    <div class="card" id="certificate">
+      <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
+      <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
+      It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
+      {{if not .Cert.NotAfter.IsZero}}
+      <label>Expires</label>
+      <span class="code">{{.Cert.NotAfter.UTC.Format "2006-01-02 15:04 UTC"}}</span>
+      {{end}}
+      <p class="{{if eq .Cert.Status "ok"}}muted{{else}}error{{end}}">{{.Cert.Detail}}</p>
+    </div>
   </div>
 
   <div class="card" id="sockets">

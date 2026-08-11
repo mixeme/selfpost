@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: **Status** places Mail queue and TLS certificate side by side (the
+  same `.split` / wide layout as Settings and a delivery), so the shorter
+  checks take less vertical space; Processes, Machine, sockets, hostname, and
+  Configuration stay full width.
+
 ### Fixed
 
 - panel: on the user create/edit form, **Assigned domains** checkboxes stacked

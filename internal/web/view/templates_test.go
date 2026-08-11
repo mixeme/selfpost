@@ -263,7 +263,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	wide := map[string]bool{"account": true, "deliveries": true, "delivery": true, "mail_queue": true, "system_log": true}
+	wide := map[string]bool{"account": true, "deliveries": true, "delivery": true, "mail_queue": true, "status": true, "system_log": true}
 	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
@@ -379,6 +379,9 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
 		"203.0.113.10 → no PTR record", `action="/reload"`,
 		`hx-get="/status/fragment"`, `class="st st-error"`,
+		// Queue and certificate sit abreast inside the polled fragment; their
+		// ids stay on the cards so the section index and scroll highlights hold.
+		`class="split"`, `id="queue"`, `id="certificate"`, `id="sockets"`,
 		// The machine card: the bars carry their reading in an attribute
 		// (the CSP rules out sizing them with a style), and the figures are
 		// printed beside them for anything that does not render a meter.
