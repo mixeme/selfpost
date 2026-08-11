@@ -75,13 +75,13 @@
     {{if eq .Active "mail_queue"}}<span aria-current="page">{{template "icon-mail-queue"}}Mail queue</span>{{else}}<a href="/mail-queue">{{template "icon-mail-queue"}}Mail queue</a>{{end}}
     {{if eq .Active "system_log"}}<span aria-current="page">{{template "icon-system-log"}}System log</span>{{else}}<a href="/system-log">{{template "icon-system-log"}}System log</a>{{end}}
     {{if eq .Active "backup"}}<span aria-current="page">{{template "icon-backup"}}Backup</span>{{else}}<a href="/backup">{{template "icon-backup"}}Backup</a>{{end}}
-    {{if eq .Active "users"}}<span aria-current="page">{{template "icon-account"}}Users</span>{{else}}<a href="/users">{{template "icon-account"}}Users</a>{{end}}
+    {{if eq .Active "users"}}<span aria-current="page">{{template "icon-users"}}Users</span>{{else}}<a href="/users">{{template "icon-users"}}Users</a>{{end}}
     {{end}}
   </div>
   {{template "sections" .}}
   <div class="session">
-    <span class="muted">User: {{.User}}</span>
-    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-account"}}Settings</span>{{else}}<a href="/account">{{template "icon-account"}}Settings</a>{{end}}
+    <span class="session-user muted">{{template "icon-account"}}User: {{.User}}</span>
+    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-settings"}}Settings</span>{{else}}<a href="/account">{{template "icon-settings"}}Settings</a>{{end}}
     <form class="inline" method="post" action="/logout">
       <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
     </form>
@@ -122,6 +122,10 @@
      two drawers with handles is the picture of an archive. */}}
 {{define "icon-backup"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.75" y="1.75" width="10.5" height="12.5" rx="1.15"/><path d="M2.75 8h10.5"/><path d="M6.4 4.85h3.2M6.4 11.15h3.2"/></svg>{{end}}
 {{define "icon-account"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.4" r="2.75"/><path d="M2.9 14.25a5.1 5.1 0 0 1 10.2 0"/></svg>{{end}}
+{{/* Two silhouettes, the nearer one drawn last so it reads in front — the
+     picture of a group rather than a single account. */}}
+{{define "icon-users"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="5" r="2.15"/><path d="M7.35 13.85a4.2 4.2 0 0 1 6.8 0"/><circle cx="5.25" cy="5.35" r="2.5"/><path d="M1.35 14.25a4.9 4.9 0 0 1 7.8 0"/></svg>{{end}}
+{{define "icon-settings"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2"/><path d="M8 1.75v1.65M8 12.6v1.65M1.75 8h1.65M12.6 8h1.65M3.52 3.52l1.17 1.17M11.31 11.31l1.17 1.17M3.52 12.48l1.17-1.17M11.31 4.69l1.17-1.17"/></svg>{{end}}
 {{/* Sign out is the one icon here that marks an action rather than a page: an
      open door with the arrow leading out of it. */}}
 {{define "icon-sign-out"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.1 14.25H3.65a1.15 1.15 0 0 1-1.15-1.15V2.9a1.15 1.15 0 0 1 1.15-1.15H6.1"/><path d="M10.6 11.15 13.75 8 10.6 4.85"/><path d="M13.75 8H6.35"/></svg>{{end}}

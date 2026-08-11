@@ -17,6 +17,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- panel: navigation session icons are distinct — **Settings** uses a gear,
+  the signed-in user line carries the single-user icon, and **Users** a
+  two-person group mark instead of the same account silhouette for all three.
 - panel: `/` redirects domain administrators to `/domains`; global users still
   land on `/status`. Navigation hides global-only sections for domain
   administrators.

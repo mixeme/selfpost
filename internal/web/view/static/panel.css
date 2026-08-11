@@ -356,6 +356,9 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
    of them. It may be long and there is nothing to break it on, so it is allowed
    to break mid word rather than widen the column. */
 .nav .session .muted { padding: 0 0.6rem; font-size: 0.85rem; overflow-wrap: anywhere; }
+.nav .session-user {
+  display: flex; align-items: center; gap: 0.5rem;
+}
 /* The mark is a link, but not one of the column's entries: it takes none of the
    padding and rounding the entry rule below applies, so its own edge lines up
    with the entries' icons rather than sitting half a step inside them. */
