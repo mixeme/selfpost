@@ -88,20 +88,20 @@ COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 
 # Licence text shipped with the image (AGPL-3.0 conveyance). The panel also
 # serves the same text at /license from an embedded copy.
-COPY LICENSE NOTICE /usr/share/doc/selfpost/
+COPY --chmod=0644 LICENSE NOTICE /usr/share/doc/selfpost/
 
-COPY build/opendkim.conf /etc/opendkim.conf
-COPY build/logrotate-mail.conf /etc/logrotate.d/mail
-COPY build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
-COPY build/postfix-config.sh /usr/local/bin/postfix-config.sh
-COPY build/postfix-cert-reload.sh /usr/local/bin/postfix-cert-reload.sh
-COPY build/logrotate-loop.sh /usr/local/bin/logrotate-loop.sh
-COPY build/crashexit.py /usr/local/bin/crashexit.py
-COPY build/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY build/supervisord.conf /etc/supervisor/supervisord.conf
-RUN chmod +x /usr/local/bin/postfix-wrapper.sh /usr/local/bin/postfix-config.sh \
-      /usr/local/bin/postfix-cert-reload.sh /usr/local/bin/logrotate-loop.sh \
-      /usr/local/bin/crashexit.py /usr/local/bin/entrypoint.sh
+# File modes are pinned here so a build context copied from a checkout without
+# POSIX permissions (e.g. Windows tar sync) cannot land group-writable config
+# that logrotate would silently ignore — see docs/plans/logrotate-mode.md.
+COPY --chmod=0644 build/opendkim.conf /etc/opendkim.conf
+COPY --chmod=0644 build/logrotate-mail.conf /etc/logrotate.d/mail
+COPY --chmod=0755 build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
+COPY --chmod=0755 build/postfix-config.sh /usr/local/bin/postfix-config.sh
+COPY --chmod=0755 build/postfix-cert-reload.sh /usr/local/bin/postfix-cert-reload.sh
+COPY --chmod=0755 build/logrotate-loop.sh /usr/local/bin/logrotate-loop.sh
+COPY --chmod=0755 build/crashexit.py /usr/local/bin/crashexit.py
+COPY --chmod=0755 build/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chmod=0644 build/supervisord.conf /etc/supervisor/supervisord.conf
 
 # Published submission ports: 465 (smtps, primary) and 587 (submission, optional)
 # plus the panel on 8080. Outbound delivery dials remote MXs on 25 as a client,

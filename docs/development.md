@@ -162,8 +162,10 @@ docker build -f build/Dockerfile -t selfpost:dev --build-arg VERSION=dev .
 ```
 
 The Dockerfile has a build stage (`go vet`, `go build` with `VERSION`) and a
-runtime stage (Debian + mail stack). See [architecture.md](architecture.md) §
-Image and processes.
+runtime stage (Debian + mail stack). Runtime config and scripts use `COPY
+--chmod` so file modes in the image do not depend on how the build context was
+synced (e.g. a Windows checkout widening permissions on `logrotate-mail.conf`).
+See [architecture.md](architecture.md) § Image and processes.
 
 ---
 

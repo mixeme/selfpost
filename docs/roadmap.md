@@ -29,7 +29,6 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
-| logrotate-mode | `mail.log` stops rotating in some builds | candidate | [plans/logrotate-mode.md](plans/logrotate-mode.md) |
 | panel-docs | In-panel operator documentation | candidate | — |
 
 **Recommended order** (not binding): **inbound-relay** first among agreed

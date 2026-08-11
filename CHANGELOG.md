@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- image: `mail.log` rotation no longer silently stops when the build context
+  ships `logrotate-mail.conf` with group/other write bits (common after a
+  Windows checkout sync). Runtime `COPY --chmod` pins config and script modes
+  in the Dockerfile; `logrotate-loop.sh` refuses a config logrotate would
+  ignore. E2e checks mode `644`, forced rotation, and a group-writable context
+  build.
+
 ## [1.2.2] - 2026-08-12
 
 Status page layout after 1.2.1: paired cards in a wide column, denser machine

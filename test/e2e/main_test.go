@@ -105,6 +105,12 @@ func TestE2E(t *testing.T) {
 		if err := checkSupervisorProcesses(h); err != nil {
 			t.Fatal(err)
 		}
+		if err := checkLogrotateConfigMode(h); err != nil {
+			t.Fatal(err)
+		}
+		if err := checkLogrotateRotation(h); err != nil {
+			t.Fatal(err)
+		}
 		if err := waitForPanelReady(); err != nil {
 			t.Fatal(err)
 		}
