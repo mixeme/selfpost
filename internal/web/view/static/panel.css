@@ -174,10 +174,28 @@ h1 { font-size: 1.5rem; font-weight: 300; letter-spacing: -0.01em; margin-top: 0
    is what centres the signed-out block on the page when there is no nav. */
 main:has(> .card.narrow) > * { max-width: 24rem; }
 label { display: block; font-weight: 600; margin: 0.9rem 0 0.3rem; }
+/* Checkbox rows (domain assignment, encrypt toggle) opt out of the block
+   label and full-width input rules above: the box and its caption sit on one
+   line. Without this the caption drops under a stretched checkbox. */
+label.check {
+  display: flex; align-items: center; gap: 0.5rem; margin: 0.45rem 0 0; font-weight: 600;
+  cursor: pointer;
+}
+label.check input { width: auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
 input {
   width: 100%; padding: 0.55rem 0.7rem; font-family: inherit; font-size: 1rem;
   border: 1px solid var(--control-border); border-radius: 5px; background: var(--input-bg); color: inherit;
 }
+/* Domain assignment on the user form: a bordered group under Role, not another
+   stacked field label. Legend replaces the usual label; the muted line is the
+   hint that used to sit where a field caption would. */
+fieldset {
+  margin: 0.9rem 0 0; padding: 0.55rem 0.85rem 0.85rem;
+  border: 1px solid var(--control-border); border-radius: 5px;
+}
+fieldset legend { padding: 0 0.25rem; font-weight: 600; }
+fieldset > .muted { margin: 0.15rem 0 0.35rem; font-size: 0.85rem; font-weight: 400; }
+fieldset > label.check:first-of-type { margin-top: 0.15rem; }
 /* One vocabulary for actions. Anything that performs an action looks like a
    button: a <button>, or an <a> carrying .btn/.danger where the action is a
    plain navigation (the delete confirmation page, the full queue view).
@@ -645,19 +663,15 @@ button.copy { flex: none; margin-top: 0.3rem; }
 }
 
 /* The optional "encrypt this download" block on the backup and export forms.
-   Its label is the one checkbox in the panel, so it opts out of the
-   block-level label rule above and sits on one line with its box; the fields it
-   reveals are indented under it to read as its consequence rather than as three
-   more fields of the form. panel.js hides the inner block until the box is
-   ticked (and empties it when unticked); without JavaScript everything stays
-   visible, which the server handles identically. The import form reuses the
-   same indented .encrypt-fields look for its password field, but reveals it
-   by file extension instead of a checkbox (see panel.js). */
+   The checkbox uses the shared label.check rule above; the fields it reveals
+   are indented under it to read as its consequence rather than as three more
+   fields of the form. panel.js hides the inner block until the box is ticked
+   (and empties it when unticked); without JavaScript everything stays visible,
+   which the server handles identically. The import form reuses the same
+   indented .encrypt-fields look for its password field, but reveals it by
+   file extension instead of a checkbox (see panel.js). */
 .encrypt { margin-top: 1.2rem; }
-.encrypt label.check {
-  display: flex; align-items: center; gap: 0.5rem; margin: 0; font-weight: 600;
-}
-.encrypt label.check input { width: auto; margin: 0; }
+.encrypt label.check { margin: 0; }
 .encrypt-fields {
   margin-top: 1.2rem; margin-left: 1.6rem; padding-left: 0.9rem;
   border-left: 2px solid var(--border);

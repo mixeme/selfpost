@@ -25,7 +25,7 @@
       <legend>Assigned domains</legend>
       <p class="muted">Required for domain administrators.</p>
       {{range .Domains}}
-      <label class="checkbox">
+      <label class="check">
         <input type="checkbox" name="domain_ids" value="{{.ID}}" {{if index $.FormDomains .ID}}checked{{end}}>
         {{.Name}}
       </label>

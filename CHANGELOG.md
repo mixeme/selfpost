@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- panel: on the user create/edit form, **Assigned domains** checkboxes stacked
+  the box above the domain name (and stretched it full-width) because the form's
+  block-label and full-width input rules applied to them. Checkbox rows now use
+  the shared `label.check` layout; the fieldset has matching spacing.
+
 ## [1.2.1] - 2026-08-11
 
 Panel refinements after 1.2.0: navigation icons, status-badge centreing,
