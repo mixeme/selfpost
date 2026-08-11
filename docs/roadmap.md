@@ -30,6 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | logrotate-mode | `mail.log` stops rotating in some builds | candidate | [plans/logrotate-mode.md](plans/logrotate-mode.md) |
+| narrow-page-alignment | Settings and the user form: heading and card do not share an edge | candidate | [plans/narrow-page-alignment.md](plans/narrow-page-alignment.md) |
 
 **Recommended order** (not binding): **inbound-relay** first among agreed
 items — it is the largest remaining 1.x+ extension. Candidates need explicit
