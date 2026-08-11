@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- panel: the **Settings** navigation icon was a sun-with-rays (circle plus
+  spokes), not a gear. It now uses a toothed cog so it matches the other
+  session icons and the 1.2.0 release note.
 - panel: the user create/edit form placed «Back to users» at the bottom of the
   card instead of under the heading like the delivery, domain, and domain-delete
   pages. A shared `back_link` template now renders every drill-down up-link, and
