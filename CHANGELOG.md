@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- panel: status badge text sat low in the box (and below the heading or label
+  beside it). IBM Plex Mono sits low in its em square; the previous top-heavy
+  padding made that worse. Bottom padding is now heavier so the word centres
+  optically.
 - panel: the **Users** navigation icon was two full silhouettes with staggered
   baselines, so the pair looked lopsided at 16 px. The rear person is now a
   right-side crescent (head + shoulder) behind a full front silhouette aligned

@@ -485,16 +485,14 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
    the pill's own emphasis — dropped with the pill, since the colour already
    says how loud the badge is. */
 /* line-height 1 and the padding doing the centring, rather than the 1.5 the
-   badge would inherit from the body. In a tall line box a word of lowercase
-   with no descender — ok, warn, unknown — sits above the optical centre of the
-   space around it, and inside a bordered box that reads as text stuck to the
-   top. With the box hugging the line, the padding is what centres the word, and
-   it is uneven on purpose: the extra tenth at the top pays for the descender
-   space every line box reserves below the baseline and these words rarely use.
-   The one that does use it, queued, keeps the same box — the tail hangs into
-   the bottom padding rather than growing the badge. */
+   badge would inherit from the body. IBM Plex Mono sits a shade low in its em
+   square, so equal padding leaves "ok" / "warn" sunk in the box (and visibly
+   below the heading or label it sits next to). The bottom padding is therefore
+   heavier than the top — enough to lift the word to the optical centre. A
+   top-heavy pad was tried earlier and made the sink worse. Words with a
+   descender (queued) hang into that bottom pad rather than growing the badge. */
 .st {
-  display: inline-block; padding: 0.28rem 0.45rem 0.2rem; border-radius: 4px;
+  display: inline-block; padding: 0.14rem 0.45rem 0.28rem; border-radius: 4px;
   font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; line-height: 1;
   letter-spacing: 0.02em;
   vertical-align: middle; border: 1px solid transparent;
