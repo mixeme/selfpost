@@ -15,6 +15,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   administrator into a global user; sessions and full backup restore carry users
   and domain bindings.
 
+### Fixed
+
+- panel: on signed-in pages with a narrow card (**Settings**, the user form)
+  the heading, flash, card and footer now share one left edge. `.card.narrow`
+  had overridden only `max-width` while `main > *` still centred siblings on
+  the 48rem measure, so the card floated 12rem to the right of the title.
+  `main:has(> .card.narrow) > *` keeps the stack on 24rem without narrowing
+  the column, so the navigation stays put; login/setup are unchanged.
+
 ### Changed
 
 - panel: navigation session icons are distinct — **Settings** uses a gear,
@@ -27,11 +36,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and warm paper in place of the blue-on-cool-grey defaults, IBM Plex Sans and
   IBM Plex Mono served by the panel itself, squarer corners, and column
   headings, status badges and small labels set in the mono face. Light and dark
-  schemes both keep their contrast; no page, control or workflow changed. A page
-  whose only card is the narrow one now takes its heading and footer down to the
-  card's width instead of splitting them across the wider measure, and the send
-  log stops breaking `Details` and `deferred` across two lines when a row is
-  tight.
+  schemes both keep their contrast; no page, control or workflow changed. The
+  send log stops breaking `Details` and `deferred` across two lines when a row
+  is tight.
 - panel: the send log's **status is a badge**, in the same ok/warn/error/unknown
   colours the status page and the DNS checks use, instead of the one place in
   the panel where a status was bare text. The mapping is the one the delivery
@@ -42,9 +49,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   so the Content-Security-Policy is unchanged (`default-src 'self'`).
 - docs: [roadmap.md](docs/roadmap.md) and [product.md](docs/product.md) no
   longer list domain-admin or visual-style as open work — both ship in this line.
-  Completed plan files (`domain-admin`, `visual-style`, `web-split`) are
-  removed; history stays in git and the entries above. Inbound relay is the
-  main agreed 1.x+ item left on the roadmap.
+  Completed plan files (`domain-admin`, `visual-style`, `web-split`,
+  `narrow-page-alignment`) are removed; history stays in git and the entries
+  above. Inbound relay is the main agreed 1.x+ item left on the roadmap.
 
 ## [1.1.0] - 2026-08-10
 

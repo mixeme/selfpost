@@ -161,6 +161,18 @@ h1 { font-size: 1.5rem; font-weight: 300; letter-spacing: -0.01em; margin-top: 0
   padding: 1.5rem; margin: 0 auto;
 }
 .card.narrow { max-width: 24rem; }
+/* A narrow card as a direct child of main means the page is a short form:
+   every sibling in the column (heading, flash, footer) must share that 24rem
+   measure, or they centre on 48rem while the card centres on 24rem and the
+   left edges drift by half the difference (12rem / 192px at a 16px root —
+   measured). The column itself stays 64rem so the navigation does not move;
+   only the stack inside the column narrows. :has tracks the card rather than
+   a per-page class, so a new signed-in page that adds .card.narrow inherits
+   the alignment without a second stylesheet rule.
+   login/setup already shrink main to 24rem (below); this rule is then a no-op
+   relative to the parent. Do not replace that with :has alone: narrowing main
+   is what centres the signed-out block on the page when there is no nav. */
+main:has(> .card.narrow) > * { max-width: 24rem; }
 label { display: block; font-weight: 600; margin: 0.9rem 0 0.3rem; }
 input {
   width: 100%; padding: 0.55rem 0.7rem; font-family: inherit; font-size: 1rem;
@@ -200,12 +212,10 @@ form.inline { display: inline; margin: 0; }
    left, three alignments on a page with four elements. Narrowing the column to
    the card's own width makes the three line up and puts the block as a whole in
    the middle of the page.
-   By page name and not by "the page holds a narrow card", which is what this
-   briefly was. Settings and the user form hold one too, and narrowing their
-   column moves the navigation sideways with it — the shell centres the column
-   and the page as a pair, so 296px of it, measured. Their heading and card are
-   still not aligned with each other; that is worth fixing on its own terms and
-   not by making every page's chrome move. */
+   By page name and not by "the page holds a narrow card": signed-in pages that
+   hold a narrow card keep the 64rem column (see main:has(> .card.narrow)
+   above) so the navigation stays put; only these two pages have no nav and
+   need the column itself narrowed. */
 main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1.2rem; }
