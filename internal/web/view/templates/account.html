@@ -1,14 +1,21 @@
+{{/* Wide enough for credentials and DMARC settings side by side (see .split
+     in panel.css, as on a delivery's page). */}}
+{{define "wide"}}wide{{end}}
+
 {{define "content"}}
 <h1>Settings</h1>
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 
-<div class="card narrow">
-  <h2>Panel credentials</h2>
-  <p class="muted">These are the credentials for this control panel only.
-  Applications keep their own logins and passwords, which are not affected.</p>
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <form method="post" action="/account">
+{{if .ShowDMARC}}
+<form method="post" action="/account">
+<div class="split">
+  <div class="card">
+    <h2>Panel credentials</h2>
+    <p class="muted">These are the credentials for this control panel only.
+    Applications keep their own logins and passwords, which are not affected.</p>
+
     <label for="username">Username</label>
     <input id="username" name="username" autocomplete="username"
            autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
@@ -22,9 +29,10 @@
 
     <label for="new_password_confirm">Confirm new password</label>
     <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
+  </div>
 
-    {{if .ShowDMARC}}
-    <h3>DMARC aggregate reports</h3>
+  <div class="card">
+    <h2>DMARC aggregate reports</h2>
     <p class="muted">Optional default <code>rua=</code> address for every sending
     domain (can be overridden per domain). Use a mailbox on a domain that
     receives inbound mail. SelfPost is send-only today; a future release will
@@ -59,12 +67,39 @@
 {{end}}</span>{{end}}
     {{end}}
     {{end}}
-    {{end}}
+  </div>
+</div>
+
+<button type="submit">Save changes</button>
+<p class="muted">Leave both new-password fields empty to change the username
+or DMARC address only. Changing the password signs out every other session;
+this one stays signed in.</p>
+</form>
+{{else}}
+<div class="card narrow">
+  <h2>Panel credentials</h2>
+  <p class="muted">These are the credentials for this control panel only.
+  Applications keep their own logins and passwords, which are not affected.</p>
+  <form method="post" action="/account">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username"
+           autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
+
+    <label for="current_password">Current password</label>
+    <input id="current_password" name="current_password" type="password"
+           autocomplete="current-password" required>
+
+    <label for="new_password">New password</label>
+    <input id="new_password" name="new_password" type="password" autocomplete="new-password">
+
+    <label for="new_password_confirm">Confirm new password</label>
+    <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
 
     <button type="submit">Save changes</button>
   </form>
   <p class="muted">Leave both new-password fields empty to change the username
-  {{if .ShowDMARC}}or DMARC address {{end}}only. Changing the password signs out every other session;
+  only. Changing the password signs out every other session;
   this one stays signed in.</p>
 </div>
+{{end}}
 {{end}}

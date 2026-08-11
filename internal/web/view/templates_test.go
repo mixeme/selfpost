@@ -263,7 +263,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	wide := map[string]bool{"deliveries": true, "delivery": true, "mail_queue": true, "system_log": true}
+	wide := map[string]bool{"account": true, "deliveries": true, "delivery": true, "mail_queue": true, "system_log": true}
 	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {

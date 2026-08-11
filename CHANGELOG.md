@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: **Settings** shows panel credentials and DMARC aggregate reports side
+  by side for global administrators (the same `.split` layout as a delivery's
+  message and history). Domain-scoped users keep the single narrow card.
+
 ## [1.2.0] - 2026-08-11
 
 The second MINOR after 1.0.0: domain administrators with per-domain scope, a
