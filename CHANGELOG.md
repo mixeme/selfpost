@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- panel: the **Users** navigation icon was two full silhouettes with staggered
+  baselines, so the pair looked lopsided at 16 px. The rear person is now a
+  right-side crescent (head + shoulder) behind a full front silhouette aligned
+  with `icon-account`.
 - panel: the **Settings** navigation icon was a sun-with-rays (circle plus
   spokes), not a gear. It now uses a toothed cog so it matches the other
   session icons and the 1.2.0 release note.

@@ -130,9 +130,11 @@
      two drawers with handles is the picture of an archive. */}}
 {{define "icon-backup"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.75" y="1.75" width="10.5" height="12.5" rx="1.15"/><path d="M2.75 8h10.5"/><path d="M6.4 4.85h3.2M6.4 11.15h3.2"/></svg>{{end}}
 {{define "icon-account"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.4" r="2.75"/><path d="M2.9 14.25a5.1 5.1 0 0 1 10.2 0"/></svg>{{end}}
-{{/* Two silhouettes, the nearer one drawn last so it reads in front — the
-     picture of a group rather than a single account. */}}
-{{define "icon-users"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="5" r="2.15"/><path d="M7.35 13.85a4.2 4.2 0 0 1 6.8 0"/><circle cx="5.25" cy="5.35" r="2.5"/><path d="M1.35 14.25a4.9 4.9 0 0 1 7.8 0"/></svg>{{end}}
+{{/* Two people: rear as a right-side crescent (head + shoulder) so it peeks
+     from behind; front is a full silhouette matching icon-account. Heads share
+     one baseline; shoulder arcs share one floor — otherwise the pair looks
+     lopsided at 16 px. */}}
+{{define "icon-users"}}<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.9 3.1a2.1 2.1 0 0 1 0 4.2"/><path d="M14.7 14.25a3.8 3.8 0 0 0-3.9-3.65"/><circle cx="5.5" cy="5.2" r="2.5"/><path d="M1.4 14.25a4.8 4.8 0 0 1 8.2 0"/></svg>{{end}}
 {{/* A gear (Feather "settings"), not a sun-with-rays: at 16 px spokes alone
      read as brightness, while the toothed rim is the picture of configuration.
      viewBox 0 0 24 matches the source path; CSS sizes the icon to 1 rem. */}}
