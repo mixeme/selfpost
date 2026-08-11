@@ -279,6 +279,32 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	}
 }
 
+// Drill-down pages carry an up-link directly under the heading and above the
+// cards. A link at the bottom of a form is easy to miss and drifts from the
+// rest of the panel, so the shared back_link template is mandatory on those
+// pages and TestDrillDownPagesPlaceBackLinkAboveContent guards its position.
+func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
+	drillDown := map[string]bool{
+		"user_form.html":     true,
+		"domain_detail.html": true,
+		"domain_delete.html": true,
+		"delivery.html":      true,
+	}
+	forEachTemplate(t, func(name, body string) {
+		if !drillDown[name] {
+			return
+		}
+		if !strings.Contains(body, `template "back_link"`) {
+			t.Errorf("%s is a drill-down page but does not use the shared back_link template", name)
+		}
+		backIdx := strings.Index(body, `template "back_link"`)
+		cardIdx := strings.Index(body, `class="card`)
+		if cardIdx >= 0 && backIdx > cardIdx {
+			t.Errorf("%s places the back link after the first card", name)
+		}
+	})
+}
+
 // Since the panel root redirects to the status page, a link left pointing at
 // "/" silently lands on the wrong screen instead of failing — so no template may
 // contain one.

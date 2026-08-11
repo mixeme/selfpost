@@ -107,6 +107,14 @@
      so its definition replaces the empty one. */}}
 {{define "wide"}}{{end}}
 
+{{/* back_link — up-navigation on drill-down pages. Invoke with the "back"
+     function, e.g. {{template "back_link" (back "/users" "Back to users")}}.
+     Place it directly under the page <h1> and above the cards (see .back in
+     panel.css). TestDrillDownPagesPlaceBackLinkAboveContent guards this. */}}
+{{define "back_link"}}
+<a class="back" href="{{.Href}}">&larr; {{.Label}}</a>
+{{end}}
+
 {{/* Navigation icons. Inline SVG rather than an icon font or sprite file: they
      inherit the link's colour through currentColor, cost no extra request, and
      need no exemption from the panel's "default-src 'self'" policy. Each is

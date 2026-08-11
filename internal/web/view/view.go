@@ -65,7 +65,7 @@ func New(version string) (*Engine, error) {
 	}
 	for name, files := range pageFiles {
 		patterns := append([]string{"templates/layout.html"}, files...)
-		tmpl, err := template.New("layout.html").ParseFS(assetsFS, patterns...)
+		tmpl, err := template.New("layout.html").Funcs(templateFuncs()).ParseFS(assetsFS, patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
 		}
@@ -79,6 +79,17 @@ func New(version string) (*Engine, error) {
 		e.fragments[name] = tmpl
 	}
 	return e, nil
+}
+
+// templateFuncs supplies helpers shared across page templates.
+func templateFuncs() template.FuncMap {
+	return template.FuncMap{
+		// back builds the map back_link reads; keeps href and label paired at
+		// the call site instead of repeating the <a class="back"> markup.
+		"back": func(href, label string) map[string]string {
+			return map[string]string{"Href": href, "Label": label}
+		},
+	}
 }
 
 // Page returns a parsed page template by logical name. It is exported for

@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
 
-<a class="back" href="/domains">&larr; All domains</a>
+{{template "back_link" (back "/domains" "All domains")}}
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 {{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}

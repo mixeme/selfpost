@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- panel: the user create/edit form placed «Back to users» at the bottom of the
+  card instead of under the heading like the delivery, domain, and domain-delete
+  pages. A shared `back_link` template now renders every drill-down up-link, and
+  `TestDrillDownPagesPlaceBackLinkAboveContent` guards its position.
+
 ### Changed
 
 - panel: **Settings** shows panel credentials and DMARC aggregate reports side

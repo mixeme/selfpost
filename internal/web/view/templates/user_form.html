@@ -1,6 +1,8 @@
 {{define "content"}}
 <h1>{{if .IsEdit}}Edit user{{else}}Create user{{end}}</h1>
 
+{{template "back_link" (back "/users" "Back to users")}}
+
 <div class="card narrow">
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
   <form method="post" action="{{if .IsEdit}}/users/{{.UserID}}{{else}}/users/new{{end}}">
@@ -33,6 +35,5 @@
     <button type="submit" name="action" value="delete" class="danger">Delete user</button>
     {{end}}
   </form>
-  <p class="muted"><a href="/users">Back to users</a></p>
 </div>
 {{end}}

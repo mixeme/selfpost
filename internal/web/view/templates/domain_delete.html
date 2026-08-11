@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Delete {{.Domain.Name}}</h1>
 
-<a class="back" href="/domains/{{.Domain.ID}}">&larr; Back to {{.Domain.Name}}</a>
+{{template "back_link" (back (printf "/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
 
 <div class="card">
   <h2>Confirm deletion</h2>
