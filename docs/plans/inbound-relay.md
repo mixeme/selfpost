@@ -5,7 +5,7 @@
 the implementation lands (do not fix a major in advance).  
 **Order:** recommended next among agreed 1.x+ items (after `internal/web` split
 and the domain-admin role, both shipped — see [CHANGELOG](../CHANGELOG.md)
-`[1.1.0]` and `[Unreleased]`).
+`[1.2.0]`).
 
 ---
 
