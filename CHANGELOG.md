@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-11
+
+Panel refinements after 1.2.0: navigation icons, status-badge centreing,
+drill-down back-link placement, and safeguards for the sole global
+administrator. Upgrading is a tag bump; no migration.
+
 ### Fixed
 
 - panel: status badge text sat low in the box (and below the heading or label
