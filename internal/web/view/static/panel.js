@@ -72,6 +72,28 @@
     });
   }
 
+  // --- Domain pick shown only for domain administrators ------------------
+  // Global administrators manage every domain, so the assignment checkboxes
+  // are irrelevant for that role. The toggle runs on load too, because the
+  // edit form of an existing global user should not flash the fieldset.
+  function syncDomainPickField(select) {
+    var form = select.closest("form");
+    var field = form && form.querySelector("[data-domain-pick]");
+    if (!field) {
+      return;
+    }
+    field.hidden = select.value === select.dataset.globalRole;
+  }
+
+  function initDomainPickFields(root) {
+    root.querySelectorAll("select[data-global-role]").forEach(function (select) {
+      syncDomainPickField(select);
+      select.addEventListener("change", function () {
+        syncDomainPickField(select);
+      });
+    });
+  }
+
   // --- Encryption password fields shown only when asked for --------------
   // The backup, export and import forms carry an optional password block. It
   // is hidden until the checkbox next to it is ticked, and cleared when it is
@@ -199,6 +221,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     initAddressFields(document);
+    initDomainPickFields(document);
     initEncryptFields(document);
     initImportPasswordField(document);
     initSectionIndex();

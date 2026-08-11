@@ -128,6 +128,7 @@ func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status
 	data["Error"] = view.FormErr
 	data["FormUsername"] = view.FormUsername
 	data["FormRole"] = view.FormRole
+	data["GlobalRole"] = store.RoleGlobal
 	data["FormDomains"] = view.FormDomains
 	data["FormPassword"] = view.FormPassword
 	data["IsEdit"] = userID != 0

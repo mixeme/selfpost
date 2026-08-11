@@ -21,6 +21,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- panel: the user create/edit form hides **Assigned domains** when the role is
+  global administrator, since that role manages every domain anyway.
 - panel: **Settings** shows panel credentials and DMARC aggregate reports side
   by side for global administrators (the same `.split` layout as a delivery's
   message and history). Domain-scoped users keep the single narrow card.

@@ -14,12 +14,12 @@
     <input id="password" name="password" type="password" autocomplete="new-password" {{if not .IsEdit}}required{{end}}>
 
     <label for="role">Role</label>
-    <select id="role" name="role">
+    <select id="role" name="role" data-global-role="{{.GlobalRole}}">
       <option value="domain_admin" {{if eq .FormRole "domain_admin"}}selected{{end}}>Domain administrator</option>
       <option value="global" {{if eq .FormRole "global"}}selected{{end}}>Global administrator</option>
     </select>
 
-    <fieldset id="domain-pick">
+    <fieldset id="domain-pick" data-domain-pick>
       <legend>Assigned domains</legend>
       <p class="muted">Required for domain administrators.</p>
       {{range .Domains}}
