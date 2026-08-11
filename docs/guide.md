@@ -189,7 +189,7 @@ service healthy and will mail be accepted?"
 - **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
   TLS certificate validity and expiry, milter socket presence, and a short
   Postfix queue summary. The **Machine** card adds the resource usage of the
-  host underneath — processor (with the load average), memory and swap, and
+  host underneath — processor (core and thread counts), memory and swap, and
   per-interface network throughput and totals — read from the kernel's
   counters; CPU and throughput are measured between refreshes, so they appear
   one refresh after the page opens. A fully busy processor or a machine out of

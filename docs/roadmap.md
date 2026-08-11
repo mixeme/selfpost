@@ -30,6 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | logrotate-mode | `mail.log` stops rotating in some builds | candidate | [plans/logrotate-mode.md](plans/logrotate-mode.md) |
+| panel-docs | In-panel operator documentation | candidate | — |
 
 **Recommended order** (not binding): **inbound-relay** first among agreed
 items — it is the largest remaining 1.x+ extension. Candidates need explicit
@@ -102,3 +103,28 @@ source of truth for `rua=` in DNS guidance.
 inbound-relay depending on how port 25 acceptance is structured.
 
 **Version:** `1.x` MINOR.
+
+---
+
+## panel-docs
+
+**Goal:** built-in operator documentation in the panel — short pages (or a
+help drawer) that explain what each Status check and other controls mean,
+without sending the operator out to `docs/guide.md`.
+
+**Boundary:** in-panel help only; not a second copy of the full operator guide.
+Seed content includes the Status blurbs removed from the cards in favour of a
+denser layout — Machine (kernel counters / rate window), TLS certificate
+(port 465, reverse-proxy mount), Hostname / reverse DNS (forward-confirmed
+reverse DNS, PTR at the hosting provider), and similar notes for other panel
+surfaces as they lose inline commentary.
+
+**Done when:** an operator can open help from the panel for those topics; the
+removed Status blurbs are preserved there (or equivalent); no requirement to
+read the git tree for day-to-day meaning of a card.
+
+**Dependencies / risks:** copy ownership and translation; keeping help in sync
+when checks change; not bloating every page with a second column of prose.
+
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+

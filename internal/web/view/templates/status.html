@@ -1,5 +1,5 @@
-{{/* Wide enough for mail queue and TLS certificate side by side (see .split
-     in panel.css, as on account and delivery). */}}
+{{/* Wide so Machine|Processes and the other .split pairs fill the column
+     rather than the 48rem reading measure. */}}
 {{define "wide"}}wide{{end}}
 
 {{define "content"}}
@@ -8,30 +8,6 @@
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{template "status_body" .}}
-
-<div class="card" id="hostname">
-  <h2>Hostname and reverse DNS <span class="st st-{{.PTR.Status}}">{{.PTR.Status}}</span></h2>
-  <p class="muted">Receiving servers check that the name this server announces
-  resolves to its address <em>and</em> that the address resolves back to the same
-  name (forward-confirmed reverse DNS). A missing or mismatched reverse record is
-  the most common reason self-hosted mail is rejected or scored as spam. The
-  reverse record is set at the hosting provider, not in the domain's DNS zone.</p>
-
-  <label>Server hostname</label>
-  <span class="code">{{if .Hostname}}{{.Hostname}}{{else}}(SELFPOST_HOSTNAME is not set){{end}}</span>
-
-  {{if .PTR.Records}}
-  <label>Forward and reverse lookup</label>
-  <span class="code">{{range .PTR.Records}}{{.}}
-{{end}}</span>
-  {{end}}
-
-  <p class="{{if eq .PTR.Status "ok"}}muted{{else}}error{{end}}">{{.PTR.Detail}}</p>
-
-  <form class="inline" method="post" action="/status/recheck">
-    <button type="submit">Re-check DNS</button>
-  </form>
-</div>
 
 <div class="card" id="configuration">
   <h2>Configuration</h2>
@@ -43,24 +19,5 @@
   <form class="inline" method="post" action="/reload">
     <button type="submit">Reload configuration</button>
   </form>
-</div>
-{{end}}
-
-{{/* The status page's section index, shown in the navigation column (see the
-     "sections" block in layout.html). The first six cards are the ones the
-     polling fragment replaces on a timer; their ids are part of
-     status_body.html and do not change with the reading, so the links here hold
-     across a refresh. */}}
-{{define "sections"}}
-<div class="sections">
-  <p class="sections-title">On this page</p>
-  <a href="#overall">Overall</a>
-  <a href="#processes">Processes</a>
-  <a href="#machine">Machine</a>
-  <a href="#queue">Mail queue</a>
-  <a href="#certificate">TLS certificate</a>
-  <a href="#sockets">Milter sockets</a>
-  <a href="#hostname">Hostname and reverse DNS</a>
-  <a href="#configuration">Configuration</a>
 </div>
 {{end}}

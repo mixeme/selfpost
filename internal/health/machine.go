@@ -62,10 +62,14 @@ type CPU struct {
 	// nothing until it is true.
 	Measured bool
 	BusyPct  float64
-	Cores    int
+	// Cores and Threads are physical cores and logical CPUs (SMT). Both come
+	// from /proc/cpuinfo when it is readable; otherwise Threads falls back to
+	// the cpuN lines in /proc/stat and Cores matches Threads.
+	Cores   int
+	Threads int
 	// Load is the 1/5/15-minute load average, present when /proc/loadavg
-	// could be read. Unlike BusyPct it needs no previous sample, so it is
-	// there on the very first page load.
+	// could be read. Unlike BusyPct it needs no previous sample. It is kept
+	// for the sampler but is no longer shown on the Status card.
 	Load    [3]float64
 	HasLoad bool
 	Status  Status
@@ -176,7 +180,14 @@ type netCounters struct {
 func (m *MachineSampler) Sample() Machine {
 	root := m.root()
 	now := time.Now()
-	cpuNow, cores, cpuErr := readCPUTimes(root)
+	cpuNow, logical, cpuErr := readCPUTimes(root)
+	cores, threads := readCPUTopology(root)
+	if threads == 0 {
+		threads = logical
+	}
+	if cores == 0 {
+		cores = threads
+	}
 	netNow, netErr := readNetDev(root)
 
 	m.mu.Lock()
@@ -198,7 +209,7 @@ func (m *MachineSampler) Sample() Machine {
 	fresh := !prevAt.IsZero() && window > 0 && window <= machineSampleWindow
 
 	mach := Machine{
-		CPU:     cpuUsage(prevCPU, cpuNow, cores, readLoadAvg(root), fresh, cpuErr),
+		CPU:     cpuUsage(prevCPU, cpuNow, cores, threads, readLoadAvg(root), fresh, cpuErr),
 		Memory:  readMemory(root),
 		Network: networkUsage(prevNet, netNow, window, fresh, netErr),
 	}
@@ -209,12 +220,11 @@ func (m *MachineSampler) Sample() Machine {
 	return mach
 }
 
-// cpuUsage grades the processor over the window. The load average is reported
-// alongside it because the two answer different questions — how busy the
-// processor was, and how many tasks were waiting for it — and a machine can
-// look idle while work queues up behind a slow disk.
-func cpuUsage(prev, cur cpuTimes, cores int, load [3]float64, fresh bool, err error) CPU {
-	c := CPU{Cores: cores}
+// cpuUsage grades the processor over the window. Detail carries only the
+// core and thread counts — load average and busy prose stay out of the Status
+// card (see roadmap panel-docs for operator-facing explanation later).
+func cpuUsage(prev, cur cpuTimes, cores, threads int, load [3]float64, fresh bool, err error) CPU {
+	c := CPU{Cores: cores, Threads: threads}
 	if !isZeroLoad(load) {
 		c.Load, c.HasLoad = load, true
 	}
@@ -223,9 +233,9 @@ func cpuUsage(prev, cur cpuTimes, cores int, load [3]float64, fresh bool, err er
 		c.Detail = "The kernel's processor counters (/proc/stat) could not be read here."
 		return c
 	}
+	c.Detail = c.contextText()
 	if !fresh || cur.total <= prev.total {
 		c.Status = StatusUnknown
-		c.Detail = joinDetail("Measuring — this reading sets the baseline; the next refresh has the figure.", c.contextText())
 		return c
 	}
 
@@ -242,25 +252,24 @@ func cpuUsage(prev, cur cpuTimes, cores int, load [3]float64, fresh bool, err er
 
 	if c.BusyPct >= cpuWarnPct {
 		c.Status = StatusWarn
-		c.Detail = joinDetail(c.contextText(), "The processor is close to fully busy, which slows queue processing and every panel page.")
 	} else {
 		c.Status = StatusOK
-		c.Detail = c.contextText()
 	}
 	return c
 }
 
-// contextText is the CPU's supporting figures: what the percentage is a
-// percentage of, and how deep the run queue is.
+// contextText is the CPU detail column: physical cores and logical threads.
 func (c CPU) contextText() string {
-	var parts []string
-	if c.Cores > 0 {
-		parts = append(parts, fmt.Sprintf("%d core(s)", c.Cores))
+	switch {
+	case c.Cores > 0 && c.Threads > 0:
+		return fmt.Sprintf("%d cores · %d threads", c.Cores, c.Threads)
+	case c.Threads > 0:
+		return fmt.Sprintf("%d threads", c.Threads)
+	case c.Cores > 0:
+		return fmt.Sprintf("%d cores", c.Cores)
+	default:
+		return ""
 	}
-	if c.HasLoad {
-		parts = append(parts, fmt.Sprintf("load average %.2f, %.2f, %.2f", c.Load[0], c.Load[1], c.Load[2]))
-	}
-	return strings.Join(parts, " · ")
 }
 
 // readMemory reports main memory from /proc/meminfo. Used is derived from
@@ -296,8 +305,7 @@ func readMemory(root string) Memory {
 		m.SwapUsedBytes = m.SwapTotalBytes - swapFree
 	}
 
-	detail := fmt.Sprintf("%s used of %s; %s available to new work.",
-		humanBytes(m.UsedBytes), humanBytes(total), humanBytes(available))
+	detail := fmt.Sprintf("%s used of %s.", humanBytes(m.UsedBytes), humanBytes(total))
 	if m.SwapTotalBytes > 0 {
 		detail += fmt.Sprintf(" Swap: %s of %s.", humanBytes(m.SwapUsedBytes), humanBytes(m.SwapTotalBytes))
 	}
@@ -416,6 +424,74 @@ func readCPUTimes(root string) (cpuTimes, int, error) {
 		return cpuTimes{}, 0, fmt.Errorf("/proc/stat: no aggregate cpu line")
 	}
 	return times, cores, nil
+}
+
+// readCPUTopology returns physical core and logical thread counts from
+// /proc/cpuinfo. Zeroes mean the file was missing or empty; the caller falls
+// back to the cpuN count from /proc/stat.
+func readCPUTopology(root string) (cores, threads int) {
+	data, err := os.ReadFile(filepath.Join(root, "cpuinfo"))
+	if err != nil {
+		return 0, 0
+	}
+	type coreKey struct{ phys, core int }
+	seen := map[coreKey]bool{}
+	var (
+		inCPU bool
+		phys  = -1
+		core  = -1
+		idx   int
+	)
+	flush := func() {
+		if !inCPU {
+			return
+		}
+		p, c := phys, core
+		if p < 0 {
+			p = idx
+		}
+		if c < 0 {
+			c = idx
+		}
+		seen[coreKey{p, c}] = true
+		inCPU, phys, core = false, -1, -1
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			flush()
+			continue
+		}
+		key, val, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		val = strings.TrimSpace(val)
+		switch key {
+		case "processor":
+			flush()
+			inCPU = true
+			threads++
+			idx = threads - 1
+			if n, err := strconv.Atoi(val); err == nil {
+				idx = n
+			}
+		case "physical id":
+			if n, err := strconv.Atoi(val); err == nil {
+				phys = n
+			}
+		case "core id":
+			if n, err := strconv.Atoi(val); err == nil {
+				core = n
+			}
+		}
+	}
+	flush()
+	if threads == 0 {
+		return 0, 0
+	}
+	return len(seen), threads
 }
 
 // readLoadAvg reads the 1/5/15-minute load averages. A machine without
@@ -543,15 +619,4 @@ func humanRate(perSec float64) string {
 		perSec = 0
 	}
 	return humanBytes(uint64(perSec+0.5)) + "/s"
-}
-
-// joinDetail joins the non-empty parts of a detail line.
-func joinDetail(parts ...string) string {
-	var kept []string
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, " ")
 }

@@ -7,13 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
-- panel: **Status** places Mail queue and TLS certificate side by side (the
-  same `.split` / wide layout as Settings and a delivery), so the shorter
-  checks take less vertical space; Processes, Machine, sockets, hostname, and
-  Configuration stay full width.
+- panel: **Status** is wide again so paired cards fill the column. Layout:
+  Overall; Machine ‖ Processes; Mail queue ‖ TLS certificate; Milter sockets ‖
+  Hostname / reverse DNS; Configuration. Dropped lead blurbs on Machine, TLS
+  certificate, and Hostname (and Hostname's trailing detail line); milter
+  socket paths omitted from the table; queue link reads **View queue**; milter
+  ok detail is `Listening` without a trailing period and sits in its own
+  Detail column beside the status badge; CPU detail is only core and thread
+  counts (no load average); memory detail is `N used of M` without the
+  «available to new work» clause; network detail lists per-interface totals
+  only (rates stay in the Usage column). No «On this page» section index —
+  the paired layout is short enough. Hostname stays in the polled fragment so
+  the pair survives HTMX refresh. In-panel docs for the removed blurbs filed
+  as roadmap `panel-docs`.
 
 ### Fixed
 
+- panel: cards inside `.split` used `margin: 0 auto`, which in a CSS grid
+  shrinks each card to its content and centres it in the track instead of
+  filling half the row. Side margins are cancelled for `.split > .card`
+  (Status, Settings, and a delivery's message/history).
 - panel: on the user create/edit form, **Assigned domains** checkboxes stacked
   the box above the domain name (and stretched it full-width) because the form's
   block-label and full-width input rules applied to them. Checkbox rows now use

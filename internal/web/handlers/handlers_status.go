@@ -13,15 +13,11 @@ func (h *Handlers) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := h.statusBody()
-	srv := h.dns.Server(h.cfg.Hostname, false)
-
 	data["Title"] = "SelfPost — status"
 	data["User"] = auth.CurrentUser(r)
 	data["Active"] = "status"
 	data["IsGlobal"] = true
 	data["Flash"] = statusFlash(r)
-	data["Hostname"] = h.cfg.Hostname
-	data["PTR"] = srv.PTR
 	h.view.Render(w, http.StatusOK, "status", data)
 }
 
@@ -68,6 +64,7 @@ func (h *Handlers) statusBody() map[string]any {
 	}
 
 	machine := h.machine.Sample()
+	srv := h.dns.Server(h.cfg.Hostname, false)
 
 	overall := health.Worst(procStatus, queueStatus, cert.Status, socketStatus, machine.Status)
 	return map[string]any{
@@ -81,6 +78,8 @@ func (h *Handlers) statusBody() map[string]any {
 		"Cert":           cert,
 		"Sockets":        sockets,
 		"SocketStatus":   socketStatus,
+		"Hostname":       h.cfg.Hostname,
+		"PTR":            srv.PTR,
 		"OverallStatus":  overall,
 		"OverallHeading": overallHeading(overall),
 	}

@@ -41,9 +41,9 @@ func TestSectionIndexIsOnTheLongPagesOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	// Anchors the index links to, taken from the page's own cards.
+	// Anchors the index links to, taken from the page's own cards. Status used
+	// to carry one too; the paired layout is short enough without it.
 	wantAnchors := map[string]string{
-		"status":        `href="#certificate"`,
 		"domain_detail": `href="#danger"`,
 	}
 	for name, page := range engine.Pages() {
@@ -72,9 +72,10 @@ func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	// The pages that carry an index; both are checked with a credential shown,
-	// which is the domain page's one conditional entry.
-	for _, name := range []string{"status", "domain_detail"} {
+	// The pages that carry an index; checked with a credential shown, which is
+	// the domain page's one conditional entry. Status dropped its index once
+	// the paired layout was short enough.
+	for _, name := range []string{"domain_detail"} {
 		var index bytes.Buffer
 		if err := engine.Page(name).ExecuteTemplate(&index, "sections", map[string]any{"NewCred": true}); err != nil {
 			t.Fatalf("execute sections for %q: %v", name, err)
@@ -379,19 +380,37 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
 		"203.0.113.10 → no PTR record", `action="/reload"`,
 		`hx-get="/status/fragment"`, `class="st st-error"`,
-		// Queue and certificate sit abreast inside the polled fragment; their
-		// ids stay on the cards so the section index and scroll highlights hold.
-		`class="split"`, `id="queue"`, `id="certificate"`, `id="sockets"`,
+		// Three .split rows inside the polled fragment: machine|processes,
+		// queue|certificate, and sockets|hostname. Ids stay on the cards.
+		`id="processes"`, `id="machine"`, `id="queue"`, `id="certificate"`, `id="sockets"`, `id="hostname"`,
+		`action="/status/recheck"`,
 		// The machine card: the bars carry their reading in an attribute
 		// (the CSP rules out sizing them with a style), and the figures are
 		// printed beside them for anything that does not render a meter.
 		`<meter value="12"`, `<meter value="50"`,
-		"load average 0.31, 0.24, 0.19", "2.0 GiB used of 4.0 GiB",
+		"4 cores · 4 threads", "2.0 GiB used of 4.0 GiB",
 		"eth0: 1.0 MiB in, 512.0 KiB out",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("status page is missing %q", want)
 		}
+	}
+	if got := strings.Count(out, `class="split"`); got != 3 {
+		t.Errorf("status page has %d .split rows, want 3", got)
+	}
+	// Hostname must live inside the fragment so a poll refresh keeps it beside
+	// sockets; Configuration stays outside (static reload control).
+	body := strings.Index(out, `id="status-body"`)
+	conf := strings.Index(out, `id="configuration"`)
+	if body < 0 || conf < 0 || conf < body {
+		t.Fatal("status-body or configuration card missing or out of order")
+	}
+	frag := out[body:conf]
+	if !strings.Contains(frag, `id="hostname"`) {
+		t.Error("hostname card is outside the polled status-body fragment")
+	}
+	if strings.Contains(frag, `id="configuration"`) || strings.Contains(frag, `action="/reload"`) {
+		t.Error("configuration reload must stay outside the polled fragment")
 	}
 }
 
@@ -456,13 +475,13 @@ func statusPageData() map[string]any {
 		},
 		"Machine": health.Machine{
 			CPU: health.CPU{
-				Measured: true, BusyPct: 12.4, Cores: 4,
+				Measured: true, BusyPct: 12.4, Cores: 4, Threads: 4,
 				Load: [3]float64{0.31, 0.24, 0.19}, HasLoad: true,
-				Status: health.StatusOK, Detail: "4 core(s) · load average 0.31, 0.24, 0.19",
+				Status: health.StatusOK, Detail: "4 cores · 4 threads",
 			},
 			Memory: health.Memory{
 				Measured: true, TotalBytes: 4 << 30, UsedBytes: 2 << 30, UsedPct: 50,
-				Status: health.StatusOK, Detail: "2.0 GiB used of 4.0 GiB; 2.0 GiB available to new work.",
+				Status: health.StatusOK, Detail: "2.0 GiB used of 4.0 GiB.",
 			},
 			Network: health.Network{
 				Measured: true, RxRate: 2048, TxRate: 1024,
@@ -475,7 +494,7 @@ func statusPageData() map[string]any {
 			Status: health.StatusOK,
 		},
 		"Sockets": []health.Socket{
-			{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening."},
+			{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening"},
 		},
 		"SocketStatus":   health.StatusOK,
 		"OverallStatus":  health.StatusError,

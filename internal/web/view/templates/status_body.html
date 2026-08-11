@@ -5,71 +5,69 @@
     <p class="muted">{{.OverallHeading}}</p>
   </div>
 
-  <div class="card" id="processes">
-    <h2>Processes <span class="st st-{{.ProcessStatus}}">{{.ProcessStatus}}</span></h2>
-    {{if .ProcessError}}
-    <p class="error">Could not ask supervisord for the process list.</p>
-    {{else}}
-    <table>
-      <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
-      <tbody>
-        {{range .Processes}}
-        <tr>
-          <td>{{.Name}}</td>
-          <td><span class="st st-{{.Status}}">{{.State}}</span></td>
-          <td class="muted">{{.Detail}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
-    {{end}}
-  </div>
+  <div class="split">
+    <div class="card" id="machine">
+      <h2>Machine <span class="st st-{{.Machine.Status}}">{{.Machine.Status}}</span></h2>
+      <table>
+        <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="metric">CPU</td>
+            <td class="metric">
+              {{if .Machine.CPU.Measured}}
+              <meter value="{{.Machine.CPU.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.CPU.BusyText}}</meter>
+              {{.Machine.CPU.BusyText}}
+              {{else}}<span class="muted">—</span>{{end}}
+            </td>
+            <td class="muted">{{.Machine.CPU.Detail}}</td>
+          </tr>
+          <tr>
+            <td class="metric">Memory</td>
+            <td class="metric">
+              {{if .Machine.Memory.Measured}}
+              <meter value="{{.Machine.Memory.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.Memory.PctText}}</meter>
+              {{.Machine.Memory.PctText}}
+              {{else}}<span class="muted">—</span>{{end}}
+            </td>
+            <td class="muted">{{.Machine.Memory.Detail}}</td>
+          </tr>
+          <tr>
+            <td class="metric">Network</td>
+            <td class="metric">
+              {{if .Machine.Network.Measured}}
+              ↓ {{.Machine.Network.InRateText}}<br>↑ {{.Machine.Network.OutRateText}}
+              {{else}}<span class="muted">—</span>{{end}}
+            </td>
+            <td class="muted">
+              {{range .Machine.Network.Interfaces}}
+              <div>{{.Name}}: {{.InText}} in, {{.OutText}} out</div>
+              {{end}}
+              {{if .Machine.Network.Detail}}<div>{{.Machine.Network.Detail}}</div>{{end}}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-  <div class="card" id="machine">
-    <h2>Machine <span class="st st-{{.Machine.Status}}">{{.Machine.Status}}</span></h2>
-    <p class="muted">Processor, memory and network of the machine this container
-    runs on, read from the kernel's counters. CPU and throughput are rates, so
-    they describe{{if .Machine.WindowText}} the {{.Machine.WindowText}}{{end}}
-    since the previous refresh rather than this instant.</p>
-    <table>
-      <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
-      <tbody>
-        <tr>
-          <td class="metric">CPU</td>
-          <td class="metric">
-            {{if .Machine.CPU.Measured}}
-            <meter value="{{.Machine.CPU.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.CPU.BusyText}}</meter>
-            {{.Machine.CPU.BusyText}}
-            {{else}}<span class="muted">—</span>{{end}}
-          </td>
-          <td class="muted">{{.Machine.CPU.Detail}}</td>
-        </tr>
-        <tr>
-          <td class="metric">Memory</td>
-          <td class="metric">
-            {{if .Machine.Memory.Measured}}
-            <meter value="{{.Machine.Memory.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.Memory.PctText}}</meter>
-            {{.Machine.Memory.PctText}}
-            {{else}}<span class="muted">—</span>{{end}}
-          </td>
-          <td class="muted">{{.Machine.Memory.Detail}}</td>
-        </tr>
-        <tr>
-          <td class="metric">Network</td>
-          <td class="metric">
-            {{if .Machine.Network.Measured}}
-            ↓ {{.Machine.Network.InRateText}}<br>↑ {{.Machine.Network.OutRateText}}
-            {{else}}<span class="muted">—</span>{{end}}
-          </td>
-          <td class="muted">
-            {{range .Machine.Network.Interfaces}}
-            <div>{{.Name}}: {{.InText}} in, {{.OutText}} out{{if .Measured}} (↓ {{.InRateText}} ↑ {{.OutRateText}}){{end}}</div>
-            {{end}}
-            {{if .Machine.Network.Detail}}<div>{{.Machine.Network.Detail}}</div>{{end}}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="card" id="processes">
+      <h2>Processes <span class="st st-{{.ProcessStatus}}">{{.ProcessStatus}}</span></h2>
+      {{if .ProcessError}}
+      <p class="error">Could not ask supervisord for the process list.</p>
+      {{else}}
+      <table>
+        <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          {{range .Processes}}
+          <tr>
+            <td>{{.Name}}</td>
+            <td><span class="st st-{{.Status}}">{{.State}}</span></td>
+            <td class="muted">{{.Detail}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+      {{end}}
+    </div>
   </div>
 
   <div class="split">
@@ -79,14 +77,12 @@
       <p class="error">{{.QueueError}}</p>
       {{else}}
       <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}</p>
-      <a class="btn" href="/mail-queue">Full queue</a>
+      <a class="btn" href="/mail-queue">View queue</a>
       {{end}}
     </div>
 
     <div class="card" id="certificate">
       <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
-      <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
-      It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
       {{if not .Cert.NotAfter.IsZero}}
       <label>Expires</label>
       <span class="code">{{.Cert.NotAfter.UTC.Format "2006-01-02 15:04 UTC"}}</span>
@@ -95,20 +91,39 @@
     </div>
   </div>
 
-  <div class="card" id="sockets">
-    <h2>Milter sockets <span class="st st-{{.SocketStatus}}">{{.SocketStatus}}</span></h2>
-    <table>
-      <thead><tr><th>Milter</th><th>Socket</th><th>State</th></tr></thead>
-      <tbody>
-        {{range .Sockets}}
-        <tr>
-          <td>{{.Name}}</td>
-          <td class="muted">{{.Path}}</td>
-          <td><span class="st st-{{.Status}}">{{.Status}}</span> {{.Detail}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+  <div class="split">
+    <div class="card" id="sockets">
+      <h2>Milter sockets <span class="st st-{{.SocketStatus}}">{{.SocketStatus}}</span></h2>
+      <table>
+        <thead><tr><th>Milter</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          {{range .Sockets}}
+          <tr>
+            <td>{{.Name}}</td>
+            <td><span class="st st-{{.Status}}">{{.Status}}</span></td>
+            <td class="muted">{{.Detail}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" id="hostname">
+      <h2>Hostname and reverse DNS <span class="st st-{{.PTR.Status}}">{{.PTR.Status}}</span></h2>
+
+      <label>Server hostname</label>
+      <span class="code">{{if .Hostname}}{{.Hostname}}{{else}}(SELFPOST_HOSTNAME is not set){{end}}</span>
+
+      {{if .PTR.Records}}
+      <label>Forward and reverse lookup</label>
+      <span class="code">{{range .PTR.Records}}{{.}}
+{{end}}</span>
+      {{end}}
+
+      <form class="inline" method="post" action="/status/recheck">
+        <button type="submit">Re-check DNS</button>
+      </form>
+    </div>
   </div>
 </div>
 {{end}}

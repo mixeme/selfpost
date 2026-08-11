@@ -440,10 +440,10 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
    a link's blue and Sign out's red all carry through without a rule apiece. */
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
 /* The current page's own sections, listed under the page entries. The domain
-   page and the status page are eight and nine cards tall, and the only way to
-   the card you came for was to scroll past all the ones you did not. Only pages
-   that long carry an index — it comes from the page's own "sections" template
-   (see layout.html), so a page with two cards renders nothing here. */
+   page is long enough that the only way to the card you came for was to scroll
+   past all the ones you did not. Only pages that long carry an index — it comes
+   from the page's own "sections" template (see layout.html), so a page with
+   two cards or a short paired Status layout renders nothing here. */
 .sections {
   display: flex; flex-direction: column; gap: 0.1rem;
   padding-top: 0.75rem; border-top: 1px solid var(--border);
@@ -550,12 +550,21 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
   display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   gap: 1.2rem; margin-top: 1.2rem;
 }
+/* Cards use margin: 0 auto so a lone card centres in the column. Inside the
+   grid those auto side margins absorb free space and shrink each card to its
+   content instead of filling the 1fr track — so cancel them here, and allow
+   the cell to shrink below the card's intrinsic minimum when the column is
+   tight. */
+.split > .card { margin-left: 0; margin-right: 0; min-width: 0; }
 /* The gap already spaces the cards inside the grid; the general .card + .card
    rule would add a second gap's worth on top of it, and only to the second
    card, which in one column reads as an uneven stack. The blocks around the
    grid keep their spacing from it instead. */
 .split > .card + .card { margin-top: 0; }
 .split + .card { margin-top: 1.2rem; }
+/* Configuration sits outside the polled fragment; without this it would
+   touch the last .split inside #status-body (a nested .split is not a sibling). */
+#status-body + .card { margin-top: 1.2rem; }
 /* The subject heads a delivery's page, and it is the one heading in the panel
    whose text we do not control: it may be a hundred characters with nothing to
    break on. It wraps to as many lines as it needs (this is the page's name, not
