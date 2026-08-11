@@ -132,7 +132,16 @@ func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status
 	data["FormDomains"] = view.FormDomains
 	data["FormPassword"] = view.FormPassword
 	data["IsEdit"] = userID != 0
+	data["LastGlobalLocked"] = lastGlobalLocked(h, userID, view.FormRole)
 	h.view.Render(w, status, "user_form", data)
+}
+
+func lastGlobalLocked(h *Handlers, userID int64, formRole string) bool {
+	if userID == 0 || formRole != string(store.RoleGlobal) {
+		return false
+	}
+	n, err := h.store.CountGlobalUsers()
+	return err == nil && n <= 1
 }
 
 func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {

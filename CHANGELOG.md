@@ -21,6 +21,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- panel: the user edit form disables role change and delete for the only global
+  administrator, with a short note, instead of allowing the action and showing
+  an error on submit.
 - panel: the user create/edit form hides **Assigned domains** when the role is
   global administrator, since that role manages every domain anyway.
 - panel: **Settings** shows panel credentials and DMARC aggregate reports side

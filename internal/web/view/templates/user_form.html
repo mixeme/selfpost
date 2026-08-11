@@ -14,10 +14,12 @@
     <input id="password" name="password" type="password" autocomplete="new-password" {{if not .IsEdit}}required{{end}}>
 
     <label for="role">Role</label>
-    <select id="role" name="role" data-global-role="{{.GlobalRole}}">
+    {{if .LastGlobalLocked}}<input type="hidden" name="role" value="{{.FormRole}}">{{end}}
+    <select id="role" name="role" data-global-role="{{.GlobalRole}}"{{if .LastGlobalLocked}} disabled{{end}}>
       <option value="domain_admin" {{if eq .FormRole "domain_admin"}}selected{{end}}>Domain administrator</option>
       <option value="global" {{if eq .FormRole "global"}}selected{{end}}>Global administrator</option>
     </select>
+    {{if .LastGlobalLocked}}<p class="muted">The only global administrator cannot be demoted.</p>{{end}}
 
     <fieldset id="domain-pick" data-domain-pick>
       <legend>Assigned domains</legend>
@@ -32,7 +34,8 @@
 
     <button type="submit">{{if .IsEdit}}Save{{else}}Create{{end}}</button>
     {{if .IsEdit}}
-    <button type="submit" name="action" value="delete" class="danger">Delete user</button>
+    <button type="submit" name="action" value="delete" class="danger"{{if .LastGlobalLocked}} disabled{{end}}>Delete user</button>
+    {{if .LastGlobalLocked}}<p class="muted">The only global administrator cannot be deleted.</p>{{end}}
     {{end}}
   </form>
 </div>
