@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-08-12
+
+Status page layout after 1.2.1: paired cards in a wide column, denser machine
+and check copy, and a user-form checkbox fix. Upgrading is a tag bump; no
+migration.
+
 ### Changed
 
 - panel: **Status** is wide again so paired cards fill the column. Layout:
