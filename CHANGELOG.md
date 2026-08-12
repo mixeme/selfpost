@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-08-12
+
+Level-2 rate-limit semantics inverted after 1.2.3, plus a small DNS field
+height fix. Upgrading is a tag bump; no migration.
+
 ### Changed
 
 - rate limiting (level 2): domain ceilings apply to every client IP (no IP
