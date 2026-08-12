@@ -13,7 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   shared `st` badge. Trusted-IP help sits under the IP field; domain rate-limit
   help sits above Save; Address mode / trusted-IP columns share muted leads and
   matched control height; Domain settings uses subgrid so DMARC and rate-limit
-  rows line up; paired `.split` cards pin primary actions to a shared baseline.
+  rows line up.
 
 ## [1.2.4] - 2026-08-12
 

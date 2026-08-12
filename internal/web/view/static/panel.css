@@ -551,22 +551,6 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    the cell to shrink below the card's intrinsic minimum when the column is
    tight. */
 .split > .card { margin-left: 0; margin-right: 0; min-width: 0; }
-/* Paired cards often differ in body length (export's encrypt checkbox vs
-   danger's short blurb). Stretch both in the grid row and pin the primary
-   action to the bottom so the buttons share a baseline. */
-.split > .card {
-  display: flex; flex-direction: column;
-}
-.split > .card > form {
-  display: flex; flex-direction: column; flex: 1 1 auto;
-}
-.split > .card > form > button[type="submit"]:last-child {
-  margin-top: auto;
-}
-.split > .card > a.danger:last-child,
-.split > .card > a.btn:last-child {
-  margin-top: auto; align-self: flex-start;
-}
 /* The gap already spaces the cards inside the grid; the general .card + .card
    rule would add a second gap's worth on top of it, and only to the second
    card, which in one column reads as an uneven stack. The blocks around the
