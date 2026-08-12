@@ -565,10 +565,18 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    one column when the parent is too narrow for both. */
 .field-pair {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: 0 1rem; margin-top: 0.45rem;
+  gap: 0 1rem;
 }
+/* First control row in a check-col form: match a bare label's top margin so
+   paired columns (DMARC ‖ rate limit) line up their first field labels. */
+form > .field-pair { margin-top: 0; }
+form > .field-pair > div > label { margin-top: 0.9rem; }
 .field-pair > div { min-width: 0; }
 .field-pair label { margin-top: 0.45rem; }
+/* Hint under a field-pair sits tight above the form's submit button (the
+   global button margin-top would leave a blank line). */
+.field-pair + p.muted { margin: 0.45rem 0 0; }
+.field-pair + p.muted + button { margin-top: 0.45rem; }
 /* Host / name beside a DNS Type that is always TXT — size the type column to
    that token rather than giving it half the row. Vertical padding matches
    .code-row .code so TXT is the same height as Host when Copy sits beside it. */

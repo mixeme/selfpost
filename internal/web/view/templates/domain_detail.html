@@ -345,13 +345,12 @@
               <div class="check-col">
                 <p class="check-col-title">Optional trusted-IP override
                   {{if .HasLimit}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
-                <p class="muted">These IPs get a higher ceiling than the domain
-                (≤ level&nbsp;1) and skip the domain check; everyone else uses
-                {{if $.DomainHasRL}}the domain ceiling ({{$.DomainRLMaxNum}}){{else}}level&nbsp;1 only{{end}}.</p>
-                <p class="muted">Level&nbsp;1 backstop: {{$.L1Messages}} messages / {{$.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
                   <label>Trusted client IPs (required; one per line or comma-separated)</label>
                   <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
+                  <p class="muted">These IPs get a higher ceiling than the domain
+                  (≤ level&nbsp;1) and skip the domain check; everyone else uses
+                  {{if $.DomainHasRL}}the domain ceiling ({{$.DomainRLMaxNum}}){{else}}level&nbsp;1 only{{end}}.</p>
                   <div class="field-pair">
                     <div>
                       <label>Message limit (max {{$.L1Messages}})</label>
@@ -416,8 +415,8 @@
     </div>
 
     <div class="check-col">
-      <p class="check-col-title">Optional level-2 sending rate limit
-        {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive — level 1 only</span>{{end}}</p>
+      <p class="check-col-title">Level-2 rate limit
+        {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
       <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
 
       <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
