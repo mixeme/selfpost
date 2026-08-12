@@ -121,7 +121,11 @@ func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status
 		return
 	}
 	data := h.pageBase(r)
-	data["Title"] = "SelfPost — user"
+	if userID != 0 {
+		data["Title"] = "SelfPost — edit user"
+	} else {
+		data["Title"] = "SelfPost — create user"
+	}
 	data["Active"] = "users"
 	data["UserID"] = userID
 	data["Domains"] = domains

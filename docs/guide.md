@@ -229,7 +229,7 @@ service healthy and will mail be accepted?"
 - **Backup** (`/backup`) — download a full-server backup; the same page hosts
   the domain-import form (`POST /domains/import`). See
   [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
-- **Settings** (`/account`) — change the administrator username and/or password.
+- **Settings** (`/settings`) — change the administrator username and/or password.
   Application SASL logins are separate and are not changed here.
 
 **Sessions.** A login survives a container restart: sessions live in SQLite, not

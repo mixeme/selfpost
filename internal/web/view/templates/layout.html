@@ -81,7 +81,7 @@
   {{template "sections" .}}
   <div class="session">
     <span class="session-user muted">{{template "icon-account"}}User: {{.User}}</span>
-    {{if eq .Active "account"}}<span aria-current="page">{{template "icon-settings"}}Settings</span>{{else}}<a href="/account">{{template "icon-settings"}}Settings</a>{{end}}
+    {{if eq .Active "settings"}}<span aria-current="page">{{template "icon-settings"}}Settings</span>{{else}}<a href="/settings">{{template "icon-settings"}}Settings</a>{{end}}
     <form class="inline" method="post" action="/logout">
       <button type="submit" class="danger">{{template "icon-sign-out"}}Sign out</button>
     </form>

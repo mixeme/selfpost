@@ -49,7 +49,7 @@ func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status 
 	}
 	data := h.pageBase(r)
 	data["Title"] = "SelfPost — settings"
-	data["Active"] = "account"
+	data["Active"] = "settings"
 	data["FormUsername"] = formUsername
 	data["FormDMARCEmail"] = formDMARCEmail
 	data["ShowDMARC"] = showDMARC
@@ -59,7 +59,7 @@ func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status 
 	data["ReportAuthHub"] = dnscheck.EmailDomain(formDMARCEmail)
 	data["Error"] = formErr
 	data["Flash"] = accountFlash(r)
-	h.view.Render(w, status, "account", data)
+	h.view.Render(w, status, "settings", data)
 }
 
 func accountFlash(r *http.Request) string {
@@ -196,7 +196,7 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logf("panel: user %d account updated (username: %t, password: %t, dmarc email: %t)", user.ID, renaming, repassword, emailChanging)
-	http.Redirect(w, r, "/account?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
 }
 
 func updatedFlag(renamed, repassword, emailChanged bool) string {

@@ -34,7 +34,7 @@ var pageFiles = map[string][]string{
 	"setup":         {"templates/setup.html"},
 	"login":         {"templates/login.html"},
 	"dashboard":     {"templates/dashboard.html"},
-	"account":       {"templates/account.html"},
+	"settings":      {"templates/settings.html"},
 	"users":         {"templates/users.html"},
 	"user_form":     {"templates/user_form.html"},
 	"backup":        {"templates/backup.html", "templates/encrypt_fields.html"},

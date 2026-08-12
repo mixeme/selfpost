@@ -9,7 +9,7 @@
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
 
 {{if .ShowDMARC}}
-<form method="post" action="/account">
+<form method="post" action="/settings">
 <div class="split">
   <div class="card">
     <h2>Panel credentials</h2>
@@ -80,7 +80,7 @@ this one stays signed in.</p>
   <h2>Panel credentials</h2>
   <p class="muted">These are the credentials for this control panel only.
   Applications keep their own logins and passwords, which are not affected.</p>
-  <form method="post" action="/account">
+  <form method="post" action="/settings">
     <label for="username">Username</label>
     <input id="username" name="username" autocomplete="username"
            autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>

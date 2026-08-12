@@ -41,7 +41,7 @@ func (h *Handlers) renderDashboard(w http.ResponseWriter, r *http.Request, statu
 		return
 	}
 	data := h.pageBase(r)
-	data["Title"] = "SelfPost"
+	data["Title"] = "SelfPost — domains"
 	data["Active"] = "domains"
 	data["Domains"] = h.domainRows(domains)
 	data["Error"] = formErr

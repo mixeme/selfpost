@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: page URLs, browser titles, and headings are aligned — **Settings** is
+  now `/settings` (legacy `/account` redirects with 308); the domains list title
+  is `SelfPost — domains`; Status, Users, and user create/edit titles match their
+  nav labels and `<h1>` text; the backup page title is `SelfPost — backup &
+  migration` to reflect domain import as well as full backup. Operator guide and
+  architecture route tables updated.
+
 ### Fixed
 
 - image: `mail.log` rotation no longer silently stops when the build context

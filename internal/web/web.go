@@ -151,7 +151,8 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
 	authed.HandleFunc("POST /reload", h.HandleReload)
 
-	authed.HandleFunc("/account", h.HandleAccount)
+	authed.HandleFunc("/settings", h.HandleAccount)
+	authed.HandleFunc("/account", redirectSettings)
 
 	authed.HandleFunc("GET /users", h.HandleUsers)
 	authed.HandleFunc("GET /users/new", h.HandleUserNew)
@@ -172,6 +173,15 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("/", s.auth.RequireAuth(authed))
 	return s.secure(mux)
+}
+
+// redirectSettings sends legacy /account bookmarks to /settings (308 preserves POST).
+func redirectSettings(w http.ResponseWriter, r *http.Request) {
+	target := "/settings"
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusPermanentRedirect)
 }
 
 func redirectHome(w http.ResponseWriter, r *http.Request) {

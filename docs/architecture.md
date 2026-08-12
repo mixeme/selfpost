@@ -170,7 +170,8 @@ unless noted. The table below is a summary — HTMX fragment endpoints
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |
 | `/backup` | Full backup download (page also hosts the import form) |
-| `/account` | Admin username/password |
+| `/settings` | Admin username/password and DMARC report address |
+| `/users`, `/users/*` | Panel user CRUD (global admin only) |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in

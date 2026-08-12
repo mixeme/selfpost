@@ -45,7 +45,7 @@ func (h *Handlers) renderBackupPage(w http.ResponseWriter, r *http.Request, stat
 // wrong form.
 func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, status int, importErr, backupErr string) {
 	data := h.pageBase(r)
-	data["Title"] = "SelfPost — backup"
+	data["Title"] = "SelfPost — backup & migration"
 	data["Active"] = "backup"
 	data["ImportErr"] = importErr
 	data["BackupErr"] = backupErr
