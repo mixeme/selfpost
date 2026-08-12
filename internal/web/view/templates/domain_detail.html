@@ -329,6 +329,7 @@
             <div class="check-cols">
               <div class="check-col">
                 <p class="check-col-title">Address mode</p>
+                <p class="muted">Which From addresses this application may use.</p>
                 <form method="post" action="/applications/{{.ID}}/mode">
                   <select name="mode" data-list-mode="{{$.List}}" aria-label="Address mode">
                     <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
@@ -345,12 +346,14 @@
               <div class="check-col">
                 <p class="check-col-title">Optional trusted-IP override
                   {{if .HasLimit}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
+                <p class="muted">One per line or comma-separated.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
-                  <label>Trusted client IPs (required; one per line or comma-separated)</label>
-                  <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
+                  <textarea name="allowed_ips" rows="1" placeholder="203.0.113.10"
+                            aria-label="Trusted client IPs">{{.IPsText}}</textarea>
                   <p class="muted">These IPs get a higher ceiling than the domain
                   (≤ level&nbsp;1) and skip the domain check; everyone else uses
-                  {{if $.DomainHasRL}}the domain ceiling ({{$.DomainRLMaxNum}}){{else}}level&nbsp;1 only{{end}}.</p>
+                  the domain level-2 limit{{if $.DomainHasRL}} ({{$.DomainRLMaxNum}}){{end}}
+                  if set, otherwise level&nbsp;1.</p>
                   <div class="field-pair">
                     <div>
                       <label>Message limit (max {{$.L1Messages}})</label>
@@ -390,58 +393,64 @@
 <div class="card" id="domain-settings">
   <h2>Domain settings</h2>
 
-  <div class="check-cols">
+  <div class="check-cols check-cols-rows">
     <div class="check-col">
       <p class="check-col-title">DMARC reports</p>
       <p class="muted">Default comes from <a href="/settings">Settings</a>;
       override per domain here.</p>
-      <form method="post" action="/domains/{{.Domain.ID}}/dmarc">
-        <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
-        <select id="dmarc_rua_mode" name="dmarc_rua_mode" data-custom-mode="custom">
-          <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
-          <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
-          <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
-        </select>
+      <div class="check-col-fields">
+        <form id="dmarc-domain" method="post" action="/domains/{{.Domain.ID}}/dmarc">
+          <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
+          <select id="dmarc_rua_mode" name="dmarc_rua_mode" data-custom-mode="custom">
+            <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
+            <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
+            <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
+          </select>
 
-        <div data-custom-address>
-          <label for="dmarc_rua_email">Custom report address</label>
-          <input id="dmarc_rua_email" name="dmarc_rua_email" type="email"
-                 autocapitalize="none" spellcheck="false" value="{{.DMARCRuaCustom}}"
-                 placeholder="reports@your-mail-domain.com">
-        </div>
-
-        <button type="submit">Save DMARC report settings</button>
-      </form>
+          <div data-custom-address>
+            <label for="dmarc_rua_email">Custom report address</label>
+            <input id="dmarc_rua_email" name="dmarc_rua_email" type="email"
+                   autocapitalize="none" spellcheck="false" value="{{.DMARCRuaCustom}}"
+                   placeholder="reports@your-mail-domain.com">
+          </div>
+        </form>
+      </div>
+      <div class="check-col-actions">
+        <button type="submit" form="dmarc-domain">Save DMARC report settings</button>
+      </div>
     </div>
 
     <div class="check-col">
       <p class="check-col-title">Level-2 rate limit
         {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
       <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
-
-      <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
-        <div class="field-pair">
-          <div>
-            <label for="d_max">Message limit (max {{.L1Messages}})</label>
-            <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
-                   value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
+      <div class="check-col-fields">
+        <form id="rl-domain" method="post" action="/domains/{{.Domain.ID}}/ratelimit">
+          <div class="field-pair">
+            <div>
+              <label for="d_max">Message limit (max {{.L1Messages}})</label>
+              <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
+                     value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
+            </div>
+            <div>
+              <label for="d_win">Window (seconds)</label>
+              <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+            </div>
           </div>
-          <div>
-            <label for="d_win">Window (seconds)</label>
-            <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
-          </div>
-        </div>
-        <p class="muted">Applies to every client IP on this domain. Leave the
-          message limit empty to use level&nbsp;1 only.</p>
-        <button type="submit">Save limit</button>
-      </form>
-      {{if .DomainHasRL}}
-      <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
-            data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
-        <input type="hidden" name="clear" value="1">
-        <button type="submit" class="danger">Remove limit</button>
-      </form>
-      {{end}}
+          <p class="muted">Applies to every client IP on this domain. Leave the
+            message limit empty to use level&nbsp;1 only.</p>
+        </form>
+      </div>
+      <div class="check-col-actions">
+        <button type="submit" form="rl-domain">Save limit</button>
+        {{if .DomainHasRL}}
+        <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
+              data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
+          <input type="hidden" name="clear" value="1">
+          <button type="submit" class="danger">Remove limit</button>
+        </form>
+        {{end}}
+      </div>
     </div>
   </div>
 </div>

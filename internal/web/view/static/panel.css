@@ -360,6 +360,19 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 .app .actions > .panel .panel-buttons form { margin-top: 0; }
 .app .actions > .panel .check-cols { margin-top: 0.6rem; }
 .app .actions > .panel .check-col > form { margin-top: 0; }
+.app .actions > .panel .check-col > .check-col-title { margin-top: 0; }
+.app .actions > .panel .check-col > .muted { margin: 0; }
+/* Address mode select ‖ trusted-IP field: same top offset and control height. */
+.app .actions > .panel .check-col > .muted + form > select:first-of-type,
+.app .actions > .panel .check-col > .muted + form > textarea[name="allowed_ips"] {
+  margin-top: 0.45rem;
+  min-height: 2.55rem;
+  box-sizing: border-box;
+}
+.app .actions > .panel .check-col > .muted + form > textarea[name="allowed_ips"] {
+  field-sizing: fixed;
+  overflow-y: auto;
+}
 .credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
@@ -538,6 +551,22 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    the cell to shrink below the card's intrinsic minimum when the column is
    tight. */
 .split > .card { margin-left: 0; margin-right: 0; min-width: 0; }
+/* Paired cards often differ in body length (export's encrypt checkbox vs
+   danger's short blurb). Stretch both in the grid row and pin the primary
+   action to the bottom so the buttons share a baseline. */
+.split > .card {
+  display: flex; flex-direction: column;
+}
+.split > .card > form {
+  display: flex; flex-direction: column; flex: 1 1 auto;
+}
+.split > .card > form > button[type="submit"]:last-child {
+  margin-top: auto;
+}
+.split > .card > a.danger:last-child,
+.split > .card > a.btn:last-child {
+  margin-top: auto; align-self: flex-start;
+}
 /* The gap already spaces the cards inside the grid; the general .card + .card
    rule would add a second gap's worth on top of it, and only to the second
    card, which in one column reads as an uneven stack. The blocks around the
@@ -561,16 +590,37 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
   margin: 1rem 0 0.35rem; font-size: 1.05rem; font-weight: 600;
 }
 .card > h2 + .check-col-title { margin-top: 0.55rem; }
+/* Domain settings pairs DMARC ‖ rate limit: share four row tracks so titles,
+   leads, fields and action buttons line up across columns. */
+@supports (grid-template-rows: subgrid) {
+  .check-cols-rows {
+    grid-template-rows: auto auto 1fr auto;
+  }
+  .check-cols-rows > .check-col {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 4;
+  }
+}
+.check-cols-rows > .check-col > .check-col-title { margin-top: 0; }
+.check-cols-rows > .check-col > .muted { margin: 0; }
+.check-col-fields { min-width: 0; }
+.check-col-fields > form { margin: 0; }
+.check-col-fields .field-pair { margin-top: 0; }
+.check-col-fields .field-pair > div > label { margin-top: 0.9rem; }
+.check-col-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.75rem;
+  margin-top: 0;
+}
+.check-col-actions > button { margin-top: 1.2rem; }
+.check-col-actions > form.inline { margin: 0; }
+.check-col-actions > form.inline > button { margin-top: 1.2rem; }
 /* Two short fields on one row (rate-limit message count ‖ window). Falls to
    one column when the parent is too narrow for both. */
 .field-pair {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: 0 1rem;
+  gap: 0 1rem; margin-top: 0.45rem;
 }
-/* First control row in a check-col form: match a bare label's top margin so
-   paired columns (DMARC ‖ rate limit) line up their first field labels. */
-form > .field-pair { margin-top: 0; }
-form > .field-pair > div > label { margin-top: 0.9rem; }
 .field-pair > div { min-width: 0; }
 .field-pair label { margin-top: 0.45rem; }
 /* Hint under a field-pair sits tight above the form's submit button (the
