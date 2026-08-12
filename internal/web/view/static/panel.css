@@ -570,9 +570,13 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
 .field-pair > div { min-width: 0; }
 .field-pair label { margin-top: 0.45rem; }
 /* Host / name beside a DNS Type that is always TXT — size the type column to
-   that token rather than giving it half the row. */
+   that token rather than giving it half the row. Vertical padding matches
+   .code-row .code so TXT is the same height as Host when Copy sits beside it. */
 .field-pair.host-type {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+.field-pair.host-type .code {
+  padding-top: 0.45rem; padding-bottom: 0.45rem;
 }
 .field-type { width: max-content; }
 .field-type .code {
