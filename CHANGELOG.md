@@ -5,10 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- panel: level-1 backstop is shown as a dedicated line (`N messages / Ws`) and
+  in message-limit labels; Settings uses a code-row for the L1 value. Domain
+  and application rate-limit status uses the shared `st` badge (`active` /
+  `inactive — level 1 only`). Trusted-IP override copy is a single paragraph.
+
 ## [1.2.4] - 2026-08-12
 
-Level-2 rate-limit semantics inverted after 1.2.3, with clearer L1 display and
-status badges. Upgrading is a tag bump; no migration.
+Level-2 rate-limit semantics inverted after 1.2.3, plus a small DNS field
+height fix. Upgrading is a tag bump; no migration.
 
 ### Changed
 
@@ -20,10 +27,6 @@ status badges. Upgrading is a tag bump; no migration.
   level-1 backstop on domain/application forms and Settings, rejects maxima
   above level 1, and requires an application override to exceed the domain
   maximum. Operator guide and architecture updated.
-- panel: level-1 backstop is shown as a dedicated line (`N messages / Ws`) and
-  in message-limit labels; Settings uses a code-row for the L1 value. Domain
-  and application rate-limit status uses the shared `st` badge (`active` /
-  `inactive — level 1 only`). Trusted-IP override copy is a single paragraph.
 
 ### Fixed
 
