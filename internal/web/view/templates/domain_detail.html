@@ -330,8 +330,7 @@
               <div class="check-col">
                 <p class="check-col-title">Address mode</p>
                 <form method="post" action="/applications/{{.ID}}/mode">
-                  <label>Address mode</label>
-                  <select name="mode" data-list-mode="{{$.List}}">
+                  <select name="mode" data-list-mode="{{$.List}}" aria-label="Address mode">
                     <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
                     <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
                   </select>
@@ -349,10 +348,7 @@
                 <p class="muted">These IPs get a higher ceiling than the domain
                 (≤ level&nbsp;1) and skip the domain check; everyone else uses
                 {{if $.DomainHasRL}}the domain ceiling ({{$.DomainRLMaxNum}}){{else}}level&nbsp;1 only{{end}}.</p>
-                <p>Level&nbsp;1 backstop:
-                  <strong>{{$.L1Messages}}</strong> messages /
-                  <strong>{{$.L1Window}}</strong>s
-                  — <a href="/settings#rate-limits">Settings</a>.</p>
+                <p class="muted">Level&nbsp;1 backstop: {{$.L1Messages}} messages / {{$.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
                   <label>Trusted client IPs (required; one per line or comma-separated)</label>
                   <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
@@ -422,12 +418,7 @@
     <div class="check-col">
       <p class="check-col-title">Optional level-2 sending rate limit
         {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive — level 1 only</span>{{end}}</p>
-      <p class="muted">Applies to every client IP on this domain. Leave the
-        message limit empty to use level&nbsp;1 only.</p>
-      <p>Level&nbsp;1 backstop (from <code>.env</code>):
-        <strong>{{.L1Messages}}</strong> messages /
-        <strong>{{.L1Window}}</strong>s
-        — see <a href="/settings#rate-limits">Settings</a>.</p>
+      <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
 
       <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
         <div class="field-pair">
@@ -441,7 +432,8 @@
             <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
           </div>
         </div>
-
+        <p class="muted">Applies to every client IP on this domain. Leave the
+          message limit empty to use level&nbsp;1 only.</p>
         <button type="submit">Save limit</button>
       </form>
       {{if .DomainHasRL}}

@@ -7,10 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
-- panel: level-1 backstop is shown as a dedicated line (`N messages / Ws`) and
-  in message-limit labels; Settings uses a code-row for the L1 value. Domain
+- panel: level-1 backstop is shown as muted copy (`N messages / Ws — Settings`)
+  and in message-limit labels; Settings uses a code-row for the L1 value. Domain
   and application rate-limit status uses the shared `st` badge (`active` /
-  `inactive — level 1 only`). Trusted-IP override copy is a single paragraph.
+  `inactive — level 1 only`). Trusted-IP override copy is a single paragraph;
+  domain rate-limit help sits above Save; Address mode drops the duplicate
+  field label.
 
 ## [1.2.4] - 2026-08-12
 
