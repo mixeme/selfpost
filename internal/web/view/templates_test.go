@@ -207,7 +207,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 }
 
 // The domain page pairs cards the same way Status does: three .split rows
-// (DKIM|SPF+DMARC, settings|add-app, export|danger). DNS status, Applications
+// (DKIM+SPF|DMARC, connection|add-app, export|danger). DNS status, Applications
 // and Domain settings are full-width; DNS status and Domain settings (and the
 // application Edit panel) use .check-cols. Losing a row silently stacks again.
 func TestDomainDetailPageHasPairedCards(t *testing.T) {
@@ -230,8 +230,8 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 		t.Error("application Edit mode and Rate limit should be one Edit button")
 	}
 	for _, id := range []string{
-		`id="dkim"`, `id="dns-status"`, `id="spf-dmarc"`,
-		`id="settings"`, `id="add-application"`, `id="applications"`,
+		`id="dkim-spf"`, `id="dns-status"`, `id="dmarc"`,
+		`id="connection"`, `id="add-application"`, `id="applications"`,
 		`id="domain-settings"`, `id="export"`, `id="danger"`,
 	} {
 		if !strings.Contains(src, id) {
@@ -241,11 +241,8 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 	if strings.Contains(src, `id="rate-limit"`) {
 		t.Error("domain rate limit should live inside domain-settings, not its own card")
 	}
-	if strings.Contains(src, `id="spf"`) && !strings.Contains(src, `id="spf-dmarc"`) {
-		t.Error("standalone SPF card should be merged into spf-dmarc")
-	}
-	if regexp.MustCompile(`id="dmarc"`).MatchString(src) {
-		t.Error("standalone DMARC card should be merged into spf-dmarc")
+	if strings.Contains(src, `id="spf-dmarc"`) {
+		t.Error("SPF should sit with DKIM, not with DMARC")
 	}
 }
 

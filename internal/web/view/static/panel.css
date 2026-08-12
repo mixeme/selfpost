@@ -508,8 +508,20 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    beside them would otherwise win the width and leave "Memory" broken across
    two lines. */
 .metric { white-space: nowrap; }
+/* Copy sits at the top of the value — right for a long DKIM key. The row's
+   .code uses the compact button's vertical padding so a one-line value is the
+   same height as Copy and does not leave the button hanging under an empty
+   band of padding. */
 .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
-.code-row .code { flex: 1; min-width: 0; }
+.code-row .code {
+  flex: 1; min-width: 0; margin-top: 0;
+  padding-top: 0.45rem; padding-bottom: 0.45rem;
+}
+/* A short field with its submit on the same row (Add domain). The button
+   keeps the card's usual filled look; its top margin is for stacked forms. */
+.input-row { display: flex; align-items: stretch; gap: 0.5rem; }
+.input-row input { flex: 1; min-width: 0; }
+.input-row button { margin-top: 0; flex: none; white-space: nowrap; }
 
 /* Two cards abreast, on the one page that has a pair of them worth reading
    together (a delivery's facts beside its history). auto-fit with a minimum
@@ -557,6 +569,15 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
 }
 .field-pair > div { min-width: 0; }
 .field-pair label { margin-top: 0.45rem; }
+/* Host / name beside a DNS Type that is always TXT — size the type column to
+   that token rather than giving it half the row. */
+.field-pair.host-type {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.field-type { width: max-content; }
+.field-type .code {
+  width: fit-content; min-width: 2.75rem; text-align: center; box-sizing: border-box;
+}
 /* The subject heads a delivery's page, and it is the one heading in the panel
    whose text we do not control: it may be a hundred characters with nothing to
    break on. It wraps to as many lines as it needs (this is the page's name, not
@@ -646,7 +667,7 @@ button.copy, .actions button, .actions > label.toggle, .actions a.danger, .nav b
 }
 button.copy:hover, .actions button:hover, .actions > label.toggle:hover,
 .actions a.danger:hover, .nav button:hover { background: var(--surface-bg-hover); }
-button.copy { flex: none; margin-top: 0.3rem; }
+button.copy { flex: none; }
 .actions button.danger, .actions a.danger, .nav button.danger {
   color: var(--danger-fg); background: var(--danger-bg); border-color: var(--danger-border);
 }

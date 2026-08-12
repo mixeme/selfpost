@@ -141,7 +141,7 @@ Requires Go 1.26+ and `CGO_ENABLED=0`.
 
 ```sh
 make build        # bin/panel, bin/selfpost-backup (VERSION=dev by default)
-make build VERSION=1.2.2
+make build VERSION=1.2.3
 ```
 
 Or directly:

@@ -8,14 +8,14 @@
   <h2>Add a sending domain</h2>
   <form method="post" action="/domains">
     <label for="name">Domain</label>
-    <input id="name" name="name" type="text" placeholder="example.com"
-           autocomplete="off" autocapitalize="none" spellcheck="false"
-           value="{{.FormName}}" autofocus required>
+    <div class="input-row">
+      <input id="name" name="name" type="text" placeholder="example.com"
+             autocomplete="off" autocapitalize="none" spellcheck="false"
+             value="{{.FormName}}" autofocus required>
+      <button type="submit">Add domain</button>
+    </div>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    <button type="submit">Add domain</button>
   </form>
-  <p class="muted">A DKIM key is generated for the domain; you then publish the
-  shown DNS record. Adding a domain does not create an application.</p>
 </div>
 {{end}}
 

@@ -37,39 +37,93 @@
   <div class="check-cols">
     <div class="check-col">
       <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
-      <p class="muted">{{.Record.Name}}</p>
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <span class="code">{{.Record.Name}}</span>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">TXT</span>
+        </div>
+      </div>
+      {{if .DNS.DKIM.Records}}
+      <label>Value</label>
+      <span class="code">{{range .DNS.DKIM.Records}}{{.}}
+{{end}}</span>
+      {{end}}
       {{if ne .DNS.DKIM.Status "ok"}}
       <p class="{{if eq .DNS.DKIM.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
       {{end}}
-      {{if .DNS.DKIM.Records}}<span class="code">{{range .DNS.DKIM.Records}}{{.}}
-{{end}}</span>{{end}}
     </div>
 
     <div class="check-col">
       <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
-      <p class="muted">{{.Domain.Name}}</p>
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <span class="code">{{.Domain.Name}}</span>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">TXT</span>
+        </div>
+      </div>
+      {{if .DNS.SPF.Records}}
+      <label>Value</label>
+      <span class="code">{{range .DNS.SPF.Records}}{{.}}
+{{end}}</span>
+      {{end}}
       {{if ne .DNS.SPF.Status "ok"}}
       <p class="{{if eq .DNS.SPF.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
       {{end}}
       <p class="muted">Shallow check: literal address only, no <code>include:</code> /
       <code>redirect=</code>.</p>
-      {{if .DNS.SPF.Records}}<span class="code">{{range .DNS.SPF.Records}}{{.}}
-{{end}}</span>{{end}}
     </div>
 
     <div class="check-col">
       <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
-      <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
-      {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
-{{end}}</span>{{end}}
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <span class="code">{{.DMARCName}}</span>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">TXT</span>
+        </div>
+      </div>
+      {{if .DNS.DMARC.Records}}
+      <label>Value</label>
+      <span class="code">{{range .DNS.DMARC.Records}}{{.}}
+{{end}}</span>
+      {{end}}
+      {{if ne .DNS.DMARC.Status "ok"}}
+      <p class="{{if eq .DNS.DMARC.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
+      {{else}}
+      <p class="muted">{{.DNS.DMARC.Detail}}</p>
+      {{end}}
     </div>
 
     <div class="check-col">
       {{if .DNS.DMARCReportAuth.Status}}
       <label>Report authorization <span class="st st-{{.DNS.DMARCReportAuth.Status}}">{{.DNS.DMARCReportAuth.Status}}</span></label>
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <span class="code">{{.ReportAuthName}}</span>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">TXT</span>
+        </div>
+      </div>
+      {{if .DNS.DMARCReportAuth.Records}}
+      <label>Value</label>
+      <span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
+{{end}}</span>
+      {{end}}
       <p class="{{if eq .DNS.DMARCReportAuth.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARCReportAuth.Detail}}</p>
-      {{if .DNS.DMARCReportAuth.Records}}<span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
-{{end}}</span>{{end}}
       {{else}}
       <label>Report authorization</label>
       <p class="muted">Not required (no external <code>rua=</code>).</p>
@@ -83,17 +137,23 @@
 </div>
 
 <div class="split">
-  <div class="card" id="dkim">
-    <h2>DKIM record</h2>
+  <div class="card" id="dkim-spf">
+    <h2>DKIM and SPF records</h2>
 
-    <label>Host / name</label>
-    <div class="code-row">
-      <span class="code">{{.Record.Name}}</span>
-      <button type="button" class="copy">Copy</button>
+    <p class="check-col-title">DKIM</p>
+    <div class="field-pair host-type">
+      <div>
+        <label>Host / name</label>
+        <div class="code-row">
+          <span class="code">{{.Record.Name}}</span>
+          <button type="button" class="copy">Copy</button>
+        </div>
+      </div>
+      <div class="field-type">
+        <label>Type</label>
+        <span class="code">TXT</span>
+      </div>
     </div>
-
-    <label>Type</label>
-    <span class="code">TXT</span>
 
     <label>Value</label>
     <div class="code-row">
@@ -103,20 +163,21 @@
 
     <p class="muted">Not a secret. Signed with selector
     <strong>{{.Domain.DKIMSelector}}</strong>.</p>
-  </div>
-
-  <div class="card" id="spf-dmarc">
-    <h2>SPF and DMARC records</h2>
 
     <p class="check-col-title">SPF</p>
-    <label>Host / name</label>
-    <div class="code-row">
-      <span class="code">{{.Domain.Name}}</span>
-      <button type="button" class="copy">Copy</button>
+    <div class="field-pair host-type">
+      <div>
+        <label>Host / name</label>
+        <div class="code-row">
+          <span class="code">{{.Domain.Name}}</span>
+          <button type="button" class="copy">Copy</button>
+        </div>
+      </div>
+      <div class="field-type">
+        <label>Type</label>
+        <span class="code">TXT</span>
+      </div>
     </div>
-
-    <label>Type</label>
-    <span class="code">TXT</span>
 
     <label>Value</label>
     <div class="code-row">
@@ -126,16 +187,24 @@
 
     <p class="muted">Merge into an existing SPF if the domain already has one —
     do not publish a second record.</p>
+  </div>
 
-    <p class="check-col-title">DMARC</p>
-    <label>Host / name</label>
-    <div class="code-row">
-      <span class="code">{{.DMARCName}}</span>
-      <button type="button" class="copy">Copy</button>
+  <div class="card" id="dmarc">
+    <h2>DMARC record</h2>
+
+    <div class="field-pair host-type">
+      <div>
+        <label>Host / name</label>
+        <div class="code-row">
+          <span class="code">{{.DMARCName}}</span>
+          <button type="button" class="copy">Copy</button>
+        </div>
+      </div>
+      <div class="field-type">
+        <label>Type</label>
+        <span class="code">TXT</span>
+      </div>
     </div>
-
-    <label>Type</label>
-    <span class="code">TXT</span>
 
     <label>Value{{if eq .DMARCSource "settings"}} <span class="muted">(from Settings)</span>{{else if eq .DMARCSource "custom"}} <span class="muted">(custom)</span>{{else if eq .DMARCSource "none"}} <span class="muted">(no reports)</span>{{end}}</label>
     <div class="code-row">
@@ -151,14 +220,19 @@
 
     {{if .NeedsReportAuth}}
     <p class="check-col-title">Report authorization</p>
-    <label>Host / name</label>
-    <div class="code-row">
-      <span class="code">{{.ReportAuthName}}</span>
-      <button type="button" class="copy">Copy</button>
+    <div class="field-pair host-type">
+      <div>
+        <label>Host / name</label>
+        <div class="code-row">
+          <span class="code">{{.ReportAuthName}}</span>
+          <button type="button" class="copy">Copy</button>
+        </div>
+      </div>
+      <div class="field-type">
+        <label>Type</label>
+        <span class="code">TXT</span>
+      </div>
     </div>
-
-    <label>Type</label>
-    <span class="code">TXT</span>
 
     <label>Value</label>
     <div class="code-row">
@@ -174,8 +248,8 @@
 </div>
 
 <div class="split">
-  <div class="card" id="settings">
-    <h2>Sending server settings</h2>
+  <div class="card" id="connection">
+    <h2>Connection settings</h2>
     <p class="muted">Same for every domain. Authenticate with an application
     login from below.</p>
 
@@ -193,8 +267,8 @@
     create or regenerate.</p>
   </div>
 
-  {{/* Create form beside settings, mirroring "Add a sending domain" above the
-       domains list. */}}
+  {{/* Create form beside connection settings, mirroring "Add a sending domain"
+       above the domains list. */}}
   <div class="card" id="add-application">
     <h2>Add an application</h2>
     <form method="post" action="/domains/{{.Domain.ID}}/applications">
@@ -270,7 +344,10 @@
                 </form>
               </div>
               <div class="check-col">
-                <p class="check-col-title">Rate limit</p>
+                <p class="check-col-title">Optional level-2 rate limit</p>
+                <p class="muted">Caps this application only. The domain level-2
+                limit (<a href="#domain-settings">Domain settings</a>) and the
+                global level-1 limit still apply.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
                   <label>Expected client IPs (one per line or comma-separated)</label>
                   <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
