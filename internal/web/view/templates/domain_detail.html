@@ -28,11 +28,63 @@
 </div>
 {{end}}
 
+{{/* Two rows of two checks (.check-cols). */}}
+<div class="card" id="dns-status">
+  <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
+  <p class="muted">Cached a few minutes — use <em>Re-check</em> after
+  publishing.</p>
+
+  <div class="check-cols">
+    <div class="check-col">
+      <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
+      <p class="muted">{{.Record.Name}}</p>
+      {{if ne .DNS.DKIM.Status "ok"}}
+      <p class="{{if eq .DNS.DKIM.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
+      {{end}}
+      {{if .DNS.DKIM.Records}}<span class="code">{{range .DNS.DKIM.Records}}{{.}}
+{{end}}</span>{{end}}
+    </div>
+
+    <div class="check-col">
+      <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
+      <p class="muted">{{.Domain.Name}}</p>
+      {{if ne .DNS.SPF.Status "ok"}}
+      <p class="{{if eq .DNS.SPF.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
+      {{end}}
+      <p class="muted">Shallow check: literal address only, no <code>include:</code> /
+      <code>redirect=</code>.</p>
+      {{if .DNS.SPF.Records}}<span class="code">{{range .DNS.SPF.Records}}{{.}}
+{{end}}</span>{{end}}
+    </div>
+
+    <div class="check-col">
+      <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
+      <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
+      {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
+{{end}}</span>{{end}}
+    </div>
+
+    <div class="check-col">
+      {{if .DNS.DMARCReportAuth.Status}}
+      <label>Report authorization <span class="st st-{{.DNS.DMARCReportAuth.Status}}">{{.DNS.DMARCReportAuth.Status}}</span></label>
+      <p class="{{if eq .DNS.DMARCReportAuth.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARCReportAuth.Detail}}</p>
+      {{if .DNS.DMARCReportAuth.Records}}<span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
+{{end}}</span>{{end}}
+      {{else}}
+      <label>Report authorization</label>
+      <p class="muted">Not required (no external <code>rua=</code>).</p>
+      {{end}}
+    </div>
+  </div>
+
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
+    <button type="submit">Re-check</button>
+  </form>
+</div>
+
 <div class="split">
   <div class="card" id="dkim">
-    <h2>DKIM DNS record</h2>
-    <p class="muted">Publish this TXT for <strong>{{.Domain.Name}}</strong>.
-    It is not a secret.</p>
+    <h2>DKIM record</h2>
 
     <label>Host / name</label>
     <div class="code-row">
@@ -49,90 +101,41 @@
       <button type="button" class="copy">Copy</button>
     </div>
 
-    <p class="muted">Signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+    <p class="muted">Not a secret. Signed with selector
+    <strong>{{.Domain.DKIMSelector}}</strong>.</p>
   </div>
 
-  <div class="card" id="dns-status">
-    <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
-    <p class="muted">Cached a few minutes — use <em>Re-check</em> after
-    publishing.</p>
+  <div class="card" id="spf-dmarc">
+    <h2>SPF and DMARC records</h2>
 
-    <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
-    <p class="{{if eq .DNS.DKIM.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
-    {{if .DNS.DKIM.Records}}<span class="code">{{range .DNS.DKIM.Records}}{{.}}
-{{end}}</span>{{end}}
-
-    <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
-    <p class="{{if eq .DNS.SPF.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
-    {{if .DNS.SPF.Records}}<span class="code">{{range .DNS.SPF.Records}}{{.}}
-{{end}}</span>{{end}}
-    <p class="muted">Shallow check: literal address only, no
-    <code>include:</code> / <code>redirect=</code>.</p>
-
-    <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
-    <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
-    {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
-{{end}}</span>{{end}}
-
-    {{if .DNS.DMARCReportAuth.Status}}
-    <label>Report authorization <span class="st st-{{.DNS.DMARCReportAuth.Status}}">{{.DNS.DMARCReportAuth.Status}}</span></label>
-    <p class="{{if eq .DNS.DMARCReportAuth.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARCReportAuth.Detail}}</p>
-    {{if .DNS.DMARCReportAuth.Records}}<span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
-{{end}}</span>{{end}}
-    {{end}}
-
-    <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
-      <button type="submit">Re-check</button>
-    </form>
-  </div>
-</div>
-
-<div class="split">
-  <div class="card" id="spf">
-    <h2>SPF record</h2>
-    <p class="muted">Suggested TXT. If the domain already has SPF, merge this
-    server's mechanism into it — do not add a second record.</p>
-
+    <p class="check-col-title">SPF</p>
     <label>Host / name</label>
     <div class="code-row">
       <span class="code">{{.Domain.Name}}</span>
       <button type="button" class="copy">Copy</button>
     </div>
 
+    <label>Type</label>
+    <span class="code">TXT</span>
+
     <label>Value</label>
     <div class="code-row">
       <span class="code">{{.SPFExample}}</span>
       <button type="button" class="copy">Copy</button>
     </div>
-  </div>
 
-  <div class="card" id="dmarc">
-    <h2>DMARC record</h2>
-    <p class="muted">Policy TXT. SelfPost is send-only — omit <code>rua=</code>
-    or point it at a mailbox elsewhere (<a href="/settings">Settings</a> default
-    or custom below).</p>
+    <p class="muted">Merge into an existing SPF if the domain already has one —
+    do not publish a second record.</p>
 
-    <form method="post" action="/domains/{{.Domain.ID}}/dmarc">
-      <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
-      <select id="dmarc_rua_mode" name="dmarc_rua_mode">
-        <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
-        <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
-        <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
-      </select>
-
-      <label for="dmarc_rua_email">Custom report address</label>
-      <input id="dmarc_rua_email" name="dmarc_rua_email" type="email"
-             autocapitalize="none" spellcheck="false" value="{{.DMARCRuaCustom}}"
-             placeholder="reports@your-mail-domain.com">
-
-      <button type="submit">Save DMARC report settings</button>
-    </form>
-
+    <p class="check-col-title">DMARC</p>
     <label>Host / name</label>
     <div class="code-row">
       <span class="code">{{.DMARCName}}</span>
       <button type="button" class="copy">Copy</button>
     </div>
+
+    <label>Type</label>
+    <span class="code">TXT</span>
 
     <label>Value{{if eq .DMARCSource "settings"}} <span class="muted">(from Settings)</span>{{else if eq .DMARCSource "custom"}} <span class="muted">(custom)</span>{{else if eq .DMARCSource "none"}} <span class="muted">(no reports)</span>{{end}}</label>
     <div class="code-row">
@@ -147,13 +150,17 @@
     {{end}}
 
     {{if .NeedsReportAuth}}
-    <label>Report authorization — host / name</label>
+    <p class="check-col-title">Report authorization</p>
+    <label>Host / name</label>
     <div class="code-row">
       <span class="code">{{.ReportAuthName}}</span>
       <button type="button" class="copy">Copy</button>
     </div>
 
-    <label>Report authorization — value</label>
+    <label>Type</label>
+    <span class="code">TXT</span>
+
+    <label>Value</label>
     <div class="code-row">
       <span class="code">{{.ReportAuthValue}}</span>
       <button type="button" class="copy">Copy</button>
@@ -161,7 +168,8 @@
     {{end}}
 
     <p class="muted"><code>p=none</code> does not affect delivery. Tighten to
-    <code>p=quarantine</code> then <code>p=reject</code> once reports look clean.</p>
+    <code>p=quarantine</code> then <code>p=reject</code> once reports look clean.
+    Report address is set under <a href="#domain-settings">Domain settings</a>.</p>
   </div>
 </div>
 
@@ -229,17 +237,12 @@
           {{if eq .AddressMode $.Wildcard}}Any address of the domain — *@{{$.Domain.Name}}
           {{else}}Fixed list — {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}
         </p>
-        <!-- The two panels are opened by a checkbox and a label rather than by
-             <details>, so that the controls stay a single row of buttons and
-             what a panel reveals is laid out under all four of them instead of
-             splitting the row in two. The checkbox precedes both its label and
-             its panel, which is what lets the CSS alone show them (no script
-             involved) — see .panel-toggle in panel.css. -->
+        <!-- One Edit panel (mode ‖ rate limit) opened by a checkbox and label
+             rather than <details>, so the button row stays intact — see
+             .panel-toggle in panel.css. -->
         <div class="actions">
-          <input class="panel-toggle t-mode" id="mode-{{.ID}}" type="checkbox">
-          <label class="toggle for-mode" for="mode-{{.ID}}">Edit mode</label>
-          <input class="panel-toggle t-limit" id="limit-{{.ID}}" type="checkbox">
-          <label class="toggle for-limit" for="limit-{{.ID}}">Rate limit{{if .HasLimit}} (active){{end}}</label>
+          <input class="panel-toggle t-edit" id="edit-{{.ID}}" type="checkbox">
+          <label class="toggle for-edit" for="edit-{{.ID}}">Edit{{if .HasLimit}} (limit active){{end}}</label>
           <form class="inline" method="post" action="/applications/{{.ID}}/password"
                 data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
             <button type="submit">New password</button>
@@ -248,44 +251,55 @@
                 data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
             <button type="submit" class="danger">Delete</button>
           </form>
-          <div class="panel panel-mode">
-            <form method="post" action="/applications/{{.ID}}/mode">
-              <label>Address mode</label>
-              <select name="mode" data-list-mode="{{$.List}}">
-                <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
-                <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
-              </select>
-              <div data-addresses>
-                <label>Addresses (one per line or comma-separated)</label>
-                <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
+          <div class="panel panel-edit">
+            <div class="check-cols">
+              <div class="check-col">
+                <p class="check-col-title">Address mode</p>
+                <form method="post" action="/applications/{{.ID}}/mode">
+                  <label>Address mode</label>
+                  <select name="mode" data-list-mode="{{$.List}}">
+                    <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
+                    <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
+                  </select>
+                  <div data-addresses>
+                    <label>Addresses (one per line or comma-separated)</label>
+                    <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
 {{end}}{{$a}}{{end}}</textarea>
+                  </div>
+                  <button type="submit">Save mode</button>
+                </form>
               </div>
-              <button type="submit">Save mode</button>
-            </form>
-          </div>
-          <div class="panel panel-limit">
-            <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
-              <label>Expected client IPs (one per line or comma-separated)</label>
-              <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
-              <label>Message limit</label>
-              <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
-              <label>Window (seconds)</label>
-              <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
-            </form>
-            <!-- Saving and removing the limit are two posts, so they are two
-                 forms and could not share a line while the Save button sat
-                 inside the block form above. It is bound to that form by id
-                 instead (the form attribute, no script involved), which lets
-                 both buttons stand together in one row under the fields. -->
-            <div class="panel-buttons">
-              <button type="submit" form="rl-{{.ID}}">Save limit</button>
-              {{if .HasLimit}}
-              <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                    data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
-                <input type="hidden" name="clear" value="1">
-                <button type="submit" class="danger">Remove limit</button>
-              </form>
-              {{end}}
+              <div class="check-col">
+                <p class="check-col-title">Rate limit</p>
+                <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
+                  <label>Expected client IPs (one per line or comma-separated)</label>
+                  <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
+                  <p class="muted">The limit counts only connections from these
+                  IPs. Leave empty to leave the limit inactive.</p>
+                  <div class="field-pair">
+                    <div>
+                      <label>Message limit</label>
+                      <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
+                    </div>
+                    <div>
+                      <label>Window (seconds)</label>
+                      <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
+                    </div>
+                  </div>
+                </form>
+                <!-- Saving and removing the limit are two posts; the Save
+                     button is bound by form= id so both buttons share a row. -->
+                <div class="panel-buttons">
+                  <button type="submit" form="rl-{{.ID}}">Save limit</button>
+                  {{if .HasLimit}}
+                  <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
+                        data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
+                    <input type="hidden" name="clear" value="1">
+                    <button type="submit" class="danger">Remove limit</button>
+                  </form>
+                  {{end}}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -297,42 +311,73 @@
   {{end}}
 </div>
 
-<div class="split">
-  <div class="card" id="rate-limit">
-    <h2>Sending rate limit (domain)</h2>
-    <p class="muted">Optional level-2 cap across this domain's applications from
-    the listed client IPs. Empty IP list = inactive (level-1 only).</p>
+<div class="card" id="domain-settings">
+  <h2>Domain settings</h2>
 
-    <p class="muted">Status:
-      {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive (level-1 only){{end}}.</p>
+  <div class="check-cols">
+    <div class="check-col">
+      <p class="check-col-title">DMARC reports</p>
+      <p class="muted">Default comes from <a href="/settings">Settings</a>;
+      override per domain here.</p>
+      <form method="post" action="/domains/{{.Domain.ID}}/dmarc">
+        <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
+        <select id="dmarc_rua_mode" name="dmarc_rua_mode" data-custom-mode="custom">
+          <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
+          <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
+          <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
+        </select>
 
-    <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
-      <label for="d_ips">Expected client IPs (one per line or comma-separated)</label>
-      <textarea id="d_ips" name="allowed_ips" rows="2"
-                placeholder="203.0.113.10">{{.DomainRLIPs}}</textarea>
+        <div data-custom-address>
+          <label for="dmarc_rua_email">Custom report address</label>
+          <input id="dmarc_rua_email" name="dmarc_rua_email" type="email"
+                 autocapitalize="none" spellcheck="false" value="{{.DMARCRuaCustom}}"
+                 placeholder="reports@your-mail-domain.com">
+        </div>
 
-      <label for="d_max">Message limit</label>
-      <input id="d_max" name="max_messages" type="number" min="1"
-             value="{{.DomainRLMax}}" placeholder="1000">
+        <button type="submit">Save DMARC report settings</button>
+      </form>
+    </div>
 
-      <label for="d_win">Window (seconds)</label>
-      <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+    <div class="check-col">
+      <p class="check-col-title">Optional level-2 sending rate limit</p>
+      <p class="muted">Empty IP list = inactive (level-1 only). Status:
+        {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive{{end}}.</p>
 
-      <button type="submit">Save limit</button>
-    </form>
-    {{if .DomainHasRL}}
-    <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
-          data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
-      <input type="hidden" name="clear" value="1">
-      <button type="submit" class="danger">Remove limit</button>
-    </form>
-    {{end}}
+      <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
+        <label for="d_ips">Expected client IPs (one per line or comma-separated)</label>
+        <textarea id="d_ips" name="allowed_ips" rows="2"
+                  placeholder="203.0.113.10">{{.DomainRLIPs}}</textarea>
+        <p class="muted">The limit counts only connections from these IPs.
+        Leave empty to leave the limit inactive.</p>
+
+        <div class="field-pair">
+          <div>
+            <label for="d_max">Message limit</label>
+            <input id="d_max" name="max_messages" type="number" min="1"
+                   value="{{.DomainRLMax}}" placeholder="1000">
+          </div>
+          <div>
+            <label for="d_win">Window (seconds)</label>
+            <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+          </div>
+        </div>
+
+        <button type="submit">Save limit</button>
+      </form>
+      {{if .DomainHasRL}}
+      <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
+            data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
+        <input type="hidden" name="clear" value="1">
+        <button type="submit" class="danger">Remove limit</button>
+      </form>
+      {{end}}
+    </div>
   </div>
+</div>
 
+<div class="split">
   <div class="card" id="export">
     <h2>Export domain</h2>
-    <p class="muted">DKIM key, selector and application passwords for another
-    SelfPost instance. DNS stays the same on import.</p>
     <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt
     below as <code>.spde</code>.</p>
     {{if .ExportErr}}<p class="error">{{.ExportErr}}</p>{{end}}
@@ -341,30 +386,11 @@
       <button type="submit">Export domain</button>
     </form>
   </div>
-</div>
 
-<div class="card" id="danger">
-  <h2>Danger zone</h2>
-  <p class="muted">Deletes the DKIM key and every application on this domain.</p>
-  <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
-</div>
-{{end}}
-
-{{/* Section index in the navigation column (layout.html). The freshly generated
-     password is only listed while it is on the page. */}}
-{{define "sections"}}
-<div class="sections">
-  <p class="sections-title">On this page</p>
-  {{if .NewCred}}<a href="#new-credential">New application password</a>{{end}}
-  <a href="#dkim">DKIM DNS record</a>
-  <a href="#dns-status">DNS status</a>
-  <a href="#spf">SPF record</a>
-  <a href="#dmarc">DMARC record</a>
-  <a href="#settings">Sending server settings</a>
-  <a href="#add-application">Add an application</a>
-  <a href="#applications">Applications</a>
-  <a href="#rate-limit">Sending rate limit</a>
-  <a href="#export">Export domain</a>
-  <a href="#danger">Danger zone</a>
+  <div class="card" id="danger">
+    <h2>Danger zone</h2>
+    <p class="muted">Deletes the DKIM key and every application on this domain.</p>
+    <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
+  </div>
 </div>
 {{end}}

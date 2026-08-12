@@ -61,9 +61,9 @@
 {{define "nav"}}
 <nav class="nav">
   {{/* The order of the blocks is the order they are read in, top to bottom of
-       the column: the mark, the panel's pages, the current page's own sections,
-       and the session last. The mark goes to /status, the page the panel opens
-       on — named outright rather than as "/", which is only a redirect to it. */}}
+       the column: the mark, the panel's pages, and the session last. The mark
+       goes to /status, the page the panel opens on — named outright rather
+       than as "/", which is only a redirect to it. */}}
   <a class="brand" href="{{if .IsGlobal}}/status{{else}}/domains{{end}}"><img src="/static/logo-compact.svg" width="220" height="100" alt="SelfPost"></a>
   <div class="links">
     {{if .IsGlobal}}
@@ -78,7 +78,6 @@
     {{if eq .Active "users"}}<span aria-current="page">{{template "icon-users"}}Users</span>{{else}}<a href="/users">{{template "icon-users"}}Users</a>{{end}}
     {{end}}
   </div>
-  {{template "sections" .}}
   <div class="session">
     <span class="session-user muted">{{template "icon-account"}}User: {{.User}}</span>
     {{if eq .Active "settings"}}<span aria-current="page">{{template "icon-settings"}}Settings</span>{{else}}<a href="/settings">{{template "icon-settings"}}Settings</a>{{end}}
@@ -89,22 +88,12 @@
 </nav>
 {{end}}
 
-{{/* The index of the current page's own sections, shown in the navigation
-     column under the page entries. Most pages are one or two cards and need no
-     index, so the block is empty here and only the pages that are genuinely
-     long — the domain page, the status page — redefine it with their own list
-     (see .sections in panel.css for what it looks like, and panel.js for the
-     marking of the section in view). Each page's template file is parsed after
-     this one, so its definition replaces this empty one; a page that defines
-     nothing keeps it and renders no index. */}}
-{{define "sections"}}{{end}}
-
 {{/* Whether the page takes the column whole. Empty here, so a page is held to
-     the reading measure unless it says otherwise; the three pages that are
-     tables of data or raw log lines redefine this as the word "wide", which
-     lands in <main>'s class list (see main.wide in panel.css). Same mechanism
-     as "sections" above: each page's template file is parsed after this one,
-     so its definition replaces the empty one. */}}
+     the reading measure unless it says otherwise; the pages that are tables of
+     data, raw log lines or side-by-side cards redefine this as the word "wide",
+     which lands in <main>'s class list (see main.wide in panel.css). Each
+     page's template file is parsed after this one, so its definition replaces
+     the empty one. */}}
 {{define "wide"}}{{end}}
 
 {{/* back_link — up-navigation on drill-down pages. Invoke with the "back"

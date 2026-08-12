@@ -7,10 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
-- panel: the domain detail page is wide with paired cards (DKIM ‖ DNS status;
-  SPF ‖ DMARC; sending settings ‖ add application; rate limit ‖ export).
-  Applications and Danger stay full-width; SPF and DMARC are separate cards;
-  section blurbs are shorter.
+- panel: the domain detail page is wide with paired cards (DKIM ‖ SPF+DMARC;
+  sending settings ‖ add application; export ‖ danger). DNS status,
+  Applications and Domain settings are full-width. DNS status is two rows
+  (DKIM ‖ SPF, DMARC ‖ report authorization); Domain settings pairs DMARC
+  report mode with the domain rate limit; application Edit opens mode and
+  rate limit side by side; the custom rua address field is shown only for
+  Custom address. The in-nav “On this page” section index is removed (Status
+  already dropped it; the paired domain layout no longer needs it). Section
+  blurbs are shorter.
 - panel: page URLs, browser titles, and headings are aligned — **Settings** is
   now `/settings` (legacy `/account` redirects with 308); the domains list title
   is `SelfPost — domains`; Status, Users, and user create/edit titles match their

@@ -29,80 +29,6 @@ func TestEveryPageResolvesNav(t *testing.T) {
 	}
 }
 
-// The section index each long page shows in the navigation column works by
-// overriding an empty "sections" block defined in the layout, which only holds
-// as long as the layout is parsed before the page's own files (see pageFiles).
-// Reverse that order and every index would silently disappear — the empty
-// definition would win and no page would fail to render — so the two ends are
-// asserted here: the long pages produce a list, and a page that defines nothing
-// produces nothing at all.
-func TestSectionIndexIsOnTheLongPagesOnly(t *testing.T) {
-	engine, err := New("test")
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	// Anchors the index links to, taken from the page's own cards. Status used
-	// to carry one too; the paired layout is short enough without it.
-	wantAnchors := map[string]string{
-		"domain_detail": `href="#danger"`,
-	}
-	for name, page := range engine.Pages() {
-		var buf bytes.Buffer
-		// The domain page's index hides the freshly generated credential entry
-		// unless one is on the page, so the data map carries the key it reads.
-		if err := page.ExecuteTemplate(&buf, "sections", map[string]any{"NewCred": nil}); err != nil {
-			t.Fatalf("execute sections for %q: %v", name, err)
-		}
-		out := buf.String()
-		anchor, wanted := wantAnchors[name]
-		switch {
-		case wanted && !strings.Contains(out, anchor):
-			t.Errorf("page %q shows no section index (expected %s):\n%s", name, anchor, out)
-		case !wanted && strings.TrimSpace(out) != "":
-			t.Errorf("page %q is not long enough to carry a section index:\n%s", name, out)
-		}
-	}
-}
-
-// A section link that points at no card is a link that does nothing, and
-// nothing about rendering the page says so. Every anchor the index offers must
-// name an element the same page defines an id for.
-func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
-	engine, err := New("test")
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	// The pages that carry an index; checked with a credential shown, which is
-	// the domain page's one conditional entry. Status dropped its index once
-	// the paired layout was short enough.
-	for _, name := range []string{"domain_detail"} {
-		var index bytes.Buffer
-		if err := engine.Page(name).ExecuteTemplate(&index, "sections", map[string]any{"NewCred": true}); err != nil {
-			t.Fatalf("execute sections for %q: %v", name, err)
-		}
-		// The cards are spread over the page's template files, so the ids are
-		// collected from the files rather than from a rendered page — rendering
-		// one would need the whole of a handler's data map.
-		ids := map[string]bool{}
-		for _, file := range pageFiles[name] {
-			body, err := fs.ReadFile(assetsFS, file)
-			if err != nil {
-				t.Fatalf("read %s: %v", file, err)
-			}
-			// Cards only: a form field's id is not somewhere a section link may
-			// land, so matching those too would weaken the check.
-			for _, m := range regexp.MustCompile(`class="card[^"]*" id="([a-z-]+)"`).FindAllStringSubmatch(string(body), -1) {
-				ids[m[1]] = true
-			}
-		}
-		for _, m := range regexp.MustCompile(`href="#([a-z-]+)"`).FindAllStringSubmatch(index.String(), -1) {
-			if !ids[m[1]] {
-				t.Errorf("page %q indexes #%s, which no card on it carries", name, m[1])
-			}
-		}
-	}
-}
-
 // The version comes from render(), not from each handler's data map, so the
 // footer is only correct as long as every page composes with the layout and
 // render keeps supplying the key. Both are asserted here rather than trusted.
@@ -280,29 +206,46 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	}
 }
 
-// The domain page pairs cards the same way Status does: four .split rows
-// (DKIM|DNS, SPF|DMARC, settings|add-app, rate-limit|export) with Applications
-// and Danger full-width. Losing a row silently stacks the page again.
+// The domain page pairs cards the same way Status does: three .split rows
+// (DKIM|SPF+DMARC, settings|add-app, export|danger). DNS status, Applications
+// and Domain settings are full-width; DNS status and Domain settings (and the
+// application Edit panel) use .check-cols. Losing a row silently stacks again.
 func TestDomainDetailPageHasPairedCards(t *testing.T) {
 	body, err := fs.ReadFile(assetsFS, "templates/domain_detail.html")
 	if err != nil {
 		t.Fatalf("read domain_detail: %v", err)
 	}
 	src := string(body)
-	if got := strings.Count(src, `class="split"`); got != 4 {
-		t.Errorf("domain detail has %d .split rows, want 4", got)
+	if got := strings.Count(src, `class="split"`); got != 3 {
+		t.Errorf("domain detail has %d .split rows, want 3", got)
+	}
+	if !strings.Contains(src, `class="check-cols"`) {
+		t.Error("domain detail is missing the check-cols grid")
+	}
+	if !strings.Contains(src, `class="panel-toggle t-edit"`) {
+		t.Error("application Edit should be a single panel-toggle")
+	}
+	if strings.Contains(src, `panel-toggle t-mode`) || strings.Contains(src, `panel-toggle t-limit`) ||
+		strings.Contains(src, `panel-mode`) || strings.Contains(src, `panel-limit`) {
+		t.Error("application Edit mode and Rate limit should be one Edit button")
 	}
 	for _, id := range []string{
-		`id="dkim"`, `id="dns-status"`, `id="spf"`, `id="dmarc"`,
+		`id="dkim"`, `id="dns-status"`, `id="spf-dmarc"`,
 		`id="settings"`, `id="add-application"`, `id="applications"`,
-		`id="rate-limit"`, `id="export"`, `id="danger"`,
+		`id="domain-settings"`, `id="export"`, `id="danger"`,
 	} {
 		if !strings.Contains(src, id) {
 			t.Errorf("domain detail is missing %s", id)
 		}
 	}
-	if strings.Contains(src, `id="spf-dmarc"`) {
-		t.Error("domain detail still has the combined spf-dmarc card; SPF and DMARC are separate")
+	if strings.Contains(src, `id="rate-limit"`) {
+		t.Error("domain rate limit should live inside domain-settings, not its own card")
+	}
+	if strings.Contains(src, `id="spf"`) && !strings.Contains(src, `id="spf-dmarc"`) {
+		t.Error("standalone SPF card should be merged into spf-dmarc")
+	}
+	if regexp.MustCompile(`id="dmarc"`).MatchString(src) {
+		t.Error("standalone DMARC card should be merged into spf-dmarc")
 	}
 }
 

@@ -259,9 +259,9 @@ th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(
 td.time, td.status { white-space: nowrap; }
 /* Column headings are set in the mono face: they are labels for machine data
    rather than prose, and the wider tracking a small monospaced capital wants
-   also holds them apart from the first row of values. Same treatment on the
-   other two small all-caps labels in the panel (.sections-title, .fact-label),
-   so a heading of that size reads as one thing wherever it appears. */
+   also holds them apart from the first row of values. Same treatment on
+   .fact-label, so a heading of that size reads as one thing wherever it
+   appears. */
 th {
   font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
@@ -329,23 +329,19 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 .app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
 /* Mode and rate limit open under the whole row rather than inside it. As
    <details> the panel sat where its summary was, so opening one cut the row of
-   four controls in half and pushed the rest below a block of fields — the
-   buttons moved every time a panel opened or closed. The panels are therefore
-   the last children of the row, and the checkbox that opens each one is
-   visually hidden earlier in the row with its label drawn as the button. The
-   checkbox stays in the tab order and keeps its focus ring on the label, so it
-   works from the keyboard, and being pure CSS it also works with JavaScript
-   blocked, as <details> did. */
+   controls in half and pushed the rest below a block of fields — the buttons
+   moved every time a panel opened or closed. The panel is therefore the last
+   child of the row, and the checkbox that opens it is visually hidden earlier
+   in the row with its label drawn as the button. The checkbox stays in the tab
+   order and keeps its focus ring on the label, so it works from the keyboard,
+   and being pure CSS it also works with JavaScript blocked, as <details> did. */
 .app .actions > .panel-toggle {
   position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none;
 }
 .app .actions > .panel { display: none; flex: 1 0 100%; }
-.app .actions > .t-mode:checked ~ .panel-mode,
-.app .actions > .t-limit:checked ~ .panel-limit { display: block; }
-.app .actions > .t-mode:checked ~ .for-mode,
-.app .actions > .t-limit:checked ~ .for-limit { background: var(--surface-open-bg); }
-.app .actions > .t-mode:focus-visible ~ .for-mode,
-.app .actions > .t-limit:focus-visible ~ .for-limit { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
+.app .actions > .t-edit:checked ~ .panel-edit { display: block; }
+.app .actions > .t-edit:checked ~ .for-edit { background: var(--surface-open-bg); }
+.app .actions > .t-edit:focus-visible ~ .for-edit { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
 .panel form { margin-top: 0.6rem; }
 /* A panel's own submit is a form button, not one of the controls in the row
    above, so it takes back the spacing the compact .actions rule zeroes out:
@@ -362,6 +358,8 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 }
 .app .actions > .panel .panel-buttons button,
 .app .actions > .panel .panel-buttons form { margin-top: 0; }
+.app .actions > .panel .check-cols { margin-top: 0.6rem; }
+.app .actions > .panel .check-col > form { margin-top: 0; }
 .credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
@@ -370,11 +368,9 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
    738px the panel was wide, so as a bar it had to be split over two rows — and
    even then it cost the top of every page. Standing it up removes that: the
    entries share one left edge to scan down, the session sits at the foot where
-   it is out of the way, and there is room between them for the current page's
-   own sections (.sections below), which is what makes the long pages navigable.
-   Sticky, so both lists stay in view while the page scrolls past them. The
-   layout template lists the blocks in the order they are drawn, so reading and
-   tab order follow the eye without a CSS `order`. */
+   it is out of the way. Sticky, so the list stays in view while the page
+   scrolls past it. The layout template lists the blocks in the order they are
+   drawn, so reading and tab order follow the eye without a CSS `order`. */
 .nav {
   position: sticky; top: 2rem; align-self: flex-start;
   flex: none; width: 13.5rem;
@@ -439,32 +435,7 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 /* The icons draw in the entry's own colour, so the active entry's darker text,
    a link's blue and Sign out's red all carry through without a rule apiece. */
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
-/* The current page's own sections, listed under the page entries. The domain
-   page is long enough that the only way to the card you came for was to scroll
-   past all the ones you did not. Only pages that long carry an index — it comes
-   from the page's own "sections" template (see layout.html), so a page with
-   two cards or a short paired Status layout renders nothing here. */
-.sections {
-  display: flex; flex-direction: column; gap: 0.1rem;
-  padding-top: 0.75rem; border-top: 1px solid var(--border);
-}
-.sections-title {
-  margin: 0 0 0.25rem 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--muted);
-}
-/* Quieter and a step in from the page entries: this is an index of one page,
-   subordinate to the list of pages above it. */
-.nav .sections a {
-  padding: 0.2rem 0.6rem 0.2rem 0.9rem;
-  font-size: 0.85rem; color: var(--muted); text-decoration: none;
-}
-.nav .sections a:hover { color: var(--fg); }
-/* panel.js marks the section the page is scrolled to. Without JavaScript
-   nothing is marked and the list is still a working index. */
-.nav .sections a.current { color: var(--fg); font-weight: 600; background: var(--nav-active-bg); }
-/* Jumping to a card should not leave it touching the top edge of the window. */
+/* Jumping to a card (in-page links) should not leave it touching the top edge. */
 .card[id] { scroll-margin-top: 1rem; }
 /* Below the width the two columns need (13.5rem of navigation, 1.75rem of gap
    and the 48rem measure, plus the body's padding — the measure, not the column
@@ -488,11 +459,10 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
   .nav .brand img { width: 110px; }
   /* Each block keeps its own group of entries together and wraps as one; the
      rules that separated the blocks vertically become the space between them. */
-  .nav .links, .nav .session, .nav .sections {
+  .nav .links, .nav .session {
     flex-direction: row; flex-wrap: wrap; align-items: center;
     gap: 0.2rem 0.6rem; padding-top: 0; border-top: 0;
   }
-  .sections-title { margin: 0; }
 }
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
@@ -562,9 +532,31 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
    grid keep their spacing from it instead. */
 .split > .card + .card { margin-top: 0; }
 .split + .card { margin-top: 1.2rem; }
+.card + .split { margin-top: 1.2rem; }
 /* Configuration sits outside the polled fragment; without this it would
    touch the last .split inside #status-body (a nested .split is not a sibling). */
 #status-body + .card { margin-top: 1.2rem; }
+/* Peer checks or paired forms inside one card (domain DNS status: two rows of
+   two; domain settings; application edit). Same auto-fit idea as .split, so a
+   wide card gets two columns — not three — and falls to one when narrow. */
+.check-cols {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 1rem 1.2rem; margin-top: 1rem;
+}
+.check-col { min-width: 0; }
+.check-col > label:first-child { margin-top: 0; }
+.check-col-title {
+  margin: 1rem 0 0.35rem; font-size: 1.05rem; font-weight: 600;
+}
+.card > h2 + .check-col-title { margin-top: 0.55rem; }
+/* Two short fields on one row (rate-limit message count ‖ window). Falls to
+   one column when the parent is too narrow for both. */
+.field-pair {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0 1rem; margin-top: 0.45rem;
+}
+.field-pair > div { min-width: 0; }
+.field-pair label { margin-top: 0.45rem; }
 /* The subject heads a delivery's page, and it is the one heading in the panel
    whose text we do not control: it may be a hundred characters with nothing to
    break on. It wraps to as many lines as it needs (this is the page's name, not
