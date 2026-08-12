@@ -244,8 +244,11 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 	if strings.Contains(src, `id="d_ips"`) {
 		t.Error("domain rate limit must not ask for client IPs")
 	}
-	if !strings.Contains(src, "level&nbsp;1") {
-		t.Error("domain rate limit should mention the level-1 backstop")
+	if !strings.Contains(src, "{{.L1Messages}}") && !strings.Contains(src, "{{$.L1Messages}}") {
+		t.Error("domain rate limit should show the L1 message count")
+	}
+	if !strings.Contains(src, "Level&nbsp;1 backstop") {
+		t.Error("domain rate limit should show a Level 1 backstop line")
 	}
 	if !strings.Contains(src, "Trusted client IPs") {
 		t.Error("application override should ask for trusted client IPs")
@@ -268,6 +271,7 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 		"RATE_LIMIT_MESSAGES_PER_IP",
 		"Level 2 — domain",
 		"trusted IPs",
+		"{{.L1Messages}} messages / {{.L1Window}} seconds",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("settings rate limits card missing %q", want)

@@ -316,7 +316,7 @@
              .panel-toggle in panel.css. -->
         <div class="actions">
           <input class="panel-toggle t-edit" id="edit-{{.ID}}" type="checkbox">
-          <label class="toggle for-edit" for="edit-{{.ID}}">Edit{{if .HasLimit}} (limit active){{end}}</label>
+          <label class="toggle for-edit" for="edit-{{.ID}}">Edit{{if .HasLimit}} <span class="st st-ok">limit</span>{{end}}</label>
           <form class="inline" method="post" action="/applications/{{.ID}}/password"
                 data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
             <button type="submit">New password</button>
@@ -344,21 +344,21 @@
                 </form>
               </div>
               <div class="check-col">
-                <p class="check-col-title">Optional trusted-IP override</p>
-                <p class="muted">Listed client IPs get a higher ceiling than the
-                domain limit (still capped by level&nbsp;1:
-                {{$.L1Messages}} / {{$.L1Window}}s —
-                <a href="/settings">Settings</a>).
-                {{if $.DomainHasRL}}Domain ceiling: {{$.DomainRLMaxNum}}.{{else}}No domain ceiling (level&nbsp;1 only for other IPs).{{end}}</p>
+                <p class="check-col-title">Optional trusted-IP override
+                  {{if .HasLimit}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
+                <p class="muted">These IPs get a higher ceiling than the domain
+                (≤ level&nbsp;1) and skip the domain check; everyone else uses
+                {{if $.DomainHasRL}}the domain ceiling ({{$.DomainRLMaxNum}}){{else}}level&nbsp;1 only{{end}}.</p>
+                <p>Level&nbsp;1 backstop:
+                  <strong>{{$.L1Messages}}</strong> messages /
+                  <strong>{{$.L1Window}}</strong>s
+                  — <a href="/settings#rate-limits">Settings</a>.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
                   <label>Trusted client IPs (required; one per line or comma-separated)</label>
                   <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
-                  <p class="muted">Only these IPs use the application ceiling and
-                  skip the domain limit. Other IPs stay under the domain (or
-                  level&nbsp;1).</p>
                   <div class="field-pair">
                     <div>
-                      <label>Message limit</label>
+                      <label>Message limit (max {{$.L1Messages}})</label>
                       <input name="max_messages" type="number" min="1" max="{{$.L1Messages}}"
                              value="{{.MaxText}}" placeholder="{{$.L1Messages}}">
                     </div>
@@ -420,17 +420,19 @@
     </div>
 
     <div class="check-col">
-      <p class="check-col-title">Optional level-2 sending rate limit</p>
-      <p class="muted">Applies to every client IP on this domain. Status:
-        {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive (level&nbsp;1 only){{end}}.
-        Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s
-        (<a href="/settings">Settings</a>). Leave the message limit empty to
-        use level&nbsp;1 only.</p>
+      <p class="check-col-title">Optional level-2 sending rate limit
+        {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive — level 1 only</span>{{end}}</p>
+      <p class="muted">Applies to every client IP on this domain. Leave the
+        message limit empty to use level&nbsp;1 only.</p>
+      <p>Level&nbsp;1 backstop (from <code>.env</code>):
+        <strong>{{.L1Messages}}</strong> messages /
+        <strong>{{.L1Window}}</strong>s
+        — see <a href="/settings#rate-limits">Settings</a>.</p>
 
       <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
         <div class="field-pair">
           <div>
-            <label for="d_max">Message limit</label>
+            <label for="d_max">Message limit (max {{.L1Messages}})</label>
             <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
                    value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
           </div>

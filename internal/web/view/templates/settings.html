@@ -110,9 +110,9 @@ this one stays signed in.</p>
   each domain's page.</p>
 
   <label>Level 1 — per client IP (Postfix)</label>
-  <p><strong>{{.L1Messages}}</strong> messages per <strong>{{.L1Window}}</strong>
-  seconds (<code>RATE_LIMIT_MESSAGES_PER_IP</code> /
-  <code>RATE_LIMIT_WINDOW_SECONDS</code>). Hard ceiling for every connecting IP;
+  <p class="code-row"><span class="code">{{.L1Messages}} messages / {{.L1Window}} seconds</span></p>
+  <p class="muted"><code>RATE_LIMIT_MESSAGES_PER_IP</code> /
+  <code>RATE_LIMIT_WINDOW_SECONDS</code>. Hard ceiling for every connecting IP;
   the panel cannot raise a domain or application limit above this.</p>
 
   <label>Level 2 — domain</label>
