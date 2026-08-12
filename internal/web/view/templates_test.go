@@ -264,7 +264,7 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	wide := map[string]bool{"settings": true, "deliveries": true, "delivery": true, "mail_queue": true, "status": true, "system_log": true}
+	wide := map[string]bool{"settings": true, "deliveries": true, "delivery": true, "mail_queue": true, "status": true, "system_log": true, "domain_detail": true}
 	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
@@ -277,6 +277,32 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		case !wide[name] && got != "":
 			t.Errorf("page %q declares itself %q; only the pages that are tables of data, raw log lines or side-by-side cards take the whole column", name, got)
 		}
+	}
+}
+
+// The domain page pairs cards the same way Status does: four .split rows
+// (DKIM|DNS, SPF|DMARC, settings|add-app, rate-limit|export) with Applications
+// and Danger full-width. Losing a row silently stacks the page again.
+func TestDomainDetailPageHasPairedCards(t *testing.T) {
+	body, err := fs.ReadFile(assetsFS, "templates/domain_detail.html")
+	if err != nil {
+		t.Fatalf("read domain_detail: %v", err)
+	}
+	src := string(body)
+	if got := strings.Count(src, `class="split"`); got != 4 {
+		t.Errorf("domain detail has %d .split rows, want 4", got)
+	}
+	for _, id := range []string{
+		`id="dkim"`, `id="dns-status"`, `id="spf"`, `id="dmarc"`,
+		`id="settings"`, `id="add-application"`, `id="applications"`,
+		`id="rate-limit"`, `id="export"`, `id="danger"`,
+	} {
+		if !strings.Contains(src, id) {
+			t.Errorf("domain detail is missing %s", id)
+		}
+	}
+	if strings.Contains(src, `id="spf-dmarc"`) {
+		t.Error("domain detail still has the combined spf-dmarc card; SPF and DMARC are separate")
 	}
 }
 
