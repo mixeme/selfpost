@@ -102,4 +102,26 @@ this one stays signed in.</p>
   this one stays signed in.</p>
 </div>
 {{end}}
+
+<div class="card" id="rate-limits">
+  <h2>Sending rate limits</h2>
+  <p class="muted">Configured in <code>.env</code> / Compose; restart the
+  container to change level&nbsp;1. Domain and application ceilings are set on
+  each domain's page.</p>
+
+  <label>Level 1 — per client IP (Postfix)</label>
+  <p><strong>{{.L1Messages}}</strong> messages per <strong>{{.L1Window}}</strong>
+  seconds (<code>RATE_LIMIT_MESSAGES_PER_IP</code> /
+  <code>RATE_LIMIT_WINDOW_SECONDS</code>). Hard ceiling for every connecting IP;
+  the panel cannot raise a domain or application limit above this.</p>
+
+  <label>Level 2 — domain</label>
+  <p class="muted">Optional ceiling for <em>all</em> senders on a domain. When
+  unset, only level&nbsp;1 applies. Must be ≤ level&nbsp;1.</p>
+
+  <label>Level 2 — application (trusted IPs)</label>
+  <p class="muted">Optional override: list client IPs and a ceiling
+  <em>strictly above</em> the domain limit (still ≤ level&nbsp;1). Those IPs
+  skip the domain check; everyone else stays under the domain (or level&nbsp;1).</p>
+</div>
 {{end}}

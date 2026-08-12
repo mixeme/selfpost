@@ -59,6 +59,8 @@ func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status 
 	data["ReportAuthHub"] = dnscheck.EmailDomain(formDMARCEmail)
 	data["Error"] = formErr
 	data["Flash"] = accountFlash(r)
+	data["L1Messages"] = h.l1Messages()
+	data["L1Window"] = h.l1Window()
 	h.view.Render(w, status, "settings", data)
 }
 

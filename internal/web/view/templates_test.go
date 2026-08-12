@@ -241,15 +241,40 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 	if strings.Contains(src, `id="rate-limit"`) {
 		t.Error("domain rate limit should live inside domain-settings, not its own card")
 	}
+	if strings.Contains(src, `id="d_ips"`) {
+		t.Error("domain rate limit must not ask for client IPs")
+	}
+	if !strings.Contains(src, "level&nbsp;1") {
+		t.Error("domain rate limit should mention the level-1 backstop")
+	}
+	if !strings.Contains(src, "Trusted client IPs") {
+		t.Error("application override should ask for trusted client IPs")
+	}
 	if strings.Contains(src, `id="spf-dmarc"`) {
 		t.Error("SPF should sit with DKIM, not with DMARC")
 	}
 }
 
-// Drill-down pages carry an up-link directly under the heading and above the
-// cards. A link at the bottom of a form is easy to miss and drifts from the
-// rest of the panel, so the shared back_link template is mandatory on those
-// pages and TestDrillDownPagesPlaceBackLinkAboveContent guards its position.
+func TestSettingsPageDocumentsRateLimits(t *testing.T) {
+	body, err := fs.ReadFile(assetsFS, "templates/settings.html")
+	if err != nil {
+		t.Fatalf("read settings: %v", err)
+	}
+	src := string(body)
+	if !strings.Contains(src, `id="rate-limits"`) {
+		t.Error("settings should include a sending rate limits card")
+	}
+	for _, want := range []string{
+		"RATE_LIMIT_MESSAGES_PER_IP",
+		"Level 2 — domain",
+		"trusted IPs",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("settings rate limits card missing %q", want)
+		}
+	}
+}
+
 func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 	drillDown := map[string]bool{
 		"user_form.html":     true,

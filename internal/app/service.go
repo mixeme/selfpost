@@ -189,9 +189,9 @@ func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
 	return s.store.GetRateLimit(store.RateLimitScopeApp, appID)
 }
 
-// SaveRateLimit stores the application-level rate limit. The caller has validated
-// the IPs and numbers (security.md); the milter reads the row live, so no reload
-// is needed.
+// SaveRateLimit stores the application-level trusted-IP override (guide § Rate
+// limiting). The caller has validated the IPs and numbers (security.md); the
+// milter reads the row live, so no reload is needed.
 func (s *Service) SaveRateLimit(appID int64, ips []string, maxMessages, windowSeconds int) error {
 	return s.store.SetRateLimit(store.RateLimit{
 		Scope:         store.RateLimitScopeApp,

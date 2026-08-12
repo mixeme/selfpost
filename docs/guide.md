@@ -202,7 +202,8 @@ service healthy and will mail be accepted?"
   shows after manual edits under `/data`.
 - **Domains** (`/domains`) — add sending domains, inspect each domain's DKIM
   TXT value, SPF/DMARC checks, and SASL applications. Per-domain rate limits
-  (level 2) are configured here. *Export domain* writes a single-domain archive;
+  (level 2) and trusted-IP application overrides are configured here.
+  *Export domain* writes a single-domain archive;
   *Import a domain* on the Backup page reads one back in.
 - **Deliveries** (`/deliveries`) — searchable send log with server-side filters
   by domain and application. A row identifies its message and nothing more —
@@ -269,8 +270,10 @@ docker compose exec selfpost cat /data/setup-token
 
 ## Rate limiting
 
-SelfPost applies two independent limits; both can refuse a submission, but only
-level 2 writes a `rejected` row in the send log.
+SelfPost applies two independent layers; both can refuse a submission, but only
+level 2 writes a `rejected` row in the send log. Level-2 ceilings set in the
+panel cannot exceed level 1 (the panel shows the level-1 values and rejects
+higher numbers).
 
 **Level 1 (IP backstop)** — always on, configured via `.env`:
 
@@ -278,14 +281,20 @@ level 2 writes a `rejected` row in the send log.
 - `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
 
 This is an anvil limit per connecting client IP. It keeps working even if the
-journal-milter (level 2) is down.
+journal-milter (level 2) is down. There is no per-IP bypass.
 
-**Level 2 (per domain / per application)** — optional, configured in the panel
-on each domain's page or on an individual application. You set a message
-ceiling, a time window, and optionally restrict the limit to specific client
-IPs; an empty IP list means the differentiated limit does not apply. When
-exceeded, Postfix returns a 4xx and the refusal is recorded in Deliveries as
-`rejected`.
+**Level 2 — domain** — optional, on each domain's page. A message ceiling and
+window for **every** client IP sending as that domain. When unset, only
+level 1 applies for non-privileged senders.
+
+**Level 2 — application (trusted IPs)** — optional override on an application:
+list one or more client IPs and a ceiling **strictly above** the domain limit
+(still ≤ level 1). Connections from those IPs use the application ceiling and
+skip the domain check. Other IPs stay under the domain limit (or level 1 alone).
+An application override without trusted IPs is inactive.
+
+When a level-2 ceiling is exceeded, Postfix returns a 4xx and the refusal is
+recorded in Deliveries as `rejected`.
 
 ## Backup, restore, and moving a single domain
 

@@ -344,19 +344,23 @@
                 </form>
               </div>
               <div class="check-col">
-                <p class="check-col-title">Optional level-2 rate limit</p>
-                <p class="muted">Caps this application only. The domain level-2
-                limit (<a href="#domain-settings">Domain settings</a>) and the
-                global level-1 limit still apply.</p>
+                <p class="check-col-title">Optional trusted-IP override</p>
+                <p class="muted">Listed client IPs get a higher ceiling than the
+                domain limit (still capped by level&nbsp;1:
+                {{$.L1Messages}} / {{$.L1Window}}s —
+                <a href="/settings">Settings</a>).
+                {{if $.DomainHasRL}}Domain ceiling: {{$.DomainRLMaxNum}}.{{else}}No domain ceiling (level&nbsp;1 only for other IPs).{{end}}</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
-                  <label>Expected client IPs (one per line or comma-separated)</label>
+                  <label>Trusted client IPs (required; one per line or comma-separated)</label>
                   <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
-                  <p class="muted">The limit counts only connections from these
-                  IPs. Leave empty to leave the limit inactive.</p>
+                  <p class="muted">Only these IPs use the application ceiling and
+                  skip the domain limit. Other IPs stay under the domain (or
+                  level&nbsp;1).</p>
                   <div class="field-pair">
                     <div>
                       <label>Message limit</label>
-                      <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
+                      <input name="max_messages" type="number" min="1" max="{{$.L1Messages}}"
+                             value="{{.MaxText}}" placeholder="{{$.L1Messages}}">
                     </div>
                     <div>
                       <label>Window (seconds)</label>
@@ -370,7 +374,7 @@
                   <button type="submit" form="rl-{{.ID}}">Save limit</button>
                   {{if .HasLimit}}
                   <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                        data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
+                        data-confirm="Remove the rate limit for {{.Login}}? The domain limit (or level 1) will apply.">
                     <input type="hidden" name="clear" value="1">
                     <button type="submit" class="danger">Remove limit</button>
                   </form>
@@ -417,21 +421,18 @@
 
     <div class="check-col">
       <p class="check-col-title">Optional level-2 sending rate limit</p>
-      <p class="muted">Empty IP list = inactive (level-1 only). Status:
-        {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive{{end}}.</p>
+      <p class="muted">Applies to every client IP on this domain. Status:
+        {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive (level&nbsp;1 only){{end}}.
+        Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s
+        (<a href="/settings">Settings</a>). Leave the message limit empty to
+        use level&nbsp;1 only.</p>
 
       <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
-        <label for="d_ips">Expected client IPs (one per line or comma-separated)</label>
-        <textarea id="d_ips" name="allowed_ips" rows="2"
-                  placeholder="203.0.113.10">{{.DomainRLIPs}}</textarea>
-        <p class="muted">The limit counts only connections from these IPs.
-        Leave empty to leave the limit inactive.</p>
-
         <div class="field-pair">
           <div>
             <label for="d_max">Message limit</label>
-            <input id="d_max" name="max_messages" type="number" min="1"
-                   value="{{.DomainRLMax}}" placeholder="1000">
+            <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
+                   value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
           </div>
           <div>
             <label for="d_win">Window (seconds)</label>

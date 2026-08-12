@@ -63,6 +63,8 @@ type config struct {
 	trustedProxies    []*net.IPNet
 	sessionIdleDays   int
 	dnsResolvers      []string
+	rateLimitMessagesPerIP int
+	rateLimitWindowSeconds int
 
 	// Read-only inputs to the panel's status page: the certificate Postfix
 	// serves and the two milter sockets it connects to. The defaults mirror
@@ -116,6 +118,10 @@ func loadConfig() config {
 		// Recursive resolvers the deliverability checks query directly. Empty
 		// means dnscheck's public defaults; a closed network names its own here.
 		dnsResolvers: dnscheck.ParseResolvers(os.Getenv("SELFPOST_DNS_RESOLVERS")),
+
+		// Level-1 anvil defaults match build/postfix-config.sh / guide.md.
+		rateLimitMessagesPerIP: envInt("RATE_LIMIT_MESSAGES_PER_IP", 100),
+		rateLimitWindowSeconds: envInt("RATE_LIMIT_WINDOW_SECONDS", 3600),
 
 		tlsCertFile:    envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
 		opendkimSocket: envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),

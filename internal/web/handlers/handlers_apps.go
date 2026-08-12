@@ -165,9 +165,11 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	data["ExportErr"] = view.ExportErr
 	data["MinPwLen"] = validate.MinSecretFilePasswordLen
 	data["DomainHasRL"] = domainRLok && domainRL.Active()
-	data["DomainRLIPs"] = strings.Join(domainRL.AllowedIPs, "\n")
 	data["DomainRLMax"] = intOrBlank(domainRL.MaxMessages)
 	data["DomainRLWin"] = windowOrDefault(domainRL.WindowSeconds)
+	data["DomainRLMaxNum"] = domainRL.MaxMessages
+	data["L1Messages"] = h.l1Messages()
+	data["L1Window"] = h.l1Window()
 	h.view.Render(w, status, "domain_detail", data)
 }
 

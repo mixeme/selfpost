@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- rate limiting (level 2): domain ceilings apply to every client IP (no IP
+  allowlist). An application ceiling with trusted IPs is an override
+  **above** the domain limit (still ≤ level 1) and skips the domain check for
+  those IPs; without IPs the application override is inactive. When no domain
+  ceiling is set, non-privileged senders use level 1 only. The panel shows the
+  level-1 backstop on domain/application forms and Settings, rejects maxima
+  above level 1, and requires an application override to exceed the domain
+  maximum. Operator guide and architecture updated.
+
+### Fixed
+
+- panel: on the domain DNS status grid, the Type (TXT) field height matches
+  the Host fields.
+
 ## [1.2.3] - 2026-08-12
 
 Domain detail layout and panel polish after 1.2.2. Upgrading is a tag bump; no

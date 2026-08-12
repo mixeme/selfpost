@@ -70,6 +70,11 @@ type Config struct {
 	// checks must not go through the system resolver — see dnscheck's
 	// externalResolver — so this is how a closed network points them at its own.
 	DNSResolvers []string
+	// RateLimitMessagesPerIP and RateLimitWindowSeconds are the level-1
+	// Postfix anvil backstop (env RATE_LIMIT_*), mirrored into the panel for
+	// display and to cap domain/app level-2 ceilings (guide § Rate limiting).
+	RateLimitMessagesPerIP int
+	RateLimitWindowSeconds int
 }
 
 // Server is the panel HTTP application.
@@ -96,15 +101,17 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
 	h := handlers.New(st, domains, apps, handlers.Config{
-		Hostname:          cfg.Hostname,
-		SubmissionEnabled: cfg.SubmissionEnabled,
-		MailLogPath:       cfg.MailLogPath,
-		DataDir:           cfg.DataDir,
-		DBPath:            cfg.DBPath,
-		Version:           cfg.Version,
-		TLSCertFile:       cfg.TLSCertFile,
-		OpenDKIMSocket:    cfg.OpenDKIMSocket,
-		JournalSocket:     cfg.JournalSocket,
+		Hostname:               cfg.Hostname,
+		SubmissionEnabled:      cfg.SubmissionEnabled,
+		MailLogPath:            cfg.MailLogPath,
+		DataDir:                cfg.DataDir,
+		DBPath:                 cfg.DBPath,
+		Version:                cfg.Version,
+		TLSCertFile:            cfg.TLSCertFile,
+		OpenDKIMSocket:         cfg.OpenDKIMSocket,
+		JournalSocket:          cfg.JournalSocket,
+		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
+		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }

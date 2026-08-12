@@ -26,19 +26,21 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), apps, cfg.dkimSelectorDef)
 
 	srvApp, err := web.New(st, domains, apps, web.Config{
-		Hostname:          cfg.hostname,
-		CookieSecure:      cfg.cookieSecure,
-		SubmissionEnabled: cfg.submissionEnabled,
-		MailLogPath:       cfg.mailLog,
-		DataDir:           cfg.dataDir,
-		DBPath:            cfg.dbPath,
-		Version:           buildinfo.Version,
-		TrustedProxyCIDRs: cfg.trustedProxies,
-		TLSCertFile:       cfg.tlsCertFile,
-		OpenDKIMSocket:    cfg.opendkimSocket,
-		JournalSocket:     cfg.journalSocket,
-		SessionIdleDays:   cfg.sessionIdleDays,
-		DNSResolvers:      cfg.dnsResolvers,
+		Hostname:               cfg.hostname,
+		CookieSecure:           cfg.cookieSecure,
+		SubmissionEnabled:      cfg.submissionEnabled,
+		MailLogPath:            cfg.mailLog,
+		DataDir:                cfg.dataDir,
+		DBPath:                 cfg.dbPath,
+		Version:                buildinfo.Version,
+		TrustedProxyCIDRs:      cfg.trustedProxies,
+		TLSCertFile:            cfg.tlsCertFile,
+		OpenDKIMSocket:         cfg.opendkimSocket,
+		JournalSocket:          cfg.journalSocket,
+		SessionIdleDays:        cfg.sessionIdleDays,
+		DNSResolvers:           cfg.dnsResolvers,
+		RateLimitMessagesPerIP: cfg.rateLimitMessagesPerIP,
+		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
 	}, cfg.setupTokenPath)
 	if err != nil {
 		return err

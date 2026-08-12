@@ -81,11 +81,13 @@ One process, three roles:
    proxy only.
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
-   (`default_action=accept`) so milter failure does not stop mail. The level-2
-   count is the stored send-log rows plus the messages this process has admitted
-   but not yet written (`internal/milter/inflight.go`), so concurrent sessions
-   cannot each spend the same last slot; a reservation is released at
-   end-of-message, on ABORT, or after a 10-minute TTL.
+   (`default_action=accept`) so milter failure does not stop mail. Domain
+   ceilings apply to every client IP; an application ceiling with trusted IPs
+   raises the limit for those IPs only and skips the domain check (guide § Rate
+   limiting). The level-2 count is the stored send-log rows plus the messages
+   this process has admitted but not yet written (`internal/milter/inflight.go`),
+   so concurrent sessions cannot each spend the same last slot; a reservation
+   is released at end-of-message, on ABORT, or after a 10-minute TTL.
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
