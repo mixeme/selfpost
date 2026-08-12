@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))
+  — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log
+  authorization. Roadmap queues that plan ahead of inbound-relay and records
+  `schema-squash` (replace the 1.x SQLite migration chain with a 2.x baseline;
+  not a reason to cut a major on its own).
+
 ## [1.2.5] - 2026-08-13
 
 Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.

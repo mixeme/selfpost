@@ -15,7 +15,9 @@ planned but unlisted.
 
 **Versioning:** SemVer MINOR in the **1.x+** line by default (`1.1.0`…), as long
 as defaults and migrations stay compatible with `1.0.0`. A major `2.x` only for
-an explicit break.
+an explicit break. One such break, when 2.x is cut for any reason, is
+[schema-squash](#schema-squash) — replacing the 1.x SQLite migration chain
+with a baseline. That item does not by itself justify a major.
 
 **Process:** [development.md](development.md). The history of closed phases is
 in `git log` and [CHANGELOG.md](../CHANGELOG.md).
@@ -26,17 +28,39 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Plan |
 |---|---|---|---|
+| code-review | Full-tree review follow-ups (authz, docs, GUI, tests) | **agreed** | [plans/code-review.md](plans/code-review.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | panel-docs | In-panel operator documentation | candidate | — |
+| schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — |
 
-**Recommended order** (not binding): **inbound-relay** first among agreed
-items — it is the largest remaining 1.x+ extension. Candidates need explicit
-agreement before they join the queue.
+**Recommended order** (not binding): **code-review P0** first (shipped
+domain-admin send-log leak — a defect, not a feature), then the rest of that
+plan as listed, then **inbound-relay**. Candidates need explicit agreement
+before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the checklist in its linked plan.
+
+---
+
+## code-review
+
+**Goal:** close the 2026-08-13 full-tree review: domain-admin send-log
+authorization, a few fail-closed paths, docs that still say “single-user”,
+GUI flash/delete bugs, test gaps, licence/release hygiene.
+
+**Boundary:** defects and docs/UI follow-ups inside the current 1.x product.
+Not inbound-relay, not DMARC ingestion, not a layer rewrite.
+
+**Done when:** see the criteria in
+[plans/code-review.md](plans/code-review.md).
+
+**Dependencies / risks:** P0 is confidentiality between panel roles; it
+jumps the feature queue. Implementation models are in the plan (Opus / Sonnet
+/ Haiku / Fable per [development.md](development.md)).
+**Version:** patch.
 
 ---
 
@@ -126,4 +150,41 @@ read the git tree for day-to-day meaning of a card.
 when checks change; not bloating every page with a second column of prose.
 
 **Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+
+---
+
+## schema-squash
+
+**Goal:** when 2.x is cut, stop shipping the 1.x migration files
+(`0001_init.sql` … `0005_panel_users.sql`) in the binary and replace them with
+one baseline that is the schema as of `user_version = 5`. Fresh 2.x data
+directories no longer create-then-drop the historical `admin` table.
+
+**Boundary:** 1.x keeps the full chain so a 1.0.0 data directory still boots.
+Do not delete, rename, or reorder those files while MINOR compatibility with
+`1.0.0` holds. `migrate()` maps **file order** to `PRAGMA user_version` (`target
+= i + 1`); dropping a file in 1.x would skip or mis-apply steps on existing
+databases. Git history keeps the old files either way; only the embedded set
+in the 2.x image changes.
+
+**Upgrade gate (required with the squash):**
+
+| `user_version` | 2.x behaviour |
+|---|---|
+| `0` (empty file) | Apply the baseline; set `user_version` to the new chain’s head |
+| `>= 5` (fully migrated 1.x) | Skip; schema is already the baseline |
+| `1`…`4` (mid-chain 1.x) | **Refuse to start** — boot the last 1.x once, then 2.x |
+
+Restore remains a separate lock: the backup manifest version must match the
+running binary ([architecture.md](architecture.md) § Persistence). It does not
+replace this gate.
+
+**Done when:** 2.x embeds a single baseline (plus any 2.x-only migrations after
+it); the gate above is tested; the operator guide says a 2.x image will not
+open an unfinished 1.x database.
+
+**Dependencies / risks:** a decided 2.x cut (another breaking change, or an
+explicit major). Squashing five short files is not a reason to cut 2.x on its
+own. A missed gate leaves a `user_version = 3` database silently stuck.
+**Version:** `2.x` major only; not a 1.x item.
 
