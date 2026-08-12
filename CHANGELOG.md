@@ -5,15 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-08-13
+
+Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.
+
 ### Changed
 
-- panel: level-1 backstop is shown as muted copy on the domain form
-  (`N messages / Ws — Settings`) and in message-limit labels; Settings uses a
-  code-row for the L1 value. Domain and application rate-limit status uses the
-  shared `st` badge. Trusted-IP help sits under the IP field; domain rate-limit
-  help sits above Save; Address mode / trusted-IP columns share muted leads and
-  matched control height; Domain settings uses subgrid so DMARC and rate-limit
-  rows line up.
+- panel: rate-limit forms refined — level-1 backstop as muted copy on the
+  domain settings form (`N messages / Ws — Settings`) and in message-limit
+  labels (`max N`); Settings shows the L1 ceiling in a code-row. Domain,
+  application, and Edit-toggle limit state use the shared `st` badge instead of
+  bold text or parenthetical copy. Address mode and trusted-IP override columns
+  carry muted leads and matched control height; trusted-IP help sits under the
+  IP field. Domain settings pairs DMARC reports with the level-2 rate limit
+  using CSS subgrid so titles, fields, and Save / Remove buttons line up across
+  columns.
 
 ## [1.2.4] - 2026-08-12
 
