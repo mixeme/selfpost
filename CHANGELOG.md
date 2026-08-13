@@ -19,6 +19,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- ci: gofmt on eight files that failed the formatting workflow check (panel
+  config, DNS check, domain transfer export, rate-limit tests, auth principal,
+  domain and delivery handlers, web package doc comment).
+
 - docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))
   — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log
   authorization. Roadmap queues that plan ahead of inbound-relay and records

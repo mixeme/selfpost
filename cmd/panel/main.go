@@ -53,16 +53,16 @@ type config struct {
 	mailLog       string
 	retentionDays int
 
-	dataDir           string
-	dbPath            string
-	manifestPath      string
-	setupTokenPath    string
-	hostname          string
-	cookieSecure      bool
-	submissionEnabled bool
-	trustedProxies    []*net.IPNet
-	sessionIdleDays   int
-	dnsResolvers      []string
+	dataDir                string
+	dbPath                 string
+	manifestPath           string
+	setupTokenPath         string
+	hostname               string
+	cookieSecure           bool
+	submissionEnabled      bool
+	trustedProxies         []*net.IPNet
+	sessionIdleDays        int
+	dnsResolvers           []string
 	rateLimitMessagesPerIP int
 	rateLimitWindowSeconds int
 

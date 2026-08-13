@@ -124,10 +124,10 @@ func (h *Handlers) HandleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.view.Render(w, http.StatusOK, "domain_delete", map[string]any{
-		"Title":  "SelfPost — delete " + d.Name,
-		"User":   auth.CurrentUser(r),
-		"Active": "domains",
-		"Domain": d,
+		"Title":    "SelfPost — delete " + d.Name,
+		"User":     auth.CurrentUser(r),
+		"Active":   "domains",
+		"Domain":   d,
 		"IsGlobal": true,
 	})
 }

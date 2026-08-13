@@ -10,8 +10,8 @@ import (
 type ctxKey int
 
 const (
-	usernameKey   ctxKey = 0
-	principalKey  ctxKey = 1
+	usernameKey  ctxKey = 0
+	principalKey ctxKey = 1
 )
 
 // Role is a panel user's access level.

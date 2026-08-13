@@ -1,4 +1,4 @@
-﻿// Package web implements the SelfPost control panel's HTTP surface: the
+// Package web implements the SelfPost control panel's HTTP surface: the
 // one-time administrator setup flow (security.md), login/session handling
 // (security.md) and the authenticated shell the later phases build on.
 package web
