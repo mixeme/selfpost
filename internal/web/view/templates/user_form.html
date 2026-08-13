@@ -33,10 +33,13 @@
     </fieldset>
 
     <button type="submit">{{if .IsEdit}}Save{{else}}Create{{end}}</button>
-    {{if .IsEdit}}
-    <button type="submit" name="action" value="delete" class="danger"{{if .LastGlobalLocked}} disabled{{end}}>Delete user</button>
-    {{if .LastGlobalLocked}}<p class="muted">The only global administrator cannot be deleted.</p>{{end}}
-    {{end}}
   </form>
+  {{if .IsEdit}}
+  {{if .LastGlobalLocked}}
+  <p class="muted">The only global administrator cannot be deleted.</p>
+  {{else}}
+  <a class="danger" href="/users/{{.UserID}}/delete">Delete user</a>
+  {{end}}
+  {{end}}
 </div>
 {{end}}

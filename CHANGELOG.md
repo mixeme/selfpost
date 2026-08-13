@@ -44,11 +44,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   still authenticate to Postfix. This matches the order domain deletion already
   used.
 
+- panel (GUI): a rejected rate-limit change on a domain's page now renders on
+  the danger surface (`.flash.error`) instead of the success one — it was
+  green with red text, reading as good news. Deleting a panel user now goes
+  through a confirmation page, the same pattern as domain deletion, instead of
+  a plain submit button next to Save with no confirmation at all.
+
 ### Changed
 
 - ci: gofmt on eight files that failed the formatting workflow check (panel
   config, DNS check, domain transfer export, rate-limit tests, auth principal,
   domain and delivery handlers, web package doc comment).
+
+- panel (templates): the repeated Host/Type/Value DNS record markup on a
+  domain's page and the duplicated credentials form on Settings are now
+  shared partials (`host_type`, `host_type_copy`, `field_value`,
+  `field_values`, `credentials_fields`) instead of copy-pasted blocks. No
+  behaviour or visible change.
 
 - docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))
   — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log

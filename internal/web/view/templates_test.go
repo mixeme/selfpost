@@ -282,6 +282,7 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 	drillDown := map[string]bool{
 		"user_form.html":     true,
+		"user_delete.html":   true,
 		"domain_detail.html": true,
 		"domain_delete.html": true,
 		"delivery.html":      true,

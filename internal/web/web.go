@@ -166,6 +166,8 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /users/new", h.HandleUserNew)
 	authed.HandleFunc("GET /users/{uid}", h.HandleUserEdit)
 	authed.HandleFunc("POST /users/{uid}", h.HandleUserEdit)
+	authed.HandleFunc("GET /users/{uid}/delete", h.HandleUserDeleteConfirm)
+	authed.HandleFunc("POST /users/{uid}/delete", h.HandleUserDelete)
 
 	authed.HandleFunc("GET /backup", h.HandleBackupPage)
 	authed.HandleFunc("POST /backup", h.HandleBackup)

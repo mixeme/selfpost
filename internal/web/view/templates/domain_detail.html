@@ -2,6 +2,61 @@
      measure (same pattern as Status). */}}
 {{define "wide"}}wide{{end}}
 
+{{/* The Host/name ‖ Type field-pair repeats for every DNS record this page
+     shows (DKIM, SPF, DMARC, report authorization) in both the status card
+     and the publishable-record cards below it — only the host and whether it
+     carries a Copy button change. Two variants rather than one templated
+     Copy flag: the DNS status card never offers Copy (its host is derived,
+     not something to paste), the record cards always do. */}}
+{{define "host_type"}}
+<div class="field-pair host-type">
+  <div>
+    <label>Host / name</label>
+    <span class="code">{{.}}</span>
+  </div>
+  <div class="field-type">
+    <label>Type</label>
+    <span class="code">TXT</span>
+  </div>
+</div>
+{{end}}
+
+{{define "host_type_copy"}}
+<div class="field-pair host-type">
+  <div>
+    <label>Host / name</label>
+    <div class="code-row">
+      <span class="code">{{.}}</span>
+      <button type="button" class="copy">Copy</button>
+    </div>
+  </div>
+  <div class="field-type">
+    <label>Type</label>
+    <span class="code">TXT</span>
+  </div>
+</div>
+{{end}}
+
+{{/* Value partials pair with the two host_type variants above: field_values
+     is the DNS status card's raw record dump (no Copy — those values are for
+     comparison, not for pasting), field_value is the single publishable
+     value on the record cards below (always has Copy). Callers still guard
+     the empty case, since "no records yet" and "one blank record" read
+     differently. */}}
+{{define "field_values"}}
+<label>Value</label>
+<span class="code">{{range .}}{{.}}
+{{end}}</span>
+{{end}}
+
+{{define "field_value"}}
+<label>Value</label>
+<div class="code-row">
+  <span class="code">{{.}}</span>
+  <button type="button" class="copy">Copy</button>
+</div>
+{{end}}
+
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
 
@@ -37,21 +92,8 @@
   <div class="check-cols">
     <div class="check-col">
       <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
-      <div class="field-pair host-type">
-        <div>
-          <label>Host / name</label>
-          <span class="code">{{.Record.Name}}</span>
-        </div>
-        <div class="field-type">
-          <label>Type</label>
-          <span class="code">TXT</span>
-        </div>
-      </div>
-      {{if .DNS.DKIM.Records}}
-      <label>Value</label>
-      <span class="code">{{range .DNS.DKIM.Records}}{{.}}
-{{end}}</span>
-      {{end}}
+      {{template "host_type" .Record.Name}}
+      {{if .DNS.DKIM.Records}}{{template "field_values" .DNS.DKIM.Records}}{{end}}
       {{if ne .DNS.DKIM.Status "ok"}}
       <p class="{{if eq .DNS.DKIM.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
       {{end}}
@@ -59,21 +101,8 @@
 
     <div class="check-col">
       <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
-      <div class="field-pair host-type">
-        <div>
-          <label>Host / name</label>
-          <span class="code">{{.Domain.Name}}</span>
-        </div>
-        <div class="field-type">
-          <label>Type</label>
-          <span class="code">TXT</span>
-        </div>
-      </div>
-      {{if .DNS.SPF.Records}}
-      <label>Value</label>
-      <span class="code">{{range .DNS.SPF.Records}}{{.}}
-{{end}}</span>
-      {{end}}
+      {{template "host_type" .Domain.Name}}
+      {{if .DNS.SPF.Records}}{{template "field_values" .DNS.SPF.Records}}{{end}}
       {{if ne .DNS.SPF.Status "ok"}}
       <p class="{{if eq .DNS.SPF.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
       {{end}}
@@ -83,21 +112,8 @@
 
     <div class="check-col">
       <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
-      <div class="field-pair host-type">
-        <div>
-          <label>Host / name</label>
-          <span class="code">{{.DMARCName}}</span>
-        </div>
-        <div class="field-type">
-          <label>Type</label>
-          <span class="code">TXT</span>
-        </div>
-      </div>
-      {{if .DNS.DMARC.Records}}
-      <label>Value</label>
-      <span class="code">{{range .DNS.DMARC.Records}}{{.}}
-{{end}}</span>
-      {{end}}
+      {{template "host_type" .DMARCName}}
+      {{if .DNS.DMARC.Records}}{{template "field_values" .DNS.DMARC.Records}}{{end}}
       {{if ne .DNS.DMARC.Status "ok"}}
       <p class="{{if eq .DNS.DMARC.Status "unknown"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
       {{else}}
@@ -108,21 +124,8 @@
     <div class="check-col">
       {{if .DNS.DMARCReportAuth.Status}}
       <label>Report authorization <span class="st st-{{.DNS.DMARCReportAuth.Status}}">{{.DNS.DMARCReportAuth.Status}}</span></label>
-      <div class="field-pair host-type">
-        <div>
-          <label>Host / name</label>
-          <span class="code">{{.ReportAuthName}}</span>
-        </div>
-        <div class="field-type">
-          <label>Type</label>
-          <span class="code">TXT</span>
-        </div>
-      </div>
-      {{if .DNS.DMARCReportAuth.Records}}
-      <label>Value</label>
-      <span class="code">{{range .DNS.DMARCReportAuth.Records}}{{.}}
-{{end}}</span>
-      {{end}}
+      {{template "host_type" .ReportAuthName}}
+      {{if .DNS.DMARCReportAuth.Records}}{{template "field_values" .DNS.DMARCReportAuth.Records}}{{end}}
       <p class="{{if eq .DNS.DMARCReportAuth.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARCReportAuth.Detail}}</p>
       {{else}}
       <label>Report authorization</label>
@@ -141,49 +144,15 @@
     <h2>DKIM and SPF records</h2>
 
     <p class="check-col-title">DKIM</p>
-    <div class="field-pair host-type">
-      <div>
-        <label>Host / name</label>
-        <div class="code-row">
-          <span class="code">{{.Record.Name}}</span>
-          <button type="button" class="copy">Copy</button>
-        </div>
-      </div>
-      <div class="field-type">
-        <label>Type</label>
-        <span class="code">TXT</span>
-      </div>
-    </div>
-
-    <label>Value</label>
-    <div class="code-row">
-      <span class="code">{{.Record.Value}}</span>
-      <button type="button" class="copy">Copy</button>
-    </div>
+    {{template "host_type_copy" .Record.Name}}
+    {{template "field_value" .Record.Value}}
 
     <p class="muted">Not a secret. Signed with selector
     <strong>{{.Domain.DKIMSelector}}</strong>.</p>
 
     <p class="check-col-title">SPF</p>
-    <div class="field-pair host-type">
-      <div>
-        <label>Host / name</label>
-        <div class="code-row">
-          <span class="code">{{.Domain.Name}}</span>
-          <button type="button" class="copy">Copy</button>
-        </div>
-      </div>
-      <div class="field-type">
-        <label>Type</label>
-        <span class="code">TXT</span>
-      </div>
-    </div>
-
-    <label>Value</label>
-    <div class="code-row">
-      <span class="code">{{.SPFExample}}</span>
-      <button type="button" class="copy">Copy</button>
-    </div>
+    {{template "host_type_copy" .Domain.Name}}
+    {{template "field_value" .SPFExample}}
 
     <p class="muted">Merge into an existing SPF if the domain already has one —
     do not publish a second record.</p>
@@ -192,19 +161,7 @@
   <div class="card" id="dmarc">
     <h2>DMARC record</h2>
 
-    <div class="field-pair host-type">
-      <div>
-        <label>Host / name</label>
-        <div class="code-row">
-          <span class="code">{{.DMARCName}}</span>
-          <button type="button" class="copy">Copy</button>
-        </div>
-      </div>
-      <div class="field-type">
-        <label>Type</label>
-        <span class="code">TXT</span>
-      </div>
-    </div>
+    {{template "host_type_copy" .DMARCName}}
 
     <label>Value{{if eq .DMARCSource "settings"}} <span class="muted">(from Settings)</span>{{else if eq .DMARCSource "custom"}} <span class="muted">(custom)</span>{{else if eq .DMARCSource "none"}} <span class="muted">(no reports)</span>{{end}}</label>
     <div class="code-row">
@@ -220,25 +177,8 @@
 
     {{if .NeedsReportAuth}}
     <p class="check-col-title">Report authorization</p>
-    <div class="field-pair host-type">
-      <div>
-        <label>Host / name</label>
-        <div class="code-row">
-          <span class="code">{{.ReportAuthName}}</span>
-          <button type="button" class="copy">Copy</button>
-        </div>
-      </div>
-      <div class="field-type">
-        <label>Type</label>
-        <span class="code">TXT</span>
-      </div>
-    </div>
-
-    <label>Value</label>
-    <div class="code-row">
-      <span class="code">{{.ReportAuthValue}}</span>
-      <button type="button" class="copy">Copy</button>
-    </div>
+    {{template "host_type_copy" .ReportAuthName}}
+    {{template "field_value" .ReportAuthValue}}
     {{end}}
 
     <p class="muted"><code>p=none</code> does not affect delivery. Tighten to

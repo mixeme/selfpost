@@ -245,6 +245,11 @@ form.inline { display: inline; margin: 0; }
 main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: var(--flash-bg); border: 1px solid var(--flash-border); color: var(--flash-fg); padding: 0.7rem 1rem; border-radius: 6px; margin-bottom: 1.2rem; }
+/* RateLimitErr renders as .flash.error: a validation failure, not a success
+   notice. Without this rule it inherited the success surface (green) and only
+   .error's text colour, so a rejected rate limit read as good news in red
+   text. Same box, danger palette. */
+.flash.error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-fg); }
 table { width: 100%; border-collapse: collapse; }
 /* A table column is at least as wide as the longest unbreakable run inside it,
    and the panel's tables are full of runs with nothing to break on: email

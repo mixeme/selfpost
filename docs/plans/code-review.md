@@ -545,11 +545,12 @@ roles, and security.md no longer calls the panel single-user.
 
 **Model: Sonnet.**
 
-- [ ] `.flash.error` (or stop using `.flash` for `RateLimitErr`) — danger
+- [x] `.flash.error` (or stop using `.flash` for `RateLimitErr`) — danger
       surface, not success.
-- [ ] User delete: `data-confirm` at minimum; prefer a confirm page like
-      domain delete.
-- [ ] DNS field partial; settings credentials partial.
+- [x] User delete: `data-confirm` at minimum; prefer a confirm page like
+      domain delete. Done as a confirm page (`GET/POST /users/{uid}/delete`),
+      matching `domain_delete.html`.
+- [x] DNS field partial; settings credentials partial.
 - [ ] Optional: `urlquery` on deliveries fragment params; `aria-live` on
       polled regions; confirm-without-JS note next to the CSRF accepted risks.
 
