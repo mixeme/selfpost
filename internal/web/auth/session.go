@@ -41,17 +41,22 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Create issues a new session for username and returns its token.
-func (s *sessionStore) Create(username string) string {
+// Create issues a new session for username and returns its token. It fails
+// closed: if the row cannot be written the caller gets an error and must not
+// hand out a cookie, because a token that is not in the database looks like a
+// signed-in browser while every request it makes bounces back to /login.
+func (s *sessionStore) Create(username string) (string, error) {
 	token := randomToken(32)
 	now := time.Now()
 	if err := s.store.CreateSession(hashToken(token), username, now.Add(s.idle)); err != nil {
-		logf("panel: session: create failed: %v", err)
+		return "", err
 	}
+	// Pruning is housekeeping: the new session is already valid, so a failure
+	// here is logged and does not fail the login.
 	if _, err := s.store.DeleteExpiredSessions(now); err != nil {
 		logf("panel: session: prune expired failed: %v", err)
 	}
-	return token
+	return token, nil
 }
 
 // Lookup returns the session username for a token if it exists and is

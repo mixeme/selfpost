@@ -36,6 +36,29 @@ type inflight struct {
 	m  map[string]map[*reservation]struct{}
 }
 
+// tryAdmit decides whether one more message may be sent for key and, if so,
+// claims its slot — both under a single lock. Counting and reserving in two
+// separate critical sections would let two SMTP sessions that reach MAIL FROM
+// at the same moment observe the same total and each take the last free slot,
+// which is exactly the overshoot the in-flight registry exists to prevent.
+//
+// stored is the count the send log already holds for the limit's window and max
+// is the ceiling; the caller supplies both because only it can query the store.
+// The returned total is what was measured, for the refusal log line.
+func (f *inflight) tryAdmit(key string, since time.Time, stored, max int64) (*reservation, int64, bool) {
+	if f == nil {
+		return nil, stored, stored < max // no in-flight accounting (tests)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	total := stored + f.countLocked(key, since)
+	if total >= max {
+		return nil, total, false
+	}
+	return f.reserveLocked(key), total, true
+}
+
 // count returns how many reservations for key were taken within the limit's
 // window (at or after since), pruning any that outlived reservationTTL.
 func (f *inflight) count(key string, since time.Time) int64 {
@@ -45,6 +68,11 @@ func (f *inflight) count(key string, since time.Time) int64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	return f.countLocked(key, since)
+}
+
+// countLocked is count's body; the caller holds mu.
+func (f *inflight) countLocked(key string, since time.Time) int64 {
 	set := f.m[key]
 	cutoff := time.Now().Add(-reservationTTL)
 	var n int64
@@ -63,14 +91,8 @@ func (f *inflight) count(key string, since time.Time) int64 {
 	return n
 }
 
-// reserve claims a slot for key until the message is recorded or released.
-func (f *inflight) reserve(key string) *reservation {
-	if f == nil {
-		return nil
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
+// reserveLocked is reserve's body; the caller holds mu.
+func (f *inflight) reserveLocked(key string) *reservation {
 	if f.m == nil {
 		f.m = make(map[string]map[*reservation]struct{})
 	}

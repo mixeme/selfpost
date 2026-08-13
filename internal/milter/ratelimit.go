@@ -54,22 +54,23 @@ func (s *session) overLimit() bool {
 }
 
 // enforceLimit counts recent messages for scope/ref and refuses when at or
-// above the ceiling. On admit it reserves an in-flight slot on the session.
+// above the ceiling. The stored count and the in-flight slots are weighed and
+// the admitted message's own slot is taken in one atomic step (tryAdmit), so
+// two sessions racing at MAIL FROM cannot both claim the last free slot.
 func (s *session) enforceLimit(scope, ref string, rl store.RateLimit) bool {
 	since := time.Now().Add(-time.Duration(rl.WindowSeconds) * time.Second)
-	n, err := s.rec.CountMessages(scope, ref, since)
+	stored, err := s.rec.CountMessages(scope, ref, since)
 	if err != nil {
 		log.Printf("journal-milter: rate-limit count %s %q: %v (fail-open)", scope, ref, err)
 		return false
 	}
-	key := scope + "|" + ref
-	n += s.flight.count(key, since)
-	if n >= int64(rl.MaxMessages) {
+	r, n, ok := s.flight.tryAdmit(scope+"|"+ref, since, stored, int64(rl.MaxMessages))
+	if !ok {
 		log.Printf("journal-milter: %s %q over limit: %d/%d in %ds from %s — refusing 4xx",
 			scope, ref, n, rl.MaxMessages, rl.WindowSeconds, s.clientIP)
 		return true
 	}
-	s.reserved = append(s.reserved, s.flight.reserve(key))
+	s.reserved = append(s.reserved, r)
 	return false
 }
 

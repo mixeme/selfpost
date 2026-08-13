@@ -24,6 +24,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   principal's own domains and applications before the query runs, so a
   hand-written URL cannot widen the scope. Global administrators are unaffected.
 
+- mail (level-2 rate limit): the ceiling is no longer overshot by messages that
+  arrive at the same instant. The milter counted the stored and in-flight
+  messages and reserved its own slot in two separate steps, so several SMTP
+  sessions could pass the same check before any of them had reserved. Counting
+  and reserving now happen as one operation, and the ceiling is handed out
+  exactly as many times as configured. Postfix's level-1 limit remains the
+  backstop and the level-2 check stays fail-open on store errors.
+
+- panel (sign-in): a session that cannot be written to the database no longer
+  produces a session cookie. The login used to log the failure, set the cookie
+  and redirect to the dashboard, leaving the browser looking signed in while
+  every request bounced back to `/login`; it now fails closed with an error on
+  the sign-in page.
+
+- panel (applications): deleting an application removes its SASL credentials
+  before its registry row. If `saslpasswd2` fails, the application stays listed
+  and the delete can be retried, instead of leaving a hidden account that could
+  still authenticate to Postfix. This matches the order domain deletion already
+  used.
+
 ### Changed
 
 - ci: gofmt on eight files that failed the formatting workflow check (panel

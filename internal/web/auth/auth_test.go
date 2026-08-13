@@ -1,12 +1,16 @@
 package auth
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/view"
@@ -20,6 +24,15 @@ func newTestSessionStore(t *testing.T) *sessionStore {
 	}
 	t.Cleanup(func() { st.Close() })
 	return newSessionStore(st, 7*24*time.Hour)
+}
+
+func mustCreate(t *testing.T, s *sessionStore, username string) string {
+	t.Helper()
+	token, err := s.Create(username)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	return token
 }
 
 func mustView(t *testing.T) *view.Engine {
@@ -86,7 +99,7 @@ func TestSessionTokenIgnoresTheOtherName(t *testing.T) {
 
 func TestRequireAuthRejectsDuplicateCookies(t *testing.T) {
 	m := testModule(t, false)
-	token := m.sessions.Create("admin")
+	token := mustCreate(t, m.sessions, "admin")
 
 	reached := false
 	h := m.RequireAuth(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true }))
@@ -107,7 +120,7 @@ func TestRequireAuthRejectsDuplicateCookies(t *testing.T) {
 
 func TestLogoutClearsBothCookieNames(t *testing.T) {
 	m := testModule(t, true)
-	token := m.sessions.Create("admin")
+	token := mustCreate(t, m.sessions, "admin")
 
 	r := httptest.NewRequest(http.MethodPost, "http://panel.example.com/logout", nil)
 	r.Host = "panel.example.com"
@@ -132,9 +145,63 @@ func TestLogoutClearsBothCookieNames(t *testing.T) {
 	}
 }
 
+// A session that could not be stored must not turn into a cookie: the browser
+// would look signed in, and every request it made would be bounced to /login
+// with no explanation. Only the sessions table is broken here, so the request
+// gets past the user lookup and password check and fails exactly where the
+// session is written.
+func TestLoginSetsNoCookieWhenTheSessionCannotBeStored(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	hash, err := bcrypt.GenerateFromPassword([]byte("correct-horse-battery"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if err := st.CreateGlobalUser("admin", string(hash)); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	dropSessionsTable(t, path)
+
+	m := New(st, Config{}, mustView(t), "")
+	form := url.Values{"username": {"admin"}, "password": {"correct-horse-battery"}}
+	r := httptest.NewRequest(http.MethodPost, "http://panel.example.com/login",
+		strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	m.HandleLogin(rec, r)
+
+	if got := rec.Header().Values("Set-Cookie"); len(got) != 0 {
+		t.Errorf("a session cookie was issued for a session that was never stored: %v", got)
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500 (the login failed)", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Errorf("the browser was sent to %q as if it were signed in", loc)
+	}
+}
+
+// dropSessionsTable breaks session persistence while leaving the rest of the
+// schema usable. The SQLite driver is registered by internal/store.
+func dropSessionsTable(t *testing.T, path string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatalf("open database directly: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec("DROP TABLE sessions"); err != nil {
+		t.Fatalf("drop sessions table: %v", err)
+	}
+}
+
 func TestSessionRename(t *testing.T) {
 	s := newTestSessionStore(t)
-	token := s.Create("admin")
+	token := mustCreate(t, s, "admin")
 
 	s.Rename(token, "operator")
 
@@ -149,8 +216,8 @@ func TestSessionRename(t *testing.T) {
 
 func TestSessionDestroyOthers(t *testing.T) {
 	s := newTestSessionStore(t)
-	keep := s.Create("admin")
-	other := s.Create("admin")
+	keep := mustCreate(t, s, "admin")
+	other := mustCreate(t, s, "admin")
 
 	s.DestroyOthers(keep)
 
@@ -165,7 +232,7 @@ func TestSessionDestroyOthers(t *testing.T) {
 func TestSessionLookupRejectsExpired(t *testing.T) {
 	s := newTestSessionStore(t)
 	s.idle = -time.Minute
-	token := s.Create("admin")
+	token := mustCreate(t, s, "admin")
 
 	if _, ok := s.Lookup(token); ok {
 		t.Fatal("expired session was accepted")
@@ -174,7 +241,7 @@ func TestSessionLookupRejectsExpired(t *testing.T) {
 
 func TestSessionTouchThrottled(t *testing.T) {
 	s := newTestSessionStore(t)
-	token := s.Create("admin")
+	token := mustCreate(t, s, "admin")
 
 	if s.Touch(token) {
 		t.Fatal("touch renewed a session created moments ago")

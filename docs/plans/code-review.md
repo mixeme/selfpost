@@ -504,11 +504,15 @@ the list, the fragment, or query parameters. `go test ./...` green.
 
 **Model: Opus.**
 
-- [ ] `inflight.tryAdmit` (count + reserve under one lock). Extend milter
+- [x] `inflight.tryAdmit` (count + reserve under one lock). Extend milter
       tests with overlapping `MailFrom` (true concurrency, not sequential).
-- [ ] `sessionStore.Create` returns an error; login does not set a cookie on
+      Two tests: concurrent `MailFrom` sessions gated so they all read the
+      stored count before anyone reserves (exactly one admitted), and a
+      saturation test on `tryAdmit` that overshoots the ceiling whenever count
+      and reserve are separate critical sections.
+- [x] `sessionStore.Create` returns an error; login does not set a cookie on
       failure.
-- [ ] `app.Service.Delete`: SASL (and rate-limit row) before or compensating
+- [x] `app.Service.Delete`: SASL (and rate-limit row) before or compensating
       with the registry row; match domain-delete ordering. Test the failure
       path with a fake SASL that errors.
 

@@ -181,6 +181,37 @@ func TestServiceDelete(t *testing.T) {
 	}
 }
 
+// If sasldb2 cannot be updated the application must stay in the registry: an
+// account that still authenticates but has no panel row is invisible to the
+// operator and cannot be deleted again.
+func TestServiceDeleteKeepsRowWhenSASLFails(t *testing.T) {
+	svc, st, rec, _ := newServiceHarness(t)
+	d := addDomain(t, st, "example.com")
+	a, _, err := svc.Create(d.ID, "app1", store.AddressModeWildcard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec.failNext = true // saslpasswd2 -d fails
+	if err := svc.Delete(a.ID); err == nil {
+		t.Fatal("Delete reported success although the SASL account was not removed")
+	}
+	apps, _ := st.ListApplicationsByDomain(d.ID)
+	if len(apps) != 1 {
+		t.Fatalf("registry row dropped while the SASL account can still authenticate: %+v", apps)
+	}
+	if _, ok := rec.set["app1"]; !ok {
+		t.Fatal("SASL account gone despite the failure — the harness no longer proves the ordering")
+	}
+	// The delete is retryable now that the row is still there.
+	if err := svc.Delete(a.ID); err != nil {
+		t.Fatalf("retried Delete: %v", err)
+	}
+	if _, ok := rec.set["app1"]; ok {
+		t.Error("SASL account not deleted on retry")
+	}
+}
+
 func TestServiceUpdateMode(t *testing.T) {
 	svc, st, _, maps := newServiceHarness(t)
 	d := addDomain(t, st, "example.com")
