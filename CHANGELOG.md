@@ -64,6 +64,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   reload) is checked to answer a domain administrator — and a request with no
   principal — with 404, the check that would have caught the send-log leak.
 
+- test: restore is covered as the operator performs it, in process. A backup is
+  downloaded from a running panel through `POST /backup` (plain and encrypted),
+  unpacked the way `tar -xzf` unpacks it onto the `/data` bind mount, and a
+  second panel is booted on the result through the startup order the panel
+  itself uses — version guard, database, services, HTTP application. The
+  restored panel shows the domain and journal the archive carried, finds the
+  DKIM key, SASL database and Postfix sender map where its configuration says
+  they are, does not reopen the one-time setup link, and still honours a
+  session that predates the backup. A data directory left by another version is
+  refused with both versions named and the manifest kept. `serveHTTP` is split
+  in two so that composition can be started without binding a port; no
+  behaviour change.
+
 - test (e2e): the CoreDNS image is pinned to `1.14.6` instead of `latest`, so
   the release gate cannot change under a commit between two runs. The level-1
   rate-limit failure message quoted `RATE_LIMIT_MESSAGES_PER_IP=5` while the

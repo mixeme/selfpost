@@ -575,8 +575,16 @@ typo; **Sonnet** if e2e docs need a paragraph.
 - [x] Fix e2e L1 fatal string (`50`, not `5`).
 - [x] Pin `coredns` image: tag `1.14.6`, not a digest — the tag is a multi-arch
       manifest and the stand has to come up on arm64 developer machines.
-- [ ] Optional later: backup extract + `CheckRestore` + panel boot (heavy;
-      e2e or integration). Not a P4 blocker.
+- [x] Optional: backup extract + `CheckRestore` + panel boot. Done as an
+      in-process integration test (`cmd/panel/restore_test.go`) rather than
+      e2e, so it runs in `go test ./...`: the archive is downloaded from a
+      running panel through `POST /backup` (which closes the “`HandleBackup`
+      POST untested” gap in §14 as well), unpacked the way `tar -xzf` unpacks
+      it, and a second panel is booted on the result through run()'s own
+      startup order. Also covers the encrypted download, the version-mismatch
+      refusal, that a restore does not reopen the setup link, and that sessions
+      travel in the archive. `serveHTTP` was split so the composition it
+      performs (`newPanel`) can be booted without binding a port.
 
 **Done when:** P0 cannot regress without a red test; e2e L1 message matches
 the override.

@@ -15,17 +15,17 @@ import (
 	"github.com/mixeme/selfpost/internal/web"
 )
 
-// serveHTTP runs the control-panel HTTP server until ctx is cancelled, using
-// the database handle shared by all roles: setup, login and the authenticated
-// panel surface (security.md).
-func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
+// newPanel wires the panel's services over the shared database handle and
+// builds the HTTP application from cfg. It is the composition of the panel as
+// the environment describes it, with nothing bound to a port yet.
+func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	// Applications own the SASL accounts and the Postfix sender map; the domain
 	// service delegates to them when a domain (and its applications) is deleted.
 	pf := postfix.New(cfg.postfixDir)
 	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
 	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), apps, cfg.dkimSelectorDef)
 
-	srvApp, err := web.New(st, domains, apps, web.Config{
+	return web.New(st, domains, apps, web.Config{
 		Hostname:               cfg.hostname,
 		CookieSecure:           cfg.cookieSecure,
 		SubmissionEnabled:      cfg.submissionEnabled,
@@ -42,6 +42,13 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 		RateLimitMessagesPerIP: cfg.rateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
 	}, cfg.setupTokenPath)
+}
+
+// serveHTTP runs the control-panel HTTP server until ctx is cancelled, using
+// the database handle shared by all roles: setup, login and the authenticated
+// panel surface (security.md).
+func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
+	srvApp, err := newPanel(cfg, st)
 	if err != nil {
 		return err
 	}
