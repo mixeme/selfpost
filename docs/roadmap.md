@@ -29,6 +29,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Plan |
 |---|---|---|---|
 | code-review | Full-tree review follow-ups (authz, docs, GUI, tests) | **agreed** | [plans/code-review.md](plans/code-review.md) |
+| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | [plans/queue-retries.md](plans/queue-retries.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
@@ -37,7 +38,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 **Recommended order** (not binding): **code-review P0** first (shipped
 domain-admin send-log leak — a defect, not a feature), then the rest of that
-plan as listed, then **inbound-relay**. Candidates need explicit agreement
+plan as listed; **queue-retries** is a small panel item that can land in
+parallel after P0; then **inbound-relay**. Candidates need explicit agreement
 before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
@@ -60,6 +62,27 @@ Not inbound-relay, not DMARC ingestion, not a layer rewrite.
 **Dependencies / risks:** P0 is confidentiality between panel roles; it
 jumps the feature queue. Implementation models are in the plan (Opus / Sonnet
 / Haiku / Fable per [development.md](development.md)).
+**Version:** patch.
+
+---
+
+## queue-retries
+
+**Goal:** show on Mail queue and on a delivery's history how this Postfix
+retries deferred mail — first delay, backoff cap, queue lifetime — reading
+the effective config (`postconf -h`) once at panel start so a manual
+override is visible.
+
+**Boundary:** explanation only. Postfix stays as-is; no attempt counter, no
+panel knobs for queue lifetime, no schema change. Domain administrators see
+the intervals on `/deliveries/{id}` (they cannot open Mail queue).
+
+**Done when:** see the criteria in
+[plans/queue-retries.md](plans/queue-retries.md).
+
+**Dependencies / risks:** `postconf` unavailable outside the container
+(fallback + muted note). Copy must stay time-based — Postfix has no max
+attempt count.
 **Version:** patch.
 
 ---

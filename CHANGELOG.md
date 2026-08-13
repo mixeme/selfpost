@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- docs: agreed roadmap item **queue-retries** — show this Postfix's retry
+  policy (first delay, backoff cap, queue lifetime) on Mail queue and on a
+  delivery's history, reading `postconf -h` once at panel start so a manual
+  override is visible. Plan: [docs/plans/queue-retries.md](docs/plans/queue-retries.md).
+  Explanation only; no attempt counter and no panel knobs. Not yet
+  implemented.
+
 ### Fixed
 
 - test (e2e): send-log status scrapers follow the badge markup in
