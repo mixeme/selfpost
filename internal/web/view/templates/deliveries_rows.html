@@ -1,5 +1,6 @@
 {{define "deliveries_rows"}}
-<div id="deliveries-rows" data-poll hx-get="/deliveries/rows?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.Page}}"
+<div id="deliveries-rows" data-poll aria-live="polite"
+     hx-get="/deliveries/rows?domain={{.FilterDomain | urlquery}}&app={{.FilterApp | urlquery}}&p={{.Page}}"
      hx-trigger="load" hx-swap="outerHTML">
   {{if .Rows}}
   <table>
@@ -14,15 +15,15 @@
         <td>{{.To}}</td>
         <td class="subject"><span title="{{.Subject}}">{{.Subject}}</span></td>
         <td class="status"><span class="st st-{{.Level}}">{{.Status}}</span></td>
-        <td class="actions"><a href="/deliveries/{{.ID}}?domain={{$.FilterDomain}}&app={{$.FilterApp}}&p={{$.Page}}">Details</a></td>
+        <td class="actions"><a href="/deliveries/{{.ID}}?domain={{$.FilterDomain | urlquery}}&app={{$.FilterApp | urlquery}}&p={{$.Page}}">Details</a></td>
       </tr>
       {{end}}
     </tbody>
   </table>
   <p class="muted">
     Page {{.Page}}{{if .LastPage}} of {{.LastPage}}{{end}}
-    {{if .HasPrev}} &middot; <a href="/deliveries?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.PrevPage}}">&larr; Newer</a>{{end}}
-    {{if .HasNext}} &middot; <a href="/deliveries?domain={{.FilterDomain}}&app={{.FilterApp}}&p={{.NextPage}}">Older &rarr;</a>{{end}}
+    {{if .HasPrev}} &middot; <a href="/deliveries?domain={{.FilterDomain | urlquery}}&app={{.FilterApp | urlquery}}&p={{.PrevPage}}">&larr; Newer</a>{{end}}
+    {{if .HasNext}} &middot; <a href="/deliveries?domain={{.FilterDomain | urlquery}}&app={{.FilterApp | urlquery}}&p={{.NextPage}}">Older &rarr;</a>{{end}}
   </p>
   {{else}}
   <p class="muted">No messages logged yet.</p>

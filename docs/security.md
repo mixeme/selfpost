@@ -127,6 +127,19 @@ deferred item from the roadmap.
   either: code executing in the panel's origin sends the request itself —
   against that, `html/template` auto-escaping and CSP do the work, which is why
   templates must contain no inline scripts and no inline styles.
+- **Destructive-action confirmation (`data-confirm`) is JavaScript-only.**
+  Delete, regenerate-password, and clear-rate-limit forms carry a
+  `data-confirm` prompt handled entirely in
+  [panel.js](../internal/web/view/static/panel.js); with JavaScript disabled
+  or blocked the form submits immediately, exactly as it did before the
+  prompts existed. Accepted deliberately: the prompt is a mis-click guard,
+  not an authorization boundary — the same origin check and session/RBAC
+  gate every one of these `POST`s whether or not JavaScript ran. Progressive
+  enhancement means the panel must work with JavaScript off; a
+  server-rendered confirmation step would need a second page (or a `?confirm=1`
+  round trip) for every one of these forms, which is what
+  [`user_delete.html`](../internal/web/view/templates/user_delete.html) and
+  `domain_delete.html` already do for the two highest-blast-radius deletes.
 - **Encrypting backups and exports is an option, not the default.** With the
   checkbox cleared the file downloads in the clear, as in 1.0. Otherwise an
   operator with nowhere to keep a password would lose the ability to take a

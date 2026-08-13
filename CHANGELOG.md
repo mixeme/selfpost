@@ -62,6 +62,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `field_values`, `credentials_fields`) instead of copy-pasted blocks. No
   behaviour or visible change.
 
+- panel (GUI, accessibility): the Deliveries fragment's `hx-get` and pagination
+  links now `urlquery`-encode the `domain`/`app` filters instead of splicing
+  them into the query string raw. The four polled regions (deliveries rows,
+  status, mail queue, system log) carry `aria-live="polite"` so a screen
+  reader announces the refreshed content.
+
+- docs: [security.md](docs/security.md) accepted risks now note that
+  `data-confirm` prompts on destructive forms are JavaScript-only — with
+  JavaScript disabled the form submits immediately, the same as before the
+  prompts existed — and why that is acceptable (the prompt is a mis-click
+  guard, not an authorization boundary).
+
 - docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))
   — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log
   authorization. Roadmap queues that plan ahead of inbound-relay and records
