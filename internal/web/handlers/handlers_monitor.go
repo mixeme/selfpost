@@ -299,47 +299,28 @@ func deliveriesBackURL(r *http.Request) string {
 // sendLogData reads the domain/app filters and page number off the query
 // string, queries the store, and assembles everything the template needs
 // (filter dropdown options plus the current selection, rows, and pagination).
+//
+// The invariant this function owes the journal: a principal who is not global
+// only ever reads rows for the domains assigned to them. That scope is stated
+// to the store as SendLogFilter.Domains and holds for every number of
+// assignments, including none — a domain administrator whose last domain was
+// deleted gets an empty log, not the whole one. The query parameters are
+// filters *within* that scope and can only narrow it: both are checked against
+// the assigned domains and their applications before the query runs, because a
+// dropdown that offers only permitted values is a courtesy to the browser, not
+// a check on the request.
 func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	p, ok := h.principal(r)
 	if !ok {
 		return nil, errors.New("no principal")
 	}
 	q := r.URL.Query()
-	filter := store.SendLogFilter{
-		Domain:   q.Get("domain"),
-		AppLogin: q.Get("app"),
-	}
 
 	assigned, err := h.assignedDomains(p)
 	if err != nil {
 		return nil, err
 	}
 	allowedNames := domainNameSet(assigned)
-
-	if !p.IsGlobal() {
-		if filter.Domain != "" && !allowedNames[filter.Domain] {
-			filter.Domain = ""
-		}
-		if filter.Domain == "" && len(assigned) == 1 {
-			filter.Domain = assigned[0].Name
-		}
-	}
-
-	page := parsePage(q.Get("p"))
-
-	total, err := h.store.CountSendLog(filter)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
-	if err != nil {
-		return nil, err
-	}
-	view := make([]sendLogRow, len(rows))
-	for i := range rows {
-		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
-		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
-	}
 
 	domainNames := make([]string, 0, len(assigned))
 	for _, d := range assigned {
@@ -362,8 +343,37 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	}
 	sort.Strings(logins)
 
-	if !p.IsGlobal() && filter.AppLogin != "" && !loginSet[filter.AppLogin] {
-		filter.AppLogin = ""
+	filter := store.SendLogFilter{
+		Domain:   q.Get("domain"),
+		AppLogin: q.Get("app"),
+		// A global administrator reads the whole journal, including rows left
+		// behind by a domain that has since been deleted.
+		Domains:    domainNames,
+		AllDomains: p.IsGlobal(),
+	}
+	if !p.IsGlobal() {
+		if filter.Domain != "" && !allowedNames[filter.Domain] {
+			filter.Domain = ""
+		}
+		if filter.AppLogin != "" && !loginSet[filter.AppLogin] {
+			filter.AppLogin = ""
+		}
+	}
+
+	page := parsePage(q.Get("p"))
+
+	total, err := h.store.CountSendLog(filter)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
+	if err != nil {
+		return nil, err
+	}
+	view := make([]sendLogRow, len(rows))
+	for i := range rows {
+		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
+		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
 	}
 
 	lastPage := 1

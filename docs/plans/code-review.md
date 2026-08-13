@@ -485,14 +485,16 @@ change. After Go changes: `go build`, `go vet`, `go test ./...`.
 **Model: Opus.** Tests in the same change. **Fable** on the diff after it
 lands (reviewer ≠ author).
 
-- [ ] Extend `SendLogFilter` so a non-empty domain list is an `IN` constraint.
-      Empty list for a non-global user → zero rows, not “all”.
-- [ ] `sendLogData`: for `!p.IsGlobal()`, always constrain to assigned domain
+- [x] Extend `SendLogFilter` so a non-empty domain list is an `IN` constraint.
+      Empty list for a non-global user → zero rows, not “all”. Done as
+      `Domains` + `AllDomains`: the zero value matches nothing, so a caller
+      that states no scope cannot read the journal.
+- [x] `sendLogData`: for `!p.IsGlobal()`, always constrain to assigned domain
       names; validate `AppLogin` against the user’s apps **before** query.
-- [ ] Tests: domain-admin with 0, 1, and 2 assigned domains; unfiltered list;
+- [x] Tests: domain-admin with 0, 1, and 2 assigned domains; unfiltered list;
       forged `?domain=` and `?app=`; detail page still 404s on a foreign id
       (already true — keep a regression test).
-- [ ] Comment the invariant next to `sendLogData` (the comment that was
+- [x] Comment the invariant next to `sendLogData` (the comment that was
       missing).
 
 **Done when:** a domain-admin cannot read another domain’s send-log rows via

@@ -129,7 +129,7 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
-	rows, err := h.store.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
@@ -215,6 +215,143 @@ func TestDeliveryPageNotFound(t *testing.T) {
 	}
 }
 
+// A domain administrator reads the journal of the domains assigned to them and
+// nothing else. The list used to be scoped only when exactly one domain was
+// assigned, which meant two assignments read as none at all.
+func TestSendLogScopedToAssignedDomains(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+
+	for name, tc := range map[string]struct {
+		principal auth.Principal
+		want      []string
+		unwanted  []string
+	}{
+		"global sees both": {
+			globalPrincipal, []string{"First message", "Second message"}, nil,
+		},
+		"one assigned domain": {
+			domainAdmin(domains["first.example.ru"].ID),
+			[]string{"First message"}, []string{"Second message", "second-app"},
+		},
+		"two assigned domains": {
+			domainAdmin(domains["first.example.ru"].ID, domains["second.example.ru"].ID),
+			[]string{"First message", "Second message"}, nil,
+		},
+		// Every assigned domain deleted cascades the assignments away. That
+		// leaves a principal entitled to nothing, which is an empty log — the
+		// case that used to hand over the whole journal.
+		"no assigned domains": {
+			domainAdmin(), []string{"No messages logged yet."},
+			[]string{"First message", "Second message"},
+		},
+	} {
+		for view, handler := range map[string]http.HandlerFunc{
+			"page":     h.HandleDeliveries,
+			"fragment": h.HandleDeliveriesRows,
+		} {
+			out := getBodyAs(t, handler, "/deliveries", tc.principal)
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("%s (%s): missing %q:\n%s", name, view, want, out)
+				}
+			}
+			for _, unwanted := range tc.unwanted {
+				if strings.Contains(out, unwanted) {
+					t.Errorf("%s (%s): leaks %q:\n%s", name, view, unwanted, out)
+				}
+			}
+		}
+	}
+}
+
+// The filter dropdowns offer only permitted values, so a leak through them can
+// only come from a hand-written URL — which is exactly why the values are
+// checked against the principal's own domains and applications rather than
+// trusted for having been rendered by us.
+func TestSendLogIgnoresForgedFilters(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+	p := domainAdmin(domains["first.example.ru"].ID)
+
+	for _, target := range []string{
+		"/deliveries?domain=second.example.ru",
+		"/deliveries?app=second-app",
+		"/deliveries?domain=second.example.ru&app=second-app",
+	} {
+		out := getBodyAs(t, h.HandleDeliveries, target, p)
+		if strings.Contains(out, "Second message") {
+			t.Errorf("GET %s leaks another domain's journal:\n%s", target, out)
+		}
+		if !strings.Contains(out, "First message") {
+			t.Errorf("GET %s hid the principal's own journal:\n%s", target, out)
+		}
+	}
+}
+
+// The detail page has always checked membership; keep it checked, because the
+// list and the page are two ways to the same row.
+func TestDeliveryPageForeignDomainNotFound(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{Domain: "second.example.ru", AllDomains: true}, 1, 0)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("query: %v (%d rows)", err, len(rows))
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/deliveries/"+itoa(rows[0].ID), nil)
+	req.SetPathValue("id", itoa(rows[0].ID))
+	req = auth.RequestWithPrincipal(req, domainAdmin(domains["first.example.ru"].ID))
+	h.HandleDelivery(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("delivery page for a foreign domain = %d, want 404", rec.Code)
+	}
+}
+
+// serverWithTwoDomains builds a panel over a store holding two domains, one
+// application and one delivered message each, so a scoping test can tell "my
+// rows" from "every row" by reading the page.
+func serverWithTwoDomains(t *testing.T) (*Handlers, map[string]store.Domain) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	domains := make(map[string]store.Domain, 2)
+	for _, d := range []struct{ name, app, subject string }{
+		{"first.example.ru", "first-app", "First message"},
+		{"second.example.ru", "second-app", "Second message"},
+	} {
+		dom, err := st.AddDomain(d.name, "mail")
+		if err != nil {
+			t.Fatalf("add domain %s: %v", d.name, err)
+		}
+		if _, err := st.AddApplication(dom.ID, d.app, store.AddressModeWildcard, nil); err != nil {
+			t.Fatalf("add application %s: %v", d.app, err)
+		}
+		if err := st.InsertQueued(store.SendLogEntry{
+			QueueID: "Q" + d.app, Domain: d.name, AppLogin: d.app,
+			From: "noreply@" + d.name, To: "public@example.net", Subject: d.subject,
+		}); err != nil {
+			t.Fatalf("insert %s: %v", d.subject, err)
+		}
+		domains[d.name] = dom
+	}
+
+	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, domains
+}
+
+var globalPrincipal = auth.Principal{ID: 1, Username: "admin", Role: auth.RoleGlobal}
+
+func domainAdmin(domainIDs ...int64) auth.Principal {
+	return auth.Principal{
+		ID:       2,
+		Username: "domain-admin",
+		Role:     auth.RoleDomainAdmin,
+		Domains:  domainIDs,
+	}
+}
+
 // serverWithDelivery builds a panel over a store holding one delivery, written
 // the way the journal-milter wrote them before it decoded subjects itself.
 func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
@@ -238,7 +375,7 @@ func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
 	if _, err := st.UpdateStatus("4A1B2C3D", "public@example.ru", store.StatusSent); err != nil {
 		t.Fatalf("update status: %v", err)
 	}
-	rows, err := st.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	rows, err := st.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
@@ -246,18 +383,20 @@ func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
 	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, rows[0]
 }
 
-// getBody runs one handler over a GET and returns the page it wrote, failing
-// the test on any non-200. The path's {id} is bound by hand because these calls
-// bypass the router that would otherwise fill it in.
+// getBody runs one handler over a GET as the global administrator.
 func getBody(t *testing.T, h http.HandlerFunc, target string) string {
+	t.Helper()
+	return getBodyAs(t, h, target, globalPrincipal)
+}
+
+// getBodyAs runs one handler over a GET as the given principal and returns the
+// page it wrote, failing the test on any non-200. The path's {id} is bound by
+// hand because these calls bypass the router that would otherwise fill it in.
+func getBodyAs(t *testing.T, h http.HandlerFunc, target string, p auth.Principal) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req = auth.RequestWithPrincipal(req, auth.Principal{
-		ID:       1,
-		Username: "admin",
-		Role:     auth.RoleGlobal,
-	})
+	req = auth.RequestWithPrincipal(req, p)
 	if rest, ok := strings.CutPrefix(req.URL.Path, "/deliveries/"); ok && rest != "rows" {
 		req.SetPathValue("id", rest)
 	}

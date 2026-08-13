@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- security (panel): the Deliveries list is scoped to a domain administrator's
+  assigned domains for every number of assignments. Previously the send log was
+  narrowed only when exactly one domain was assigned, so an administrator with
+  none or with two or more read every domain's rows (sender, recipient, subject)
+  on the list and its polled fragment. The domain scope is now an `IN`
+  constraint carried by the store query — a filter that states no scope returns
+  nothing — and the `domain` and `app` query parameters are checked against the
+  principal's own domains and applications before the query runs, so a
+  hand-written URL cannot widen the scope. Global administrators are unaffected.
+
 ### Changed
 
 - docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))

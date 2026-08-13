@@ -1,6 +1,8 @@
 package store
 
 import (
+	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -159,6 +161,61 @@ func TestUpdateStatusNoMatch(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("want 0 rows updated, got %d", n)
+	}
+}
+
+// The journal is read by principals who are only entitled to part of it, so
+// the scope is part of the query rather than something the caller remembers to
+// apply afterwards. A filter that states no scope is a caller that has not
+// decided who is asking, and the safe answer to that is nothing.
+func TestSendLogScopeIsMandatory(t *testing.T) {
+	st := openTestStore(t)
+	for _, domain := range []string{"first.example.ru", "second.example.ru"} {
+		if err := st.InsertQueued(SendLogEntry{
+			QueueID: "Q-" + domain, Domain: domain, AppLogin: "app-" + domain,
+			From: "noreply@" + domain, To: "public@example.net", Subject: domain,
+		}); err != nil {
+			t.Fatalf("InsertQueued: %v", err)
+		}
+	}
+
+	for name, tc := range map[string]struct {
+		filter SendLogFilter
+		want   []string
+	}{
+		"no scope":           {SendLogFilter{}, nil},
+		"empty scope":        {SendLogFilter{Domains: []string{}}, nil},
+		"all domains":        {SendLogFilter{AllDomains: true}, []string{"first.example.ru", "second.example.ru"}},
+		"one domain":         {SendLogFilter{Domains: []string{"first.example.ru"}}, []string{"first.example.ru"}},
+		"two domains":        {SendLogFilter{Domains: []string{"first.example.ru", "second.example.ru"}}, []string{"first.example.ru", "second.example.ru"}},
+		"unknown domain":     {SendLogFilter{Domains: []string{"third.example.ru"}}, nil},
+		"filter within":      {SendLogFilter{Domain: "first.example.ru", Domains: []string{"first.example.ru", "second.example.ru"}}, []string{"first.example.ru"}},
+		"filter outside":     {SendLogFilter{Domain: "second.example.ru", Domains: []string{"first.example.ru"}}, nil},
+		"app filter outside": {SendLogFilter{AppLogin: "app-second.example.ru", Domains: []string{"first.example.ru"}}, nil},
+	} {
+		rows, err := st.QuerySendLog(tc.filter, 50, 0)
+		if err != nil {
+			t.Fatalf("%s: QuerySendLog: %v", name, err)
+		}
+		var got []string
+		for _, r := range rows {
+			got = append(got, r.Domain)
+		}
+		// Which rows came back is the question here; the page's own order is
+		// newest-first and is tested where it matters.
+		sort.Strings(got)
+		if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("%s: rows for %v, want %v", name, got, tc.want)
+		}
+		// The count drives pagination, so it has to agree with the page or the
+		// UI advertises pages of rows the reader is not allowed to see.
+		n, err := st.CountSendLog(tc.filter)
+		if err != nil {
+			t.Fatalf("%s: CountSendLog: %v", name, err)
+		}
+		if int(n) != len(tc.want) {
+			t.Errorf("%s: count %d, want %d", name, n, len(tc.want))
+		}
 	}
 }
 
