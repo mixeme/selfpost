@@ -16,8 +16,9 @@ const setupTokenTTL = 10 * time.Minute
 
 // setupManager owns the one-time administrator setup token. The token itself is
 // ephemeral (regenerated on restart or expiry) and lives only in memory; the
-// persistent "setup complete" fact is the presence of the admin row in the
-// store, so once that exists the token is gone for good (security.md).
+// persistent "setup complete" fact is the presence of any row in the store's
+// users table (`store.UserExists`), so once the first global administrator is
+// created the token is gone for good (security.md).
 type setupManager struct {
 	store     *store.Store
 	hostname  string

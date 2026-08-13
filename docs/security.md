@@ -34,8 +34,8 @@ The panel is exposed to the internet — the items below are **not optional**.
 - Failed attempts do **not** invalidate the token early (protects setup from
   being DoS-ed).
 - Once the administrator exists the token is void forever, `/setup/*` → 404.
-- The administrator password is bcrypt (or argon2) in SQLite only; no plaintext
-  and no MD5.
+- The administrator password is bcrypt in SQLite only; no plaintext and no
+  MD5.
 - `PANEL_USERNAME` / `PANEL_PASSWORD_HASH` in env are **not used**.
 
 ### Application SASL passwords
@@ -112,19 +112,21 @@ deferred item from the roadmap.
 - **A `POST` with neither `Sec-Fetch-Site` nor `Origin` is allowed through.**
   A client that sends neither — a genuinely old browser, or a webview with a
   frozen engine — stays vulnerable to CSRF from any site. Accepted
-  deliberately: the panel is single-user, the administrator picks the browser,
-  and a strict mode would not "protect" such a client, it would simply break the
-  panel in it. Tightening is one line in `originAllowed`
+  deliberately: every panel user (global or domain-admin) is an operator who
+  picks their own browser, not an untrusted party the panel needs to defend
+  against, and a strict mode would not "protect" such a client, it would
+  simply break the panel in it. Tightening is one line in `originAllowed`
   ([internal/web/security.go](../internal/web/security.go)): return `false`
   instead of `true` in the "neither header present" branch.
 - **Session-bound CSRF tokens are not implemented.** The origin check closes the
   neighbouring-subdomain case but depends on browser behaviour; a token does
   not. The price is a hidden field in roughly two dozen forms. The trigger to
-  revisit is a requirement for protection that holds regardless of the browser.
-  A token would not save the panel from XSS inside it either: code executing in
-  the panel's origin sends the request itself — against that, `html/template`
-  auto-escaping and CSP do the work, which is why templates must contain no
-  inline scripts and no inline styles.
+  revisit is a requirement for protection that holds regardless of the browser,
+  or a domain-admin population the global administrator does not fully trust
+  (see the ADR below). A token would not save the panel from XSS inside it
+  either: code executing in the panel's origin sends the request itself —
+  against that, `html/template` auto-escaping and CSP do the work, which is why
+  templates must contain no inline scripts and no inline styles.
 - **Encrypting backups and exports is an option, not the default.** With the
   checkbox cleared the file downloads in the clear, as in 1.0. Otherwise an
   operator with nowhere to keep a password would lose the ability to take a
@@ -158,24 +160,35 @@ deferred item from the roadmap.
 
 **Context.** The panel is forms (`POST`) with a cookie session — the classic
 CSRF surface. What is needed is a way to tell a request from the panel's own
-page apart from one initiated by a third-party site in the logged-in
-administrator's browser.
+page apart from one initiated by a third-party site in a logged-in user's
+browser. The panel is multi-user since 1.2.0 (a global administrator plus
+zero or more domain-admin users, each scoped to their assigned domains), but
+that is an authorization boundary (who can see or change what), not a change
+to the CSRF threat: the attacker in scope here is still an external site
+riding a legitimate user's cookie, not one panel user attacking another
+through the browser.
 
 **Decision.** `originAllowed` in
 [internal/web/security.go](../internal/web/security.go) checks `Sec-Fetch-Site`
 (when the browser sends it) or `Origin` (fallback) against the panel's host; a
 request carrying neither header is **allowed through** rather than rejected.
-There are no session-bound tokens embedded in forms.
+There are no session-bound tokens embedded in forms. The check applies the same
+way regardless of the requesting user's role.
 
-**Why not tokens.** The panel is single-user (one administrator per instance) —
-the threat model does not include cross-user CSRF inside the panel itself, only
-an external site making the administrator's browser send a request. The origin
-check covers that without touching a single template: a token would need a
-hidden field in roughly two dozen forms and synchronisation with every new form,
-and it would still not protect against XSS inside the panel — code executing in
-the panel's origin reads the token and sends the request itself. XSS is handled
-by `html/template` auto-escaping and CSP, so that is a separate line of defence,
-not a CSRF token.
+**Why not tokens.** Cross-user CSRF is not the threat model here: a
+domain-admin's browser sending a request still needs that domain-admin's own
+cookie, so a token would not add a boundary between roles that the
+authorization checks (`Principal.CanAccessDomain`,
+[internal/web/auth/principal.go](../internal/web/auth/principal.go); route
+gating in [internal/web/auth/middleware.go](../internal/web/auth/middleware.go))
+don't already enforce. The remaining case is an external site making a
+logged-in user's browser send a request, which the origin check covers without
+touching a single template.
+A token would need a hidden field in roughly two dozen forms and
+synchronisation with every new form, and it would still not protect against
+XSS inside the panel — code executing in the panel's origin reads the token
+and sends the request itself. XSS is handled by `html/template` auto-escaping
+and CSP, so that is a separate line of defence, not a CSRF token.
 
 **Trade-off.** A client that sends neither `Sec-Fetch-Site` nor `Origin` (a
 genuinely old browser, or a webview with a frozen engine) stays vulnerable — see
@@ -183,7 +196,11 @@ genuinely old browser, or a webview with a frozen engine) stays vulnerable — s
 such a client, at the price of a narrow residual surface.
 
 **Revisit if:** a requirement appears for protection that does not depend on
-browser behaviour, or the panel becomes multi-user.
+browser behaviour, or domain-admin accounts stop being trusted operators (for
+example, if a future release lets a global administrator invite domain-admins
+whose browsers/devices are not vetted) — at that point cross-role request
+forgery inside the panel would need its own analysis, separate from the
+external-site case this ADR covers.
 
 ## How this list grows
 

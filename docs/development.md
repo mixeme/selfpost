@@ -265,7 +265,11 @@ operator would actually use.
 **Coverage (summary):** bootstrap → SMTP AUTH → delivery → DKIM verify →
 send-log `queued → sent`; negatives (no AUTH, relay, sender/login mismatch,
 L1/L2 limits, milter fail-open, bad `SELFPOST_HOSTNAME`, session survives
-`docker restart`). Polling with timeouts only — no fixed `sleep`.
+`docker restart`); startup checks that supervisord actually brought up
+OpenDKIM, the panel, and Postfix (`checkSupervisorProcesses`), plus logrotate
+config-mode and forced-rotation checks (`checkLogrotateConfigMode`,
+`checkLogrotateRotation` — [test/e2e/logrotate_check.go](../test/e2e/logrotate_check.go)).
+Polling with timeouts only — no fixed `sleep`.
 
 Requires **Docker + Compose v2** on the machine running the suite.
 

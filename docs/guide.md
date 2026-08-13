@@ -230,8 +230,22 @@ service healthy and will mail be accepted?"
 - **Backup** (`/backup`) — download a full-server backup; the same page hosts
   the domain-import form (`POST /domains/import`). See
   [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
-- **Settings** (`/settings`) — change the administrator username and/or password.
-  Application SASL logins are separate and are not changed here.
+- **Settings** (`/settings`) — change the administrator username and/or
+  password, and the panel-wide default DMARC report address (`rua=`) offered
+  when a domain doesn't set its own — see [DNS setup](#dns-setup). Application
+  SASL logins are separate and are not changed here.
+- **Users** (`/users`, global administrator only) — create, edit, and delete
+  panel users. There are two roles:
+  - **Global administrator** — full access to every page and every domain,
+    including Users, Backup, Status, Mail queue, and System log.
+  - **Domain-admin** — scoped to one or more domains assigned by a global
+    administrator. Sees only those domains' pages, applications, and
+    Deliveries rows; `/users`, `/backup`, `/status`, `/mail-queue`, and
+    `/system-log` are not reachable (404). A domain-admin can *export* the
+    domains assigned to them — see the note on working credentials below.
+
+  The panel refuses to remove or demote the **last** global administrator, so
+  it can never end up with none.
 
 **Sessions.** A login survives a container restart: sessions live in SQLite, not
 in memory. Expiry is a sliding idle window (`PANEL_SESSION_IDLE_DAYS`, default
@@ -296,6 +310,12 @@ An application override without trusted IPs is inactive.
 When a level-2 ceiling is exceeded, Postfix returns a 4xx and the refusal is
 recorded in Deliveries as `rejected`.
 
+**Level 2 is best-effort, not a guarantee.** It runs inside the journal-milter
+and is deliberately fail-open: if the rate-limit lookup hits a store error, or
+the connecting client's IP is not available to the milter, level 2 is skipped
+and the message is accepted rather than held up. Level 1 (the Postfix anvil
+limit above) is the backstop that keeps working even when level 2 cannot run.
+
 ## Backup, restore, and moving a single domain
 
 Two related but distinct operations
@@ -317,6 +337,12 @@ Two related but distinct operations
   `:latest`: without a known version, there'd be no way to tell which image
   restoring a given backup actually requires.
 
+  Restoring an archive taken **before** you invalidated a session (password
+  change, logout everywhere) can bring that session back: session rows travel
+  with the backup, and a browser that still holds the matching cookie is
+  logged in again once the idle timeout allows it. If a restore might do this,
+  changing every user's password afterwards clears it out.
+
   **Alternative: archive `./data` while stopped.** If the service can be taken
   offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
   the host is safe — nothing is writing to SQLite. Unlike the panel/CLI backup
@@ -332,7 +358,12 @@ Two related but distinct operations
   file, *Backup* → *Import a domain* to read it back in): moves one domain — its DKIM key and its applications' **working**
   SASL passwords — to a different SelfPost instance without regenerating
   anything, so DNS (the DKIM TXT record) doesn't need to change. Unlike a full
-  restore, this works across different hostnames/instances.
+  restore, this works across different hostnames/instances. *Import* is
+  global-administrator only; *export* is available to any user who can access
+  the domain, **including a domain-admin** for a domain assigned to them — so
+  a domain-admin can walk away with that domain's working SASL passwords in
+  the clear. Weigh that when deciding which domains to assign to a
+  domain-admin account.
 
 Both files are **secrets** — they contain the admin password hash (full
 backup) or working application credentials (domain export) in the clear or in

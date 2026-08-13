@@ -6,13 +6,18 @@
 // it. TLS certificates (the reverse proxy's responsibility) and the Postfix
 // queue are deliberately excluded (architecture.md § Persistence).
 //
-// Restore is intentionally not a separate code path: a backup is extracted
-// into the /data bind mount before first start, and the panel regenerates
-// Postfix and OpenDKIM from the restored SQLite state exactly as on any normal
-// start. The only restore-specific step is CheckRestore, which refuses to boot
-// if the manifest's version does not match the running binary, so
-// schema/format skew between versions cannot silently corrupt state
-// (architecture.md § Persistence).
+// Restore is not a separate code path in the panel: a backup is extracted into
+// the /data bind mount before first start, and the archive already carries
+// everything the mail path needs — DKIM keys, sasldb2, and Postfix's sender
+// map — so nothing needs to be regenerated from SQLite for the daemons to
+// start correctly. The only restore-specific step the panel runs is
+// CheckRestore, which refuses to boot if the manifest's version does not match
+// the running binary, so schema/format skew between versions cannot silently
+// corrupt state (architecture.md § Persistence). If a daemon's on-disk state
+// ever drifts from what SQLite records — for example after a manual edit
+// under /data — the Status page's "Reload configuration" button re-derives
+// OpenDKIM's tables and the Postfix sender map from the database; that is a
+// deliberate, operator-triggered heal, not something restore does on its own.
 package backup
 
 import (

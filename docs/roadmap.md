@@ -118,9 +118,10 @@ reports (`ruf=`) out of scope for v1.
 
 **Dependencies / risks:** inbound SMTP in the image (may share infrastructure
 with [inbound-relay](plans/inbound-relay.md) but must not require backup-MX);
-storage and retention of parsed summaries; the `admin.dmarc_report_email` and
-`domains.dmarc_rua` settings added in the DMARC template work must stay the
-source of truth for `rua=` in DNS guidance.
+storage and retention of parsed summaries; the `dmarc_report_email` setting
+(migration `0005` moved it off the old `admin` table into `settings`) and
+`domains.dmarc_rua` added in the DMARC template work must stay the source of
+truth for `rua=` in DNS guidance.
 
 **Order:** after the DMARC `rua=` settings ship; may follow or overlap with
 inbound-relay depending on how port 25 acceptance is structured.

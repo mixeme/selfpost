@@ -161,8 +161,10 @@ unless noted. The table below is a summary — HTMX fragment endpoints
 | Route | Purpose |
 |---|---|
 | `/healthz` | Liveness (no auth) |
+| `/license` | Embedded `LICENSE` text (no auth) |
 | `/setup/*` | One-time admin bootstrap |
 | `/login`, `/logout` | Session auth |
+| `/account` | 308 redirect to `/settings` (pre-1.2.3 route, kept as a compat shim) |
 | `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
 | `/domains/import` | Domain import (`POST`; form on the Backup page) |

@@ -18,7 +18,8 @@ operator.
 - gzip + XML aggregate parsing → SQLite summaries per sending domain.
 - Panel page and/or per-domain section: recent reports, third-party senders,
   delivery health of report ingestion.
-- Reuse `admin.dmarc_report_email` and `domains.dmarc_rua` for DNS templates;
+- Reuse the `dmarc_report_email` setting (moved off the old `admin` table into
+  `settings` by migration `0005`) and `domains.dmarc_rua` for DNS templates;
   when enabled, suggest a SelfPost-hosted report address.
 
 **Out:**

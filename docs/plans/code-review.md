@@ -522,21 +522,21 @@ the list, the fragment, or query parameters. `go test ./...` green.
 
 **Model: Sonnet** (English docs). No code behaviour change except copy.
 
-- [ ] Rewrite the CSRF ADR in [security.md](../security.md) for a panel that
+- [x] Rewrite the CSRF ADR in [security.md](../security.md) for a panel that
       already has global + domain-admin. Keep the origin-check mechanism
       unless a new decision says otherwise. New revisit trigger (e.g. untrusted
       domain-admins, or a requirement that does not depend on browser
       headers).
-- [ ] Drop “or argon2” unless argon2 is implemented.
-- [ ] [guide.md](../guide.md): Users / roles; Settings DMARC field; L2
+- [x] Drop “or argon2” unless argon2 is implemented.
+- [x] [guide.md](../guide.md): Users / roles; Settings DMARC field; L2
       fail-open; restore can resurrect sessions; domain-admin can export
       working SASL passwords for assigned domains.
-- [ ] Architecture route table: `/license`, `/account` → `/settings`.
-- [ ] Fix `internal/backup` package comment (restore = extract tarball +
+- [x] Architecture route table: `/license`, `/account` → `/settings`.
+- [x] Fix `internal/backup` package comment (restore = extract tarball +
       `CheckRestore`; maps come from the archive; Reload heals drift).
-- [ ] `admin.dmarc_report_email` → `settings` in roadmap + dmarc-reports plan.
-- [ ] development.md e2e summary: logrotate + process checks.
-- [ ] `setupManager` / `store` package comments: `users`, not `admin` row.
+- [x] `admin.dmarc_report_email` → `settings` in roadmap + dmarc-reports plan.
+- [x] development.md e2e summary: logrotate + process checks.
+- [x] `setupManager` / `store` package comments: `users`, not `admin` row.
 
 **Done when:** an operator who reads only the guide knows the panel has two
 roles, and security.md no longer calls the panel single-user.

@@ -56,6 +56,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `schema-squash` (replace the 1.x SQLite migration chain with a 2.x baseline;
   not a reason to cut a major on its own).
 
+- docs: security and operator docs updated for the panel that has shipped
+  global administrators and domain-admins since 1.2.0. The CSRF ADR in
+  [security.md](docs/security.md) no longer argues from "single-user"; it now
+  states that cross-user CSRF between panel roles is not the threat the origin
+  check defends against, and gives a new revisit trigger. Dropped the
+  unimplemented "or argon2" alternative for the password hash.
+  [guide.md](docs/guide.md) documents the Users page and the two roles,
+  the Settings page's default DMARC report address, level-2 rate limiting's
+  fail-open behaviour, that restoring an older backup can resurrect sessions,
+  and that a domain-admin can export working SASL passwords for domains
+  assigned to them. [architecture.md](docs/architecture.md)'s route table now
+  lists `/license` and the `/account` → `/settings` redirect. Fixed the
+  `internal/backup` package comment, which claimed the panel regenerates
+  Postfix/OpenDKIM state from SQLite on every restore boot (it only runs the
+  version guard; drifted daemon state is healed by the Status page's Reload
+  button). Corrected stale `admin.dmarc_report_email` references in
+  [roadmap.md](docs/roadmap.md) and
+  [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
+  actual home after migration `0005`. No behaviour change.
+
 ## [1.2.5] - 2026-08-13
 
 Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.
