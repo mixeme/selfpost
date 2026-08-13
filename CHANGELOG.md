@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- test (e2e): send-log status scrapers follow the badge markup in
+  `deliveries_rows`. The release gate still looked for bare `<td>sent</td>`
+  after the panel started rendering status as `<span class="st st-*">` badges,
+  so `send_verify_dkim_and_status` timed out even when mail was delivered and
+  logged. A handler regression test catches this drift in `go test ./...`
+  without Docker.
+
 - security (panel): the Deliveries list is scoped to a domain administrator's
   assigned domains for every number of assignments. Previously the send log was
   narrowed only when exactly one domain was assigned, so an administrator with
