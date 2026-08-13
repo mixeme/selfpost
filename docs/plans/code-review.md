@@ -562,12 +562,19 @@ cannot be a single unmarked click.
 **Model: Opus** for auth/RBAC/limiter tests; **Haiku** for the L1 fatal-string
 typo; **Sonnet** if e2e docs need a paragraph.
 
-- [ ] `auth/ratelimit.go` unit tests (window, lockout, sweep).
-- [ ] Login/setup handler tests (happy path + lockout + setup expiry).
-- [ ] Domain-admin 404 on `/users`, `/backup`, `/mail-queue`, `/system-log`,
-      `/status` (if not already implied by P0 tests).
-- [ ] Fix e2e L1 fatal string (`50`, not `5`).
-- [ ] Pin `coredns` image digest or a major version.
+- [x] `auth/ratelimit.go` unit tests (window, lockout, sweep). Also the
+      per-key scope: one locked-out address must not lock out the others.
+- [x] Login/setup handler tests (happy path + lockout + setup expiry). The
+      lockout test also states that a correct password does not bypass it, and
+      that the two refusals are byte-identical (no username enumeration).
+- [x] Domain-admin 404 on `/users`, `/backup`, `/mail-queue`, `/system-log`,
+      `/status` — as a table of every global-only route (`internal/web/handlers/authz_test.go`),
+      including the write routes, plus the same 404 for a request with no
+      principal and a positive control so the table cannot pass on a handler
+      that always 404s.
+- [x] Fix e2e L1 fatal string (`50`, not `5`).
+- [x] Pin `coredns` image: tag `1.14.6`, not a digest — the tag is a multi-arch
+      manifest and the stand has to come up on arm64 developer machines.
 - [ ] Optional later: backup extract + `CheckRestore` + panel boot (heavy;
       e2e or integration). Not a P4 blocker.
 

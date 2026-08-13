@@ -52,6 +52,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- test: the authorization and sign-in surfaces that had no tests now have them.
+  The login limiter is covered for its ceiling, its per-address scope, the reset
+  at the end of a window and the sweep that keeps finished buckets out of
+  memory; sign-in for a successful session, for refusals that do not reveal
+  which usernames exist, and for a lockout that a correct password cannot
+  bypass; the one-time setup link for creating the first administrator, closing
+  afterwards, rejecting a wrong or expired token, and refusing credentials the
+  panel would not accept later. Every global-only route (`/users`, `/backup`,
+  domain import, `/status`, `/mail-queue`, `/system-log`, domain add and delete,
+  reload) is checked to answer a domain administrator — and a request with no
+  principal — with 404, the check that would have caught the send-log leak.
+
+- test (e2e): the CoreDNS image is pinned to `1.14.6` instead of `latest`, so
+  the release gate cannot change under a commit between two runs. The level-1
+  rate-limit failure message quoted `RATE_LIMIT_MESSAGES_PER_IP=5` while the
+  stand sets `50`.
+
 - ci: gofmt on eight files that failed the formatting workflow check (panel
   config, DNS check, domain transfer export, rate-limit tests, auth principal,
   domain and delivery handlers, web package doc comment).
