@@ -13,12 +13,13 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
 ## Table of contents
 
 - [Installation](#installation)
-  - [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
+  - [Ports](#ports)
   - [Local trial](#local-trial)
+  - [Initial setup](#initial-setup)
+  - [Full deployment](#full-deployment)
+    - [Fixed image tag](#fixed-image-tag)
   - [Environment variables](#environment-variables)
-  - [First-time setup link](#first-time-setup-link)
-  - [Published ports](#published-ports)
-  - [Fixed image tag](#fixed-image-tag)
+  - [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
 - [Instance administration](#instance-administration)
   - [Status](#status)
   - [Mail queue and System log](#mail-queue-and-system-log)
@@ -41,39 +42,12 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
 
 ## Installation
 
-### Reverse proxy (mandatory)
+### Ports
 
-SelfPost's panel speaks plain HTTP and never terminates TLS itself — a reverse
-proxy in front of it is not optional. The proxy is also the project's only
-source of TLS certificates: whatever it obtains via ACME/Let's Encrypt gets
-bind-mounted **read-only** into the SelfPost container, and Postfix uses those
-same PEM files for TLS on 465 (and 587, if enabled). If the panel and the mail
-service share one hostname — the common case — it's genuinely one certificate
-serving both.
-
-SelfPost isn't tied to a specific proxy; pick whichever fits your host:
-
-| Proxy | Where certs live | Fragment |
-|---|---|---|
-| **Apache** (default/recommended) | Host disk, via the certbot Apache plugin — PEM files ready to bind-mount, no extraction step. | [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) |
-| nginx | Host disk, via a certbot sidecar container — same PEM-ready shape as Apache. | [deploy/nginx/](../deploy/nginx/) |
-| Caddy | Automatic ACME, zero extra containers — simplest, but its on-disk cert path is versioned internal layout, not a stable API; verify it for the Caddy version you run. | [deploy/caddy/](../deploy/caddy/) |
-| Traefik | Bundled inside `acme.json` — needs a small extraction script to produce standalone PEM files. | [deploy/traefik/](../deploy/traefik/) |
-
-Apache is the recommended default because the certbot Apache plugin already
-writes plain `fullchain.pem`/`privkey.pem` files to a predictable path with no
-extra moving parts between "certificate issued" and "Postfix can read it."
-
-**The proxy needs no security configuration of its own.** The panel emits its
-own `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`,
-`X-Content-Type-Options` and `Referrer-Policy` — deliberately, so the part
-that's easy to get wrong lives in the service rather than in a config file
-somebody edits under pressure. There is exactly one thing the proxy must do:
-**pass the original `Host` header through**. All four fragments above already
-do (Apache `ProxyPreserveHost On`, nginx `proxy_set_header Host $host`, Caddy
-and Traefik by default). A proxy that rewrites `Host` instead makes the panel
-reject every form submission as cross-origin — the log says so explicitly,
-printing the `Origin` and `Host` it compared.
+`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
+(smtps) is always active. Port **587** is published even when
+`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
+but it can look like an open port in external scans.
 
 ### Local trial
 
@@ -108,6 +82,98 @@ openssl req -x509 -newkey rsa:2048 \
 Add `-v /tmp/selfpost-certs:/etc/postfix/tls:ro` to the `docker run` command
 (and keep `SELFPOST_HOSTNAME=mail.local.test` so it matches the certificate CN).
 Clients must skip TLS verification — the cert is not from a public CA.
+
+### Initial setup
+
+On first start the one-time setup URL is printed in the container log
+(`docker compose logs -f`) and written to `/data/setup-token` inside the
+container — `./data/setup-token` on the host, mode `0600` — then deleted when
+setup completes. The link is `https://<SELFPOST_HOSTNAME>/setup/<token>` (path
+token, not a query string), valid for ten minutes. Open it to choose the
+administrator username and password — until then the panel has no login. If
+this host ships container logs to a central aggregator, prefer reading the
+file:
+
+```sh
+docker compose exec selfpost cat /data/setup-token
+```
+
+### Full deployment
+
+Production layout: one `docker-compose.yml`, a `.env`, persistent `./data`, and
+TLS PEM files at `./certs` (read by Postfix on 465/587). The panel is reached
+only through a [reverse proxy](#reverse-proxy-mandatory) on 443 — port 8080 is
+bound to localhost in the default compose file.
+
+| Artefact | Path |
+|---|---|
+| Compose file (fixed image tag) | [deploy/docker-compose.yml](../deploy/docker-compose.yml) |
+| Environment template | [deploy/.env.example](../deploy/.env.example) |
+| Apache vhost (recommended) | [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) |
+| nginx | [deploy/nginx/](../deploy/nginx/) |
+| Caddy | [deploy/caddy/](../deploy/caddy/) |
+| Traefik | [deploy/traefik/](../deploy/traefik/) |
+
+**1. Fetch the base files.**
+
+```sh
+mkdir -p selfpost/data selfpost/certs && cd selfpost
+curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/docker-compose.yml
+curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/.env.example
+cp .env.example .env
+```
+
+Edit `.env` — at minimum set `SELFPOST_HOSTNAME` to your mail hostname (bare
+FQDN, e.g. `mail.example.com`). It must match the PTR record you request from
+your provider and the certificate your proxy will obtain. See [Environment
+variables](#environment-variables) for the full list.
+
+**2. Reverse proxy and TLS.** Pick and set up one proxy — see [Reverse proxy
+(mandatory)](#reverse-proxy-mandatory) for the per-proxy commands. The same
+certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem`
+so Postfix can serve it on 465 (and 587 if enabled).
+
+**3. Start SelfPost.** If you used Apache on the host (the recommended
+option), start only the base compose file from your `selfpost/` directory:
+
+```sh
+docker compose up -d
+```
+
+The nginx/Caddy/Traefik fragments already include `docker compose up -d` —
+skip this if you ran one of those.
+
+**Get the setup URL** — open it in a browser to create the admin account (see
+[Initial setup](#initial-setup)):
+
+```sh
+docker compose logs selfpost 2>&1 | grep -m1 'http'
+```
+
+```sh
+cat ./data/setup-token
+```
+
+**4. DNS and sending.** Before sending real mail:
+
+1. Confirm PTR/rDNS for the server IP points at `SELFPOST_HOSTNAME` (Status
+   page → *Re-check*) — see [Server-level DNS](#server-level-dns-ptrrdns).
+2. For each domain you add in the panel, publish SPF, DKIM, and DMARC at the
+   same time ([Domain-level DNS](#domain-level-dns-spf-dkim-dmarc)).
+3. Warm up a new IP gradually ([IP warmup](#ip-warmup)).
+
+#### Fixed image tag
+
+`deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
+deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
+CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
+image was published. Pinning matters because of the backup version check (see
+[Full backup and restore](#full-backup-and-restore)): the panel binary's
+embedded version and the image tag that produced it are the same value by
+construction (the release CI stamps both from one git tag — see
+`.github/workflows/release.yml`), so the pin is what makes "restore into the
+same version" a checkable fact rather than a guess. Upgrade by bumping the tag
+deliberately, not by riding a moving target — see [Upgrading](#upgrading).
 
 ### Environment variables
 
@@ -158,38 +224,97 @@ supported configuration:
   hours; logrotate keeps 14 rotated files on a daily schedule, and each
   rotation triggers `postfix reload`).
 
-### First-time setup link
+### Reverse proxy (mandatory)
 
-On first start the one-time setup URL is printed in the container log
-(`docker compose logs -f`) and written to `/data/setup-token` inside the
-container — `./data/setup-token` on the host, mode `0600` — then deleted when
-setup completes. The link is `https://<SELFPOST_HOSTNAME>/setup/<token>` (path
-token, not a query string), valid for ten minutes. If this host ships
-container logs to a central aggregator, prefer reading the file:
+SelfPost's panel speaks plain HTTP and never terminates TLS itself — a reverse
+proxy in front of it is not optional. The proxy is also the project's only
+source of TLS certificates: whatever it obtains via ACME/Let's Encrypt gets
+bind-mounted **read-only** into the SelfPost container, and Postfix uses those
+same PEM files for TLS on 465 (and 587, if enabled). If the panel and the mail
+service share one hostname — the common case — it's genuinely one certificate
+serving both.
+
+SelfPost isn't tied to a specific proxy; pick whichever fits your host:
+
+| Proxy | Where certs live | Fragment |
+|---|---|---|
+| **Apache** (default/recommended) | Host disk, via the certbot Apache plugin — PEM files ready to bind-mount, no extraction step. | [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) |
+| nginx | Host disk, via a certbot sidecar container — same PEM-ready shape as Apache. | [deploy/nginx/](../deploy/nginx/) |
+| Caddy | Automatic ACME, zero extra containers — simplest, but its on-disk cert path is versioned internal layout, not a stable API; verify it for the Caddy version you run. | [deploy/caddy/](../deploy/caddy/) |
+| Traefik | Bundled inside `acme.json` — needs a small extraction script to produce standalone PEM files. | [deploy/traefik/](../deploy/traefik/) |
+
+Apache is the recommended default because the certbot Apache plugin already
+writes plain `fullchain.pem`/`privkey.pem` files to a predictable path with no
+extra moving parts between "certificate issued" and "Postfix can read it."
+
+**The proxy needs no security configuration of its own.** The panel emits its
+own `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`,
+`X-Content-Type-Options` and `Referrer-Policy` — deliberately, so the part
+that's easy to get wrong lives in the service rather than in a config file
+somebody edits under pressure. There is exactly one thing the proxy must do:
+**pass the original `Host` header through**. All four fragments above already
+do (Apache `ProxyPreserveHost On`, nginx `proxy_set_header Host $host`, Caddy
+and Traefik by default). A proxy that rewrites `Host` instead makes the panel
+reject every form submission as cross-origin — the log says so explicitly,
+printing the `Origin` and `Host` it compared.
+
+In every case the proxy terminates HTTPS for the panel; the resulting
+certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem`.
+
+**Apache (recommended, on the host).** Install Apache with `ssl`, `proxy`, and
+`proxy_http` enabled. Copy
+[deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) into your
+vhost directory, replace `mail.example.com` with your hostname, enable the site,
+then issue a certificate:
 
 ```sh
-docker compose exec selfpost cat /data/setup-token
+sudo certbot --apache -d mail.example.com
 ```
 
-### Published ports
+Point `./certs` at the PEM files certbot wrote (symlink is fine):
 
-`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
-(smtps) is always active. Port **587** is published even when
-`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
-but it can look like an open port in external scans.
+```sh
+ln -s /etc/letsencrypt/live/mail.example.com certs
+```
 
-### Fixed image tag
+**nginx (containerised).** From the `deploy/` directory, merge the nginx
+fragment and issue the first certificate before nginx can serve HTTPS:
 
-`deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
-CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
-image was published. Pinning matters because of the backup version check (see
-[Full backup and restore](#full-backup-and-restore)): the panel binary's
-embedded version and the image tag that produced it are the same value by
-construction (the release CI stamps both from one git tag — see
-`.github/workflows/release.yml`), so the pin is what makes "restore into the
-same version" a checkable fact rather than a guess. Upgrade by bumping the tag
-deliberately, not by riding a moving target — see [Upgrading](#upgrading).
+```sh
+docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
+  run --rm certbot certonly --webroot -w /var/www/certbot \
+  -d mail.example.com --email you@example.com --agree-tos --no-eff-email
+
+docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
+```
+
+Edit [deploy/nginx/nginx.conf.example](../deploy/nginx/nginx.conf.example) and
+replace `mail.example.com` first. The fragment bind-mounts certbot's output into
+both nginx and SelfPost.
+
+**Caddy (containerised, automatic ACME).** Edit
+[deploy/caddy/Caddyfile](../deploy/caddy/Caddyfile) and the `<hostname>` placeholders
+in [deploy/caddy/docker-compose.caddy.yml](../deploy/caddy/docker-compose.caddy.yml),
+then:
+
+```sh
+docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
+```
+
+Verify Caddy's on-disk cert path for your version before relying on the
+default mount — see the comment at the top of the Caddy compose fragment.
+
+**Traefik (containerised).** Edit the `Host(...)` label and ACME email in
+[deploy/traefik/docker-compose.traefik.yml](../deploy/traefik/docker-compose.traefik.yml),
+start the stack, then extract PEM files for Postfix whenever Traefik issues or
+renews a certificate:
+
+```sh
+docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
+./traefik/extract-cert.sh ./traefik/letsencrypt/acme.json mail.example.com ./traefik/extracted-certs
+```
+
+Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
 
 ## Instance administration
 
