@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-14
+
+Security and quality after 1.2.5: domain-admin send-log authorization,
+fail-closed sign-in and application delete, level-2 rate-limit race fix,
+restore Resync, expanded tests, operator docs, release CI, and OFL for IBM
+Plex. Upgrading from 1.2.x is a tag bump; no migration.
+
 ### Added
 
 - licence: the SIL Open Font License 1.1 text now travels with the IBM Plex

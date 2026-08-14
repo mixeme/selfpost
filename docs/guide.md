@@ -165,7 +165,7 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
+deliberately never `:latest`. The current pin is `1.3.0`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check (see
 [Full backup and restore](#full-backup-and-restore)): the panel binary's
@@ -466,7 +466,7 @@ A version mismatch at step 5 refuses to start and leaves `/data` untouched —
 the panel exits with a message naming the tag to use, e.g.:
 
 ```
-backup: this backup was created by SelfPost 1.2.3 but this image is 1.2.5 — restore into the matching image (selfpost:1.2.3)
+backup: this backup was created by SelfPost 1.2.3 but this image is 1.3.0 — restore into the matching image (selfpost:1.2.3)
 ```
 
 Fix the tag in `docker-compose.yml`, `docker compose pull && docker compose up
