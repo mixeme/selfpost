@@ -329,9 +329,9 @@ the panel shows after manual edits under `/data`.
 
 ### Settings
 
-`/settings` changes the administrator username and/or password, and the
-panel-wide default DMARC report address (`rua=`) offered when a domain
-doesn't set its own — see
+`/settings` changes the signed-in user's username and/or password. **Global
+administrators** also set the panel-wide default DMARC report address (`rua=`)
+offered when a domain doesn't set its own — see
 [Domain-level DNS](#domain-level-dns-spf-dkim-dmarc). Application SASL logins
 are separate and are not changed here.
 
@@ -344,8 +344,9 @@ There are two roles:
   including Users, Backup, Status, Mail queue, and System log.
 - **Domain-admin** — scoped to one or more domains assigned by a global
   administrator. Sees only those domains' pages, applications, and
-  Deliveries rows; `/users`, `/backup`, `/status`, `/mail-queue`, and
-  `/system-log` are not reachable (404). A domain-admin can *export* the
+  Deliveries rows; cannot add or delete domains. `/users`, `/backup`,
+  `/status`, `/mail-queue`, `/system-log`, and `POST /reload` are not
+  reachable (404). A domain-admin can *export* the
   domains assigned to them — see
   [Exporting and importing a single domain](#exporting-and-importing-a-single-domain).
 
@@ -360,8 +361,10 @@ seven days) with no absolute lifetime cap — an admin who keeps using the panel
 stays signed in indefinitely. HTMX polling on the monitoring screens
 (Deliveries, Mail queue, System log, and the Status health fragment) does
 **not** count as activity, so an auto-refreshing tab left open will not keep a
-session alive forever. Changing the password signs out every other session but
-leaves the current browser signed in.
+session alive forever. Changing **your own** password on `/settings` signs out
+every other session for that user but leaves the current browser signed in.
+Signing out (`POST /logout`) ends only the current session — other browsers or
+tabs for the same user keep working until their session rows expire.
 
 ### Upgrading
 
@@ -389,8 +392,8 @@ from whoever assigns the IP (hosting provider's panel/support), not from
 your own DNS zone.
 
 The [Status](#status) page verifies the server's hostname against this
-record (forward-confirmed reverse DNS). Results are cached for a few
-minutes; use *Re-check* right after publishing a record.
+record (forward-confirmed reverse DNS). Results are cached for about one
+minute; use *Re-check* right after publishing a record.
 
 Per-domain DNS (SPF, DKIM, DMARC) is a separate scope — see
 [Domain-level DNS](#domain-level-dns-spf-dkim-dmarc).
@@ -427,7 +430,11 @@ starting a container of the **exact same image version** that created it —
 SelfPost refuses to start otherwise and tells you which tag to use. On the
 first successful start after restore, `manifest.json` from the archive is
 **deleted** — it guards only that one boot, so a later in-place upgrade is
-not blocked. This is why the compose file pins a fixed tag rather than
+not blocked. On that same first boot the panel also runs one **Resync** —
+OpenDKIM's tables and Postfix's sender map are re-derived from SQLite and both
+daemons are reloaded, healing any drift between the extracted files and the
+database (the Status page's *Reload configuration* button runs the same step
+on demand). This is why the compose file pins a fixed tag rather than
 `:latest`: without a known version, there'd be no way to tell which image
 restoring a given backup actually requires (see [Fixed image
 tag](#fixed-image-tag)).
@@ -475,8 +482,8 @@ belong to the old IP/host and have to be reissued for the new one; nothing in
 the backup carries them.
 
 **Restoring an encrypted (`.spbk`) backup** needs a running container to
-decrypt it first — an empty first-boot container works, any matching or
-newer version, since decryption doesn't touch `/data`. Start one normally
+decrypt it first — any container with the `selfpost-backup` CLI works; decryption
+does not read `/data` and performs no version check. Start one normally
 (step 5, but on an empty `/data` you haven't unpacked yet), then:
 
 ```sh
@@ -488,11 +495,14 @@ resulting `.tar.gz` — see [Encrypting a backup or
 export](#encrypting-a-backup-or-export) for the decrypt command's password
 options.
 
-Restoring an archive taken **before** you invalidated a session (password
-change, logout everywhere) can bring that session back: session rows travel
-with the backup, and a browser that still holds the matching cookie is
-logged in again once the idle timeout allows it. If a restore might do this,
-changing every user's password afterwards clears it out.
+Restoring an archive taken **before** a session row was removed can bring
+that session back: session rows travel with the backup, and a browser that
+still holds the matching cookie is signed in again on the next request if the
+restored row's idle expiry has not passed. `POST /logout` removes only the
+current session; there is no "logout everywhere". Changing your own password
+on `/settings` deletes your other sessions, but a global administrator
+resetting another user's password on `/users` does not invalidate that user's
+existing sessions.
 
 **Alternative: archive `./data` while stopped.** If the service can be taken
 offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
@@ -559,12 +569,14 @@ With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
 
 ### Domains page
 
-`/domains` adds sending domains, and shows each domain's DKIM TXT value,
-SPF/DMARC checks, and SASL applications. Per-domain rate limits (level 2) and
-trusted-IP application overrides are configured here — see [Rate limiting —
+`/domains` lists sending domains and hosts the add-domain form (**global
+administrator only**). Domain administrators see only domains assigned to
+them. Each row shows its DKIM TXT value, SPF/DMARC checks, and SASL
+applications. Per-domain rate limits (level 2) and trusted-IP application
+overrides are configured here — see [Rate limiting —
 level 2](#rate-limiting--level-2-domain-and-application). *Export domain*
 writes a single-domain archive; *Import a domain* on the Backup page reads
-one back in — see [Exporting and importing a single
+one back in (**global administrator only**) — see [Exporting and importing a single
 domain](#exporting-and-importing-a-single-domain).
 
 ### Domain-level DNS (SPF, DKIM, DMARC)

@@ -154,7 +154,10 @@ state for an older message and the page reports it as such, not as a failure.
 ## Panel HTTP surface
 
 Canonical routes: [internal/web/web.go](../internal/web/web.go). Authenticated
-unless noted. The table below is a summary — HTMX fragment endpoints
+unless noted. Routes marked **global** return **404** for domain administrators
+(`requireGlobal()` in
+[internal/web/handlers/authz.go](../internal/web/handlers/authz.go)). The table
+below is a summary — HTMX fragment endpoints
 (`/status/fragment`, `/deliveries/rows`, `/mail-queue/body`,
 `/system-log/body`, …) and every POST variant live in `web.go`.
 
@@ -165,17 +168,17 @@ unless noted. The table below is a summary — HTMX fragment endpoints
 | `/setup/*` | One-time admin bootstrap |
 | `/login`, `/logout` | Session auth |
 | `/account` | 308 redirect to `/settings` (pre-1.2.3 route, kept as a compat shim) |
-| `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
-| `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
-| `/domains/import` | Domain import (`POST`; form on the Backup page) |
-| `/deliveries` | Send log with filters |
-| `/deliveries/{id}` | One send-log row in full, with its `mail.log` lines |
-| `/mail-queue` | Postfix queue view |
-| `/system-log` | `mail.log` tail |
-| `/reload` | Reload OpenDKIM + Postfix maps |
-| `/backup` | Full backup download (page also hosts the import form) |
-| `/settings` | Admin username/password and DMARC report address |
-| `/users`, `/users/*` | Panel user CRUD (global admin only) |
+| `/status`, `/status/*` | **Global.** Process, cert, socket, PTR checks; machine CPU/memory/network |
+| `/domains` | Domain list; `POST /domains` (add domain) is **global** |
+| `/domains/{id}`, `/domains/{id}/*` | Assigned-domain detail for domain-admins; delete domain is **global** |
+| `/domains/import` | **Global.** Domain import (`POST`; form on the Backup page) |
+| `/deliveries`, `/deliveries/{id}` | Send log with filters; scoped to assigned domains for domain-admins |
+| `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view |
+| `/system-log`, `/system-log/*` | **Global.** `mail.log` tail |
+| `/reload` | **Global.** `POST` — reload OpenDKIM + Postfix maps |
+| `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
+| `/settings` | Username/password for any user; DMARC report default is **global** only |
+| `/users`, `/users/*` | **Global.** Panel user CRUD |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
@@ -194,13 +197,16 @@ holds the cookie works after process restart, redeploy, or full backup restore.
   absolute cap (regular use keeps the session alive indefinitely).
 - **Renewal** — DB `last_seen` and cookie `Max-Age` update at most once per hour
   (`renewThreshold` in [internal/web/auth/session.go](../internal/web/auth/session.go)).
-- **Password change** — all other sessions are deleted; the current session stays
-  active ([internal/store/sessions.go](../internal/store/sessions.go),
+- **Password change on `/settings`** — changing your own password deletes
+  every other session for that user; the current session stays active
+  ([internal/store/sessions.go](../internal/store/sessions.go),
   [handlers_settings.go](../internal/web/handlers/handlers_settings.go)).
+  A global administrator resetting another user's password on `/users` updates
+  the hash but does not delete that user's existing sessions.
 
-Restoring an **older** backup also restores session rows: a session invalidated
-after that backup was taken can become valid again if the browser still has the
-cookie and idle timeout has not expired.
+Restoring an **older** backup also restores session rows: a session removed
+after that backup was taken can become valid again if the browser still holds
+the cookie and the restored row's `expires_at` has not passed.
 
 ---
 
@@ -295,9 +301,13 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 `mail.log` via logrotate (14 rotated files, check every 6h, rename +
 `postfix reload` in `postrotate` — see § Log tailer above).
 
-**Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
+**Restore:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
 `/data` tree, minus `log/`, the setup token and any `tls/`; version check on
-restore. Stopped-container `tar` of `./data` is safe (see guide).
+restore. On the first successful boot after restore, the panel runs one
+**Resync** — OpenDKIM's tables and Postfix's sender map are re-derived from
+SQLite and both daemons are reloaded, so drift between the extracted archive
+and the database is healed before mail flows (same step as `POST /reload` on
+demand). Stopped-container `tar` of `./data` is safe (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →

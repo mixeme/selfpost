@@ -26,7 +26,7 @@ send log and DNS checks in the panel, encrypted backups.
 - DNS status checks (PTR, SPF, DKIM, DMARC) with in-panel re-check
 - Two-level rate limiting — IP backstop (Postfix), per-domain ceilings, and trusted-IP app overrides
 - Full-server backup and single-domain export/import (optional password encryption)
-- Single Docker image; data in a `./data` bind mount
+- Single Docker image; production data in a `./data` bind mount (the quick start below uses a named Docker volume instead)
 
 ## Documentation
 
@@ -136,9 +136,9 @@ DNS — lives in the operator guide's [Full
 deployment](docs/guide.md#full-deployment) section, with proxy-specific
 commands under [Reverse proxy](docs/guide.md#reverse-proxy-mandatory).
 
-The compose file maps **465** (always) and **587** (when
-`SUBMISSION_ENABLE=true`); bump the pinned image tag deliberately when
-upgrading, never `:latest` ([why](docs/guide.md#fixed-image-tag)). Optional
+The compose file always publishes **465** and **587**; Postfix listens on 587
+only when `SUBMISSION_ENABLE=true` (see [Ports](docs/guide.md#ports)). Bump the
+pinned image tag deliberately when upgrading, never `:latest` ([why](docs/guide.md#fixed-image-tag)). Optional
 variables (`TRUSTED_PROXY_CIDR`, rate limits, retention): see [Environment
 variables](docs/guide.md#environment-variables).
 

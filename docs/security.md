@@ -198,7 +198,7 @@ domain-admin's browser sending a request still needs that domain-admin's own
 cookie, so a token would not add a boundary between roles that the
 authorization checks (`Principal.CanAccessDomain`,
 [internal/web/auth/principal.go](../internal/web/auth/principal.go); route
-gating in [internal/web/auth/middleware.go](../internal/web/auth/middleware.go))
+gating in [internal/web/handlers/authz.go](../internal/web/handlers/authz.go))
 don't already enforce. The remaining case is an external site making a
 logged-in user's browser send a request, which the origin check covers without
 touching a single template.

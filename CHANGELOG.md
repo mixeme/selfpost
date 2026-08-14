@@ -84,6 +84,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs: operator and as-built docs aligned with the code after a full
+  pass — [architecture.md](docs/architecture.md) route table now marks
+  **global** routes (404 for domain administrators) and documents the
+  one-time restore Resync; session/password and restore-session wording
+  corrected in [guide.md](docs/guide.md) and architecture (own-password change
+  vs admin reset, no "logout everywhere", immediate session restore, PTR cache
+  ≈1 min, decrypt has no version check); [README.md](README.md) port-587 and
+  quick-start volume wording fixed; [security.md](docs/security.md) CSRF ADR
+  points at `authz.go` for route gating. No behaviour change.
+
 - docs: [guide.md](docs/guide.md) reorganised into **Installation**, **Instance
   administration**, and **Domain administration** — DNS setup, operations,
   rate limiting, and backup sections follow the instance/domain boundary
