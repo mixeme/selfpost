@@ -2,9 +2,8 @@ name: release
 
 # Publishes an immutable, version-tagged image on ghcr.io (spec 10.1).
 # Ordinary commits and bare git tag pushes do not publish anything. A published
-# GitHub Release starts release-on-publish.yml, which dispatches this workflow
-# with the release version. You can also run it manually via workflow_dispatch
-# with an explicit SemVer X.Y.Z version.
+# GitHub Release runs this workflow directly (same pattern as gosentry / imap-scrub).
+# You can also run it manually via workflow_dispatch with an explicit SemVer X.Y.Z.
 #
 # Native per-architecture builds (see docs/development.md), not qemu:
 # running the full Postfix/OpenDKIM stack under emulation for the e2e gate
@@ -12,10 +11,12 @@ name: release
 # tag on its own native runner; a merge job then combines them into the one
 # manifest tag documented in deploy/docker-compose.yml. "test, then push" (not
 # push-by-digest then test) is deliberate: it means the bytes that get tagged
-# are exactly the bytes that passed e2e, at the cost of per-arch tags lingering
-# in the registry as a side effect (harmless — the version tag's immutability,
-# spec 10.1, is about that tag, not these).
+# are exactly the bytes that passed e2e. Per-arch tags are pushed only so
+# imagetools can assemble the multi-arch manifest; merge removes them from GHCR
+# so operators see a single version tag (spec 10.1).
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -37,20 +38,20 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          raw="${INPUT_VERSION:-}"
+          if [ "$EVENT_NAME" = "release" ]; then
+            raw="${RELEASE_TAG:-}"
+          else
+            raw="${INPUT_VERSION:-}"
+          fi
           raw="${raw#v}"
           if ! [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::release version is not SemVer X.Y.Z (event=${EVENT_NAME}; pass inputs.version on workflow_dispatch). Refusing to publish ghcr.io/${{ github.repository }}:${raw:-?}"
+            echo "::error::release version is not SemVer X.Y.Z (event=${EVENT_NAME}; tag=${RELEASE_TAG:-} input=${INPUT_VERSION:-}). Refusing to publish ghcr.io/${{ github.repository }}:${raw:-?}"
             exit 1
           fi
-          #region agent log
-          echo "::group::agent-log prepare version"
-          echo "event=${EVENT_NAME} version=${raw} checkout_ref=v${raw}"
-          echo "::endgroup::"
-          #endregion
           echo "version=${raw}" >> "$GITHUB_OUTPUT"
 
   build:
@@ -136,24 +137,6 @@ jobs:
         with:
           ref: v${{ needs.prepare.outputs.version }}
 
-      - name: Debug — snapshot GitHub Release state (agent)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          #region agent log
-          set -euo pipefail
-          tag="v${VERSION}"
-          echo "::group::agent-log release snapshot for ${tag}"
-          if out=$(gh release view "$tag" --repo "${{ github.repository }}" --json isDraft,tagName,publishedAt,url 2>&1); then
-            echo "release-exists: ${out}"
-          else
-            echo "release-missing: ${out}"
-          fi
-          echo "event=${{ github.event_name }} ref=${GITHUB_REF_NAME}"
-          echo "::endgroup::"
-          #endregion
-
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to ghcr.io
@@ -181,12 +164,6 @@ jobs:
             set -e
             if [ "$rc" -eq 0 ]; then
               printf '%s\n' "$out"
-              #region agent log
-              echo "::group::agent-log ghcr tags published"
-              echo "version=${{ needs.prepare.outputs.version }} event=${{ github.event_name }} ref=${GITHUB_REF_NAME}"
-              echo "tags_pushed=${{ needs.prepare.outputs.version }},${{ needs.prepare.outputs.version }}-amd64,${{ needs.prepare.outputs.version }}-arm64"
-              echo "::endgroup::"
-              #endregion
               exit 0
             fi
             printf '%s\n' "$out" >&2
@@ -198,4 +175,24 @@ jobs:
             sleep "$backoff"
             attempt=$((attempt + 1))
             backoff=$((backoff * 2))
+          done
+
+      - name: Remove per-arch tags from GHCR
+        # Side-effect tags for imagetools assembly only — not part of the public
+        # version surface (deploy/docker-compose.yml pins X.Y.Z, not X.Y.Z-amd64).
+        run: |
+          set -euo pipefail
+          repo="ghcr.io/${{ github.repository }}"
+          version="${{ needs.prepare.outputs.version }}"
+          for suffix in amd64 arm64; do
+            tag="${repo}:${version}-${suffix}"
+            set +e
+            out=$(docker buildx imagetools rm "$tag" 2>&1)
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
+              printf '%s\n' "$out"
+            else
+              echo "::warning::could not remove ${tag}: ${out}" >&2
+            fi
           done

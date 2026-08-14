@@ -205,9 +205,8 @@ the binaries so they cannot drift apart.
    local-trial image references) in the **same** release commit.
 2. Create and push git tag `vX.Y.Z` on that commit.
 3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
-4. Workflow [release-on-publish.yml](../.github/workflows/release-on-publish.yml)
-   starts [release.yml](../.github/workflows/release.yml) with that version;
-   the build checks out tag `vX.Y.Z` (not `main` HEAD).
+4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
+   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z` (checks out tag `vX.Y.Z`).
 
 **GitHub Release vs GHCR.** The public [Releases](https://github.com/mixeme/selfpost/releases)
 page lists only **published** releases. A draft is visible to maintainers only —
@@ -307,29 +306,31 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 ### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 
-Publishing a GitHub Release runs [release-on-publish.yml](../.github/workflows/release-on-publish.yml),
-which dispatches `release.yml` with the version parsed from the release tag.
-You can also run `release.yml` manually via `workflow_dispatch` and an
-explicit `X.Y.Z` input. A bare git tag push does not run either workflow.
-The build always checks out `vX.Y.Z`, not `main` HEAD.
+Publishing a GitHub Release runs `release.yml` directly (`release: published`,
+same pattern as gosentry / imap-scrub). You can also run it manually via
+`workflow_dispatch` with an explicit `X.Y.Z` input. A bare git tag push does not
+run the workflow. The build always checks out `vX.Y.Z`, not `main` HEAD.
 
-`prepare` takes the version from the `workflow_dispatch` `version` input. A
-dispatch whose input is missing or not `X.Y.Z` fails in `prepare`.
+`prepare` takes the version from `github.event.release.tag_name` on a release
+event, or from the `workflow_dispatch` `version` input. A dispatch whose input
+is missing or not `X.Y.Z` fails in `prepare`.
 
 ```
-release-on-publish (release: published → workflow_dispatch)
-prepare (version from workflow_dispatch input; checkout vX.Y.Z)
+release: published
+prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
       → docker build --load (VERSION from prepare)
       → e2e (test/e2e)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z
+      → imagetools rm → drop X.Y.Z-amd64 and X.Y.Z-arm64 from GHCR
 ```
 
 Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under
 emulation for e2e is impractical. E2e first, then push — the registry receives
-the bytes that passed the gate.
+the bytes that passed the gate. Only `ghcr.io/mixeme/selfpost:X.Y.Z` remains
+tagged in GHCR; per-arch names exist briefly during the merge job.
 
 A failed e2e **blocks** image publication.
 
