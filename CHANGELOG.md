@@ -76,11 +76,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs: [guide.md](docs/guide.md) reorganised into **Installation**, **Instance
+  administration**, and **Domain administration** — DNS setup, operations,
+  rate limiting, and backup sections follow the instance/domain boundary
+  instead of mixing them. **Installation** now reads Ports → Local trial →
+  Initial setup → Full deployment (with the fixed image tag nested under it) →
+  Environment variables → Reverse proxy; the step-by-step production deploy and
+  per-proxy TLS commands move here from README's "Reference deploy" (README
+  keeps a short pointer). Internal (non-operator) environment variables move
+  to [architecture.md](docs/architecture.md) § Configuration; the guide keeps
+  a one-line pointer. **Full backup and restore** gains worked commands for
+  in-place restore, move-to-a-new-host, and encrypted-backup decrypt-first,
+  plus the version-mismatch error text. README anchors updated for the new
+  headings. No behaviour change.
+
 - docs: the 2026-08-13 full-tree review plan is complete — every phase (P0–P7)
   is closed — and `docs/plans/code-review.md` is deleted per its own exit
-  criteria (history in git and in this file). The
-  [roadmap](docs/roadmap.md)'s recommended order returns to **queue-retries**
-  and then **inbound-relay**.
+  criteria (history in git and in this file). The plan covered architecture,
+  quality, GUI, tests, and licence work; P0 was domain-admin send-log
+  authorization. The [roadmap](docs/roadmap.md)'s recommended order returns to
+  **queue-retries** and then **inbound-relay**; it still records
+  **schema-squash** (replace the 1.x SQLite migration chain with a 2.x baseline;
+  not a reason to cut a major on its own).
 
 - licence: [NOTICE](NOTICE) tells modifiers to update `SourceURL` in
   `internal/legal/legal.go` (the value the panel footer actually injects), not
@@ -144,13 +161,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   prompts existed — and why that is acceptable (the prompt is a mis-click
   guard, not an authorization boundary).
 
-- docs: full-tree review plan (`docs/plans/code-review.md`, since completed
-  and deleted — history in git)
-  — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log
-  authorization. Roadmap queues that plan ahead of inbound-relay and records
-  `schema-squash` (replace the 1.x SQLite migration chain with a 2.x baseline;
-  not a reason to cut a major on its own).
-
 - docs: security and operator docs updated for the panel that has shipped
   global administrators and domain-admins since 1.2.0. The CSRF ADR in
   [security.md](docs/security.md) no longer argues from "single-user"; it now
@@ -162,11 +172,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   fail-open behaviour, that restoring an older backup can resurrect sessions,
   and that a domain-admin can export working SASL passwords for domains
   assigned to them. [architecture.md](docs/architecture.md)'s route table now
-  lists `/license` and the `/account` → `/settings` redirect. Fixed the
-  `internal/backup` package comment, which claimed the panel regenerates
-  Postfix/OpenDKIM state from SQLite on every restore boot (it only runs the
-  version guard; drifted daemon state is healed by the Status page's Reload
-  button). Corrected stale `admin.dmarc_report_email` references in
+  lists `/license` and the `/account` → `/settings` redirect. Corrected stale
+  `admin.dmarc_report_email` references in
   [roadmap.md](docs/roadmap.md) and
   [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
   actual home after migration `0005`. No behaviour change.
@@ -186,7 +193,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and Postfix's sender map are re-derived from SQLite and the daemons are
   reloaded, so drift between the archive and the database is healed before
   mail flows. Later starts skip that step; the Status page Reload button runs
-  the same Resync on demand.
+  the same Resync on demand. The `internal/backup` package comment now matches
+  this behaviour.
 
 ## [1.2.5] - 2026-08-13
 
