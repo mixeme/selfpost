@@ -3,21 +3,45 @@
 Detailed install, configuration, and day-to-day operations. For a short
 overview and quick start, see [README.md](../README.md).
 
+This guide has three parts: **[Installation](#installation)** (getting a
+container running with a working reverse proxy and TLS), **[Instance
+administration](#instance-administration)** (running and maintaining the
+SelfPost server itself — status, backups, users, upgrades), and **[Domain
+administration](#domain-administration)** (day-to-day work on the sending
+domains hosted on that instance — DNS, deliveries, rate limits, applications).
+
 ## Table of contents
 
-- [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
-- [Local trial](#local-trial)
-- [Environment variables](#environment-variables)
-- [DNS setup](#dns-setup)
-- [IP warmup](#ip-warmup)
-- [Operations](#operations)
-- [Rate limiting](#rate-limiting)
-- [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain)
-  - [Encrypting a backup or export](#encrypting-a-backup-or-export)
-- [Published ports](#published-ports)
-- [Fixed image tag](#fixed-image-tag)
+- [Installation](#installation)
+  - [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
+  - [Local trial](#local-trial)
+  - [Environment variables](#environment-variables)
+  - [First-time setup link](#first-time-setup-link)
+  - [Published ports](#published-ports)
+  - [Fixed image tag](#fixed-image-tag)
+- [Instance administration](#instance-administration)
+  - [Status](#status)
+  - [Mail queue and System log](#mail-queue-and-system-log)
+  - [Settings](#settings)
+  - [Users](#users)
+  - [Sessions](#sessions)
+  - [Upgrading](#upgrading)
+  - [Container health](#container-health)
+  - [Server-level DNS (PTR/rDNS)](#server-level-dns-ptrrdns)
+  - [Rate limiting — level 1 (IP backstop)](#rate-limiting--level-1-ip-backstop)
+  - [Full backup and restore](#full-backup-and-restore)
+    - [Encrypting a backup or export](#encrypting-a-backup-or-export)
+- [Domain administration](#domain-administration)
+  - [Domains page](#domains-page)
+  - [Domain-level DNS (SPF, DKIM, DMARC)](#domain-level-dns-spf-dkim-dmarc)
+  - [IP warmup](#ip-warmup)
+  - [Rate limiting — level 2 (domain and application)](#rate-limiting--level-2-domain-and-application)
+  - [Deliveries](#deliveries)
+  - [Exporting and importing a single domain](#exporting-and-importing-a-single-domain)
 
-## Reverse proxy (mandatory)
+## Installation
+
+### Reverse proxy (mandatory)
 
 SelfPost's panel speaks plain HTTP and never terminates TLS itself — a reverse
 proxy in front of it is not optional. The proxy is also the project's only
@@ -51,7 +75,7 @@ and Traefik by default). A proxy that rewrites `Host` instead makes the panel
 reject every form submission as cross-origin — the log says so explicitly,
 printing the `Origin` and `Host` it compared.
 
-## Local trial
+### Local trial
 
 The [README quick start](../README.md#quick-start) runs a single container
 with `PANEL_COOKIE_SECURE=false` and port 8080 published on localhost. No
@@ -85,7 +109,7 @@ Add `-v /tmp/selfpost-certs:/etc/postfix/tls:ro` to the `docker run` command
 (and keep `SELFPOST_HOSTNAME=mail.local.test` so it matches the certificate CN).
 Clients must skip TLS verification — the cert is not from a public CA.
 
-## Environment variables
+### Environment variables
 
 Copy [deploy/.env.example](../deploy/.env.example) to `.env` next to your
 `docker-compose.yml`. The table below lists every variable an operator is
@@ -95,7 +119,7 @@ expected to set; defaults match the code exactly.
 |---|---|---|---|
 | `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
-| `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting](#rate-limiting). | `100` | `.env` |
+| `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
 | `SEND_LOG_RETENTION_DAYS` | Days of send-log history kept before the background sweep deletes rows — the main driver of `/data` growth over time. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: an admin who keeps coming back stays signed in indefinitely. | `7` | `.env` |
@@ -134,91 +158,64 @@ supported configuration:
   hours; logrotate keeps 14 rotated files on a daily schedule, and each
   rotation triggers `postfix reload`).
 
-## DNS setup
+### First-time setup link
 
-Two different scopes — don't confuse them:
+On first start the one-time setup URL is printed in the container log
+(`docker compose logs -f`) and written to `/data/setup-token` inside the
+container — `./data/setup-token` on the host, mode `0600` — then deleted when
+setup completes. The link is `https://<SELFPOST_HOSTNAME>/setup/<token>` (path
+token, not a query string), valid for ten minutes. If this host ships
+container logs to a central aggregator, prefer reading the file:
 
-**Server level (once, for the machine itself):**
-- **PTR/rDNS** for the server's IP, pointing at its mail hostname. Most
-  receiving mail servers weigh this heavily; get it from whoever assigns the IP
-  (hosting provider's panel/support), not from your own DNS zone.
+```sh
+docker compose exec selfpost cat /data/setup-token
+```
 
-**Domain level (for *every* sending domain you add in the panel):**
-- **SPF** — a TXT record on the domain authorizing this server to send on its
-  behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).
-- **DKIM** — a TXT record with the exact value the panel shows on that
-  domain's page (`domain page → DKIM TXT record`), one selector per domain.
-- **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring
-  only, safe to publish immediately). On a send-only relay the sending domain
-  often has no inbox, so `rua=` is optional — configure a default report address
-  in *Settings* or per domain when you have a mailbox that receives inbound mail
-  elsewhere. If `rua=` points at another domain, publish `_report._dmarc` on that
-  hub domain too; the panel checks it. Public mail hosts (Gmail, Outlook, …)
-  cannot be used as external report destinations.
+### Published ports
 
-Skipping any of the three per-domain records is the single most common reason
-mail lands in spam even though SelfPost delivered it correctly — DKIM passing
-doesn't help if SPF/DMARC are absent. **Whenever you add a new domain in the
-panel, add its DNS records at the same time**, not later.
+`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
+(smtps) is always active. Port **587** is published even when
+`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
+but it can look like an open port in external scans.
 
-The panel checks both scopes for you and tells you what is actually published:
-the *Status* page verifies the server's hostname and its reverse record
-(forward-confirmed reverse DNS), and each domain's page shows a *DNS status*
-card comparing the published DKIM record against the key this server signs with,
-plus the domain's SPF, DMARC, and (when configured) DMARC report-authorisation
-records. Results are cached for a few minutes;
-use *Re-check* right after publishing a record. The SPF check is deliberately
-shallow — it looks for a mechanism that literally covers this server's address
-and does not follow `include:` or `redirect=`, so a record that authorizes the
-server through an include is reported as "cannot tell" rather than as a failure.
+### Fixed image tag
 
-## IP warmup
+`deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
+deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
+CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
+image was published. Pinning matters because of the backup version check (see
+[Full backup and restore](#full-backup-and-restore)): the panel binary's
+embedded version and the image tag that produced it are the same value by
+construction (the release CI stamps both from one git tag — see
+`.github/workflows/release.yml`), so the pin is what makes "restore into the
+same version" a checkable fact rather than a guess. Upgrade by bumping the tag
+deliberately, not by riding a moving target — see [Upgrading](#upgrading).
 
-A brand-new IP has no sending history, so receiving servers are cautious with
-it regardless of how correct your DKIM/SPF/DMARC are. Start with low volume to
-a domain, increase gradually over days/weeks rather than sending everything on
-day one, and check the IP against major blocklists (Spamhaus and similar)
-before and during warmup. This is inherent to how mail reputation works on the
-public internet, not something SelfPost's configuration can shortcut.
-
-## Operations
+## Instance administration
 
 After sign-in the panel opens on **Status** — the place to answer "is the
 service healthy and will mail be accepted?"
 
-- **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
-  TLS certificate validity and expiry, milter socket presence, and a short
-  Postfix queue summary. The **Machine** card adds the resource usage of the
-  host underneath — processor (core and thread counts), memory and swap, and
-  per-interface network throughput and totals — read from the kernel's
-  counters; CPU and throughput are measured between refreshes, so they appear
-  one refresh after the page opens. A fully busy processor or a machine out of
-  memory is a warning here, because both delay or kill the mail path;
-  throughput is only reported. The hostname block compares `SELFPOST_HOSTNAME`
-  against the PTR record the internet publishes for this server's IP
-  (forward-confirmed reverse DNS); use *Re-check* after changing DNS. The
-  **Reload configuration** button re-applies OpenDKIM tables and the Postfix
-  sender map from the database — use it if daemons drifted from what the panel
-  shows after manual edits under `/data`.
-- **Domains** (`/domains`) — add sending domains, inspect each domain's DKIM
-  TXT value, SPF/DMARC checks, and SASL applications. Per-domain rate limits
-  (level 2) and trusted-IP application overrides are configured here.
-  *Export domain* writes a single-domain archive;
-  *Import a domain* on the Backup page reads one back in.
-- **Deliveries** (`/deliveries`) — searchable send log with server-side filters
-  by domain and application. A row identifies its message and nothing more —
-  time, sender, recipient, subject and status `queued` (accepted, not yet
-  delivered), `sent` (handed off successfully), `deferred` (Postfix is retrying),
-  `bounced` (final failure), or `rejected` (refused — for example by a level-2
-  rate limit); *Details* opens that row's own page
-  (`/deliveries/{id}`). That page carries the sending domain, the application it
-  was submitted under, the Postfix queue id and the journal id, beside the
-  message's history — when it was accepted and what Postfix later reported for
-  the recipient — and, under both, the `mail.log` lines for its queue id: the
-  connection to the receiving server, the server's reply, and the status that
-  reply was filed as. Rows outlive `mail.log`, so an older message's lines may
-  have rotated away; the page says so. Retention is controlled by
-  `SEND_LOG_RETENTION_DAYS`.
+### Status
+
+`/status` shows supervised processes (Postfix, OpenDKIM, panel), TLS
+certificate validity and expiry, milter socket presence, and a short Postfix
+queue summary. The **Machine** card adds the resource usage of the host
+underneath — processor (core and thread counts), memory and swap, and
+per-interface network throughput and totals — read from the kernel's
+counters; CPU and throughput are measured between refreshes, so they appear
+one refresh after the page opens. A fully busy processor or a machine out of
+memory is a warning here, because both delay or kill the mail path;
+throughput is only reported. The hostname block compares `SELFPOST_HOSTNAME`
+against the PTR record the internet publishes for this server's IP
+(forward-confirmed reverse DNS) — see
+[Server-level DNS](#server-level-dns-ptrrdns); use *Re-check* after changing
+DNS. The **Reload configuration** button re-applies OpenDKIM tables and the
+Postfix sender map from the database — use it if daemons drifted from what
+the panel shows after manual edits under `/data`.
+
+### Mail queue and System log
+
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
   trying to deliver or deferring.
 - **System log** (`/system-log`) — tail of `/data/log/mail.log` (Postfix and
@@ -227,28 +224,36 @@ service healthy and will mail be accepted?"
   hours. It lives in the data volume, so it survives a container recreate along
   with the rest of the state — `./data/log/` on the host — but it is *not*
   included in backups: it is diagnostics, not state.
-- **Backup** (`/backup`) — download a full-server backup; the same page hosts
-  the domain-import form (`POST /domains/import`). See
-  [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
-- **Settings** (`/settings`) — change the administrator username and/or
-  password, and the panel-wide default DMARC report address (`rua=`) offered
-  when a domain doesn't set its own — see [DNS setup](#dns-setup). Application
-  SASL logins are separate and are not changed here.
-- **Users** (`/users`, global administrator only) — create, edit, and delete
-  panel users. There are two roles:
-  - **Global administrator** — full access to every page and every domain,
-    including Users, Backup, Status, Mail queue, and System log.
-  - **Domain-admin** — scoped to one or more domains assigned by a global
-    administrator. Sees only those domains' pages, applications, and
-    Deliveries rows; `/users`, `/backup`, `/status`, `/mail-queue`, and
-    `/system-log` are not reachable (404). A domain-admin can *export* the
-    domains assigned to them — see the note on working credentials below.
 
-  The panel refuses to remove or demote the **last** global administrator, so
-  it can never end up with none.
+### Settings
 
-**Sessions.** A login survives a container restart: sessions live in SQLite, not
-in memory. Expiry is a sliding idle window (`PANEL_SESSION_IDLE_DAYS`, default
+`/settings` changes the administrator username and/or password, and the
+panel-wide default DMARC report address (`rua=`) offered when a domain
+doesn't set its own — see
+[Domain-level DNS](#domain-level-dns-spf-dkim-dmarc). Application SASL logins
+are separate and are not changed here.
+
+### Users
+
+`/users` (global administrator only) creates, edits, and deletes panel users.
+There are two roles:
+
+- **Global administrator** — full access to every page and every domain,
+  including Users, Backup, Status, Mail queue, and System log.
+- **Domain-admin** — scoped to one or more domains assigned by a global
+  administrator. Sees only those domains' pages, applications, and
+  Deliveries rows; `/users`, `/backup`, `/status`, `/mail-queue`, and
+  `/system-log` are not reachable (404). A domain-admin can *export* the
+  domains assigned to them — see
+  [Exporting and importing a single domain](#exporting-and-importing-a-single-domain).
+
+The panel refuses to remove or demote the **last** global administrator, so
+it can never end up with none.
+
+### Sessions
+
+A login survives a container restart: sessions live in SQLite, not in
+memory. Expiry is a sliding idle window (`PANEL_SESSION_IDLE_DAYS`, default
 seven days) with no absolute lifetime cap — an admin who keeps using the panel
 stays signed in indefinitely. HTMX polling on the monitoring screens
 (Deliveries, Mail queue, System log, and the Status health fragment) does
@@ -256,40 +261,48 @@ stays signed in indefinitely. HTMX polling on the monitoring screens
 session alive forever. Changing the password signs out every other session but
 leaves the current browser signed in.
 
-**Upgrading.** Bump the pinned image tag in `docker-compose.yml` to the target
-release, then `docker compose up -d`. The backup version check requires the
-running image to match the version that created a full backup — see [Fixed image
+### Upgrading
+
+Bump the pinned image tag in `docker-compose.yml` to the target release, then
+`docker compose up -d`. The backup version check requires the running image
+to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag).
 
-**Container health.** The image declares a Docker `HEALTHCHECK` that probes
-`GET /healthz` on port 8080 (unauthenticated). It returns `200 ok` when
-OpenDKIM, the panel, and Postfix are all `RUNNING` under supervisord;
-otherwise `503 unhealthy`. This catches a dead mail path that would still leave
-the HTTP server up, but it does **not** verify TLS certificates, DNS records,
-or end-to-end delivery — use the authenticated **Status** page for that. External
-monitoring can use the same endpoint through the reverse proxy if you expose it,
-or poll `docker inspect` health state on the host.
+### Container health
 
-**First-time setup link.** On first start the one-time setup URL is printed in
-the container log (`docker compose logs -f`) and written to `/data/setup-token`
-inside the container — `./data/setup-token` on the host, mode `0600` — then
-deleted when setup completes. The link is
-`https://<SELFPOST_HOSTNAME>/setup/<token>` (path token, not a query string),
-valid for ten minutes. If this host ships container logs to a central
-aggregator, prefer reading the file:
+The image declares a Docker `HEALTHCHECK` that probes `GET /healthz` on port
+8080 (unauthenticated). It returns `200 ok` when OpenDKIM, the panel, and
+Postfix are all `RUNNING` under supervisord; otherwise `503 unhealthy`. This
+catches a dead mail path that would still leave the HTTP server up, but it
+does **not** verify TLS certificates, DNS records, or end-to-end delivery —
+use the authenticated [Status](#status) page for that. External monitoring
+can use the same endpoint through the reverse proxy if you expose it, or poll
+`docker inspect` health state on the host.
 
-```sh
-docker compose exec selfpost cat /data/setup-token
-```
+### Server-level DNS (PTR/rDNS)
 
-## Rate limiting
+Once, for the machine itself: **PTR/rDNS** for the server's IP, pointing at
+its mail hostname. Most receiving mail servers weigh this heavily; get it
+from whoever assigns the IP (hosting provider's panel/support), not from
+your own DNS zone.
 
-SelfPost applies two independent layers; both can refuse a submission, but only
-level 2 writes a `rejected` row in the send log. Level-2 ceilings set in the
-panel cannot exceed level 1 (the panel shows the level-1 values and rejects
-higher numbers).
+The [Status](#status) page verifies the server's hostname against this
+record (forward-confirmed reverse DNS). Results are cached for a few
+minutes; use *Re-check* right after publishing a record.
 
-**Level 1 (IP backstop)** — always on, configured via `.env`:
+Per-domain DNS (SPF, DKIM, DMARC) is a separate scope — see
+[Domain-level DNS](#domain-level-dns-spf-dkim-dmarc).
+
+### Rate limiting — level 1 (IP backstop)
+
+SelfPost applies two independent layers of rate limiting; both can refuse a
+submission, but only level 2 (domain/application, see
+[Domain administration](#rate-limiting--level-2-domain-and-application))
+writes a `rejected` row in the send log. Level-2 ceilings set in the panel
+cannot exceed level 1 (the panel shows the level-1 values and rejects higher
+numbers).
+
+Level 1 is always on, configured via `.env`:
 
 - `RATE_LIMIT_MESSAGES_PER_IP` → Postfix `smtpd_client_message_rate_limit`
 - `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
@@ -297,81 +310,54 @@ higher numbers).
 This is an anvil limit per connecting client IP. It keeps working even if the
 journal-milter (level 2) is down. There is no per-IP bypass.
 
-**Level 2 — domain** — optional, on each domain's page. A message ceiling and
-window for **every** client IP sending as that domain. When unset, only
-level 1 applies for non-privileged senders.
+### Full backup and restore
 
-**Level 2 — application (trusted IPs)** — optional override on an application:
-list one or more client IPs and a ceiling **strictly above** the domain limit
-(still ≤ level 1). Connections from those IPs use the application ceiling and
-skip the domain check. Other IPs stay under the domain limit (or level 1 alone).
-An application override without trusted IPs is inactive.
+**Full backup** (whole `/data` except `log/`: SQLite, all domains' DKIM keys,
+all applications' SASL credentials, `manifest.json` with the version that
+created it): panel button (*Backup* → *Full backup*), or from the host:
 
-When a level-2 ceiling is exceeded, Postfix returns a 4xx and the refusal is
-recorded in Deliveries as `rejected`.
+```sh
+docker exec <container> selfpost-backup > selfpost-backup.tar.gz
+```
 
-**Level 2 is best-effort, not a guarantee.** It runs inside the journal-milter
-and is deliberately fail-open: if the rate-limit lookup hits a store error, or
-the connecting client's IP is not available to the milter, level 2 is skipped
-and the message is accepted rather than held up. Level 1 (the Postfix anvil
-limit above) is the backstop that keeps working even when level 2 cannot run.
+**Restore** means unpacking that archive into a fresh `/data` bind mount and
+starting a container of the **exact same image version** that created it —
+SelfPost refuses to start otherwise and tells you which tag to use. On the
+first successful start after restore, `manifest.json` from the archive is
+**deleted** — it guards only that one boot, so a later in-place upgrade is
+not blocked. This is why the compose file pins a fixed tag rather than
+`:latest`: without a known version, there'd be no way to tell which image
+restoring a given backup actually requires (see [Fixed image
+tag](#fixed-image-tag)).
 
-## Backup, restore, and moving a single domain
+Restoring an archive taken **before** you invalidated a session (password
+change, logout everywhere) can bring that session back: session rows travel
+with the backup, and a browser that still holds the matching cookie is
+logged in again once the idle timeout allows it. If a restore might do this,
+changing every user's password afterwards clears it out.
 
-Two related but distinct operations
-([architecture.md](architecture.md) § Persistence):
+**Alternative: archive `./data` while stopped.** If the service can be taken
+offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
+the host is safe — nothing is writing to SQLite. Unlike the panel/CLI backup
+this sweeps in `./data/log/` too, which is Postfix's raw log and usually the
+bulk of the archive; add `--exclude=./data/log` if you only want the state.
+Do **not** tar `./data` while the container is running: the database uses
+WAL mode and a naive copy can capture an inconsistent snapshot. The
+panel/CLI backup remains preferable when you cannot afford downtime because
+it takes a consistent SQLite snapshot via the Backup API on a live
+container.
 
-- **Full backup** (whole `/data` except `log/`: SQLite, all domains' DKIM keys,
-  all applications' SASL credentials, `manifest.json` with the version that
-  created it): panel button (*Backup* → *Full backup*), or from the
-  host:
-  ```sh
-  docker exec <container> selfpost-backup > selfpost-backup.tar.gz
-  ```
-  **Restore** means unpacking that archive into a fresh `/data` bind mount and
-  starting a container of the **exact same image version** that created it —
-  SelfPost refuses to start otherwise and tells you which tag to use. On the
-  first successful start after restore, `manifest.json` from the archive is
-  **deleted** — it guards only that one boot, so a later in-place upgrade is
-  not blocked. This is why the compose file pins a fixed tag rather than
-  `:latest`: without a known version, there'd be no way to tell which image
-  restoring a given backup actually requires.
+See also [Exporting and importing a single
+domain](#exporting-and-importing-a-single-domain) — a different, domain-scoped
+operation that also lives on the *Backup* page (`/backup`).
 
-  Restoring an archive taken **before** you invalidated a session (password
-  change, logout everywhere) can bring that session back: session rows travel
-  with the backup, and a browser that still holds the matching cookie is
-  logged in again once the idle timeout allows it. If a restore might do this,
-  changing every user's password afterwards clears it out.
+Both a full backup and a domain export are **secrets** — they contain the
+admin password hash (full backup) or working application credentials (domain
+export) in the clear or in directly reversible form. Treat them like any
+other credential material: restrict who can read them, don't email them
+around — and encrypt them, which SelfPost can do for you.
 
-  **Alternative: archive `./data` while stopped.** If the service can be taken
-  offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
-  the host is safe — nothing is writing to SQLite. Unlike the panel/CLI backup
-  this sweeps in `./data/log/` too, which is Postfix's raw log and usually the
-  bulk of the archive; add `--exclude=./data/log` if you only want the state.
-  Do **not** tar `./data` while
-  the container is running: the database uses WAL mode and a naive copy can
-  capture an inconsistent snapshot. The panel/CLI backup remains preferable when
-  you cannot afford downtime because it takes a consistent SQLite snapshot via
-  the Backup API on a live container.
-
-- **Export/import a single domain** (domain page → *Export domain* to write the
-  file, *Backup* → *Import a domain* to read it back in): moves one domain — its DKIM key and its applications' **working**
-  SASL passwords — to a different SelfPost instance without regenerating
-  anything, so DNS (the DKIM TXT record) doesn't need to change. Unlike a full
-  restore, this works across different hostnames/instances. *Import* is
-  global-administrator only; *export* is available to any user who can access
-  the domain, **including a domain-admin** for a domain assigned to them — so
-  a domain-admin can walk away with that domain's working SASL passwords in
-  the clear. Weigh that when deciding which domains to assign to a
-  domain-admin account.
-
-Both files are **secrets** — they contain the admin password hash (full
-backup) or working application credentials (domain export) in the clear or in
-directly reversible form. Treat them like any other credential material:
-restrict who can read them, don't email them around — and encrypt them, which
-SelfPost can do for you.
-
-### Encrypting a backup or export
+#### Encrypting a backup or export
 
 Both download forms carry an **Encrypt with a password** checkbox. Ticked, the
 file that comes down is an encrypted envelope instead of the plain archive:
@@ -411,21 +397,119 @@ docker exec -e SELFPOST_BACKUP_PASSWORD="$PW" <container> selfpost-backup > back
 
 With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
 
-## Published ports
+## Domain administration
 
-`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
-(smtps) is always active. Port **587** is published even when
-`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
-but it can look like an open port in external scans.
+### Domains page
 
-## Fixed image tag
+`/domains` adds sending domains, and shows each domain's DKIM TXT value,
+SPF/DMARC checks, and SASL applications. Per-domain rate limits (level 2) and
+trusted-IP application overrides are configured here — see [Rate limiting —
+level 2](#rate-limiting--level-2-domain-and-application). *Export domain*
+writes a single-domain archive; *Import a domain* on the Backup page reads
+one back in — see [Exporting and importing a single
+domain](#exporting-and-importing-a-single-domain).
 
-`deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
-CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
-image was published. Pinning matters because of the backup version check above:
-the panel binary's embedded version and the image tag that produced it are the
-same value by construction (the release CI stamps both from one git tag — see
-`.github/workflows/release.yml`), so the pin is what makes "restore into the
-same version" a checkable fact rather than a guess. Upgrade by bumping the tag
-deliberately, not by riding a moving target.
+### Domain-level DNS (SPF, DKIM, DMARC)
+
+For *every* sending domain you add in the panel:
+
+- **SPF** — a TXT record on the domain authorizing this server to send on its
+  behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).
+- **DKIM** — a TXT record with the exact value the panel shows on that
+  domain's page (`domain page → DKIM TXT record`), one selector per domain.
+- **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring
+  only, safe to publish immediately). On a send-only relay the sending domain
+  often has no inbox, so `rua=` is optional — configure a default report address
+  in *Settings* (see [Settings](#settings)) or per domain when you have a
+  mailbox that receives inbound mail elsewhere. If `rua=` points at another
+  domain, publish `_report._dmarc` on that hub domain too; the panel checks
+  it. Public mail hosts (Gmail, Outlook, …) cannot be used as external
+  report destinations.
+
+Skipping any of the three records is the single most common reason mail
+lands in spam even though SelfPost delivered it correctly — DKIM passing
+doesn't help if SPF/DMARC are absent. **Whenever you add a new domain in the
+panel, add its DNS records at the same time**, not later.
+
+Each domain's page shows a *DNS status* card comparing the published DKIM
+record against the key this server signs with, plus the domain's SPF,
+DMARC, and (when configured) DMARC report-authorisation records. Results are
+cached for a few minutes; use *Re-check* right after publishing a record.
+The SPF check is deliberately shallow — it looks for a mechanism that
+literally covers this server's address and does not follow `include:` or
+`redirect=`, so a record that authorizes the server through an include is
+reported as "cannot tell" rather than as a failure.
+
+Server-level DNS (the PTR/rDNS record) is a separate, once-per-machine scope
+— see [Server-level DNS](#server-level-dns-ptrrdns).
+
+### IP warmup
+
+A brand-new IP has no sending history, so receiving servers are cautious with
+it regardless of how correct your DKIM/SPF/DMARC are. Start with low volume to
+a domain, increase gradually over days/weeks rather than sending everything on
+day one, and check the IP against major blocklists (Spamhaus and similar)
+before and during warmup. This is inherent to how mail reputation works on the
+public internet, not something SelfPost's configuration can shortcut.
+
+### Rate limiting — level 2 (domain and application)
+
+Level 2 is optional, configured on each domain's page, and layers on top of
+the always-on [level-1 IP backstop](#rate-limiting--level-1-ip-backstop).
+Level-2 ceilings cannot exceed level 1 (the panel shows the level-1 values
+and rejects higher numbers). When a level-2 ceiling is exceeded, Postfix
+returns a 4xx and the refusal is recorded in [Deliveries](#deliveries) as
+`rejected`.
+
+**Level 2 — domain** — a message ceiling and window for **every** client IP
+sending as that domain. When unset, only level 1 applies for non-privileged
+senders.
+
+**Level 2 — application (trusted IPs)** — optional override on an
+application: list one or more client IPs and a ceiling **strictly above**
+the domain limit (still ≤ level 1). Connections from those IPs use the
+application ceiling and skip the domain check. Other IPs stay under the
+domain limit (or level 1 alone). An application override without trusted
+IPs is inactive.
+
+**Level 2 is best-effort, not a guarantee.** It runs inside the
+journal-milter and is deliberately fail-open: if the rate-limit lookup hits
+a store error, or the connecting client's IP is not available to the
+milter, level 2 is skipped and the message is accepted rather than held up.
+Level 1 is the backstop that keeps working even when level 2 cannot run.
+
+### Deliveries
+
+`/deliveries` is a searchable send log with server-side filters by domain
+and application. A row identifies its message and nothing more — time,
+sender, recipient, subject and status `queued` (accepted, not yet
+delivered), `sent` (handed off successfully), `deferred` (Postfix is
+retrying), `bounced` (final failure), or `rejected` (refused — for example
+by a [level-2 rate limit](#rate-limiting--level-2-domain-and-application));
+*Details* opens that row's own page (`/deliveries/{id}`). That page carries
+the sending domain, the application it was submitted under, the Postfix
+queue id and the journal id, beside the message's history — when it was
+accepted and what Postfix later reported for the recipient — and, under
+both, the `mail.log` lines for its queue id: the connection to the
+receiving server, the server's reply, and the status that reply was filed
+as. Rows outlive `mail.log`, so an older message's lines may have rotated
+away; the page says so. Retention is controlled by
+`SEND_LOG_RETENTION_DAYS`.
+
+### Exporting and importing a single domain
+
+Domain page → *Export domain* to write the file, *Backup* → *Import a
+domain* to read it back in. This moves one domain — its DKIM key and its
+applications' **working** SASL passwords — to a different SelfPost instance
+without regenerating anything, so DNS (the DKIM TXT record) doesn't need to
+change. Unlike a full restore (see [Full backup and
+restore](#full-backup-and-restore)), this works across different
+hostnames/instances. *Import* is global-administrator only; *export* is
+available to any user who can access the domain, **including a domain-admin**
+for a domain assigned to them — so a domain-admin can walk away with that
+domain's working SASL passwords in the clear. Weigh that when deciding which
+domains to assign to a domain-admin account.
+
+A domain export is a secret in the same way a full backup is, and can be
+encrypted the same way — see [Encrypting a backup or
+export](#encrypting-a-backup-or-export).

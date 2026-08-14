@@ -76,7 +76,7 @@ For every domain you add in the panel:
 - [ ] DKIM TXT record (value shown on the domain page)
 - [ ] DMARC `_dmarc` TXT record
 
-See [DNS setup](docs/guide.md#dns-setup) in the operator guide.
+See [Domain-level DNS](docs/guide.md#domain-level-dns-spf-dkim-dmarc) in the operator guide.
 
 ## Quick start
 
@@ -248,7 +248,7 @@ Before sending real mail:
 1. Confirm PTR/rDNS for the server IP points at `SELFPOST_HOSTNAME` (Status
    page → *Re-check*).
 2. For each domain you add in the panel, publish SPF, DKIM, and DMARC at the
-   same time ([DNS setup](docs/guide.md#dns-setup)).
+   same time ([Domain-level DNS](docs/guide.md#domain-level-dns-spf-dkim-dmarc)).
 3. Warm up a new IP gradually ([IP warmup](docs/guide.md#ip-warmup)).
 
 ### Ports and upgrades
