@@ -74,6 +74,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   through a confirmation page, the same pattern as domain deletion, instead of
   a plain submit button next to Save with no confirmation at all.
 
+- panel (restore): after a backup is extracted and the version guard passes,
+  the panel runs one mail-path Resync on the first boot — OpenDKIM's tables
+  and Postfix's sender map are re-derived from SQLite and the daemons are
+  reloaded, so drift between the archive and the database is healed before
+  mail flows. Later starts skip that step; the Status page Reload button runs
+  the same Resync on demand. The `internal/backup` package comment now matches
+  this behaviour.
+
 ### Changed
 
 - docs: [guide.md](docs/guide.md) reorganised into **Installation**, **Instance
@@ -125,13 +133,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   downloaded from a running panel through `POST /backup` (plain and encrypted),
   unpacked the way `tar -xzf` unpacks it onto the `/data` bind mount, and a
   second panel is booted on the result through the startup order the panel
-  itself uses — version guard, database, services, HTTP application. The
-  restored panel shows the domain and journal the archive carried, finds the
-  DKIM key, SASL database and Postfix sender map where its configuration says
-  they are, does not reopen the one-time setup link, and still honours a
-  session that predates the backup. A data directory left by another version is
-  refused with both versions named and the manifest kept. `serveHTTP` is split
-  in two so that composition can be started without binding a port; no
+  itself uses — version guard, database, one Resync when restoring, then
+  services and the HTTP application. The restored panel shows the domain and
+  journal the archive carried, finds the DKIM key, SASL database and Postfix
+  sender map where its configuration says they are, does not reopen the
+  one-time setup link, and still honours a session that predates the backup.
+  Drifted on-disk maps are healed by that Resync step
+  (`TestResyncAfterRestoreHealsDriftedMaps`). A data directory left by another
+  version is refused with both versions named and the manifest kept. `serveHTTP`
+  is split in two so that composition can be started without binding a port; no
   behaviour change.
 
 - test (e2e): the CoreDNS image is pinned to `1.14.6` instead of `latest`, so
@@ -187,14 +197,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   show/hide field helpers in `panel.js` are one rule table; DMARC copy no
   longer promises in-panel report reception in a future release — SelfPost
   does not receive inbound mail.
-
-- panel (restore): after a backup is extracted and the version guard passes,
-  the panel runs one mail-path Resync on the first boot — OpenDKIM's tables
-  and Postfix's sender map are re-derived from SQLite and the daemons are
-  reloaded, so drift between the archive and the database is healed before
-  mail flows. Later starts skip that step; the Status page Reload button runs
-  the same Resync on demand. The `internal/backup` package comment now matches
-  this behaviour.
 
 ## [1.2.5] - 2026-08-13
 
