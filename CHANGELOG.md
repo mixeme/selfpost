@@ -121,13 +121,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - licence: [NOTICE](NOTICE) tells modifiers to update `SourceURL` in
   `internal/legal/legal.go` (the value the panel footer actually injects), not
-  `layout.html`. `release.yml` refuses a `workflow_dispatch` whose version is
-  not SemVer `X.Y.Z`, so a run from `main` cannot publish `ghcr.io/...:main`.
-  Per-file `SPDX-License-Identifier` headers on the two command packages were
-  dropped so the tree is consistent; AGPL-3.0 does not require them
-  ([development.md](docs/development.md) § External libraries). Deleted the
+  `layout.html`. Per-file `SPDX-License-Identifier` headers on the two command
+  packages were dropped so the tree is consistent; AGPL-3.0 does not require
+  them ([development.md](docs/development.md) § External libraries). Deleted the
   completed `docs/plans/logrotate-mode.md` (history in git and
   [1.2.3](#123---2026-08-12)).
+
+- ci: the release image is published only for a **published** GitHub Release
+  (`vX.Y.Z`) or a manual `workflow_dispatch` with an explicit SemVer version — a
+  bare git tag push no longer starts the build. `release.yml` listens for
+  `release: published`, checks out that tag (not `main` HEAD), e2e-gates each
+  native arch build, merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one manifest,
+  then removes the per-arch tags from GHCR so operators see only
+  `ghcr.io/mixeme/selfpost:X.Y.Z` (what `deploy/docker-compose.yml` pins). A
+  dispatch whose version input is missing or not `X.Y.Z` fails in `prepare`.
+  [development.md](docs/development.md) documents draft vs published releases
+  and why deleting a release tag converts it back to draft.
 
 - test: the authorization and sign-in surfaces that had no tests now have them.
   The login limiter is covered for its ceiling, its per-address scope, the reset
