@@ -191,11 +191,12 @@ tag / push only on explicit request (see `release.yml`).
 
 ### Release image
 
-The release image is published **only** for a SemVer version `X.Y.Z`: a pushed
-tag `vX.Y.Z`, or a `workflow_dispatch` that supplies that version (or runs on
-such a tag). Ordinary commits, and a dispatch from `main` without a version
-input, do not publish. The version is the single source that drives the image
-tag and `-ldflags` in the binaries so they cannot drift apart.
+The release image is published **only** for a SemVer version `X.Y.Z`: a
+**published** GitHub Release whose tag is `vX.Y.Z`, or a `workflow_dispatch`
+that supplies that version. Pushing a git tag alone does not publish. Ordinary
+commits, and a dispatch from `main` without a version input, do not publish.
+The version is the single source that drives the image tag and `-ldflags` in
+the binaries so they cannot drift apart.
 
 **Steps (on explicit request):**
 
@@ -203,8 +204,21 @@ tag and `-ldflags` in the binaries so they cannot drift apart.
    tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
    local-trial image references) in the **same** release commit.
 2. Create and push git tag `vX.Y.Z` on that commit.
-3. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
+3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
+4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
    and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
+
+**GitHub Release vs GHCR.** The public [Releases](https://github.com/mixeme/selfpost/releases)
+page lists only **published** releases. A draft is visible to maintainers only —
+it looks like “no releases” to everyone else. CI does not create or publish the
+GitHub Release; you do that in the UI. Deleting a release’s git tag on GitHub
+(or re-pushing tags while cleaning the registry) converts a published release
+back into a **draft** — that matches “I published three times and it keeps
+disappearing”. After publish, leave the tag on GitHub; clean up only unwanted
+GHCR package versions, not the git tag.
+
+Push workflow and source changes to **github.com/mixeme/selfpost** before
+publishing — Actions reads that repo, not Gitea.
 
 Ordinary commits **do not** publish an image. The compose pin and the git tag
 must match (`1.0.0` / `v1.0.0` for the first published release). Intermediate
@@ -290,15 +304,15 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 `gofmt -l` → `go vet ./...` → `go test ./...` (main module, no e2e).
 
-### `release.yml` — push of tag `vX.Y.Z`, or `workflow_dispatch` with SemVer
+### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 
-`prepare` takes the version from the tag (`v1.2.5` → `1.2.5`) or from the
-`workflow_dispatch` `version` input. A dispatch whose ref is not a `vX.Y.Z`
-tag and whose input is missing or not `X.Y.Z` fails in `prepare` — it must
-not publish `ghcr.io/...:main`.
+`prepare` takes the version from the published release tag (`v1.2.5` → `1.2.5`)
+or from the `workflow_dispatch` `version` input. A bare git tag push does not
+run this workflow. A dispatch whose input is missing or not `X.Y.Z` fails in
+`prepare` — it must not publish `ghcr.io/...:main`.
 
 ```
-prepare (version from tag or workflow_dispatch input)
+prepare (version from published release tag or workflow_dispatch input)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
       → docker build --load (VERSION from prepare)
       → e2e (test/e2e)

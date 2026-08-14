@@ -1,13 +1,14 @@
 name: release
 
 # Publishes an immutable, version-tagged image on ghcr.io (spec 10.1).
-# Ordinary commits do not publish anything. A pushed tag matching vX.Y.Z does,
-# and so does workflow_dispatch when it supplies a SemVer X.Y.Z version (or
-# runs on such a tag). A dispatch from main without that input must fail in
-# prepare — it must not publish ghcr.io/...:main. The version is the single
-# source that goes into both the image tag and the panel binary's -ldflags
-# version, so the two can never drift apart (the invariant restore's version
-# check in spec 7.5.A depends on).
+# Ordinary commits and bare git tag pushes do not publish anything. The
+# workflow runs when a GitHub Release is published (not while it is still a
+# draft), or on workflow_dispatch with an explicit SemVer X.Y.Z version. A
+# dispatch from main without that input must fail in prepare — it must not
+# publish ghcr.io/...:main. The version is the single source that goes into
+# both the image tag and the panel binary's -ldflags version, so the two can
+# never drift apart (the invariant restore's version check in spec 7.5.A
+# depends on).
 #
 # Native per-architecture builds (see docs/development.md), not qemu:
 # running the full Postfix/OpenDKIM stack under emulation for the e2e gate
@@ -19,13 +20,12 @@ name: release
 # in the registry as a side effect (harmless — the version tag's immutability,
 # spec 10.1, is about that tag, not these).
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: "Image version as X.Y.Z (no v prefix). Required unless this run is already on a vX.Y.Z tag."
+        description: "Image version as X.Y.Z (no v prefix). Required on workflow_dispatch."
         required: false
         type: string
 
@@ -43,17 +43,24 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           raw="${INPUT_VERSION:-}"
-          if [ -z "$raw" ] && [[ "${GITHUB_REF_NAME}" == v[0-9]*.[0-9]*.[0-9]* ]]; then
-            raw="${GITHUB_REF_NAME#v}"
+          if [ -z "$raw" ] && [ "${EVENT_NAME}" = "release" ] && [ -n "${RELEASE_TAG:-}" ]; then
+            raw="${RELEASE_TAG}"
           fi
           raw="${raw#v}"
           if ! [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::release version is not SemVer X.Y.Z (ref is ${GITHUB_REF_NAME}; pass inputs.version on workflow_dispatch). Refusing to publish ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME}"
+            echo "::error::release version is not SemVer X.Y.Z (event=${EVENT_NAME}; release tag=${RELEASE_TAG:-none}; pass inputs.version on workflow_dispatch). Refusing to publish ghcr.io/${{ github.repository }}:${raw:-?}"
             exit 1
           fi
+          #region agent log
+          echo "::group::agent-log prepare version"
+          echo "event=${EVENT_NAME} release_tag=${RELEASE_TAG:-none} version=${raw}"
+          echo "::endgroup::"
+          #endregion
           echo "version=${raw}" >> "$GITHUB_OUTPUT"
 
   build:
@@ -69,6 +76,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -133,6 +142,28 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Debug — snapshot GitHub Release state (agent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          #region agent log
+          set -euo pipefail
+          tag="v${VERSION}"
+          echo "::group::agent-log release snapshot for ${tag}"
+          if out=$(gh release view "$tag" --repo "${{ github.repository }}" --json isDraft,tagName,publishedAt,url 2>&1); then
+            echo "release-exists: ${out}"
+          else
+            echo "release-missing: ${out}"
+          fi
+          echo "event=${{ github.event_name }} ref=${GITHUB_REF_NAME}"
+          echo "::endgroup::"
+          #endregion
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to ghcr.io
@@ -160,6 +191,12 @@ jobs:
             set -e
             if [ "$rc" -eq 0 ]; then
               printf '%s\n' "$out"
+              #region agent log
+              echo "::group::agent-log ghcr tags published"
+              echo "version=${{ needs.prepare.outputs.version }} event=${{ github.event_name }} ref=${GITHUB_REF_NAME}"
+              echo "tags_pushed=${{ needs.prepare.outputs.version }},${{ needs.prepare.outputs.version }}-amd64,${{ needs.prepare.outputs.version }}-arm64"
+              echo "::endgroup::"
+              #endregion
               exit 0
             fi
             printf '%s\n' "$out" >&2
