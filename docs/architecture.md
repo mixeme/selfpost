@@ -319,5 +319,33 @@ origin check, no CSRF tokens) are documented there separately.
 
 ## Configuration
 
-Public and internal env vars: [guide § Environment variables](guide.md#environment-variables).
+Public env vars: [guide § Environment variables](guide.md#environment-variables).
 Regression test: [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go).
+
+**Internal env vars.** The following are read by the panel or startup scripts
+but are not part of the operator interface — not meant to be changed in a
+normal deployment; documented here so an accidental override reads as
+unsupported rather than as a missing doc:
+
+- **Panel paths and tuning:** `SELFPOST_DATA_DIR` (`/data`), `SELFPOST_DB_PATH`
+  (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
+  (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
+  `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`), `MAIL_LOG`
+  (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
+  here has to be matched in `build/postfix-config.sh`),
+  `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
+  (`/run/opendkim/opendkim.sock`), `OPENDKIM_DIR` (`/data/opendkim`),
+  `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
+  (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
+  `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
+  (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel
+  always writes `<POSTFIX_DIR>/sender_login_maps`, so overriding this env alone
+  desyncs the map Postfix reads from the file the panel maintains).
+- **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
+  `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
+  `MILTER_WAIT_TIMEOUT` (`30` seconds).
+- **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — daily
+  `postfix reload` to pick up renewed certificates),
+  `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
+  hours; logrotate keeps 14 rotated files on a daily schedule, and each
+  rotation triggers `postfix reload`).

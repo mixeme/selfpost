@@ -17,7 +17,7 @@ var documentedPublic = []string{
 	"TRUSTED_PROXY_CIDR",
 }
 
-// documentedInternal matches guide.md "Internal variables (not part of the operator interface)".
+// documentedInternal matches architecture.md § Configuration "Internal env vars".
 var documentedInternal = []string{
 	"SELFPOST_DATA_DIR",
 	"SELFPOST_DB_PATH",
