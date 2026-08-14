@@ -1,11 +1,13 @@
 name: release
 
 # Publishes an immutable, version-tagged image on ghcr.io (spec 10.1).
-# Ordinary commits do not publish anything — only a pushed tag matching
-# vX.Y.Z does. That tag is the single source the version comes from: it goes
-# into both the image tag and the panel binary's -ldflags version, so the two
-# can never drift apart (the invariant restore's version check in spec 7.5.A
-# depends on).
+# Ordinary commits do not publish anything. A pushed tag matching vX.Y.Z does,
+# and so does workflow_dispatch when it supplies a SemVer X.Y.Z version (or
+# runs on such a tag). A dispatch from main without that input must fail in
+# prepare — it must not publish ghcr.io/...:main. The version is the single
+# source that goes into both the image tag and the panel binary's -ldflags
+# version, so the two can never drift apart (the invariant restore's version
+# check in spec 7.5.A depends on).
 #
 # Native per-architecture builds (see docs/development.md), not qemu:
 # running the full Postfix/OpenDKIM stack under emulation for the e2e gate
@@ -21,6 +23,11 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Image version as X.Y.Z (no v prefix). Required unless this run is already on a vX.Y.Z tag."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -32,9 +39,22 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Derive version from tag
+      - name: Derive a SemVer X.Y.Z version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          raw="${INPUT_VERSION:-}"
+          if [ -z "$raw" ] && [[ "${GITHUB_REF_NAME}" == v[0-9]*.[0-9]*.[0-9]* ]]; then
+            raw="${GITHUB_REF_NAME#v}"
+          fi
+          raw="${raw#v}"
+          if ! [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::release version is not SemVer X.Y.Z (ref is ${GITHUB_REF_NAME}; pass inputs.version on workflow_dispatch). Refusing to publish ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          echo "version=${raw}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: prepare

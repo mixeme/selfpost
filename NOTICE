@@ -10,8 +10,8 @@ Corresponding Source for the published releases is at:
 
 If you modify SelfPost and let users interact with it over a network,
 AGPL-3.0 §13 requires you to offer them the Corresponding Source of
-your modified version. Update the Source link in the panel footer
-(internal/web/view/templates/layout.html) so it points at your sources.
+your modified version. Update SourceURL in internal/legal/legal.go
+so the panel footer points at your sources.
 
 Third-party software included in this distribution
 ----------------------------------------------------
@@ -24,6 +24,9 @@ htmx 2.0.4 (internal/web/view/static/htmx.min.js)
 IBM Plex Sans / IBM Plex Mono
   Copyright © 2017 IBM Corp., with Reserved Font Name "Plex"
   Licence: SIL Open Font License 1.1
+  Full text: internal/web/view/static/OFL.txt
+    (also /usr/share/doc/selfpost/OFL.txt in the image, and
+    /static/OFL.txt from the control panel)
   https://github.com/IBM/plex
   Distributed unmodified as three latin-subset WOFF2 files served by the
   control panel:

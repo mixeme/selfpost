@@ -10,7 +10,8 @@ import (
 )
 
 // checkLogrotateConfigMode verifies the image pins /etc/logrotate.d/mail at 0644
-// so logrotate will not silently ignore it (docs/plans/logrotate-mode.md).
+// so logrotate will not silently ignore it (docs/development.md § Building
+// binaries and the image).
 func checkLogrotateConfigMode(s *stack) error {
 	mode, err := s.execIn("selfpost", "stat", "-c", "%a", "/etc/logrotate.d/mail")
 	if err != nil {

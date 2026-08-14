@@ -1,8 +1,10 @@
 package view
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +28,7 @@ func TestStaticAssetsCarryETag(t *testing.T) {
 		// The fonts are the assets this matters most for: they are the largest
 		// thing the panel serves and the ones a browser is most willing to keep.
 		"ibm-plex-sans.woff2", "ibm-plex-mono-400.woff2", "ibm-plex-mono-600.woff2",
+		"OFL.txt",
 	} {
 		rec := serveStatic("/static/"+name, nil)
 		if rec.Code != http.StatusOK {
@@ -75,5 +78,29 @@ func TestStaticETagsAreContentDerived(t *testing.T) {
 	svg := serveStatic("/static/favicon.svg", nil).Header().Get("ETag")
 	if png == svg {
 		t.Errorf("favicon.png and favicon.svg share the ETag %s", png)
+	}
+}
+
+// OFL condition 2: the licence text must travel with the Font Software. The
+// WOFF2 files are embedded; OFL.txt sits next to them so a copy of the panel
+// (source tree, image, or /static/OFL.txt) always has it.
+func TestOFLTravelsWithFonts(t *testing.T) {
+	b, err := fs.ReadFile(assetsFS, "static/OFL.txt")
+	if err != nil {
+		t.Fatalf("OFL.txt is not embedded next to the Plex WOFF2 files: %v", err)
+	}
+	body := string(b)
+	if !strings.Contains(body, `Reserved Font Name "Plex"`) {
+		t.Error("OFL.txt is missing the IBM Plex reserved-font-name notice")
+	}
+	if !strings.Contains(body, "SIL OPEN FONT LICENSE Version 1.1") {
+		t.Error("OFL.txt is missing the SIL OFL 1.1 text")
+	}
+	rec := serveStatic("/static/OFL.txt", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /static/OFL.txt: status %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "SIL OPEN FONT LICENSE Version 1.1") {
+		t.Error("GET /static/OFL.txt did not serve the OFL text")
 	}
 }

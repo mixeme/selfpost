@@ -14,8 +14,9 @@ import (
 var License []byte
 
 // SourceURL is where Corresponding Source for the published upstream
-// releases lives. Operators who ship a modified version must point their
-// users at their own sources instead (NOTICE; AGPL-3.0 §13).
+// releases lives. It is injected into the panel footer by view.go.
+// Operators who ship a modified version must change this constant so the
+// footer points at their own sources (NOTICE; AGPL-3.0 §13).
 const SourceURL = "https://github.com/mixeme/selfpost"
 
 // CopyrightLine is the short copyright notice shown in the panel footer.

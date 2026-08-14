@@ -18,7 +18,6 @@
 //	docker exec -i <container> selfpost-backup -decrypt < backup.spbk > backup.tar.gz
 //
 // Copyright (C) 2026 Mikhail Yenuchenko
-// SPDX-License-Identifier: AGPL-3.0-only
 package main
 
 import (

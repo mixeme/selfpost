@@ -594,13 +594,18 @@ the override.
 **Model: Sonnet** for OFL/NOTICE prose; **Opus** for `release.yml`; **Haiku**
 for SPDX consistency and deleting the done logrotate plan.
 
-- [ ] Add SIL OFL 1.1 text beside the Plex WOFF2 files; point `NOTICE` at it.
-- [ ] `NOTICE` Source URL instructions → `internal/legal/legal.go`.
-- [ ] `release.yml`: `workflow_dispatch` must not publish `main` as a version
+- [x] Add SIL OFL 1.1 text beside the Plex WOFF2 files; point `NOTICE` at it.
+      IBM Plex `LICENSE.txt` as `internal/web/view/static/OFL.txt` (copyright
+      + OFL 1.1). Copied into the image at `/usr/share/doc/selfpost/OFL.txt`;
+      served at `/static/OFL.txt`.
+- [x] `NOTICE` Source URL instructions → `internal/legal/legal.go`.
+- [x] `release.yml`: `workflow_dispatch` must not publish `main` as a version
       (require `vX.Y.Z` or an explicit `version` input that matches SemVer).
-- [ ] Delete [plans/logrotate-mode.md](logrotate-mode.md) (done; git keeps it).
-- [ ] Decide SPDX-everywhere vs SPDX-nowhere; do not leave two files special
-      without a one-line note in development.md.
+- [x] Delete [plans/logrotate-mode.md](logrotate-mode.md) (done; git keeps it).
+- [x] Decide SPDX-everywhere vs SPDX-nowhere; do not leave two files special
+      without a one-line note in development.md. SPDX-nowhere: dropped the
+      two `cmd/` headers; development.md § External libraries records that
+      AGPL-3.0 does not require per-file SPDX.
 
 **Done when:** OFL travels with the fonts; a dispatch from `main` cannot tag
 `ghcr.io/...:main`.

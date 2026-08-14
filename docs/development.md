@@ -93,8 +93,9 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 ## External libraries
 
 The project is **AGPL-3.0** ([LICENSE](../LICENSE)). Copyright holder and
-third-party notices: [NOTICE](../NOTICE). New Go dependencies must be
-permissive or GPL-family (see
+third-party notices: [NOTICE](../NOTICE). The tree does not use per-file
+`SPDX-License-Identifier` headers; AGPL-3.0 does not require them. New Go
+dependencies must be permissive or GPL-family (see
 [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
 
 ### Main module (`go.mod`)
@@ -113,6 +114,7 @@ the tree are AGPL-3.0-compatible.
 | Asset | Version | Repository | License |
 |---|---|---|---|
 | `internal/web/view/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
+| `internal/web/view/static/ibm-plex-*.woff2` | latin subset | <https://github.com/IBM/plex> | SIL OFL 1.1 (`OFL.txt` beside the files) |
 
 ### E2e module (`test/e2e/go.mod`)
 
@@ -128,8 +130,10 @@ the image.
 Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
 from Debian bookworm repositories; licenses are in each package's `copyright`
 file on <https://packages.debian.org/bookworm/>.
-The image also ships [LICENSE](../LICENSE) and [NOTICE](../NOTICE) under
-`/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license`.
+The image also ships [LICENSE](../LICENSE), [NOTICE](../NOTICE), and the IBM
+Plex [OFL.txt](../internal/web/view/static/OFL.txt) under
+`/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license` and
+the OFL text at `/static/OFL.txt`.
 
 ---
 
@@ -187,9 +191,11 @@ tag / push only on explicit request (see `release.yml`).
 
 ### Release image
 
-The release image is published **only on tag** `vX.Y.Z` (not on every push to
-`main`). The tag is the single source of version: it drives the image tag and
-`-ldflags` in the binaries so they cannot drift apart.
+The release image is published **only** for a SemVer version `X.Y.Z`: a pushed
+tag `vX.Y.Z`, or a `workflow_dispatch` that supplies that version (or runs on
+such a tag). Ordinary commits, and a dispatch from `main` without a version
+input, do not publish. The version is the single source that drives the image
+tag and `-ldflags` in the binaries so they cannot drift apart.
 
 **Steps (on explicit request):**
 
@@ -284,12 +290,17 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 `gofmt -l` → `go vet ./...` → `go test ./...` (main module, no e2e).
 
-### `release.yml` — push of tag `vX.Y.Z` or `workflow_dispatch`
+### `release.yml` — push of tag `vX.Y.Z`, or `workflow_dispatch` with SemVer
+
+`prepare` takes the version from the tag (`v1.2.5` → `1.2.5`) or from the
+`workflow_dispatch` `version` input. A dispatch whose ref is not a `vX.Y.Z`
+tag and whose input is missing or not `X.Y.Z` fails in `prepare` — it must
+not publish `ghcr.io/...:main`.
 
 ```
-prepare (version from tag)
+prepare (version from tag or workflow_dispatch input)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
-      → docker build --load (VERSION from tag)
+      → docker build --load (VERSION from prepare)
       → e2e (test/e2e)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge

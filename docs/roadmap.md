@@ -59,6 +59,9 @@ Not inbound-relay, not DMARC ingestion, not a layer rewrite.
 **Done when:** see the criteria in
 [plans/code-review.md](plans/code-review.md).
 
+**Progress:** P0–P5 done. Remaining: P6 (optional cleanup), P7 (Fable review
+of the P0–P1 diff).
+
 **Dependencies / risks:** P0 is confidentiality between panel roles; it
 jumps the feature queue. Implementation models are in the plan (Opus / Sonnet
 / Haiku / Fable per [development.md](development.md)).
