@@ -3,8 +3,9 @@
 **Status:** agreed  
 **Version:** target bump **1.x** MINOR; **`2.x` possible** — to be settled once
 the implementation lands (do not fix a major in advance).  
-**Order:** after [code-review.md](code-review.md) P0 (and preferably P0–P3);
-this remains the largest remaining 1.x+ **feature**. The domain-admin role
+**Order:** the 2026-08-13 full-tree review follow-ups are closed (CHANGELOG
+`[Unreleased]`), so this is next up as the largest remaining 1.x+ **feature**.
+The domain-admin role
 and `internal/web` split have shipped — see [CHANGELOG](../../CHANGELOG.md)
 `[1.2.0]`.
 

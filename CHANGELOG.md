@@ -76,6 +76,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 
+- docs: the 2026-08-13 full-tree review plan is complete — every phase (P0–P7)
+  is closed — and `docs/plans/code-review.md` is deleted per its own exit
+  criteria (history in git and in this file). The
+  [roadmap](docs/roadmap.md)'s recommended order returns to **queue-retries**
+  and then **inbound-relay**.
+
 - licence: [NOTICE](NOTICE) tells modifiers to update `SourceURL` in
   `internal/legal/legal.go` (the value the panel footer actually injects), not
   `layout.html`. `release.yml` refuses a `workflow_dispatch` whose version is
@@ -138,7 +144,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   prompts existed — and why that is acceptable (the prompt is a mis-click
   guard, not an authorization boundary).
 
-- docs: full-tree review plan ([docs/plans/code-review.md](docs/plans/code-review.md))
+- docs: full-tree review plan (`docs/plans/code-review.md`, since completed
+  and deleted — history in git)
   — architecture, quality, GUI, tests, licence; P0 is domain-admin send-log
   authorization. Roadmap queues that plan ahead of inbound-relay and records
   `schema-squash` (replace the 1.x SQLite migration chain with a 2.x baseline;

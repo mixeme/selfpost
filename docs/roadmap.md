@@ -28,7 +28,6 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Plan |
 |---|---|---|---|
-| code-review | Full-tree review follow-ups (authz, docs, GUI, tests) | **agreed** | [plans/code-review.md](plans/code-review.md) |
 | queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | [plans/queue-retries.md](plans/queue-retries.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
@@ -36,36 +35,15 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-docs | In-panel operator documentation | candidate | — |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — |
 
-**Recommended order** (not binding): **code-review P0** first (shipped
-domain-admin send-log leak — a defect, not a feature), then the rest of that
-plan as listed; **queue-retries** is a small panel item that can land in
-parallel after P0; then **inbound-relay**. Candidates need explicit agreement
-before they join the queue.
+**Recommended order** (not binding): **queue-retries** is a small panel item
+that can land first or in parallel; the next feature is **inbound-relay**.
+The 2026-08-13 full-tree review follow-ups (send-log authorization,
+fail-closed paths, docs, GUI, tests, licence) are closed — history in
+[CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` and git. Candidates need
+explicit agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the checklist in its linked plan.
-
----
-
-## code-review
-
-**Goal:** close the 2026-08-13 full-tree review: domain-admin send-log
-authorization, a few fail-closed paths, docs that still say “single-user”,
-GUI flash/delete bugs, test gaps, licence/release hygiene.
-
-**Boundary:** defects and docs/UI follow-ups inside the current 1.x product.
-Not inbound-relay, not DMARC ingestion, not a layer rewrite.
-
-**Done when:** see the criteria in
-[plans/code-review.md](plans/code-review.md).
-
-**Progress:** P0–P5 done. Remaining: P6 (optional cleanup), P7 (Fable review
-of the P0–P1 diff).
-
-**Dependencies / risks:** P0 is confidentiality between panel roles; it
-jumps the feature queue. Implementation models are in the plan (Opus / Sonnet
-/ Haiku / Fable per [development.md](development.md)).
-**Version:** patch.
 
 ---
 

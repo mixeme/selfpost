@@ -3,8 +3,7 @@
 **Status:** agreed  
 **Date:** 2026-08-13  
 **Version:** patch; no schema, no configuration surface.  
-**Order:** small panel item; does not wait on inbound-relay. May follow or
-interleave with remaining [code-review.md](code-review.md) work after P0.
+**Order:** small panel item; does not wait on inbound-relay.
 
 ---
 
