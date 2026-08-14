@@ -87,12 +87,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - docs: operator and as-built docs aligned with the code after a full
   pass — [architecture.md](docs/architecture.md) route table now marks
   **global** routes (404 for domain administrators) and documents the
-  one-time restore Resync; session/password and restore-session wording
-  corrected in [guide.md](docs/guide.md) and architecture (own-password change
-  vs admin reset, no "logout everywhere", immediate session restore, PTR cache
-  ≈1 min, decrypt has no version check); [README.md](README.md) port-587 and
-  quick-start volume wording fixed; [security.md](docs/security.md) CSRF ADR
-  points at `authz.go` for route gating. No behaviour change.
+  one-time restore Resync in Persistence; session/password and restore-session
+  wording corrected in [guide.md](docs/guide.md) and architecture (own-password
+  change vs admin reset, no "logout everywhere", immediate session restore on
+  the next request, PTR cache ≈1 min, decrypt has no version check, restore
+  Resync on first boot, domain add/delete/import and `POST /reload` global-only,
+  Settings DMARC global-only); [README.md](README.md) port-587 and quick-start
+  volume wording fixed; [security.md](docs/security.md) CSRF ADR points at
+  `authz.go` for route gating. No behaviour change.
 
 - docs: [guide.md](docs/guide.md) reorganised into **Installation**, **Instance
   administration**, and **Domain administration** — DNS setup, operations,
@@ -188,11 +190,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   check defends against, and gives a new revisit trigger. Dropped the
   unimplemented "or argon2" alternative for the password hash.
   [guide.md](docs/guide.md) documents the Users page and the two roles,
-  the Settings page's default DMARC report address, level-2 rate limiting's
-  fail-open behaviour, that restoring an older backup can resurrect sessions,
-  and that a domain-admin can export working SASL passwords for domains
-  assigned to them. [architecture.md](docs/architecture.md)'s route table now
-  lists `/license` and the `/account` → `/settings` redirect. Corrected stale
+  level-2 rate limiting's fail-open behaviour, and that a domain-admin can
+  export working SASL passwords for domains assigned to them.
+  [architecture.md](docs/architecture.md) gains `/license` and the
+  `/account` → `/settings` redirect in the route table (later expanded for
+  RBAC in the doc-alignment pass above). Corrected stale
   `admin.dmarc_report_email` references in
   [roadmap.md](docs/roadmap.md) and
   [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
