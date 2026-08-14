@@ -620,8 +620,7 @@ for SPDX consistency and deleting the done logrotate plan.
 - [x] Cap or periodically sweep the login limiter map (**Opus**, small).
 - [x] Collapse `panel.js` field-sync helpers.
 - [x] Soften or keep DMARC “future release” UI copy (product call). Softened.
-- [ ] Optional startup `Resync` after restore (**Opus**). Dropped — P2 backup
-      comment fix is sufficient.
+- [x] Optional startup `Resync` after restore (**Opus**).
 
 ### P7 — Security review of the P0–P1 diff
 

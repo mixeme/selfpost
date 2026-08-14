@@ -222,7 +222,8 @@ func run() error {
 	// touch the database, so schema/format skew between versions cannot corrupt
 	// the restored state. A match consumes the manifest; its absence is the
 	// normal (non-restore) case.
-	if err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version); err != nil {
+	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	if err != nil {
 		return err
 	}
 
@@ -234,6 +235,13 @@ func run() error {
 		return err
 	}
 	defer st.Close()
+
+	if restored {
+		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
+		if err := resyncAfterRestore(cfg, st, false); err != nil {
+			return err
+		}
+	}
 
 	var wg sync.WaitGroup
 	errc := make(chan error, 3)

@@ -156,16 +156,24 @@ func writeManifest(t *testing.T, dir, format, version string) string {
 }
 
 func TestCheckRestoreNoManifestIsNormalStart(t *testing.T) {
-	if err := CheckRestore(filepath.Join(t.TempDir(), "manifest.json"), "1.0.0"); err != nil {
+	restored, err := CheckRestore(filepath.Join(t.TempDir(), "manifest.json"), "1.0.0")
+	if err != nil {
 		t.Errorf("CheckRestore with no manifest = %v, want nil", err)
+	}
+	if restored {
+		t.Error("CheckRestore with no manifest reported a restore")
 	}
 }
 
 func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, FormatFull, "1.0.0")
-	if err := CheckRestore(path, "1.0.0"); err != nil {
+	restored, err := CheckRestore(path, "1.0.0")
+	if err != nil {
 		t.Fatalf("CheckRestore matching = %v, want nil", err)
+	}
+	if !restored {
+		t.Fatal("CheckRestore matching did not report a restore")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("manifest should be consumed after a matching restore, stat err = %v", err)
@@ -175,9 +183,12 @@ func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
 func TestCheckRestoreVersionMismatchRefusesAndKeeps(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, FormatFull, "1.0.0")
-	err := CheckRestore(path, "2.0.0")
+	restored, err := CheckRestore(path, "2.0.0")
 	if err == nil {
 		t.Fatal("CheckRestore mismatch = nil, want error")
+	}
+	if restored {
+		t.Error("CheckRestore mismatch reported a restore")
 	}
 	if !strings.Contains(err.Error(), "1.0.0") || !strings.Contains(err.Error(), "2.0.0") {
 		t.Errorf("error should name both versions: %v", err)
@@ -190,7 +201,11 @@ func TestCheckRestoreVersionMismatchRefusesAndKeeps(t *testing.T) {
 func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, "something-else", "1.0.0")
-	if err := CheckRestore(path, "1.0.0"); err == nil {
+	restored, err := CheckRestore(path, "1.0.0")
+	if err == nil {
 		t.Error("CheckRestore accepted a non-backup manifest")
+	}
+	if restored {
+		t.Error("CheckRestore wrong format reported a restore")
 	}
 }

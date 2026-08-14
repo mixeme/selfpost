@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -74,13 +75,12 @@ func TestPanelBootsOnADataDirectoryRestoredFromItsOwnBackup(t *testing.T) {
 		}
 	}
 
-	// The daemons read their own state from the archive rather than from
-	// SQLite, so the files have to land where the panel's configuration says
-	// they are — that is the whole reason restore needs no regeneration step.
+	// The archive carries the daemon files, and the first boot after restore
+	// re-derives the maps from SQLite so they stay aligned with the database.
 	for path, want := range map[string]string{
 		filepath.Join("opendkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
 		filepath.Join("sasl", "sasldb2"):                                     "SASLDB",
-		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop",
+		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop\n",
 	} {
 		got, err := os.ReadFile(filepath.Join(r.dataDir, path))
 		if err != nil {
@@ -135,6 +135,57 @@ func TestAnEncryptedBackupRestoresTheSameWay(t *testing.T) {
 	}
 }
 
+// A restore boot runs one Resync from SQLite. If the archive's Postfix map
+// drifted from the database, that step puts it back before mail flows.
+func TestResyncAfterRestoreHealsDriftedMaps(t *testing.T) {
+	dataDir := seedPanelData(t)
+	cfg := panelConfig(t, dataDir)
+
+	mapPath := filepath.Join(dataDir, "postfix", "sender_login_maps")
+	if err := os.WriteFile(mapPath, []byte("stale map\n"), 0o640); err != nil {
+		t.Fatalf("write stale map: %v", err)
+	}
+
+	manifest, err := json.Marshal(backup.Manifest{
+		Format:    backup.FormatFull,
+		Version:   buildinfo.Version,
+		CreatedAt: "2026-08-14T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(cfg.manifestPath, manifest, 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	if err != nil {
+		t.Fatalf("CheckRestore: %v", err)
+	}
+	if !restored {
+		t.Fatal("CheckRestore did not report a restore")
+	}
+
+	st, err := store.Open(cfg.dbPath)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer st.Close()
+
+	if err := resyncAfterRestore(cfg, st, true); err != nil {
+		t.Fatalf("resync after restore: %v", err)
+	}
+
+	got, err := os.ReadFile(mapPath)
+	if err != nil {
+		t.Fatalf("read sender map: %v", err)
+	}
+	want := "@" + restoreDomain + " shop\n"
+	if string(got) != want {
+		t.Errorf("sender map = %q, want %q", got, want)
+	}
+}
+
 // The version guard is what stops a restore from being silently corrupted by
 // schema skew, and it runs before anything opens the database. The manifest
 // stays put on a mismatch: the operator's next move is to start the image the
@@ -153,7 +204,7 @@ func TestPanelRefusesADataDirectoryRestoredFromAnotherVersion(t *testing.T) {
 	extract(t, archive.Bytes(), target)
 
 	cfg := panelConfig(t, target)
-	err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	_, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
 	if err == nil {
 		t.Fatal("the panel booted on a data directory left by another version")
 	}
@@ -206,7 +257,7 @@ func seedPanelData(t *testing.T) string {
 	for path, content := range map[string]string{
 		filepath.Join("opendkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
 		filepath.Join("sasl", "sasldb2"):                                     "SASLDB",
-		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop",
+		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop\n",
 		filepath.Join("log", "mail.log"):                                     "postfix/smtp[1]: 4A1B2C3D: status=sent",
 	} {
 		full := filepath.Join(dataDir, path)
@@ -241,11 +292,14 @@ func bootPanel(t *testing.T, dataDir string) http.Handler {
 	t.Helper()
 	cfg := panelConfig(t, dataDir)
 
-	if err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version); err != nil {
+	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	if err != nil {
 		t.Fatalf("the panel refused to start on %s: %v", dataDir, err)
 	}
-	if _, err := os.Stat(cfg.manifestPath); err == nil {
-		t.Errorf("the restore manifest was not consumed, so the next start is gated by it too")
+	if restored {
+		if _, err := os.Stat(cfg.manifestPath); err == nil {
+			t.Errorf("the restore manifest was not consumed, so the next start is gated by it too")
+		}
 	}
 
 	st, err := store.Open(cfg.dbPath)
@@ -253,6 +307,12 @@ func bootPanel(t *testing.T, dataDir string) http.Handler {
 		t.Fatalf("open the restored database: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+
+	if restored {
+		if err := resyncAfterRestore(cfg, st, true); err != nil {
+			t.Fatalf("resync after restore: %v", err)
+		}
+	}
 
 	panel, err := newPanel(cfg, st)
 	if err != nil {

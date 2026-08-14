@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -15,17 +16,57 @@ import (
 	"github.com/mixeme/selfpost/internal/web"
 )
 
+// mailStack is the panel's domain and application services plus the on-disk
+// mail-path adapters they write through.
+type mailStack struct {
+	Domains *domain.Service
+	Apps    *app.Service
+	pf      *postfix.Postfix
+	odk     *domain.OpenDKIM
+}
+
+func newMailStack(cfg config, st *store.Store) *mailStack {
+	pf := postfix.New(cfg.postfixDir)
+	odk := domain.NewOpenDKIM(cfg.opendkimDir)
+	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
+	domains := domain.NewService(st, odk, apps, cfg.dkimSelectorDef)
+	return &mailStack{Domains: domains, Apps: apps, pf: pf, odk: odk}
+}
+
+// Resync rebuilds OpenDKIM's tables and Postfix's sender map from SQLite and
+// reloads both daemons — the same work as the Status page's Reload button.
+func (m *mailStack) Resync() error {
+	if err := m.Domains.Resync(); err != nil {
+		return fmt.Errorf("opendkim resync: %w", err)
+	}
+	if err := m.Apps.Resync(); err != nil {
+		return fmt.Errorf("postfix resync: %w", err)
+	}
+	return nil
+}
+
+func (m *mailStack) skipReloadForTest() {
+	m.pf.SetReloadHook(func() error { return nil })
+	m.odk.SetReloadHook(func() error { return nil })
+}
+
+// resyncAfterRestore runs one mail-path Resync on the first boot after a
+// backup restore. testNoReload skips the supervisord reload step so restore
+// tests can verify file regeneration without a running mail stack.
+func resyncAfterRestore(cfg config, st *store.Store, testNoReload bool) error {
+	ms := newMailStack(cfg, st)
+	if testNoReload {
+		ms.skipReloadForTest()
+	}
+	return ms.Resync()
+}
+
 // newPanel wires the panel's services over the shared database handle and
 // builds the HTTP application from cfg. It is the composition of the panel as
 // the environment describes it, with nothing bound to a port yet.
 func newPanel(cfg config, st *store.Store) (*web.Server, error) {
-	// Applications own the SASL accounts and the Postfix sender map; the domain
-	// service delegates to them when a domain (and its applications) is deleted.
-	pf := postfix.New(cfg.postfixDir)
-	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
-	domains := domain.NewService(st, domain.NewOpenDKIM(cfg.opendkimDir), apps, cfg.dkimSelectorDef)
-
-	return web.New(st, domains, apps, web.Config{
+	ms := newMailStack(cfg, st)
+	return web.New(st, ms.Domains, ms.Apps, web.Config{
 		Hostname:               cfg.hostname,
 		CookieSecure:           cfg.cookieSecure,
 		SubmissionEnabled:      cfg.submissionEnabled,

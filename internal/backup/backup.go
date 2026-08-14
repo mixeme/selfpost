@@ -9,15 +9,16 @@
 // Restore is not a separate code path in the panel: a backup is extracted into
 // the /data bind mount before first start, and the archive already carries
 // everything the mail path needs — DKIM keys, sasldb2, and Postfix's sender
-// map — so nothing needs to be regenerated from SQLite for the daemons to
-// start correctly. The only restore-specific step the panel runs is
-// CheckRestore, which refuses to boot if the manifest's version does not match
-// the running binary, so schema/format skew between versions cannot silently
-// corrupt state (architecture.md § Persistence). If a daemon's on-disk state
-// ever drifts from what SQLite records — for example after a manual edit
-// under /data — the Status page's "Reload configuration" button re-derives
-// OpenDKIM's tables and the Postfix sender map from the database; that is a
-// deliberate, operator-triggered heal, not something restore does on its own.
+// map — so the daemons can start on the extracted files alone. The
+// restore-specific steps the panel runs are CheckRestore, which refuses to
+// boot if the manifest's version does not match the running binary so
+// schema/format skew between versions cannot silently corrupt state
+// (architecture.md § Persistence), and a one-time Resync of OpenDKIM's tables
+// and the Postfix sender map from SQLite on that first boot, so any drift
+// between the archive and the database is healed before mail flows. If
+// on-disk state drifts again later — for example after a manual edit under
+// /data — the Status page's "Reload configuration" button runs the same
+// Resync on demand.
 package backup
 
 import (
@@ -269,33 +270,34 @@ func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
 // directory), its version must match binaryVersion or the panel refuses to
 // start, telling the operator which image tag to use. On a match the manifest
 // is consumed (deleted) so it guards only the first boot after a restore and
-// never blocks a later in-place image upgrade. Absence of the manifest is the
-// normal case and returns nil.
-func CheckRestore(manifestPath, binaryVersion string) error {
+// never blocks a later in-place image upgrade, and restored is true so the
+// caller can heal drifted daemon maps once. Absence of the manifest is the
+// normal case and returns restored == false with a nil error.
+func CheckRestore(manifestPath, binaryVersion string) (restored bool, err error) {
 	data, err := os.ReadFile(manifestPath)
 	if os.IsNotExist(err) {
-		return nil // ordinary start, not a restore
+		return false, nil // ordinary start, not a restore
 	}
 	if err != nil {
-		return fmt.Errorf("backup: read restore manifest: %w", err)
+		return false, fmt.Errorf("backup: read restore manifest: %w", err)
 	}
 
 	var m Manifest
 	if err := json.Unmarshal(data, &m); err != nil {
-		return fmt.Errorf("backup: restore manifest %s is not valid JSON: %w", manifestPath, err)
+		return false, fmt.Errorf("backup: restore manifest %s is not valid JSON: %w", manifestPath, err)
 	}
 	if m.Format != FormatFull {
-		return fmt.Errorf("backup: %s is not a SelfPost full backup manifest (format %q)", manifestPath, m.Format)
+		return false, fmt.Errorf("backup: %s is not a SelfPost full backup manifest (format %q)", manifestPath, m.Format)
 	}
 	if m.Version != binaryVersion {
-		return fmt.Errorf(
+		return false, fmt.Errorf(
 			"backup: this backup was created by SelfPost %s but this image is %s — restore into the matching image (selfpost:%s)",
 			m.Version, binaryVersion, m.Version)
 	}
 	// Version matches: consume the manifest so subsequent normal starts (and
 	// in-place upgrades) are not gated by it.
 	if err := os.Remove(manifestPath); err != nil {
-		return fmt.Errorf("backup: consume restore manifest: %w", err)
+		return false, fmt.Errorf("backup: consume restore manifest: %w", err)
 	}
-	return nil
+	return true, nil
 }

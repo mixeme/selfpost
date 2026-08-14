@@ -162,8 +162,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   expired buckets on a timer and cap the map at 4096 keys; the five
   show/hide field helpers in `panel.js` are one rule table; DMARC copy no
   longer promises in-panel report reception in a future release — SelfPost
-  does not receive inbound mail. No optional post-restore map `Resync` (the
-  backup package comment fix in P2 is enough).
+  does not receive inbound mail.
+
+- panel (restore): after a backup is extracted and the version guard passes,
+  the panel runs one mail-path Resync on the first boot — OpenDKIM's tables
+  and Postfix's sender map are re-derived from SQLite and the daemons are
+  reloaded, so drift between the archive and the database is healed before
+  mail flows. Later starts skip that step; the Status page Reload button runs
+  the same Resync on demand.
 
 ## [1.2.5] - 2026-08-13
 
