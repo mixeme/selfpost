@@ -205,8 +205,9 @@ the binaries so they cannot drift apart.
    local-trial image references) in the **same** release commit.
 2. Create and push git tag `vX.Y.Z` on that commit.
 3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
-4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
-   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
+4. Workflow [release-on-publish.yml](../.github/workflows/release-on-publish.yml)
+   starts [release.yml](../.github/workflows/release.yml) with that version;
+   the build checks out tag `vX.Y.Z` (not `main` HEAD).
 
 **GitHub Release vs GHCR.** The public [Releases](https://github.com/mixeme/selfpost/releases)
 page lists only **published** releases. A draft is visible to maintainers only —
@@ -306,13 +307,18 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 ### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 
-`prepare` takes the version from the published release tag (`v1.2.5` → `1.2.5`)
-or from the `workflow_dispatch` `version` input. A bare git tag push does not
-run this workflow. A dispatch whose input is missing or not `X.Y.Z` fails in
-`prepare` — it must not publish `ghcr.io/...:main`.
+Publishing a GitHub Release runs [release-on-publish.yml](../.github/workflows/release-on-publish.yml),
+which dispatches `release.yml` with the version parsed from the release tag.
+You can also run `release.yml` manually via `workflow_dispatch` and an
+explicit `X.Y.Z` input. A bare git tag push does not run either workflow.
+The build always checks out `vX.Y.Z`, not `main` HEAD.
+
+`prepare` takes the version from the `workflow_dispatch` `version` input. A
+dispatch whose input is missing or not `X.Y.Z` fails in `prepare`.
 
 ```
-prepare (version from published release tag or workflow_dispatch input)
+release-on-publish (release: published → workflow_dispatch)
+prepare (version from workflow_dispatch input; checkout vX.Y.Z)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
       → docker build --load (VERSION from prepare)
       → e2e (test/e2e)
