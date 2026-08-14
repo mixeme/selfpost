@@ -158,7 +158,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
 	authed.HandleFunc("POST /reload", h.HandleReload)
 
-	authed.HandleFunc("/settings", h.HandleAccount)
+	authed.HandleFunc("/settings", h.HandleSettings)
 	authed.HandleFunc("/account", redirectSettings)
 
 	authed.HandleFunc("GET /users", h.HandleUsers)

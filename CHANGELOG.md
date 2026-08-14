@@ -154,6 +154,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
   actual home after migration `0005`. No behaviour change.
 
+- panel: code-review P6 cleanup — the unused `auth.RequireGlobal` middleware is
+  gone (handlers already call `requireGlobal`); the settings route handler is
+  named `HandleSettings` in `handlers_settings.go`; domain lists for a
+  domain-admin now come from `ListDomainsForUser` in SQL instead of loading
+  every domain and filtering in Go; the login and setup rate limiters sweep
+  expired buckets on a timer and cap the map at 4096 keys; the five
+  show/hide field helpers in `panel.js` are one rule table; DMARC copy no
+  longer promises in-panel report reception in a future release — SelfPost
+  does not receive inbound mail. No optional post-restore map `Resync` (the
+  backup package comment fix in P2 is enough).
+
 ## [1.2.5] - 2026-08-13
 
 Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.

@@ -196,7 +196,7 @@ holds the cookie works after process restart, redeploy, or full backup restore.
   (`renewThreshold` in [internal/web/auth/session.go](../internal/web/auth/session.go)).
 - **Password change** — all other sessions are deleted; the current session stays
   active ([internal/store/sessions.go](../internal/store/sessions.go),
-  [handlers_account.go](../internal/web/handlers/handlers_account.go)).
+  [handlers_settings.go](../internal/web/handlers/handlers_settings.go)).
 
 Restoring an **older** backup also restores session rows: a session invalidated
 after that backup was taken can become valid again if the browser still has the

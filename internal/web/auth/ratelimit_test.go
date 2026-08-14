@@ -98,3 +98,28 @@ func expire(r *rateLimiter, key string) {
 		b.windowEnds = time.Now().Add(-time.Second)
 	}
 }
+
+// A long-running panel can see many unique client addresses. Finished buckets
+// are swept on every new window, and a hard cap evicts the oldest when the map
+// would otherwise grow without bound.
+func TestRateLimiterCapsBucketCount(t *testing.T) {
+	r := newRateLimiter(1, time.Minute)
+	r.maxBuckets = 3
+
+	for i, key := range []string{"203.0.113.7", "198.51.100.9", "192.0.2.5"} {
+		if !r.Allow(key) {
+			t.Fatalf("attempt %d for %s was refused under the cap", i+1, key)
+		}
+		expire(r, key)
+	}
+
+	if !r.Allow("203.0.113.8") {
+		t.Fatal("a fourth address was refused even though room was made")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.buckets) > 3 {
+		t.Fatalf("bucket count = %d, want at most 3", len(r.buckets))
+	}
+}

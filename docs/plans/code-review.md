@@ -614,14 +614,14 @@ for SPDX consistency and deleting the done logrotate plan.
 
 **Model: Sonnet** unless noted.
 
-- [ ] Use `auth.RequireGlobal` or delete it (**Haiku** if delete).
-- [ ] Rename `handlers_account.go` / `HandleAccount` to settings (**Haiku**).
-- [ ] `ListDomainsForUser` instead of load-all-and-filter.
-- [ ] Cap or periodically sweep the login limiter map (**Opus**, small).
-- [ ] Collapse `panel.js` field-sync helpers.
-- [ ] Soften or keep DMARC “future release” UI copy (product call).
-- [ ] Optional startup `Resync` after restore (**Opus**). Only if P2’s comment
-      fix is judged insufficient.
+- [x] Use `auth.RequireGlobal` or delete it (**Haiku** if delete). Deleted.
+- [x] Rename `handlers_account.go` / `HandleAccount` to settings (**Haiku**).
+- [x] `ListDomainsForUser` instead of load-all-and-filter.
+- [x] Cap or periodically sweep the login limiter map (**Opus**, small).
+- [x] Collapse `panel.js` field-sync helpers.
+- [x] Soften or keep DMARC “future release” UI copy (product call). Softened.
+- [ ] Optional startup `Resync` after restore (**Opus**). Dropped — P2 backup
+      comment fix is sufficient.
 
 ### P7 — Security review of the P0–P1 diff
 

@@ -42,8 +42,8 @@
     <h2>DMARC aggregate reports</h2>
     <p class="muted">Optional default <code>rua=</code> address for every sending
     domain (can be overridden per domain). Use a mailbox on a domain that
-    receives inbound mail. SelfPost is send-only today; a future release will
-    be able to receive reports in the panel itself.</p>
+    receives inbound mail. SelfPost does not receive inbound mail — point
+    <code>rua=</code> at a mailbox elsewhere.</p>
 
     <label for="dmarc_report_email">Default report address</label>
     <input id="dmarc_report_email" name="dmarc_report_email" type="email"

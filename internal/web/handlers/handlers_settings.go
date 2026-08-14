@@ -14,8 +14,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HandleAccount serves the signed-in user's account settings.
-func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
+// HandleSettings serves the signed-in user's panel settings.
+func (h *Handlers) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		p, ok := h.principal(r)
@@ -25,20 +25,20 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		u, err := h.store.GetUser(p.ID)
 		if err != nil {
-			logf("panel: account: get user failed: %v", err)
+			logf("panel: settings: get user failed: %v", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.renderAccount(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, p.IsGlobal())
+		h.renderSettings(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, p.IsGlobal())
 	case http.MethodPost:
-		h.submitAccount(w, r)
+		h.submitSettings(w, r)
 	default:
 		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string, showDMARC bool) {
+func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string, showDMARC bool) {
 	var reportAuth dnscheck.Result
 	if showDMARC && formDMARCEmail != "" {
 		if hub := dnscheck.EmailDomain(formDMARCEmail); hub != "" {
@@ -58,13 +58,13 @@ func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status 
 	data["ReportAuthDNS"] = reportAuth
 	data["ReportAuthHub"] = dnscheck.EmailDomain(formDMARCEmail)
 	data["Error"] = formErr
-	data["Flash"] = accountFlash(r)
+	data["Flash"] = settingsFlash(r)
 	data["L1Messages"] = h.l1Messages()
 	data["L1Window"] = h.l1Window()
 	h.view.Render(w, status, "settings", data)
 }
 
-func accountFlash(r *http.Request) string {
+func settingsFlash(r *http.Request) string {
 	switch r.URL.Query().Get("updated") {
 	case "username":
 		return "Username changed."
@@ -85,16 +85,16 @@ func accountFlash(r *http.Request) string {
 	}
 }
 
-func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 	if !h.auth.AllowLoginAttempt(r) {
 		p, _ := h.principal(r)
-		h.renderAccount(w, r, http.StatusTooManyRequests,
+		h.renderSettings(w, r, http.StatusTooManyRequests,
 			"Too many attempts. Please wait and try again.", auth.CurrentUser(r), "", p.IsGlobal())
 		return
 	}
 	if err := r.ParseForm(); err != nil {
 		p, _ := h.principal(r)
-		h.renderAccount(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "", p.IsGlobal())
+		h.renderSettings(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "", p.IsGlobal())
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.store.GetUser(p.ID)
 	if err != nil {
-		logf("panel: account: get user failed: %v", err)
+		logf("panel: settings: get user failed: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -123,21 +123,21 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
-		h.renderAccount(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail, p.IsGlobal())
+		h.renderSettings(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail, p.IsGlobal())
 		return
 	}
 
 	renaming := username != user.Username
 	if renaming {
 		if err := validate.Username(username); err != nil {
-			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
 			return
 		}
 	}
 
 	if p.IsGlobal() {
 		if err := validate.Email(dmarcEmail); err != nil {
-			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, true)
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, true)
 			return
 		}
 	}
@@ -147,16 +147,16 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	repassword := password != "" || confirm != ""
 	if repassword {
 		if password != confirm {
-			h.renderAccount(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail, p.IsGlobal())
 			return
 		}
 		if err := validate.AdminPassword(password); err != nil {
-			h.renderAccount(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
 			return
 		}
 	}
 	if !renaming && !repassword && !emailChanging {
-		h.renderAccount(w, r, http.StatusBadRequest,
+		h.renderSettings(w, r, http.StatusBadRequest,
 			"Nothing to change: enter a new username, password, or DMARC report address.", username, dmarcEmail, p.IsGlobal())
 		return
 	}
@@ -165,8 +165,8 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	if repassword {
 		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			logf("panel: account: hashing password failed: %v", err)
-			h.renderAccount(w, r, http.StatusInternalServerError,
+			logf("panel: settings: hashing password failed: %v", err)
+			h.renderSettings(w, r, http.StatusInternalServerError,
 				"Internal error. Please try again.", username, dmarcEmail, p.IsGlobal())
 			return
 		}
@@ -174,17 +174,17 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpdateUser(user.ID, username, hash, dmarcEmail); err != nil {
-		logf("panel: account: update user failed: %v", err)
+		logf("panel: settings: update user failed: %v", err)
 		msg := "Could not save the changes. Please check the logs and try again."
 		if errors.Is(err, store.ErrUserNotFound) {
 			msg = "There is no user account to update."
 		}
 		if errors.Is(err, store.ErrUserExists) {
 			msg = "That username is already in use."
-			h.renderAccount(w, r, http.StatusConflict, msg, username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusConflict, msg, username, dmarcEmail, p.IsGlobal())
 			return
 		}
-		h.renderAccount(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, p.IsGlobal())
+		h.renderSettings(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, p.IsGlobal())
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *Handlers) submitAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logf("panel: user %d account updated (username: %t, password: %t, dmarc email: %t)", user.ID, renaming, repassword, emailChanging)
+	logf("panel: user %d settings updated (username: %t, password: %t, dmarc email: %t)", user.ID, renaming, repassword, emailChanging)
 	http.Redirect(w, r, "/settings?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
 }
 

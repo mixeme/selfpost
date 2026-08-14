@@ -57,7 +57,7 @@ var globalOnlyRoutes = []route{
 // case the send-log leak (P0, code-review.md) showed is easy to get wrong.
 func TestGlobalOnlyRoutesAnswerADomainAdmin404(t *testing.T) {
 	h, domains := serverWithTwoDomains(t)
-	p := domainAdmin(domains["first.example.ru"].ID)
+	p := domainAdmin(t, h.store, "global-only", domains["first.example.ru"].ID)
 
 	for _, rt := range globalOnlyRoutes {
 		rec := call(h, rt, p)

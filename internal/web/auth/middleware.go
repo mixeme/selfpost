@@ -44,15 +44,3 @@ func CurrentUser(r *http.Request) string {
 	}
 	return ""
 }
-
-// RequireGlobal wraps a handler that only global administrators may reach.
-func RequireGlobal(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := CurrentPrincipal(r.Context())
-		if !ok || !p.IsGlobal() {
-			http.NotFound(w, r)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}

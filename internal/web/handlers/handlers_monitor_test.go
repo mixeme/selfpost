@@ -222,34 +222,41 @@ func TestSendLogScopedToAssignedDomains(t *testing.T) {
 	h, domains := serverWithTwoDomains(t)
 
 	for name, tc := range map[string]struct {
-		principal auth.Principal
+		username  string
+		domainIDs []int64
 		want      []string
 		unwanted  []string
 	}{
 		"global sees both": {
-			globalPrincipal, []string{"First message", "Second message"}, nil,
+			"", nil, []string{"First message", "Second message"}, nil,
 		},
 		"one assigned domain": {
-			domainAdmin(domains["first.example.ru"].ID),
+			"one-domain", []int64{domains["first.example.ru"].ID},
 			[]string{"First message"}, []string{"Second message", "second-app"},
 		},
 		"two assigned domains": {
-			domainAdmin(domains["first.example.ru"].ID, domains["second.example.ru"].ID),
+			"two-domains", []int64{domains["first.example.ru"].ID, domains["second.example.ru"].ID},
 			[]string{"First message", "Second message"}, nil,
 		},
 		// Every assigned domain deleted cascades the assignments away. That
 		// leaves a principal entitled to nothing, which is an empty log — the
 		// case that used to hand over the whole journal.
 		"no assigned domains": {
-			domainAdmin(), []string{"No messages logged yet."},
+			"no-domains", nil, []string{"No messages logged yet."},
 			[]string{"First message", "Second message"},
 		},
 	} {
+		var p auth.Principal
+		if tc.username == "" {
+			p = globalPrincipal
+		} else {
+			p = domainAdmin(t, h.store, tc.username, tc.domainIDs...)
+		}
 		for view, handler := range map[string]http.HandlerFunc{
 			"page":     h.HandleDeliveries,
 			"fragment": h.HandleDeliveriesRows,
 		} {
-			out := getBodyAs(t, handler, "/deliveries", tc.principal)
+			out := getBodyAs(t, handler, "/deliveries", p)
 			for _, want := range tc.want {
 				if !strings.Contains(out, want) {
 					t.Errorf("%s (%s): missing %q:\n%s", name, view, want, out)
@@ -270,7 +277,7 @@ func TestSendLogScopedToAssignedDomains(t *testing.T) {
 // trusted for having been rendered by us.
 func TestSendLogIgnoresForgedFilters(t *testing.T) {
 	h, domains := serverWithTwoDomains(t)
-	p := domainAdmin(domains["first.example.ru"].ID)
+	p := domainAdmin(t, h.store, "forged-filter", domains["first.example.ru"].ID)
 
 	for _, target := range []string{
 		"/deliveries?domain=second.example.ru",
@@ -299,7 +306,7 @@ func TestDeliveryPageForeignDomainNotFound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/deliveries/"+itoa(rows[0].ID), nil)
 	req.SetPathValue("id", itoa(rows[0].ID))
-	req = auth.RequestWithPrincipal(req, domainAdmin(domains["first.example.ru"].ID))
+	req = auth.RequestWithPrincipal(req, domainAdmin(t, h.store, "foreign-detail", domains["first.example.ru"].ID))
 	h.HandleDelivery(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("delivery page for a foreign domain = %d, want 404", rec.Code)
@@ -343,13 +350,37 @@ func serverWithTwoDomains(t *testing.T) (*Handlers, map[string]store.Domain) {
 
 var globalPrincipal = auth.Principal{ID: 1, Username: "admin", Role: auth.RoleGlobal}
 
-func domainAdmin(domainIDs ...int64) auth.Principal {
-	return auth.Principal{
-		ID:       2,
-		Username: "domain-admin",
-		Role:     auth.RoleDomainAdmin,
-		Domains:  domainIDs,
+func domainAdmin(t *testing.T, st *store.Store, username string, domainIDs ...int64) auth.Principal {
+	t.Helper()
+	const hash = "test-hash"
+	if len(domainIDs) == 0 {
+		placeholder, err := st.AddDomain(username+".placeholder.invalid", "mail")
+		if err != nil {
+			t.Fatalf("add placeholder domain: %v", err)
+		}
+		id, err := st.CreateUser(username, hash, store.RoleDomainAdmin, []int64{placeholder.ID})
+		if err != nil {
+			t.Fatalf("create domain admin %s: %v", username, err)
+		}
+		if err := st.DeleteDomain(placeholder.ID); err != nil {
+			t.Fatalf("delete placeholder domain: %v", err)
+		}
+		domainIDs = nil
+		u, err := st.GetUser(id)
+		if err != nil {
+			t.Fatalf("get domain admin %s: %v", username, err)
+		}
+		return auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, Domains: u.DomainIDs}
 	}
+	id, err := st.CreateUser(username, hash, store.RoleDomainAdmin, domainIDs)
+	if err != nil {
+		t.Fatalf("create domain admin %s: %v", username, err)
+	}
+	u, err := st.GetUser(id)
+	if err != nil {
+		t.Fatalf("get domain admin %s: %v", username, err)
+	}
+	return auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, Domains: u.DomainIDs}
 }
 
 // serverWithDelivery builds a panel over a store holding one delivery, written
