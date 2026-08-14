@@ -432,6 +432,62 @@ not blocked. This is why the compose file pins a fixed tag rather than
 restoring a given backup actually requires (see [Fixed image
 tag](#fixed-image-tag)).
 
+**Restoring in place** (same host — recovering from data loss, or rolling
+back after a bad change):
+
+```sh
+# 1. Stop the instance being replaced
+docker compose down
+
+# 2. Move the current /data aside rather than deleting it, start from empty
+mv ./data ./data.before-restore
+mkdir ./data
+
+# 3. Unpack the backup into the fresh directory
+tar xzf selfpost-backup.tar.gz -C ./data
+
+# 4. docker-compose.yml must already pin the exact tag the backup was made
+#    with — check the archive's manifest if unsure:
+tar xzf selfpost-backup.tar.gz -O manifest.json
+
+# 5. Start it and watch the boot
+docker compose up -d
+docker compose logs -f selfpost
+```
+
+A version mismatch at step 5 refuses to start and leaves `/data` untouched —
+the panel exits with a message naming the tag to use, e.g.:
+
+```
+backup: this backup was created by SelfPost 1.2.3 but this image is 1.2.5 — restore into the matching image (selfpost:1.2.3)
+```
+
+Fix the tag in `docker-compose.yml`, `docker compose pull && docker compose up
+-d` again — the manifest is still there because the failed boot never got to
+delete it.
+
+**Moving to a different host** is the same five steps, just starting cold:
+bring the compose files and the correct pinned image tag to the new host
+(step 1 of [Full deployment](#full-deployment)), put the backup archive in
+place of step 3 above, then redo the reverse-proxy/TLS and DNS steps of a
+[Full deployment](#full-deployment) — the PTR record and the certificate both
+belong to the old IP/host and have to be reissued for the new one; nothing in
+the backup carries them.
+
+**Restoring an encrypted (`.spbk`) backup** needs a running container to
+decrypt it first — an empty first-boot container works, any matching or
+newer version, since decryption doesn't touch `/data`. Start one normally
+(step 5, but on an empty `/data` you haven't unpacked yet), then:
+
+```sh
+docker exec -i <container> selfpost-backup -decrypt < backup.spbk > selfpost-backup.tar.gz
+```
+
+Stop it, wipe `/data` again, and continue from step 2 above with the
+resulting `.tar.gz` — see [Encrypting a backup or
+export](#encrypting-a-backup-or-export) for the decrypt command's password
+options.
+
 Restoring an archive taken **before** you invalidated a session (password
 change, logout everywhere) can bring that session back: session rows travel
 with the backup, and a browser that still holds the matching cookie is
