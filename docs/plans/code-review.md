@@ -626,9 +626,21 @@ for SPDX consistency and deleting the done logrotate plan.
 
 **Model: Fable.** Not authorship.
 
-- [ ] Review the send-log authz change, `tryAdmit`, session create, and app
+- [x] Review the send-log authz change, `tryAdmit`, session create, and app
       delete ordering against [security.md](../security.md). Close each finding
-      with a fix or an accepted-risk entry.
+      with a fix or an accepted-risk entry. Ran 2026-08-14 (Fable): **no
+      findings.** Verified at HEAD: every `QuerySendLog`/`CountSendLog` caller
+      states a scope and the zero-valued filter matches nothing; the detail
+      page 404s on a foreign domain; forged `domain`/`app` parameters are
+      checked against the principal before the query; rejected rows are
+      excluded from the window count so a refusal cannot consume budget;
+      `tryAdmit` counts and reserves under one lock and its nil-registry
+      fail-open is reachable only from tests (`Serve` always wires a shared
+      registry); session create fails closed with a generic error page and the
+      token is never logged; app delete removes SASL first and
+      `saslpasswd2 -d` is idempotent, so the failure residue is an application
+      that cannot authenticate but can be re-deleted — every residual path
+      fails safe. Outcome recorded in security.md's header.
 
 ---
 

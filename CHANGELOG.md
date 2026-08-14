@@ -19,6 +19,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   Explanation only; no attempt counter and no panel knobs. Not yet
   implemented.
 
+### Security
+
+- The independent security review of the send-log authorization and
+  fail-closed fixes below (code-review plan § P7; reviewer model ≠ author
+  model) found no further issues: the domain scope holds on every query path,
+  a rate-limit refusal cannot consume window budget, and each failure residue
+  of the reordered application delete fails safe. Nothing was added to
+  [docs/security.md](docs/security.md) § Accepted risks; the review is
+  recorded in that file's header.
+
 ### Fixed
 
 - test (e2e): send-log status scrapers follow the badge markup in

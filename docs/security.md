@@ -5,7 +5,12 @@ meet; the full v1.0 audit passed. The pre-release review (plan § D, 2026-08-06)
 covered the whole diff from the v1.0 audit (Phase 11) to HEAD and the checklist
 in full: no exploitable findings; one defence-in-depth change — `--` before the
 login in the `saslpasswd2` argv
-([internal/app/sasl.go](../internal/app/sasl.go)). (2) **Accepted risks** —
+([internal/app/sasl.go](../internal/app/sasl.go)). The 2026-08-14 review
+(code-review plan § P7, Fable; reviewer ≠ author) covered the P0–P1 diff of the
+2026-08-13 full-tree review against this document — send-log authorization for
+domain administrators, the atomic level-2 admit (`tryAdmit`), fail-closed
+session creation, and application-delete ordering: no findings, and nothing
+needed adding to the accepted risks. (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
 
