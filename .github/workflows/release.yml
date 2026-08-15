@@ -180,19 +180,25 @@ jobs:
       - name: Remove per-arch tags from GHCR
         # Side-effect tags for imagetools assembly only — not part of the public
         # version surface (deploy/docker-compose.yml pins X.Y.Z, not X.Y.Z-amd64).
+        # imagetools has no "rm" subcommand; delete via the GitHub Packages API.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          repo="ghcr.io/${{ github.repository }}"
           version="${{ needs.prepare.outputs.version }}"
+          owner="${{ github.repository_owner }}"
+          pkg="${{ github.event.repository.name }}"
+          api="/users/${owner}/packages/container/${pkg}/versions"
           for suffix in amd64 arm64; do
-            tag="${repo}:${version}-${suffix}"
-            set +e
-            out=$(docker buildx imagetools rm "$tag" 2>&1)
-            rc=$?
-            set -e
-            if [ "$rc" -eq 0 ]; then
-              printf '%s\n' "$out"
-            else
-              echo "::warning::could not remove ${tag}: ${out}" >&2
+            tag="${version}-${suffix}"
+            mapfile -t ids < <(gh api "$api" --paginate \
+              --jq ".[] | select([.metadata.container.tags[]] | index(\"${tag}\")) | .id")
+            if [ "${#ids[@]}" -eq 0 ]; then
+              echo "no GHCR package version for tag ${tag}"
+              continue
             fi
+            for id in "${ids[@]}"; do
+              echo "deleting GHCR package version ${id} (tag ${tag})"
+              gh api -X DELETE "${api}/${id}"
+            done
           done

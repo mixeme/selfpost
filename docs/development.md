@@ -220,6 +220,27 @@ GHCR package versions, not the git tag.
 Push workflow and source changes to **github.com/mixeme/selfpost** before
 publishing — Actions reads that repo, not Gitea.
 
+**Gitea → GitHub tag mirror.** If every tag push from Gitea is mirrored to
+GitHub, two things follow:
+
+1. **GitHub Release tags must not be deleted on GitHub.** Many mirror setups
+   prune remote tags that are absent on Gitea (or re-push with `--force` /
+   `--prune`). Deleting `v1.0.0` / `v1.3.0` on GitHub converts a published
+   Release back to draft. Mirror **branches and new tags forward**; do not
+   delete release tags on the GitHub side. GHCR cleanup is package versions in
+   the UI — not `git push github --delete` and not tag prune on the mirror.
+
+2. **Tag push runs the workflow file at that tag's commit**, not `main`. `v1.0.0`
+   still points at a commit whose `release.yml` has `on: push: tags` and no
+   per-arch GHCR cleanup — every mirror (re)push of that tag can republish
+   `1.0.0-amd64` / `1.0.0-arm64`. Tags from `v1.3.0` onward only run
+   `release.yml` on **Publish release** (`release: published`), so mirroring
+   those tags alone does not start the image build.
+
+   Safe mirror: push tags to GitHub without deleting existing ones; keep release
+   tags on Gitea; publish the GitHub Release on github.com after the mirror has
+   the tag.
+
 Ordinary commits **do not** publish an image. The compose pin and the git tag
 must match (`1.0.0` / `v1.0.0` for the first published release). Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development history before that cut.
@@ -324,7 +345,7 @@ prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z
-      → imagetools rm → drop X.Y.Z-amd64 and X.Y.Z-arm64 from GHCR
+      → GitHub Packages API → drop X.Y.Z-amd64 and X.Y.Z-arm64 from GHCR
 ```
 
 Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under

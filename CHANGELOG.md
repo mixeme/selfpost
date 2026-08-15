@@ -89,6 +89,11 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   the same Resync on demand. The `internal/backup` package comment now matches
   this behaviour.
 
+- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
+  after the manifest merge via the GitHub Packages API. The merge job had called
+  `docker buildx imagetools rm`, which is not a valid subcommand — cleanup failed
+  with a warning and the side-effect tags stayed in the registry.
+
 ### Changed
 
 - docs: operator and as-built docs aligned with the code after a full
@@ -139,11 +144,14 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   bare git tag push no longer starts the build. `release.yml` listens for
   `release: published`, checks out that tag (not `main` HEAD), e2e-gates each
   native arch build, merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one manifest,
-  then removes the per-arch tags from GHCR so operators see only
-  `ghcr.io/mixeme/selfpost:X.Y.Z` (what `deploy/docker-compose.yml` pins). A
-  dispatch whose version input is missing or not `X.Y.Z` fails in `prepare`.
-  [development.md](docs/development.md) documents draft vs published releases
-  and why deleting a release tag converts it back to draft.
+  then removes the per-arch tags from GHCR via the GitHub Packages API so
+  operators see only `ghcr.io/mixeme/selfpost:X.Y.Z` (what
+  `deploy/docker-compose.yml` pins). A dispatch whose version input is missing
+  or not `X.Y.Z` fails in `prepare`. [development.md](docs/development.md)
+  documents draft vs published releases, why deleting a release tag converts
+  it back to draft, and Gitea → GitHub tag-mirror pitfalls (do not prune release
+  tags on GitHub; a mirrored `v1.0.0` still runs that tag's `on: push: tags`
+  workflow).
 
 - test: the authorization and sign-in surfaces that had no tests now have them.
   The login limiter is covered for its ceiling, its per-address scope, the reset
