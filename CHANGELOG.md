@@ -15,6 +15,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   palette stay; extra nav icons are proposals only. Design artefact; the
   running panel is unchanged.
 
+### Changed
+
+- docs: panel UI mockups after review — Status restored to live readings
+  (queue line, PTR, machine/process tables, Configuration); inbound MX DNS
+  check, recipient mode (list or any), and Danger zone beside recipients;
+  Backup and Settings as two-column ops pages; Save and Delete user on one
+  row; help «?» on domain cards; Host/name ‖ Type height matched to the live
+  panel (`b0ebe06`).
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,

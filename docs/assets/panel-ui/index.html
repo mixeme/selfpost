@@ -23,9 +23,9 @@
 
 <section>
   <h2>Ширина окна</h2>
-  <p>Сейчас оболочка центрируется, колонка контента упирается в <code>64rem</code>, формы ещё уже — <code>48rem</code>. На широком мониторе поля пустые. Растянуть всё на 100% окна нельзя: поля Settings и Backup становятся нечитаемыми.</p>
+  <p>Сейчас оболочка центрируется, колонка контента упирается в <code>64rem</code>, формы ещё уже — <code>48rem</code>. На широком мониторе поля пустые. Растянуть поля на 100% окна нельзя — они становятся нечитаемыми. Две независимые карточки рядом — можно.</p>
   <h3>Гибрид</h3>
-  <p>Навигация прижата влево. Ops-страницы (Status, Deliveries, очередь, лог, DMARC, inbound) занимают остаток до <strong>90rem (~1440px)</strong>. Формы остаются <strong>42rem и выровнены влево</strong> в колонке, а не висят по центру пустого поля. Login и setup — по-прежнему узкий центрированный блок.</p>
+  <p>Навигация прижата влево. Ops-страницы (Status, Deliveries, очередь, лог, Backup, Settings, DMARC, inbound) занимают остаток до <strong>90rem (~1440px)</strong>. Backup — полный бэкап ‖ импорт. Settings — учётные данные ‖ DMARC (у domain-admin остаётся одна узкая карточка). Одиночные формы (Users, подтверждения) остаются <strong>42rem и выровнены влево</strong>. Login и setup — по-прежнему узкий центрированный блок.</p>
   <div class="compare">
     <div>
       <div class="row">сейчас, окно ~1600px</div>
@@ -68,7 +68,7 @@
         <li>Inbound <span class="tag">1.x</span> — скрыт, пока <code>INBOUND_RELAY_ENABLE</code> выключен</li>
         <li>DMARC reports <span class="tag future">candidate</span></li>
         <li>Backup, Users, Settings</li>
-        <li>Help <span class="tag future">candidate</span> — пункт навбара и drawer с карточек Status</li>
+        <li>Help <span class="tag future">candidate</span> — пункт навбара и drawer с карточек Status и страницы домена</li>
       </ul>
     </div>
     <div>
@@ -147,15 +147,17 @@
   <div class="screen-index">
     <a href="app.html#mail-queue">queue-retries — карточка на Mail queue</a>
     <a href="app.html#delivery">queue-retries — history deferred</a>
-    <a href="app.html#inbound">Inbound list</a>
-    <a href="app.html#inbound-domain">Inbound domain</a>
+    <a href="app.html#inbound">Inbound list (колонка DNS = MX)</a>
+    <a href="app.html#inbound-domain">Inbound domain — DNS ok</a>
+    <a href="app.html#inbound-backup">Inbound domain — DNS error</a>
+    <a href="app.html#inbound-delete">Delete inbound domain</a>
     <a href="app.html?inbound=0#status">Inbound выключен (пункта нет)</a>
     <a href="app.html#dmarc">DMARC reports <span class="tag future">candidate</span></a>
     <a href="app.html#help">Help <span class="tag future">candidate</span></a>
   </div>
   <h3>Аварийный телефон</h3>
   <div class="screen-index">
-    <a href="app.html?view=phone#status">Status 390px — overall и warn сверху</a>
+    <a href="app.html?view=phone#status">Status 390px — Overall, then queue/cert, then the rest</a>
     <a href="app.html?view=phone#mail-queue">Mail queue 390px</a>
     <a href="app.html?view=phone#deliveries">Deliveries 390px — список, не таблица</a>
     <a href="app.html?view=phone#delivery">Delivery 390px</a>
@@ -164,7 +166,7 @@
 
 <section style="border-bottom:none">
   <h2>Как смотреть</h2>
-  <p>Откройте <a href="app.html#status">app.html</a> в браузере. Шапка прототипа — не часть панели: роль, Desktop/Phone, inbound, светлая/тёмная. Копирайт экранов английский, как в продукте. Drawer Help открывается с карточек Status (кнопка «?») или из навбара.</p>
+  <p>Откройте <a href="app.html#status">app.html</a> в браузере. Шапка прототипа — не часть панели: роль, Desktop/Phone, inbound, светлая/тёмная. Копирайт экранов английский, как в продукте. Drawer Help открывается с «?» на Status или с карточек домена; на карточках остаются показания и колонка Detail.</p>
   <p class="muted">После утверждения макетов вёрстка <code>panel.css</code> и шаблонов — отдельная задача. CSP и progressive enhancement в этом HTML не воспроизводятся один в один: здесь допустимы вещи, которые в панели останутся в файле стилей.</p>
 </section>
 

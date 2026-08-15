@@ -17,7 +17,17 @@
 <input class="ctrl" type="radio" name="theme" id="theme-dark">
 <input class="ctrl" type="checkbox" id="feat-inbound" checked>
 <input class="ctrl" type="checkbox" id="nav-open">
-<input class="ctrl" type="checkbox" id="help-open">
+<input class="ctrl" type="radio" name="help" id="help-off" checked>
+<input class="ctrl" type="radio" name="help" id="help-index">
+<input class="ctrl" type="radio" name="help" id="help-status">
+<input class="ctrl" type="radio" name="help" id="help-password">
+<input class="ctrl" type="radio" name="help" id="help-dns">
+<input class="ctrl" type="radio" name="help" id="help-records">
+<input class="ctrl" type="radio" name="help" id="help-dmarc">
+<input class="ctrl" type="radio" name="help" id="help-connection">
+<input class="ctrl" type="radio" name="help" id="help-apps">
+<input class="ctrl" type="radio" name="help" id="help-domain-settings">
+<input class="ctrl" type="radio" name="help" id="help-export">
 
 <header class="gallery">
   <a class="brand-mini" href="index.html">Макеты</a>
@@ -92,82 +102,156 @@
     <span class="pt pt-queue">Mail queue</span>
     <span class="pt pt-log">System log</span>
     <span class="pt pt-inbound">Inbound</span>
+    <span class="pt pt-inbound-domain">lists.example.com</span>
+    <span class="pt pt-inbound-backup">backup.example.net</span>
     <span class="pt pt-dmarc">DMARC</span>
     <span class="pt pt-backup">Backup</span>
     <span class="pt pt-users">Users</span>
     <span class="pt pt-help">Help</span>
     <span class="pt pt-settings">Settings</span>
   </span>
-  <label class="help-link" for="help-open" title="Help">?</label>
+  <label class="help-link" for="help-index" title="Help">?</label>
 </div>
 
 <!-- STATUS -->
 <main id="status" class="screen ops">
-  <div class="status-hero attn">
-    <h1>Status <span class="st st-warn">warn</span></h1>
-    <p class="lead">3 messages deferred — first retry in about 4 minutes. Everything else is up.</p>
-    <form class="inline" action="#" onsubmit="return false"><button type="button">Reload configuration</button></form>
+  <div class="page-head">
+    <h1>Status</h1>
+    <label class="help-link" for="help-status" title="What these checks mean">?</label>
   </div>
-  <div class="status-grid">
-    <article class="card attn">
-      <div class="card-head">
-        <h2>Mail queue <span class="st st-warn">warn</span></h2>
-        <label class="help-link" for="help-open">?</label>
-      </div>
-      <p>3 deferred, 0 bounce-hold. Oldest 18 minutes.</p>
+
+  <div class="card" id="overall">
+    <h2>Overall <span class="st st-warn">warn</span></h2>
+    <p class="muted">Running, with warnings below.</p>
+  </div>
+
+  <div class="split">
+    <div class="card attn" id="queue">
+      <h2>Mail queue <span class="st st-warn">warn</span></h2>
+      <p>3 Kbytes in 3 Requests.</p>
       <a class="btn" href="#mail-queue">View queue</a>
-    </article>
-    <article class="card in-only">
-      <div class="card-head">
-        <h2>Inbound <span class="st st-ok">ok</span></h2>
-      </div>
-      <p>Accepting on port 25 for 1 domain. Last forward 2 minutes ago.</p>
-      <a href="#inbound">Inbound domains</a>
-    </article>
-    <article class="card in-off">
-      <div class="card-head"><h2>Inbound</h2></div>
-      <p class="muted">Module off (<code>INBOUND_RELAY_ENABLE=false</code>). The outbound path is unchanged.</p>
-    </article>
-    <article class="card">
-      <div class="card-head">
-        <h2>Machine <span class="st st-ok">ok</span></h2>
-        <label class="help-link" for="help-open">?</label>
-      </div>
-      <div class="metric-row"><span class="k">CPU</span><span class="v"><meter value="12" min="0" max="100" low="70" high="90" optimum="10"></meter>12%</span></div>
-      <div class="metric-row"><span class="k">Memory</span><span class="v"><meter value="41" min="0" max="100" low="70" high="90" optimum="10"></meter>41%</span></div>
-      <div class="metric-row"><span class="k">Network</span><span class="v">↓ 48 KiB/s · ↑ 12 KiB/s</span></div>
-    </article>
-    <article class="card">
-      <div class="card-head"><h2>Processes <span class="st st-ok">ok</span></h2></div>
-      <div class="metric-row"><span class="k">postfix</span><span class="st st-ok">RUNNING</span></div>
-      <div class="metric-row"><span class="k">opendkim</span><span class="st st-ok">RUNNING</span></div>
-      <div class="metric-row"><span class="k">panel</span><span class="st st-ok">RUNNING</span></div>
-    </article>
-    <article class="card">
-      <div class="card-head">
-        <h2>TLS certificate <span class="st st-ok">ok</span></h2>
-        <label class="help-link" for="help-open">?</label>
-      </div>
+    </div>
+    <div class="card" id="certificate">
+      <h2>TLS certificate <span class="st st-ok">ok</span></h2>
       <label>Expires</label>
       <span class="code">2026-11-02 12:00 UTC</span>
-      <p class="muted">Let’s Encrypt, 78 days left. Mounted for port 465.</p>
-    </article>
-    <article class="card">
-      <div class="card-head"><h2>Milter sockets <span class="st st-ok">ok</span></h2></div>
-      <div class="metric-row"><span class="k">opendkim</span><span class="st st-ok">ok</span></div>
-      <div class="metric-row"><span class="k">journal</span><span class="st st-ok">ok</span></div>
-    </article>
-    <article class="card">
-      <div class="card-head">
-        <h2>Hostname / rDNS <span class="st st-ok">ok</span></h2>
-        <label class="help-link" for="help-open">?</label>
-      </div>
+      <p class="muted">Valid for another 78 day(s).</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card" id="sockets">
+      <h2>Milter sockets <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th>Milter</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>OpenDKIM</td>
+            <td><span class="st st-ok">ok</span></td>
+            <td class="muted">Listening</td>
+          </tr>
+          <tr>
+            <td>send-log</td>
+            <td><span class="st st-ok">ok</span></td>
+            <td class="muted">Listening</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" id="hostname">
+      <h2>Hostname and reverse DNS <span class="st st-ok">ok</span></h2>
       <label>Server hostname</label>
       <span class="code">mail.example.org</span>
-      <label>Forward and reverse</label>
-      <span class="code">mail.example.org → 203.0.113.10 → mail.example.org</span>
+      <label>Forward and reverse lookup</label>
+      <span class="code">203.0.113.10 → mail.example.org</span>
+      <p class="muted">mail.example.org resolves to 203.0.113.10 and the reverse lookup points back at it.</p>
       <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check DNS</button></form>
-    </article>
+    </div>
+  </div>
+
+  <div class="card in-only" id="inbound-status">
+    <h2>Inbound <span class="st st-warn">warn</span></h2>
+    <p><code>INBOUND_RELAY_ENABLE</code> is on. Port 25 accepts mail for 2 domains and forwards it upstream — not to local mailboxes.</p>
+    <p class="muted">One domain has no MX pointing at this server. Recipients are a list or any address at the domain. Open Inbound for the list, MX checks, upstream, and recipient maps.</p>
+    <a href="#inbound">Inbound domains</a>
+  </div>
+
+  <div class="split">
+    <div class="card" id="machine">
+      <h2>Machine <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="metric">CPU</td>
+            <td class="metric"><meter value="12" min="0" max="100" low="70" high="90" optimum="10">12%</meter> 12%</td>
+            <td class="muted">4 cores · 4 threads</td>
+          </tr>
+          <tr>
+            <td class="metric">Memory</td>
+            <td class="metric"><meter value="41" min="0" max="100" low="70" high="90" optimum="10">41%</meter> 41%</td>
+            <td class="muted">1.6 GiB used of 4.0 GiB.</td>
+          </tr>
+          <tr>
+            <td class="metric">Network</td>
+            <td class="metric">↓ 2.0 KiB/s<br>↑ 1.0 KiB/s</td>
+            <td class="muted">
+              <div>eth0: 1.0 MiB in, 512.0 KiB out</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" id="processes">
+      <h2>Processes <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>opendkim</td>
+            <td><span class="st st-ok">RUNNING</span></td>
+            <td class="muted">pid 21, uptime 3 days, 4:12:01</td>
+          </tr>
+          <tr>
+            <td>panel</td>
+            <td><span class="st st-ok">RUNNING</span></td>
+            <td class="muted">pid 18, uptime 3 days, 4:12:03</td>
+          </tr>
+          <tr>
+            <td>postfix</td>
+            <td><span class="st st-ok">RUNNING</span></td>
+            <td class="muted">pid 42, uptime 3 days, 4:11:58</td>
+          </tr>
+          <tr>
+            <td>postfix-reload</td>
+            <td><span class="st st-ok">STOPPED</span></td>
+            <td class="muted">Not started</td>
+          </tr>
+          <tr>
+            <td>cert-reload</td>
+            <td><span class="st st-ok">STOPPED</span></td>
+            <td class="muted">Not started</td>
+          </tr>
+          <tr>
+            <td>logrotate</td>
+            <td><span class="st st-ok">STOPPED</span></td>
+            <td class="muted">Not started</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="configuration">
+    <h2>Configuration</h2>
+    <p class="muted">Regenerates the OpenDKIM and Postfix configuration from the
+    database and reloads both daemons. Use it if you edited the files by hand,
+    restored a backup, or the running configuration looks out of step with the
+    domain and application lists. It does not touch the mail queue or the TLS
+    certificate, and it is safe to run at any time.</p>
+    <form class="inline" action="#" onsubmit="return false">
+      <button type="button">Reload configuration</button>
+    </form>
   </div>
   <p class="version">SelfPost 1.2.3 · © Mixeme · <a href="#">License (AGPL-3.0)</a></p>
 </main>
@@ -253,7 +337,10 @@
   <h1>example.com</h1>
   <a class="back" href="#domains">&larr; All domains</a>
   <div class="card credential" id="new-credential">
-    <h2>New application password</h2>
+    <div class="card-head">
+      <h2>New application password</h2>
+      <label class="help-link" for="help-password" title="Why this is shown once">?</label>
+    </div>
     <p class="muted">Shown <strong>once only</strong> and not stored. Copy it now.</p>
     <label>Login</label>
     <div class="code-row"><span class="code">newsletter</span><button type="button" class="copy">Copy</button></div>
@@ -261,7 +348,10 @@
     <div class="code-row"><span class="code">xK.9fQ2m-pL7wR</span><button type="button" class="copy">Copy</button></div>
   </div>
   <div class="card" id="dns-status">
-    <h2>DNS status <span class="st st-ok">ok</span></h2>
+    <div class="card-head">
+      <h2>DNS status <span class="st st-ok">ok</span></h2>
+      <label class="help-link" for="help-dns" title="What these checks mean">?</label>
+    </div>
     <div class="check-cols">
       <div class="check-col">
         <label>DKIM <span class="st st-ok">ok</span></label>
@@ -284,8 +374,11 @@
     <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check</button></form>
   </div>
   <div class="split">
-    <div class="card">
-      <h2>DKIM and SPF records</h2>
+    <div class="card" id="dkim-spf">
+      <div class="card-head">
+        <h2>DKIM and SPF records</h2>
+        <label class="help-link" for="help-records" title="What to publish">?</label>
+      </div>
       <p class="check-col-title">DKIM</p>
       <div class="field-pair host-type"><div><label>Host / name</label><div class="code-row"><span class="code">mail._domainkey.example.com</span><button type="button" class="copy">Copy</button></div></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
       <label>Value</label>
@@ -293,8 +386,11 @@
       <p class="check-col-title">SPF</p>
       <div class="code-row"><span class="code">v=spf1 ip4:203.0.113.10 -all</span><button type="button" class="copy">Copy</button></div>
     </div>
-    <div class="card">
-      <h2>DMARC record</h2>
+    <div class="card" id="dmarc-record">
+      <div class="card-head">
+        <h2>DMARC record</h2>
+        <label class="help-link" for="help-dmarc" title="What this record does">?</label>
+      </div>
       <div class="field-pair host-type"><div><label>Host / name</label><div class="code-row"><span class="code">_dmarc.example.com</span><button type="button" class="copy">Copy</button></div></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
       <label>Value <span class="muted">(from Settings)</span></label>
       <div class="code-row"><span class="code">v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org</span><button type="button" class="copy">Copy</button></div>
@@ -302,16 +398,22 @@
     </div>
   </div>
   <div class="split">
-    <div class="card">
-      <h2>Connection settings</h2>
+    <div class="card" id="connection">
+      <div class="card-head">
+        <h2>Connection settings</h2>
+        <label class="help-link" for="help-connection" title="How to connect">?</label>
+      </div>
       <label>Server</label>
       <div class="code-row"><span class="code">mail.example.org</span><button type="button" class="copy">Copy</button></div>
       <label>Port and encryption</label>
       <span class="code">465 — SSL/TLS (implicit)
 587 — STARTTLS (submission)</span>
     </div>
-    <div class="card">
-      <h2>Add an application</h2>
+    <div class="card" id="add-application">
+      <div class="card-head">
+        <h2>Add an application</h2>
+        <label class="help-link" for="help-apps" title="What an application is">?</label>
+      </div>
       <form action="#" onsubmit="return false">
         <label>Login</label>
         <input placeholder="prod-server" autocomplete="off">
@@ -321,8 +423,11 @@
       </form>
     </div>
   </div>
-  <div class="card">
-    <h2>Applications</h2>
+  <div class="card" id="applications">
+    <div class="card-head">
+      <h2>Applications</h2>
+      <label class="help-link" for="help-apps" title="Address mode and rate limits">?</label>
+    </div>
     <ul class="apps">
       <li class="app-item">
         <p class="app-login">newsletter</p>
@@ -361,8 +466,11 @@
       </li>
     </ul>
   </div>
-  <div class="card">
-    <h2>Domain settings</h2>
+  <div class="card" id="domain-settings">
+    <div class="card-head">
+      <h2>Domain settings</h2>
+      <label class="help-link" for="help-domain-settings" title="Reports and rate limits">?</label>
+    </div>
     <div class="check-cols">
       <div class="check-col">
         <p class="check-col-title">DMARC reports</p>
@@ -381,8 +489,11 @@
     </div>
   </div>
   <div class="split">
-    <div class="card">
-      <h2>Export domain</h2>
+    <div class="card" id="export-domain">
+      <div class="card-head">
+        <h2>Export domain</h2>
+        <label class="help-link" for="help-export" title="What the file contains">?</label>
+      </div>
       <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt as <code>.spde</code>.</p>
       <div class="encrypt">
         <label class="check"><input type="checkbox"> <span>Encrypt with a password</span></label>
@@ -608,27 +719,33 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
 </main>
 
 <!-- BACKUP -->
-<main id="backup" class="screen form">
+<main id="backup" class="screen ops">
   <h1>Backup &amp; migration</h1>
-  <div class="card">
-    <h2>Full backup</h2>
-    <p class="muted">Download a full backup of all persistent state. Restore into a container of the <strong>same SelfPost version</strong>. TLS certificates and the mail queue are not included. The file is a secret.</p>
-    <div class="encrypt">
-      <label class="check"><input type="checkbox" checked> <span>Encrypt with a password</span></label>
-      <div class="encrypt-fields">
-        <label>Password</label><input type="password" placeholder="at least 8 characters">
-        <label>Repeat password</label><input type="password">
-        <p class="muted">Keep this password: without it the file cannot be opened.</p>
+  <div class="split">
+    <div class="card">
+      <h2>Full backup</h2>
+      <p class="muted">Download a full backup of all persistent state — the database, every domain’s DKIM key and the application credentials. Restore into a container of the <strong>same SelfPost version</strong>, with the same data mount, before first start. TLS certificates and the mail queue are not included.</p>
+      <p class="muted"><strong>The backup file is a secret.</strong> Encrypting it is the simplest way to store it: the download is then a <code>.spbk</code> that only the password opens.</p>
+      <div class="encrypt">
+        <label class="check"><input type="checkbox" checked> <span>Encrypt with a password</span></label>
+        <div class="encrypt-fields">
+          <label>Password</label><input type="password" placeholder="at least 8 characters">
+          <label>Repeat password</label><input type="password">
+          <p class="muted">Keep this password: without it the file cannot be opened.</p>
+        </div>
       </div>
+      <button type="button">Download full backup</button>
     </div>
-    <button type="button">Download full backup</button>
-  </div>
-  <div class="card">
-    <h2>Import a domain</h2>
-    <p class="muted">Plain <code>.json</code> or encrypted <code>.spde</code>.</p>
-    <label>Domain export file</label>
-    <input type="file">
-    <button type="button">Import domain</button>
+    <div class="card">
+      <h2>Import a domain</h2>
+      <p class="muted">Move a single domain here from another SelfPost instance — plain <code>.json</code> or encrypted <code>.spde</code>. Its DKIM key and application passwords come across, so the published DNS record needs no change. The export file is a secret, like a full backup.</p>
+      <label>Domain export file</label>
+      <input type="file">
+      <label>Password</label>
+      <input type="password" autocomplete="off">
+      <p class="muted">Needed for a <code>.spde</code> file. Leave empty for plain <code>.json</code>.</p>
+      <button type="button">Import domain</button>
+    </div>
   </div>
 </main>
 
@@ -665,9 +782,11 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
         <label class="check"><input type="checkbox"> example.com</label>
         <label class="check"><input type="checkbox" checked> alerts.example.com</label>
       </fieldset>
-      <button type="button">Save</button>
+      <div class="form-actions">
+        <button type="button">Save</button>
+        <a class="danger" href="#user-delete">Delete user</a>
+      </div>
     </form>
-    <a class="danger" href="#user-delete">Delete user</a>
   </div>
 </main>
 
@@ -683,31 +802,60 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
 </main>
 
 <!-- SETTINGS -->
-<main id="settings" class="screen form">
+<main id="settings" class="screen ops">
   <h1>Settings</h1>
-  <div class="card">
-    <h2>Panel credentials</h2>
-    <p class="muted">These are the credentials for this control panel only. Applications keep their own logins.</p>
-    <label>Username</label><input value="admin" autocomplete="username">
-    <label>Current password</label><input type="password" autocomplete="current-password">
-    <label>New password</label><input type="password" autocomplete="new-password">
-    <label>Confirm new password</label><input type="password">
-  </div>
-  <div class="card g-only">
-    <h2>DMARC aggregate reports</h2>
-    <p class="muted">Default <code>rua=</code> for every sending domain. When ingest is on, this can be an address SelfPost accepts.</p>
-    <label>Default report address</label>
-    <input type="email" value="dmarc@mail.example.org">
-    <p class="muted"><a href="#dmarc">DMARC reports</a> in the panel.</p>
-  </div>
-  <button type="button">Save changes</button>
+  <form action="#" onsubmit="return false">
+    <div class="split">
+      <div class="card">
+        <h2>Panel credentials</h2>
+        <p class="muted">These are the credentials for this control panel only. Applications keep their own logins and passwords, which are not affected.</p>
+        <label>Username</label><input value="admin" autocomplete="username">
+        <label>Current password</label><input type="password" autocomplete="current-password">
+        <label>New password</label><input type="password" autocomplete="new-password">
+        <label>Confirm new password</label><input type="password">
+      </div>
+      <div class="card g-only">
+        <h2>DMARC aggregate reports</h2>
+        <p class="muted">Default <code>rua=</code> for every sending domain (overridable per domain). When ingest is on, this can be an address SelfPost accepts.</p>
+        <label>Default report address</label>
+        <input type="email" value="dmarc@mail.example.org">
+        <p class="muted">When <code>rua=</code> points at another domain, that hub must publish a report-authorisation record. <a href="#dmarc">DMARC reports</a> in the panel.</p>
+        <div class="field-pair host-type">
+          <div>
+            <label>Host / name</label>
+            <div class="code-row"><span class="code">mail.example.org._report._dmarc.example.com</span><button type="button" class="copy">Copy</button></div>
+          </div>
+          <div class="field-type">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+        <label>Value</label>
+        <div class="code-row"><span class="code">v=DMARC1;</span><button type="button" class="copy">Copy</button></div>
+        <label>Report authorization DNS <span class="st st-ok">ok</span></label>
+        <p class="muted">Published at mail.example.org._report._dmarc.example.com — aggregate reports addressed to dmarc@mail.example.org are authorised.</p>
+      </div>
+    </div>
+    <button type="button">Save changes</button>
+    <p class="muted">Leave both new-password fields empty to change the username or DMARC address only. Changing the password signs out every other session; this one stays signed in.</p>
+  </form>
   <div class="card" id="rate-limits">
     <h2>Sending rate limits</h2>
-    <p class="muted">Level 1 is set in Compose. Domain and application ceilings live on each domain’s page.</p>
-    <div class="facts">
-      <div class="fact"><span class="fact-label">Level 1 / IP</span><span class="fact-value">100 / 60s</span></div>
-      <div class="fact"><span class="fact-label">Level 2 domain</span><span class="fact-value">optional, ≤ L1</span></div>
-      <div class="fact"><span class="fact-label">App override</span><span class="fact-value">trusted IPs only</span></div>
+    <p class="muted">Level 1 is set in Compose; restart the container to change it. Domain and application ceilings live on each domain’s page.</p>
+    <div class="check-cols">
+      <div class="check-col">
+        <p class="check-col-title">Level 1 — per client IP</p>
+        <span class="code">100 messages / 60 seconds</span>
+        <p class="muted"><code>RATE_LIMIT_MESSAGES_PER_IP</code> / <code>RATE_LIMIT_WINDOW_SECONDS</code>. Hard ceiling for every connecting IP; the panel cannot raise a domain or application limit above this.</p>
+      </div>
+      <div class="check-col">
+        <p class="check-col-title">Level 2 — domain</p>
+        <p class="muted">Optional ceiling for <em>all</em> senders on a domain. When unset, only level 1 applies. Must be ≤ level 1.</p>
+      </div>
+      <div class="check-col">
+        <p class="check-col-title">Level 2 — application</p>
+        <p class="muted">Optional override for trusted IPs: a ceiling strictly above the domain limit (still ≤ level 1). Those IPs skip the domain check; everyone else stays under the domain (or level 1).</p>
+      </div>
     </div>
   </div>
 </main>
@@ -717,7 +865,7 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
   <div class="page-head">
     <h1>Inbound <span class="tag">1.x</span></h1>
   </div>
-  <p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed domains; unknown recipients are rejected at RCPT. Off by default in Compose.</p>
+  <p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed domains. Recipients are either an allow-list or any address at that domain. Off by default in Compose.</p>
   <div class="card" style="margin-bottom:1rem">
     <h2>Add inbound domain</h2>
     <form action="#" onsubmit="return false">
@@ -731,20 +879,31 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
   <div class="card">
     <h2>Forwarding</h2>
     <table class="desk-only">
-      <thead><tr><th>Domain</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr></thead>
+      <thead><tr><th>Domain</th><th>DNS</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr></thead>
       <tbody>
         <tr>
           <td><a href="#inbound-domain">lists.example.com</a></td>
+          <td><a class="st st-ok" href="#inbound-domain">ok</a></td>
           <td class="muted">10.0.0.8:25</td>
           <td>12 listed</td>
           <td><span class="st st-ok">required</span></td>
-          <td class="actions"><a href="#inbound-domain">Edit</a></td>
+          <td class="actions"><a class="danger" href="#inbound-delete">Delete</a></td>
+        </tr>
+        <tr>
+          <td><a href="#inbound-backup">backup.example.net</a></td>
+          <td><a class="st st-error" href="#inbound-backup">error</a></td>
+          <td class="muted">192.0.2.20:25</td>
+          <td>any</td>
+          <td><span class="st st-unknown">off</span></td>
+          <td class="actions"><a class="danger" href="#inbound-delete">Delete</a></td>
         </tr>
       </tbody>
     </table>
     <ul class="phone-list phone-only">
-      <li><a href="#inbound-domain"><span>lists.example.com</span><span class="st st-ok">tls</span><span class="pair">→ 10.0.0.8:25 · 12 recipients</span></a></li>
+      <li><a href="#inbound-domain"><span>lists.example.com</span><span class="st st-ok">ok</span><span class="pair">12 listed · 10.0.0.8:25</span></a></li>
+      <li><a href="#inbound-backup"><span>backup.example.net</span><span class="st st-error">error</span><span class="pair">any recipient · 192.0.2.20:25</span></a></li>
     </ul>
+    <p class="muted">The <em>DNS</em> badge is the MX check: at least one MX must point at this server. Results are cached for a few minutes; open a domain for the lookup and a <em>Re-check</em> button.</p>
   </div>
 </main>
 
@@ -752,6 +911,32 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
 <main id="inbound-domain" class="screen ops">
   <h1>lists.example.com</h1>
   <a class="back" href="#inbound">&larr; All inbound domains</a>
+
+  <div class="card">
+    <h2>DNS status <span class="st st-ok">ok</span></h2>
+    <p class="muted">Cached a few minutes — use <em>Re-check</em> after publishing. Unlike outbound, inbound needs an MX pointing at this server.</p>
+    <div class="check-cols">
+      <div class="check-col">
+        <label>MX <span class="st st-ok">ok</span></label>
+        <div class="field-pair host-type">
+          <div>
+            <label>Host / name</label>
+            <span class="code">lists.example.com</span>
+          </div>
+          <div class="field-type">
+            <label>Type</label>
+            <span class="code">MX</span>
+          </div>
+        </div>
+        <label>Value</label>
+        <span class="code">10 mail.example.org.
+20 mail.primary.example.net.</span>
+        <p class="muted">An MX points at mail.example.org (this server). Other MX values are the domain’s own primaries — they are not an error.</p>
+      </div>
+    </div>
+    <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check</button></form>
+  </div>
+
   <div class="split">
     <div class="card">
       <h2>Upstream</h2>
@@ -763,26 +948,147 @@ Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.examp
       <button type="button">Save upstream</button>
     </div>
     <div class="card">
-      <h2>DNS — MX</h2>
-      <p class="muted">Unlike outbound, inbound needs an MX pointing at this server.</p>
-      <label>Host / name</label>
-      <div class="code-row"><span class="code">lists.example.com</span><button type="button" class="copy">Copy</button></div>
+      <h2>MX record to publish</h2>
+      <p class="muted">Add this MX so the internet delivers here. Keep any existing primary MX if this is backup-MX.</p>
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <div class="code-row"><span class="code">lists.example.com</span><button type="button" class="copy">Copy</button></div>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">MX</span>
+        </div>
+      </div>
       <label>Value</label>
       <div class="code-row"><span class="code">10 mail.example.org.</span><button type="button" class="copy">Copy</button></div>
     </div>
   </div>
-  <div class="card">
-    <h2>Valid recipients</h2>
-    <p class="muted">Unknown recipients are rejected at RCPT so this relay does not generate backscatter. One address per line; empty means reject all until listed.</p>
-    <textarea rows="6">staff@lists.example.com
+  <div class="split">
+    <div class="card rcpt-mode">
+      <h2>Valid recipients</h2>
+      <p class="muted">Who this domain accepts on port 25. Same idea as an application’s address mode: a list, or any address at the domain.</p>
+      <label>Who to accept</label>
+      <select>
+        <option value="list" selected>Listed addresses only</option>
+        <option value="any">Any recipient at this domain</option>
+      </select>
+      <div class="rcpt-list">
+        <label>Addresses (one per line or comma-separated)</label>
+        <textarea rows="6">staff@lists.example.com
 postmaster@lists.example.com
 abuse@lists.example.com</textarea>
-    <button type="button">Save recipients</button>
+        <p class="muted">Unknown recipients are rejected at RCPT so this relay does not generate backscatter.</p>
+      </div>
+      <p class="rcpt-any muted">Every address at this domain is accepted and forwarded. Prefer a list unless the upstream rejects unknowns — otherwise this relay may generate backscatter.</p>
+      <button type="button">Save recipients</button>
+    </div>
+    <div class="card">
+      <h2>Danger zone</h2>
+      <p class="muted">Stops accepting mail for this domain. Does not touch outbound sending domains.</p>
+      <a class="danger" href="#inbound-delete">Delete inbound domain</a>
+    </div>
   </div>
+</main>
+
+<!-- INBOUND DOMAIN (MX error) -->
+<main id="inbound-backup" class="screen ops">
+  <h1>backup.example.net</h1>
+  <a class="back" href="#inbound">&larr; All inbound domains</a>
+
   <div class="card">
-    <h2>Danger zone</h2>
-    <p class="muted">Stops accepting mail for this domain. Does not touch outbound sending domains.</p>
-    <button type="button" class="danger">Remove inbound domain</button>
+    <h2>DNS status <span class="st st-error">error</span></h2>
+    <p class="muted">Cached a few minutes — use <em>Re-check</em> after publishing. Unlike outbound, inbound needs an MX pointing at this server.</p>
+    <div class="check-cols">
+      <div class="check-col">
+        <label>MX <span class="st st-error">error</span></label>
+        <div class="field-pair host-type">
+          <div>
+            <label>Host / name</label>
+            <span class="code">backup.example.net</span>
+          </div>
+          <div class="field-type">
+            <label>Type</label>
+            <span class="code">MX</span>
+          </div>
+        </div>
+        <label>Value</label>
+        <span class="code">10 mail.primary.example.net.</span>
+        <p class="error">No MX points at mail.example.org (this server). Publish the record below, or wait for DNS to propagate and Re-check.</p>
+      </div>
+    </div>
+    <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check</button></form>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <h2>Upstream</h2>
+      <p class="muted">Where accepted mail is handed off. Not a mailbox.</p>
+      <label>Host</label><input value="192.0.2.20">
+      <label>Port</label><input value="25">
+      <label>TLS to upstream</label>
+      <select><option>Opportunistic</option><option>Required</option><option selected>Off</option></select>
+      <button type="button">Save upstream</button>
+    </div>
+    <div class="card">
+      <h2>MX record to publish</h2>
+      <p class="muted">Add this MX so the internet delivers here. Keep any existing primary MX if this is backup-MX.</p>
+      <div class="field-pair host-type">
+        <div>
+          <label>Host / name</label>
+          <div class="code-row"><span class="code">backup.example.net</span><button type="button" class="copy">Copy</button></div>
+        </div>
+        <div class="field-type">
+          <label>Type</label>
+          <span class="code">MX</span>
+        </div>
+      </div>
+      <label>Value</label>
+      <div class="code-row"><span class="code">20 mail.example.org.</span><button type="button" class="copy">Copy</button></div>
+    </div>
+  </div>
+  <div class="split">
+    <div class="card rcpt-mode">
+      <h2>Valid recipients</h2>
+      <p class="muted">Who this domain accepts on port 25. Same idea as an application’s address mode: a list, or any address at the domain.</p>
+      <label>Who to accept</label>
+      <select>
+        <option value="list">Listed addresses only</option>
+        <option value="any" selected>Any recipient at this domain</option>
+      </select>
+      <div class="rcpt-list">
+        <label>Addresses (one per line or comma-separated)</label>
+        <textarea rows="6">postmaster@backup.example.net
+abuse@backup.example.net</textarea>
+        <p class="muted">Unknown recipients are rejected at RCPT so this relay does not generate backscatter.</p>
+      </div>
+      <p class="rcpt-any muted">Every address at this domain is accepted and forwarded. Prefer a list unless the upstream rejects unknowns — otherwise this relay may generate backscatter.</p>
+      <button type="button">Save recipients</button>
+    </div>
+    <div class="card">
+      <h2>Danger zone</h2>
+      <p class="muted">Stops accepting mail for this domain. Does not touch outbound sending domains.</p>
+      <a class="danger" href="#inbound-delete">Delete inbound domain</a>
+    </div>
+  </div>
+</main>
+
+<!-- INBOUND DELETE -->
+<main id="inbound-delete" class="screen form">
+  <h1>Delete lists.example.com</h1>
+  <a class="back" href="#inbound-domain">&larr; Back to lists.example.com</a>
+  <div class="card">
+    <h2>Confirm deletion</h2>
+    <p>You are about to stop accepting inbound mail for <strong>lists.example.com</strong>. This will:</p>
+    <ul>
+      <li>remove it from <code>relay_domains</code> and the recipient map;</li>
+      <li>stop forwarding to <strong>10.0.0.8:25</strong>;</li>
+      <li>leave outbound sending domains untouched.</li>
+    </ul>
+    <p class="muted">This cannot be undone from a backup of inbound maps alone unless you restore one. Remove the MX if you do not plan to re-add the domain.</p>
+    <form action="#" onsubmit="return false">
+      <button type="button" class="danger">Delete lists.example.com</button>
+    </form>
   </div>
 </main>
 
@@ -829,7 +1135,7 @@ abuse@lists.example.com</textarea>
   <div class="page-head">
     <h1>Help <span class="tag future">candidate</span></h1>
   </div>
-  <p class="muted">Short operator notes inside the panel — not a second copy of the full guide. Seeded from the Status blurbs that left the cards.</p>
+  <p class="muted">Short operator notes inside the panel — not a second copy of the full guide. Seeded from the Status explanations that do not belong on the cards (what a kernel counter is, why PTR is set at the host, what Reload does not touch). The cards themselves keep their readings, Detail columns, and the Configuration control.</p>
   <div class="card">
     <h2>On this panel</h2>
     <ul>
@@ -837,9 +1143,10 @@ abuse@lists.example.com</textarea>
       <li><a href="#help">TLS certificate</a> — port 465, reverse-proxy mount</li>
       <li><a href="#help">Hostname / reverse DNS</a> — forward-confirmed PTR at the hosting provider</li>
       <li><a href="#help">Mail queue retries</a> — time-based, no attempt budget</li>
-      <li><a href="#help">Inbound</a> — not mailboxes; reject unknown recipients</li>
+      <li><a href="#help">Inbound</a> — not mailboxes; listed recipients or any address at the domain</li>
+      <li>Domain page — DNS, records, connection, applications, export (drawer from each card’s «?»)</li>
     </ul>
-    <p class="muted">The same texts open in the drawer from a card’s «?» — so a Status page can stay dense.</p>
+    <p class="muted">The same texts open in the drawer from Status’s «?» — so a card can stay a reading, not a paragraph, without throwing the reading away.</p>
   </div>
   <div class="card">
     <h2>Machine</h2>
@@ -858,17 +1165,94 @@ abuse@lists.example.com</textarea>
 </div>
 </div>
 
-<label class="help-scrim" for="help-open"></label>
+<label class="help-scrim" for="help-off"></label>
 <aside class="help-drawer">
-  <label class="help-close" for="help-open">Close</label>
-  <h2>Machine</h2>
-  <p>CPU and memory are the container’s readings. Network is a short rate window. These numbers explain load; they do not replace the queue.</p>
-  <h2>TLS certificate</h2>
-  <p>Presented on port 465. Issued and renewed outside SelfPost. Warn = expires soon; error = missing, and submission will fail.</p>
-  <h2>Hostname / reverse DNS</h2>
-  <p>The hostname must forward to this IP and the PTR must come back to the same name. Set PTR at the provider.</p>
-  <h2>Mail queue</h2>
-  <p>Deferred mail is retried on a time schedule (first delay, doubling cap, queue lifetime). There is no “attempt 3 of N”.</p>
+  <label class="help-close" for="help-off">Close</label>
+
+  <article class="help-pane help-pane-index">
+    <h2>Help</h2>
+    <p>Short notes for the card you opened — not a second copy of the guide.</p>
+    <p class="muted">Status</p>
+    <ul class="toc">
+      <li><label for="help-status">Status checks</label></li>
+    </ul>
+    <p class="muted">Domain</p>
+    <ul class="toc">
+      <li><label for="help-password">New application password</label></li>
+      <li><label for="help-dns">DNS status</label></li>
+      <li><label for="help-records">DKIM and SPF records</label></li>
+      <li><label for="help-dmarc">DMARC record</label></li>
+      <li><label for="help-connection">Connection settings</label></li>
+      <li><label for="help-apps">Applications</label></li>
+      <li><label for="help-domain-settings">Domain settings</label></li>
+      <li><label for="help-export">Export domain</label></li>
+    </ul>
+  </article>
+
+  <article class="help-pane help-pane-status">
+    <h2>Status checks</h2>
+    <p>The cards keep the readings. This drawer is what used to sit under them as paragraphs.</p>
+    <h2>Machine</h2>
+    <p>CPU and memory are the container’s readings. Network is a short rate window. These numbers explain load; they do not replace the queue.</p>
+    <h2>TLS certificate</h2>
+    <p>Presented on port 465. Issued and renewed outside SelfPost. Warn = expires soon; error = missing, and submission will fail.</p>
+    <h2>Hostname / reverse DNS</h2>
+    <p>The hostname must forward to this IP and the PTR must come back to the same name. Set PTR at the provider.</p>
+    <h2>Mail queue</h2>
+    <p>Deferred mail is retried on a time schedule (first delay, doubling cap, queue lifetime). There is no “attempt 3 of N”.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-password">
+    <h2>New application password</h2>
+    <p>Shown <strong>once only</strong> and not stored. Copy it now — if it is lost, regenerate a new one. The previous password stops working immediately.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-dns">
+    <h2>DNS status</h2>
+    <p>The badge is the worst of DKIM, SPF and DMARC. Results are cached a few minutes — use <em>Re-check</em> after publishing.</p>
+    <p>SPF is a shallow check: the literal address only, no <code>include:</code> or <code>redirect=</code>. Report authorization is required only when <code>rua=</code> points at a domain this server does not accept.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-records">
+    <h2>DKIM and SPF records</h2>
+    <p>DKIM is not a secret. The selector on this page is the one this server signs with. Merge the SPF example into an existing record if the domain already has one — do not publish a second TXT.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-dmarc">
+    <h2>DMARC record</h2>
+    <p><code>p=none</code> does not affect delivery. Tighten to <code>p=quarantine</code> then <code>p=reject</code> once reports look clean. The report address is set under Domain settings (or the Settings default).</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-connection">
+    <h2>Connection settings</h2>
+    <p>Same host for every domain. Authenticate with an application login from this page. Auth is required on every port. The password is shown once at create or regenerate.</p>
+    <p>465 is implicit TLS; 587 is STARTTLS submission when that port is enabled.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-apps">
+    <h2>Applications</h2>
+    <p>SASL logins for this domain. Login is unique across domains; letters, digits, <code>.</code>, <code>-</code> and <code>_</code>. The password is shown once.</p>
+    <p>Address mode is which From addresses this application may use: any address of the domain, or a fixed list. A trusted-IP override gives those clients a higher ceiling than the domain (still ≤ level 1) and skips the domain check; everyone else uses the domain limit if set, otherwise level 1.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-domain-settings">
+    <h2>Domain settings</h2>
+    <p>Aggregate reports (<code>rua=</code>) inherit the Settings default, or you override them per domain. Level 2 is an optional ceiling for all senders on this domain; it must be ≤ level 1. Application overrides live on each application.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
+
+  <article class="help-pane help-pane-export">
+    <h2>Export domain</h2>
+    <p>The file is a secret: it carries the DKIM key and application passwords, so published DNS does not have to change on the other instance. Transfer it securely, or encrypt it as <code>.spde</code>.</p>
+    <p class="more muted"><label for="help-index">All topics</label></p>
+  </article>
 </aside>
 
 <script>
@@ -883,7 +1267,8 @@ abuse@lists.example.com</textarea>
     var h = location.hash.slice(1);
     var blocked = {
       status: 1, "mail-queue": 1, "system-log": 1, backup: 1, users: 1,
-      "user-form": 1, "user-delete": 1, inbound: 1, "inbound-domain": 1, dmarc: 1
+      "user-form": 1, "user-delete": 1, inbound: 1, "inbound-domain": 1,
+      "inbound-backup": 1, "inbound-delete": 1, dmarc: 1
     };
     if (blocked[h] || !h) location.hash = "domains";
     var brand = document.querySelector(".nav .brand");
