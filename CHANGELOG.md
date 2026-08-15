@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- docs: HTML mockups for a full panel UI refresh
+  ([docs/assets/panel-ui/](docs/assets/panel-ui/index.html)) — current screens,
+  agreed and candidate roadmap surfaces (queue-retries, inbound-relay,
+  dmarc-reports, panel-docs), a hybrid width (ops pages use the window, forms
+  keep a reading measure), and a 390px emergency layout. The stamp and brick
+  palette stay; extra nav icons are proposals only. Design artefact; the
+  running panel is unchanged.
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,

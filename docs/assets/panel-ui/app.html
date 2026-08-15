@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SelfPost — panel mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+
+<input class="ctrl" type="radio" name="role" id="role-global" checked>
+<input class="ctrl" type="radio" name="role" id="role-domain">
+<input class="ctrl" type="radio" name="vp" id="vp-desktop" checked>
+<input class="ctrl" type="radio" name="vp" id="vp-phone">
+<input class="ctrl" type="radio" name="theme" id="theme-light" checked>
+<input class="ctrl" type="radio" name="theme" id="theme-dark">
+<input class="ctrl" type="checkbox" id="feat-inbound" checked>
+<input class="ctrl" type="checkbox" id="nav-open">
+<input class="ctrl" type="checkbox" id="help-open">
+
+<header class="gallery">
+  <a class="brand-mini" href="index.html">Макеты</a>
+  <div class="seg">
+    <span>Роль</span>
+    <label for="role-global">Global</label>
+    <label for="role-domain">Domain-admin</label>
+  </div>
+  <div class="seg">
+    <span>Ширина</span>
+    <label for="vp-desktop">Desktop</label>
+    <label for="vp-phone">Phone</label>
+  </div>
+  <div class="seg">
+    <span>Тема</span>
+    <label for="theme-light">Light</label>
+    <label for="theme-dark">Dark</label>
+  </div>
+  <label class="g-only" for="feat-inbound">Inbound</label>
+  <a href="index.html">Оглавление</a>
+</header>
+
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-status" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.25 8.5h2.9L6.2 3.4l3.1 9.4 1.9-4.3h3.55"/></symbol>
+  <symbol id="i-domains" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"/><path d="M1.9 8h12.2"/><path d="M8 1.75c1.85 1.8 2.8 4 2.8 6.25S9.85 12.45 8 14.25C6.15 12.45 5.2 10.25 5.2 8S6.15 3.55 8 1.75Z"/></symbol>
+  <symbol id="i-deliveries" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.25 1.75 1.6 6.6l5 2.05 2.05 5z"/><path d="M14.25 1.75 6.6 8.65"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.75 9.5h3.3l1 1.75h3.9l1-1.75h3.3v3.05a1.2 1.2 0 0 1-1.2 1.2H2.95a1.2 1.2 0 0 1-1.2-1.2z"/><path d="M1.75 9.5 3.4 3.2a1.25 1.25 0 0 1 1.2-.95h6.8a1.25 1.25 0 0 1 1.2.95l1.65 6.3"/></symbol>
+  <symbol id="i-log" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 1.75h5.1l3.4 3.4v8.05a1.05 1.05 0 0 1-1.05 1.05H3.75a1.05 1.05 0 0 1-1.05-1.05V2.8a1.05 1.05 0 0 1 1.05-1.05Z"/><path d="M8.85 1.75v3.4h3.4"/><path d="M5.35 8.6h5.3M5.35 11.1h3.5"/></symbol>
+  <symbol id="i-inbound" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5h11"/><path d="M8 2.75v6.2"/><path d="M5.4 6.4 8 9.05 10.6 6.4"/><path d="M3.2 12.6h9.6"/></symbol>
+  <symbol id="i-dmarc" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.85 2.75 3.7v4.2c0 3.15 2.15 5.2 5.25 6.25 3.1-1.05 5.25-3.1 5.25-6.25V3.7Z"/><path d="M5.4 8.05 7.15 9.8 10.7 6.2"/></symbol>
+  <symbol id="i-backup" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.75" y="1.75" width="10.5" height="12.5" rx="1.15"/><path d="M2.75 8h10.5"/><path d="M6.4 4.85h3.2M6.4 11.15h3.2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.9 3.1a2.1 2.1 0 0 1 0 4.2"/><path d="M14.7 14.25a3.8 3.8 0 0 0-3.9-3.65"/><circle cx="5.5" cy="5.2" r="2.5"/><path d="M1.4 14.25a4.8 4.8 0 0 1 8.2 0"/></symbol>
+  <symbol id="i-help" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.2V11.4"/><path d="M8 5.05v.01"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-account" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.4" r="2.75"/><path d="M2.9 14.25a5.1 5.1 0 0 1 10.2 0"/></symbol>
+  <symbol id="i-out" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.1 14.25H3.65a1.15 1.15 0 0 1-1.15-1.15V2.9a1.15 1.15 0 0 1 1.15-1.15H6.1"/><path d="M10.6 11.15 13.75 8 10.6 4.85"/><path d="M13.75 8H6.35"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></symbol>
+</svg>
+
+<div class="app">
+<nav class="nav">
+  <a class="brand" href="#status"><img src="../selfpost-stamp-compact.svg" width="220" height="100" alt="SelfPost"></a>
+  <div class="links">
+    <a class="n-status g-only" href="#status"><svg class="icon"><use href="#i-status"/></svg>Status</a>
+    <a class="n-domains" href="#domains"><svg class="icon"><use href="#i-domains"/></svg>Domains</a>
+    <a class="n-deliveries" href="#deliveries"><svg class="icon"><use href="#i-deliveries"/></svg>Deliveries</a>
+    <a class="n-queue g-only" href="#mail-queue"><svg class="icon"><use href="#i-queue"/></svg>Mail queue</a>
+    <a class="n-log g-only" href="#system-log"><svg class="icon"><use href="#i-log"/></svg>System log</a>
+    <a class="n-inbound g-only in-only" href="#inbound"><svg class="icon"><use href="#i-inbound"/></svg>Inbound</a>
+    <a class="n-dmarc g-only" href="#dmarc"><svg class="icon"><use href="#i-dmarc"/></svg>DMARC <span class="tag future">1.x</span></a>
+    <a class="n-backup g-only" href="#backup"><svg class="icon"><use href="#i-backup"/></svg>Backup</a>
+    <a class="n-users g-only" href="#users"><svg class="icon"><use href="#i-users"/></svg>Users</a>
+    <a class="n-help" href="#help"><svg class="icon"><use href="#i-help"/></svg>Help <span class="tag future">1.x</span></a>
+  </div>
+  <div class="session">
+    <span class="session-user muted"><svg class="icon"><use href="#i-account"/></svg>User: admin</span>
+    <a class="n-settings" href="#settings"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
+    <a class="btn-ghost" href="#login"><svg class="icon"><use href="#i-out"/></svg>Sign out</a>
+  </div>
+</nav>
+
+<div class="stage">
+<div class="phone-bar">
+  <label class="nav-burger" for="nav-open" title="Menu"><svg class="icon"><use href="#i-menu"/></svg></label>
+  <img class="phone-mark" src="../selfpost-icon.svg" width="28" height="28" alt="">
+  <span class="grow">
+    <span class="pt pt-status">Status</span>
+    <span class="pt pt-domains">Domains</span>
+    <span class="pt pt-domain">example.com</span>
+    <span class="pt pt-deliveries">Deliveries</span>
+    <span class="pt pt-delivery">Message</span>
+    <span class="pt pt-queue">Mail queue</span>
+    <span class="pt pt-log">System log</span>
+    <span class="pt pt-inbound">Inbound</span>
+    <span class="pt pt-dmarc">DMARC</span>
+    <span class="pt pt-backup">Backup</span>
+    <span class="pt pt-users">Users</span>
+    <span class="pt pt-help">Help</span>
+    <span class="pt pt-settings">Settings</span>
+  </span>
+  <label class="help-link" for="help-open" title="Help">?</label>
+</div>
+
+<!-- STATUS -->
+<main id="status" class="screen ops">
+  <div class="status-hero attn">
+    <h1>Status <span class="st st-warn">warn</span></h1>
+    <p class="lead">3 messages deferred — first retry in about 4 minutes. Everything else is up.</p>
+    <form class="inline" action="#" onsubmit="return false"><button type="button">Reload configuration</button></form>
+  </div>
+  <div class="status-grid">
+    <article class="card attn">
+      <div class="card-head">
+        <h2>Mail queue <span class="st st-warn">warn</span></h2>
+        <label class="help-link" for="help-open">?</label>
+      </div>
+      <p>3 deferred, 0 bounce-hold. Oldest 18 minutes.</p>
+      <a class="btn" href="#mail-queue">View queue</a>
+    </article>
+    <article class="card in-only">
+      <div class="card-head">
+        <h2>Inbound <span class="st st-ok">ok</span></h2>
+      </div>
+      <p>Accepting on port 25 for 1 domain. Last forward 2 minutes ago.</p>
+      <a href="#inbound">Inbound domains</a>
+    </article>
+    <article class="card in-off">
+      <div class="card-head"><h2>Inbound</h2></div>
+      <p class="muted">Module off (<code>INBOUND_RELAY_ENABLE=false</code>). The outbound path is unchanged.</p>
+    </article>
+    <article class="card">
+      <div class="card-head">
+        <h2>Machine <span class="st st-ok">ok</span></h2>
+        <label class="help-link" for="help-open">?</label>
+      </div>
+      <div class="metric-row"><span class="k">CPU</span><span class="v"><meter value="12" min="0" max="100" low="70" high="90" optimum="10"></meter>12%</span></div>
+      <div class="metric-row"><span class="k">Memory</span><span class="v"><meter value="41" min="0" max="100" low="70" high="90" optimum="10"></meter>41%</span></div>
+      <div class="metric-row"><span class="k">Network</span><span class="v">↓ 48 KiB/s · ↑ 12 KiB/s</span></div>
+    </article>
+    <article class="card">
+      <div class="card-head"><h2>Processes <span class="st st-ok">ok</span></h2></div>
+      <div class="metric-row"><span class="k">postfix</span><span class="st st-ok">RUNNING</span></div>
+      <div class="metric-row"><span class="k">opendkim</span><span class="st st-ok">RUNNING</span></div>
+      <div class="metric-row"><span class="k">panel</span><span class="st st-ok">RUNNING</span></div>
+    </article>
+    <article class="card">
+      <div class="card-head">
+        <h2>TLS certificate <span class="st st-ok">ok</span></h2>
+        <label class="help-link" for="help-open">?</label>
+      </div>
+      <label>Expires</label>
+      <span class="code">2026-11-02 12:00 UTC</span>
+      <p class="muted">Let’s Encrypt, 78 days left. Mounted for port 465.</p>
+    </article>
+    <article class="card">
+      <div class="card-head"><h2>Milter sockets <span class="st st-ok">ok</span></h2></div>
+      <div class="metric-row"><span class="k">opendkim</span><span class="st st-ok">ok</span></div>
+      <div class="metric-row"><span class="k">journal</span><span class="st st-ok">ok</span></div>
+    </article>
+    <article class="card">
+      <div class="card-head">
+        <h2>Hostname / rDNS <span class="st st-ok">ok</span></h2>
+        <label class="help-link" for="help-open">?</label>
+      </div>
+      <label>Server hostname</label>
+      <span class="code">mail.example.org</span>
+      <label>Forward and reverse</label>
+      <span class="code">mail.example.org → 203.0.113.10 → mail.example.org</span>
+      <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check DNS</button></form>
+    </article>
+  </div>
+  <p class="version">SelfPost 1.2.3 · © Mixeme · <a href="#">License (AGPL-3.0)</a></p>
+</main>
+
+<!-- LOGIN -->
+<main id="login" class="screen auth">
+  <img class="mark" src="../selfpost-stamp.svg" width="330" height="150" alt="SelfPost">
+  <h1>Sign in</h1>
+  <div class="card narrow">
+    <form action="#status" onsubmit="location.hash='status'; return false;">
+      <label for="u">Username</label>
+      <input id="u" name="username" autocomplete="username">
+      <label for="p">Password</label>
+      <input id="p" name="password" type="password" autocomplete="current-password">
+      <button type="submit">Sign in</button>
+    </form>
+  </div>
+  <p class="version" style="text-align:center">© Mixeme · <a href="#">License (AGPL-3.0)</a></p>
+</main>
+
+<!-- SETUP -->
+<main id="setup" class="screen auth">
+  <img class="mark" src="../selfpost-stamp.svg" width="330" height="150" alt="SelfPost">
+  <h1>Create administrator</h1>
+  <div class="card narrow">
+    <p class="muted">This one-time link creates the single panel administrator. After you submit, the link stops working for good.</p>
+    <form action="#status" onsubmit="location.hash='status'; return false;">
+      <label>Username</label>
+      <input autocomplete="username">
+      <label>Password</label>
+      <input type="password" autocomplete="new-password">
+      <label>Confirm password</label>
+      <input type="password" autocomplete="new-password">
+      <button type="submit">Create administrator</button>
+    </form>
+  </div>
+</main>
+
+<!-- DOMAINS -->
+<main id="domains" class="screen ops">
+  <div class="page-head"><h1>Domains</h1></div>
+  <div class="card g-only" style="margin-bottom:1rem">
+    <h2>Add a sending domain</h2>
+    <form action="#" onsubmit="return false;">
+      <label for="dname">Domain</label>
+      <div class="input-row">
+        <input id="dname" placeholder="example.com" autocomplete="off">
+        <button type="button">Add domain</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Domains</h2>
+    <table class="desk-only">
+      <thead><tr><th>Domain</th><th>DNS</th><th>Selector</th><th>Apps</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="#domain">example.com</a></td>
+          <td><a class="st st-ok" href="#domain">ok</a></td>
+          <td class="muted">mail</td>
+          <td>2</td>
+          <td class="actions g-only"><a class="danger" href="#domain-delete">Delete</a></td>
+        </tr>
+        <tr>
+          <td><a href="#domain">alerts.example.com</a></td>
+          <td><a class="st st-warn" href="#domain">warn</a></td>
+          <td class="muted">mail</td>
+          <td>1</td>
+          <td class="actions g-only"><a class="danger" href="#domain-delete">Delete</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <ul class="phone-list phone-only">
+      <li><a href="#domain"><span>example.com</span><span class="st st-ok">ok</span><span class="pair">2 apps · selector mail</span></a></li>
+      <li><a href="#domain"><span>alerts.example.com</span><span class="st st-warn">warn</span><span class="pair">1 app · selector mail</span></a></li>
+    </ul>
+    <p class="muted">The DNS badge is the worst of DKIM, SPF and DMARC. Open a domain for details.</p>
+  </div>
+</main>
+
+<!-- DOMAIN DETAIL -->
+<main id="domain" class="screen ops">
+  <h1>example.com</h1>
+  <a class="back" href="#domains">&larr; All domains</a>
+  <div class="card credential" id="new-credential">
+    <h2>New application password</h2>
+    <p class="muted">Shown <strong>once only</strong> and not stored. Copy it now.</p>
+    <label>Login</label>
+    <div class="code-row"><span class="code">newsletter</span><button type="button" class="copy">Copy</button></div>
+    <label>Password</label>
+    <div class="code-row"><span class="code">xK.9fQ2m-pL7wR</span><button type="button" class="copy">Copy</button></div>
+  </div>
+  <div class="card" id="dns-status">
+    <h2>DNS status <span class="st st-ok">ok</span></h2>
+    <div class="check-cols">
+      <div class="check-col">
+        <label>DKIM <span class="st st-ok">ok</span></label>
+        <div class="field-pair host-type"><div><label>Host / name</label><span class="code">mail._domainkey.example.com</span></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
+      </div>
+      <div class="check-col">
+        <label>SPF <span class="st st-ok">ok</span></label>
+        <div class="field-pair host-type"><div><label>Host / name</label><span class="code">example.com</span></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
+      </div>
+      <div class="check-col">
+        <label>DMARC <span class="st st-ok">ok</span></label>
+        <div class="field-pair host-type"><div><label>Host / name</label><span class="code">_dmarc.example.com</span></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
+        <p class="muted">p=none; rua points at SelfPost ingest.</p>
+      </div>
+      <div class="check-col">
+        <label>Report authorization</label>
+        <p class="muted">Not required (rua= is on a domain SelfPost accepts).</p>
+      </div>
+    </div>
+    <form class="inline" action="#" onsubmit="return false"><button type="button">Re-check</button></form>
+  </div>
+  <div class="split">
+    <div class="card">
+      <h2>DKIM and SPF records</h2>
+      <p class="check-col-title">DKIM</p>
+      <div class="field-pair host-type"><div><label>Host / name</label><div class="code-row"><span class="code">mail._domainkey.example.com</span><button type="button" class="copy">Copy</button></div></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
+      <label>Value</label>
+      <div class="code-row"><span class="code">v=DKIM1; k=rsa; p=MIIBIjANBgkqh…</span><button type="button" class="copy">Copy</button></div>
+      <p class="check-col-title">SPF</p>
+      <div class="code-row"><span class="code">v=spf1 ip4:203.0.113.10 -all</span><button type="button" class="copy">Copy</button></div>
+    </div>
+    <div class="card">
+      <h2>DMARC record</h2>
+      <div class="field-pair host-type"><div><label>Host / name</label><div class="code-row"><span class="code">_dmarc.example.com</span><button type="button" class="copy">Copy</button></div></div><div class="field-type"><label>Type</label><span class="code">TXT</span></div></div>
+      <label>Value <span class="muted">(from Settings)</span></label>
+      <div class="code-row"><span class="code">v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org</span><button type="button" class="copy">Copy</button></div>
+      <p class="muted"><a href="#dmarc">Open DMARC reports</a> for this domain.</p>
+    </div>
+  </div>
+  <div class="split">
+    <div class="card">
+      <h2>Connection settings</h2>
+      <label>Server</label>
+      <div class="code-row"><span class="code">mail.example.org</span><button type="button" class="copy">Copy</button></div>
+      <label>Port and encryption</label>
+      <span class="code">465 — SSL/TLS (implicit)
+587 — STARTTLS (submission)</span>
+    </div>
+    <div class="card">
+      <h2>Add an application</h2>
+      <form action="#" onsubmit="return false">
+        <label>Login</label>
+        <input placeholder="prod-server" autocomplete="off">
+        <label>Address mode</label>
+        <select><option>Any address of the domain</option><option>Specific addresses (list)</option></select>
+        <button type="button">Create application</button>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Applications</h2>
+    <ul class="apps">
+      <li class="app-item">
+        <p class="app-login">newsletter</p>
+        <p class="app-addr muted">Any address of the domain — *@example.com</p>
+        <div class="actions">
+          <input class="panel-toggle t-edit" id="edit-1" type="checkbox" checked>
+          <label class="toggle for-edit" for="edit-1">Edit <span class="st st-ok">limit</span></label>
+          <button type="button">New password</button>
+          <button type="button" class="danger">Delete</button>
+          <div class="panel panel-edit">
+            <div class="check-cols">
+              <div class="check-col">
+                <p class="check-col-title">Address mode</p>
+                <select><option selected>Any address of the domain</option><option>Specific addresses (list)</option></select>
+              </div>
+              <div class="check-col">
+                <p class="check-col-title">Trusted-IP override <span class="st st-ok">active</span></p>
+                <textarea rows="1">203.0.113.40</textarea>
+                <div class="field-pair">
+                  <div><label>Message limit</label><input value="80"></div>
+                  <div><label>Window (seconds)</label><input value="60"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+      <li class="app-item">
+        <p class="app-login">billing</p>
+        <p class="app-addr muted">Fixed list — invoices@example.com</p>
+        <div class="actions">
+          <button type="button">Edit</button>
+          <button type="button">New password</button>
+          <button type="button" class="danger">Delete</button>
+        </div>
+      </li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Domain settings</h2>
+    <div class="check-cols">
+      <div class="check-col">
+        <p class="check-col-title">DMARC reports</p>
+        <label>Aggregate reports (rua=)</label>
+        <select><option selected>Same as Settings (dmarc@mail.example.org)</option><option>No aggregate reports</option><option>Custom address</option></select>
+        <button type="button">Save DMARC report settings</button>
+      </div>
+      <div class="check-col">
+        <p class="check-col-title">Level-2 rate limit <span class="st st-ok">active</span></p>
+        <div class="field-pair">
+          <div><label>Message limit</label><input value="40"></div>
+          <div><label>Window (seconds)</label><input value="60"></div>
+        </div>
+        <button type="button">Save limit</button>
+      </div>
+    </div>
+  </div>
+  <div class="split">
+    <div class="card">
+      <h2>Export domain</h2>
+      <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt as <code>.spde</code>.</p>
+      <div class="encrypt">
+        <label class="check"><input type="checkbox"> <span>Encrypt with a password</span></label>
+        <div class="encrypt-fields">
+          <label>Password</label><input type="password">
+          <label>Repeat password</label><input type="password">
+        </div>
+      </div>
+      <button type="button">Export domain</button>
+    </div>
+    <div class="card g-only">
+      <h2>Danger zone</h2>
+      <p class="muted">Deletes the DKIM key and every application on this domain.</p>
+      <a class="danger" href="#domain-delete">Delete domain</a>
+    </div>
+  </div>
+</main>
+
+<!-- DOMAIN DELETE -->
+<main id="domain-delete" class="screen form">
+  <h1>Delete example.com</h1>
+  <a class="back" href="#domain">&larr; Back to example.com</a>
+  <div class="card">
+    <h2>Confirm deletion</h2>
+    <p>You are about to delete <strong>example.com</strong>. This will:</p>
+    <ul>
+      <li>permanently delete its DKIM signing key;</li>
+      <li>delete <strong>all 2 bound applications</strong>, including their SASL credentials;</li>
+      <li>reload OpenDKIM so the domain is no longer signed.</li>
+    </ul>
+    <p class="muted">This cannot be undone.</p>
+    <button type="button" class="danger">Delete example.com</button>
+  </div>
+</main>
+
+<!-- DELIVERIES -->
+<main id="deliveries" class="screen ops">
+  <h1>Deliveries</h1>
+  <form class="toolbar" action="#" onsubmit="return false">
+    <div class="field"><label>Domain</label>
+      <select><option>All domains</option><option>example.com</option><option>alerts.example.com</option></select>
+    </div>
+    <div class="field"><label>Application</label>
+      <select><option>All applications</option><option>newsletter</option><option>billing</option></select>
+    </div>
+    <button type="button">Filter</button>
+  </form>
+  <div class="card">
+    <table class="desk-only">
+      <thead><tr><th>Time</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="time muted">2026-08-15 20:14:02</td>
+          <td>billing@example.com</td>
+          <td>ada@example.net</td>
+          <td class="subject"><span>Invoice #4412</span></td>
+          <td class="status"><span class="st st-warn">deferred</span></td>
+          <td class="actions"><a href="#delivery">Details</a></td>
+        </tr>
+        <tr>
+          <td class="time muted">2026-08-15 20:11:40</td>
+          <td>news@example.com</td>
+          <td>list-bounces@example.net</td>
+          <td class="subject"><span>August digest</span></td>
+          <td class="status"><span class="st st-ok">delivered</span></td>
+          <td class="actions"><a href="#delivery">Details</a></td>
+        </tr>
+        <tr>
+          <td class="time muted">2026-08-15 19:02:11</td>
+          <td>alerts@alerts.example.com</td>
+          <td>noreply@blocked.example</td>
+          <td class="subject"><span>Disk 92% on web-3</span></td>
+          <td class="status"><span class="st st-error">bounced</span></td>
+          <td class="actions"><a href="#delivery">Details</a></td>
+        </tr>
+        <tr>
+          <td class="time muted">2026-08-15 18:44:09</td>
+          <td>news@example.com</td>
+          <td>sam@example.org</td>
+          <td class="subject"><span>August digest</span></td>
+          <td class="status"><span class="st st-ok">delivered</span></td>
+          <td class="actions"><a href="#delivery">Details</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <ul class="phone-list phone-only">
+      <li>
+        <a href="#delivery">
+          <span class="st st-warn">deferred</span><span class="when">20:14</span>
+          <span class="pair">billing@example.com → ada@example.net</span>
+          <span class="subj">Invoice #4412</span>
+        </a>
+      </li>
+      <li>
+        <a href="#delivery">
+          <span class="st st-ok">delivered</span><span class="when">20:11</span>
+          <span class="pair">news@example.com → list-bounces@example.net</span>
+          <span class="subj">August digest</span>
+        </a>
+      </li>
+      <li>
+        <a href="#delivery">
+          <span class="st st-error">bounced</span><span class="when">19:02</span>
+          <span class="pair">alerts@alerts.example.com → noreply@blocked.example</span>
+          <span class="subj">Disk 92% on web-3</span>
+        </a>
+      </li>
+    </ul>
+    <p class="muted">Page 1 of 4 · <a href="#deliveries">Older →</a></p>
+  </div>
+</main>
+
+<!-- DELIVERY (deferred + queue-retries) -->
+<main id="delivery" class="screen ops">
+  <h1 class="subject">Invoice #4412</h1>
+  <p class="route">
+    <span class="addr">billing@example.com</span>
+    <span class="arrow">→</span>
+    <span class="addr">ada@example.net</span>
+    <span class="st st-warn">deferred</span>
+  </p>
+  <a class="back" href="#deliveries">&larr; Back to deliveries</a>
+  <div class="split">
+    <div class="card">
+      <h2>Message</h2>
+      <div class="facts">
+        <div class="fact"><span class="fact-label">Domain</span><span class="fact-value">example.com</span></div>
+        <div class="fact"><span class="fact-label">Application</span><span class="fact-value">billing</span></div>
+        <div class="fact"><span class="fact-label">Accepted</span><span class="fact-value">2026-08-15 20:14:02 UTC</span></div>
+        <div class="fact"><span class="fact-label">Status reported</span><span class="fact-value">2026-08-15 20:14:08 UTC</span></div>
+        <div class="fact"><span class="fact-label">Queue id</span><span class="fact-value mono">4C3A1E2F1A</span></div>
+        <div class="fact"><span class="fact-label">Journal id</span><span class="fact-value mono">1842</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>History</h2>
+      <ol class="timeline">
+        <li class="event lvl-ok">
+          <p class="event-time">2026-08-15 20:14:02 UTC</p>
+          <p class="event-title"><span class="st st-ok">accepted</span> Received by the relay</p>
+          <p class="event-detail muted">SASL login billing, queued as 4C3A1E2F1A.</p>
+        </li>
+        <li class="event lvl-warn">
+          <p class="event-time">2026-08-15 20:14:08 UTC</p>
+          <p class="event-title"><span class="st st-warn">deferred</span> Receiving MX asked to try later</p>
+          <p class="event-detail muted">Postfix retries: first after 5 minutes, then with increasing gaps up to 1 hour 7 minutes, for up to 5 days. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.</p>
+        </li>
+        <li class="event pending">
+          <p class="event-time">not yet</p>
+          <p class="event-title"><span class="st st-unknown">delivery</span> Waiting on the next retry</p>
+        </li>
+      </ol>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Delivery log</h2>
+    <table class="log desk-only">
+      <thead><tr><th>Time</th><th>Message</th></tr></thead>
+      <tbody>
+        <tr><td class="time muted">20:14:02</td><td class="log-text">postfix/smtpd[221]: 4C3A1E2F1A: client=203.0.113.40, sasl_username=billing</td></tr>
+        <tr><td class="time muted">20:14:02</td><td class="log-text">postfix/cleanup[224]: 4C3A1E2F1A: message-id=&lt;4412@example.com&gt;</td></tr>
+        <tr><td class="time muted">20:14:08</td><td class="log-text">postfix/smtp[230]: 4C3A1E2F1A: to=&lt;ada@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=6, status=deferred (450 4.2.1 mailbox busy)</td></tr>
+      </tbody>
+    </table>
+    <div class="phone-only">
+      <p class="muted" style="margin:0.6rem 0 0.2rem">20:14:08</p>
+      <span class="code">status=deferred (450 4.2.1 mailbox busy)</span>
+      <p class="muted" style="margin:0.6rem 0 0.2rem">20:14:02</p>
+      <span class="code">client=203.0.113.40, sasl_username=billing</span>
+    </div>
+  </div>
+</main>
+
+<!-- MAIL QUEUE + queue-retries -->
+<main id="mail-queue" class="screen ops">
+  <h1>Mail queue</h1>
+  <div class="card">
+    <h2>How delivery retries work</h2>
+    <p class="muted">This Postfix’s policy, read once at panel start. There is no maximum attempt count — only time.</p>
+    <div class="facts retry-facts">
+      <div class="fact"><span class="fact-label">First retry</span><span class="fact-value">5 minutes</span></div>
+      <div class="fact"><span class="fact-label">Later retries</span><span class="fact-value">doubling, cap 1 h 7 min</span></div>
+      <div class="fact"><span class="fact-label">Kept in queue</span><span class="fact-value">5 days</span></div>
+      <div class="fact"><span class="fact-label">Then</span><span class="fact-value">bounced</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Pending messages</h2>
+    <table class="desk-only">
+      <thead><tr><th>Queue id</th><th>Age</th><th>From</th><th>To</th><th>Size</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">4C3A1E2F1A</td><td class="time muted">18 min</td><td>billing@example.com</td><td>ada@example.net</td><td>12 KiB</td></tr>
+        <tr><td class="mono">4C3A1E3010</td><td class="time muted">11 min</td><td>news@example.com</td><td>pat@slow.example</td><td>48 KiB</td></tr>
+        <tr><td class="mono">4C3A1E3102</td><td class="time muted">4 min</td><td>billing@example.com</td><td>ada@example.net</td><td>9 KiB</td></tr>
+      </tbody>
+    </table>
+    <ul class="phone-list phone-only">
+      <li><a href="#delivery"><span>4C3A1E2F1A</span><span class="when">18 min</span><span class="pair">billing@example.com → ada@example.net</span></a></li>
+      <li><a href="#delivery"><span>4C3A1E3010</span><span class="when">11 min</span><span class="pair">news@example.com → pat@slow.example</span></a></li>
+      <li><a href="#delivery"><span>4C3A1E3102</span><span class="when">4 min</span><span class="pair">billing@example.com → ada@example.net</span></a></li>
+    </ul>
+    <label>postqueue -p</label>
+    <span class="code">-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------
+4C3A1E2F1A*    12288 Sat Aug 15 20:14:02  billing@example.com
+                                         ada@example.net
+4C3A1E3010     49152 Sat Aug 15 20:21:18  news@example.com
+                                         pat@slow.example
+-- 3 Kbytes in 3 Requests.</span>
+  </div>
+</main>
+
+<!-- SYSTEM LOG -->
+<main id="system-log" class="screen ops">
+  <h1>System log</h1>
+  <div class="card">
+    <h2>Recent log entries</h2>
+    <span class="code">Aug 15 20:14:08 mail postfix/smtp[230]: 4C3A1E2F1A: to=&lt;ada@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=6, delays=0.2/0.1/0.4/5.3, dsn=4.2.1, status=deferred (450 4.2.1 mailbox busy)
+Aug 15 20:14:02 mail postfix/qmgr[119]: 4C3A1E2F1A: from=&lt;billing@example.com&gt;, size=12288, nrcpt=1 (queue active)
+Aug 15 20:14:02 mail postfix/smtpd[221]: 4C3A1E2F1A: client=203.0.113.40[203.0.113.40], sasl_method=PLAIN, sasl_username=billing
+Aug 15 20:11:40 mail postfix/smtp[228]: 4B19D0AA01: to=&lt;list-bounces@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=0.9, status=sent (250 2.0.0 Ok)
+Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.example&gt;, status=bounced (host mx.blocked.example[203.0.113.99] said: 550 5.7.1 rejected)</span>
+  </div>
+</main>
+
+<!-- BACKUP -->
+<main id="backup" class="screen form">
+  <h1>Backup &amp; migration</h1>
+  <div class="card">
+    <h2>Full backup</h2>
+    <p class="muted">Download a full backup of all persistent state. Restore into a container of the <strong>same SelfPost version</strong>. TLS certificates and the mail queue are not included. The file is a secret.</p>
+    <div class="encrypt">
+      <label class="check"><input type="checkbox" checked> <span>Encrypt with a password</span></label>
+      <div class="encrypt-fields">
+        <label>Password</label><input type="password" placeholder="at least 8 characters">
+        <label>Repeat password</label><input type="password">
+        <p class="muted">Keep this password: without it the file cannot be opened.</p>
+      </div>
+    </div>
+    <button type="button">Download full backup</button>
+  </div>
+  <div class="card">
+    <h2>Import a domain</h2>
+    <p class="muted">Plain <code>.json</code> or encrypted <code>.spde</code>.</p>
+    <label>Domain export file</label>
+    <input type="file">
+    <button type="button">Import domain</button>
+  </div>
+</main>
+
+<!-- USERS -->
+<main id="users" class="screen form">
+  <h1>Users</h1>
+  <div class="card">
+    <p><a href="#user-form">Create user</a></p>
+    <table>
+      <thead><tr><th>Username</th><th>Role</th><th>Domains</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>admin</td><td>Global</td><td class="muted">All</td><td class="actions"><a href="#user-form">Edit</a></td></tr>
+        <tr><td>ops-alerts</td><td>Domain admin</td><td class="muted">alerts.example.com</td><td class="actions"><a href="#user-form">Edit</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- USER FORM -->
+<main id="user-form" class="screen form">
+  <h1>Edit user</h1>
+  <a class="back" href="#users">&larr; Back to users</a>
+  <div class="card narrow">
+    <form action="#" onsubmit="return false">
+      <label>Username</label>
+      <input value="ops-alerts">
+      <label>Password (leave empty to keep)</label>
+      <input type="password">
+      <label>Role</label>
+      <select><option selected>Domain administrator</option><option>Global administrator</option></select>
+      <fieldset>
+        <legend>Assigned domains</legend>
+        <p class="muted">Required for domain administrators.</p>
+        <label class="check"><input type="checkbox"> example.com</label>
+        <label class="check"><input type="checkbox" checked> alerts.example.com</label>
+      </fieldset>
+      <button type="button">Save</button>
+    </form>
+    <a class="danger" href="#user-delete">Delete user</a>
+  </div>
+</main>
+
+<!-- USER DELETE -->
+<main id="user-delete" class="screen form">
+  <h1>Delete ops-alerts</h1>
+  <a class="back" href="#user-form">&larr; Back to ops-alerts</a>
+  <div class="card narrow">
+    <h2>Confirm deletion</h2>
+    <p>You are about to delete the panel user <strong>ops-alerts</strong>. A signed-in session for this user stops working immediately.</p>
+    <button type="button" class="danger">Delete ops-alerts</button>
+  </div>
+</main>
+
+<!-- SETTINGS -->
+<main id="settings" class="screen form">
+  <h1>Settings</h1>
+  <div class="card">
+    <h2>Panel credentials</h2>
+    <p class="muted">These are the credentials for this control panel only. Applications keep their own logins.</p>
+    <label>Username</label><input value="admin" autocomplete="username">
+    <label>Current password</label><input type="password" autocomplete="current-password">
+    <label>New password</label><input type="password" autocomplete="new-password">
+    <label>Confirm new password</label><input type="password">
+  </div>
+  <div class="card g-only">
+    <h2>DMARC aggregate reports</h2>
+    <p class="muted">Default <code>rua=</code> for every sending domain. When ingest is on, this can be an address SelfPost accepts.</p>
+    <label>Default report address</label>
+    <input type="email" value="dmarc@mail.example.org">
+    <p class="muted"><a href="#dmarc">DMARC reports</a> in the panel.</p>
+  </div>
+  <button type="button">Save changes</button>
+  <div class="card" id="rate-limits">
+    <h2>Sending rate limits</h2>
+    <p class="muted">Level 1 is set in Compose. Domain and application ceilings live on each domain’s page.</p>
+    <div class="facts">
+      <div class="fact"><span class="fact-label">Level 1 / IP</span><span class="fact-value">100 / 60s</span></div>
+      <div class="fact"><span class="fact-label">Level 2 domain</span><span class="fact-value">optional, ≤ L1</span></div>
+      <div class="fact"><span class="fact-label">App override</span><span class="fact-value">trusted IPs only</span></div>
+    </div>
+  </div>
+</main>
+
+<!-- INBOUND -->
+<main id="inbound" class="screen ops">
+  <div class="page-head">
+    <h1>Inbound <span class="tag">1.x</span></h1>
+  </div>
+  <p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed domains; unknown recipients are rejected at RCPT. Off by default in Compose.</p>
+  <div class="card" style="margin-bottom:1rem">
+    <h2>Add inbound domain</h2>
+    <form action="#" onsubmit="return false">
+      <label>Domain</label>
+      <div class="input-row">
+        <input placeholder="lists.example.com">
+        <button type="button">Add domain</button>
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Forwarding</h2>
+    <table class="desk-only">
+      <thead><tr><th>Domain</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="#inbound-domain">lists.example.com</a></td>
+          <td class="muted">10.0.0.8:25</td>
+          <td>12 listed</td>
+          <td><span class="st st-ok">required</span></td>
+          <td class="actions"><a href="#inbound-domain">Edit</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <ul class="phone-list phone-only">
+      <li><a href="#inbound-domain"><span>lists.example.com</span><span class="st st-ok">tls</span><span class="pair">→ 10.0.0.8:25 · 12 recipients</span></a></li>
+    </ul>
+  </div>
+</main>
+
+<!-- INBOUND DOMAIN -->
+<main id="inbound-domain" class="screen ops">
+  <h1>lists.example.com</h1>
+  <a class="back" href="#inbound">&larr; All inbound domains</a>
+  <div class="split">
+    <div class="card">
+      <h2>Upstream</h2>
+      <p class="muted">Where accepted mail is handed off. Not a mailbox.</p>
+      <label>Host</label><input value="10.0.0.8">
+      <label>Port</label><input value="25">
+      <label>TLS to upstream</label>
+      <select><option>Opportunistic</option><option selected>Required</option><option>Off</option></select>
+      <button type="button">Save upstream</button>
+    </div>
+    <div class="card">
+      <h2>DNS — MX</h2>
+      <p class="muted">Unlike outbound, inbound needs an MX pointing at this server.</p>
+      <label>Host / name</label>
+      <div class="code-row"><span class="code">lists.example.com</span><button type="button" class="copy">Copy</button></div>
+      <label>Value</label>
+      <div class="code-row"><span class="code">10 mail.example.org.</span><button type="button" class="copy">Copy</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Valid recipients</h2>
+    <p class="muted">Unknown recipients are rejected at RCPT so this relay does not generate backscatter. One address per line; empty means reject all until listed.</p>
+    <textarea rows="6">staff@lists.example.com
+postmaster@lists.example.com
+abuse@lists.example.com</textarea>
+    <button type="button">Save recipients</button>
+  </div>
+  <div class="card">
+    <h2>Danger zone</h2>
+    <p class="muted">Stops accepting mail for this domain. Does not touch outbound sending domains.</p>
+    <button type="button" class="danger">Remove inbound domain</button>
+  </div>
+</main>
+
+<!-- DMARC (candidate) -->
+<main id="dmarc" class="screen ops">
+  <div class="page-head">
+    <h1>DMARC reports <span class="tag future">candidate</span></h1>
+  </div>
+  <p class="muted">Aggregate reports SelfPost accepted for <code>rua=</code>. Forensic (<code>ruf=</code>) is out of scope.</p>
+  <div class="status-grid" style="margin-bottom:1rem">
+    <article class="card">
+      <h2>Ingest <span class="st st-ok">ok</span></h2>
+      <p>Last report 6 hours ago. 14 kept, 0 parse failures this week.</p>
+    </article>
+    <article class="card">
+      <h2>example.com <span class="st st-ok">pass</span></h2>
+      <p>98% aligned last 7 days. Tightening <code>p=</code> looks reasonable.</p>
+    </article>
+    <article class="card attn">
+      <h2>alerts.example.com <span class="st st-warn">fail</span></h2>
+      <p>A third-party sender is not in SPF/DKIM. See sources.</p>
+    </article>
+  </div>
+  <div class="card">
+    <h2>Sources · last 7 days</h2>
+    <table class="desk-only">
+      <thead><tr><th>Domain</th><th>Source</th><th>Pass</th><th>Fail</th><th>Disposition</th></tr></thead>
+      <tbody>
+        <tr><td>example.com</td><td class="muted">203.0.113.10 (this relay)</td><td>412</td><td>2</td><td><span class="st st-ok">none</span></td></tr>
+        <tr><td>example.com</td><td class="muted">google.com / 66.102.0.0/20</td><td>0</td><td>6</td><td><span class="st st-warn">none</span></td></tr>
+        <tr><td>alerts.example.com</td><td class="muted">203.0.113.10 (this relay)</td><td>88</td><td>0</td><td><span class="st st-ok">none</span></td></tr>
+        <tr><td>alerts.example.com</td><td class="muted">unknown / 198.51.100.80</td><td>0</td><td>19</td><td><span class="st st-error">none</span></td></tr>
+      </tbody>
+    </table>
+    <ul class="phone-list phone-only">
+      <li><a href="#domain"><span>example.com · this relay</span><span class="st st-ok">412 pass</span></a></li>
+      <li><a href="#domain"><span>alerts.example.com · 198.51.100.80</span><span class="st st-error">19 fail</span></a></li>
+    </ul>
+  </div>
+</main>
+
+<!-- HELP (candidate) -->
+<main id="help" class="screen form">
+  <div class="page-head">
+    <h1>Help <span class="tag future">candidate</span></h1>
+  </div>
+  <p class="muted">Short operator notes inside the panel — not a second copy of the full guide. Seeded from the Status blurbs that left the cards.</p>
+  <div class="card">
+    <h2>On this panel</h2>
+    <ul>
+      <li><a href="#help">Machine</a> — kernel counters and the rate window</li>
+      <li><a href="#help">TLS certificate</a> — port 465, reverse-proxy mount</li>
+      <li><a href="#help">Hostname / reverse DNS</a> — forward-confirmed PTR at the hosting provider</li>
+      <li><a href="#help">Mail queue retries</a> — time-based, no attempt budget</li>
+      <li><a href="#help">Inbound</a> — not mailboxes; reject unknown recipients</li>
+    </ul>
+    <p class="muted">The same texts open in the drawer from a card’s «?» — so a Status page can stay dense.</p>
+  </div>
+  <div class="card">
+    <h2>Machine</h2>
+    <p>CPU and memory are the container’s own readings, not the host’s spare capacity. Network is a short window, not a daily total. High CPU with an empty queue usually means something else on the box — not SelfPost “being slow to send”.</p>
+  </div>
+  <div class="card">
+    <h2>TLS certificate</h2>
+    <p>Port 465 presents the certificate the reverse proxy (or the image) mounted. The panel does not issue certificates. A warn here is “expires soon”; an error is “missing or unreadable”, and clients will refuse submission.</p>
+  </div>
+  <div class="card">
+    <h2>Hostname / reverse DNS</h2>
+    <p>Forward-confirmed reverse DNS: the A/AAAA for <code>SELFPOST_HOSTNAME</code> must reverse to that same name. PTR is set at the hosting provider, not in this panel. Receiving networks use this pair as a cheap reputation check.</p>
+  </div>
+</main>
+
+</div>
+</div>
+
+<label class="help-scrim" for="help-open"></label>
+<aside class="help-drawer">
+  <label class="help-close" for="help-open">Close</label>
+  <h2>Machine</h2>
+  <p>CPU and memory are the container’s readings. Network is a short rate window. These numbers explain load; they do not replace the queue.</p>
+  <h2>TLS certificate</h2>
+  <p>Presented on port 465. Issued and renewed outside SelfPost. Warn = expires soon; error = missing, and submission will fail.</p>
+  <h2>Hostname / reverse DNS</h2>
+  <p>The hostname must forward to this IP and the PTR must come back to the same name. Set PTR at the provider.</p>
+  <h2>Mail queue</h2>
+  <p>Deferred mail is retried on a time schedule (first delay, doubling cap, queue lifetime). There is no “attempt 3 of N”.</p>
+</aside>
+
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (q.get("view") === "phone") document.getElementById("vp-phone").checked = true;
+  if (q.get("role") === "domain") document.getElementById("role-domain").checked = true;
+  if (q.get("theme") === "dark") document.getElementById("theme-dark").checked = true;
+  if (q.get("inbound") === "0") document.getElementById("feat-inbound").checked = false;
+  function gate() {
+    if (!document.getElementById("role-domain").checked) return;
+    var h = location.hash.slice(1);
+    var blocked = {
+      status: 1, "mail-queue": 1, "system-log": 1, backup: 1, users: 1,
+      "user-form": 1, "user-delete": 1, inbound: 1, "inbound-domain": 1, dmarc: 1
+    };
+    if (blocked[h] || !h) location.hash = "domains";
+    var brand = document.querySelector(".nav .brand");
+    if (brand) brand.setAttribute("href", "#domains");
+  }
+  gate();
+  document.getElementById("role-global").addEventListener("change", function () {
+    var brand = document.querySelector(".nav .brand");
+    if (brand) brand.setAttribute("href", "#status");
+  });
+  document.getElementById("role-domain").addEventListener("change", gate);
+  window.addEventListener("hashchange", gate);
+  document.querySelectorAll(".nav a").forEach(function (a) {
+    a.addEventListener("click", function () {
+      document.getElementById("nav-open").checked = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

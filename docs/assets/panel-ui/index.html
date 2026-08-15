@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SelfPost — макеты панели</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+</head>
+<body class="doc">
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">макеты · не панель</p>
+  <h1>Self<b>Post</b> — полное обновление интерфейса</h1>
+  <p>Click-through прототип всех экранов: текущая панель, согласованный roadmap и кандидаты. Знак и палитра из листа утверждения не меняются. Это HTML в <code>docs/assets/panel-ui/</code>, не вёрстка <code>internal/web</code>.</p>
+  <div class="cta-row">
+    <a class="cta" href="app.html#status">Открыть прототип</a>
+    <a class="cta quiet" href="app.html?view=phone#status">Аварийный телефон</a>
+    <a class="cta quiet" href="app.html?theme=dark#status">Status, тёмная тема</a>
+  </div>
+</header>
+
+<section>
+  <h2>Ширина окна</h2>
+  <p>Сейчас оболочка центрируется, колонка контента упирается в <code>64rem</code>, формы ещё уже — <code>48rem</code>. На широком мониторе поля пустые. Растянуть всё на 100% окна нельзя: поля Settings и Backup становятся нечитаемыми.</p>
+  <h3>Гибрид</h3>
+  <p>Навигация прижата влево. Ops-страницы (Status, Deliveries, очередь, лог, DMARC, inbound) занимают остаток до <strong>90rem (~1440px)</strong>. Формы остаются <strong>42rem и выровнены влево</strong> в колонке, а не висят по центру пустого поля. Login и setup — по-прежнему узкий центрированный блок.</p>
+  <div class="compare">
+    <div>
+      <div class="row">сейчас, окно ~1600px</div>
+      <div class="bar">
+        <i class="navc">nav</i>
+        <i class="col" style="width:42%">64rem</i>
+        <i class="empty">пусто</i>
+      </div>
+    </div>
+    <div>
+      <div class="row">макет, ops-страница</div>
+      <div class="bar">
+        <i class="navc">nav</i>
+        <i class="fill">контент до 90rem</i>
+      </div>
+    </div>
+    <div>
+      <div class="row">макет, форма</div>
+      <div class="bar">
+        <i class="navc">nav</i>
+        <i class="col" style="width:28%">42rem</i>
+        <i class="empty">поле не растягивает инпуты</i>
+      </div>
+    </div>
+  </div>
+  <div class="note">На телефоне это не «узкий десктоп». Таблицы из шести колонок складываются в список. Навигация — выезжающая колонка на CSS-checkbox, без обязательного JavaScript (как панели Edit у приложений уже сейчас).</div>
+</section>
+
+<section>
+  <h2>Информационная архитектура</h2>
+  <div class="ia">
+    <div>
+      <h3>Global administrator</h3>
+      <ul>
+        <li>Status</li>
+        <li>Domains → domain → delete</li>
+        <li>Deliveries → message</li>
+        <li>Mail queue</li>
+        <li>System log</li>
+        <li>Inbound <span class="tag">1.x</span> — скрыт, пока <code>INBOUND_RELAY_ENABLE</code> выключен</li>
+        <li>DMARC reports <span class="tag future">candidate</span></li>
+        <li>Backup, Users, Settings</li>
+        <li>Help <span class="tag future">candidate</span> — пункт навбара и drawer с карточек Status</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Domain-admin</h3>
+      <ul>
+        <li>Domains (только назначенные) → domain</li>
+        <li>Deliveries → message, включая пояснение retry</li>
+        <li>Settings — только учётные данные панели</li>
+        <li>Help drawer</li>
+        <li>Нет Status, очереди, system log, Backup, Users, inbound, глобального DMARC hub</li>
+      </ul>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:1rem">В прототипе роль, inbound-флаг, ширина и тема переключаются в шапке. <code>contributing</code> и <code>schema-squash</code> экранов не имеют.</p>
+</section>
+
+<section>
+  <h2>Знак и новые иконки</h2>
+  <p>Утверждённый stamp не заменяется. Для узкой шапки телефона предлагается уже существующий SP-значок (фавикон), а не компактный wordmark: на 390px высота важнее, чем прочитать «SelfPost» второй раз.</p>
+  <div class="mark-row">
+    <figure>
+      <img src="../selfpost-stamp.svg" width="220" height="100" alt="Полный знак">
+      <figcaption>эталон · login / setup</figcaption>
+    </figure>
+    <figure>
+      <img src="../selfpost-stamp-compact.svg" width="160" height="73" alt="Компактный знак">
+      <figcaption>колонка навбара</figcaption>
+    </figure>
+    <figure>
+      <img src="../selfpost-icon.svg" width="64" height="64" alt="SP">
+      <figcaption>телефон · шапка drawer</figcaption>
+    </figure>
+  </div>
+  <h3>Иконки новых пунктов</h3>
+  <p class="muted">Тот же штрих 1.5, что у Status / Domains. Не пиктограммы-эмодзи и не заливка.</p>
+  <div class="icons-row">
+    <div class="icon-card">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5h11"/><path d="M8 2.75v6.2"/><path d="M5.4 6.4 8 9.05 10.6 6.4"/><path d="M3.2 12.6h9.6"/></svg>
+      <span>Inbound</span>
+    </div>
+    <div class="icon-card">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.85 2.75 3.7v4.2c0 3.15 2.15 5.2 5.25 6.25 3.1-1.05 5.25-3.1 5.25-6.25V3.7Z"/><path d="M5.4 8.05 7.15 9.8 10.7 6.2"/></svg>
+      <span>DMARC</span>
+    </div>
+    <div class="icon-card">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.2V11.4"/><path d="M8 5.05v.01"/></svg>
+      <span>Help</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Экраны</h2>
+  <h3>Вход</h3>
+  <div class="screen-index">
+    <a href="app.html#login">Sign in</a>
+    <a href="app.html#setup">Create administrator</a>
+  </div>
+  <h3>Текущая панель</h3>
+  <div class="screen-index">
+    <a href="app.html#status">Status</a>
+    <a href="app.html#domains">Domains</a>
+    <a href="app.html#domain">Domain detail</a>
+    <a href="app.html#domain-delete">Delete domain</a>
+    <a href="app.html#deliveries">Deliveries</a>
+    <a href="app.html#delivery">Delivery (deferred + retries)</a>
+    <a href="app.html#mail-queue">Mail queue + retry policy</a>
+    <a href="app.html#system-log">System log</a>
+    <a href="app.html#backup">Backup</a>
+    <a href="app.html#users">Users</a>
+    <a href="app.html#user-form">Edit user</a>
+    <a href="app.html#user-delete">Delete user</a>
+    <a href="app.html#settings">Settings</a>
+  </div>
+  <h3>Roadmap</h3>
+  <div class="screen-index">
+    <a href="app.html#mail-queue">queue-retries — карточка на Mail queue</a>
+    <a href="app.html#delivery">queue-retries — history deferred</a>
+    <a href="app.html#inbound">Inbound list</a>
+    <a href="app.html#inbound-domain">Inbound domain</a>
+    <a href="app.html?inbound=0#status">Inbound выключен (пункта нет)</a>
+    <a href="app.html#dmarc">DMARC reports <span class="tag future">candidate</span></a>
+    <a href="app.html#help">Help <span class="tag future">candidate</span></a>
+  </div>
+  <h3>Аварийный телефон</h3>
+  <div class="screen-index">
+    <a href="app.html?view=phone#status">Status 390px — overall и warn сверху</a>
+    <a href="app.html?view=phone#mail-queue">Mail queue 390px</a>
+    <a href="app.html?view=phone#deliveries">Deliveries 390px — список, не таблица</a>
+    <a href="app.html?view=phone#delivery">Delivery 390px</a>
+  </div>
+</section>
+
+<section style="border-bottom:none">
+  <h2>Как смотреть</h2>
+  <p>Откройте <a href="app.html#status">app.html</a> в браузере. Шапка прототипа — не часть панели: роль, Desktop/Phone, inbound, светлая/тёмная. Копирайт экранов английский, как в продукте. Drawer Help открывается с карточек Status (кнопка «?») или из навбара.</p>
+  <p class="muted">После утверждения макетов вёрстка <code>panel.css</code> и шаблонов — отдельная задача. CSP и progressive enhancement в этом HTML не воспроизводятся один в один: здесь допустимы вещи, которые в панели останутся в файле стилей.</p>
+</section>
+
+</div>
+</body>
+</html>
