@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMARC reports — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-dmarc" data-page="dmarc" data-nav="dmarc" data-title="DMARC" data-global-only="1">
+<main class="stack">
+  <div class="page-head">
+    <h1>DMARC reports <span class="tag future">candidate</span></h1>
+  </div>
+  <p class="muted">Aggregate reports SelfPost accepted for <code>rua=</code>. Forensic (<code>ruf=</code>) is out of scope.</p>
+  <div class="pair">
+    <article class="card">
+      <h2>Ingest <span class="st st-ok">ok</span></h2>
+      <p>Last report 6 hours ago. 14 kept, 0 parse failures this week.</p>
+    </article>
+    <article class="card">
+      <h2>example.com <span class="st st-ok">pass</span></h2>
+      <p>98% aligned last 7 days. Tightening <code>p=</code> looks reasonable.</p>
+    </article>
+  </div>
+  <div class="fill">
+    <article class="card attn">
+      <h2>alerts.example.com <span class="st st-warn">fail</span></h2>
+      <p>A third-party sender is not in SPF/DKIM. See sources.</p>
+    </article>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Sources · last 7 days</h2>
+      <table class="desk-only">
+        <thead><tr><th>Domain</th><th>Source</th><th>Pass</th><th>Fail</th><th>Disposition</th></tr></thead>
+        <tbody>
+          <tr><td>example.com</td><td class="muted">203.0.113.10 (this relay)</td><td>412</td><td>2</td><td><span class="st st-ok">none</span></td></tr>
+          <tr><td>example.com</td><td class="muted">google.com / 66.102.0.0/20</td><td>0</td><td>6</td><td><span class="st st-warn">none</span></td></tr>
+          <tr><td>alerts.example.com</td><td class="muted">203.0.113.10 (this relay)</td><td>88</td><td>0</td><td><span class="st st-ok">none</span></td></tr>
+          <tr><td>alerts.example.com</td><td class="muted">unknown / 198.51.100.80</td><td>0</td><td>19</td><td><span class="st st-error">none</span></td></tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li><a href="domain.html"><span>example.com · this relay</span><span class="st st-ok">412 pass</span></a></li>
+        <li><a href="domain.html"><span>alerts.example.com · 198.51.100.80</span><span class="st st-error">19 fail</span></a></li>
+      </ul>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

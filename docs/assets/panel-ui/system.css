@@ -1,0 +1,127 @@
+/* Panel UI system primitives.
+   Source of truth: system.html. Screens are separate HTML files composed from
+   these classes. Do not “fix” empty columns, Host/Type height, or split
+   actions by one-off rules — compose with these instead. */
+
+.stack {
+  display: flex; flex-direction: column; gap: 1rem;
+  width: 100%; min-width: 0;
+}
+.stack > .card,
+.stack > .pair,
+.stack > .measure,
+.stack > .fill { margin-top: 0; }
+.stack > .card + .card { margin-top: 0; }
+
+.measure { width: 100%; max-width: var(--form-max); min-width: 0; }
+
+.fill { width: 100%; max-width: var(--ops-max); min-width: 0; }
+.fill > .card { margin-top: 0; }
+.fill .card:has(table) { overflow-x: auto; }
+
+/* Two peer jobs. One child → reading measure (domain-admin Settings).
+   Never a full-width lonely card on an ops page. */
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%; max-width: var(--ops-max); min-width: 0;
+}
+.pair > * { min-width: 0; }
+.card > .stack { min-width: 0; }
+.pair > .card { margin-top: 0; }
+.pair > .card + .card { margin-top: 0; }
+.pair:has(> :only-child) {
+  display: block;
+  max-width: var(--form-max);
+}
+
+.actions-row {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+  margin-top: 1.1rem;
+}
+.actions-row > button,
+.actions-row > a.btn,
+.actions-row > a.danger { margin-top: 0; }
+
+/* Two labelled controls on one row. Labels share row 1, values share row 2
+   so they are the same height by construction — not by matching padding. */
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(2.5rem, auto);
+  column-gap: 1rem;
+  align-items: stretch;
+  margin-top: 0.45rem;
+}
+.field-row.equal { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.field-row > .field { display: contents; }
+.field-row > .field:first-child > * { grid-column: 1; }
+.field-row > .field:last-child > * { grid-column: 2; }
+.field-row > .field > label { grid-row: 1; margin-top: 0.45rem; }
+.field-row > .field > :not(label) {
+  grid-row: 2; align-self: stretch; min-width: 0;
+  margin-top: 0.3rem; box-sizing: border-box;
+}
+.field-row > .field > .code,
+.field-row > .field > .code-row {
+  height: 100%;
+}
+.field-row > .field > .code {
+  display: flex; align-items: center;
+  padding-top: 0.45rem; padding-bottom: 0.45rem;
+}
+.field-row > .field:last-child > .code {
+  width: fit-content; min-width: 2.75rem;
+  justify-content: center; text-align: center;
+}
+.field-row .code-row {
+  display: flex; align-items: stretch; gap: 0.5rem; height: 100%;
+}
+.field-row .code-row .code {
+  flex: 1; min-width: 0; margin-top: 0; height: auto;
+  display: flex; align-items: center;
+  padding-top: 0.45rem; padding-bottom: 0.45rem;
+}
+.field-row .code-row .copy { margin-top: 0; align-self: stretch; }
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.card-head h2 { margin: 0; }
+
+@media (max-width: 52rem) {
+  .pair { grid-template-columns: 1fr; }
+  /* field-row stays two columns: Type is a token, not a second form. */
+}
+
+/* Specimens on the system page */
+.sys-wrap { max-width: 70rem; }
+.sys-wrap > header p,
+.sys-wrap section > p,
+.sys-wrap li { max-width: 68ch; }
+.sys-toc {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem;
+  margin: 1rem 0 0; padding: 0; list-style: none;
+}
+.sys-toc a { font-size: 0.92rem; }
+.specimen {
+  margin: 1rem 0 0; padding: 0.9rem 1rem 1.1rem;
+  border: 1px dashed var(--border); border-radius: 6px; background: var(--code-bg);
+}
+.specimen > figcaption {
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 0.7rem;
+}
+.specimen.bad {
+  border-color: var(--danger-border); background: var(--danger-bg);
+}
+.specimen.bad > figcaption { color: var(--danger-fg); }
+.recipes {
+  width: 100%; margin-top: 0.8rem; font-size: 0.92rem;
+}
+.recipes th, .recipes td { white-space: normal; vertical-align: top; }
+.recipes code { font-size: 0.82rem; }
+.forbid { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.forbid li { margin: 0.35rem 0; }

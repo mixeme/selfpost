@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SelfPost — система панели</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="doc">
+<div class="wrap sys-wrap">
+
+<header>
+  <p class="eyebrow">система · не рескин</p>
+  <h1>Self<b>Post</b> — грамматика интерфейса</h1>
+  <p>Это проект системы. Экраны складываются из регионов и контролов. Запрещённые состояния нельзя «починить паддингом» — их не из чего собрать. Знак, кирпич и IBM Plex не меняются. Живая панель (<code>internal/web</code>) пока не трогается.</p>
+  <div class="cta-row">
+    <a class="cta" href="#regions">Регионы</a>
+    <a class="cta quiet" href="#controls">Контролы</a>
+    <a class="cta quiet" href="#recipes">Экраны</a>
+    <a class="cta quiet" href="status.html">Макеты экранов</a>
+  </div>
+  <ul class="sys-toc">
+    <li><a href="#why">Зачем</a></li>
+    <li><a href="#regions">Регионы</a></li>
+    <li><a href="#card">Карточка</a></li>
+    <li><a href="#controls">Контролы</a></li>
+    <li><a href="#actions">Действия</a></li>
+    <li><a href="#forbid">Нельзя</a></li>
+    <li><a href="#recipes">Рецепты экранов</a></li>
+    <li><a href="#phone">Телефон</a></li>
+    <li><a href="#apply">Как внедрять</a></li>
+  </ul>
+</header>
+
+<section id="why">
+  <h2>Зачем</h2>
+  <p>Первый макет скопировал грамматику живой панели: страница помечается <code>ops</code> или <code>form</code>, карточки стопкой, пара полей — два независимых <code>.code</code>, Save внутри <code>&lt;form&gt;</code>, Delete снаружи. Дальше каждая мелочь чинилась отдельно — как в <code>panel.css</code> годами. Новый интерфейс должен <strong>не давать собрать</strong> пустую колонку, разные высоты Host/Type и кнопки на двух строках.</p>
+  <p>Три оси, которые больше не выбираются «на глаз» у каждой страницы:</p>
+  <ol>
+    <li><strong>Регион</strong> — как блок занимает ширину окна.</li>
+    <li><strong>Карточка</strong> — заголовок, справка, тело, действия.</li>
+    <li><strong>Контрол</strong> — одно поле или пара полей одной высоты.</li>
+  </ol>
+</section>
+
+<section id="regions">
+  <h2>Регионы</h2>
+  <p>Страница — это <code>stack</code> регионов, не класс на <code>&lt;main&gt;</code>. Оболочка одна: навбар прижат влево, контент забирает остаток. Навбар не прыгает, когда меняется содержимое.</p>
+  <table class="recipes">
+    <thead><tr><th>Регион</th><th>Ширина</th><th>Когда</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>measure</code></td>
+        <td>до 42rem, влево</td>
+        <td>Одна читаемая форма: login, setup, подтверждение удаления, форма пользователя. Не «вся страница Settings».</td>
+      </tr>
+      <tr>
+        <td><code>pair</code></td>
+        <td>две колонки до 90rem</td>
+        <td>Две равноправные задачи на одном экране. Один ребёнок — сам сжимается в <code>measure</code> (domain-admin без DMARC).</td>
+      </tr>
+      <tr>
+        <td><code>fill</code></td>
+        <td>до 90rem</td>
+        <td>Таблица, лог, DNS-статус, список приложений. Ячейки не переносят однострочные значения; карточка скроллится по X.</td>
+      </tr>
+      <tr>
+        <td><code>stack</code></td>
+        <td>колонка с зазором</td>
+        <td>Вертикальный порядок регионов. Зазор даёт <code>gap</code>, не <code>.card + .card</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <figure class="specimen bad">
+    <figcaption>Нельзя — страница-форма, две задачи стопкой</figcaption>
+    <div class="measure">
+      <div class="card">
+        <h2>Full backup</h2>
+        <p class="muted">Карточка узкая. Справа пустое поле на 1600px.</p>
+        <button type="button">Download</button>
+      </div>
+      <div class="card">
+        <h2>Import a domain</h2>
+        <p class="muted">Вторая задача под первой — та же пустота.</p>
+        <button type="button">Import</button>
+      </div>
+    </div>
+  </figure>
+
+  <figure class="specimen">
+    <figcaption>Надо — pair</figcaption>
+    <div class="pair">
+      <div class="card">
+        <h2>Full backup</h2>
+        <p class="muted">Секрет. Шифрование — внутри карточки, поля не растягиваются на 1440px.</p>
+        <div class="actions-row"><button type="button">Download full backup</button></div>
+      </div>
+      <div class="card">
+        <h2>Import a domain</h2>
+        <p class="muted">Тот же экран, вторая задача. Не «ещё одна форма ниже».</p>
+        <div class="actions-row"><button type="button">Import domain</button></div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<section id="card">
+  <h2>Карточка</h2>
+  <p>Один хром: <code>card-head</code> (заголовок + слот «?»), тело, при необходимости <code>actions-row</code>. Справка — часть хрома, её не расставляют после того, как карточки уже собраны. Нет «?» — слот пустой, заголовки соседних карточек всё равно на одной линии.</p>
+  <p>Показания (очередь, PTR, CPU) остаются на карточке. В drawer уходит только то, чего на карточке быть не должно: что такое kernel counter, зачем PTR у провайдера, почему пароль показывают один раз.</p>
+  <figure class="specimen">
+    <figcaption>Хром карточки</figcaption>
+    <div class="pair">
+      <div class="card">
+        <div class="card-head">
+          <h2>DNS status <span class="st st-ok">ok</span></h2>
+          <span class="help-link" title="What these checks mean">?</span>
+        </div>
+        <p class="muted">Чтение и Re-check здесь. Абзац «зачем MX» — в справке.</p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Danger zone</h2>
+        </div>
+        <p class="muted">Без «?»: действие очевидное. Карточка всё равно пара к форме, не на всю ширину.</p>
+        <div class="actions-row"><a class="danger" href="#forbid">Delete inbound domain</a></div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<section id="controls">
+  <h2>Контролы</h2>
+  <p>Одно поле — <code>field</code> (подпись + контроль). Два поля в ряд — <code>field-row</code>: подписи в первой сетке-строке, значения во второй. Высота значений общая, потому что это одна строка грида, а не два блока с подобранным padding. Баг «Type ниже Host» (<code>b0ebe06</code>) из этой разметки не собирается.</p>
+  <p><code>field-row</code> с узкой второй колонкой — Host / name ‖ Type. <code>field-row equal</code> — два равноправных инпута (лимит и окно).</p>
+
+  <figure class="specimen">
+    <figcaption>field-row — Host ‖ Type, с Copy и без</figcaption>
+    <div class="pair">
+      <div class="card">
+        <h2>With Copy</h2>
+        <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <div class="code-row">
+              <span class="code">mail._domainkey.example.com</span>
+              <button type="button" class="copy">Copy</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Lookup, no Copy</h2>
+        <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <span class="code">lists.example.com</span>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">MX</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <figure class="specimen">
+    <figcaption>field-row equal — лимит ‖ окно</figcaption>
+    <div class="measure">
+      <div class="card">
+        <h2>Level-2 rate limit</h2>
+        <div class="field-row equal">
+          <div class="field">
+            <label>Message limit</label>
+            <input value="40">
+          </div>
+          <div class="field">
+            <label>Window (seconds)</label>
+            <input value="60">
+          </div>
+        </div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<section id="actions">
+  <h2>Действия</h2>
+  <p>Primary, secondary и danger — всегда <code>actions-row</code>. Для вёрстки неважно, POST это или переход на confirm: ряд один. Форма либо оборачивает всю карточку, либо кнопки несут <code>form=</code>. Нельзя оставить Submit внутри блочной формы, а Delete — следующим соседом: блок формы занимает строку целиком.</p>
+  <figure class="specimen">
+    <figcaption>Save и Delete в одном ряду</figcaption>
+    <div class="measure">
+      <div class="card">
+        <h2>Edit user</h2>
+        <label>Username</label>
+        <input value="ops-alerts">
+        <div class="actions-row">
+          <button type="button">Save</button>
+          <a class="danger" href="#forbid">Delete user</a>
+        </div>
+      </div>
+    </div>
+  </figure>
+</section>
+
+<section id="forbid">
+  <h2>Нельзя</h2>
+  <p>Если хочется добавить правило «только на этой странице» — сначала проверить, какого региона не хватило.</p>
+  <ul class="forbid">
+    <li>Класс на <code>main</code> (<code>ops</code> / <code>form</code>) как способ выбрать ширину. Ширину выбирает регион.</li>
+    <li>Одиночная карточка на 90rem с двумя полями ввода. Это <code>measure</code> или <code>pair</code>.</li>
+    <li>Danger zone отдельным <code>fill</code>. Она вторая колонка последней пары (получатели ‖ удалить, экспорт ‖ удалить).</li>
+    <li>Два <code>.code</code> рядом с разным padding, чтобы «почти совпало». Только <code>field-row</code>.</li>
+    <li>Submit внутри <code>&lt;form&gt;</code>, danger-ссылка после <code>&lt;/form&gt;</code>.</li>
+    <li>Перенос однострочного поля, адреса, статуса, hostname. <code>nowrap</code> + горизонтальный скролл карточки.</li>
+    <li>Status из одних бейджей без Detail / без строки очереди / без PTR.</li>
+    <li>Телефон как уменьшенный десктоп с шестиколоночной таблицей. Таблица → список; <code>pair</code> → одна колонка; <code>field-row</code> остаётся парой.</li>
+    <li>Копировать разметку <code>internal/web/view/templates</code> «как есть» в макет. Рецепт экрана — ниже, не шаблон Go.</li>
+  </ul>
+</section>
+
+<section id="recipes">
+  <h2>Рецепты экранов</h2>
+  <p>Экраны — отдельные HTML-файлы рядом с этой спецификацией. Собираются только так:</p>
+  <table class="recipes">
+    <thead><tr><th>Экран</th><th>Стек регионов</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><a href="login.html">Login</a> / <a href="setup.html">setup</a></td>
+        <td>центр оболочки, <code>measure</code> 24rem, полный stamp</td>
+      </tr>
+      <tr>
+        <td><a href="status.html">Status</a></td>
+        <td><code>stack</code>: overall → <code>pair</code> очередь‖TLS → <code>pair</code> milters‖PTR → inbound если есть → <code>pair</code> machine‖processes → configuration. На карточках остаются числа и Detail.</td>
+      </tr>
+      <tr>
+        <td><a href="domains.html">Domains</a> / <a href="deliveries.html">Deliveries</a> / <a href="system-log.html">log</a> / <a href="mail-queue.html">queue</a></td>
+        <td><code>fill</code> таблица. Добавление домена — <code>measure</code> или узкая карточка над таблицей, не растянутый инпут.</td>
+      </tr>
+      <tr>
+        <td><a href="domain.html">Domain</a></td>
+        <td><code>fill</code> DNS status → <code>pair</code> DKIM/SPF ‖ DMARC → <code>pair</code> connection ‖ add app → <code>fill</code> applications → <code>pair</code> domain settings (две половины) → <code>pair</code> export ‖ danger. «?» на рабочих карточках.</td>
+      </tr>
+      <tr>
+        <td><a href="inbound-domain.html">Inbound domain</a></td>
+        <td><code>fill</code> MX DNS → <code>pair</code> upstream ‖ MX to publish → <code>pair</code> recipients ‖ danger</td>
+      </tr>
+      <tr>
+        <td><a href="backup.html">Backup</a></td>
+        <td><code>pair</code> full backup ‖ import</td>
+      </tr>
+      <tr>
+        <td><a href="settings.html">Settings</a></td>
+        <td>global: <code>pair</code> credentials ‖ DMARC, затем <code>fill</code> rate limits. Domain-admin: один ребёнок в <code>pair</code> → сам <code>measure</code></td>
+      </tr>
+      <tr>
+        <td><a href="users.html">Users</a></td>
+        <td><code>fill</code> таблица. <a href="user-form.html">Create/Edit</a> — <code>measure</code> + <code>actions-row</code></td>
+      </tr>
+      <tr>
+        <td><a href="domain-delete.html">Confirm delete</a></td>
+        <td><code>measure</code> одна карточка</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="phone">
+  <h2>Телефон</h2>
+  <p>Аварийный доступ, не продукт. <code>pair</code> складывается в одну колонку. Таблица заменяется списком (как сейчас в прототипе). <code>field-row</code> не складывается: Type — токен. Навбар — выезжающая колонка на checkbox, без обязательного JS. Знак в шапке — SP-иконка, не второй wordmark.</p>
+</section>
+
+<section id="apply" style="border-bottom:none">
+  <h2>Как внедрять</h2>
+  <ol>
+    <li>Новый экран или правка макета — только классы из <code>system.css</code> (<code>stack</code>, <code>pair</code>, <code>measure</code>, <code>fill</code>, <code>field-row</code>, <code>actions-row</code>).</li>
+    <li>Не добавлять исключения в <code>mock.css</code> «для этой страницы», если это ширина, высота пары полей или ряд кнопок.</li>
+    <li>Click-through — отдельные страницы (<code>status.html</code>, <code>domain.html</code>, …), не простыня с якорями. Оболочка общая: <code>shell.js</code>.</li>
+    <li>Вёрстка <code>internal/web</code> — отдельная задача после утверждения системы, не параллельный рескин шаблонов.</li>
+  </ol>
+  <p class="muted">Классы живут в <code>docs/assets/panel-ui/system.css</code>. Этот файл — спецификация. Экраны — <a href="status.html">status.html</a> и соседние страницы; оглавление — <a href="index.html">index.html</a>.</p>
+</section>
+
+</div>
+</body>
+</html>

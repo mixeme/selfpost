@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-settings" data-page="settings" data-nav="settings" data-title="Settings">
+<main class="stack">
+  <h1>Settings</h1>
+  <form class="stack" action="#" onsubmit="return false">
+    <div class="pair">
+      <div class="card">
+        <h2>Panel credentials</h2>
+        <p class="muted">These are the credentials for this control panel only. Applications keep their own logins and passwords, which are not affected.</p>
+        <label>Username</label><input value="admin" autocomplete="username">
+        <label>Current password</label><input type="password" autocomplete="current-password">
+        <label>New password</label><input type="password" autocomplete="new-password">
+        <label>Confirm new password</label><input type="password">
+        <div class="actions-row"><button type="button">Save changes</button></div>
+        <p class="muted">Leave both new-password fields empty to change the username or DMARC address only. Changing the password signs out every other session; this one stays signed in.</p>
+      </div>
+      <div class="card g-only">
+        <h2>DMARC aggregate reports</h2>
+        <p class="muted">Default <code>rua=</code> for every sending domain (overridable per domain). When ingest is on, this can be an address SelfPost accepts.</p>
+        <label>Default report address</label>
+        <input type="email" value="dmarc@mail.example.org">
+        <p class="muted">When <code>rua=</code> points at another domain, that hub must publish a report-authorisation record. <a href="dmarc.html">DMARC reports</a> in the panel.</p>
+        <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <div class="code-row"><span class="code">mail.example.org._report._dmarc.example.com</span><button type="button" class="copy">Copy</button></div>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+        <label>Value</label>
+        <div class="code-row"><span class="code">v=DMARC1;</span><button type="button" class="copy">Copy</button></div>
+        <label>Report authorization DNS <span class="st st-ok">ok</span></label>
+        <p class="muted">Published at mail.example.org._report._dmarc.example.com — aggregate reports addressed to dmarc@mail.example.org are authorised.</p>
+      </div>
+    </div>
+  </form>
+  <div class="fill g-only">
+    <div class="card" id="rate-limits">
+      <h2>Sending rate limits</h2>
+      <p class="muted">Level 1 is set in Compose; restart the container to change it. Domain and application ceilings live on each domain’s page.</p>
+      <div class="check-cols">
+        <div class="check-col">
+          <p class="check-col-title">Level 1 — per client IP</p>
+          <span class="code">100 messages / 60 seconds</span>
+          <p class="muted"><code>RATE_LIMIT_MESSAGES_PER_IP</code> / <code>RATE_LIMIT_WINDOW_SECONDS</code>. Hard ceiling for every connecting IP; the panel cannot raise a domain or application limit above this.</p>
+        </div>
+        <div class="check-col">
+          <p class="check-col-title">Level 2 — domain</p>
+          <p class="muted">Optional ceiling for <em>all</em> senders on a domain. When unset, only level 1 applies. Must be ≤ level 1.</p>
+        </div>
+        <div class="check-col">
+          <p class="check-col-title">Level 2 — application</p>
+          <p class="muted">Optional override for trusted IPs: a ceiling strictly above the domain limit (still ≤ level 1). Those IPs skip the domain check; everyone else stays under the domain (or level 1).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit user — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-user-form" data-page="user-form" data-nav="users" data-title="Edit user" data-global-only="1">
+<main class="stack">
+  <div>
+    <h1>Edit user</h1>
+    <a class="back" href="users.html">&larr; Back to users</a>
+  </div>
+  <div class="measure">
+    <div class="card">
+      <form action="#" onsubmit="return false">
+        <label>Username</label>
+        <input value="ops-alerts">
+        <label>Password (leave empty to keep)</label>
+        <input type="password">
+        <label>Role</label>
+        <select><option selected>Domain administrator</option><option>Global administrator</option></select>
+        <fieldset>
+          <legend>Assigned domains</legend>
+          <p class="muted">Required for domain administrators.</p>
+          <label class="check"><input type="checkbox"> example.com</label>
+          <label class="check"><input type="checkbox" checked> alerts.example.com</label>
+        </fieldset>
+        <div class="actions-row">
+          <button type="button">Save</button>
+          <a class="danger" href="user-delete.html">Delete user</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

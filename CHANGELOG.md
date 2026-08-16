@@ -24,6 +24,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   row; help «?» on domain cards; Host/name ‖ Type height matched to the live
   panel (`b0ebe06`).
 
+- docs: panel UI design system and mockups rebuilt as separate pages
+  (`system.html`, `status.html`, `domain.html`, …), not one hash sheet.
+  Regions are `stack` / `pair` / `measure` / `fill`; Host ‖ Type is
+  `field-row`; Save + Delete is `actions-row`. Shared chrome is `shell.js`.
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete lists.example.com — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-inbound-delete" data-page="inbound-delete" data-nav="inbound" data-title="Delete inbound" data-global-only="1">
+<main class="stack">
+  <div>
+    <h1>Delete lists.example.com</h1>
+    <a class="back" href="inbound-domain.html">&larr; Back to lists.example.com</a>
+  </div>
+  <div class="measure">
+    <div class="card">
+      <h2>Confirm deletion</h2>
+      <p>You are about to stop accepting inbound mail for <strong>lists.example.com</strong>. This will:</p>
+      <ul>
+        <li>remove it from <code>relay_domains</code> and the recipient map;</li>
+        <li>stop forwarding to <strong>10.0.0.8:25</strong>;</li>
+        <li>leave outbound sending domains untouched.</li>
+      </ul>
+      <p class="muted">This cannot be undone from a backup of inbound maps alone unless you restore one. Remove the MX if you do not plan to re-add the domain.</p>
+      <div class="actions-row"><button type="button" class="danger">Delete lists.example.com</button></div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

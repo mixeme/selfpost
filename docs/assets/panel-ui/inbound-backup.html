@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>backup.example.net — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-inbound-backup" data-page="inbound-backup" data-nav="inbound" data-title="backup.example.net" data-global-only="1">
+<main class="stack">
+  <div>
+    <h1>backup.example.net</h1>
+    <a class="back" href="inbound.html">&larr; All inbound domains</a>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>DNS status <span class="st st-error">error</span></h2>
+      <p class="muted">Cached a few minutes — use <em>Re-check</em> after publishing. Unlike outbound, inbound needs an MX pointing at this server.</p>
+      <label>MX <span class="st st-error">error</span></label>
+      <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <span class="code">backup.example.net</span>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">MX</span>
+          </div>
+        </div>
+      <label>Value</label>
+      <span class="code">10 mail.primary.example.net.</span>
+      <p class="error">No MX points at mail.example.org (this server). Publish the record below, or wait for DNS to propagate and Re-check.</p>
+      <div class="actions-row"><button type="button">Re-check</button></div>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card">
+      <h2>Upstream</h2>
+      <p class="muted">Where accepted mail is handed off. Not a mailbox.</p>
+      <label>Host</label><input value="192.0.2.20">
+      <label>Port</label><input value="25">
+      <label>TLS to upstream</label>
+      <select><option>Opportunistic</option><option>Required</option><option selected>Off</option></select>
+      <div class="actions-row"><button type="button">Save upstream</button></div>
+    </div>
+    <div class="card">
+      <h2>MX record to publish</h2>
+      <p class="muted">Add this MX so the internet delivers here. Keep any existing primary MX if this is backup-MX.</p>
+      <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <div class="code-row"><span class="code">backup.example.net</span><button type="button" class="copy">Copy</button></div>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">MX</span>
+          </div>
+        </div>
+      <label>Value</label>
+      <div class="code-row"><span class="code">20 mail.example.org.</span><button type="button" class="copy">Copy</button></div>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card rcpt-mode">
+      <h2>Valid recipients</h2>
+      <p class="muted">Who this domain accepts on port 25. Same idea as an application’s address mode: a list, or any address at the domain.</p>
+      <label>Who to accept</label>
+      <select>
+        <option value="list">Listed addresses only</option>
+        <option value="any" selected>Any recipient at this domain</option>
+      </select>
+      <div class="rcpt-list">
+        <label>Addresses (one per line or comma-separated)</label>
+        <textarea rows="6">postmaster@backup.example.net
+abuse@backup.example.net</textarea>
+        <p class="muted">Unknown recipients are rejected at RCPT so this relay does not generate backscatter.</p>
+      </div>
+      <p class="rcpt-any muted">Every address at this domain is accepted and forwarded. Prefer a list unless the upstream rejects unknowns — otherwise this relay may generate backscatter.</p>
+      <div class="actions-row"><button type="button">Save recipients</button></div>
+    </div>
+    <div class="card">
+      <h2>Danger zone</h2>
+      <p class="muted">Stops accepting mail for this domain. Does not touch outbound sending domains.</p>
+      <div class="actions-row"><a class="danger" href="inbound-delete.html">Delete inbound domain</a></div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

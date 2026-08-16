@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backup &amp; migration — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-backup" data-page="backup" data-nav="backup" data-title="Backup" data-global-only="1">
+<main class="stack">
+  <h1>Backup &amp; migration</h1>
+  <div class="pair">
+    <div class="card">
+      <h2>Full backup</h2>
+      <p class="muted">Download a full backup of all persistent state — the database, every domain’s DKIM key and the application credentials. Restore into a container of the <strong>same SelfPost version</strong>, with the same data mount, before first start. TLS certificates and the mail queue are not included.</p>
+      <p class="muted"><strong>The backup file is a secret.</strong> Encrypting it is the simplest way to store it: the download is then a <code>.spbk</code> that only the password opens.</p>
+      <div class="encrypt">
+        <label class="check"><input type="checkbox" checked> <span>Encrypt with a password</span></label>
+        <div class="encrypt-fields">
+          <label>Password</label><input type="password" placeholder="at least 8 characters">
+          <label>Repeat password</label><input type="password">
+          <p class="muted">Keep this password: without it the file cannot be opened.</p>
+        </div>
+      </div>
+      <div class="actions-row"><button type="button">Download full backup</button></div>
+    </div>
+    <div class="card">
+      <h2>Import a domain</h2>
+      <p class="muted">Move a single domain here from another SelfPost instance — plain <code>.json</code> or encrypted <code>.spde</code>. Its DKIM key and application passwords come across, so the published DNS record needs no change. The export file is a secret, like a full backup.</p>
+      <label>Domain export file</label>
+      <input type="file">
+      <label>Password</label>
+      <input type="password" autocomplete="off">
+      <p class="muted">Needed for a <code>.spde</code> file. Leave empty for plain <code>.json</code>.</p>
+      <div class="actions-row"><button type="button">Import domain</button></div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

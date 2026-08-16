@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>example.com — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-domain" data-page="domain" data-nav="domains" data-title="example.com">
+<main class="stack">
+  <div>
+    <h1>example.com</h1>
+    <a class="back" href="domains.html">&larr; All domains</a>
+  </div>
+  <div class="measure">
+    <div class="card credential" id="new-credential">
+      <div class="card-head">
+        <h2>New application password</h2>
+        <label class="help-link" for="help-password" title="Why this is shown once">?</label>
+      </div>
+      <p class="muted">Shown <strong>once only</strong> and not stored. Copy it now.</p>
+      <label>Login</label>
+      <div class="code-row"><span class="code">newsletter</span><button type="button" class="copy">Copy</button></div>
+      <label>Password</label>
+      <div class="code-row"><span class="code">xK.9fQ2m-pL7wR</span><button type="button" class="copy">Copy</button></div>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card" id="dns-status">
+      <div class="card-head">
+        <h2>DNS status <span class="st st-ok">ok</span></h2>
+        <label class="help-link" for="help-dns" title="What these checks mean">?</label>
+      </div>
+      <div class="stack">
+      <div class="pair">
+        <div>
+          <label>DKIM <span class="st st-ok">ok</span></label>
+          <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <span class="code">mail._domainkey.example.com</span>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+        </div>
+        <div>
+          <label>SPF <span class="st st-ok">ok</span></label>
+          <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <span class="code">example.com</span>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+        </div>
+      </div>
+      <div class="pair">
+        <div>
+          <label>DMARC <span class="st st-ok">ok</span></label>
+          <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <span class="code">_dmarc.example.com</span>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+          <p class="muted">p=none; rua points at SelfPost ingest.</p>
+        </div>
+        <div>
+          <label>Report authorization</label>
+          <p class="muted">Not required (rua= is on a domain SelfPost accepts).</p>
+        </div>
+      </div>
+      </div>
+      <div class="actions-row"><button type="button">Re-check</button></div>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card" id="dkim-spf">
+      <div class="card-head">
+        <h2>DKIM and SPF records</h2>
+        <label class="help-link" for="help-records" title="What to publish">?</label>
+      </div>
+      <p class="check-col-title">DKIM</p>
+      <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <div class="code-row"><span class="code">mail._domainkey.example.com</span><button type="button" class="copy">Copy</button></div>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+      <label>Value</label>
+      <div class="code-row"><span class="code">v=DKIM1; k=rsa; p=MIIBIjANBgkqh…</span><button type="button" class="copy">Copy</button></div>
+      <p class="check-col-title">SPF</p>
+      <div class="code-row"><span class="code">v=spf1 ip4:203.0.113.10 -all</span><button type="button" class="copy">Copy</button></div>
+    </div>
+    <div class="card" id="dmarc-record">
+      <div class="card-head">
+        <h2>DMARC record</h2>
+        <label class="help-link" for="help-dmarc" title="What this record does">?</label>
+      </div>
+      <div class="field-row">
+          <div class="field">
+            <label>Host / name</label>
+            <div class="code-row"><span class="code">_dmarc.example.com</span><button type="button" class="copy">Copy</button></div>
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <span class="code">TXT</span>
+          </div>
+        </div>
+      <label>Value <span class="muted">(from Settings)</span></label>
+      <div class="code-row"><span class="code">v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org</span><button type="button" class="copy">Copy</button></div>
+      <p class="muted"><a href="dmarc.html">Open DMARC reports</a> for this domain.</p>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card" id="connection">
+      <div class="card-head">
+        <h2>Connection settings</h2>
+        <label class="help-link" for="help-connection" title="How to connect">?</label>
+      </div>
+      <label>Server</label>
+      <div class="code-row"><span class="code">mail.example.org</span><button type="button" class="copy">Copy</button></div>
+      <label>Port and encryption</label>
+      <span class="code">465 — SSL/TLS (implicit)
+587 — STARTTLS (submission)</span>
+    </div>
+    <div class="card" id="add-application">
+      <div class="card-head">
+        <h2>Add an application</h2>
+        <label class="help-link" for="help-apps" title="What an application is">?</label>
+      </div>
+      <form action="#" onsubmit="return false">
+        <label>Login</label>
+        <input placeholder="prod-server" autocomplete="off">
+        <label>Address mode</label>
+        <select><option>Any address of the domain</option><option>Specific addresses (list)</option></select>
+        <div class="actions-row"><button type="button">Create application</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card" id="applications">
+      <div class="card-head">
+        <h2>Applications</h2>
+        <label class="help-link" for="help-apps" title="Address mode and rate limits">?</label>
+      </div>
+      <ul class="apps">
+        <li class="app-item">
+          <p class="app-login">newsletter</p>
+          <p class="app-addr muted">Any address of the domain — *@example.com</p>
+          <div class="actions">
+            <input class="panel-toggle t-edit" id="edit-1" type="checkbox" checked>
+            <label class="toggle for-edit" for="edit-1">Edit <span class="st st-ok">limit</span></label>
+            <button type="button">New password</button>
+            <button type="button" class="danger">Delete</button>
+            <div class="panel panel-edit">
+              <div class="pair">
+                <div>
+                  <p class="check-col-title">Address mode</p>
+                  <select><option selected>Any address of the domain</option><option>Specific addresses (list)</option></select>
+                </div>
+                <div>
+                  <p class="check-col-title">Trusted-IP override <span class="st st-ok">active</span></p>
+                  <textarea rows="1">203.0.113.40</textarea>
+                  <div class="field-row equal">
+                    <div class="field">
+                      <label>Message limit</label>
+                      <input value="80">
+                    </div>
+                    <div class="field">
+                      <label>Window (seconds)</label>
+                      <input value="60">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="app-item">
+          <p class="app-login">billing</p>
+          <p class="app-addr muted">Fixed list — invoices@example.com</p>
+          <div class="actions">
+            <button type="button">Edit</button>
+            <button type="button">New password</button>
+            <button type="button" class="danger">Delete</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card" id="domain-settings-dmarc">
+      <div class="card-head">
+        <h2>DMARC reports</h2>
+        <label class="help-link" for="help-domain-settings" title="Reports and rate limits">?</label>
+      </div>
+      <label>Aggregate reports (rua=)</label>
+      <select><option selected>Same as Settings (dmarc@mail.example.org)</option><option>No aggregate reports</option><option>Custom address</option></select>
+      <div class="actions-row"><button type="button">Save DMARC report settings</button></div>
+    </div>
+    <div class="card" id="domain-settings-limit">
+      <div class="card-head">
+        <h2>Level-2 rate limit <span class="st st-ok">active</span></h2>
+      </div>
+      <div class="field-row equal">
+        <div class="field">
+          <label>Message limit</label>
+          <input value="40">
+        </div>
+        <div class="field">
+          <label>Window (seconds)</label>
+          <input value="60">
+        </div>
+      </div>
+      <div class="actions-row"><button type="button">Save limit</button></div>
+    </div>
+  </div>
+  <div class="pair">
+    <div class="card" id="export-domain">
+      <div class="card-head">
+        <h2>Export domain</h2>
+        <label class="help-link" for="help-export" title="What the file contains">?</label>
+      </div>
+      <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt as <code>.spde</code>.</p>
+      <div class="encrypt">
+        <label class="check"><input type="checkbox"> <span>Encrypt with a password</span></label>
+        <div class="encrypt-fields">
+          <label>Password</label><input type="password">
+          <label>Repeat password</label><input type="password">
+        </div>
+      </div>
+      <div class="actions-row"><button type="button">Export domain</button></div>
+    </div>
+    <div class="card g-only">
+      <h2>Danger zone</h2>
+      <p class="muted">Deletes the DKIM key and every application on this domain.</p>
+      <div class="actions-row"><a class="danger" href="domain-delete.html">Delete domain</a></div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

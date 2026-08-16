@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Domains — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-domains" data-page="domains" data-nav="domains" data-title="Domains">
+<main class="stack">
+  <div class="page-head"><h1>Domains</h1></div>
+  <div class="measure g-only">
+    <div class="card">
+      <h2>Add a sending domain</h2>
+      <form action="#" onsubmit="return false;">
+        <label for="dname">Domain</label>
+        <div class="input-row">
+          <input id="dname" placeholder="example.com" autocomplete="off">
+          <button type="button">Add domain</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Domains</h2>
+      <table class="desk-only">
+        <thead><tr><th>Domain</th><th>DNS</th><th>Selector</th><th>Apps</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="domain.html">example.com</a></td>
+            <td><a class="st st-ok" href="domain.html">ok</a></td>
+            <td class="muted">mail</td>
+            <td>2</td>
+            <td class="actions g-only"><a class="danger" href="domain-delete.html">Delete</a></td>
+          </tr>
+          <tr>
+            <td><a href="domain.html">alerts.example.com</a></td>
+            <td><a class="st st-warn" href="domain.html">warn</a></td>
+            <td class="muted">mail</td>
+            <td>1</td>
+            <td class="actions g-only"><a class="danger" href="domain-delete.html">Delete</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li><a href="domain.html"><span>example.com</span><span class="st st-ok">ok</span><span class="meta">2 apps · selector mail</span></a></li>
+        <li><a href="domain.html"><span>alerts.example.com</span><span class="st st-warn">warn</span><span class="meta">1 app · selector mail</span></a></li>
+      </ul>
+      <p class="muted">The DNS badge is the worst of DKIM, SPF and DMARC. Open a domain for details.</p>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

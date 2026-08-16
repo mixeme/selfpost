@@ -1,0 +1,22 @@
+---
+description: Panel UI mockups use the design system primitives, not a reskin of live templates.
+globs: docs/assets/panel-ui/**
+alwaysApply: false
+---
+
+# Panel UI system
+
+Source of truth: [docs/assets/panel-ui/system.html](docs/assets/panel-ui/system.html) and `system.css`.
+
+Do not copy `internal/web/view/templates` into mockups. Do not mark `<main>` as `ops`/`form` to pick width. Do not fix empty columns, Host/Type height, or split Save/Delete with one-off CSS.
+
+Compose screens from `stack`, `pair`, `measure`, `fill`, `field-row`, `actions-row`:
+- Two peer jobs → `pair` (one child shrinks to `measure`).
+- Tables/logs/DNS → `fill` (nowrap + overflow-x on the card).
+- Confirm/login/user form → `measure`.
+- Host ‖ Type and two equal inputs → `field-row` (shared grid row, not two `.code` paddings).
+- Save + Delete → `actions-row` inside the card; never submit inside `<form>` and danger after `</form>`.
+- Danger zone is the second column of the last `pair`, never a full-width `fill`.
+- Card chrome is title + optional `?` + body + actions. Help is not sprinkled later.
+- Phone: `pair` stacks; `field-row` does not; tables become lists.
+- One screen is one HTML file. Shared chrome is `shell.js`. Do not put every screen in one hash-SPA.

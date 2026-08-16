@@ -171,52 +171,28 @@ body:has(#theme-dark:checked) { background: #16181b; color: #e9e6e0; }
   font-weight: 600; color: var(--accent-text); background: var(--nav-active-bg);
   box-shadow: inset 2px 0 0 var(--accent-fill);
 }
-html:not(:has(.screen:target)) .n-status,
-body:has(#status:target) .n-status,
-body:has(#domains:target) .n-domains,
-body:has(#domain:target) .n-domains,
-body:has(#domain-delete:target) .n-domains,
-body:has(#deliveries:target) .n-deliveries,
-body:has(#delivery:target) .n-deliveries,
-body:has(#mail-queue:target) .n-queue,
-body:has(#system-log:target) .n-log,
-body:has(#inbound:target) .n-inbound,
-body:has(#inbound-domain:target) .n-inbound,
-body:has(#inbound-backup:target) .n-inbound,
-body:has(#inbound-delete:target) .n-inbound,
-body:has(#dmarc:target) .n-dmarc,
-body:has(#backup:target) .n-backup,
-body:has(#users:target) .n-users,
-body:has(#user-form:target) .n-users,
-body:has(#user-delete:target) .n-users,
-body:has(#help:target) .n-help,
-body:has(#settings:target) .n-settings {
+body.page-status .n-status,
+body.page-domains .n-domains,
+body.page-domain .n-domains,
+body.page-domain-delete .n-domains,
+body.page-deliveries .n-deliveries,
+body.page-delivery .n-deliveries,
+body.page-mail-queue .n-queue,
+body.page-system-log .n-log,
+body.page-inbound .n-inbound,
+body.page-inbound-domain .n-inbound,
+body.page-inbound-backup .n-inbound,
+body.page-inbound-delete .n-inbound,
+body.page-dmarc .n-dmarc,
+body.page-backup .n-backup,
+body.page-users .n-users,
+body.page-user-form .n-users,
+body.page-user-delete .n-users,
+body.page-help .n-help,
+body.page-settings .n-settings {
   font-weight: 600; color: var(--accent-text); background: var(--nav-active-bg);
   box-shadow: inset 2px 0 0 var(--accent-fill);
 }
-.pt { display: none; }
-html:not(:has(.screen:target)) .pt-status,
-body:has(#status:target) .pt-status,
-body:has(#login:target) .pt-login,
-body:has(#setup:target) .pt-setup,
-body:has(#domains:target) .pt-domains,
-body:has(#domain:target) .pt-domain,
-body:has(#domain-delete:target) .pt-domain,
-body:has(#deliveries:target) .pt-deliveries,
-body:has(#delivery:target) .pt-delivery,
-body:has(#mail-queue:target) .pt-queue,
-body:has(#system-log:target) .pt-log,
-body:has(#inbound:target) .pt-inbound,
-body:has(#inbound-domain:target) .pt-inbound-domain,
-body:has(#inbound-backup:target) .pt-inbound-backup,
-body:has(#inbound-delete:target) .pt-inbound-domain,
-body:has(#dmarc:target) .pt-dmarc,
-body:has(#backup:target) .pt-backup,
-body:has(#users:target) .pt-users,
-body:has(#user-form:target) .pt-users,
-body:has(#user-delete:target) .pt-users,
-body:has(#help:target) .pt-help,
-body:has(#settings:target) .pt-settings { display: inline; }
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
 .nav button, .nav .btn-ghost {
   display: flex; align-items: center; gap: 0.5rem;
@@ -246,28 +222,27 @@ main {
   flex: 1 1 auto; min-width: 0; width: 100%;
   padding: 1.5rem 1.5rem 2.5rem;
 }
-main.ops { max-width: var(--ops-max); }
-main.form { max-width: calc(var(--form-max) + 3rem); }
-main.form .measure, main.form > :not(.phone-bar) { max-width: var(--form-max); }
 main.auth {
   max-width: none; display: flex; flex-direction: column; align-items: center;
   padding-top: 3rem;
 }
 main.auth > * { width: 100%; max-width: var(--auth-max); margin-left: auto; margin-right: auto; }
+main.stack > .page-head,
+main.stack > h1 { margin-bottom: 0; }
+main.stack > .back { margin: 0; }
+main.stack > .route { margin-top: 0; margin-bottom: 0; }
+main.stack > p.muted { margin-top: 0; margin-bottom: 0; }
+main.stack > .toolbar { margin-bottom: 0; max-width: var(--ops-max); }
 
-.screen { display: none; }
-.screen:target { display: block; }
-main.auth.screen:target { display: flex; }
-html:not(:has(.screen:target)) #status { display: block; }
-body:has(#login:target) .nav,
-body:has(#setup:target) .nav,
-body:has(#login:target) .phone-bar,
-body:has(#setup:target) .phone-bar { display: none !important; }
-body:has(#login:target) .app,
-body:has(#setup:target) .app { display: block; }
+body.page-login .nav,
+body.page-setup .nav,
+body.page-login .phone-bar,
+body.page-setup .phone-bar { display: none !important; }
+body.page-login .app,
+body.page-setup .app { display: block; }
 
 #role-domain:checked ~ .app .g-only { display: none !important; }
-#role-domain:checked ~ .app #settings .split {
+#role-domain:checked ~ .app .pair:has(> .g-only) {
   display: block;
   max-width: var(--form-max);
 }
@@ -545,7 +520,7 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
   padding: 0.75rem 0.1rem; text-decoration: none; color: var(--fg);
 }
 .phone-list .when { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
-.phone-list .pair { grid-column: 1 / -1; font-family: var(--font-mono); font-size: 0.82rem; white-space: nowrap; overflow-x: auto; }
+.phone-list .meta { grid-column: 1 / -1; font-family: var(--font-mono); font-size: 0.82rem; white-space: nowrap; overflow-x: auto; }
 .phone-list .subj { grid-column: 1 / -1; margin: 0; }
 
 /* Help drawer — CSS checkbox, no script required */
@@ -626,6 +601,7 @@ html:has(#help-export:checked) .help-pane-export { display: block; }
 #vp-phone:checked ~ .app .phone-list { display: block; }
 #vp-phone:checked ~ .app .status-grid { display: flex; flex-direction: column; }
 #vp-phone:checked ~ .app .status-grid .attn { order: -1; }
+#vp-phone:checked ~ .app .pair { grid-template-columns: 1fr; }
 #vp-phone:checked ~ .app .split,
 #vp-phone:checked ~ .app .check-cols,
 #vp-phone:checked ~ .app .field-pair:not(.host-type),
@@ -665,7 +641,7 @@ html:has(#help-export:checked) .help-pane-export { display: block; }
   .phone-only, .phone-list { display: block; }
   .status-grid { display: flex; flex-direction: column; }
   .status-grid .attn { order: -1; }
-  .split, #settings .split, #backup > .split,
+  .split, .pair, #settings .split, #backup > .split,
   .check-cols, .field-pair:not(.host-type), .facts, .retry-facts { grid-template-columns: 1fr; }
   .help-drawer { width: 100vw; }
 }

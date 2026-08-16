@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbound — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-inbound" data-page="inbound" data-nav="inbound" data-title="Inbound" data-global-only="1">
+<main class="stack">
+  <div class="page-head">
+    <h1>Inbound <span class="tag">1.x</span></h1>
+  </div>
+  <p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed domains. Recipients are either an allow-list or any address at that domain. Off by default in Compose.</p>
+  <div class="measure">
+    <div class="card">
+      <h2>Add inbound domain</h2>
+      <form action="#" onsubmit="return false">
+        <label>Domain</label>
+        <div class="input-row">
+          <input placeholder="lists.example.com">
+          <button type="button">Add domain</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Forwarding</h2>
+      <table class="desk-only">
+        <thead><tr><th>Domain</th><th>DNS</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="inbound-domain.html">lists.example.com</a></td>
+            <td><a class="st st-ok" href="inbound-domain.html">ok</a></td>
+            <td class="muted">10.0.0.8:25</td>
+            <td>12 listed</td>
+            <td><span class="st st-ok">required</span></td>
+            <td class="actions"><a class="danger" href="inbound-delete.html">Delete</a></td>
+          </tr>
+          <tr>
+            <td><a href="inbound-backup.html">backup.example.net</a></td>
+            <td><a class="st st-error" href="inbound-backup.html">error</a></td>
+            <td class="muted">192.0.2.20:25</td>
+            <td>any</td>
+            <td><span class="st st-unknown">off</span></td>
+            <td class="actions"><a class="danger" href="inbound-delete.html">Delete</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li><a href="inbound-domain.html"><span>lists.example.com</span><span class="st st-ok">ok</span><span class="meta">12 listed · 10.0.0.8:25</span></a></li>
+        <li><a href="inbound-backup.html"><span>backup.example.net</span><span class="st st-error">error</span><span class="meta">any recipient · 192.0.2.20:25</span></a></li>
+      </ul>
+      <p class="muted">The <em>DNS</em> badge is the MX check: at least one MX must point at this server. Results are cached for a few minutes; open a domain for the lookup and a <em>Re-check</em> button.</p>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>
