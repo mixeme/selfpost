@@ -14,21 +14,16 @@
     <h1>Inbound <span class="tag">1.x</span></h1>
   </div>
   <p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed domains. Recipients are either an allow-list or any address at that domain. Off by default in Compose.</p>
-  <div class="measure">
-    <div class="card">
-      <h2>Add inbound domain</h2>
-      <form action="#" onsubmit="return false">
-        <label>Domain</label>
-        <div class="input-row">
-          <input placeholder="lists.example.com">
-          <button type="button">Add domain</button>
-        </div>
-      </form>
-    </div>
-  </div>
   <div class="fill">
     <div class="card">
       <h2>Forwarding</h2>
+      <form class="measure" action="#" onsubmit="return false">
+        <label for="iname">Add inbound domain</label>
+        <div class="input-row">
+          <input id="iname" placeholder="lists.example.com">
+          <button type="button">Add domain</button>
+        </div>
+      </form>
       <table class="desk-only">
         <thead><tr><th>Domain</th><th>DNS</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr></thead>
         <tbody>

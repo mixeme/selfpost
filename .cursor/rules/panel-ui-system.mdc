@@ -12,7 +12,7 @@ Do not copy `internal/web/view/templates` into mockups. Do not mark `<main>` as 
 
 Compose screens from `stack`, `pair`, `measure`, `fill`, `field-row`, `actions-row`:
 - Two peer jobs → `pair` (one child shrinks to `measure`).
-- Tables/logs/DNS → `fill` (nowrap + overflow-x on the card).
+- Tables/logs/DNS → `fill` (nowrap + overflow-x on the card). Add-to-list is a `measure` row inside that card, not a second card above it.
 - Confirm/login/user form → `measure`.
 - Host ‖ Type and two equal inputs → `field-row` (shared grid row, not two `.code` paddings).
 - Save + Delete → `actions-row` inside the card; never submit inside `<form>` and danger after `</form>`.

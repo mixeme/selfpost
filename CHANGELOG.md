@@ -29,6 +29,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   Regions are `stack` / `pair` / `measure` / `fill`; Host ‖ Type is
   `field-row`; Save + Delete is `actions-row`. Shared chrome is `shell.js`.
 
+- docs: panel UI mockups — add-domain sits in the list card (Domains and
+  Inbound); DMARC candidate screens drill into a domain roll-up and a
+  parsed aggregate report (aligned vs third-party fail), not a hub-only
+  summary.
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,

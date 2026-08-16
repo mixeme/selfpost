@@ -184,6 +184,9 @@ body.page-inbound-domain .n-inbound,
 body.page-inbound-backup .n-inbound,
 body.page-inbound-delete .n-inbound,
 body.page-dmarc .n-dmarc,
+body.page-dmarc-domain .n-dmarc,
+body.page-dmarc-report .n-dmarc,
+body.page-dmarc-report-fail .n-dmarc,
 body.page-backup .n-backup,
 body.page-users .n-users,
 body.page-user-form .n-users,
@@ -515,7 +518,8 @@ meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4re
 
 .phone-list { display: none; list-style: none; margin: 0; padding: 0; }
 .phone-list li { border-bottom: 1px solid var(--border); }
-.phone-list a {
+.phone-list a,
+.phone-list .item {
   display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.7rem;
   padding: 0.75rem 0.1rem; text-decoration: none; color: var(--fg);
 }

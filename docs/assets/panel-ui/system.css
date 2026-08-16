@@ -18,6 +18,7 @@
 .fill { width: 100%; max-width: var(--ops-max); min-width: 0; }
 .fill > .card { margin-top: 0; }
 .fill .card:has(table) { overflow-x: auto; }
+.card > .measure { margin-bottom: 1rem; }
 
 /* Two peer jobs. One child → reading measure (domain-admin Settings).
    Never a full-width lonely card on an ops page. */
