@@ -78,7 +78,14 @@ by the panel. Socket `/run/opendkim/opendkim.sock`.
 One process, three roles:
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
-   proxy only.
+   proxy only. On start it runs `postconf -h` once for the deferred-mail retry
+   parameters (`queue_run_delay`, `minimal_backoff_time`,
+   `maximal_backoff_time`, `maximal_queue_lifetime`, `bounce_queue_lifetime`,
+   `delay_warning_time`) and caches the snapshot on the handlers config. The
+   Mail queue card and a delivery's `deferred` / `bounced` history print those
+   numbers; they never call `postconf` per request. If `postconf` is missing,
+   the panel logs a warning and uses Postfix 3.x compiled-in defaults
+   (`300s` / `4000s` / `5d` / `0`) with a muted note on the card.
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
@@ -173,7 +180,7 @@ below is a summary — HTMX fragment endpoints
 | `/domains/{id}`, `/domains/{id}/*` | Assigned-domain detail for domain-admins; delete domain is **global** |
 | `/domains/import` | **Global.** Domain import (`POST`; form on the Backup page) |
 | `/deliveries`, `/deliveries/{id}` | Send log with filters; scoped to assigned domains for domain-admins |
-| `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view |
+| `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view; retry-policy card on the page (not the HTMX fragment) |
 | `/system-log`, `/system-log/*` | **Global.** `mail.log` tail |
 | `/reload` | **Global.** `POST` — reload OpenDKIM + Postfix maps |
 | `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
@@ -184,7 +191,9 @@ HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
 `panel.js` via `data-poll`, not `hx-trigger="every …"`); polling does not extend
 session idle timeout (only non-`HX-Request` GET and mutating requests count as
-activity).
+activity). The Mail queue retry-policy card is outside that fragment: it is the
+start-up `postconf -h` snapshot (see [Panel binary](#panel-binary-cmdpanel)),
+not a live re-read.
 
 ### Sessions
 

@@ -527,3 +527,39 @@ func forEachTemplate(t *testing.T, fn func(name, body string)) {
 		fn(e.Name(), string(body))
 	}
 }
+
+// The retry-policy card is static HTML on mail_queue (outside the HTMX
+// fragment), so rendering the page with a fixture must print those strings
+// rather than falling back to empty template fields.
+func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "layout.html", map[string]any{
+		"Title": "t", "User": "admin", "Active": "mail_queue", "Version": "test",
+		"Copyright":  "Copyright © 2026 Mikhail Yenuchenko",
+		"SourceURL":  "https://github.com/mixeme/selfpost",
+		"FirstRetry": "10 minutes", "BackoffCap": "about 1 hour 7 minutes",
+		"QueueLifetime": "2 days",
+	}); err != nil {
+		t.Fatalf("execute mail_queue: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"How delivery retries work",
+		"10 minutes",
+		"about 1 hour 7 minutes",
+		"2 days",
+		`id="retry-policy"`,
+		`hx-get="/mail-queue/body"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("mail_queue is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "compiled-in defaults") {
+		t.Error("RetryFromDefaults was unset; the fallback note should stay off")
+	}
+}

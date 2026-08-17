@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- Mail queue and a delivery's history show this Postfix's retry policy
+  (first delay, backoff cap, queue lifetime), read from `postconf -h` once
+  at panel start. A manual `postconf -e` override is visible after the next
+  panel restart. There is no attempt counter — Postfix retries on time.
+
 - docs: **Plan checklists** in [development.md](docs/development.md) — format,
   `Progress` column in [roadmap.md](docs/roadmap.md), per-step commit +
   CHANGELOG, version cuts `1.3.1`…`1.8.0` per roadmap stage.

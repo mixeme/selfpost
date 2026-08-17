@@ -319,7 +319,12 @@ the panel shows after manual edits under `/data`.
 ### Mail queue and System log
 
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
-  trying to deliver or deferring.
+  trying to deliver or deferring. A card at the top states this instance's
+  retry policy — first retry delay, later backoff cap, how long a message
+  stays in the queue — from `postconf -h`, read once when the panel starts.
+  A `postconf -e` override inside the container is visible after the next
+  panel (or container) restart. There is no maximum attempt count: Postfix
+  retries until the message is delivered or the queue lifetime runs out.
 - **System log** (`/system-log`) — tail of `/data/log/mail.log` (Postfix and
   related daemon lines). The log rotates daily (14 files kept) with a
   `postfix reload` after each rotation; a background loop checks every six
@@ -668,8 +673,11 @@ by a [level-2 rate limit](#rate-limiting--level-2-domain-and-application));
 *Details* opens that row's own page (`/deliveries/{id}`). That page carries
 the sending domain, the application it was submitted under, the Postfix
 queue id and the journal id, beside the message's history — when it was
-accepted and what Postfix later reported for the recipient — and, under
-both, the `mail.log` lines for its queue id: the connection to the
+accepted and what Postfix later reported for the recipient. A `deferred`
+or `bounced` row includes this Postfix's retry intervals (first delay,
+backoff cap, queue lifetime), the same numbers Mail queue shows; domain
+administrators see them here because they cannot open Mail queue. Under
+both sit the `mail.log` lines for its queue id: the connection to the
 receiving server, the server's reply, and the status that reply was filed
 as. Rows outlive `mail.log`, so an older message's lines may have rotated
 away; the page says so. Retention is controlled by

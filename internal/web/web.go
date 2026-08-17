@@ -13,6 +13,7 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/legal"
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/handlers"
@@ -77,6 +78,10 @@ type Config struct {
 	// display and to cap domain/app level-2 ceilings (guide § Rate limiting).
 	RateLimitMessagesPerIP int
 	RateLimitWindowSeconds int
+	// RetryPolicy is this Postfix's deferred-mail timings, snapshotted once
+	// when the HTTP role starts. Handlers read the cache; they never call
+	// postconf (architecture.md).
+	RetryPolicy postfix.RetryPolicy
 }
 
 // Server is the panel HTTP application.
@@ -115,6 +120,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		JournalSocket:          cfg.JournalSocket,
 		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
+		RetryPolicy:            cfg.RetryPolicy,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }

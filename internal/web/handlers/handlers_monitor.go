@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -115,7 +116,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		// The status in the panel's own badge vocabulary, so the headline reads
 		// the same way as every other health signal in the panel.
 		"Level":  deliveryLevel(row.Status),
-		"Events": deliveryEvents(row),
+		"Events": deliveryEvents(row, h.cfg.RetryPolicy),
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
 		"LogRows": logRows,
@@ -173,7 +174,9 @@ type deliveryEvent struct {
 // timestamps *are* the history, and stating them as steps is what makes a row
 // whose created_at and updated_at differ by six hours legible as "queued for
 // six hours, then delivered" rather than as two dates in a list of fields.
-func deliveryEvents(row store.SendLogRow) []deliveryEvent {
+// policy supplies the human intervals for deferred and bounced copy, the same
+// strings the Mail queue card prints, so the two cannot drift.
+func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []deliveryEvent {
 	// A rejected message has no second step, and its first one is not an
 	// acceptance: the journal-milter refused it, so Postfix never queued it.
 	if row.Status == store.StatusRejected {
@@ -217,7 +220,8 @@ func deliveryEvents(row store.SendLogRow) []deliveryEvent {
 			Level:  "warn",
 			Status: store.StatusDeferred,
 			Title:  "Deferred, will be retried",
-			Detail: "The receiving server could not take the message yet. Postfix keeps it queued and retries until it is delivered or the queue lifetime runs out.",
+			Detail: fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
+				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime()),
 		})
 	case store.StatusBounced:
 		return append(events, deliveryEvent{
@@ -225,7 +229,8 @@ func deliveryEvents(row store.SendLogRow) []deliveryEvent {
 			Level:  "error",
 			Status: store.StatusBounced,
 			Title:  "Bounced",
-			Detail: "Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after the queue lifetime. The reason is in the delivery log below.",
+			Detail: fmt.Sprintf("Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after %s in the queue. The reason is in the delivery log below.",
+				policy.QueueLifetime()),
 		})
 	default:
 		// A status the log-tailer learns to write before this switch does.
@@ -412,13 +417,18 @@ func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, errText := readQueue()
+	policy := h.cfg.RetryPolicy
 	h.view.Render(w, http.StatusOK, "mail_queue", map[string]any{
-		"Title":    "SelfPost — mail queue",
-		"User":     auth.CurrentUser(r),
-		"Active":   "mail_queue",
-		"IsGlobal": true,
-		"Output":   out,
-		"Error":    errText,
+		"Title":             "SelfPost — mail queue",
+		"User":              auth.CurrentUser(r),
+		"Active":            "mail_queue",
+		"IsGlobal":          true,
+		"Output":            out,
+		"Error":             errText,
+		"FirstRetry":        policy.FirstRetry(),
+		"BackoffCap":        policy.BackoffCap(),
+		"QueueLifetime":     policy.QueueLifetime(),
+		"RetryFromDefaults": policy.FromDefaults,
 	})
 }
 

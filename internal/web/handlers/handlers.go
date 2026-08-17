@@ -8,6 +8,7 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/view"
@@ -29,6 +30,10 @@ type Config struct {
 	// and used to cap domain/app level-2 ceilings (guide § Rate limiting).
 	RateLimitMessagesPerIP int
 	RateLimitWindowSeconds int
+	// RetryPolicy is this Postfix's deferred-mail timings, snapshotted once
+	// when the HTTP role starts (architecture.md). The Mail queue card and
+	// delivery history read it from here; they never call postconf.
+	RetryPolicy postfix.RetryPolicy
 }
 
 // Handlers holds dependencies for authenticated panel routes.

@@ -66,6 +66,10 @@ func resyncAfterRestore(cfg config, st *store.Store, testNoReload bool) error {
 // the environment describes it, with nothing bound to a port yet.
 func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	ms := newMailStack(cfg, st)
+	// postfix-config.sh has already run (entrypoint). postconf -h is the
+	// effective config, including a manual override; the panel keeps this
+	// snapshot for the process lifetime (architecture.md).
+	retryPolicy := postfix.LoadRetryPolicy()
 	return web.New(st, ms.Domains, ms.Apps, web.Config{
 		Hostname:               cfg.hostname,
 		CookieSecure:           cfg.cookieSecure,
@@ -83,6 +87,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		DNSResolvers:           cfg.dnsResolvers,
 		RateLimitMessagesPerIP: cfg.rateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
+		RetryPolicy:            retryPolicy,
 	}, cfg.setupTokenPath)
 }
 

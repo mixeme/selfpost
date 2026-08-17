@@ -1,6 +1,6 @@
 # Plan: queue-retries (Postfix retry policy in the panel)
 
-**Status:** agreed  
+**Status:** implemented (2026-08-17); version cut `1.3.1` pending  
 **Date:** 2026-08-13  
 **Version:** patch; no schema, no configuration surface.  
 **Order:** small panel item; does not wait on inbound-relay.
@@ -145,12 +145,12 @@ lifetime runs out.
 Target version cut: **`1.3.1`** (PATCH). One commit per step; see
 [development.md](../development.md) § Plan checklists.
 
-- [ ] `internal/postfix`: parse Postfix time units (`5d`, `300s`, bare seconds) + tests — **Opus**
-- [ ] `internal/postfix`: one-shot `postconf -h` (six keys), fallback + warn — **Opus**
-- [ ] Load policy at HTTP start in `cmd/panel/httpserver.go`; cache on handlers config — **Opus**
-- [ ] Human-readable duration formatter (shared by Mail queue card and delivery history) — **Sonnet**
-- [ ] «How delivery retries work» card on `/mail-queue` (outside HTMX fragment) — **Sonnet**
-- [ ] `deliveryEvents(row, policy)` — intervals in deferred/bounced copy — **Sonnet**
-- [ ] Handler and template tests (`handlers_monitor_test.go`, `templates_test.go`) — **Sonnet**
-- [ ] [guide.md](../guide.md) and [architecture.md](../architecture.md) — **Sonnet**
-- [ ] `go vet`, `go test` on touched packages — **Haiku**
+- [x] `internal/postfix`: parse Postfix time units (`5d`, `300s`, bare seconds) + tests — **Opus**
+- [x] `internal/postfix`: one-shot `postconf -h` (six keys), fallback + warn — **Opus**
+- [x] Load policy at HTTP start in `cmd/panel/httpserver.go`; cache on handlers config — **Opus**
+- [x] Human-readable duration formatter (shared by Mail queue card and delivery history) — **Sonnet**
+- [x] «How delivery retries work» card on `/mail-queue` (outside HTMX fragment) — **Sonnet**
+- [x] `deliveryEvents(row, policy)` — intervals in deferred/bounced copy — **Sonnet**
+- [x] Handler and template tests (`handlers_monitor_test.go`, `templates_test.go`) — **Sonnet**
+- [x] [guide.md](../guide.md) and [architecture.md](../architecture.md) — **Sonnet**
+- [x] `go vet`, `go test` on touched packages — **Haiku**

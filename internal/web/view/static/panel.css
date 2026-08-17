@@ -663,6 +663,10 @@ h1.subject { overflow-wrap: anywhere; }
    wider than the column it shares. */
 .fact-value { display: block; margin-top: 0.1rem; overflow-wrap: anywhere; }
 .fact-value.mono { font-family: var(--font-mono); font-size: 0.85rem; }
+/* Retry-policy tiles carry a short phrase (`doubling, cap about 1 hour 7
+   minutes`) rather than a domain or a queue id, so they need a slightly
+   wider minimum than the delivery-page facts before wrapping to one column. */
+.facts.retry-facts { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
 /* A message's history: the steps down a line, each with the time it happened,
    the status it reached and what that means. The line is the list's own left
    border and the dots sit on top of it, so nothing has to be positioned against

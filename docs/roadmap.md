@@ -28,7 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | 0/9 | [plans/queue-retries.md](plans/queue-retries.md) |
+| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | 9/9 | [plans/queue-retries.md](plans/queue-retries.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 0/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
 | domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
@@ -65,7 +65,10 @@ panel knobs for queue lifetime, no schema change. Domain administrators see
 the intervals on `/deliveries/{id}` (they cannot open Mail queue).
 
 **Done when:** see the criteria in
-[plans/queue-retries.md](plans/queue-retries.md).
+[plans/queue-retries.md](plans/queue-retries.md). Implementation is on
+`main` (checklist 9/9); the `1.3.1` version cut is still pending because
+`[Unreleased]` also holds unrelated work (including a breaking backup-layout
+change).
 
 **Dependencies / risks:** `postconf` unavailable outside the container
 (fallback + muted note). Copy must stay time-based — Postfix has no max

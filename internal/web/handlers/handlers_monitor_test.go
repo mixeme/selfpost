@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
@@ -449,4 +451,91 @@ func writeMailLog(t *testing.T, lines ...string) string {
 		t.Fatalf("write mail.log: %v", err)
 	}
 	return path
+}
+
+// fixtureRetryPolicy is a distinctive policy so tests can tell the Config
+// snapshot from live postconf and from compiled-in defaults (5 minutes / 5 days).
+func fixtureRetryPolicy() postfix.RetryPolicy {
+	return postfix.RetryPolicy{
+		QueueRunDelay:        10 * time.Minute,
+		MinimalBackoff:       10 * time.Minute,
+		MaximalBackoff:       4000 * time.Second,
+		MaximalQueueLifetime: 2 * 24 * time.Hour,
+		BounceQueueLifetime:  2 * 24 * time.Hour,
+	}
+}
+
+// The retry card sits on the page itself, outside the HTMX poll, and prints
+// whatever policy was cached on Config — never a live postconf.
+func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{Version: "test", RetryPolicy: fixtureRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	for _, want := range []string{
+		"How delivery retries work",
+		"id=\"retry-policy\"",
+		">10 minutes<",
+		"doubling, cap about 1 hour 7 minutes",
+		">2 days<",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("mail queue is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, ">5 minutes<") || strings.Contains(out, ">5 days<") {
+		t.Errorf("mail queue shows stock defaults instead of the fixture:\n%s", out)
+	}
+	if strings.Contains(out, "compiled-in defaults") {
+		t.Error("a fixture policy must not show the fallback note")
+	}
+}
+
+func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: fixtureRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueueBody, "/mail-queue/body")
+	if strings.Contains(out, "How delivery retries work") || strings.Contains(out, "10 minutes") {
+		t.Errorf("HTMX fragment includes the retry card:\n%s", out)
+	}
+}
+
+func TestMailQueueNotesCompiledInFallback(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: postfix.DefaultRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	if !strings.Contains(out, "compiled-in defaults") {
+		t.Errorf("fallback note missing:\n%s", out)
+	}
+}
+
+func TestDeliveryPageDeferredUsesRetryPolicy(t *testing.T) {
+	h, row := serverWithDelivery(t)
+	h.cfg.RetryPolicy = fixtureRetryPolicy()
+	if _, err := h.store.UpdateStatus(row.QueueID, row.To, store.StatusDeferred); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
+
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	for _, want := range []string{
+		"first after 10 minutes",
+		"up to about 1 hour 7 minutes",
+		"for up to 2 days",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("deferred history is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDeliveryPageBouncedUsesRetryPolicy(t *testing.T) {
+	h, row := serverWithDelivery(t)
+	h.cfg.RetryPolicy = fixtureRetryPolicy()
+	if _, err := h.store.UpdateStatus(row.QueueID, row.To, store.StatusBounced); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
+
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	if !strings.Contains(out, "gave up after 2 days in the queue") {
+		t.Errorf("bounced history does not use the fixture lifetime:\n%s", out)
+	}
 }
