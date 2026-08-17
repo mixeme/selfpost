@@ -28,7 +28,6 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | 9/9 | [plans/queue-retries.md](plans/queue-retries.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 0/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
 | domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
@@ -37,43 +36,17 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): **queue-retries** is a small panel item
-that can land first or in parallel; the next feature is **inbound-relay**.
+**Recommended order** (not binding): the next feature is **inbound-relay**.
 **send-log-retention** can land before or beside **domain-stats-auto-ratelimit**
-(panel retention ≥ 30 days helps the stats window). The 2026-08-13 full-tree
-review follow-ups (send-log authorization,
-fail-closed paths, docs, GUI, tests, licence) are closed — history in
-[CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` and git. Candidates need
-explicit agreement before they join the queue.
+(panel retention ≥ 30 days helps the stats window). queue-retries shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.3.1]`; the 2026-08-13 full-tree review
+follow-ups are in `[1.3.0]`. Candidates need explicit agreement before they
+join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
 is `done/total` checklist steps in that plan ([development.md](development.md)
 § Plan checklists).
-
----
-
-## queue-retries
-
-**Goal:** show on Mail queue and on a delivery's history how this Postfix
-retries deferred mail — first delay, backoff cap, queue lifetime — reading
-the effective config (`postconf -h`) once at panel start so a manual
-override is visible.
-
-**Boundary:** explanation only. Postfix stays as-is; no attempt counter, no
-panel knobs for queue lifetime, no schema change. Domain administrators see
-the intervals on `/deliveries/{id}` (they cannot open Mail queue).
-
-**Done when:** see the criteria in
-[plans/queue-retries.md](plans/queue-retries.md). Implementation is on
-`main` (checklist 9/9); the `1.3.1` version cut is still pending because
-`[Unreleased]` also holds unrelated work (including a breaking backup-layout
-change).
-
-**Dependencies / risks:** `postconf` unavailable outside the container
-(fallback + muted note). Copy must stay time-based — Postfix has no max
-attempt count.
-**Version:** patch.
 
 ---
 

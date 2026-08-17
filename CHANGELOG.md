@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-17
+
+Retry policy in the panel, persistent Postfix queue, and self-contained
+full backups. Mail queue and delivery history show this Postfix's first
+retry, backoff cap, and queue lifetime. Deferred mail survives container
+recreate. Full backups now archive `data/`, compose, `.env`, and `certs/`;
+the archive layout breaks 1.3.0 flat backups (unpack those with
+`tar xzf backup.tar.gz -C ./data` as before). Upgrading from 1.3.0 is a
+tag bump; no schema migration.
+
 ### Added
 
 - Mail queue and a delivery's history show this Postfix's retry policy

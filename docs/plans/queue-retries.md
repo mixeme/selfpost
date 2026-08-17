@@ -1,6 +1,6 @@
 # Plan: queue-retries (Postfix retry policy in the panel)
 
-**Status:** implemented (2026-08-17); version cut `1.3.1` pending  
+**Status:** done — shipped in `[1.3.1]` (2026-08-17)  
 **Date:** 2026-08-13  
 **Version:** patch; no schema, no configuration surface.  
 **Order:** small panel item; does not wait on inbound-relay.
