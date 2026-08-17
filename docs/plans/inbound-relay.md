@@ -1,12 +1,9 @@
 # Plan: inbound-relay (inbound relay)
 
-**Status:** agreed  
-**Version:** target bump **1.x** MINOR; **`2.x` possible** — to be settled once
-the implementation lands (do not fix a major in advance).  
-**Order:** queue-retries shipped in `[1.3.1]`; this is next as the largest
-remaining 1.x+ **feature**. The 2026-08-13 full-tree review follow-ups closed
-in `[1.3.0]`. The domain-admin role and `internal/web` split have shipped —
-see [CHANGELOG](../../CHANGELOG.md) `[1.2.0]`.
+**Status:** done — shipped in `[1.4.0]` (2026-08-17)  
+**Version:** 1.4.0 MINOR (flag off is compatible; not a 2.x break).  
+**Order:** after queue-retries `[1.3.1]`. One checklist step remains:
+security review of the inbound path (Fable).
 
 ---
 

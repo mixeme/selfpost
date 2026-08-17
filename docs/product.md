@@ -57,8 +57,8 @@ Explicitly excluded to prevent scope creep:
 
 The **domain-admin** role ships in the current line (global administrator plus
 domain administrators with assigned domains). The optional **inbound relay**
-(backup-MX / forwarder on port 25) is an agreed 1.x extension — off by default
-behind `INBOUND_RELAY_ENABLE`; it is relay/forward, not IMAP/webmail. Items
+(backup-MX / forwarder on port 25) ships in `[1.4.0]`, off by default behind
+`INBOUND_RELAY_ENABLE`; it is relay/forward, not IMAP/webmail. Items
 marked *candidate* in the
 [roadmap](roadmap.md) require explicit approval before coding (including
 **send-log retention in Settings**, **30-day send statistics**, and **auto

@@ -5,10 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-17
+
 Optional inbound relay (backup-MX / forwarder) on port 25, off by default.
 Mail is accepted only for domains configured in the panel and forwarded to
-an upstream; there are still no mailboxes. Security review of the inbound
-path is pending (Fable).
+an upstream; there are still no mailboxes. A dedicated security review of
+the inbound path is still open on the plan (Fable).
 
 ### Added
 
