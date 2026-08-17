@@ -14,7 +14,7 @@
   <div class="pair">
     <div class="card">
       <h2>Full backup</h2>
-      <p class="muted">Download a full backup of all persistent state — the database, every domain’s DKIM key and the application credentials. Restore into a container of the <strong>same SelfPost version</strong>, with the same data mount, before first start. TLS certificates and the mail queue are not included.</p>
+      <p class="muted">Download a self-contained backup — <code>data/</code> (database, DKIM keys, credentials, Postfix queue), <code>docker-compose.yml</code>, <code>.env</code>, and <code>certs/</code>. Extract into an empty project directory on a new machine, adjust hostname if needed, and start the <strong>same SelfPost version</strong> before first boot. The reverse-proxy vhost is not included.</p>
       <p class="muted"><strong>The backup file is a secret.</strong> Encrypting it is the simplest way to store it: the download is then a <code>.spbk</code> that only the password opens.</p>
       <div class="encrypt">
         <label class="check"><input type="checkbox" checked> <span>Encrypt with a password</span></label>

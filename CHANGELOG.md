@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- Postfix queue under `/data/postfix/queue` — deferred and active mail survive
+  container recreate and are included in full backups.
+- Full backup archives the whole operator project: `data/`, `docker-compose.yml`,
+  `.env`, and `certs/` (requires `.:/selfpost-deploy:ro` in compose). Restore
+  by unpacking into an empty project directory.
+
+### Changed
+
+- **Breaking:** full-backup archive layout — paths are prefixed with `data/`;
+  deploy files sit at the archive root. Old flat archives restore with
+  `tar xzf backup.tar.gz -C ./data` as before.
+- docs: operator guide, architecture, security, and backup UI updated for
+  self-contained backups and persistent queue.
+
 - docs: HTML mockups for a full panel UI refresh
   ([docs/assets/panel-ui/](docs/assets/panel-ui/index.html)) — current screens,
   agreed and candidate roadmap surfaces (queue-retries, inbound-relay,

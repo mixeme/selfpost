@@ -22,7 +22,7 @@ import (
 )
 
 // Restoring a SelfPost backup is not a code path in the panel: the operator
-// extracts the archive into the /data bind mount and starts the image, and the
+// extracts the archive into a project directory and starts the image, and the
 // panel is expected to come up on it (architecture.md § Persistence). Nothing
 // below stubs that story out — the archive is downloaded from a running panel
 // through /backup, unpacked the way `tar -xzf` unpacks it, and a second panel
@@ -37,9 +37,10 @@ const (
 
 // restored is the outcome of a full backup-and-restore round trip.
 type restored struct {
-	panel   http.Handler // panel booted on the restored data directory
-	dataDir string       // the restored /data
-	session *http.Cookie // a session opened before the backup was taken
+	panel      http.Handler // panel booted on the restored data directory
+	deployRoot string       // the restored project directory
+	dataDir    string       // the restored /data
+	session    *http.Cookie // a session opened before the backup was taken
 }
 
 // restoreFromOwnBackup runs the operator's path end to end: seed a panel that
@@ -50,7 +51,7 @@ type restored struct {
 func restoreFromOwnBackup(t *testing.T, password string) restored {
 	t.Helper()
 
-	live := seedPanelData(t)
+	live := seedPanelProject(t)
 	panel := bootPanel(t, live)
 	session := signIn(t, panel)
 	archive := downloadBackup(t, panel, session, password)
@@ -58,7 +59,12 @@ func restoreFromOwnBackup(t *testing.T, password string) restored {
 	target := t.TempDir()
 	extract(t, archive, target)
 
-	return restored{panel: bootPanel(t, target), dataDir: target, session: session}
+	return restored{
+		panel:      bootPanel(t, target),
+		deployRoot: target,
+		dataDir:    filepath.Join(target, "data"),
+		session:    session,
+	}
 }
 
 // The panel has to come up on the restored directory and show the state that
@@ -89,6 +95,12 @@ func TestPanelBootsOnADataDirectoryRestoredFromItsOwnBackup(t *testing.T) {
 		}
 		if string(got) != want {
 			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+
+	for _, name := range []string{backup.ComposeFileName, backup.EnvFileName} {
+		if _, err := os.Stat(filepath.Join(r.deployRoot, name)); err != nil {
+			t.Errorf("the restored project directory has no %s: %v", name, err)
 		}
 	}
 }
@@ -138,8 +150,9 @@ func TestAnEncryptedBackupRestoresTheSameWay(t *testing.T) {
 // A restore boot runs one Resync from SQLite. If the archive's Postfix map
 // drifted from the database, that step puts it back before mail flows.
 func TestResyncAfterRestoreHealsDriftedMaps(t *testing.T) {
-	dataDir := seedPanelData(t)
-	cfg := panelConfig(t, dataDir)
+	deployRoot := seedPanelProject(t)
+	dataDir := filepath.Join(deployRoot, "data")
+	cfg := panelConfig(t, deployRoot)
 
 	mapPath := filepath.Join(dataDir, "postfix", "sender_login_maps")
 	if err := os.WriteFile(mapPath, []byte("stale map\n"), 0o640); err != nil {
@@ -191,12 +204,14 @@ func TestResyncAfterRestoreHealsDriftedMaps(t *testing.T) {
 // stays put on a mismatch: the operator's next move is to start the image the
 // backup names, and it has to be there when they do.
 func TestPanelRefusesADataDirectoryRestoredFromAnotherVersion(t *testing.T) {
-	live := seedPanelData(t)
+	deployRoot := seedPanelProject(t)
+	dataDir := filepath.Join(deployRoot, "data")
 	var archive bytes.Buffer
 	if err := backup.Create(&archive, backup.Params{
-		DataDir: live,
-		DBPath:  filepath.Join(live, "selfpost.db"),
-		Version: "9.9.9",
+		DataDir:    dataDir,
+		DBPath:     filepath.Join(dataDir, "selfpost.db"),
+		Version:    "9.9.9",
+		DeployRoot: deployRoot,
 	}); err != nil {
 		t.Fatalf("create backup: %v", err)
 	}
@@ -218,13 +233,15 @@ func TestPanelRefusesADataDirectoryRestoredFromAnotherVersion(t *testing.T) {
 	}
 }
 
-// seedPanelData builds the /data tree of a panel that has been in use: an
-// administrator, a sending domain with an application and one logged message,
-// and the daemon state the mail path needs (a DKIM key, the SASL database and
-// Postfix's sender map).
-func seedPanelData(t *testing.T) string {
+// seedPanelProject builds an operator project tree: data/ with a panel that has
+// been in use, plus docker-compose.yml, .env, and certs/ for full backups.
+func seedPanelProject(t *testing.T) string {
 	t.Helper()
-	dataDir := t.TempDir()
+	deployRoot := t.TempDir()
+	dataDir := filepath.Join(deployRoot, "data")
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
+		t.Fatalf("mkdir data: %v", err)
+	}
 
 	st, err := store.Open(filepath.Join(dataDir, "selfpost.db"))
 	if err != nil {
@@ -268,16 +285,33 @@ func seedPanelData(t *testing.T) string {
 			t.Fatalf("write %s: %v", full, err)
 		}
 	}
-	return dataDir
+
+	writeDeployFile(t, filepath.Join(deployRoot, backup.ComposeFileName), "services:\n  selfpost:\n    image: test\n")
+	writeDeployFile(t, filepath.Join(deployRoot, backup.EnvFileName), "SELFPOST_HOSTNAME=mail.example.ru\n")
+	writeDeployFile(t, filepath.Join(deployRoot, backup.CertsDirName, "fullchain.pem"), "CERT")
+	writeDeployFile(t, filepath.Join(deployRoot, backup.CertsDirName, "privkey.pem"), "KEY")
+	return deployRoot
 }
 
-// panelConfig resolves the panel's own configuration for a data directory, so
+func writeDeployFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatalf("mkdir %s: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o640); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+// panelConfig resolves the panel's own configuration for a project directory, so
 // the test finds the files where the running binary would look for them rather
 // than where it put them. Cookies are marked insecure for the same reason the
 // e2e stand does it: the test client speaks plain HTTP.
-func panelConfig(t *testing.T, dataDir string) config {
+func panelConfig(t *testing.T, deployRoot string) config {
 	t.Helper()
+	dataDir := filepath.Join(deployRoot, "data")
 	t.Setenv("SELFPOST_DATA_DIR", dataDir)
+	t.Setenv("SELFPOST_DEPLOY_ROOT", deployRoot)
 	t.Setenv("PANEL_COOKIE_SECURE", "false")
 	t.Setenv("SELFPOST_HOSTNAME", "mail.example.ru")
 	// MAIL_LOG's default is an absolute path, not one derived from the data
@@ -288,13 +322,13 @@ func panelConfig(t *testing.T, dataDir string) config {
 
 // bootPanel performs the startup sequence run() performs, in the same order,
 // and returns the panel's HTTP handler.
-func bootPanel(t *testing.T, dataDir string) http.Handler {
+func bootPanel(t *testing.T, deployRoot string) http.Handler {
 	t.Helper()
-	cfg := panelConfig(t, dataDir)
+	cfg := panelConfig(t, deployRoot)
 
 	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
 	if err != nil {
-		t.Fatalf("the panel refused to start on %s: %v", dataDir, err)
+		t.Fatalf("the panel refused to start on %s: %v", deployRoot, err)
 	}
 	if restored {
 		if _, err := os.Stat(cfg.manifestPath); err == nil {
@@ -380,8 +414,8 @@ func downloadBackup(t *testing.T, h http.Handler, session *http.Cookie, password
 	return plain
 }
 
-// extract unpacks a backup archive into dir, as `tar -xzf` does onto the /data
-// bind mount before the image is started.
+// extract unpacks a backup archive into dir, as `tar -xzf` does onto the project
+// directory before the image is started.
 func extract(t *testing.T, archive []byte, dir string) {
 	t.Helper()
 	gz, err := gzip.NewReader(bytes.NewReader(archive))

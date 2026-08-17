@@ -31,6 +31,7 @@ services:
       TLS_KEY_FILE: /etc/postfix/tls/<hostname>.key
     volumes: !override
       - ./data:/data
+      - .:/selfpost-deploy:ro
       # Replace <hostname> with your actual mail/panel hostname, matching
       # the Caddyfile below and SELFPOST_HOSTNAME.
       - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>:/etc/postfix/tls:ro

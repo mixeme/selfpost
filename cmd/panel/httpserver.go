@@ -73,6 +73,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		MailLogPath:            cfg.mailLog,
 		DataDir:                cfg.dataDir,
 		DBPath:                 cfg.dbPath,
+		DeployRoot:             cfg.deployRoot,
 		Version:                buildinfo.Version,
 		TrustedProxyCIDRs:      cfg.trustedProxies,
 		TLSCertFile:            cfg.tlsCertFile,

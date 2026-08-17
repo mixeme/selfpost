@@ -58,6 +58,9 @@ services:
       # kept) so the delivery lines that resolve a queued send-log row survive
       # a container recreate; it is diagnostics and is left out of backups.
       - ./data:/data
+      # Read-only project root for full backups: docker-compose.yml, .env, and
+      # certs/ are archived alongside /data (architecture.md § Persistence).
+      - .:/selfpost-deploy:ro
       # Read-only: SelfPost only ever reads certificates, never manages them
       # (spec 10 p.2). Point this at wherever your reverse-proxy/certbot
       # writes PEM files, e.g. /etc/letsencrypt on the host.

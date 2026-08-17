@@ -40,11 +40,13 @@ type Config struct {
 	// the log-tailer role follows in cmd/panel.
 	MailLogPath string
 	// DataDir and DBPath locate the persistent state a full backup archives
-	// (architecture.md § Persistence); Version is stamped into the backup
-	// manifest. They mirror the panel's own configuration.
-	DataDir string
-	DBPath  string
-	Version string
+	// (architecture.md § Persistence); DeployRoot is the operator project
+	// directory (docker-compose.yml, .env, certs/); Version is stamped into
+	// the backup manifest. They mirror the panel's own configuration.
+	DataDir    string
+	DBPath     string
+	DeployRoot string
+	Version    string
 	// TrustedProxyCIDRs are the reverse-proxy addresses allowed to supply
 	// X-Forwarded-For (env TRUSTED_PROXY_CIDR). A request whose
 	// direct peer (RemoteAddr) is not in this list never has its XFF header
@@ -106,6 +108,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		MailLogPath:            cfg.MailLogPath,
 		DataDir:                cfg.DataDir,
 		DBPath:                 cfg.DBPath,
+		DeployRoot:             cfg.DeployRoot,
 		Version:                cfg.Version,
 		TLSCertFile:            cfg.TLSCertFile,
 		OpenDKIMSocket:         cfg.OpenDKIMSocket,

@@ -57,6 +57,9 @@ JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
 # Persistent panel-managed sender map (spec 5.1); texthash needs no postmap, so
 # the unprivileged panel can rewrite it and just ask for a reload.
 SENDER_LOGIN_MAPS="${POSTFIX_SENDER_LOGIN_MAPS:-/data/postfix/sender_login_maps}"
+# Transit mail queue under /data so deferred/active messages survive container
+# recreate (architecture.md § Persistence). Distinct from sender_login_maps.
+QUEUE_DIR="${POSTFIX_QUEUE_DIR:-/data/postfix/queue}"
 SASLDB_PATH="${SASL_DB_PATH:-/data/sasl/sasldb2}"
 
 # Optional submission service on 587 (spec 5 p.1: off by default, enabled only
@@ -128,7 +131,8 @@ postconf -e \
 # resolves the full address first, then the "@domain" wildcard, so both address
 # modes work from the same map.
 postconf -e \
-	"smtpd_sender_login_maps=texthash:${SENDER_LOGIN_MAPS}"
+	"smtpd_sender_login_maps=texthash:${SENDER_LOGIN_MAPS}" \
+	"queue_directory=${QUEUE_DIR}"
 
 # Restrictions: authenticated clients only, no relay to foreign destinations,
 # and every authenticated sender address must be owned by its login. NO

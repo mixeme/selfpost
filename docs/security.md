@@ -86,10 +86,11 @@ The panel is exposed to the internet — the items below are **not optional**.
 
 ### Backup and domain export
 
-- Both files are secrets: a full backup carries DKIM keys, `sasldb2`, and the
-  administrator's password hash; a domain export carries the DKIM key and
-  **working** application passwords in the clear (otherwise a transfer without
-  recreating credentials would be impossible).
+- Both files are secrets: a full backup carries DKIM keys, `sasldb2`, the
+  administrator's password hash, `docker-compose.yml`, `.env`, and the TLS
+  private key from `certs/` when present; a domain export carries the DKIM key
+  and **working** application passwords in the clear (otherwise a transfer
+  without recreating credentials would be impossible).
 - Both downloads can be encrypted with a password (a checkbox on the form):
   scrypt (N=2¹⁵, r=8, p=1) → AES-256-GCM, streamed in 64 KiB chunks, each
   authenticated with the header, the chunk number, and an end-of-stream flag —

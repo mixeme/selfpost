@@ -417,25 +417,31 @@ journal-milter (level 2) is down. There is no per-IP bypass.
 
 ### Full backup and restore
 
-**Full backup** (whole `/data` except `log/`: SQLite, all domains' DKIM keys,
-all applications' SASL credentials, `manifest.json` with the version that
-created it): panel button (*Backup* → *Full backup*), or from the host:
+**Full backup** is a self-contained project archive: `data/` (SQLite, all
+domains' DKIM keys, all applications' SASL credentials, the Postfix queue,
+`manifest.json` with the version that created it), plus `docker-compose.yml`,
+`.env`, and `certs/` from the operator directory next to `./data`. Delivery
+logs under `data/log/` are excluded. The base compose file mounts the project
+directory read-only at `/selfpost-deploy` so the panel and CLI can read those
+deploy files — without that mount, *Full backup* refuses with an error.
+
+Take a backup from the panel (*Backup* → *Full backup*) or from the host:
 
 ```sh
 docker exec <container> selfpost-backup > selfpost-backup.tar.gz
 ```
 
-**Restore** means unpacking that archive into a fresh `/data` bind mount and
-starting a container of the **exact same image version** that created it —
-SelfPost refuses to start otherwise and tells you which tag to use. On the
-first successful start after restore, `manifest.json` from the archive is
-**deleted** — it guards only that one boot, so a later in-place upgrade is
-not blocked. On that same first boot the panel also runs one **Resync** —
-OpenDKIM's tables and Postfix's sender map are re-derived from SQLite and both
-daemons are reloaded, healing any drift between the extracted files and the
-database (the Status page's *Reload configuration* button runs the same step
-on demand). This is why the compose file pins a fixed tag rather than
-`:latest`: without a known version, there'd be no way to tell which image
+**Restore** means unpacking that archive into an **empty project directory**
+(not into `./data` alone) and starting a container of the **exact same image
+version** that created it — SelfPost refuses to start otherwise and tells you
+which tag to use. On the first successful start after restore, `data/manifest.json`
+from the archive is **deleted** — it guards only that one boot, so a later
+in-place upgrade is not blocked. On that same first boot the panel also runs
+one **Resync** — OpenDKIM's tables and Postfix's sender map are re-derived from
+SQLite and both daemons are reloaded, healing any drift between the extracted
+files and the database (the Status page's *Reload configuration* button runs
+the same step on demand). This is why the compose file pins a fixed tag rather
+than `:latest`: without a known version, there'd be no way to tell which image
 restoring a given backup actually requires (see [Fixed image
 tag](#fixed-image-tag)).
 
@@ -446,16 +452,16 @@ back after a bad change):
 # 1. Stop the instance being replaced
 docker compose down
 
-# 2. Move the current /data aside rather than deleting it, start from empty
-mv ./data ./data.before-restore
-mkdir ./data
+# 2. Move the current project aside rather than deleting it
+mv . ../selfpost.before-restore
+mkdir selfpost && cd selfpost
 
 # 3. Unpack the backup into the fresh directory
-tar xzf selfpost-backup.tar.gz -C ./data
+tar xzf ../selfpost-backup.tar.gz
 
-# 4. docker-compose.yml must already pin the exact tag the backup was made
-#    with — check the archive's manifest if unsure:
-tar xzf selfpost-backup.tar.gz -O manifest.json
+# 4. docker-compose.yml in the archive must pin the exact tag the backup was
+#    made with — check if unsure:
+tar xzf ../selfpost-backup.tar.gz -O data/manifest.json
 
 # 5. Start it and watch the boot
 docker compose up -d
@@ -473,27 +479,30 @@ Fix the tag in `docker-compose.yml`, `docker compose pull && docker compose up
 -d` again — the manifest is still there because the failed boot never got to
 delete it.
 
-**Moving to a different host** is the same five steps, just starting cold:
-bring the compose files and the correct pinned image tag to the new host
-(step 1 of [Full deployment](#full-deployment)), put the backup archive in
-place of step 3 above, then redo the reverse-proxy/TLS and DNS steps of a
-[Full deployment](#full-deployment) — the PTR record and the certificate both
-belong to the old IP/host and have to be reissued for the new one; nothing in
-the backup carries them.
+**Moving to a different host** is the same flow: create an empty project
+directory, unpack the backup there, edit `.env` (and `docker-compose.yml` if
+needed) for the new hostname or proxy, then `docker compose up -d`. The archive
+carries `certs/` from the old host — re-issue certificates when the hostname or
+IP changes. Set up the reverse-proxy vhost separately (not in the backup).
 
 **Restoring an encrypted (`.spbk`) backup** needs a running container to
 decrypt it first — any container with the `selfpost-backup` CLI works; decryption
 does not read `/data` and performs no version check. Start one normally
-(step 5, but on an empty `/data` you haven't unpacked yet), then:
+(step 5, but on an empty project you have not unpacked yet), then:
 
 ```sh
 docker exec -i <container> selfpost-backup -decrypt < backup.spbk > selfpost-backup.tar.gz
 ```
 
-Stop it, wipe `/data` again, and continue from step 2 above with the
-resulting `.tar.gz` — see [Encrypting a backup or
+Stop it, wipe the project directory again, and continue from step 2 above with
+the resulting `.tar.gz` — see [Encrypting a backup or
 export](#encrypting-a-backup-or-export) for the decrypt command's password
 options.
+
+**Archives from older SelfPost versions** (flat layout: `manifest.json` and
+`selfpost.db` at the archive root, no `data/` prefix, no deploy files) restore
+with the previous procedure: `tar xzf backup.tar.gz -C ./data` into a project
+that already has `docker-compose.yml` and `.env`.
 
 Restoring an archive taken **before** a session row was removed can bring
 that session back: session rows travel with the backup, and a browser that
@@ -520,9 +529,9 @@ domain](#exporting-and-importing-a-single-domain) — a different, domain-scoped
 operation that also lives on the *Backup* page (`/backup`).
 
 Both a full backup and a domain export are **secrets** — they contain the
-admin password hash (full backup) or working application credentials (domain
-export) in the clear or in directly reversible form. Treat them like any
-other credential material: restrict who can read them, don't email them
+admin password hash (full backup), TLS private keys and `.env` (full backup),
+or working application credentials (domain export) in the clear or in
+directly reversible form. Treat them like any other credential material: restrict who can read them, don't email them
 around — and encrypt them, which SelfPost can do for you.
 
 #### Encrypting a backup or export

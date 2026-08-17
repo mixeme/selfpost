@@ -3,13 +3,15 @@
 
 <div class="card">
   <h2>Full backup</h2>
-  <p class="muted">Download a full backup of all persistent state — the database,
-  every domain's DKIM key and the application credentials. Use it to move the
-  whole server to a new machine: restore it into a container of the
-  <strong>same SelfPost version</strong>, with the same data mount, before first
-  start. TLS certificates and the mail queue are not included.</p>
+  <p class="muted">Download a self-contained backup of the whole instance —
+  <code>data/</code> (database, DKIM keys, application credentials, and the
+  Postfix queue), <code>docker-compose.yml</code>, <code>.env</code>, and
+  <code>certs/</code>. Extract it into an empty project directory on a new
+  machine, adjust hostname or proxy settings if needed, and start a container of
+  the <strong>same SelfPost version</strong> before first boot. The reverse-proxy
+  vhost is not included — set that up separately on the new host.</p>
   <p class="muted"><strong>The backup file is a secret</strong> (it contains
-  private keys and credentials). Store and transfer it securely and delete it
+  private keys, TLS material, and credentials). Store and transfer it securely and delete it
   once the restore succeeds. Encrypting it below is the simplest way to do that:
   the download is then a <code>.spbk</code> file (SelfPost backup) that only
   the password opens.</p>

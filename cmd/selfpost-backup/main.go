@@ -6,9 +6,9 @@
 //
 //	docker exec <container> selfpost-backup > selfpost-backup.tar.gz
 //
-// Use -o to write to a file instead. The resulting archive contains DKIM private
-// keys, the admin password hash and SASL credentials — treat it as a secret
-// (architecture.md § Persistence).
+// Use -o to write to a file instead. The resulting archive is self-contained:
+// data/, docker-compose.yml, .env, and certs/ when present — treat it as a
+// secret (architecture.md § Persistence).
 //
 // Given a password (SELFPOST_BACKUP_PASSWORD or -password-file, never an
 // argument, which would show up in the process list) the archive is written as
@@ -87,9 +87,13 @@ func run(outPath, password string) error {
 	}
 
 	if err := backup.Create(sink, backup.Params{
-		DataDir: dataDir,
-		DBPath:  dbPath,
-		Version: buildinfo.Version,
+		DataDir:    dataDir,
+		DBPath:     dbPath,
+		Version:    buildinfo.Version,
+		DeployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
+		OnWarn: func(msg string) {
+			fmt.Fprintf(os.Stderr, "selfpost-backup: %s\n", msg)
+		},
 	}); err != nil {
 		return err
 	}

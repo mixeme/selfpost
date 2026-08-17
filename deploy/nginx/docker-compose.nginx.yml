@@ -27,6 +27,7 @@ services:
       # network at selfpost:8080 instead (see nginx.conf.example).
     volumes: !override
       - ./data:/data
+      - .:/selfpost-deploy:ro
       # Same host directory certbot below writes into — plain bind mount,
       # no named volume, so the PEM files are as directly inspectable as in
       # the Apache scenario (spec 10.3).

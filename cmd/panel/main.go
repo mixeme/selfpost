@@ -78,6 +78,7 @@ type config struct {
 	saslDBPath string
 	saslRealm  string
 	postfixDir string
+	deployRoot string
 }
 
 func loadConfig() config {
@@ -138,6 +139,7 @@ func loadConfig() config {
 		saslDBPath: envDefault("SASL_DB_PATH", filepath.Join(dataDir, "sasl", "sasldb2")),
 		saslRealm:  saslRealm(),
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
+		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
 	}
 }
 

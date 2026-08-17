@@ -20,6 +20,7 @@ type Config struct {
 	MailLogPath       string
 	DataDir           string
 	DBPath            string
+	DeployRoot        string
 	Version           string
 	TLSCertFile       string
 	OpenDKIMSocket    string

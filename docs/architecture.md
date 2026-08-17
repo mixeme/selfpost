@@ -291,23 +291,27 @@ single-connection trade-off that follows from it.
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
+| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
 
-Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
-(transit mail not migrated by design).
+Not in `/data`: TLS certificates for the panel (reverse-proxy mount) — though
+full backups also archive the operator's `./certs` PEM files when present.
 
 **Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90);
 `mail.log` via logrotate (14 rotated files, check every 6h, rename +
 `postfix reload` in `postrotate` — see § Log tailer above).
 
-**Restore:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
-`/data` tree, minus `log/`, the setup token and any `tls/`; version check on
-restore. On the first successful boot after restore, the panel runs one
-**Resync** — OpenDKIM's tables and Postfix's sender map are re-derived from
-SQLite and both daemons are reloaded, so drift between the extracted archive
-and the database is healed before mail flows (same step as `POST /reload` on
-demand). Stopped-container `tar` of `./data` is safe (see guide).
+**Restore:** panel button or `selfpost-backup` CLI — self-contained archive:
+`data/` (SQLite snapshot + tree minus `log/`, the setup token and any `tls/`
+under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
+version check on restore. Requires the project directory mounted read-only at
+`SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
+first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
+tables and Postfix's sender map are re-derived from SQLite and both daemons are
+reloaded, so drift between the extracted archive and the database is healed
+before mail flows (same step as `POST /reload` on demand). Stopped-container
+`tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
@@ -350,7 +354,10 @@ unsupported rather than as a missing doc:
   `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
   (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel
   always writes `<POSTFIX_DIR>/sender_login_maps`, so overriding this env alone
-  desyncs the map Postfix reads from the file the panel maintains).
+  desyncs the map Postfix reads from the file the panel maintains),
+  `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
+  `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
+  full backups; mount `.:/selfpost-deploy:ro` in compose).
 - **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
   `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
   `MILTER_WAIT_TIMEOUT` (`30` seconds).

@@ -33,6 +33,8 @@ var documentedInternal = []string{
 	"SASL_REALM",
 	"POSTFIX_DIR",
 	"POSTFIX_SENDER_LOGIN_MAPS",
+	"POSTFIX_QUEUE_DIR",
+	"SELFPOST_DEPLOY_ROOT",
 	"MILTER_CONNECT_TIMEOUT",
 	"MILTER_COMMAND_TIMEOUT",
 	"MILTER_CONTENT_TIMEOUT",
@@ -70,6 +72,7 @@ var loadConfigKeys = []string{
 	"SASL_DB_PATH",
 	"SASL_REALM",
 	"POSTFIX_DIR",
+	"SELFPOST_DEPLOY_ROOT",
 }
 
 // buildScriptKeys is every ${VAR:-…} / os.Getenv used in build/*.sh and entrypoint.sh
@@ -84,6 +87,7 @@ var buildScriptKeys = []string{
 	"JOURNAL_MILTER_SOCKET",
 	"MAIL_LOG",
 	"POSTFIX_SENDER_LOGIN_MAPS",
+	"POSTFIX_QUEUE_DIR",
 	"SASL_DB_PATH",
 	"SUBMISSION_ENABLE",
 	"MILTER_CONNECT_TIMEOUT",
