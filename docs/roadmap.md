@@ -26,16 +26,16 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Index
 
-| ID | Topic | Status | Plan |
-|---|---|---|---|
-| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | [plans/queue-retries.md](plans/queue-retries.md) |
-| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
-| send-log-retention | Send-log retention days in panel Settings | candidate | [plans/send-log-retention.md](plans/send-log-retention.md) |
-| domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
-| contributing | `CONTRIBUTING.md` | candidate | — |
-| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
-| panel-docs | In-panel operator documentation | candidate | — |
-| schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — |
+| ID | Topic | Status | Progress | Plan |
+|---|---|---|---|---|
+| queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | 0/9 | [plans/queue-retries.md](plans/queue-retries.md) |
+| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 0/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
+| domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
+| contributing | `CONTRIBUTING.md` | candidate | — | — |
+| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
+| panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
+| schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): **queue-retries** is a small panel item
 that can land first or in parallel; the next feature is **inbound-relay**.
@@ -47,7 +47,9 @@ fail-closed paths, docs, GUI, tests, licence) are closed — history in
 explicit agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
-the checklist in its linked plan.
+the **Implementation checklist** in its linked plan. The `Progress` column above
+is `done/total` checklist steps in that plan ([development.md](development.md)
+§ Plan checklists).
 
 ---
 

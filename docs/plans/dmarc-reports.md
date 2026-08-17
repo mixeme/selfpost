@@ -48,3 +48,18 @@ remain a separate, opt-in feature that does not forward mail upstream.
 
 - Attack surface of accepting mail (mitigate: strict recipient allow-list).
 - Report volume and retention (mitigate: caps + pruning).
+
+## Implementation checklist
+
+Target version cut: **`1.7.0`** (MINOR). One commit per step; code only after
+roadmap status is **agreed**. Expand the sketch sections above before step 1
+if still thin. See [development.md](../development.md) § Plan checklists.
+
+- [ ] Expand plan: ingest path, `dmarc_reports` schema, retention caps — **Sonnet**
+- [ ] Opt-in inbound SMTP for report addresses only (allow-list) — **Opus**
+- [ ] Worker: gzip/XML parse → SQLite — **Opus**
+- [ ] Panel: domain roll-up + parsed report (panel-ui mockups) — **Sonnet**
+- [ ] Tie-in `dmarc_report_email` / `domains.dmarc_rua` — **Sonnet**
+- [ ] Tests and [guide.md](../guide.md) — **Sonnet**
+- [ ] Security review ingest path — **Fable**
+- [ ] `go vet`, `go test` on touched packages — **Haiku**

@@ -185,3 +185,21 @@ change in [guide.md](../guide.md) § Export.
   from the panel.
 
 **Version:** `1.x` MINOR.
+
+## Implementation checklist
+
+Target version cut: **`1.6.0`** (MINOR). One commit per step; code only after
+roadmap status is **agreed**. See [development.md](../development.md) § Plan
+checklists.
+
+- [ ] Migration `0006_rate_limit_auto.sql` (`mode`, `auto_multiplier`, `auto_updated_at`) — **Opus**
+- [ ] `internal/store/stats.go`: total / peak / avg over 30 days — **Opus**
+- [ ] Auto recalc job (6h): `ceil(avg × multiplier)`, L1 cap, fail-open on error — **Opus**
+- [ ] Extend `RateLimit` + handler forms (manual/auto) — **Opus**
+- [ ] Domain page stats card + per-app stats (`domain_detail.html`) — **Sonnet**
+- [ ] Domain export JSON includes rate limits — **Opus**
+- [ ] Milter tests — enforced limit matches stored ceiling — **Opus**
+- [ ] Store and handler tests — **Sonnet**
+- [ ] [guide.md](../guide.md) — **Sonnet**
+- [ ] Security review rate-limit path — **Fable**
+- [ ] `go vet`, `go test` on touched packages — **Haiku**

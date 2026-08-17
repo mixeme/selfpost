@@ -139,3 +139,18 @@ lifetime runs out.
 - Showing compiled-in fallbacks when `postconf` failed would mislead if the
   operator had overridden them — mitigate with the muted note on the card.
 - Inventing a max-attempt count would be false; the copy must stay time-based.
+
+## Implementation checklist
+
+Target version cut: **`1.3.1`** (PATCH). One commit per step; see
+[development.md](../development.md) § Plan checklists.
+
+- [ ] `internal/postfix`: parse Postfix time units (`5d`, `300s`, bare seconds) + tests — **Opus**
+- [ ] `internal/postfix`: one-shot `postconf -h` (six keys), fallback + warn — **Opus**
+- [ ] Load policy at HTTP start in `cmd/panel/httpserver.go`; cache on handlers config — **Opus**
+- [ ] Human-readable duration formatter (shared by Mail queue card and delivery history) — **Sonnet**
+- [ ] «How delivery retries work» card on `/mail-queue` (outside HTMX fragment) — **Sonnet**
+- [ ] `deliveryEvents(row, policy)` — intervals in deferred/bounced copy — **Sonnet**
+- [ ] Handler and template tests (`handlers_monitor_test.go`, `templates_test.go`) — **Sonnet**
+- [ ] [guide.md](../guide.md) and [architecture.md](../architecture.md) — **Sonnet**
+- [ ] `go vet`, `go test` on touched packages — **Haiku**

@@ -66,6 +66,58 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 
 ---
 
+## Plan checklists
+
+Open [roadmap.md](roadmap.md) items with a linked plan file carry an
+**Implementation checklist** in [plans/](plans/). After a context reset, work
+the **active** plan — not the roadmap prose — from the first unchecked line.
+
+**Checklist format**
+
+- `- [ ] Step description — **Model**` (model from the routing table above).
+- Mark `[x]` only in the commit that actually finishes the step.
+- `candidate` items: checklist may exist, but no code until the roadmap status
+  is agreed.
+
+**Progress column** in the roadmap index (`0/N`) counts every checklist line in
+that plan (including docs and `go vet` / `go test` steps). Update `N` when the
+checklist changes; update the numerator when steps are checked off.
+
+### Roadmap track: commit and version
+
+For the current 1.x+ roadmap queue ([roadmap.md](roadmap.md) index), stricter
+than the default «meaningful step» rule in [§ Commits and release build](#commits-and-release-build):
+
+**After each checklist step**
+
+1. Check off the step in the plan file; bump `Progress` in the roadmap index.
+2. Append [CHANGELOG.md](../CHANGELOG.md) under `[Unreleased]` for that step.
+3. Commit on `main` (push / tag / Release only on explicit request).
+
+**After each roadmap stage** (all checklist steps done; «Done when» satisfied)
+
+1. Version cut in one commit: rename `[Unreleased]` to `[X.Y.Z] - date`, open a
+   fresh `[Unreleased]`, bump the image pin in
+   [deploy/docker-compose.yml](../deploy/docker-compose.yml).
+2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
+   [§ Release image](#release-image)).
+
+**Planned version cuts** (from pin `1.3.0`; adjust if semver changes mid-track):
+
+| Stage | ID | Cut |
+|---|---|---|
+| 1 | queue-retries | `1.3.1` (PATCH) |
+| 2 | inbound-relay | `1.4.0` |
+| 3 | send-log-retention | `1.5.0` |
+| 4 | domain-stats-auto-ratelimit | `1.6.0` |
+| 5 | dmarc-reports | `1.7.0` |
+| 6 | panel-docs | `1.8.0` |
+
+Docs-only prep (checklists in plans, no product code) uses the same per-step
+commit rule but **no** version cut until stage 1 ships.
+
+---
+
 ## Technology stack and tools
 
 | Component | Version / notes |

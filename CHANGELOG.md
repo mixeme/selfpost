@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs: **Plan checklists** in [development.md](docs/development.md) — format,
+  `Progress` column in [roadmap.md](docs/roadmap.md), per-step commit +
+  CHANGELOG, version cuts `1.3.1`…`1.8.0` per roadmap stage.
+- docs: **Implementation checklists** with model routing in
+  [docs/plans/](docs/plans/) (queue-retries, inbound-relay, send-log-retention,
+  domain-stats-auto-ratelimit, dmarc-reports, panel-docs).
 - docs: roadmap candidates **send-log-retention** (panel Settings for delivery
   journal retention) and **domain-stats-auto-ratelimit** (30-day send stats per
   domain/application, auto level-2 rate limit from avg × multiplier) — plans in
