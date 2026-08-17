@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- docs: roadmap candidates **send-log-retention** (panel Settings for delivery
+  journal retention) and **domain-stats-auto-ratelimit** (30-day send stats per
+  domain/application, auto level-2 rate limit from avg × multiplier) — plans in
+  [docs/plans/](docs/plans/).
+
 - Postfix queue under `/data/postfix/queue` — deferred and active mail survive
   container recreate and are included in full backups.
 - Full backup archives the whole operator project: `data/`, `docker-compose.yml`,

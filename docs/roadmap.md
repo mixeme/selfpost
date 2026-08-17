@@ -30,6 +30,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 |---|---|---|---|
 | queue-retries | Postfix retry policy in the panel (queue lifetime, backoff) | **agreed** | [plans/queue-retries.md](plans/queue-retries.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| send-log-retention | Send-log retention days in panel Settings | candidate | [plans/send-log-retention.md](plans/send-log-retention.md) |
+| domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | panel-docs | In-panel operator documentation | candidate | — |
@@ -37,7 +39,9 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 **Recommended order** (not binding): **queue-retries** is a small panel item
 that can land first or in parallel; the next feature is **inbound-relay**.
-The 2026-08-13 full-tree review follow-ups (send-log authorization,
+**send-log-retention** can land before or beside **domain-stats-auto-ratelimit**
+(panel retention ≥ 30 days helps the stats window). The 2026-08-13 full-tree
+review follow-ups (send-log authorization,
 fail-closed paths, docs, GUI, tests, licence) are closed — history in
 [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` and git. Candidates need
 explicit agreement before they join the queue.
@@ -86,6 +90,44 @@ engine stays outside the image, only the attachment point is provided.
 a wider attack surface (port 25 accepting mail).
 **Version:** target bump `1.x`; `2.x` possible — to be settled once the
 implementation lands.
+
+---
+
+## send-log-retention
+
+**Goal:** global administrator sets how many days of delivery journal rows
+(`send_log`, `/deliveries`) are kept, from `/settings` — stored in SQLite
+`settings`, with `SEND_LOG_RETENTION_DAYS` as bootstrap default only.
+
+**Boundary:** instance-wide retention; not per-domain. Does not change
+`mail.log` rotation. Today retention is env-only (default 90 days); the panel
+has no control.
+
+**Done when:** see [plans/send-log-retention.md](plans/send-log-retention.md).
+
+**Dependencies / risks:** log-tailer must re-read settings each prune cycle;
+delivery UI must stop hardcoding «ninety days».
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+
+---
+
+## domain-stats-auto-ratelimit
+
+**Goal:** 30-day sending statistics per domain and application (total, peak and
+average msg/h) on the domain page, plus optional **auto** level-2 rate limits
+computed as `ceil(avg_hourly × multiplier)` over the level-1 window.
+
+**Boundary:** extension of v1.0 manual L2 limits; does not change Postfix
+level 1. Stats exclude level-1 refusals (not in send log). Auto with zero
+traffic stays inactive.
+
+**Done when:** see
+[plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md).
+
+**Dependencies / risks:** send log data and preferably
+[send-log-retention](#send-log-retention) ≥ 30 days; aggregate query cost on
+large logs; rate-limit path needs security review.
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 
 ---
 
