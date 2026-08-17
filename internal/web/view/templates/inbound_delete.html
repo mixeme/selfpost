@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>Delete {{.Domain.Name}}</h1>
+
+{{template "back_link" (back (printf "/inbound/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
+
+<div class="card">
+  <h2>Confirm deletion</h2>
+  <p>You are about to stop accepting inbound mail for <strong>{{.Domain.Name}}</strong>. This will:</p>
+  <ul>
+    <li>remove it from <code>relay_domains</code> and the recipient map;</li>
+    <li>stop forwarding{{if ne .Upstream "—"}} to <strong>{{.Upstream}}</strong>{{end}};</li>
+    <li>leave outbound sending domains untouched.</li>
+  </ul>
+  <p class="muted">This cannot be undone from a backup of inbound maps alone
+  unless you restore one. Remove the MX if you do not plan to re-add the domain.</p>
+  <form method="post" action="/inbound/{{.Domain.ID}}/delete">
+    <button type="submit" class="danger">Delete {{.Domain.Name}}</button>
+  </form>
+</div>
+{{end}}

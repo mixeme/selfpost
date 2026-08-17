@@ -32,6 +32,7 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
   - [Rate limiting — level 1 (IP backstop)](#rate-limiting--level-1-ip-backstop)
   - [Full backup and restore](#full-backup-and-restore)
     - [Encrypting a backup or export](#encrypting-a-backup-or-export)
+  - [Inbound relay](#inbound-relay)
 - [Domain administration](#domain-administration)
   - [Domains page](#domains-page)
   - [Domain-level DNS (SPF, DKIM, DMARC)](#domain-level-dns-spf-dkim-dmarc)
@@ -44,10 +45,13 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
 
 ### Ports
 
-`deploy/docker-compose.yml` maps **465** and **587** to the host. Port 465
-(smtps) is always active. Port **587** is published even when
-`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true` — harmless,
-but it can look like an open port in external scans.
+`deploy/docker-compose.yml` maps **465**, **587**, and **25** to the host. Port
+465 (smtps) is always active. Port **587** is published even when
+`SUBMISSION_ENABLE=false`; nothing listens until you set it to `true`. Port
+**25** is published even when `INBOUND_RELAY_ENABLE=false`; Postfix does not
+accept inbound mail until you set it to `true` (see [Inbound
+relay](#inbound-relay)). Harmless extra publishes can look like open ports in
+external scans.
 
 ### Local trial
 
@@ -185,6 +189,11 @@ expected to set; defaults match the code exactly.
 |---|---|---|---|
 | `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
+| `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
+| `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound listener only (not 465/587). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. | *(empty)* | `.env` |
+| `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). | `accept` | `.env` |
+| `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
+| `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
 | `SEND_LOG_RETENTION_DAYS` | Days of send-log history kept before the background sweep deletes rows — the main driver of `/data` growth over time. | `90` | `.env` |
@@ -313,8 +322,9 @@ against the PTR record the internet publishes for this server's IP
 (forward-confirmed reverse DNS) — see
 [Server-level DNS](#server-level-dns-ptrrdns); use *Re-check* after changing
 DNS. The **Reload configuration** button re-applies OpenDKIM tables and the
-Postfix sender map from the database — use it if daemons drifted from what
-the panel shows after manual edits under `/data`.
+Postfix sender map from the database (and inbound relay maps when
+`INBOUND_RELAY_ENABLE=true`) — use it if daemons drifted from what the panel
+shows after manual edits under `/data`.
 
 ### Mail queue and System log
 
@@ -346,12 +356,13 @@ are separate and are not changed here.
 There are two roles:
 
 - **Global administrator** — full access to every page and every domain,
-  including Users, Backup, Status, Mail queue, and System log.
+  including Users, Backup, Status, Mail queue, System log, and Inbound (when
+  the inbound relay flag is on).
 - **Domain-admin** — scoped to one or more domains assigned by a global
   administrator. Sees only those domains' pages, applications, and
   Deliveries rows; cannot add or delete domains. `/users`, `/backup`,
-  `/status`, `/mail-queue`, `/system-log`, and `POST /reload` are not
-  reachable (404). A domain-admin can *export* the
+  `/status`, `/mail-queue`, `/system-log`, `/inbound`, and `POST /reload` are
+  not reachable (404). A domain-admin can *export* the
   domains assigned to them — see
   [Exporting and importing a single domain](#exporting-and-importing-a-single-domain).
 
@@ -443,9 +454,10 @@ which tag to use. On the first successful start after restore, `data/manifest.js
 from the archive is **deleted** — it guards only that one boot, so a later
 in-place upgrade is not blocked. On that same first boot the panel also runs
 one **Resync** — OpenDKIM's tables and Postfix's sender map are re-derived from
-SQLite and both daemons are reloaded, healing any drift between the extracted
-files and the database (the Status page's *Reload configuration* button runs
-the same step on demand). This is why the compose file pins a fixed tag rather
+SQLite (and inbound relay maps when `INBOUND_RELAY_ENABLE=true`) and both
+daemons are reloaded, healing any drift between the extracted files and the
+database (the Status page's *Reload configuration* button runs the same step on
+demand). This is why the compose file pins a fixed tag rather
 than `:latest`: without a known version, there'd be no way to tell which image
 restoring a given backup actually requires (see [Fixed image
 tag](#fixed-image-tag)).
@@ -579,6 +591,53 @@ docker exec -e SELFPOST_BACKUP_PASSWORD="$PW" <container> selfpost-backup > back
 
 With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
 
+### Inbound relay
+
+Optional backup-MX / forwarder: Postfix accepts mail on port **25** for
+domains you list under *Inbound* and hands each message to the upstream host
+you configure. It is **not** mailboxes, IMAP, or webmail — SelfPost never
+stores the message locally.
+
+**Off by default.** Set `INBOUND_RELAY_ENABLE=true` in `.env` and recreate the
+container. Until then there is no `smtp inet` listener, no Inbound item in
+the nav, and `/inbound` is 404. Outbound 465/587 is unchanged.
+
+**Panel** (`/inbound`, global administrator only): add a domain, set the
+upstream host/port and TLS to that hop (opportunistic / required / off), and
+choose recipients — an allow-list, or any address at that domain. A domain
+with an empty upstream is kept in the database but is **not** published into
+Postfix maps, so mail is never accepted with nowhere to send it.
+
+**DNS.** Unlike sending domains, an inbound domain needs an **MX** record that
+points at `SELFPOST_HOSTNAME`. The domain page shows the value to publish
+(`10 <hostname>.`) and a check that succeeds when *any* MX host matches this
+server — other MX targets (a primary mail server) are fine; this is how
+backup-MX is meant to work. Use *Re-check* after publishing.
+
+**Not an open relay.** The inbound smtpd offers no SASL. It accepts only
+domains in `relay_domains` and only listed recipients (`relay_recipient_maps`);
+everything else is `reject_unauth_destination` / `reject_unlisted_recipient`.
+Prefer an explicit recipient list so unknown addresses are refused at RCPT
+and never generate a bounce (backscatter).
+
+**Anti-spam.** SelfPost does not ship a filter. To attach one, set
+`INBOUND_ANTISPAM_MILTER` (inbound listener only) and merge
+[deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml)
+the same way as the nginx/Caddy fragments:
+
+```sh
+docker compose -f docker-compose.yml -f antispam/docker-compose.antispam.yml up -d
+```
+
+The milter sees the real client IP, HELO and PTR — unlike the upstream, which
+only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
+does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
+defer instead.
+
+Inbound configuration lives in SQLite and `/data/postfix/` map files, so it
+is included in a [full backup](#full-backup-and-restore). Single-domain
+export/import is sending domains only.
+
 ## Domain administration
 
 ### Domains page
@@ -595,7 +654,9 @@ domain](#exporting-and-importing-a-single-domain).
 
 ### Domain-level DNS (SPF, DKIM, DMARC)
 
-For *every* sending domain you add in the panel:
+For *every* sending domain you add in the panel (outbound). An inbound
+forwarding domain is a different object — it needs an MX, not these TXT
+records; see [Inbound relay](#inbound-relay).
 
 - **SPF** — a TXT record on the domain authorizing this server to send on its
   behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).

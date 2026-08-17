@@ -13,6 +13,7 @@ package dnscheck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -98,6 +99,7 @@ type Checker struct {
 	mu      sync.Mutex
 	servers map[string]cached[Server]
 	domains map[string]cached[Domain]
+	inbound map[string]cached[Result]
 }
 
 type cached[T any] struct {
@@ -120,6 +122,7 @@ func newChecker(r resolver, timeout, srvTTL, domTTL time.Duration) *Checker {
 		domainTTL: domTTL,
 		servers:   make(map[string]cached[Server]),
 		domains:   make(map[string]cached[Domain]),
+		inbound:   make(map[string]cached[Result]),
 	}
 }
 
@@ -172,7 +175,75 @@ func (c *Checker) Domain(q Query, force bool) Domain {
 func (c *Checker) Forget(domainName string) {
 	c.mu.Lock()
 	delete(c.domains, domainName)
+	delete(c.inbound, domainName)
 	c.mu.Unlock()
+}
+
+// InboundMX reports whether any MX for name points at this server's hostname
+// (the inbound-relay check). Other MX values are the domain's own primaries
+// and are not an error. force skips the cache.
+func (c *Checker) InboundMX(name, hostname string, force bool) Result {
+	key := name + "\x00" + hostname
+	if !force {
+		c.mu.Lock()
+		entry, ok := c.inbound[key]
+		c.mu.Unlock()
+		if ok && time.Now().Before(entry.expires) {
+			return entry.value
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+	result := c.checkInboundMX(ctx, name, hostname)
+
+	c.mu.Lock()
+	c.inbound[key] = cached[Result]{value: result, expires: time.Now().Add(c.domainTTL)}
+	c.mu.Unlock()
+	return result
+}
+
+func (c *Checker) checkInboundMX(ctx context.Context, name, hostname string) Result {
+	mxs, err := c.resolver.LookupMX(ctx, name)
+	if err != nil {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			return Result{
+				Status: health.StatusError,
+				Detail: fmt.Sprintf("No MX record is published at %s. Publish an MX pointing at %s — until then the internet will not deliver here.", name, hostname),
+			}
+		}
+		return lookupFailed("the MX record", err)
+	}
+	if len(mxs) == 0 {
+		return Result{
+			Status: health.StatusError,
+			Detail: fmt.Sprintf("No MX record is published at %s. Publish an MX pointing at %s — until then the internet will not deliver here.", name, hostname),
+		}
+	}
+
+	want := normalizeName(hostname)
+	var records []string
+	matched := false
+	for _, mx := range mxs {
+		host := normalizeName(mx.Host)
+		records = append(records, fmt.Sprintf("%d %s.", mx.Pref, host))
+		if host == want {
+			matched = true
+		}
+	}
+	if matched {
+		return Result{
+			Status:  health.StatusOK,
+			Detail:  fmt.Sprintf("An MX points at %s (this server). Other MX values are the domain's own primaries — they are not an error.", hostname),
+			Records: records,
+		}
+	}
+	return Result{
+		Status:  health.StatusError,
+		Detail:  fmt.Sprintf("No MX points at %s (this server). Publish the record below, or wait for DNS to propagate and Re-check.", hostname),
+		Records: records,
+	}
 }
 
 // checkDomain runs the three record checks concurrently: they are independent,

@@ -33,6 +33,11 @@ services:
       # Set to true to also publish RFC 6409 submission (587/STARTTLS)
       # alongside the primary 465/smtps listener (spec 5).
       SUBMISSION_ENABLE: "${SUBMISSION_ENABLE:-false}"
+      INBOUND_RELAY_ENABLE: "${INBOUND_RELAY_ENABLE:-false}"
+      INBOUND_ANTISPAM_MILTER: "${INBOUND_ANTISPAM_MILTER:-}"
+      INBOUND_ANTISPAM_MILTER_ACTION: "${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
+      INBOUND_RATE_LIMIT_MESSAGES_PER_IP: "${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}"
+      INBOUND_MESSAGE_SIZE_LIMIT: "${INBOUND_MESSAGE_SIZE_LIMIT:-26214400}"
       # Level-1 backstop rate limit (anvil, spec 5.5, 7.4); per-domain/app
       # limits (level 2) are configured later from the panel itself.
       RATE_LIMIT_MESSAGES_PER_IP: "${RATE_LIMIT_MESSAGES_PER_IP:-100}"
@@ -76,6 +81,9 @@ services:
       # 587 is mapped even when SUBMISSION_ENABLE=false; Postfix listens only
       # when the variable is true — see docs/guide.md "Published ports".
       - "587:587"
+      # 25 is mapped even when INBOUND_RELAY_ENABLE=false; Postfix listens only
+      # when the variable is true.
+      - "25:25"
       - "127.0.0.1:8080:8080"
     # Hardening (spec 10 p.6). SelfPost's entrypoint still needs to run as
     # root very briefly to fix /data ownership and normalise permissions
@@ -85,7 +93,7 @@ services:
     # self-healing. What IS applied: no privilege escalation past what the
     # image already grants, and every Linux capability dropped except the
     # small set the root startup phase and Postfix/OpenDKIM genuinely need:
-    #   - NET_BIND_SERVICE — bind 465/587 (and 25 outbound) below 1024;
+    #   - NET_BIND_SERVICE — bind 465/587 and inbound 25 below 1024;
     #   - CHOWN            — entrypoint re-owns /data (bind mount) to `panel`;
     #   - FOWNER           — entrypoint then chmods those now panel-owned /data
     #                        dirs/files while still root (owner-check bypass);

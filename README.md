@@ -10,7 +10,9 @@ Docker image. Postfix, OpenDKIM, and a small Go panel run together under
 then point your apps at the SMTP endpoint.
 
 SelfPost sends mail straight to the internet from **your own IP**, with per-domain
-DKIM signing. It is **outbound only** — no inbound mail, mailboxes, or webmail.
+DKIM signing. It is outbound by default — no mailboxes or webmail. An optional
+inbound relay (backup-MX / forwarder on port 25) can be turned on; it forwards
+to an upstream, it does not store mail.
 
 **For:** operators who run their own VPS or home server and want a simple relay
 they control, without a third-party SMTP provider.
@@ -21,6 +23,7 @@ send log and DNS checks in the panel, encrypted backups.
 ## Features
 
 - Outbound SMTP (465/smtps; optional 587 submission) with per-domain DKIM signing
+- Optional inbound relay on port 25 (backup-MX / forwarder; off by default)
 - Web panel — domains, applications, deliveries, mail queue, system log, backup
 - Multi-domain relay — each SASL application is bound to one sending domain
 - DNS status checks (PTR, SPF, DKIM, DMARC) with in-panel re-check
@@ -77,6 +80,15 @@ For every domain you add in the panel:
 - [ ] DMARC `_dmarc` TXT record
 
 See [Domain-level DNS](docs/guide.md#domain-level-dns-spf-dkim-dmarc) in the operator guide.
+
+### Per inbound domain (optional)
+
+Only if you turn on inbound relay (`INBOUND_RELAY_ENABLE=true`):
+
+- [ ] MX record pointing at `SELFPOST_HOSTNAME` (keep any existing primary MX
+      if this host is backup-MX)
+
+See [Inbound relay](docs/guide.md#inbound-relay) in the operator guide.
 
 ## Quick start
 
@@ -136,8 +148,9 @@ DNS — lives in the operator guide's [Full
 deployment](docs/guide.md#full-deployment) section, with proxy-specific
 commands under [Reverse proxy](docs/guide.md#reverse-proxy-mandatory).
 
-The compose file always publishes **465** and **587**; Postfix listens on 587
-only when `SUBMISSION_ENABLE=true` (see [Ports](docs/guide.md#ports)). Bump the
+The compose file always publishes **465**, **587**, and **25**; Postfix listens
+on 587 only when `SUBMISSION_ENABLE=true`, and on 25 only when
+`INBOUND_RELAY_ENABLE=true` (see [Ports](docs/guide.md#ports)). Bump the
 pinned image tag deliberately when upgrading, never `:latest` ([why](docs/guide.md#fixed-image-tag)). Optional
 variables (`TRUSTED_PROXY_CIDR`, rate limits, retention): see [Environment
 variables](docs/guide.md#environment-variables).

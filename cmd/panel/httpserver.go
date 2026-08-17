@@ -11,6 +11,7 @@ import (
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/buildinfo"
 	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web"
@@ -19,10 +20,12 @@ import (
 // mailStack is the panel's domain and application services plus the on-disk
 // mail-path adapters they write through.
 type mailStack struct {
-	Domains *domain.Service
-	Apps    *app.Service
-	pf      *postfix.Postfix
-	odk     *domain.OpenDKIM
+	Domains        *domain.Service
+	Apps           *app.Service
+	Inbound        *inbound.Service
+	pf             *postfix.Postfix
+	odk            *domain.OpenDKIM
+	inboundEnabled bool
 }
 
 func newMailStack(cfg config, st *store.Store) *mailStack {
@@ -30,7 +33,8 @@ func newMailStack(cfg config, st *store.Store) *mailStack {
 	odk := domain.NewOpenDKIM(cfg.opendkimDir)
 	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
 	domains := domain.NewService(st, odk, apps, cfg.dkimSelectorDef)
-	return &mailStack{Domains: domains, Apps: apps, pf: pf, odk: odk}
+	inb := inbound.NewService(st, pf)
+	return &mailStack{Domains: domains, Apps: apps, Inbound: inb, pf: pf, odk: odk, inboundEnabled: cfg.inboundEnabled}
 }
 
 // Resync rebuilds OpenDKIM's tables and Postfix's sender map from SQLite and
@@ -41,6 +45,11 @@ func (m *mailStack) Resync() error {
 	}
 	if err := m.Apps.Resync(); err != nil {
 		return fmt.Errorf("postfix resync: %w", err)
+	}
+	if m.inboundEnabled {
+		if err := m.Inbound.Resync(); err != nil {
+			return fmt.Errorf("inbound maps resync: %w", err)
+		}
 	}
 	return nil
 }
@@ -70,7 +79,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	// effective config, including a manual override; the panel keeps this
 	// snapshot for the process lifetime (architecture.md).
 	retryPolicy := postfix.LoadRetryPolicy()
-	return web.New(st, ms.Domains, ms.Apps, web.Config{
+	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, web.Config{
 		Hostname:               cfg.hostname,
 		CookieSecure:           cfg.cookieSecure,
 		SubmissionEnabled:      cfg.submissionEnabled,
@@ -88,6 +97,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		RateLimitMessagesPerIP: cfg.rateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
 		RetryPolicy:            retryPolicy,
+		InboundEnabled:         cfg.inboundEnabled,
 	}, cfg.setupTokenPath)
 }
 

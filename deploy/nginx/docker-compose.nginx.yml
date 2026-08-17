@@ -23,6 +23,7 @@ services:
     ports: !override
       - "465:465"
       - "587:587"
+      - "25:25"
       # No host publish for 8080 here: nginx reaches it over the compose
       # network at selfpost:8080 instead (see nginx.conf.example).
     volumes: !override

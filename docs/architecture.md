@@ -53,13 +53,31 @@ Client ──TLS+SASL──► Postfix (465 smtps, optional 587 submission)
                          ├─► OpenDKIM milter (sign, tempfail on failure)
                          ├─► journal-milter (send log + L2 rate limits, fail-open)
                          └─► outbound MX delivery (port 25 client)
+
+Internet ──► Postfix smtp inet :25  (only when INBOUND_RELAY_ENABLE=true)
+                         │
+                         ├─► optional antispam milter (inbound only)
+                         └─► smtp:[upstream]:port  (transport_maps; no local delivery)
 ```
+
+The inbound listener is **absent** when the flag is off (`postconf -MX smtp/inet`
+removes Debian's stock smtpd). Outbound delivery still uses the `smtp unix`
+client; it is not the same service.
 
 ### Postfix ([build/postfix-config.sh](../build/postfix-config.sh))
 
 - **465/smtps** — implicit TLS, SASL required; primary listener.
 - **587/submission** — only when `SUBMISSION_ENABLE=true`; STARTTLS with
   `smtpd_tls_security_level=encrypt`.
+- **25/smtp inet** — only when `INBOUND_RELAY_ENABLE=true`. No SASL, no
+  OpenDKIM, no journal-milter. Accepts only `relay_domains` +
+  `relay_recipient_maps` (`reject_unauth_destination`,
+  `reject_unlisted_recipient`). Maps under `/data/postfix/`
+  (`relay_domains`, `transport`, `relay_recipients`, `tls_policy`), written
+  atomically by [internal/postfix/inbound.go](../internal/postfix/inbound.go).
+  Domains with an empty upstream host are omitted from the maps. Optional
+  `INBOUND_ANTISPAM_MILTER` on this listener only; default
+  `milter_default_action` is fail-open (`accept`).
 - **No open relay** — `permit_sasl_authenticated`, `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
 - **Level-1 rate limit** — `smtpd_client_message_rate_limit` /
@@ -186,6 +204,7 @@ below is a summary — HTMX fragment endpoints
 | `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
 | `/settings` | Username/password for any user; DMARC report default is **global** only |
 | `/users`, `/users/*` | **Global.** Panel user CRUD |
+| `/inbound`, `/inbound/{id}`, `/inbound/{id}/*` | **Global.** Inbound relay domains. Registered only when `INBOUND_RELAY_ENABLE=true`; otherwise 404. |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
@@ -251,6 +270,7 @@ flowchart TB
   subgraph services ["Services — multi-store operations + rollback"]
     domainSvc["internal/domain"]
     appSvc["internal/app"]
+    inboundSvc["internal/inbound"]
   end
   subgraph persistence ["Persistence"]
     store["internal/store — SQLite, embedded migrations"]
@@ -272,16 +292,19 @@ flowchart TB
   web --> store
   web --> domainSvc
   web --> appSvc
+  web --> inboundSvc
   web --> backupPkg
   web --> dnscheck
   web --> health
   web --> secretfile
   domainSvc --> store
   appSvc --> store
+  inboundSvc --> store
   milterPkg --> store
   logtail --> store
   domainSvc --> postfix
   appSvc --> postfix
+  inboundSvc --> postfix
 ```
 
 The three roles inside the `panel` process (HTTP server, journal-milter,
@@ -295,11 +318,15 @@ single-connection trade-off that follows from it.
 
 | Path | Contents |
 |---|---|
-| `selfpost.db` | SQLite: domains, apps, admin, sessions, send log, L2 limits, log-tailer offset |
+| `selfpost.db` | SQLite: domains, apps, admin, sessions, send log, L2 limits, log-tailer offset, inbound relay domains |
 | `setup-token` | First-run setup token file |
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
+| `postfix/relay_domains` | Inbound domains accepted on port 25 |
+| `postfix/transport` | Inbound next-hop `smtp:[host]:port` |
+| `postfix/relay_recipients` | Inbound recipient allow-list or `@domain` catch-all |
+| `postfix/tls_policy` | TLS policy for inbound next hops |
 | `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
@@ -317,9 +344,10 @@ under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
 first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
-tables and Postfix's sender map are re-derived from SQLite and both daemons are
-reloaded, so drift between the extracted archive and the database is healed
-before mail flows (same step as `POST /reload` on demand). Stopped-container
+tables, Postfix's sender map, and (when `INBOUND_RELAY_ENABLE=true`) inbound
+relay maps are re-derived from SQLite and both daemons are reloaded, so drift
+between the extracted archive and the database is healed before mail flows
+(same step as `POST /reload` on demand). Stopped-container
 `tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
@@ -364,6 +392,12 @@ unsupported rather than as a missing doc:
   (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel
   always writes `<POSTFIX_DIR>/sender_login_maps`, so overriding this env alone
   desyncs the map Postfix reads from the file the panel maintains),
+  `POSTFIX_RELAY_DOMAINS` (`/data/postfix/relay_domains`),
+  `POSTFIX_TRANSPORT_MAPS` (`/data/postfix/transport`),
+  `POSTFIX_RELAY_RECIPIENTS` (`/data/postfix/relay_recipients`),
+  `POSTFIX_TLS_POLICY_MAPS` (`/data/postfix/tls_policy`) — same desync if
+  overridden without matching the panel writer in
+  [internal/postfix/inbound.go](../internal/postfix/inbound.go),
   `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
   `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
   full backups; mount `.:/selfpost-deploy:ro` in compose).

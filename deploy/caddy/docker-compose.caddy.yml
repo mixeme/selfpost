@@ -23,6 +23,7 @@ services:
     ports: !override
       - "465:465"
       - "587:587"
+      - "25:25"
     environment:
       # Caddy names certificate files after the hostname, not
       # fullchain.pem/privkey.pem like certbot — override the base file's

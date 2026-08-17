@@ -28,7 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 0/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 14/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
 | domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |

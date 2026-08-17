@@ -62,3 +62,18 @@ func parseSupervisorStatus(out string) map[string]string {
 	}
 	return states
 }
+
+// checkInboundRelayOff asserts the default image does not accept mail on
+// port 25: smtp/inet is absent from master.cf (Debian's stock listener is
+// removed when INBOUND_RELAY_ENABLE is not true).
+func checkInboundRelayOff(s *stack) error {
+	out, err := s.execIn("selfpost", "postconf", "-M", "smtp/inet")
+	combined := out
+	if err != nil {
+		combined += err.Error()
+	}
+	if strings.Contains(combined, "smtpd") && !strings.Contains(combined, "warning:") && !strings.Contains(combined, "fatal:") {
+		return fmt.Errorf("inbound smtp/inet is present while INBOUND_RELAY_ENABLE is off:\n%s", out)
+	}
+	return nil
+}

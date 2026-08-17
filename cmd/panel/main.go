@@ -79,6 +79,8 @@ type config struct {
 	saslRealm  string
 	postfixDir string
 	deployRoot string
+
+	inboundEnabled bool
 }
 
 func loadConfig() config {
@@ -140,6 +142,8 @@ func loadConfig() config {
 		saslRealm:  saslRealm(),
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
 		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
+		// Optional inbound relay (backup-MX / forwarder). Off unless exactly "true".
+		inboundEnabled: os.Getenv("INBOUND_RELAY_ENABLE") == "true",
 	}
 }
 

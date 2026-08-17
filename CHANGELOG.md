@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+Optional inbound relay (backup-MX / forwarder) on port 25, off by default.
+Mail is accepted only for domains configured in the panel and forwarded to
+an upstream; there are still no mailboxes. Security review of the inbound
+path is pending (Fable).
+
+### Added
+
+- `INBOUND_RELAY_ENABLE` (default `false`): when true, Postfix listens on
+  port 25 without SASL, only for `relay_domains` + known recipients, and
+  forwards via `transport_maps`. Empty upstream host is omitted from the
+  maps so mail is never accepted with nowhere to send it.
+- Panel **Inbound** pages (global administrator): domains, upstream host/port
+  and TLS, recipient list or any-at-domain, MX check against
+  `SELFPOST_HOSTNAME`.
+- Optional `INBOUND_ANTISPAM_MILTER` on the inbound listener only, plus
+  [deploy/antispam/docker-compose.antispam.yml](deploy/antispam/docker-compose.antispam.yml).
+  Default milter action is fail-open (`accept`).
+- Inbound rate limit (`INBOUND_RATE_LIMIT_MESSAGES_PER_IP`, default 20) and
+  `INBOUND_MESSAGE_SIZE_LIMIT` (default 25 MiB) on smtpd port 25.
+
+### Changed
+
+- Compose publishes host port 25 even when the flag is off (nothing listens
+  until it is on), the same pattern as 587 / `SUBMISSION_ENABLE`.
+- Full-backup restore Resync also rebuilds inbound maps when the flag is on.
+  Single-domain export/import is still sending domains only.
+
 ## [1.3.1] - 2026-08-17
 
 Retry policy in the panel, persistent Postfix queue, and self-contained

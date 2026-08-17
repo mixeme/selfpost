@@ -66,6 +66,20 @@ SASLDB_PATH="${SASL_DB_PATH:-/data/sasl/sasldb2}"
 # when a client library needs STARTTLS on 587 instead of implicit TLS on 465).
 SUBMISSION_ENABLE="${SUBMISSION_ENABLE:-false}"
 
+# Optional inbound relay (backup-MX / forwarder). Off by default: port 25 does
+# not accept mail, Postfix inbound maps are not referenced, and the panel UI is
+# absent. When true, smtp inet on 25 accepts only relay_domains + known
+# recipients (docs/plans/inbound-relay.md).
+INBOUND_RELAY_ENABLE="${INBOUND_RELAY_ENABLE:-false}"
+INBOUND_ANTISPAM_MILTER="${INBOUND_ANTISPAM_MILTER:-}"
+INBOUND_ANTISPAM_MILTER_ACTION="${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
+INBOUND_RATE_LIMIT_MESSAGES_PER_IP="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}"
+INBOUND_MESSAGE_SIZE_LIMIT="${INBOUND_MESSAGE_SIZE_LIMIT:-26214400}"
+RELAY_DOMAINS_MAP="${POSTFIX_RELAY_DOMAINS:-/data/postfix/relay_domains}"
+TRANSPORT_MAP="${POSTFIX_TRANSPORT_MAPS:-/data/postfix/transport}"
+RELAY_RECIPIENTS_MAP="${POSTFIX_RELAY_RECIPIENTS:-/data/postfix/relay_recipients}"
+TLS_POLICY_MAP="${POSTFIX_TLS_POLICY_MAPS:-/data/postfix/tls_policy}"
+
 # Delivery log, written by postlogd and read by the panel's log-tailer. It lives
 # under the persistent /data (not the ephemeral /var/log) so the delivery lines
 # for messages still marked "queued" survive a container recreate — without
@@ -195,6 +209,61 @@ if [ "${SUBMISSION_ENABLE}" = "true" ]; then
 		"submission/inet/smtpd_client_restrictions=permit_sasl_authenticated,reject"
 else
 	postconf -MX "submission/inet" 2>/dev/null || true
+fi
+
+# --- inbound smtpd on port 25 (optional backup-MX / forwarder) ---------------
+# Debian's stock master.cf enables smtp/inet. When the flag is off, remove that
+# listener so port 25 is not an inbound smtpd (outbound delivery uses smtp/unix).
+# When on: no SASL, no OpenDKIM, accept only relay_domains + listed recipients.
+if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+	for f in "$RELAY_DOMAINS_MAP" "$TRANSPORT_MAP" "$RELAY_RECIPIENTS_MAP" "$TLS_POLICY_MAP"; do
+		[ -e "$f" ] || : > "$f"
+	done
+	postconf -e \
+		"relay_domains=texthash:${RELAY_DOMAINS_MAP}" \
+		"transport_maps=texthash:${TRANSPORT_MAP}" \
+		"relay_recipient_maps=texthash:${RELAY_RECIPIENTS_MAP}" \
+		"smtp_tls_policy_maps=texthash:${TLS_POLICY_MAP}" \
+		"smtpd_reject_unlisted_recipient=yes"
+
+	INBOUND_MILTERS=""
+	if [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
+		case "${INBOUND_ANTISPAM_MILTER}" in
+			inet:[A-Za-z0-9._-]*:[0-9]* | unix:/[A-Za-z0-9._/-]* ) ;;
+			*)
+				echo "FATAL: INBOUND_ANTISPAM_MILTER must be inet:host:port or unix:/path, got: ${INBOUND_ANTISPAM_MILTER}" >&2
+				exit 1
+				;;
+		esac
+		case "${INBOUND_ANTISPAM_MILTER_ACTION}" in
+			accept|tempfail) ;;
+			*)
+				echo "FATAL: INBOUND_ANTISPAM_MILTER_ACTION must be accept or tempfail, got: ${INBOUND_ANTISPAM_MILTER_ACTION}" >&2
+				exit 1
+				;;
+		esac
+		INBOUND_MILTERS="{ ${INBOUND_ANTISPAM_MILTER}, default_action=${INBOUND_ANTISPAM_MILTER_ACTION} }"
+	fi
+
+	postconf -M "smtp/inet=smtp inet n - n - - smtpd"
+	postconf -P \
+		"smtp/inet/smtpd_sasl_auth_enable=no" \
+		"smtp/inet/smtpd_tls_auth_only=no" \
+		"smtp/inet/smtpd_sender_login_maps=" \
+		"smtp/inet/smtpd_sender_restrictions=" \
+		"smtp/inet/smtpd_client_restrictions=" \
+		"smtp/inet/smtpd_relay_restrictions=reject_unauth_destination" \
+		"smtp/inet/smtpd_recipient_restrictions=reject_unauth_destination, reject_unlisted_recipient" \
+		"smtp/inet/smtpd_milters=${INBOUND_MILTERS}" \
+		"smtp/inet/smtpd_client_message_rate_limit=${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}" \
+		"smtp/inet/message_size_limit=${INBOUND_MESSAGE_SIZE_LIMIT}"
+else
+	postconf -MX "smtp/inet" 2>/dev/null || true
+	postconf -e \
+		"relay_domains=" \
+		"transport_maps=" \
+		"relay_recipient_maps=" \
+		"smtp_tls_policy_maps="
 fi
 
 # Disable chroot for every service (spec 5 p.2). Debian ships the smtp delivery

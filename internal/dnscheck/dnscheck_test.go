@@ -374,3 +374,37 @@ func TestReportAuth(t *testing.T) {
 		t.Errorf("advice %q should cite %q", got.Detail, ReportAuthExample())
 	}
 }
+
+func TestInboundMXPointsAtServer(t *testing.T) {
+	f := &fakeResolver{
+		mx: map[string][]*net.MX{
+			"lists.example.com": {
+				{Host: "mail.primary.example.net.", Pref: 10},
+				{Host: "mail.example.org.", Pref: 20},
+			},
+		},
+	}
+	got := newTestChecker(f).InboundMX("lists.example.com", "mail.example.org", false)
+	if got.Status != health.StatusOK {
+		t.Fatalf("status = %q (%s)", got.Status, got.Detail)
+	}
+}
+
+func TestInboundMXMissingThisServer(t *testing.T) {
+	f := &fakeResolver{
+		mx: map[string][]*net.MX{
+			"backup.example.net": {{Host: "mail.primary.example.net.", Pref: 10}},
+		},
+	}
+	got := newTestChecker(f).InboundMX("backup.example.net", "mail.example.org", false)
+	if got.Status != health.StatusError {
+		t.Fatalf("status = %q, want error", got.Status)
+	}
+}
+
+func TestInboundMXAbsent(t *testing.T) {
+	got := newTestChecker(&fakeResolver{}).InboundMX("none.example", "mail.example.org", false)
+	if got.Status != health.StatusError {
+		t.Fatalf("status = %q, want error", got.Status)
+	}
+}

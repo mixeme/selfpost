@@ -105,6 +105,9 @@ func TestE2E(t *testing.T) {
 		if err := checkSupervisorProcesses(h); err != nil {
 			t.Fatal(err)
 		}
+		if err := checkInboundRelayOff(h); err != nil {
+			t.Fatal(err)
+		}
 		if err := checkLogrotateConfigMode(h); err != nil {
 			t.Fatal(err)
 		}
@@ -132,6 +135,26 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("login: %v", err)
 		}
 		sc.panel = p
+	})
+
+	run("inbound_ui_absent_when_disabled", func(t *testing.T) {
+		resp, body, err := sc.panel.get("/status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 200 {
+			t.Fatalf("status = %d", resp.StatusCode)
+		}
+		if strings.Contains(body, `href="/inbound"`) {
+			t.Fatal("status page shows Inbound nav while INBOUND_RELAY_ENABLE is off")
+		}
+		resp, _, err = sc.panel.get("/inbound")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 404 {
+			t.Fatalf("GET /inbound = %d, want 404 with inbound relay off", resp.StatusCode)
+		}
 	})
 
 	run("add_domain_and_publish_dkim", func(t *testing.T) {

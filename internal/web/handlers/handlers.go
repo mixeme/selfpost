@@ -8,6 +8,7 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -34,6 +35,9 @@ type Config struct {
 	// when the HTTP role starts (architecture.md). The Mail queue card and
 	// delivery history read it from here; they never call postconf.
 	RetryPolicy postfix.RetryPolicy
+	// InboundEnabled mirrors INBOUND_RELAY_ENABLE: the inbound panel and
+	// routes exist only when this is true.
+	InboundEnabled bool
 }
 
 // Handlers holds dependencies for authenticated panel routes.
@@ -41,6 +45,7 @@ type Handlers struct {
 	store   *store.Store
 	domains *domain.Service
 	apps    *app.Service
+	inbound *inbound.Service
 	cfg     Config
 	view    *view.Engine
 	dns     *dnscheck.Checker
@@ -53,6 +58,7 @@ func New(
 	st *store.Store,
 	domains *domain.Service,
 	apps *app.Service,
+	inboundSvc *inbound.Service,
 	cfg Config,
 	v *view.Engine,
 	dns *dnscheck.Checker,
@@ -63,6 +69,7 @@ func New(
 		store:   st,
 		domains: domains,
 		apps:    apps,
+		inbound: inboundSvc,
 		cfg:     cfg,
 		view:    v,
 		dns:     dns,

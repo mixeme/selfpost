@@ -107,10 +107,10 @@ COPY --chmod=0755 build/crashexit.py /usr/local/bin/crashexit.py
 COPY --chmod=0755 build/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --chmod=0644 build/supervisord.conf /etc/supervisor/supervisord.conf
 
-# Published submission ports: 465 (smtps, primary) and 587 (submission, optional)
-# plus the panel on 8080. Outbound delivery dials remote MXs on 25 as a client,
-# which needs no inbound listener or EXPOSE.
-EXPOSE 8080 465 587
+# Published submission ports: 465 (smtps, primary) and 587 (submission, optional),
+# inbound SMTP on 25 when INBOUND_RELAY_ENABLE=true, plus the panel on 8080.
+# Outbound delivery dials remote MXs on 25 as a client even when inbound is off.
+EXPOSE 8080 465 587 25
 
 # Liveness probe: panel HTTP plus mail-path processes (opendkim, panel, postfix).
 # Does not verify TLS, DNS, or end-to-end delivery — see docs/guide.md Operations.

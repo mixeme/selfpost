@@ -1,0 +1,29 @@
+# Optional anti-spam sidecar for inbound relay (docs/plans/inbound-relay.md).
+#
+# SelfPost does not ship or start an anti-spam engine. This fragment brings up
+# rspamd next to SelfPost and points the inbound smtpd milter at it. Merge it
+# only when you want filtering on port 25:
+#
+#   docker compose -f docker-compose.yml -f antispam/docker-compose.antispam.yml up -d
+#
+# Requires INBOUND_RELAY_ENABLE=true in .env. The milter sees the real client
+# IP, HELO and PTR — unlike the upstream, which only sees SelfPost's address.
+#
+# Pin the rspamd tag the same way the SelfPost image is pinned; bump it
+# deliberately. Default milter action is fail-open (accept) so a down sidecar
+# does not block backup-MX. Set INBOUND_ANTISPAM_MILTER_ACTION=tempfail to
+# defer instead.
+
+services:
+  selfpost:
+    environment:
+      INBOUND_RELAY_ENABLE: "${INBOUND_RELAY_ENABLE:-true}"
+      INBOUND_ANTISPAM_MILTER: "${INBOUND_ANTISPAM_MILTER:-inet:antispam:11332}"
+      INBOUND_ANTISPAM_MILTER_ACTION: "${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
+    depends_on:
+      - antispam
+
+  antispam:
+    image: rspamd/rspamd:3.11
+    restart: unless-stopped
+    # No host ports: only SelfPost talks to the milter on the compose network.

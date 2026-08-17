@@ -12,6 +12,7 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/legal"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
@@ -82,6 +83,8 @@ type Config struct {
 	// when the HTTP role starts. Handlers read the cache; they never call
 	// postconf (architecture.md).
 	RetryPolicy postfix.RetryPolicy
+	// InboundEnabled mirrors INBOUND_RELAY_ENABLE.
+	InboundEnabled bool
 }
 
 // Server is the panel HTTP application.
@@ -96,18 +99,19 @@ type Server struct {
 // that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
 // apps owns application SASL accounts and the Postfix sender map
 // (architecture.md § Mail path).
-func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config, setupTokenPath string) (*Server, error) {
+func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	v, err := view.New(cfg.Version)
 	if err != nil {
 		return nil, err
 	}
+	v.SetInboundEnabled(cfg.InboundEnabled)
 	a := auth.New(st, auth.Config{
 		CookieSecure:      cfg.CookieSecure,
 		Hostname:          cfg.Hostname,
 		SessionIdleDays:   cfg.SessionIdleDays,
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
-	h := handlers.New(st, domains, apps, handlers.Config{
+	h := handlers.New(st, domains, apps, inboundSvc, handlers.Config{
 		Hostname:               cfg.Hostname,
 		SubmissionEnabled:      cfg.SubmissionEnabled,
 		MailLogPath:            cfg.MailLogPath,
@@ -121,6 +125,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
 		RetryPolicy:            cfg.RetryPolicy,
+		InboundEnabled:         cfg.InboundEnabled,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }
@@ -166,6 +171,17 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/ratelimit", h.HandleAppRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
 	authed.HandleFunc("POST /reload", h.HandleReload)
+
+	if s.cfg.InboundEnabled {
+		authed.HandleFunc("GET /inbound", h.HandleInboundList)
+		authed.HandleFunc("POST /inbound", h.HandleAddInbound)
+		authed.HandleFunc("GET /inbound/{id}", h.HandleInboundDetail)
+		authed.HandleFunc("POST /inbound/{id}/dns-recheck", h.HandleInboundDNSRecheck)
+		authed.HandleFunc("POST /inbound/{id}/upstream", h.HandleInboundTransport)
+		authed.HandleFunc("POST /inbound/{id}/recipients", h.HandleInboundRecipients)
+		authed.HandleFunc("GET /inbound/{id}/delete", h.HandleInboundDeleteConfirm)
+		authed.HandleFunc("POST /inbound/{id}/delete", h.HandleInboundDelete)
+	}
 
 	authed.HandleFunc("/settings", h.HandleSettings)
 	authed.HandleFunc("/account", redirectSettings)
