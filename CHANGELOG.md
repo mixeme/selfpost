@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-08-19
+
+Port-25 Postfix startup when inbound relay, DMARC ingest, or the inbound antispam
+milter are enabled. Schema-migration reference and roadmap plans for inbound
+antispam and quarantine. Upgrading from 1.9.0 is a tag bump; no migration.
+
 ### Added
 
 - [docs/plans/inbound-antispam-panel.md](docs/plans/inbound-antispam-panel.md) —
@@ -13,6 +19,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `1.10.0`; Composer → Opus → Fable workflow.
 - [docs/plans/inbound-quarantine.md](docs/plans/inbound-quarantine.md) — candidate
   plan for held-mail review/release (design TBD).
+- [docs/schema-migrations.md](docs/schema-migrations.md) — living reference for the
+  SQLite migration chain (`user_version` head, per-file history, legacy artefacts,
+  1.x rules, and planned 2.x squash gate).
 
 ### Changed
 
@@ -20,15 +29,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and `inbound-quarantine` (candidate) in the index.
 - [docs/development.md](docs/development.md) — plan checklists may override
   model routing with Composer → Opus → Fable.
-
-### Added
-
-- [docs/schema-migrations.md](docs/schema-migrations.md) — living reference for the
-  SQLite migration chain (`user_version` head, per-file history, legacy artefacts,
-  1.x rules, and planned 2.x squash gate).
-
-### Changed
-
 - [docs/development.md](docs/development.md), [docs/roadmap.md](docs/roadmap.md),
   and [docs/architecture.md](docs/architecture.md) link to the new file;
   `schema-squash` defers gate thresholds to it instead of a stale v5 snapshot.
