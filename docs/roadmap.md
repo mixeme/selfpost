@@ -91,36 +91,28 @@ when checks change; not bloating every page with a second column of prose.
 
 ## schema-squash
 
-**Goal:** when 2.x is cut, stop shipping the 1.x migration files
-(`0001_init.sql` … `0005_panel_users.sql`) in the binary and replace them with
-one baseline that is the schema as of `user_version = 5`. Fresh 2.x data
-directories no longer create-then-drop the historical `admin` table.
+**Goal:** when 2.x is cut, stop shipping the 1.x migration chain in the binary
+and replace it with one baseline equal to the schema at the then-current head.
+Fresh 2.x data directories no longer create-then-drop the historical `admin`
+table. Current chain, legacy notes, and gate thresholds:
+[schema-migrations.md](schema-migrations.md) (update that file when migrations
+ship; adjust the squash gate to its head at cut time).
 
-**Boundary:** 1.x keeps the full chain so a 1.0.0 data directory still boots.
-Do not delete, rename, or reorder those files while MINOR compatibility with
-`1.0.0` holds. `migrate()` maps **file order** to `PRAGMA user_version` (`target
-= i + 1`); dropping a file in 1.x would skip or mis-apply steps on existing
-databases. Git history keeps the old files either way; only the embedded set
-in the 2.x image changes.
-
-**Upgrade gate (required with the squash):**
-
-| `user_version` | 2.x behaviour |
-|---|---|
-| `0` (empty file) | Apply the baseline; set `user_version` to the new chain’s head |
-| `>= 5` (fully migrated 1.x) | Skip; schema is already the baseline |
-| `1`…`4` (mid-chain 1.x) | **Refuse to start** — boot the last 1.x once, then 2.x |
+**Boundary:** 1.x keeps the full chain so a `1.0.0` data directory still boots.
+Do not delete, rename, or reorder migration files while MINOR compatibility with
+`1.0.0` holds. Git history keeps the old files either way; only the embedded
+set in the 2.x image changes.
 
 Restore remains a separate lock: the backup manifest version must match the
 running binary ([architecture.md](architecture.md) § Persistence). It does not
-replace this gate.
+replace the squash upgrade gate.
 
 **Done when:** 2.x embeds a single baseline (plus any 2.x-only migrations after
-it); the gate above is tested; the operator guide says a 2.x image will not
-open an unfinished 1.x database.
+it); the gate in [schema-migrations.md](schema-migrations.md) is tested; the
+operator guide says a 2.x image will not open an unfinished 1.x database.
 
 **Dependencies / risks:** a decided 2.x cut (another breaking change, or an
-explicit major). Squashing five short files is not a reason to cut 2.x on its
-own. A missed gate leaves a `user_version = 3` database silently stuck.
+explicit major). Squashing the current short chain is not a reason to cut 2.x on
+its own. A missed gate leaves a mid-chain 1.x database silently stuck.
 **Version:** `2.x` major only; not a 1.x item.
 

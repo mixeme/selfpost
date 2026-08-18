@@ -318,7 +318,7 @@ single-connection trade-off that follows from it.
 
 | Path | Contents |
 |---|---|
-| `selfpost.db` | SQLite: domains, apps, admin, sessions, send log, L2 limits, log-tailer offset, inbound relay domains |
+| `selfpost.db` | SQLite panel state (domains, apps, users, sessions, send log, L2 limits, log-tailer offset, inbound relay, DMARC reports) — see [schema-migrations.md](schema-migrations.md) |
 | `setup-token` | First-run setup token file |
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |

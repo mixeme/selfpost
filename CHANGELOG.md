@@ -5,7 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-## [1.9.0] - 2026-08-18
+### Added
+
+- [docs/schema-migrations.md](docs/schema-migrations.md) — living reference for the
+  SQLite migration chain (`user_version` head, per-file history, legacy artefacts,
+  1.x rules, and planned 2.x squash gate).
+
+### Changed
+
+- [docs/development.md](docs/development.md), [docs/roadmap.md](docs/roadmap.md),
+  and [docs/architecture.md](docs/architecture.md) link to the new file;
+  `schema-squash` defers gate thresholds to it instead of a stale v5 snapshot.
+
 
 Application sending controls: client IP allow-list for authorization, and
 level-2 rate limits that override the domain ceiling per application.
