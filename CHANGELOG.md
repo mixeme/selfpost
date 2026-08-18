@@ -33,6 +33,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and [docs/architecture.md](docs/architecture.md) link to the new file;
   `schema-squash` defers gate thresholds to it instead of a stale v5 snapshot.
 
+### Fixed
+
+- `build/postfix-config.sh`: enabling inbound relay, DMARC ingest, and/or the
+  inbound antispam milter no longer crash-loops on start — `postconf -P` cannot
+  set `master.cf` `-o` values that contain whitespace, so port-25
+  `smtpd_recipient_restrictions` and `smtpd_milters` are patched directly; DMARC
+  pipe `argv` uses a `dmarc-ingest` symlink instead of `panel -dmarc-ingest`.
+
+## [1.9.0] - 2026-08-18
 
 Application sending controls: client IP allow-list for authorization, and
 level-2 rate limits that override the domain ceiling per application.
