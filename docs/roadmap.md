@@ -28,7 +28,6 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| send-log-retention | Send-log retention days in panel Settings | done | 8/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
 | domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
@@ -36,35 +35,16 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): the next feature is
-**send-log-retention** once agreed. It can land before or beside
-**domain-stats-auto-ratelimit** (panel retention ≥ 30 days helps the stats
-window). inbound-relay shipped in
-[CHANGELOG.md](../CHANGELOG.md) `[1.4.0]`; queue-retries in `[1.3.1]`; the
-2026-08-13 full-tree review follow-ups are in `[1.3.0]`. Candidates need
-explicit agreement before they join the queue.
+**domain-stats-auto-ratelimit** once agreed (panel retention ≥ 30 days helps
+the stats window). send-log-retention shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.5.0]`; inbound-relay in `[1.4.0]`;
+queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
+`[1.3.0]`. Candidates need explicit agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
 is `done/total` checklist steps in that plan ([development.md](development.md)
 § Plan checklists).
-
----
-
-## send-log-retention
-
-**Goal:** global administrator sets how many days of delivery journal rows
-(`send_log`, `/deliveries`) are kept, from `/settings` — stored in SQLite
-`settings`, with `SEND_LOG_RETENTION_DAYS` as bootstrap default only.
-
-**Boundary:** instance-wide retention; not per-domain. Does not change
-`mail.log` rotation. Today retention is env-only (default 90 days); the panel
-has no control.
-
-**Done when:** see [plans/send-log-retention.md](plans/send-log-retention.md).
-
-**Dependencies / risks:** log-tailer must re-read settings each prune cycle;
-delivery UI must stop hardcoding «ninety days».
-**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 
 ---
 

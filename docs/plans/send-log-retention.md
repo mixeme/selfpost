@@ -1,8 +1,8 @@
 # Plan: send-log-retention
 
-**Status:** done  
+**Status:** done — shipped in `[1.5.0]` (2026-08-18)  
 **Date:** 2026-08-17  
-**Version:** `1.x` MINOR; no schema migration required (uses existing `settings` table).
+**Version:** `1.5.0` MINOR; no schema migration required (uses existing `settings` table).
 
 ---
 

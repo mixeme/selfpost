@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-18
+
+Send-log retention is configurable from panel **Settings** (global
+administrator); `SEND_LOG_RETENTION_DAYS` seeds the initial default only.
+
 ### Added
 
 - Panel **Settings** (global administrator): **Send log retention (days)** —
