@@ -64,6 +64,11 @@ obligation — not because the convention around AI authorship shifts.
 Default rule: risk-critical → Opus; UI / docs / boilerplate → Sonnet; trivial
 mechanics → Haiku. Reviewers must not be the author of the code under review.
 
+**Composer → Opus → Fable** (when a plan specifies it): **Composer** writes all
+implementation for that item (code, tests, docs); **Opus** does the technical
+review of the result; **Fable** does the security review. A plan's checklist
+overrides the default routing table for that item only.
+
 ---
 
 ## Plan checklists

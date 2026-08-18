@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- [docs/plans/inbound-antispam-panel.md](docs/plans/inbound-antispam-panel.md) —
+  agreed plan for inbound antispam journal (inbound-journal milter + mail.log
+  rejects) and instance-wide allow/deny lists synced to rspamd maps; target
+  `1.10.0`; Composer → Opus → Fable workflow.
+- [docs/plans/inbound-quarantine.md](docs/plans/inbound-quarantine.md) — candidate
+  plan for held-mail review/release (design TBD).
+
+### Changed
+
+- [docs/roadmap.md](docs/roadmap.md) — `inbound-antispam-panel` (agreed, 1/12)
+  and `inbound-quarantine` (candidate) in the index.
+- [docs/development.md](docs/development.md) — plan checklists may override
+  model routing with Composer → Opus → Fable.
+
+### Added
+
 - [docs/schema-migrations.md](docs/schema-migrations.md) — living reference for the
   SQLite migration chain (`user_version` head, per-file history, legacy artefacts,
   1.x rules, and planned 2.x squash gate).

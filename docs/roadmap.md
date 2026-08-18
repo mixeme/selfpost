@@ -30,6 +30,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 |---|---|---|---|---|
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | panel-docs | In-panel operator documentation | agreed | 6/6 | [plans/panel-docs.md](plans/panel-docs.md) |
+| inbound-antispam-panel | Inbound antispam journal + allow/deny lists | agreed | 1/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
+| inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): the next feature is **panel-docs** once
@@ -86,6 +88,50 @@ read the git tree for day-to-day meaning of a card.
 when checks change; not bloating every page with a second column of prose.
 
 **Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+
+---
+
+## inbound-antispam-panel
+
+**Goal:** panel view of inbound anti-spam decisions (when, from, to, subject,
+action) plus editable allow/deny lists that tune the external filter — without
+shipping rspamd or another engine inside the image.
+
+**Boundary:** metadata journal and list sync only; SelfPost does not run the
+filter ([product.md](product.md)). Quarantine:
+[inbound-quarantine](#inbound-quarantine). Design closed in
+[plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) § Decisions.
+
+**Done when:** with inbound relay enabled, the operator sees journal rows
+(accepts via inbound-journal milter, rejects via mail.log tailer) and can
+maintain instance-wide allow/deny lists synced to rspamd maps when the antispam
+hook is set.
+
+**Dependencies / risks:** inbound relay `[1.4.0]`; rspamd map/header coupling;
+journal PII; global-admin-only RBAC.
+
+**Version:** `1.10.0` MINOR; **agreed**.
+
+---
+
+## inbound-quarantine
+
+**Goal:** optional hold for suspicious inbound mail — review in the panel, then
+release to upstream, discard, or tune lists. Design not settled.
+
+**Boundary:** expands inbound from pure relay toward short-lived message
+storage; may conflict with "no mailboxes" in [product.md](product.md) until
+product explicitly agrees. Alternatives (rspamd-only quarantine vs SelfPost
+store) are listed in [plans/inbound-quarantine.md](plans/inbound-quarantine.md).
+
+**Done when:** TBD after open questions in the plan are answered.
+
+**Dependencies / risks:** inbound relay `[1.4.0]`; storage/retention/backup
+size; malware in held MIME; overlap with
+[inbound-antispam-panel](#inbound-antispam-panel). No implementation checklist
+yet.
+
+**Version:** TBD; `candidate` until explicitly agreed.
 
 ---
 
