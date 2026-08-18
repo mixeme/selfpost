@@ -1,6 +1,6 @@
 # Plan: send-log-retention
 
-**Status:** candidate  
+**Status:** done  
 **Date:** 2026-08-17  
 **Version:** `1.x` MINOR; no schema migration required (uses existing `settings` table).
 
@@ -129,11 +129,11 @@ Target version cut: **`1.5.0`** (MINOR). One commit per step; code only after
 roadmap status is **agreed**. See [development.md](../development.md) § Plan
 checklists.
 
-- [ ] `GetSendLogRetentionDays` / `SetSetting` key `send_log_retention_days` (7–365) — **Opus**
-- [ ] Bootstrap from `SEND_LOG_RETENTION_DAYS` when settings empty — **Opus**
-- [ ] `logtail.retentionLoop`: read setting each prune cycle — **Opus**
-- [ ] Settings card on `/settings` (`settings.html`) — **Sonnet**
-- [ ] Remove hardcoded «ninety days» in handlers and templates — **Sonnet**
-- [ ] Tests: save/load, range, loop without restart — **Sonnet**
-- [ ] [guide.md](../guide.md) — **Sonnet**
-- [ ] `go vet`, `go test` on touched packages — **Haiku**
+- [x] `GetSendLogRetentionDays` / `SetSetting` key `send_log_retention_days` (7–365) — **Opus**
+- [x] Bootstrap from `SEND_LOG_RETENTION_DAYS` when settings empty — **Opus**
+- [x] `logtail.retentionLoop`: read setting each prune cycle — **Opus**
+- [x] Settings card on `/settings` (`settings.html`) — **Sonnet**
+- [x] Remove hardcoded «ninety days» in handlers and templates — **Sonnet**
+- [x] Tests: save/load, range, loop without restart — **Sonnet**
+- [x] [guide.md](../guide.md) — **Sonnet**
+- [x] `go vet`, `go test` on touched packages — **Haiku**

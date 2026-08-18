@@ -28,7 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
+| send-log-retention | Send-log retention days in panel Settings | done | 8/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
 | domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |

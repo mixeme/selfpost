@@ -300,11 +300,15 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 	if !strings.Contains(src, `id="rate-limits"`) {
 		t.Error("settings should include a sending rate limits card")
 	}
+	if !strings.Contains(src, `id="deliveries-retention"`) {
+		t.Error("settings should include a send log retention card for global administrators")
+	}
 	for _, want := range []string{
 		"RATE_LIMIT_MESSAGES_PER_IP",
 		"Level 2 — domain",
 		"trusted IPs",
 		"{{.L1Messages}} messages / {{.L1Window}} seconds",
+		`name="send_log_retention_days"`,
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("settings rate limits card missing %q", want)

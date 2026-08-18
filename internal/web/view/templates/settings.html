@@ -77,10 +77,23 @@
   </div>
 </div>
 
+<div class="card" id="deliveries-retention">
+  <h2>Deliveries</h2>
+  <p class="muted">How long rows on <a href="/deliveries">Deliveries</a> are
+  kept before the background sweep deletes them — the main driver of
+  <code>/data</code> growth over time. Does not affect <code>mail.log</code>
+  rotation (fourteen daily files).</p>
+
+  <label for="send_log_retention_days">Send log retention (days)</label>
+  <input id="send_log_retention_days" name="send_log_retention_days" type="number"
+         min="7" max="365" step="1" required
+         value="{{.FormSendLogRetentionDays}}">
+</div>
+
 <button type="submit">Save changes</button>
-<p class="muted">Leave both new-password fields empty to change the username
-or DMARC address only. Changing the password signs out every other session;
-this one stays signed in.</p>
+<p class="muted">Leave both new-password fields empty to change the username,
+DMARC address, or send log retention only. Changing the password signs out
+every other session; this one stays signed in.</p>
 </form>
 {{else}}
 <div class="card narrow">

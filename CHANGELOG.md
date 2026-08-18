@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- Panel **Settings** (global administrator): **Send log retention (days)** —
+  how long delivery journal rows on `/deliveries` are kept (7–365). Stored in
+  SQLite `settings`; `SEND_LOG_RETENTION_DAYS` seeds the initial default only.
+  The log-tailer re-reads the value every prune cycle (no restart).
+
+### Changed
+
+- Deliveries list and delivery detail pages show the configured retention
+  instead of a hardcoded ninety-day message.
+
 ## [1.4.0] - 2026-08-17
 
 Optional inbound relay (backup-MX / forwarder) on port 25, off by default.

@@ -191,11 +191,18 @@ func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
 // queue at all. Neither is a fault, so neither may render as an error.
 func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
 	h, row := serverWithDelivery(t)
+	h.cfg.SendLogRetentionEnvDefault = 60
+	if err := h.store.SetSendLogRetentionDays(60); err != nil {
+		t.Fatalf("SetSendLogRetentionDays: %v", err)
+	}
 	h.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
 
 	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
 	if !strings.Contains(out, "rotated away") {
 		t.Errorf("delivery page does not explain the empty delivery log:\n%s", out)
+	}
+	if !strings.Contains(out, "kept for 60 days") {
+		t.Errorf("delivery page does not show configured retention:\n%s", out)
 	}
 	if strings.Contains(out, `class="error"`) || strings.Contains(out, "Could not read the mail log") {
 		t.Errorf("an aged-out delivery log is reported as a failure:\n%s", out)
