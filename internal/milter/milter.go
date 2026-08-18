@@ -35,6 +35,7 @@ type Store interface {
 	InsertRejected(e store.SendLogEntry) error
 	RateLimit(scope, ref string) (store.RateLimit, bool, error)
 	CountMessages(scope, ref string, since time.Time) (int64, error)
+	ApplicationByLogin(login string) (store.Application, error)
 }
 
 // session accumulates the fields of one message as the milter callbacks fire.
@@ -84,6 +85,10 @@ func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, er
 	s.login = macro(m, "auth_authen")
 	s.rcpts = nil
 	s.subject = ""
+	if !s.authIPAllowed() {
+		s.recordRejected()
+		return milter.RespTempFail, nil
+	}
 	if s.overLimit() {
 		s.recordRejected()
 		return milter.RespTempFail, nil

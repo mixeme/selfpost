@@ -40,11 +40,13 @@ type RateLimitExport struct {
 
 // AppExport is one application within a DomainExport.
 type AppExport struct {
-	Login       string   `json:"login"`
-	AddressMode string   `json:"address_mode"`
-	Addresses   []string `json:"addresses,omitempty"` // list mode only
-	Password    string   `json:"password"`
-	RateLimit   *RateLimitExport `json:"rate_limit,omitempty"`
+	Login            string   `json:"login"`
+	AddressMode      string   `json:"address_mode"`
+	Addresses        []string `json:"addresses,omitempty"` // list mode only
+	Password         string   `json:"password"`
+	AuthIPRestrict   bool     `json:"auth_ip_restrict,omitempty"`
+	AuthAllowedIPs   []string `json:"auth_allowed_ips,omitempty"`
+	RateLimit        *RateLimitExport `json:"rate_limit,omitempty"`
 }
 
 // Export builds the transferable representation of a domain: its DKIM key, its
@@ -85,10 +87,12 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 			return DomainExport{}, fmt.Errorf("export credential for %s: %w", a.Login, err)
 		}
 		appExp := AppExport{
-			Login:       a.Login,
-			AddressMode: a.AddressMode,
-			Addresses:   a.Addresses,
-			Password:    password,
+			Login:          a.Login,
+			AddressMode:    a.AddressMode,
+			Addresses:      a.Addresses,
+			Password:       password,
+			AuthIPRestrict: a.AuthIPRestrict,
+			AuthAllowedIPs: a.AuthAllowedIPs,
 		}
 		if rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeApp, a.ID); err == nil && ok {
 			appExp.RateLimit = exportRateLimit(rl)
@@ -153,15 +157,31 @@ func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 			s.importRollback(d.ID)
 			return store.Domain{}, fmt.Errorf("import application %q: %w", a.Login, err)
 		}
-		if a.RateLimit != nil {
+		restrict, ips := a.AuthIPRestrict, a.AuthAllowedIPs
+		// Legacy exports stored client IPs on the rate-limit row as trusted IPs.
+		if a.RateLimit != nil && len(a.RateLimit.AllowedIPs) > 0 {
+			restrict = true
+			ips = a.RateLimit.AllowedIPs
+		}
+		needAuthIPs := restrict || len(ips) > 0
+		needRateLimit := a.RateLimit != nil
+		if needAuthIPs || needRateLimit {
 			app, err := s.store.GetApplicationByLogin(a.Login)
 			if err != nil {
 				s.importRollback(d.ID)
-				return store.Domain{}, fmt.Errorf("import rate limit for %q: %w", a.Login, err)
+				return store.Domain{}, fmt.Errorf("import application %q: %w", a.Login, err)
 			}
-			if err := s.importRateLimit(store.RateLimitScopeApp, app.ID, *a.RateLimit); err != nil {
-				s.importRollback(d.ID)
-				return store.Domain{}, fmt.Errorf("import rate limit for %q: %w", a.Login, err)
+			if needAuthIPs {
+				if err := s.store.UpdateApplicationAuthIPs(app.ID, restrict, ips); err != nil {
+					s.importRollback(d.ID)
+					return store.Domain{}, fmt.Errorf("import auth IPs for %q: %w", a.Login, err)
+				}
+			}
+			if needRateLimit {
+				if err := s.importRateLimit(store.RateLimitScopeApp, app.ID, *a.RateLimit); err != nil {
+					s.importRollback(d.ID)
+					return store.Domain{}, fmt.Errorf("import rate limit for %q: %w", a.Login, err)
+				}
 			}
 		}
 	}
@@ -191,7 +211,6 @@ func exportRateLimit(rl store.RateLimit) *RateLimitExport {
 		MaxMessages:    rl.MaxMessages,
 		WindowSeconds:  rl.WindowSeconds,
 		AutoMultiplier: rl.AutoMultiplier,
-		AllowedIPs:     rl.AllowedIPs,
 	}
 	return exp
 }
@@ -208,7 +227,6 @@ func (s *Service) importRateLimit(scope string, refID int64, exp RateLimitExport
 		MaxMessages:    exp.MaxMessages,
 		WindowSeconds:  exp.WindowSeconds,
 		AutoMultiplier: exp.AutoMultiplier,
-		AllowedIPs:     exp.AllowedIPs,
 	}
 	if mode == store.RateLimitModeManual && rl.MaxMessages <= 0 && rl.WindowSeconds <= 0 {
 		return nil

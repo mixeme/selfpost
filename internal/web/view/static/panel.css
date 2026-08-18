@@ -369,12 +369,12 @@ button.danger:hover, a.danger:hover { background: var(--danger-fill-hover); }
 .app .actions > .panel .check-col > .muted { margin: 0; }
 /* Address mode select ‖ trusted-IP field: same top offset and control height. */
 .app .actions > .panel .check-col > .muted + form > select:first-of-type,
-.app .actions > .panel .check-col > .muted + form > textarea[name="allowed_ips"] {
+.app .actions > .panel .check-col > .muted + form > textarea[name="auth_allowed_ips"] {
   margin-top: 0.45rem;
   min-height: 2.55rem;
   box-sizing: border-box;
 }
-.app .actions > .panel .check-col > .muted + form > textarea[name="allowed_ips"] {
+.app .actions > .panel .check-col > .muted + form > textarea[name="auth_allowed_ips"] {
   field-sizing: fixed;
   overflow-y: auto;
 }

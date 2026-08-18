@@ -5,8 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-08-18
+
+Application sending controls: client IP allow-list for authorization, and
+level-2 rate limits that override the domain ceiling per application.
+
+### Added
+
+- Per-application **client IP allow-list** on the domain page: when enabled,
+  only listed addresses may authenticate and submit as that application; when
+  off, any client IP is allowed. Form `POST /applications/{id}/authips`.
+- SQLite migration `0009_application_auth_ips.sql` (moves legacy trusted IPs
+  from `rate_limits` into `applications.auth_allowed_ips`).
+
 ### Changed
 
+- Application level-2 rate limit **overrides** the domain limit for that login
+  — the ceiling may be higher or lower than the domain setting (still ≤ level
+  1). Rate limits are no longer tied to client IPs; enforcement is in the
+  journal-milter at `MAIL FROM`.
+- Domain export/import carries `auth_ip_restrict` / `auth_allowed_ips`; legacy
+  `allowed_ips` on an application `rate_limit` in export JSON migrate on import.
+- Panel help, Settings, and [guide.md](docs/guide.md) describe override semantics
+  and the IP allow-list boundary.
 - [guide.md](docs/guide.md): full-backup section documents all four capture
   methods (panel, `selfpost-backup`, stopped `tar` of the project directory,
   stopped `tar` of `./data` only), warns against `tar` on a live container, and

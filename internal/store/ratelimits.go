@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 )
@@ -36,14 +35,13 @@ const (
 // architecture.md § Mail path) is the IP backstop that always applies even
 // when this is absent or the milter is down.
 //
-// Domain limits apply to every client IP once max and window are set. Application
-// limits additionally require AllowedIPs: those trusted addresses get the app
-// ceiling (above the domain) and skip the domain check; other IPs stay under
-// the domain limit or level 1 alone (guide § Rate limiting).
+// Domain and application limits apply once max and window are set. Client IP
+// restriction for an application is stored on the application row, not here
+// (guide § Rate limiting).
 type RateLimit struct {
 	Scope          string
 	RefID          int64
-	AllowedIPs     []string // trusted client IPs for an application override
+	AllowedIPs     []string // legacy column; unused for new rows
 	MaxMessages    int
 	WindowSeconds  int
 	Mode           string  // manual | auto
@@ -52,38 +50,13 @@ type RateLimit struct {
 }
 
 // Active reports whether the limit is fully configured and should be enforced.
-// Domain: max and window only. Application: also needs at least one trusted IP
-// (the privilege that raises the ceiling above the domain).
 // IsAuto reports whether the limit derives max_messages from send statistics.
 func (r RateLimit) IsAuto() bool {
 	return r.Mode == RateLimitModeAuto
 }
 
 func (r RateLimit) Active() bool {
-	if r.MaxMessages <= 0 || r.WindowSeconds <= 0 {
-		return false
-	}
-	if r.Scope == RateLimitScopeApp {
-		return len(r.AllowedIPs) > 0
-	}
-	// Domain (and any unset/legacy scope treated as domain-style): no IP list.
-	return true
-}
-
-// AllowsIP reports whether ip is one of the application's trusted client IPs.
-// Used only for application overrides; domain limits do not consult this list.
-// Equivalent textual forms of the same address match.
-func (r RateLimit) AllowsIP(ip string) bool {
-	c := net.ParseIP(ip)
-	if c == nil {
-		return false
-	}
-	for _, a := range r.AllowedIPs {
-		if p := net.ParseIP(a); p != nil && p.Equal(c) {
-			return true
-		}
-	}
-	return false
+	return r.MaxMessages > 0 && r.WindowSeconds > 0
 }
 
 // GetRateLimit loads the level-2 limit configured for a domain or application by

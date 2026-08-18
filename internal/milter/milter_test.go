@@ -25,10 +25,12 @@ type fakeRecorder struct {
 	fail     bool
 
 	// limits, keyed by "scope|ref", drive the level-2 rate-limit tests. counts
-	// gives the recent-message count returned for a "scope|ref". lookupErr and
-	// countErr force the store errors that must fail open.
+	// gives the recent-message count returned for a "scope|ref". apps supplies
+	// application rows for client-IP authorization tests. lookupErr and countErr
+	// force the store errors that must fail open.
 	limits    map[string]store.RateLimit
 	counts    map[string]int64
+	apps      map[string]store.Application
 	lookupErr error
 	countErr  error
 
@@ -73,6 +75,17 @@ func (f *fakeRecorder) CountMessages(scope, ref string, _ time.Time) (int64, err
 		f.onCount()
 	}
 	return f.counts[scope+"|"+ref], nil
+}
+
+func (f *fakeRecorder) ApplicationByLogin(login string) (store.Application, error) {
+	if f.lookupErr != nil {
+		return store.Application{}, f.lookupErr
+	}
+	a, ok := f.apps[login]
+	if !ok {
+		return store.Application{}, store.ErrApplicationNotFound
+	}
+	return a, nil
 }
 
 func mods(kv map[string]string) *milter.Modifier {
@@ -211,8 +224,8 @@ func domainLimit() store.RateLimit {
 	return store.RateLimit{MaxMessages: 5, WindowSeconds: 3600}
 }
 
-func appLimit(ips ...string) store.RateLimit {
-	return store.RateLimit{AllowedIPs: ips, MaxMessages: 5, WindowSeconds: 3600}
+func appLimit() store.RateLimit {
+	return store.RateLimit{MaxMessages: 5, WindowSeconds: 3600}
 }
 
 // mailFrom drives just the connect + MAIL FROM stages and returns the response,
@@ -248,7 +261,7 @@ func TestRateLimitRefusesWhenDomainOverLimit(t *testing.T) {
 func TestRateLimitRefusesWhenAppOverLimit(t *testing.T) {
 	rec := &fakeRecorder{
 		limits: map[string]store.RateLimit{
-			store.RateLimitScopeApp + "|app1": appLimit(limitIP),
+			store.RateLimitScopeApp + "|app1": appLimit(),
 		},
 		counts: map[string]int64{store.RateLimitScopeApp + "|app1": 9}, // over max
 	}
@@ -286,13 +299,11 @@ func TestRateLimitDomainAppliesToAnyIP(t *testing.T) {
 	}
 }
 
-func TestRateLimitTrustedAppSkipsDomain(t *testing.T) {
+func TestRateLimitAppSkipsDomainWhenActive(t *testing.T) {
 	rec := &fakeRecorder{
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": {MaxMessages: 1, WindowSeconds: 3600},
-			store.RateLimitScopeApp + "|app1": {
-				AllowedIPs: []string{limitIP}, MaxMessages: 10, WindowSeconds: 3600,
-			},
+			store.RateLimitScopeApp + "|app1":           appLimit(),
 		},
 		counts: map[string]int64{
 			store.RateLimitScopeDomain + "|example.com": 5, // over domain
@@ -300,41 +311,51 @@ func TestRateLimitTrustedAppSkipsDomain(t *testing.T) {
 		},
 	}
 	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
-		t.Fatalf("trusted app under its ceiling = %v, want Continue (domain skipped)", resp)
+		t.Fatalf("app under its ceiling = %v, want Continue (domain not checked)", resp)
 	}
 }
 
-func TestRateLimitUnlistedIPHitsDomain(t *testing.T) {
+func TestAuthIPRestrictBlocksUnlisted(t *testing.T) {
 	rec := &fakeRecorder{
-		limits: map[string]store.RateLimit{
-			store.RateLimitScopeDomain + "|example.com": {MaxMessages: 1, WindowSeconds: 3600},
-			store.RateLimitScopeApp + "|app1": {
-				AllowedIPs: []string{"198.51.100.1"}, MaxMessages: 100, WindowSeconds: 3600,
+		apps: map[string]store.Application{
+			"app1": {
+				Login:          "app1",
+				AuthIPRestrict: true,
+				AuthAllowedIPs: []string{"198.51.100.1"},
 			},
 		},
-		counts: map[string]int64{
-			store.RateLimitScopeDomain + "|example.com": 1,
-			store.RateLimitScopeApp + "|app1":           0,
-		},
 	}
 	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
-		t.Fatalf("unlisted IP under domain = %v, want TempFail", resp)
+		t.Fatalf("unlisted IP = %v, want TempFail", resp)
+	}
+	if len(rec.rejected) != 1 {
+		t.Fatalf("want one rejected row, got %+v", rec.rejected)
 	}
 }
 
-func TestRateLimitAppWithoutIPsDoesNotPrivilege(t *testing.T) {
+func TestAuthIPRestrictAllowsListed(t *testing.T) {
 	rec := &fakeRecorder{
-		limits: map[string]store.RateLimit{
-			store.RateLimitScopeDomain + "|example.com": {MaxMessages: 1, WindowSeconds: 3600},
-			store.RateLimitScopeApp + "|app1":           {MaxMessages: 100, WindowSeconds: 3600}, // no IPs
-		},
-		counts: map[string]int64{
-			store.RateLimitScopeDomain + "|example.com": 1,
-			store.RateLimitScopeApp + "|app1":           0,
+		apps: map[string]store.Application{
+			"app1": {
+				Login:          "app1",
+				AuthIPRestrict: true,
+				AuthAllowedIPs: []string{limitIP},
+			},
 		},
 	}
-	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
-		t.Fatalf("app without IPs must not skip domain = %v, want TempFail", resp)
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("listed IP = %v, want Continue", resp)
+	}
+}
+
+func TestAuthIPRestrictOffAllowsAnyIP(t *testing.T) {
+	rec := &fakeRecorder{
+		apps: map[string]store.Application{
+			"app1": {Login: "app1"},
+		},
+	}
+	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespContinue {
+		t.Fatalf("restriction off = %v, want Continue", resp)
 	}
 }
 
@@ -525,7 +546,7 @@ func TestRefusalDoesNotLeaveDomainReservation(t *testing.T) {
 	rec := &fakeRecorder{
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
-			store.RateLimitScopeApp + "|app1":           appLimit(limitIP),
+			store.RateLimitScopeApp + "|app1":           appLimit(),
 		},
 		counts: map[string]int64{
 			store.RateLimitScopeDomain + "|example.com": 0,

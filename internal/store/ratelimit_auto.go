@@ -92,8 +92,6 @@ func (s *Store) recalcAutoRateLimit(rl RateLimit, retentionDays, l1Max, l1Window
 	}
 
 	var stats SendStats
-	var domainMax int
-	var domainActive bool
 
 	switch rl.Scope {
 	case RateLimitScopeDomain:
@@ -114,22 +112,11 @@ func (s *Store) recalcAutoRateLimit(rl RateLimit, retentionDays, l1Max, l1Window
 		if err != nil {
 			return err
 		}
-		domainRL, ok, err := s.GetRateLimit(RateLimitScopeDomain, a.DomainID)
-		if err != nil {
-			return err
-		}
-		domainActive = ok && domainRL.Active()
-		if domainActive {
-			domainMax = domainRL.MaxMessages
-		}
 	default:
 		return fmt.Errorf("unknown scope %q", rl.Scope)
 	}
 
 	maxMsgs := computeAutoMaxMessages(stats, mult, l1Max)
-	if rl.Scope == RateLimitScopeApp {
-		maxMsgs = adjustAppAutoMax(maxMsgs, domainMax, domainActive, l1Max)
-	}
 
 	rl.MaxMessages = maxMsgs
 	rl.WindowSeconds = l1Window
@@ -152,15 +139,3 @@ func computeAutoMaxMessages(stats SendStats, multiplier float64, l1Max int) int 
 	return max
 }
 
-func adjustAppAutoMax(appMax, domainMax int, domainActive bool, l1Max int) int {
-	if appMax <= 0 {
-		return 0
-	}
-	if domainActive && appMax <= domainMax {
-		appMax = domainMax + 1
-		if appMax > l1Max {
-			return 0
-		}
-	}
-	return appMax
-}

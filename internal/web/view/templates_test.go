@@ -283,8 +283,8 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 	if !strings.Contains(src, "Level&nbsp;1 backstop") {
 		t.Error("domain rate limit should show a Level 1 backstop line")
 	}
-	if !strings.Contains(src, "Trusted client IPs") {
-		t.Error("application override should ask for trusted client IPs")
+	if !strings.Contains(src, "Restrict to listed IPs") {
+		t.Error("application should offer client IP allow-list")
 	}
 	if strings.Contains(src, `id="spf-dmarc"`) {
 		t.Error("SPF should sit with DKIM, not with DMARC")
@@ -306,7 +306,7 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 	for _, want := range []string{
 		"RATE_LIMIT_MESSAGES_PER_IP",
 		"Level 2 — domain",
-		"trusted IPs",
+		"Level 2 — application",
 		"{{.L1Messages}} messages / {{.L1Window}} seconds",
 		`name="send_log_retention_days"`,
 	} {

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -27,12 +29,32 @@ const (
 // hashed — so it can be shown exactly once at creation/regeneration
 // (security.md). Addresses is populated only in 'list' mode.
 type Application struct {
-	ID          int64
-	DomainID    int64
-	Login       string
-	AddressMode string
-	CreatedAt   time.Time
-	Addresses   []string
+	ID              int64
+	DomainID        int64
+	Login           string
+	AddressMode     string
+	CreatedAt       time.Time
+	Addresses       []string
+	AuthIPRestrict  bool     // when true, only AuthAllowedIPs may submit as this login
+	AuthAllowedIPs  []string // client IPs permitted when AuthIPRestrict is set
+}
+
+// AllowsAuthFromIP reports whether a client at ip may submit mail authenticated
+// as this application. When AuthIPRestrict is false, every IP is allowed.
+func (a Application) AllowsAuthFromIP(ip string) bool {
+	if !a.AuthIPRestrict {
+		return true
+	}
+	c := net.ParseIP(ip)
+	if c == nil {
+		return false
+	}
+	for _, allowed := range a.AuthAllowedIPs {
+		if p := net.ParseIP(allowed); p != nil && p.Equal(c) {
+			return true
+		}
+	}
+	return false
 }
 
 // Binding is one sender-address → login pair, as consumed by the
@@ -147,7 +169,7 @@ func normalizedList(mode string, addresses []string) []string {
 // ErrApplicationNotFound.
 func (s *Store) GetApplication(id int64) (Application, error) {
 	row := s.db.QueryRow(
-		"SELECT id, domain_id, login, address_mode, created_at FROM applications WHERE id = ?", id)
+		"SELECT id, domain_id, login, address_mode, created_at, auth_ip_restrict, auth_allowed_ips FROM applications WHERE id = ?", id)
 	a, err := scanApplication(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Application{}, ErrApplicationNotFound
@@ -166,7 +188,7 @@ func (s *Store) GetApplication(id int64) (Application, error) {
 // GetApplicationByLogin returns one application by its globally unique SASL login.
 func (s *Store) GetApplicationByLogin(login string) (Application, error) {
 	row := s.db.QueryRow(
-		"SELECT id, domain_id, login, address_mode, created_at FROM applications WHERE login = ?", login)
+		"SELECT id, domain_id, login, address_mode, created_at, auth_ip_restrict, auth_allowed_ips FROM applications WHERE login = ?", login)
 	a, err := scanApplication(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Application{}, ErrApplicationNotFound
@@ -182,11 +204,16 @@ func (s *Store) GetApplicationByLogin(login string) (Application, error) {
 	return a, nil
 }
 
+// ApplicationByLogin is the milter-facing alias for GetApplicationByLogin.
+func (s *Store) ApplicationByLogin(login string) (Application, error) {
+	return s.GetApplicationByLogin(login)
+}
+
 // ListApplicationsByDomain returns a domain's applications ordered by login,
 // each with its address list populated (product.md).
 func (s *Store) ListApplicationsByDomain(domainID int64) ([]Application, error) {
 	rows, err := s.db.Query(
-		"SELECT id, domain_id, login, address_mode, created_at FROM applications WHERE domain_id = ? ORDER BY login",
+		"SELECT id, domain_id, login, address_mode, created_at, auth_ip_restrict, auth_allowed_ips FROM applications WHERE domain_id = ? ORDER BY login",
 		domainID)
 	if err != nil {
 		return nil, fmt.Errorf("list applications: %w", err)
@@ -291,6 +318,31 @@ func (s *Store) ListBindings() ([]Binding, error) {
 	return out, rows.Err()
 }
 
+// UpdateApplicationAuthIPs sets whether client IP restriction is active for an
+// application and, when active, the permitted client addresses. The caller has
+// already validated the IPs (security.md). Returns ErrApplicationNotFound when
+// the id does not exist.
+func (s *Store) UpdateApplicationAuthIPs(id int64, restrict bool, ips []string) error {
+	if !restrict {
+		ips = nil
+	}
+	res, err := s.db.Exec(
+		"UPDATE applications SET auth_ip_restrict = ?, auth_allowed_ips = ? WHERE id = ?",
+		boolToInt(restrict), strings.Join(ips, ","), id,
+	)
+	if err != nil {
+		return fmt.Errorf("update application auth IPs: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update application auth IPs rows: %w", err)
+	}
+	if n == 0 {
+		return ErrApplicationNotFound
+	}
+	return nil
+}
+
 // DeleteApplication removes an application and its addresses (via cascade),
 // returning the deleted application so the caller can drop its sasldb2 entry
 // (product.md). Returns ErrApplicationNotFound if no such row existed.
@@ -336,10 +388,21 @@ func scanApplication(r scanRow) (Application, error) {
 	var (
 		a         Application
 		createdAt string
+		restrict  int
+		ips       sql.NullString
 	)
-	if err := r.Scan(&a.ID, &a.DomainID, &a.Login, &a.AddressMode, &createdAt); err != nil {
+	if err := r.Scan(&a.ID, &a.DomainID, &a.Login, &a.AddressMode, &createdAt, &restrict, &ips); err != nil {
 		return Application{}, err
 	}
 	a.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	a.AuthIPRestrict = restrict != 0
+	a.AuthAllowedIPs = splitIPs(ips.String)
 	return a, nil
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

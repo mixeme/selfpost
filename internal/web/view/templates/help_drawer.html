@@ -130,10 +130,11 @@
     digits, <code>.</code>, <code>-</code> and <code>_</code>. The password is
     shown once.</p>
     <p>Address mode is which From addresses this application may use: any
-    address of the domain, or a fixed list. A trusted-IP override gives those
-    clients a higher ceiling than the domain (still ≤ level 1) and skips the
-    domain check; everyone else uses the domain limit if set, otherwise level
-    1.</p>
+    address of the domain, or a fixed list. Client IP allow-list, when enabled,
+    restricts which addresses may authenticate as this application; when off,
+    any client IP is allowed. The level-2 rate limit <em>overrides</em> the
+    domain limit for that application — you can set a ceiling above or below
+    the domain (still ≤ level&nbsp;1). Independent of the client IP allow-list.</p>
     {{template "help_more" true}}
   </article>
 
@@ -141,8 +142,8 @@
     <h2>Domain settings</h2>
     <p>Aggregate reports (<code>rua=</code>) inherit the Settings default, or
     you override them per domain. Level 2 is an optional ceiling for all
-    senders on this domain; it must be ≤ level 1. Application overrides live on
-    each application.</p>
+    senders on this domain; it must be ≤ level 1. Each application may override
+    that domain limit (higher or lower, still ≤ level&nbsp;1).</p>
     {{template "help_more" true}}
   </article>
 

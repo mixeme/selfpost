@@ -328,16 +328,29 @@
                 </form>
               </div>
               <div class="check-col">
-                <p class="check-col-title">Optional trusted-IP override
+                <p class="check-col-title">Client IP allow-list
+                  {{if .AuthIPRestrict}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">off</span>{{end}}</p>
+                <p class="muted">When enabled, only these addresses may authenticate
+                and submit mail as this application. When off, any client IP is allowed.</p>
+                <form method="post" action="/applications/{{.ID}}/authips">
+                  <label class="check-row">
+                    <input type="checkbox" name="auth_ip_restrict" value="1"
+                           {{if .AuthIPRestrict}}checked{{end}}>
+                    Restrict to listed IPs
+                  </label>
+                  <textarea name="auth_allowed_ips" rows="2" placeholder="203.0.113.10"
+                            aria-label="Allowed client IPs">{{.AuthIPsText}}</textarea>
+                  <button type="submit">Save IP restriction</button>
+                </form>
+              </div>
+              <div class="check-col">
+                <p class="check-col-title">Level-2 rate limit
                   {{if .HasLimit}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
-                <p class="muted">One per line or comma-separated.</p>
+                <p class="muted">Overrides the domain limit for this application — the
+                ceiling may be <em>higher or lower</em> than the domain setting
+                (≤ level&nbsp;1). When unset, the domain limit{{if $.DomainHasRL}}
+                ({{$.DomainRLMaxNum}}){{end}} or level&nbsp;1 applies.</p>
                 <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
-                  <textarea name="allowed_ips" rows="1" placeholder="203.0.113.10"
-                            aria-label="Trusted client IPs">{{.IPsText}}</textarea>
-                  <p class="muted">These IPs get a higher ceiling than the domain
-                  (≤ level&nbsp;1) and skip the domain check; everyone else uses
-                  the domain level-2 limit{{if $.DomainHasRL}} ({{$.DomainRLMaxNum}}){{end}}
-                  if set, otherwise level&nbsp;1.</p>
                   <label for="mode-{{.ID}}">Limit mode</label>
                   <select id="mode-{{.ID}}" name="mode" data-ratelimit-mode>
                     <option value="manual" {{if not .IsAuto}}selected{{end}}>Manual</option>

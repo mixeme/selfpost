@@ -46,7 +46,7 @@ type detailView struct {
 type appRateLimitView struct {
 	store.Application
 	HasLimit       bool
-	IPsText        string
+	AuthIPsText    string
 	MaxText        string
 	WindowVal      string
 	Mode           string
@@ -116,7 +116,7 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		appViews = append(appViews, appRateLimitView{
 			Application:    a,
 			HasLimit:       ok && rl.Active(),
-			IPsText:        strings.Join(rl.AllowedIPs, "\n"),
+			AuthIPsText:    strings.Join(a.AuthAllowedIPs, "\n"),
 			MaxText:        intOrBlank(rl.MaxMessages),
 			WindowVal:      windowOrDefault(rl.WindowSeconds),
 			Mode:           mode,
@@ -332,6 +332,8 @@ func detailFlash(r *http.Request) string {
 		return "Application address mode updated."
 	case r.URL.Query().Get("ratelimit") != "":
 		return "Rate limit updated."
+	case r.URL.Query().Get("authips") != "":
+		return "Client IP restriction updated."
 	case r.URL.Query().Get("recalculated") != "":
 		return "Auto rate limit recalculated."
 	case r.URL.Query().Get("dmarc") != "":

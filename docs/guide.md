@@ -772,8 +772,8 @@ Parsed report data lives in SQLite and is included in a
 `/domains` lists sending domains and hosts the add-domain form (**global
 administrator only**). Domain administrators see only domains assigned to
 them. Each row shows its DKIM TXT value, SPF/DMARC checks, and SASL
-applications. Per-domain rate limits (level 2) and trusted-IP application
-overrides are configured here — see [Rate limiting —
+applications. Per-domain rate limits (level 2), per-application limits, and
+optional client IP allow-lists are configured here — see [Rate limiting —
 level 2](#rate-limiting--level-2-domain-and-application). *Export domain*
 writes a single-domain archive; *Import a domain* on the Backup page reads
 one back in (**global administrator only**) — see [Exporting and importing a single
@@ -837,12 +837,15 @@ returns a 4xx and the refusal is recorded in [Deliveries](#deliveries) as
 sending as that domain. When unset, only level 1 applies for non-privileged
 senders.
 
-**Level 2 — application (trusted IPs)** — optional override on an
-application: list one or more client IPs and a ceiling **strictly above**
-the domain limit (still ≤ level 1). Connections from those IPs use the
-application ceiling and skip the domain check. Other IPs stay under the
-domain limit (or level 1 alone). An application override without trusted
-IPs is inactive.
+**Client IP allow-list (application)** — optional restriction on an
+application: when enabled, list one or more client IPs that may authenticate
+and submit mail as that application. When disabled, any client IP is allowed.
+This is independent of rate limits.
+
+**Level 2 — application** — optional override of the domain limit for one
+application (≤ level 1). The ceiling may be **higher or lower** than the domain
+limit. When active, it replaces the domain limit for that login; when unset,
+the domain limit (or level 1 alone) applies.
 
 **Manual and auto mode** — each domain and application limit can be
 **Manual** (you set the ceiling and window) or **Auto**. Auto derives
@@ -853,8 +856,7 @@ domain page; level-1 refusals are not in the send log, so totals
 under-count strict IP limits. When retention is below 30 days, statistics
 use `min(30, retention)` days. With no traffic in the window, auto stays
 inactive until messages are sent. Auto limits are recalculated every six
-hours and on demand via **Recalculate now**. Application auto ceilings stay
-strictly above an active domain limit when possible.
+hours and on demand via **Recalculate now**.
 
 **Level 2 is best-effort, not a guarantee.** It runs inside the
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
@@ -889,7 +891,7 @@ default until it is changed there.
 Domain page → *Export domain* to write the file, *Backup* → *Import a
 domain* to read it back in. This moves one domain — its DKIM key, its
 applications' **working** SASL passwords, and configured **rate limits**
-(mode, ceilings, multipliers, trusted IPs) — to a different SelfPost
+(mode, ceilings, multipliers) and client IP allow-lists — to a different SelfPost
 instance without regenerating anything, so DNS (the DKIM TXT record)
 doesn't need to change. Unlike a full restore (see [Full backup and
 restore](#full-backup-and-restore)), this works across different

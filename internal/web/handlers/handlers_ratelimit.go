@@ -98,7 +98,7 @@ func parseDomainRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error
 	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
 }
 
-func parseAppRateLimitForm(r *http.Request, l1Max, domainMax int, domainActive bool) (rateLimitInput, error) {
+func parseAppRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
 	if err := r.ParseForm(); err != nil {
 		return rateLimitInput{}, fmt.Errorf("invalid form submission")
 	}
@@ -110,20 +110,12 @@ func parseAppRateLimitForm(r *http.Request, l1Max, domainMax int, domainActive b
 		return rateLimitInput{}, err
 	}
 
-	ips, err := parseIPList(r.PostFormValue("allowed_ips"))
-	if err != nil {
-		return rateLimitInput{}, err
-	}
-	if len(ips) == 0 {
-		return rateLimitInput{}, fmt.Errorf("enter at least one trusted client IP for an application override")
-	}
-
 	if mode == store.RateLimitModeAuto {
 		mult, err := parseAutoMultiplier(r.PostFormValue("auto_multiplier"))
 		if err != nil {
 			return rateLimitInput{}, err
 		}
-		return rateLimitInput{mode: mode, ips: ips, autoMultiplier: mult}, nil
+		return rateLimitInput{mode: mode, autoMultiplier: mult}, nil
 	}
 
 	rawMax := strings.TrimSpace(r.PostFormValue("max_messages"))
@@ -137,14 +129,29 @@ func parseAppRateLimitForm(r *http.Request, l1Max, domainMax int, domainActive b
 	if maxMessages > l1Max {
 		return rateLimitInput{}, fmt.Errorf("message limit cannot exceed the level-1 backstop (%d)", l1Max)
 	}
-	if domainActive && maxMessages <= domainMax {
-		return rateLimitInput{}, fmt.Errorf("application override must be greater than the domain limit (%d)", domainMax)
-	}
 	windowSeconds, err := parsePositiveInt(r.PostFormValue("window_seconds"), defaultRateLimitWindowSeconds)
 	if err != nil || windowSeconds <= 0 {
 		return rateLimitInput{}, fmt.Errorf("enter a time window greater than zero seconds")
 	}
-	return rateLimitInput{mode: store.RateLimitModeManual, ips: ips, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
+	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
+}
+
+func parseAppAuthIPsForm(r *http.Request) (bool, []string, error) {
+	if err := r.ParseForm(); err != nil {
+		return false, nil, fmt.Errorf("invalid form submission")
+	}
+	restrict := r.PostFormValue("auth_ip_restrict") != ""
+	if !restrict {
+		return false, nil, nil
+	}
+	ips, err := parseIPList(r.PostFormValue("auth_allowed_ips"))
+	if err != nil {
+		return false, nil, err
+	}
+	if len(ips) == 0 {
+		return false, nil, fmt.Errorf("enter at least one client IP when the allow-list is enabled")
+	}
+	return true, ips, nil
 }
 
 func parseIPList(raw string) ([]string, error) {
@@ -206,14 +213,7 @@ func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	domainRL, domainOK, err := h.domains.RateLimit(d.ID)
-	if err != nil {
-		logf("panel: domain %d: rate limit: %v", d.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	domainActive := domainOK && domainRL.Active()
-	in, err := parseAppRateLimitForm(r, h.l1Messages(), domainRL.MaxMessages, domainActive)
+	in, err := parseAppRateLimitForm(r, h.l1Messages())
 	if err != nil {
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
@@ -227,6 +227,32 @@ func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?ratelimit=1", a.DomainID), http.StatusSeeOther)
+}
+
+func (h *Handlers) HandleAppAuthIPs(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.lookupApplication(w, r)
+	if !ok {
+		return
+	}
+	d, err := h.domains.Get(a.DomainID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	restrict, ips, err := parseAppAuthIPsForm(r)
+	if err != nil {
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+			FormMode:     store.AddressModeWildcard,
+			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),
+		})
+		return
+	}
+	if err := h.apps.UpdateAuthIPs(a.ID, restrict, ips); err != nil {
+		logf("panel: application %d: save auth IPs: %v", a.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/domains/%d?authips=1", a.DomainID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +320,6 @@ func (h *Handlers) applyAppRateLimit(in rateLimitInput, appID int64) error {
 	rl := store.RateLimit{
 		Scope:          store.RateLimitScopeApp,
 		RefID:          appID,
-		AllowedIPs:     in.ips,
 		Mode:           in.mode,
 		MaxMessages:    in.maxMessages,
 		WindowSeconds:  in.windowSeconds,
