@@ -41,14 +41,15 @@
   <div class="card">
     <h2>DMARC aggregate reports</h2>
     <p class="muted">Optional default <code>rua=</code> address for every sending
-    domain (can be overridden per domain). Use a mailbox on a domain that
-    receives inbound mail. SelfPost does not receive inbound mail — point
-    <code>rua=</code> at a mailbox elsewhere.</p>
+    domain (can be overridden per domain).{{if .DMARCIngestEnabled}} When set to
+    an address on <code>{{.HostedReportAddress}}</code>, SelfPost receives and
+    parses aggregate reports on port&nbsp;25.{{else}} Use a mailbox on a domain
+    that receives inbound mail elsewhere.{{end}}</p>
 
     <label for="dmarc_report_email">Default report address</label>
     <input id="dmarc_report_email" name="dmarc_report_email" type="email"
            autocomplete="email" autocapitalize="none" spellcheck="false"
-           value="{{.FormDMARCEmail}}" placeholder="reports@your-mail-domain.com">
+           value="{{.FormDMARCEmail}}" placeholder="{{if .DMARCIngestEnabled}}{{.HostedReportAddress}}{{else}}reports@your-mail-domain.com{{end}}">
 
     {{if .FormDMARCEmail}}
     <p class="muted">When <code>rua=</code> points at another domain, that hub

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/store"
@@ -163,9 +164,15 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
 	dmarcMode := "inherit"
 	dmarcCustom := ""
+	hostedAddr := ""
+	if h.dmarc != nil && h.cfg.DMARCEnabled {
+		hostedAddr = dmarc.HostedReportAddress(h.cfg.Hostname, d.Name)
+	}
 	if d.DMARCRua.Valid {
 		if d.DMARCRua.String == "" {
 			dmarcMode = "none"
+		} else if hostedAddr != "" && strings.EqualFold(d.DMARCRua.String, hostedAddr) {
+			dmarcMode = "hosted"
 		} else {
 			dmarcMode = "custom"
 			dmarcCustom = d.DMARCRua.String
@@ -173,6 +180,8 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	}
 	dmarcSource := "policy"
 	switch {
+	case dmarcMode == "hosted":
+		dmarcSource = "hosted"
 	case dmarcMode == "custom":
 		dmarcSource = "custom"
 	case dmarcMode == "none":
@@ -195,10 +204,13 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	data["ResolvedDMARCEmail"] = reportEmail
 	data["DMARCRuaMode"] = dmarcMode
 	data["DMARCRuaCustom"] = dmarcCustom
+	data["HostedDMARCEmail"] = hostedAddr
+	data["DMARCIngestEnabled"] = h.cfg.DMARCEnabled
 	data["ReportAuthName"] = reportAuthName
 	data["ReportAuthValue"] = reportAuthValue
 	data["NeedsReportAuth"] = needsReportAuth
-	data["SameDomainRUA"] = reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name)
+	data["SameDomainRUA"] = reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name) &&
+		!(h.cfg.DMARCEnabled && dmarc.IsHostedOnHostname(reportEmail, h.cfg.Hostname))
 	data["Hostname"] = h.cfg.Hostname
 	data["SubmissionEnabled"] = h.cfg.SubmissionEnabled
 	data["Apps"] = appViews

@@ -28,6 +28,16 @@ import (
 )
 
 func main() {
+	if isDMARCIngestInvocation() {
+		log.SetFlags(log.LstdFlags | log.LUTC)
+		log.SetPrefix("dmarc-ingest: ")
+		if err := runDMARCIngestMode(); err != nil {
+			log.Printf("ingest failed: %v", err)
+			os.Exit(75) // EX_TEMPFAIL — ask Postfix to defer
+		}
+		return
+	}
+
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -81,6 +91,7 @@ type config struct {
 	deployRoot string
 
 	inboundEnabled bool
+	dmarcEnabled   bool
 }
 
 func loadConfig() config {
@@ -144,6 +155,8 @@ func loadConfig() config {
 		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
 		// Optional inbound relay (backup-MX / forwarder). Off unless exactly "true".
 		inboundEnabled: os.Getenv("INBOUND_RELAY_ENABLE") == "true",
+		// Optional DMARC aggregate ingest on port 25. Off unless exactly "true".
+		dmarcEnabled: os.Getenv("DMARC_REPORTS_ENABLE") == "true",
 	}
 }
 
@@ -246,6 +259,12 @@ func run() error {
 		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
 		if err := resyncAfterRestore(cfg, st, false); err != nil {
 			return err
+		}
+	} else if cfg.dmarcEnabled {
+		ms := newMailStack(cfg, st)
+		ms.pf.SetReloadHook(func() error { return nil })
+		if err := ms.DMARC.Resync(); err != nil {
+			log.Printf("dmarc maps bootstrap: %v", err)
 		}
 	}
 

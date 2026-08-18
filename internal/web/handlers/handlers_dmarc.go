@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
@@ -42,6 +43,13 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rua = sql.NullString{Valid: true, String: email}
+	case "hosted":
+		if h.dmarc == nil || !h.dmarc.Enabled() {
+			h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{FormErr: "SelfPost-hosted reports are not enabled on this server."})
+			return
+		}
+		addr := dmarc.HostedReportAddress(h.cfg.Hostname, d.Name)
+		rua = sql.NullString{Valid: true, String: addr}
 	default:
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{FormErr: "Choose how aggregate reports are addressed for this domain."})
 		return
@@ -51,6 +59,11 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 		logf("panel: domain %d: save dmarc rua: %v", d.ID, err)
 		h.renderDomainDetail(w, r, http.StatusInternalServerError, d, detailView{FormErr: "Could not save DMARC settings. Please check the logs and try again."})
 		return
+	}
+	if h.dmarc != nil && h.dmarc.Enabled() {
+		if err := h.dmarc.Resync(); err != nil {
+			logf("panel: domain %d: dmarc resync: %v", d.ID, err)
+		}
 	}
 	h.dns.Forget(d.Name)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?dmarc=1", d.ID), http.StatusSeeOther)

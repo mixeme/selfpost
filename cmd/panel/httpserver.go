@@ -10,6 +10,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/buildinfo"
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -23,9 +24,11 @@ type mailStack struct {
 	Domains        *domain.Service
 	Apps           *app.Service
 	Inbound        *inbound.Service
+	DMARC          *dmarc.Service
 	pf             *postfix.Postfix
 	odk            *domain.OpenDKIM
 	inboundEnabled bool
+	dmarcEnabled   bool
 }
 
 func newMailStack(cfg config, st *store.Store) *mailStack {
@@ -34,7 +37,11 @@ func newMailStack(cfg config, st *store.Store) *mailStack {
 	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
 	domains := domain.NewService(st, odk, apps, cfg.dkimSelectorDef)
 	inb := inbound.NewService(st, pf)
-	return &mailStack{Domains: domains, Apps: apps, Inbound: inb, pf: pf, odk: odk, inboundEnabled: cfg.inboundEnabled}
+	dmarcSvc := dmarc.NewService(st, pf, cfg.hostname, cfg.dmarcEnabled)
+	return &mailStack{
+		Domains: domains, Apps: apps, Inbound: inb, DMARC: dmarcSvc,
+		pf: pf, odk: odk, inboundEnabled: cfg.inboundEnabled, dmarcEnabled: cfg.dmarcEnabled,
+	}
 }
 
 // Resync rebuilds OpenDKIM's tables and Postfix's sender map from SQLite and
@@ -49,6 +56,11 @@ func (m *mailStack) Resync() error {
 	if m.inboundEnabled {
 		if err := m.Inbound.Resync(); err != nil {
 			return fmt.Errorf("inbound maps resync: %w", err)
+		}
+	}
+	if m.dmarcEnabled {
+		if err := m.DMARC.Resync(); err != nil {
+			return fmt.Errorf("dmarc maps resync: %w", err)
 		}
 	}
 	return nil
@@ -79,7 +91,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	// effective config, including a manual override; the panel keeps this
 	// snapshot for the process lifetime (architecture.md).
 	retryPolicy := postfix.LoadRetryPolicy()
-	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, web.Config{
+	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, ms.DMARC, web.Config{
 		Hostname:               cfg.hostname,
 		CookieSecure:           cfg.cookieSecure,
 		SubmissionEnabled:      cfg.submissionEnabled,
@@ -98,6 +110,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
 		RetryPolicy:                 retryPolicy,
 		InboundEnabled:              cfg.inboundEnabled,
+		DMARCEnabled:                cfg.dmarcEnabled,
 		SendLogRetentionEnvDefault: cfg.retentionDays,
 	}, cfg.setupTokenPath)
 }

@@ -33,6 +33,7 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
   - [Full backup and restore](#full-backup-and-restore)
     - [Encrypting a backup or export](#encrypting-a-backup-or-export)
   - [Inbound relay](#inbound-relay)
+  - [DMARC reports](#dmarc-reports)
 - [Domain administration](#domain-administration)
   - [Domains page](#domains-page)
   - [Domain-level DNS (SPF, DKIM, DMARC)](#domain-level-dns-spf-dkim-dmarc)
@@ -169,7 +170,7 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.6.0`. Intermediate
+deliberately never `:latest`. The current pin is `1.7.0`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check (see
 [Full backup and restore](#full-backup-and-restore)): the panel binary's
@@ -190,6 +191,9 @@ expected to set; defaults match the code exactly.
 | `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
 | `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
+| `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip/XML, and show summaries under *DMARC*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
+| `DMARC_RATE_LIMIT_MESSAGES_PER_IP` | Per-client-IP cap on port 25 when DMARC ingest is on (shared listener with inbound relay if both are enabled). | `20` | `.env` |
+| `DMARC_MESSAGE_SIZE_LIMIT` | Maximum report message size in bytes when DMARC ingest is on. | `5242880` (5 MiB) | `.env` |
 | `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound listener only (not 465/587). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. | *(empty)* | `.env` |
 | `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). | `accept` | `.env` |
 | `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
@@ -640,6 +644,44 @@ Inbound configuration lives in SQLite and `/data/postfix/` map files, so it
 is included in a [full backup](#full-backup-and-restore). Single-domain
 export/import is sending domains only.
 
+### DMARC reports
+
+Optional ingest of DMARC **aggregate** reports (`rua=`): Postfix accepts mail on
+port **25** only for addresses you configure, pipes each message to the panel
+ingest worker, and stores parsed summaries in SQLite. Forensic reports (`ruf=`)
+are not stored. This is separate from [Inbound relay](#inbound-relay) — no
+backup-MX, no forwarding upstream.
+
+**Off by default.** Set `DMARC_REPORTS_ENABLE=true` in `.env` and recreate the
+container. Until then there is no report ingest, no *DMARC* item in the nav,
+and `/dmarc` is 404. Outbound 465/587 is unchanged.
+
+**Addresses.** In *Settings* (global administrator), set the default
+`rua=` mailbox to an address on `SELFPOST_HOSTNAME`, e.g.
+`dmarc-reports@mail.example.com`. Per domain you can choose **SelfPost hosted**
+(`dmarc-reports+<domain>@<hostname>`) under *Domain settings → DMARC reports*.
+Only those allow-listed addresses are accepted on port 25.
+
+**DNS.** Publish the usual `_dmarc` TXT on each sending domain with
+`rua=mailto:…` pointing at your hosted address. Receivers deliver to the
+address domain — publish **MX** for `SELFPOST_HOSTNAME` (or the report
+address domain if different) so reports reach this server. If a hub domain
+authorises external destinations, publish `_report._dmarc` there too; the panel
+checks it on the domain page.
+
+**Panel.** *DMARC* (global administrator) lists recent reports and ingest
+health. Open a domain's roll-up from the list or from *View DMARC reports* on
+the domain page. Domain administrators see reports only for domains assigned to
+them. Summaries are pruned (500 kept, 90 days max).
+
+**Not an open relay.** The inbound smtpd offers no SASL. With DMARC ingest
+alone, `check_recipient_access` permits only configured report addresses;
+everything else is rejected. With inbound relay enabled too, both allow-lists
+apply.
+
+Parsed report data lives in SQLite and is included in a
+[full backup](#full-backup-and-restore).
+
 ## Domain administration
 
 ### Domains page
@@ -665,10 +707,10 @@ records; see [Inbound relay](#inbound-relay).
 - **DKIM** — a TXT record with the exact value the panel shows on that
   domain's page (`domain page → DKIM TXT record`), one selector per domain.
 - **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring
-  only, safe to publish immediately). On a send-only relay the sending domain
-  often has no inbox, so `rua=` is optional — configure a default report address
-  in *Settings* (see [Settings](#settings)) or per domain when you have a
-  mailbox that receives inbound mail elsewhere. If `rua=` points at another
+  only, safe to publish immediately). Set `rua=` to receive aggregate reports:
+  with [DMARC reports](#dmarc-reports) enabled, use a SelfPost-hosted address
+  from *Settings* or per-domain *Domain settings*; otherwise point `rua=` at a
+  mailbox elsewhere that receives inbound mail. If `rua=` points at another
   domain, publish `_report._dmarc` on that hub domain too; the panel checks
   it. Public mail hosts (Gmail, Outlook, …) cannot be used as external
   report destinations.

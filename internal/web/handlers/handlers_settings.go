@@ -63,6 +63,10 @@ func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status
 	data["Flash"] = settingsFlash(r)
 	data["L1Messages"] = h.l1Messages()
 	data["L1Window"] = h.l1Window()
+	data["DMARCIngestEnabled"] = h.cfg.DMARCEnabled
+	if h.dmarc != nil && h.cfg.DMARCEnabled {
+		data["HostedReportAddress"] = h.dmarc.DefaultHostedSuggestion()
+	}
 	h.view.Render(w, status, "settings", data)
 }
 
@@ -217,6 +221,12 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 			h.renderSettings(w, r, http.StatusInternalServerError,
 				"Could not save send log retention. Please check the logs and try again.", username, dmarcEmail, formRetention, true)
 			return
+		}
+	}
+
+	if emailChanging && h.dmarc != nil && h.dmarc.Enabled() {
+		if err := h.dmarc.Resync(); err != nil {
+			logf("panel: settings: dmarc resync: %v", err)
 		}
 	}
 

@@ -80,6 +80,15 @@ TRANSPORT_MAP="${POSTFIX_TRANSPORT_MAPS:-/data/postfix/transport}"
 RELAY_RECIPIENTS_MAP="${POSTFIX_RELAY_RECIPIENTS:-/data/postfix/relay_recipients}"
 TLS_POLICY_MAP="${POSTFIX_TLS_POLICY_MAPS:-/data/postfix/tls_policy}"
 
+# Optional DMARC aggregate ingest (plans/dmarc-reports.md). Off by default:
+# port 25 does not accept report mail and the panel ingest maps stay empty.
+DMARC_REPORTS_ENABLE="${DMARC_REPORTS_ENABLE:-false}"
+DMARC_RATE_LIMIT_MESSAGES_PER_IP="${DMARC_RATE_LIMIT_MESSAGES_PER_IP:-20}"
+DMARC_MESSAGE_SIZE_LIMIT="${DMARC_MESSAGE_SIZE_LIMIT:-5242880}"
+DMARC_RECIPIENTS_MAP="${POSTFIX_DMARC_RECIPIENTS:-/data/postfix/dmarc_recipients}"
+DMARC_TRANSPORT_MAP="${POSTFIX_DMARC_TRANSPORT:-/data/postfix/dmarc_transport}"
+DMARC_RELAY_DOMAINS_MAP="${POSTFIX_DMARC_RELAY_DOMAINS:-/data/postfix/dmarc_relay_domains}"
+
 # Delivery log, written by postlogd and read by the panel's log-tailer. It lives
 # under the persistent /data (not the ephemeral /var/log) so the delivery lines
 # for messages still marked "queued" survive a container recreate — without
@@ -211,23 +220,57 @@ else
 	postconf -MX "submission/inet" 2>/dev/null || true
 fi
 
-# --- inbound smtpd on port 25 (optional backup-MX / forwarder) ---------------
-# Debian's stock master.cf enables smtp/inet. When the flag is off, remove that
-# listener so port 25 is not an inbound smtpd (outbound delivery uses smtp/unix).
-# When on: no SASL, no OpenDKIM, accept only relay_domains + listed recipients.
-if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
-	for f in "$RELAY_DOMAINS_MAP" "$TRANSPORT_MAP" "$RELAY_RECIPIENTS_MAP" "$TLS_POLICY_MAP"; do
-		[ -e "$f" ] || : > "$f"
-	done
+# --- inbound smtpd on port 25 (optional inbound relay and/or DMARC ingest) -----
+# Debian's stock master.cf enables smtp/inet. When both flags are off, remove
+# that listener so port 25 is not an inbound smtpd (outbound delivery uses
+# smtp/unix). When either is on: no SASL, no OpenDKIM; relay accepts only
+# configured domains/recipients; DMARC accepts only allow-listed report addresses.
+if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
+	RELAY_DOMAINS_SETTING=""
+	TRANSPORT_SETTING=""
+	RECIPIENT_RESTRICTIONS="reject"
+	if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+		for f in "$RELAY_DOMAINS_MAP" "$TRANSPORT_MAP" "$RELAY_RECIPIENTS_MAP" "$TLS_POLICY_MAP"; do
+			[ -e "$f" ] || : > "$f"
+		done
+		RELAY_DOMAINS_SETTING="texthash:${RELAY_DOMAINS_MAP}"
+		TRANSPORT_SETTING="texthash:${TRANSPORT_MAP}"
+		RECIPIENT_RESTRICTIONS="reject_unauth_destination, reject_unlisted_recipient"
+	fi
+	if [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
+		for f in "$DMARC_RECIPIENTS_MAP" "$DMARC_TRANSPORT_MAP" "$DMARC_RELAY_DOMAINS_MAP"; do
+			[ -e "$f" ] || : > "$f"
+		done
+		postconf -M "dmarc-ingest/unix-pipe=dmarc-ingest unix - n n - - pipe"
+		postconf -P \
+			"dmarc-ingest/unix-pipe/flags=Rq" \
+			"dmarc-ingest/unix-pipe/user=panel" \
+			"dmarc-ingest/unix-pipe/argv=/usr/local/bin/panel -dmarc-ingest"
+		if [ -n "$RELAY_DOMAINS_SETTING" ]; then
+			RELAY_DOMAINS_SETTING="${RELAY_DOMAINS_SETTING} texthash:${DMARC_RELAY_DOMAINS_MAP}"
+			TRANSPORT_SETTING="${TRANSPORT_SETTING} texthash:${DMARC_TRANSPORT_MAP}"
+		else
+			RELAY_DOMAINS_SETTING="texthash:${DMARC_RELAY_DOMAINS_MAP}"
+			TRANSPORT_SETTING="texthash:${DMARC_TRANSPORT_MAP}"
+		fi
+		RECIPIENT_RESTRICTIONS="check_recipient_access texthash:${DMARC_RECIPIENTS_MAP}, ${RECIPIENT_RESTRICTIONS}"
+	fi
 	postconf -e \
-		"relay_domains=texthash:${RELAY_DOMAINS_MAP}" \
-		"transport_maps=texthash:${TRANSPORT_MAP}" \
-		"relay_recipient_maps=texthash:${RELAY_RECIPIENTS_MAP}" \
-		"smtp_tls_policy_maps=texthash:${TLS_POLICY_MAP}" \
+		"relay_domains=${RELAY_DOMAINS_SETTING}" \
+		"transport_maps=${TRANSPORT_SETTING}" \
 		"smtpd_reject_unlisted_recipient=yes"
+	if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+		postconf -e \
+			"relay_recipient_maps=texthash:${RELAY_RECIPIENTS_MAP}" \
+			"smtp_tls_policy_maps=texthash:${TLS_POLICY_MAP}"
+	else
+		postconf -e \
+			"relay_recipient_maps=" \
+			"smtp_tls_policy_maps="
+	fi
 
 	INBOUND_MILTERS=""
-	if [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
+	if [ "${INBOUND_RELAY_ENABLE}" = "true" ] && [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
 		case "${INBOUND_ANTISPAM_MILTER}" in
 			inet:[A-Za-z0-9._-]*:[0-9]* | unix:/[A-Za-z0-9._/-]* ) ;;
 			*)
@@ -245,6 +288,21 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
 		INBOUND_MILTERS="{ ${INBOUND_ANTISPAM_MILTER}, default_action=${INBOUND_ANTISPAM_MILTER_ACTION} }"
 	fi
 
+	PORT25_RATE="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}"
+	PORT25_SIZE="${INBOUND_MESSAGE_SIZE_LIMIT}"
+	if [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
+		PORT25_RATE="${DMARC_RATE_LIMIT_MESSAGES_PER_IP}"
+		PORT25_SIZE="${DMARC_MESSAGE_SIZE_LIMIT}"
+	fi
+	if [ "${INBOUND_RELAY_ENABLE}" = "true" ] && [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
+		PORT25_RATE="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}"
+		if [ "${INBOUND_MESSAGE_SIZE_LIMIT}" -gt "${DMARC_MESSAGE_SIZE_LIMIT}" ]; then
+			PORT25_SIZE="${INBOUND_MESSAGE_SIZE_LIMIT}"
+		else
+			PORT25_SIZE="${DMARC_MESSAGE_SIZE_LIMIT}"
+		fi
+	fi
+
 	postconf -M "smtp/inet=smtp inet n - n - - smtpd"
 	postconf -P \
 		"smtp/inet/smtpd_sasl_auth_enable=no" \
@@ -253,12 +311,13 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
 		"smtp/inet/smtpd_sender_restrictions=" \
 		"smtp/inet/smtpd_client_restrictions=" \
 		"smtp/inet/smtpd_relay_restrictions=reject_unauth_destination" \
-		"smtp/inet/smtpd_recipient_restrictions=reject_unauth_destination, reject_unlisted_recipient" \
+		"smtp/inet/smtpd_recipient_restrictions=${RECIPIENT_RESTRICTIONS}" \
 		"smtp/inet/smtpd_milters=${INBOUND_MILTERS}" \
-		"smtp/inet/smtpd_client_message_rate_limit=${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}" \
-		"smtp/inet/message_size_limit=${INBOUND_MESSAGE_SIZE_LIMIT}"
+		"smtp/inet/smtpd_client_message_rate_limit=${PORT25_RATE}" \
+		"smtp/inet/message_size_limit=${PORT25_SIZE}"
 else
 	postconf -MX "smtp/inet" 2>/dev/null || true
+	postconf -MX "dmarc-ingest/unix-pipe" 2>/dev/null || true
 	postconf -e \
 		"relay_domains=" \
 		"transport_maps=" \

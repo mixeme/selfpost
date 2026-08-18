@@ -29,16 +29,16 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
-| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): the next feature is **dmarc-reports** once
-agreed. domain-stats-auto-ratelimit shipped in
-[CHANGELOG.md](../CHANGELOG.md) `[1.6.0]`; send-log-retention in `[1.5.0]`;
-inbound-relay in `[1.4.0]`; queue-retries in `[1.3.1]`; the 2026-08-13
-full-tree review follow-ups are in `[1.3.0]`. Candidates need explicit
-agreement before they join the queue.
+**Recommended order** (not binding): the next feature is **panel-docs** once
+agreed. dmarc-reports shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.7.0]` (security review of the ingest path
+pending); domain-stats-auto-ratelimit in `[1.6.0]`; send-log-retention in
+`[1.5.0]`; inbound-relay in `[1.4.0]`; queue-retries in `[1.3.1]`; the
+2026-08-13 full-tree review follow-ups are in `[1.3.0]`. Candidates need
+explicit agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -62,33 +62,6 @@ it.
 **Dependencies / risks:** with a single developer and no PRs, this is low
 priority.
 **Version:** no bearing on semver.
-
----
-
-## dmarc-reports
-
-**Goal:** SelfPost receives DMARC aggregate reports (RFC 7489) on SMTP,
-parses the gzip/XML payloads, and shows pass/fail summaries in the panel — so
-the operator does not need an external DMARC service or a separate mailbox
-workflow.
-
-**Boundary:** an extension of v1.0 — not IMAP/webmail and not a general
-inbound relay. A dedicated inbound path for report messages only; forensic
-reports (`ruf=`) out of scope for v1.
-
-**Done when:** see [plans/dmarc-reports.md](plans/dmarc-reports.md).
-
-**Dependencies / risks:** inbound SMTP in the image (may share infrastructure
-with [inbound-relay](plans/inbound-relay.md) but must not require backup-MX);
-storage and retention of parsed summaries; the `dmarc_report_email` setting
-(migration `0005` moved it off the old `admin` table into `settings`) and
-`domains.dmarc_rua` added in the DMARC template work must stay the source of
-truth for `rua=` in DNS guidance.
-
-**Order:** after the DMARC `rua=` settings ship; may follow or overlap with
-inbound-relay depending on how port 25 acceptance is structured.
-
-**Version:** `1.x` MINOR.
 
 ---
 
