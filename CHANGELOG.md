@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- Operator and as-built docs aligned with the code after a full pass —
+  [architecture.md](docs/architecture.md) (port 25 opens for inbound relay
+  and/or DMARC ingest; antispam requires inbound relay; DMARC pipe transport
+  and map paths; `/help` and `/dmarc*` routes; four panel roles including
+  rate-limit recalc; restore Resync vs manual reload); [guide.md](docs/guide.md)
+  and [README.md](README.md) (image pin `1.9.1`, port 25 conditions, combined
+  listener limits, reload vs Resync); [roadmap.md](docs/roadmap.md) (`panel-docs`
+  closed at `[1.8.0]`, next item inbound-antispam-panel); [development.md](docs/development.md)
+  version-cut table through `1.9.1`; [schema-migrations.md](docs/schema-migrations.md)
+  last-updated note. No behaviour change.
+
 ## [1.9.1] - 2026-08-19
 
 Port-25 Postfix startup when inbound relay, DMARC ingest, or the inbound antispam

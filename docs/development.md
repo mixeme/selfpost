@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `1.7.0`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `1.9.1`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -117,6 +117,9 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 4 | domain-stats-auto-ratelimit | `1.6.0` |
 | 5 | dmarc-reports | `1.7.0` |
 | 6 | panel-docs | `1.8.0` |
+| 7 | application auth IPs | `1.9.0` |
+| 8 | port-25 Postfix startup fix | `1.9.1` (PATCH) |
+| 9 | inbound-antispam-panel | `1.10.0` (planned) |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.

@@ -27,7 +27,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | Program | User | Priority | Role |
 |---|---|---|---|
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
-| `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer goroutine |
+| `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer + rate-limit recalc |
 | `postfix` | root (wrapper) | 300 | MTA — started only after both milter sockets exist |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily `postfix reload` for renewed TLS certs |
@@ -54,30 +54,40 @@ Client ──TLS+SASL──► Postfix (465 smtps, optional 587 submission)
                          ├─► journal-milter (send log + L2 rate limits, fail-open)
                          └─► outbound MX delivery (port 25 client)
 
-Internet ──► Postfix smtp inet :25  (only when INBOUND_RELAY_ENABLE=true)
+Internet ──► Postfix smtp inet :25  (when INBOUND_RELAY_ENABLE=true
+                         │           and/or DMARC_REPORTS_ENABLE=true)
                          │
-                         ├─► optional antispam milter (inbound only)
-                         └─► smtp:[upstream]:port  (transport_maps; no local delivery)
+                         ├─► optional antispam milter (inbound relay only)
+                         ├─► DMARC aggregate ingest (pipe → dmarc-ingest)
+                         └─► smtp:[upstream]:port  (inbound relay only;
+                             transport_maps; no local delivery)
 ```
 
-The inbound listener is **absent** when the flag is off (`postconf -MX smtp/inet`
-removes Debian's stock smtpd). Outbound delivery still uses the `smtp unix`
-client; it is not the same service.
+The smtp/inet listener is **absent** when both flags are off (`postconf -MX
+smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
+`smtp unix` client; it is not the same service.
 
 ### Postfix ([build/postfix-config.sh](../build/postfix-config.sh))
 
 - **465/smtps** — implicit TLS, SASL required; primary listener.
 - **587/submission** — only when `SUBMISSION_ENABLE=true`; STARTTLS with
   `smtpd_tls_security_level=encrypt`.
-- **25/smtp inet** — only when `INBOUND_RELAY_ENABLE=true`. No SASL, no
-  OpenDKIM, no journal-milter. Accepts only `relay_domains` +
-  `relay_recipient_maps` (`reject_unauth_destination`,
-  `reject_unlisted_recipient`). Maps under `/data/postfix/`
-  (`relay_domains`, `transport`, `relay_recipients`, `tls_policy`), written
-  atomically by [internal/postfix/inbound.go](../internal/postfix/inbound.go).
-  Domains with an empty upstream host are omitted from the maps. Optional
-  `INBOUND_ANTISPAM_MILTER` on this listener only; default
-  `milter_default_action` is fail-open (`accept`).
+- **25/smtp inet** — when `INBOUND_RELAY_ENABLE=true` and/or
+  `DMARC_REPORTS_ENABLE=true`. No SASL, no OpenDKIM, no journal-milter.
+  **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
+  `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
+  `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,
+  `transport`, `relay_recipients`, `tls_policy`), written atomically by
+  [internal/postfix/inbound.go](../internal/postfix/inbound.go). Domains with
+  an empty upstream host are omitted from the maps. Optional
+  `INBOUND_ANTISPAM_MILTER` only when inbound relay is enabled (not on
+  DMARC-only port 25); default `milter_default_action` is fail-open
+  (`accept`). **DMARC ingest** (`DMARC_REPORTS_ENABLE=true`): allow-listed
+  report addresses via `check_recipient_access` on `postfix/dmarc_recipients`;
+  messages pipe to `dmarc-ingest` (symlink to `panel`). When both flags are
+  on, one listener serves both paths; per-IP rate uses
+  `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` and message size uses the greater of
+  `INBOUND_MESSAGE_SIZE_LIMIT` and `DMARC_MESSAGE_SIZE_LIMIT`.
 - **No open relay** — `permit_sasl_authenticated`, `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
 - **Level-1 rate limit** — `smtpd_client_message_rate_limit` /
@@ -93,7 +103,7 @@ by the panel. Socket `/run/opendkim/opendkim.sock`.
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
-One process, three roles:
+One process, four roles:
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
    proxy only. On start it runs `postconf -h` once for the deferred-mail retry
@@ -116,6 +126,8 @@ One process, three roles:
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
+4. **rate-limit recalc** — every six hours (and on demand from the domain
+   page), recomputes level-2 **Auto** rate limits from send-log statistics.
 
 Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
 
@@ -200,11 +212,13 @@ below is a summary — HTMX fragment endpoints
 | `/deliveries`, `/deliveries/{id}` | Send log with filters; scoped to assigned domains for domain-admins |
 | `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view; retry-policy card on the page (not the HTMX fragment) |
 | `/system-log`, `/system-log/*` | **Global.** `mail.log` tail |
-| `/reload` | **Global.** `POST` — reload OpenDKIM + Postfix maps |
+| `/reload` | **Global.** `POST` — reload OpenDKIM tables, Postfix sender map, and inbound relay maps when enabled (not DMARC maps — see § Persistence restore) |
 | `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
+| `/help` | In-panel operator help (any authenticated user) |
 | `/settings` | Username/password for any user; DMARC report default is **global** only |
 | `/users`, `/users/*` | **Global.** Panel user CRUD |
 | `/inbound`, `/inbound/{id}`, `/inbound/{id}/*` | **Global.** Inbound relay domains. Registered only when `INBOUND_RELAY_ENABLE=true`; otherwise 404. |
+| `/dmarc`, `/dmarc/reports/{id}`, `/dmarc/domains/{id}` | **Global** list and report detail; domain roll-up scoped like deliveries. Registered only when `DMARC_REPORTS_ENABLE=true`; otherwise 404. |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
@@ -271,6 +285,7 @@ flowchart TB
     domainSvc["internal/domain"]
     appSvc["internal/app"]
     inboundSvc["internal/inbound"]
+    dmarcSvc["internal/dmarc"]
   end
   subgraph persistence ["Persistence"]
     store["internal/store — SQLite, embedded migrations"]
@@ -293,6 +308,7 @@ flowchart TB
   web --> domainSvc
   web --> appSvc
   web --> inboundSvc
+  web --> dmarcSvc
   web --> backupPkg
   web --> dnscheck
   web --> health
@@ -300,15 +316,18 @@ flowchart TB
   domainSvc --> store
   appSvc --> store
   inboundSvc --> store
+  dmarcSvc --> store
   milterPkg --> store
   logtail --> store
   domainSvc --> postfix
   appSvc --> postfix
   inboundSvc --> postfix
+  dmarcSvc --> postfix
 ```
 
-The three roles inside the `panel` process (HTTP server, journal-milter,
-log-tailer goroutine) share one binary and one SQLite handle on purpose — see
+The four roles inside the `panel` process (HTTP server, journal-milter,
+log-tailer, rate-limit recalc) share one binary and one SQLite handle on
+purpose — see
 [Panel binary](#panel-binary-cmdpanel) for why, and *Persistence* below for the
 single-connection trade-off that follows from it.
 
@@ -327,6 +346,9 @@ single-connection trade-off that follows from it.
 | `postfix/transport` | Inbound next-hop `smtp:[host]:port` |
 | `postfix/relay_recipients` | Inbound recipient allow-list or `@domain` catch-all |
 | `postfix/tls_policy` | TLS policy for inbound next hops |
+| `postfix/dmarc_recipients` | Allow-listed DMARC aggregate report addresses |
+| `postfix/dmarc_transport` | Pipe transport for report ingest |
+| `postfix/dmarc_relay_domains` | Domains accepted for DMARC report delivery |
 | `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
@@ -344,10 +366,12 @@ under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
 first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
-tables, Postfix's sender map, and (when `INBOUND_RELAY_ENABLE=true`) inbound
-relay maps are re-derived from SQLite and both daemons are reloaded, so drift
-between the extracted archive and the database is healed before mail flows
-(same step as `POST /reload` on demand). Stopped-container
+tables, Postfix's sender map, inbound relay maps (when
+`INBOUND_RELAY_ENABLE=true`), and DMARC maps (when `DMARC_REPORTS_ENABLE=true`)
+are re-derived from SQLite and both daemons are reloaded, so drift between the
+extracted archive and the database is healed before mail flows. Manual
+`POST /reload` on the Status page resyncs OpenDKIM, the sender map, and
+inbound maps only — not DMARC maps. Stopped-container
 `tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
@@ -398,6 +422,9 @@ unsupported rather than as a missing doc:
   `POSTFIX_TLS_POLICY_MAPS` (`/data/postfix/tls_policy`) — same desync if
   overridden without matching the panel writer in
   [internal/postfix/inbound.go](../internal/postfix/inbound.go),
+  `POSTFIX_DMARC_RECIPIENTS` (`/data/postfix/dmarc_recipients`),
+  `POSTFIX_DMARC_TRANSPORT` (`/data/postfix/dmarc_transport`),
+  `POSTFIX_DMARC_RELAY_DOMAINS` (`/data/postfix/dmarc_relay_domains`),
   `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
   `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
   full backups; mount `.:/selfpost-deploy:ro` in compose).

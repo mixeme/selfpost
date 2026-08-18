@@ -52,9 +52,10 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
 465 (smtps) is always active. Port **587** is published even when
 `SUBMISSION_ENABLE=false`; nothing listens until you set it to `true`. Port
 **25** is published even when `INBOUND_RELAY_ENABLE=false`; Postfix does not
-accept inbound mail until you set it to `true` (see [Inbound
-relay](#inbound-relay)). Harmless extra publishes can look like open ports in
-external scans.
+listen on port 25 until you set **`INBOUND_RELAY_ENABLE=true`** and/or
+**`DMARC_REPORTS_ENABLE=true`** (see [Inbound relay](#inbound-relay) and
+[DMARC reports](#dmarc-reports)). Harmless extra publishes can look like open
+ports in external scans.
 
 ### Local trial
 
@@ -172,7 +173,7 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.7.0`. Intermediate
+deliberately never `:latest`. The current pin is `1.9.1`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check (see
 [Full backup and restore](#full-backup-and-restore)): the panel binary's
@@ -194,12 +195,12 @@ expected to set; defaults match the code exactly.
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
 | `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
 | `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip/XML, and show summaries under *DMARC*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
-| `DMARC_RATE_LIMIT_MESSAGES_PER_IP` | Per-client-IP cap on port 25 when DMARC ingest is on (shared listener with inbound relay if both are enabled). | `20` | `.env` |
+| `DMARC_RATE_LIMIT_MESSAGES_PER_IP` | Per-client-IP cap on port 25 when DMARC ingest is on. When inbound relay is also enabled, **`INBOUND_RATE_LIMIT_MESSAGES_PER_IP`** applies to the shared listener instead. | `20` | `.env` |
 | `DMARC_MESSAGE_SIZE_LIMIT` | Maximum report message size in bytes when DMARC ingest is on. | `5242880` (5 MiB) | `.env` |
-| `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound listener only (not 465/587). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. | *(empty)* | `.env` |
+| `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. | *(empty)* | `.env` |
 | `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). | `accept` | `.env` |
 | `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
-| `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). | `26214400` (25 MiB) | `.env` |
+| `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows — the main driver of `/data` growth over time. After the first panel start, change retention on **Settings** (global administrator); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
@@ -342,7 +343,8 @@ against the PTR record the internet publishes for this server's IP
 DNS. The **Reload configuration** button re-applies OpenDKIM tables and the
 Postfix sender map from the database (and inbound relay maps when
 `INBOUND_RELAY_ENABLE=true`) — use it if daemons drifted from what the panel
-shows after manual edits under `/data`.
+shows after manual edits under `/data`. It does **not** rebuild DMARC Postfix
+maps; a full restore Resync does (see [Restore](#restore)).
 
 ### Mail queue and System log
 
@@ -376,8 +378,8 @@ restart). Application SASL logins are separate and are not changed here.
 There are two roles:
 
 - **Global administrator** — full access to every page and every domain,
-  including Users, Backup, Status, Mail queue, System log, and Inbound (when
-  the inbound relay flag is on).
+  including Users, Backup, Status, Mail queue, System log, Help, Inbound (when
+  the inbound relay flag is on), and DMARC (when `DMARC_REPORTS_ENABLE=true`).
 - **Domain-admin** — scoped to one or more domains assigned by a global
   administrator. Sees only those domains' pages, applications, and
   Deliveries rows; cannot add or delete domains. `/users`, `/backup`,
@@ -547,10 +549,11 @@ refuses to start otherwise and tells you which tag to use. On the first
 successful start after restore, `data/manifest.json` from the archive is
 **deleted** — it guards only that one boot, so a later in-place upgrade is not
 blocked. On that same first boot the panel also runs one **Resync** — OpenDKIM's
-tables and Postfix's sender map are re-derived from SQLite (and inbound relay
-maps when `INBOUND_RELAY_ENABLE=true`) and both daemons are reloaded, healing
-any drift between the extracted files and the database (the Status page's
-*Reload configuration* button runs the same step on demand). This is why the
+tables and Postfix's sender map are re-derived from SQLite (inbound relay maps
+when `INBOUND_RELAY_ENABLE=true`; DMARC maps when `DMARC_REPORTS_ENABLE=true`)
+and both daemons are reloaded, healing any drift between the extracted files and
+the database. The Status page's *Reload configuration* button resyncs OpenDKIM,
+the sender map, and inbound maps only — not DMARC maps. This is why the
 compose file pins a fixed tag rather than `:latest`: without a known version,
 there'd be no way to tell which image restoring a given backup actually requires
 (see [Fixed image tag](#fixed-image-tag)).
@@ -688,8 +691,10 @@ you configure. It is **not** mailboxes, IMAP, or webmail — SelfPost never
 stores the message locally.
 
 **Off by default.** Set `INBOUND_RELAY_ENABLE=true` in `.env` and recreate the
-container. Until then there is no `smtp inet` listener, no Inbound item in
-the nav, and `/inbound` is 404. Outbound 465/587 is unchanged.
+container. Until then there is no inbound-relay `smtp inet` listener, no
+*Inbound* item in the nav, and `/inbound` is 404. (Port 25 can still listen
+when only `DMARC_REPORTS_ENABLE=true` — see [DMARC reports](#dmarc-reports).)
+Outbound 465/587 is unchanged.
 
 **Panel** (`/inbound`, global administrator only): add a domain, set the
 upstream host/port and TLS to that hop (opportunistic / required / off), and
@@ -710,7 +715,8 @@ Prefer an explicit recipient list so unknown addresses are refused at RCPT
 and never generate a bounce (backscatter).
 
 **Anti-spam.** SelfPost does not ship a filter. To attach one, set
-`INBOUND_ANTISPAM_MILTER` (inbound listener only) and merge
+`INBOUND_ANTISPAM_MILTER` (requires inbound relay enabled; not on DMARC-only
+port 25) and merge
 [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml)
 the same way as the nginx/Caddy fragments:
 

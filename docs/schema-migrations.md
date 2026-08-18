@@ -23,7 +23,8 @@ Documentation.
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 1.x MINOR releases must boot a `1.0.0` data directory |
 
-Last updated with release **1.9.0** (`0009_application_auth_ips`).
+Last updated with release **1.9.0** (`0009_application_auth_ips`); **1.9.1**
+had no schema change.
 
 ---
 

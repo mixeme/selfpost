@@ -29,18 +29,17 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
-| panel-docs | In-panel operator documentation | agreed | 6/6 | [plans/panel-docs.md](plans/panel-docs.md) |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | agreed | 1/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): the next feature is **panel-docs** once
-agreed. dmarc-reports shipped in
-[CHANGELOG.md](../CHANGELOG.md) `[1.7.0]` (security review of the ingest path
-pending); domain-stats-auto-ratelimit in `[1.6.0]`; send-log-retention in
-`[1.5.0]`; inbound-relay in `[1.4.0]`; queue-retries in `[1.3.1]`; the
-2026-08-13 full-tree review follow-ups are in `[1.3.0]`. Candidates need
-explicit agreement before they join the queue.
+**Recommended order** (not binding): the next feature is
+**inbound-antispam-panel** (`1.10.0`). panel-docs shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
+(security review of the ingest path pending); domain-stats-auto-ratelimit in
+`[1.6.0]`; send-log-retention in `[1.5.0]`; inbound-relay in `[1.4.0]`;
+queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
+`[1.3.0]`. Candidates need explicit agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -69,6 +68,9 @@ priority.
 
 ## panel-docs
 
+**Status:** done — shipped in `[1.8.0]` (2026-08-18). Plan:
+[plans/panel-docs.md](plans/panel-docs.md) (checklist complete).
+
 **Goal:** built-in operator documentation in the panel — short pages (or a
 help drawer) that explain what each Status check and other controls mean,
 without sending the operator out to `docs/guide.md`.
@@ -87,7 +89,7 @@ read the git tree for day-to-day meaning of a card.
 **Dependencies / risks:** copy ownership and translation; keeping help in sync
 when checks change; not bloating every page with a second column of prose.
 
-**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+**Version:** shipped `1.8.0`.
 
 ---
 

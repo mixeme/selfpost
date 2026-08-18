@@ -24,6 +24,9 @@ send log and DNS checks in the panel, encrypted backups.
 
 - Outbound SMTP (465/smtps; optional 587 submission) with per-domain DKIM signing
 - Optional inbound relay on port 25 (backup-MX / forwarder; off by default)
+- Optional DMARC aggregate report ingest on port 25 (off by default)
+- In-panel Help drawer and `/help` page for Status and domain controls
+- Per-application client IP allow-list for SMTP AUTH (optional)
 - Web panel — domains, applications, deliveries, mail queue, system log, backup
 - Multi-domain relay — each SASL application is bound to one sending domain
 - DNS status checks (PTR, SPF, DKIM, DMARC) with in-panel re-check
@@ -108,7 +111,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:1.7.0
+  ghcr.io/mixeme/selfpost:1.9.1
 ```
 
 **Get the setup URL** (pick one):
@@ -149,8 +152,9 @@ deployment](docs/guide.md#full-deployment) section, with proxy-specific
 commands under [Reverse proxy](docs/guide.md#reverse-proxy-mandatory).
 
 The compose file always publishes **465**, **587**, and **25**; Postfix listens
-on 587 only when `SUBMISSION_ENABLE=true`, and on 25 only when
-`INBOUND_RELAY_ENABLE=true` (see [Ports](docs/guide.md#ports)). Bump the
+on 587 only when `SUBMISSION_ENABLE=true`, and on 25 when
+`INBOUND_RELAY_ENABLE=true` and/or `DMARC_REPORTS_ENABLE=true` (see
+[Ports](docs/guide.md#ports)). Bump the
 pinned image tag deliberately when upgrading, never `:latest` ([why](docs/guide.md#fixed-image-tag)). Optional
 variables (`TRUSTED_PROXY_CIDR`, rate limits, retention): see [Environment
 variables](docs/guide.md#environment-variables).
