@@ -1,6 +1,6 @@
 # Plan: panel-docs (in-panel operator documentation)
 
-**Status:** candidate  
+**Status:** agreed  
 **Date:** 2026-08-17  
 **Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 
@@ -46,9 +46,9 @@ Target version cut: **`1.8.0`** (MINOR). One commit per step; code only after
 roadmap status is **agreed**. See [development.md](../development.md) § Plan
 checklists.
 
-- [ ] Help drawer / pages shell (CSS checkbox pattern from mockups) — **Sonnet**
-- [ ] Seed Status blurbs (Machine, TLS, PTR, …) — **Sonnet**
-- [ ] «?» entry points on domain cards — **Sonnet**
-- [ ] [guide.md](../guide.md) boundary: in-panel help vs full guide — **Sonnet**
-- [ ] Template tests — **Sonnet**
-- [ ] `go vet`, `go test` on touched packages — **Haiku**
+- [x] Help drawer / pages shell (CSS checkbox pattern from mockups) — **Sonnet**
+- [x] Seed Status blurbs (Machine, TLS, PTR, …) — **Sonnet**
+- [x] «?» entry points on domain cards — **Sonnet**
+- [x] [guide.md](../guide.md) boundary: in-panel help vs full guide — **Sonnet**
+- [x] Template tests — **Sonnet**
+- [x] `go vet`, `go test` on touched packages — **Haiku**

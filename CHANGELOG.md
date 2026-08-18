@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-08-18
+
+Built-in operator documentation in the panel: a CSS-only help drawer and Help
+page so Status checks and domain controls are explained without leaving the
+panel.
+
+### Added
+
+- **Help** navigation entry and `/help` index page.
+- CSS-checkbox help drawer (no extra script): seeded topics for Status (Machine,
+  TLS, PTR, mail queue, inbound when enabled) and domain cards (DNS, records,
+  DMARC, connection, applications, settings, export).
+- «?» entry points on Status and domain card heads open the matching drawer
+  topic.
+
+### Changed
+
+- [guide.md](docs/guide.md) documents the boundary: in-panel help for card
+  meaning; the repository guide for installation, env vars, and operations.
+
 ## [1.7.0] - 2026-08-18
 
 Optional DMARC aggregate report ingest: accept `rua=` mail on port 25, parse

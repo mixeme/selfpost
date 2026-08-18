@@ -67,7 +67,10 @@
 
 {{if .NewCred}}
 <div class="card credential" id="new-credential">
-  <h2>New application password</h2>
+  <div class="card-head">
+    <h2>New application password</h2>
+    {{template "card_help" (dict "ID" "password" "Title" "Why this is shown once")}}
+  </div>
   <p class="muted">Shown <strong>once only</strong> and not stored. Copy it now
   — if it is lost, regenerate a new one.</p>
   <label>Login</label>
@@ -85,7 +88,10 @@
 
 {{/* Two rows of two checks (.check-cols). */}}
 <div class="card" id="dns-status">
-  <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
+  <div class="card-head">
+    <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
+    {{template "card_help" (dict "ID" "dns" "Title" "What these checks mean")}}
+  </div>
   <p class="muted">Cached a few minutes — use <em>Re-check</em> after
   publishing.</p>
 
@@ -141,7 +147,10 @@
 
 <div class="split">
   <div class="card" id="dkim-spf">
-    <h2>DKIM and SPF records</h2>
+    <div class="card-head">
+      <h2>DKIM and SPF records</h2>
+      {{template "card_help" (dict "ID" "records" "Title" "What to publish")}}
+    </div>
 
     <p class="check-col-title">DKIM</p>
     {{template "host_type_copy" .Record.Name}}
@@ -159,7 +168,10 @@
   </div>
 
   <div class="card" id="dmarc">
-    <h2>DMARC record</h2>
+    <div class="card-head">
+      <h2>DMARC record</h2>
+      {{template "card_help" (dict "ID" "dmarc" "Title" "What this record does")}}
+    </div>
 
     {{template "host_type_copy" .DMARCName}}
 
@@ -191,7 +203,10 @@
 
 <div class="split">
   <div class="card" id="connection">
-    <h2>Connection settings</h2>
+    <div class="card-head">
+      <h2>Connection settings</h2>
+      {{template "card_help" (dict "ID" "connection" "Title" "How to connect")}}
+    </div>
     <p class="muted">Same for every domain. Authenticate with an application
     login from below.</p>
 
@@ -262,7 +277,10 @@
 </div>
 
 <div class="card" id="applications">
-  <h2>Applications</h2>
+  <div class="card-head">
+    <h2>Applications</h2>
+    {{template "card_help" (dict "ID" "apps" "Title" "What an application is")}}
+  </div>
   <p class="muted">SASL logins for this domain — wildcard (*@domain) or a fixed
   address list.</p>
 
@@ -376,7 +394,10 @@
 </div>
 
 <div class="card" id="domain-settings">
-  <h2>Domain settings</h2>
+  <div class="card-head">
+    <h2>Domain settings</h2>
+    {{template "card_help" (dict "ID" "domain-settings" "Title" "Reports and rate limits")}}
+  </div>
 
   <div class="check-cols check-cols-rows">
     <div class="check-col">
@@ -464,7 +485,10 @@
 
 <div class="split">
   <div class="card" id="export">
-    <h2>Export domain</h2>
+    <div class="card-head">
+      <h2>Export domain</h2>
+      {{template "card_help" (dict "ID" "export" "Title" "What the file contains")}}
+    </div>
     <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt
     below as <code>.spde</code>.</p>
     {{if .ExportErr}}<p class="error">{{.ExportErr}}</p>{{end}}
