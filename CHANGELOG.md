@@ -252,6 +252,14 @@ tag bump; no schema migration.
   parsed aggregate report (aligned vs third-party fail), not a hub-only
   summary.
 
+### Fixed
+
+- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
+  after the manifest merge via the GitHub Packages API. The `[1.3.0]` merge job
+  called `docker buildx imagetools rm`, which is not a valid subcommand — cleanup
+  failed with a warning and the side-effect tags stayed in the registry until
+  this fix.
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,
@@ -336,11 +344,6 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   the same Resync on demand. The `internal/backup` package comment now matches
   this behaviour.
 
-- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
-  after the manifest merge via the GitHub Packages API. The merge job had called
-  `docker buildx imagetools rm`, which is not a valid subcommand — cleanup failed
-  with a warning and the side-effect tags stayed in the registry.
-
 ### Changed
 
 - docs: operator and as-built docs aligned with the code after a full
@@ -390,15 +393,13 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   (`vX.Y.Z`) or a manual `workflow_dispatch` with an explicit SemVer version — a
   bare git tag push no longer starts the build. `release.yml` listens for
   `release: published`, checks out that tag (not `main` HEAD), e2e-gates each
-  native arch build, merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one manifest,
-  then removes the per-arch tags from GHCR via the GitHub Packages API so
-  operators see only `ghcr.io/mixeme/selfpost:X.Y.Z` (what
-  `deploy/docker-compose.yml` pins). A dispatch whose version input is missing
-  or not `X.Y.Z` fails in `prepare`. [development.md](docs/development.md)
-  documents draft vs published releases, why deleting a release tag converts
-  it back to draft, and Gitea → GitHub tag-mirror pitfalls (do not prune release
-  tags on GitHub; a mirrored `v1.0.0` still runs that tag's `on: push: tags`
-  workflow).
+  native arch build, and merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one
+  manifest. Reliable removal of the per-arch side-effect tags from GHCR landed
+  in `[1.3.1]`. A dispatch whose version input is missing or not `X.Y.Z` fails
+  in `prepare`. [development.md](docs/development.md) documents draft vs
+  published releases, why deleting a release tag converts it back to draft, and
+  Gitea → GitHub tag-mirror pitfalls (do not prune release tags on GitHub; a
+  mirrored `v1.0.0` still runs that tag's `on: push: tags` workflow).
 
 - test: the authorization and sign-in surfaces that had no tests now have them.
   The login limiter is covered for its ceiling, its per-address scope, the reset
@@ -495,7 +496,9 @@ Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.
   carry muted leads and matched control height; trusted-IP help sits under the
   IP field. Domain settings pairs DMARC reports with the level-2 rate limit
   using CSS subgrid so titles, fields, and Save / Remove buttons line up across
-  columns.
+  columns. Domain page Export and Danger cards stack naturally again — a
+  shared-baseline flex pin on `.split` cards made mismatched body lengths look
+  worse than a plain stack.
 
 ## [1.2.4] - 2026-08-12
 
@@ -1302,9 +1305,10 @@ database, or the on-disk layout. Upgrading is a tag bump.
   Bookmarks to the old paths stop working.
 
 - panel: each entry in the navigation bar now carries an icon beside its label,
-  so the bar is scannable at a glance instead of a row of similar-length words.
-  The icons are inline SVG drawn in the entry's own colour — no extra request,
-  no exemption from the panel's Content-Security-Policy — and are hidden from
+  so the bar is scannable at a glance instead of a row of similar-length words —
+  Backup uses a filing-cabinet mark; Sign out has its own icon too. The icons
+  are inline SVG drawn in the entry's own colour — no extra request, no
+  exemption from the panel's Content-Security-Policy — and are hidden from
   screen readers, which still announce the label alone.
 
 - panel: the navigation bar is laid out as two rows on purpose — the signed-in
@@ -1444,6 +1448,11 @@ database, or the on-disk layout. Upgrading is a tag bump.
   login/password and on the sending server name.
 - panel: the *Addresses* field is hidden while an application's address mode is
   *Any address of the domain*, where the server ignores it.
+- deploy: `cap_add` gains `CAP_FOWNER` and `CAP_FSETID` so the entrypoint can
+  chmod and set the setgid bit on `/data` directories it has just chowned under
+  `cap_drop: ALL`, and `CAP_KILL` so supervisord can signal OpenDKIM across uids
+  when domains are added or removed. Production boot under the hardened compose
+  file exposed both gaps after Phase 10.
 - ci: disable provenance attestation on release image push, so the ghcr.io
   manifest list shows only `linux/amd64`/`linux/arm64` (no `unknown/unknown`).
 - ci: run `go vet` and `go test ./...` on every push to `main` and every pull
