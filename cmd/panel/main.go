@@ -254,7 +254,7 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	errc := make(chan error, 3)
+	errc := make(chan error, 4)
 
 	roles := []struct {
 		name string
@@ -271,6 +271,10 @@ func run() error {
 				}
 				return days
 			})
+		}},
+		{"rate-limit-recalc", func(ctx context.Context) error {
+			runAutoRateLimitRecalc(ctx, cfg, st)
+			return nil
 		}},
 	}
 

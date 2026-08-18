@@ -25,7 +25,17 @@ type DomainExport struct {
 	DKIMSelector   string      `json:"dkim_selector"`
 	DKIMPrivateKey string      `json:"dkim_private_key"`    // PKCS#1 PEM
 	DMARCRua       *string     `json:"dmarc_rua,omitempty"` // nil = inherit profile; set = override ("" = none)
+	RateLimit      *RateLimitExport `json:"rate_limit,omitempty"`
 	Applications   []AppExport `json:"applications"`
+}
+
+// RateLimitExport is the transferable level-2 limit for a domain or application.
+type RateLimitExport struct {
+	Mode           string   `json:"mode,omitempty"`
+	MaxMessages    int      `json:"max_messages,omitempty"`
+	WindowSeconds  int      `json:"window_seconds,omitempty"`
+	AutoMultiplier float64  `json:"auto_multiplier,omitempty"`
+	AllowedIPs     []string `json:"allowed_ips,omitempty"`
 }
 
 // AppExport is one application within a DomainExport.
@@ -34,6 +44,7 @@ type AppExport struct {
 	AddressMode string   `json:"address_mode"`
 	Addresses   []string `json:"addresses,omitempty"` // list mode only
 	Password    string   `json:"password"`
+	RateLimit   *RateLimitExport `json:"rate_limit,omitempty"`
 }
 
 // Export builds the transferable representation of a domain: its DKIM key, its
@@ -65,17 +76,24 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 		s := d.DMARCRua.String
 		exp.DMARCRua = &s
 	}
+	if rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeDomain, id); err == nil && ok {
+		exp.RateLimit = exportRateLimit(rl)
+	}
 	for _, a := range apps {
 		password, err := s.apps.Secret(a.Login)
 		if err != nil {
 			return DomainExport{}, fmt.Errorf("export credential for %s: %w", a.Login, err)
 		}
-		exp.Applications = append(exp.Applications, AppExport{
+		appExp := AppExport{
 			Login:       a.Login,
 			AddressMode: a.AddressMode,
 			Addresses:   a.Addresses,
 			Password:    password,
-		})
+		}
+		if rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeApp, a.ID); err == nil && ok {
+			appExp.RateLimit = exportRateLimit(rl)
+		}
+		exp.Applications = append(exp.Applications, appExp)
 	}
 	return exp, nil
 }
@@ -123,11 +141,28 @@ func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 		}
 		d.DMARCRua = sql.NullString{Valid: true, String: *exp.DMARCRua}
 	}
+	if exp.RateLimit != nil {
+		if err := s.importRateLimit(store.RateLimitScopeDomain, d.ID, *exp.RateLimit); err != nil {
+			s.importRollback(d.ID)
+			return store.Domain{}, err
+		}
+	}
 
 	for _, a := range exp.Applications {
 		if err := s.apps.ImportApplication(d.ID, a.Login, a.AddressMode, a.Addresses, a.Password); err != nil {
 			s.importRollback(d.ID)
 			return store.Domain{}, fmt.Errorf("import application %q: %w", a.Login, err)
+		}
+		if a.RateLimit != nil {
+			app, err := s.store.GetApplicationByLogin(a.Login)
+			if err != nil {
+				s.importRollback(d.ID)
+				return store.Domain{}, fmt.Errorf("import rate limit for %q: %w", a.Login, err)
+			}
+			if err := s.importRateLimit(store.RateLimitScopeApp, app.ID, *a.RateLimit); err != nil {
+				s.importRollback(d.ID)
+				return store.Domain{}, fmt.Errorf("import rate limit for %q: %w", a.Login, err)
+			}
 		}
 	}
 	if err := s.apps.Resync(); err != nil {
@@ -144,4 +179,39 @@ func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 // the caller returns.
 func (s *Service) importRollback(id int64) {
 	_ = s.Delete(id)
+}
+
+func exportRateLimit(rl store.RateLimit) *RateLimitExport {
+	mode := rl.Mode
+	if mode == "" {
+		mode = store.RateLimitModeManual
+	}
+	exp := &RateLimitExport{
+		Mode:           mode,
+		MaxMessages:    rl.MaxMessages,
+		WindowSeconds:  rl.WindowSeconds,
+		AutoMultiplier: rl.AutoMultiplier,
+		AllowedIPs:     rl.AllowedIPs,
+	}
+	return exp
+}
+
+func (s *Service) importRateLimit(scope string, refID int64, exp RateLimitExport) error {
+	mode := exp.Mode
+	if mode == "" {
+		mode = store.RateLimitModeManual
+	}
+	rl := store.RateLimit{
+		Scope:          scope,
+		RefID:          refID,
+		Mode:           mode,
+		MaxMessages:    exp.MaxMessages,
+		WindowSeconds:  exp.WindowSeconds,
+		AutoMultiplier: exp.AutoMultiplier,
+		AllowedIPs:     exp.AllowedIPs,
+	}
+	if mode == store.RateLimitModeManual && rl.MaxMessages <= 0 && rl.WindowSeconds <= 0 {
+		return nil
+	}
+	return s.store.SetRateLimit(rl)
 }

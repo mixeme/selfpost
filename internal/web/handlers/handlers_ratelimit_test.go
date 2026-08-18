@@ -17,6 +17,7 @@ func TestParseDomainRateLimitForm(t *testing.T) {
 	}
 
 	in, err := parseDomainRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"max_messages":   {"50"},
 		"window_seconds": {"3600"},
 	}), 100)
@@ -30,6 +31,7 @@ func TestParseDomainRateLimitForm(t *testing.T) {
 	}
 
 	_, err = parseDomainRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"max_messages":   {"150"},
 		"window_seconds": {"3600"},
 	}), 100)
@@ -47,6 +49,7 @@ func TestParseAppRateLimitForm(t *testing.T) {
 	}
 
 	in, err := parseAppRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"80"},
 		"window_seconds": {"3600"},
@@ -56,6 +59,7 @@ func TestParseAppRateLimitForm(t *testing.T) {
 	}
 
 	_, err = parseAppRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"max_messages":   {"80"},
 		"window_seconds": {"3600"},
 	}), 100, 40, true)
@@ -64,6 +68,7 @@ func TestParseAppRateLimitForm(t *testing.T) {
 	}
 
 	_, err = parseAppRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"40"},
 		"window_seconds": {"3600"},
@@ -73,6 +78,7 @@ func TestParseAppRateLimitForm(t *testing.T) {
 	}
 
 	_, err = parseAppRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"150"},
 		"window_seconds": {"3600"},
@@ -83,11 +89,35 @@ func TestParseAppRateLimitForm(t *testing.T) {
 
 	// No domain limit: any app ceiling ≤ L1 is fine.
 	in, err = parseAppRateLimitForm(form(url.Values{
+		"mode":           {"manual"},
 		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"50"},
 		"window_seconds": {"3600"},
 	}), 100, 0, false)
 	if err != nil || in.maxMessages != 50 {
 		t.Fatalf("app without domain = %+v err=%v", in, err)
+	}
+}
+
+func TestParseDomainRateLimitFormAuto(t *testing.T) {
+	t.Parallel()
+	form := func(vals url.Values) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(vals.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return r
+	}
+	in, err := parseDomainRateLimitForm(form(url.Values{
+		"mode":             {"auto"},
+		"auto_multiplier":  {"2.5"},
+	}), 100)
+	if err != nil || in.mode != "auto" || in.autoMultiplier != 2.5 {
+		t.Fatalf("auto domain = %+v err=%v", in, err)
+	}
+	_, err = parseDomainRateLimitForm(form(url.Values{
+		"mode":             {"auto"},
+		"auto_multiplier":  {"10"},
+	}), 100)
+	if err == nil {
+		t.Fatal("multiplier out of range should fail")
 	}
 }

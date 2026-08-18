@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-18
+
+30-day sending statistics per domain and application, plus optional auto
+level-2 rate limits derived from average send rate.
+
+### Added
+
+- Domain page **Sending statistics** card: total messages, peak and average
+  msg/h over the last 30 days (or shorter when send-log retention is below
+  30 days). Per-application stats in the application list.
+- Level-2 rate limit **Manual** / **Auto** mode on domain and application
+  forms. Auto sets `max_messages` from `ceil(avg × multiplier)` over the
+  level-1 window, capped at level 1; background recalc every six hours and
+  **Recalculate now** on the domain page.
+- Domain export JSON now includes rate limits (`mode`, `auto_multiplier`,
+  ceilings, trusted IPs).
+
+### Changed
+
+- Auto mode uses the level-1 window (`RATE_LIMIT_WINDOW_SECONDS`); manual
+  mode behaviour is unchanged.
+
 ## [1.5.0] - 2026-08-18
 
 Send-log retention is configurable from panel **Settings** (global

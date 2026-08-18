@@ -236,6 +236,28 @@
   </div>
 </div>
 
+<div class="card" id="send-stats">
+  <h2>Sending statistics ({{.StatsWindowDays}} days)</h2>
+  <p class="muted">One message = one queue id (many recipients count once).
+  Level-1 refusals are not in the send log — totals under-count strict IP
+  limits.{{if .StatsRetentionWarning}} Send log retention is shorter than
+  30&nbsp;days; statistics use the last {{.StatsWindowDays}}&nbsp;days only.{{end}}</p>
+  <div class="field-pair">
+    <div>
+      <label>Total messages</label>
+      <span>{{.DomainStats.Total}}</span>
+    </div>
+    <div>
+      <label>Peak rate (msg/h)</label>
+      <span>{{.DomainStats.PeakPerHour}}</span>
+    </div>
+    <div>
+      <label>Average rate (msg/h)</label>
+      <span>{{.DomainStats.AvgPerHour}}</span>
+    </div>
+  </div>
+</div>
+
 <div class="card" id="applications">
   <h2>Applications</h2>
   <p class="muted">SASL logins for this domain — wildcard (*@domain) or a fixed
@@ -250,6 +272,8 @@
           {{if eq .AddressMode $.Wildcard}}Any address of the domain — *@{{$.Domain.Name}}
           {{else}}Fixed list — {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}
         </p>
+        <p class="muted app-stats">{{.Stats.Total}} msg / {{$.StatsWindowDays}}d ·
+        peak {{.Stats.PeakPerHour}} msg/h · avg {{.Stats.AvgPerHour}} msg/h</p>
         <!-- One Edit panel (mode ‖ rate limit) opened by a checkbox and label
              rather than <details>, so the button row stays intact — see
              .panel-toggle in panel.css. -->
@@ -293,22 +317,41 @@
                   (≤ level&nbsp;1) and skip the domain check; everyone else uses
                   the domain level-2 limit{{if $.DomainHasRL}} ({{$.DomainRLMaxNum}}){{end}}
                   if set, otherwise level&nbsp;1.</p>
-                  <div class="field-pair">
-                    <div>
-                      <label>Message limit (max {{$.L1Messages}})</label>
-                      <input name="max_messages" type="number" min="1" max="{{$.L1Messages}}"
-                             value="{{.MaxText}}" placeholder="{{$.L1Messages}}">
-                    </div>
-                    <div>
-                      <label>Window (seconds)</label>
-                      <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
+                  <label for="mode-{{.ID}}">Limit mode</label>
+                  <select id="mode-{{.ID}}" name="mode" data-ratelimit-mode>
+                    <option value="manual" {{if not .IsAuto}}selected{{end}}>Manual</option>
+                    <option value="auto" {{if .IsAuto}}selected{{end}}>Auto (from statistics)</option>
+                  </select>
+                  <div data-manual-fields>
+                    <div class="field-pair">
+                      <div>
+                        <label>Message limit (max {{$.L1Messages}})</label>
+                        <input name="max_messages" type="number" min="1" max="{{$.L1Messages}}"
+                               value="{{.MaxText}}" placeholder="{{$.L1Messages}}">
+                      </div>
+                      <div>
+                        <label>Window (seconds)</label>
+                        <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
+                      </div>
                     </div>
                   </div>
+                  <div data-auto-fields>
+                    <label for="mult-{{.ID}}">Multiplier ({{$.MinAutoMultiplier}}–{{$.MaxAutoMultiplier}}, default {{$.DefaultAutoMultiplier}})</label>
+                    <input id="mult-{{.ID}}" name="auto_multiplier" type="number" min="{{$.MinAutoMultiplier}}"
+                           max="{{$.MaxAutoMultiplier}}" step="0.1" value="{{.AutoMultiplier}}">
+                    <p class="muted">Computed limit: <strong>{{.MaxText}}</strong> messages /
+                    {{$.L1Window}}&nbsp;s (level-1 window). Zero traffic keeps auto inactive until
+                    messages are sent.{{if .AutoUpdated}} Last recalculated {{.AutoUpdated}}.{{end}}
+                    Peak {{.Stats.PeakPerHour}} msg/h shown for comparison.</p>
+                  </div>
                 </form>
-                <!-- Saving and removing the limit are two posts; the Save
-                     button is bound by form= id so both buttons share a row. -->
                 <div class="panel-buttons">
                   <button type="submit" form="rl-{{.ID}}">Save limit</button>
+                  {{if .IsAuto}}
+                  <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit/recalc">
+                    <button type="submit">Recalculate now</button>
+                  </form>
+                  {{end}}
                   {{if .HasLimit}}
                   <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
                         data-confirm="Remove the rate limit for {{.Login}}? The domain limit (or level 1) will apply.">
@@ -365,23 +408,44 @@
       <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
       <div class="check-col-fields">
         <form id="rl-domain" method="post" action="/domains/{{.Domain.ID}}/ratelimit">
-          <div class="field-pair">
-            <div>
-              <label for="d_max">Message limit (max {{.L1Messages}})</label>
-              <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
-                     value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
+          <label for="d_mode">Limit mode</label>
+          <select id="d_mode" name="mode" data-ratelimit-mode>
+            <option value="manual" {{if not .DomainRLAuto}}selected{{end}}>Manual</option>
+            <option value="auto" {{if .DomainRLAuto}}selected{{end}}>Auto (from statistics)</option>
+          </select>
+          <div data-manual-fields>
+            <div class="field-pair">
+              <div>
+                <label for="d_max">Message limit (max {{.L1Messages}})</label>
+                <input id="d_max" name="max_messages" type="number" min="1" max="{{.L1Messages}}"
+                       value="{{.DomainRLMax}}" placeholder="{{.L1Messages}}">
+              </div>
+              <div>
+                <label for="d_win">Window (seconds)</label>
+                <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+              </div>
             </div>
-            <div>
-              <label for="d_win">Window (seconds)</label>
-              <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
-            </div>
+            <p class="muted">Applies to every client IP on this domain. Leave the
+              message limit empty to use level&nbsp;1 only.</p>
           </div>
-          <p class="muted">Applies to every client IP on this domain. Leave the
-            message limit empty to use level&nbsp;1 only.</p>
+          <div data-auto-fields>
+            <label for="d_mult">Multiplier ({{.MinAutoMultiplier}}–{{.MaxAutoMultiplier}}, default {{.DefaultAutoMultiplier}})</label>
+            <input id="d_mult" name="auto_multiplier" type="number" min="{{.MinAutoMultiplier}}"
+                   max="{{.MaxAutoMultiplier}}" step="0.1" value="{{.DomainRLMultiplier}}">
+            <p class="muted">Computed limit: <strong>{{.DomainRLMax}}</strong> messages /
+            {{.L1Window}}&nbsp;s (level-1 window). Zero traffic keeps auto inactive until
+            messages are sent.{{if .DomainRLAutoUpdated}} Last recalculated {{.DomainRLAutoUpdated}}.{{end}}
+            Peak {{.DomainStats.PeakPerHour}} msg/h shown for comparison.</p>
+          </div>
         </form>
       </div>
       <div class="check-col-actions">
         <button type="submit" form="rl-domain">Save limit</button>
+        {{if .DomainRLAuto}}
+        <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit/recalc">
+          <button type="submit">Recalculate now</button>
+        </form>
+        {{end}}
         {{if .DomainHasRL}}
         <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
               data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">

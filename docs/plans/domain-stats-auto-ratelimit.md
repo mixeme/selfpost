@@ -1,6 +1,6 @@
 # Plan: domain-stats-auto-ratelimit
 
-**Status:** candidate  
+**Status:** done — shipped in `[1.6.0]` (2026-08-18); security review (Fable) pending  
 **Date:** 2026-08-17  
 **Version:** `1.x` MINOR; migrations must stay compatible with `1.0.0`.
 
@@ -192,14 +192,14 @@ Target version cut: **`1.6.0`** (MINOR). One commit per step; code only after
 roadmap status is **agreed**. See [development.md](../development.md) § Plan
 checklists.
 
-- [ ] Migration `0006_rate_limit_auto.sql` (`mode`, `auto_multiplier`, `auto_updated_at`) — **Opus**
-- [ ] `internal/store/stats.go`: total / peak / avg over 30 days — **Opus**
-- [ ] Auto recalc job (6h): `ceil(avg × multiplier)`, L1 cap, fail-open on error — **Opus**
-- [ ] Extend `RateLimit` + handler forms (manual/auto) — **Opus**
-- [ ] Domain page stats card + per-app stats (`domain_detail.html`) — **Sonnet**
-- [ ] Domain export JSON includes rate limits — **Opus**
-- [ ] Milter tests — enforced limit matches stored ceiling — **Opus**
-- [ ] Store and handler tests — **Sonnet**
-- [ ] [guide.md](../guide.md) — **Sonnet**
-- [ ] Security review rate-limit path — **Fable**
-- [ ] `go vet`, `go test` on touched packages — **Haiku**
+- [x] Migration `0007_rate_limit_auto.sql` (`mode`, `auto_multiplier`, `auto_updated_at`) — **Opus**
+- [x] `internal/store/stats.go`: total / peak / avg over 30 days — **Opus**
+- [x] Auto recalc job (6h): `ceil(avg × multiplier)`, L1 cap, fail-open on error — **Opus**
+- [x] Extend `RateLimit` + handler forms (manual/auto) — **Opus**
+- [x] Domain page stats card + per-app stats (`domain_detail.html`) — **Sonnet**
+- [x] Domain export JSON includes rate limits — **Opus**
+- [x] Milter tests — enforced limit matches stored ceiling — **Opus**
+- [x] Store and handler tests — **Sonnet**
+- [x] [guide.md](../guide.md) — **Sonnet**
+- [ ] Security review rate-limit path — **Fable** (pending post-release)
+- [x] `go vet`, `go test` on touched packages — **Haiku**

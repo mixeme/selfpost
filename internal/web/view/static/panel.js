@@ -62,6 +62,16 @@
       visible: function (el) { return el.value === el.dataset.customMode; }
     },
     {
+      match: "select[data-ratelimit-mode]",
+      target: "[data-manual-fields]",
+      visible: function (el) { return el.value === "manual"; }
+    },
+    {
+      match: "select[data-ratelimit-mode]",
+      target: "[data-auto-fields]",
+      visible: function (el) { return el.value === "auto"; }
+    },
+    {
       match: "select[data-global-role]",
       target: "[data-domain-pick]",
       visible: function (el) { return el.value !== el.dataset.globalRole; }

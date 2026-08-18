@@ -43,6 +43,11 @@ var pollInterval = time.Second
 // startup). It is a var so tests can shorten it.
 var retentionInterval = 6 * time.Hour
 
+// RetentionInterval returns how often background send-log pruning runs.
+func RetentionInterval() time.Duration {
+	return retentionInterval
+}
+
 // queueIDs lists the messages Postfix currently holds, for the reconcile sweep.
 // It is a var so tests can answer without a running Postfix.
 var queueIDs = postfix.QueueIDs

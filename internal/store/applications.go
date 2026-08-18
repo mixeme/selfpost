@@ -163,6 +163,25 @@ func (s *Store) GetApplication(id int64) (Application, error) {
 	return a, nil
 }
 
+// GetApplicationByLogin returns one application by its globally unique SASL login.
+func (s *Store) GetApplicationByLogin(login string) (Application, error) {
+	row := s.db.QueryRow(
+		"SELECT id, domain_id, login, address_mode, created_at FROM applications WHERE login = ?", login)
+	a, err := scanApplication(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Application{}, ErrApplicationNotFound
+	}
+	if err != nil {
+		return Application{}, err
+	}
+	addrs, err := s.applicationAddresses(a.ID)
+	if err != nil {
+		return Application{}, err
+	}
+	a.Addresses = addrs
+	return a, nil
+}
+
 // ListApplicationsByDomain returns a domain's applications ordered by login,
 // each with its address list populated (product.md).
 func (s *Store) ListApplicationsByDomain(domainID int64) ([]Application, error) {

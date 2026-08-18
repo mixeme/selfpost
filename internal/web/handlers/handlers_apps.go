@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
@@ -43,10 +44,22 @@ type detailView struct {
 // template fields (Login, AddressMode, Addresses, ID) resolve unchanged.
 type appRateLimitView struct {
 	store.Application
-	HasLimit  bool   // an active limit is configured
-	IPsText   string // allowed IPs, newline-joined for the textarea
-	MaxText   string // message ceiling, blank when unset
-	WindowVal string // window seconds, defaulted when unset
+	HasLimit       bool
+	IPsText        string
+	MaxText        string
+	WindowVal      string
+	Mode           string
+	AutoMultiplier string
+	AutoUpdated    string
+	IsAuto         bool
+	Stats          sendStatsView
+}
+
+// sendStatsView is the template-facing send statistics block.
+type sendStatsView struct {
+	Total       int64
+	PeakPerHour int64
+	AvgPerHour  string
 }
 
 // HandleDomainDetail shows a single domain: its DKIM DNS record (product.md)
@@ -77,6 +90,7 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		return
 	}
 	appViews := make([]appRateLimitView, 0, len(apps))
+	retention := h.sendLogRetentionDays()
 	for _, a := range apps {
 		rl, ok, err := h.apps.RateLimit(a.ID)
 		if err != nil {
@@ -84,12 +98,31 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		appStats, err := h.store.AppSendStats(a.Login, retention, a.CreatedAt)
+		if err != nil {
+			logf("panel: application %d: send stats: %v", a.ID, err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		mode := store.RateLimitModeManual
+		if ok && rl.Mode != "" {
+			mode = rl.Mode
+		}
+		mult := rl.AutoMultiplier
+		if mult <= 0 {
+			mult = store.DefaultAutoMultiplier
+		}
 		appViews = append(appViews, appRateLimitView{
-			Application: a,
-			HasLimit:    ok && rl.Active(),
-			IPsText:     strings.Join(rl.AllowedIPs, "\n"),
-			MaxText:     intOrBlank(rl.MaxMessages),
-			WindowVal:   windowOrDefault(rl.WindowSeconds),
+			Application:    a,
+			HasLimit:       ok && rl.Active(),
+			IPsText:        strings.Join(rl.AllowedIPs, "\n"),
+			MaxText:        intOrBlank(rl.MaxMessages),
+			WindowVal:      windowOrDefault(rl.WindowSeconds),
+			Mode:           mode,
+			AutoMultiplier: formatMultiplier(mult),
+			IsAuto:         ok && rl.IsAuto(),
+			AutoUpdated:    formatAutoUpdated(rl.AutoUpdatedAt),
+			Stats:          formatSendStats(appStats),
 		})
 	}
 
@@ -98,6 +131,22 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		logf("panel: domain %d: rate limit: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	domainStats, err := h.store.DomainSendStats(d.Name, retention, d.CreatedAt)
+	if err != nil {
+		logf("panel: domain %d: send stats: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	domainMode := store.RateLimitModeManual
+	domainMult := store.DefaultAutoMultiplier
+	if domainRLok {
+		if domainRL.Mode != "" {
+			domainMode = domainRL.Mode
+		}
+		if domainRL.AutoMultiplier > 0 {
+			domainMult = domainRL.AutoMultiplier
+		}
 	}
 
 	// What DNS actually publishes for the domain today, checked against the key
@@ -168,8 +217,18 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	data["DomainRLMax"] = intOrBlank(domainRL.MaxMessages)
 	data["DomainRLWin"] = windowOrDefault(domainRL.WindowSeconds)
 	data["DomainRLMaxNum"] = domainRL.MaxMessages
+	data["DomainRLMode"] = domainMode
+	data["DomainRLAuto"] = domainRLok && domainRL.IsAuto()
+	data["DomainRLMultiplier"] = formatMultiplier(domainMult)
+	data["DomainRLAutoUpdated"] = formatAutoUpdated(domainRL.AutoUpdatedAt)
+	data["DomainStats"] = formatSendStats(domainStats)
+	data["StatsWindowDays"] = domainStats.WindowDays
+	data["StatsRetentionWarning"] = retention < store.StatsWindowDays
 	data["L1Messages"] = h.l1Messages()
 	data["L1Window"] = h.l1Window()
+	data["DefaultAutoMultiplier"] = store.DefaultAutoMultiplier
+	data["MinAutoMultiplier"] = store.MinAutoMultiplier
+	data["MaxAutoMultiplier"] = store.MaxAutoMultiplier
 	h.view.Render(w, status, "domain_detail", data)
 }
 
@@ -232,6 +291,25 @@ func windowOrDefault(n int) string {
 	return strconv.Itoa(n)
 }
 
+func formatSendStats(s store.SendStats) sendStatsView {
+	return sendStatsView{
+		Total:       s.Total,
+		PeakPerHour: s.PeakPerHour,
+		AvgPerHour:  fmt.Sprintf("%.1f", s.AvgPerHour),
+	}
+}
+
+func formatMultiplier(v float64) string {
+	return strconv.FormatFloat(v, 'f', 1, 64)
+}
+
+func formatAutoUpdated(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02 15:04 UTC")
+}
+
 // detailFlash maps a fixed redirect flag to a fixed message, so status text
 // after a redirect is never attacker-influenced.
 func detailFlash(r *http.Request) string {
@@ -242,6 +320,8 @@ func detailFlash(r *http.Request) string {
 		return "Application address mode updated."
 	case r.URL.Query().Get("ratelimit") != "":
 		return "Rate limit updated."
+	case r.URL.Query().Get("recalculated") != "":
+		return "Auto rate limit recalculated."
 	case r.URL.Query().Get("dmarc") != "":
 		return "DMARC report settings updated."
 	case r.URL.Query().Get("imported") != "":

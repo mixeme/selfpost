@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -182,5 +183,94 @@ func TestRateLimitActiveAndAllowsIP(t *testing.T) {
 	}
 	if appActive.AllowsIP("198.51.100.7") || appActive.AllowsIP("not-an-ip") || appActive.AllowsIP("") {
 		t.Fatalf("unregistered/invalid IPs must not match")
+	}
+}
+
+func TestAutoRateLimitRecalc(t *testing.T) {
+	st := openTestStore(t)
+	d, _ := st.AddDomain("example.com", "selfpost")
+	a, _ := st.AddApplication(d.ID, "app1", AddressModeWildcard, nil)
+
+	for i := 0; i < 10; i++ {
+		if err := st.InsertQueued(SendLogEntry{
+			QueueID: fmt.Sprintf("Q%d", i), Domain: "example.com", AppLogin: "app1", To: "t@x.net",
+		}); err != nil {
+			t.Fatalf("InsertQueued: %v", err)
+		}
+	}
+
+	if err := st.SetRateLimit(RateLimit{
+		Scope: RateLimitScopeDomain, RefID: d.ID, Mode: RateLimitModeAuto,
+		AutoMultiplier: 2.0, WindowSeconds: 3600,
+	}); err != nil {
+		t.Fatalf("SetRateLimit domain: %v", err)
+	}
+	if err := st.RecalcAutoRateLimit(RateLimitScopeDomain, d.ID, 90, 100, 3600); err != nil {
+		t.Fatalf("RecalcAutoRateLimit domain: %v", err)
+	}
+	rl, ok, err := st.GetRateLimit(RateLimitScopeDomain, d.ID)
+	if err != nil || !ok {
+		t.Fatalf("GetRateLimit: ok=%v err=%v", ok, err)
+	}
+	if !rl.Active() || rl.MaxMessages > 100 {
+		t.Fatalf("domain auto limit = %+v", rl)
+	}
+	if rl.WindowSeconds != 3600 {
+		t.Fatalf("window = %d, want 3600", rl.WindowSeconds)
+	}
+
+	// Domain limit at ceiling; app auto must be strictly above or inactive at L1.
+	_ = st.SetRateLimit(RateLimit{
+		Scope: RateLimitScopeDomain, RefID: d.ID, Mode: RateLimitModeManual,
+		MaxMessages: 100, WindowSeconds: 3600,
+	})
+	if err := st.SetRateLimit(RateLimit{
+		Scope: RateLimitScopeApp, RefID: a.ID, Mode: RateLimitModeAuto,
+		AllowedIPs: []string{"203.0.113.1"}, AutoMultiplier: 2.0,
+	}); err != nil {
+		t.Fatalf("SetRateLimit app: %v", err)
+	}
+	if err := st.RecalcAutoRateLimit(RateLimitScopeApp, a.ID, 90, 100, 3600); err != nil {
+		t.Fatalf("RecalcAutoRateLimit app: %v", err)
+	}
+	appRL, ok, _ := st.GetRateLimit(RateLimitScopeApp, a.ID)
+	if ok && appRL.Active() {
+		t.Fatalf("app auto at L1 cap with domain at L1 should be inactive: %+v", appRL)
+	}
+
+	_ = st.SetRateLimit(RateLimit{
+		Scope: RateLimitScopeDomain, RefID: d.ID, Mode: RateLimitModeManual,
+		MaxMessages: 40, WindowSeconds: 3600,
+	})
+	if err := st.RecalcAutoRateLimit(RateLimitScopeApp, a.ID, 90, 100, 3600); err != nil {
+		t.Fatalf("RecalcAutoRateLimit app: %v", err)
+	}
+	appRL, ok, _ = st.GetRateLimit(RateLimitScopeApp, a.ID)
+	if !ok || !appRL.Active() || appRL.MaxMessages <= 40 {
+		t.Fatalf("app auto should be above domain 40: %+v", appRL)
+	}
+
+	// Milter reads the stored ceiling via RateLimit(name/login).
+	milterRL, ok, err := st.RateLimit(RateLimitScopeDomain, "example.com")
+	if err != nil || !ok || milterRL.MaxMessages != 40 {
+		t.Fatalf("milter domain limit = %+v ok=%v err=%v", milterRL, ok, err)
+	}
+}
+
+func TestAutoRateLimitZeroTrafficInactive(t *testing.T) {
+	st := openTestStore(t)
+	d, _ := st.AddDomain("quiet.com", "selfpost")
+	if err := st.SetRateLimit(RateLimit{
+		Scope: RateLimitScopeDomain, RefID: d.ID, Mode: RateLimitModeAuto,
+		AutoMultiplier: 2.5,
+	}); err != nil {
+		t.Fatalf("SetRateLimit: %v", err)
+	}
+	if err := st.RecalcAutoRateLimit(RateLimitScopeDomain, d.ID, 90, 100, 3600); err != nil {
+		t.Fatalf("RecalcAutoRateLimit: %v", err)
+	}
+	rl, ok, _ := st.GetRateLimit(RateLimitScopeDomain, d.ID)
+	if ok && rl.Active() {
+		t.Fatalf("zero traffic auto should be inactive: %+v", rl)
 	}
 }
