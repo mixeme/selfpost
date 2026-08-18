@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- [guide.md](docs/guide.md): full-backup section documents all four capture
+  methods (panel, `selfpost-backup`, stopped `tar` of the project directory,
+  stopped `tar` of `./data` only), warns against `tar` on a live container, and
+  compares downtime, archive contents, and restore behaviour in a table.
+
 ## [1.8.0] - 2026-08-18
 
 Built-in operator documentation in the panel: a CSS-only help drawer and Help
