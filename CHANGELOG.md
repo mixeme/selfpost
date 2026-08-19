@@ -12,6 +12,10 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Added
 
+- Roadmap item and plan for `/preflight` installation check page
+  ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
+  infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
+  DKIM socket, test email). Status: candidate.
 - SQLite migration `0010_send_log_app_login_index.sql` —
   `idx_send_log_app_login_created_at`. The journal-milter counts an
   application's messages on every `MAIL FROM`, and the domain page computes

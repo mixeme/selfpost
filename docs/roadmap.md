@@ -28,6 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
+| preflight | Installation check page (`/preflight`) | candidate | — | [plans/preflight.md](plans/preflight.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | agreed | 1/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
@@ -134,6 +135,30 @@ size; malware in held MIME; overlap with
 yet.
 
 **Version:** TBD; `candidate` until explicitly agreed.
+
+---
+
+## preflight
+
+**Goal:** a `/preflight` page (global-admin only) that verifies instance-level
+infrastructure: rDNS/PTR, TLS certificate + hostname match, port 25/465/587
+reachability, HELO banner correctness, reverse-proxy headers, DKIM milter
+socket, and a test-email sender. Each check shows an actionable fix
+recommendation on failure.
+
+**Boundary:** instance infrastructure only; per-domain DNS checks remain on
+domain detail pages. Does not track test-email delivery beyond local MTA
+acceptance.
+
+**Done when:** the page loads, all checks run with traffic-light results and
+recommendations, and the test-email form successfully submits a message through
+Postfix.
+
+**Dependencies / risks:** port-connectivity check may not reflect external
+reachability behind NAT without hairpin; test email needs at least one domain or
+falls back to `postmaster@SELFPOST_HOSTNAME`.
+
+**Version:** `1.x` MINOR; `candidate`.
 
 ---
 
