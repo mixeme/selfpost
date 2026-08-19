@@ -148,7 +148,10 @@ deferred item from the roadmap.
   (see the ADR below). A token would not save the panel from XSS inside it
   either: code executing in the panel's origin sends the request itself —
   against that, `html/template` auto-escaping and CSP do the work, which is why
-  templates must contain no inline scripts and no inline styles.
+  templates must contain no inline scripts and no inline styles. Tracked as
+  [csrf-tokens](roadmap.md#csrf-tokens): implementing that item replaces this
+  bullet and the ADR below, and dropping it leaves them as the single record of
+  the decision. The two must not disagree.
 - **Destructive-action confirmation (`data-confirm`) is JavaScript-only.**
   Delete, regenerate-password, and clear-rate-limit forms carry a
   `data-confirm` prompt handled entirely in

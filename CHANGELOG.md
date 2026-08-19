@@ -10,13 +10,13 @@ milter chain, DMARC reports are validated before they are stored, and the auto
 rate limit is correct for a non-default level-1 window. Schema migration
 `0010` (index only). Upgrading is a tag bump.
 
+A full-tree code review on 2026-08-19 (architecture, code quality, security,
+GUI, tests, documentation, AGPL compliance; 38 findings) produced most of what
+follows. Its four open items live in [roadmap.md](docs/roadmap.md); its working
+document is not part of the release.
+
 ### Added
 
-- Code review plan (`docs/plans/code-review-2026-08.md`) — full codebase audit
-  covering architecture, code quality, security, GUI, tests, documentation, and
-  AGPL compliance. 38 findings across 11 categories with a prioritised
-  implementation plan in 6 phases, and a status table recording what was
-  implemented, what was already in place, and what was declined.
 - Roadmap item and plan for `/preflight` installation check page
   ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
   infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
@@ -109,8 +109,11 @@ rate limit is correct for a non-default level-1 window. Schema migration
   `template-data-typing`, `structured-logging`, and
   `review-2026-08-followups` for the small remainder (backup re-auth, the
   missing service/handler/error-page tests, and nine minor findings that were
-  never in the phase tables). The review plan's status table links each row to
-  its roadmap item; the one declined finding is marked as declined in both.
+  never carried into the review's own phase tables). Each roadmap row stands on
+  its own — file, symptom, and what "done" means — and the declined finding
+  (`//go:build linux` for the `/proc` reader) is recorded as declined so it is
+  not raised again. The review's working document is gone from `docs/plans/`
+  now that nothing depends on it; git history keeps it.
 - Extracted `internal/configsafe` — the empty-value and forbidden-character
   check every generated config file shares. Each writer keeps its own forbidden
   set next to the file it protects (an OpenDKIM table and a Postfix map break on

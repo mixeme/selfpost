@@ -218,7 +218,9 @@ flowchart LR
 
 ## Dependencies
 
-- [inbound-relay.md](inbound-relay.md) (shipped).
+- Inbound relay, shipped in `[1.4.0]` — as built in
+  [architecture.md](../architecture.md) § Mail path. Its plan file was removed
+  once it shipped.
 
 ## Model routing (this plan)
 

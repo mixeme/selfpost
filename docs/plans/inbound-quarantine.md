@@ -43,7 +43,8 @@ attack/backup surface — closer to "mini-mailbox" than pure relay.
 
 ## Context (as-built)
 
-- Inbound relay forwards or rejects; no local delivery ([inbound-relay.md](inbound-relay.md)).
+- Inbound relay forwards or rejects; no local delivery
+  ([architecture.md](../architecture.md) § Mail path).
 - Optional `INBOUND_ANTISPAM_MILTER` — external rspamd may quarantine on its
   own today, without panel integration.
 - DMARC `p=quarantine` is unrelated (outbound policy for receivers).
@@ -56,7 +57,8 @@ attack/backup surface — closer to "mini-mailbox" than pure relay.
 
 ## Dependencies
 
-- [inbound-relay.md](inbound-relay.md) (shipped).
+- Inbound relay, shipped in `[1.4.0]` — as built in
+  [architecture.md](../architecture.md) § Mail path.
 - Sensible to decide **after** or **alongside**
   [inbound-antispam-panel.md](inbound-antispam-panel.md) (journal/lists), but
   not blocked on it for design discussion.

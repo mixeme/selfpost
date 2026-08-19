@@ -35,7 +35,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | csrf-tokens | Per-session CSRF tokens on state-changing forms | candidate | — | — |
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
-| review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | [plans/code-review-2026-08.md](plans/code-review-2026-08.md) |
+| review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): the next feature is
@@ -46,13 +46,14 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
 `[1.3.0]`. Candidates need explicit agreement before they join the queue.
 
-The 2026-08-19 code review ([plans/code-review-2026-08.md](plans/code-review-2026-08.md))
-is closed except for four items, all listed above and none of them urgent:
-[csrf-tokens](#csrf-tokens), [template-data-typing](#template-data-typing),
+The 2026-08-19 full-tree code review is closed except for four items, all
+listed above and none of them urgent: [csrf-tokens](#csrf-tokens),
+[template-data-typing](#template-data-typing),
 [structured-logging](#structured-logging) and
 [review-2026-08-followups](#review-2026-08-followups). What that review
-already produced is in [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]`; the
-per-task status table is at the end of its plan file.
+produced is in [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]`; its own document
+was removed once these four items carried everything still open, and stays in
+git history.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -178,24 +179,27 @@ falls back to `postmaster@SELFPOST_HOSTNAME`.
 ## csrf-tokens
 
 **Goal:** a per-session CSRF token on every state-changing form, checked
-server-side in addition to the `Sec-Fetch-Site` / `Origin` checks the panel
-relies on today.
+server-side in addition to the `Sec-Fetch-Site` / `Origin` check the panel
+relies on today (`originAllowed` in
+[internal/web/security.go](../internal/web/security.go)).
 
-**Boundary:** defence in depth, not a replacement — the header checks stay and
-keep covering requests that carry no form. The token is bound to the existing
+**Boundary:** defence in depth, not a replacement — the header check stays and
+keeps covering requests that carry no form. The token is bound to the existing
 session record; no new session model, no cookie changes.
 
 **Done when:** every POST form and htmx fragment that changes state carries a
 token, a missing or mismatched token is refused with a test that proves it, and
-[security.md](security.md) describes the layered model instead of arguing that
-the header checks alone are sufficient.
+[security.md](security.md) describes the layered model in one place instead of
+two.
 
-**Dependencies / risks:** the current documented decision in
-[security.md](security.md) is that header checks suffice; this item exists
-because the 2026-08-19 review recorded the opposite decision without ever
-turning it into a task (§4.4). Confirm which of the two stands before writing
-code — the honest outcomes are "implement tokens" or "keep headers and say so
-in one place only". Token plumbing through htmx swaps is where the work is.
+**Dependencies / risks:** [security.md](security.md) currently records the
+opposite decision — origin checking without tokens, with the accepted risk and
+its revisit triggers written out in the ADR § *CSRF via origin checking*. The
+2026-08-19 review recorded "add tokens" without turning it into a task, which is
+why this item exists. Settle which decision stands before writing code; both
+outcomes are honest, and "keep headers" means deleting this item rather than
+leaving the contradiction standing. The work itself is a hidden field in roughly
+two dozen forms plus the htmx swap paths.
 
 **Version:** `1.x` MINOR; `candidate`.
 
@@ -203,22 +207,26 @@ in one place only". Token plumbing through htmx swaps is where the work is.
 
 ## template-data-typing
 
-**Goal:** replace `map[string]any` template payloads in `internal/web/handlers`
-with typed structs (`DomainDetailData`, `SettingsData`, …), so a renamed or
-mistyped key is a compile error instead of a silently empty page section.
+**Goal:** replace the `map[string]any` template payloads in
+`internal/web/handlers` with typed structs (`DomainDetailData`, `SettingsData`,
+...), so a renamed or mistyped key is a compile error instead of a silently
+empty page section.
 
 **Boundary:** handler-to-template plumbing only; no template redesign, no route
-or behaviour change. `renderDomainDetail` (~40 keys) is the worst case and the
-one that motivates the item.
+or behaviour change. `renderDomainDetail`
+([handlers_apps.go](../internal/web/handlers/handlers_apps.go)) sets around
+forty keys on one map and is the case that motivates the item; roughly ten
+render sites still pass maps.
 
 **Done when:** the page handlers pass structs, the shared footer/base fields
-still arrive on every page, and the template guard tests pass unchanged.
+(`Version`, `Copyright`, `SourceURL`) still arrive on every page, and the
+template guard tests pass unchanged.
 
 **Dependencies / risks:** mechanical but wide — it touches every
-`handlers_*.go` and every template that reads those keys; a missed key is
-invisible unless a test renders that page. Worth pairing with the handler
-tests in [review-2026-08-followups](#review-2026-08-followups) so the pages
-are covered before they are rewired. Review estimate: 2–3 hours (§7.1).
+`handlers_*.go` and every template that reads those keys, and a missed key is
+invisible unless a test renders that page. Worth pairing with the handler tests
+in [review-2026-08-followups](#review-2026-08-followups) so the pages are
+covered before they are rewired. Reviewer's estimate: 2–3 hours.
 
 **Version:** no bearing on semver; `candidate`.
 
@@ -227,20 +235,20 @@ are covered before they are rewired. Review estimate: 2–3 hours (§7.1).
 ## structured-logging
 
 **Goal:** move from `log.Printf` to `log/slog` — levels, structured fields, and
-one logger injected through constructors instead of a package-level `logf` in
-five packages (§5.5, §7.2).
+one logger injected through constructors, instead of the package-level
+`logf = log.Printf` alias repeated in five packages.
 
-**Boundary:** internal logging only. The log destination stays stdout/stderr
-under supervisord; no log shipping, no new dependency, and the operator-visible
-lines the Status page and the log tailer parse must keep parsing.
+**Boundary:** internal logging only. The destination stays stdout/stderr under
+supervisord; no log shipping, no new dependency. Lines the panel's own Status
+page and log tailer depend on must keep parsing.
 
-**Done when:** packages take a `*slog.Logger`, the per-package `logf = log.Printf`
-aliases are gone, levels are used deliberately (an error is not an info), and
-the panel's own journal/log-tailer expectations still hold.
+**Done when:** packages take a `*slog.Logger`, the per-package `logf` aliases
+are gone, and levels are used deliberately (an error is not an info).
 
-**Dependencies / risks:** the log tailer reads Postfix's log, not the panel's,
-so the risk is contained — but anything that greps the panel's output (e2e,
-operator habits) sees a new format. Review estimate: 3–4 hours (§7.2).
+**Dependencies / risks:** the log tailer reads Postfix's log rather than the
+panel's, so the blast radius is small — but anything that greps the panel's
+output (e2e assertions, operator habits) sees a new format. Reviewer's
+estimate: 3–4 hours.
 
 **Version:** no bearing on semver; `candidate`.
 
@@ -248,39 +256,39 @@ operator habits) sees a new format. Review estimate: 3–4 hours (§7.2).
 
 ## review-2026-08-followups
 
-**Goal:** the leftovers of the 2026-08-19 code review that are too small to be
-roadmap items of their own. The full findings and the per-task status table are
-in [plans/code-review-2026-08.md](plans/code-review-2026-08.md).
+**Goal:** the leftovers of the 2026-08-19 full-tree code review that are too
+small to be roadmap items of their own. Everything still open from that review
+is in the table below; the rest of it shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[Unreleased]`.
 
-| § | Item |
+| Area | Item |
 |---|---|
-| §4.7 | Re-authenticate (current password) before a backup download |
-| §9.2 | Tests for the DMARC service layer (`service.go`, `addresses.go`) |
-| §9.2 | Tests for the apps / domains / users / dmarc handlers |
-| §9.4 | Tests: error page templates, corrupted backup archive, delivery-log pagination edges |
-| §9.3 | Thin spots: `store/stats_test` zero-traffic case, concurrent store operations |
-| §6.1 | `secretfile` accepts an empty password at library level — guard or document |
-| §6.2 | Log-rotation fingerprint collision in `logtail/offset.go` — include the inode |
-| §6.4 | `parsePage` does not clamp to `lastPage` |
-| §7.4 | `dnscheck` resolver fans out four parallel queries instead of falling back — decide or document |
-| §8.6 | `dev/workflow.md` still names an outdated base version |
-| §10.3 | `.pair` vs `.split`: two class names for one layout |
-| §10.4 | Two `back_link` elements in `dmarc_domain.html` |
-| §10.5 | `initShowWhen` is not re-run after an htmx swap (safe today, fragile) |
+| Security | Re-authenticate (ask for the current password) before a backup download — [handlers_backup.go](../internal/web/handlers/handlers_backup.go) hands the archive to any signed-in session |
+| Tests | The `internal/dmarc` service layer (`service.go`, `addresses.go`) has no tests |
+| Tests | No direct tests for the apps / domains / users / dmarc handlers; `authz_test` covers them only indirectly |
+| Tests | Nothing covers error page templates, a corrupted backup archive, malformed or oversized DMARC XML, delivery-log pagination edges, concurrent store operations, or zero-traffic `store` stats |
+| Edge case | `internal/secretfile` accepts an empty password at library level — guard it, or state that validation is the caller's job |
+| Edge case | The log fingerprint in [logtail/offset.go](../internal/logtail/offset.go) can collide across a rotation — include the inode |
+| Edge case | `parsePage` in [handlers_monitor.go](../internal/web/handlers/handlers_monitor.go) does not clamp to `lastPage` |
+| Edge case | [dnscheck/resolver.go](../internal/dnscheck/resolver.go) fans out four parallel queries where a fallback chain would do — change it or write down why not |
+| UI | `.pair` (DMARC templates) and `.split` (every other page) are two names for one layout |
+| UI | Two `back_link` elements in a row in `dmarc_domain.html` |
+| UI | `initShowWhen` is not re-run after an htmx swap — safe today (no form arrives that way), fragile if one ever does |
 
 **Boundary:** no feature work and no behaviour change an operator would notice,
 apart from the backup re-auth prompt. Anything here that grows past an hour
 becomes its own roadmap item instead.
 
-**Done when:** each row is either implemented or struck with a written reason,
-and the status table in the plan file says which.
+**Done when:** each row is either implemented or struck with a written reason.
 
 **Dependencies / risks:** the test rows overlap
-[template-data-typing](#template-data-typing) — write the handler tests first
-if both are taken up. §7.3 (build tags for the `/proc` reader) was **declined**
-during the review pass and is deliberately absent: that code is parameterised by
-root, has no platform-specific calls, already degrades gracefully without
-`/proc`, and tagging it `linux` would only delete cross-platform test coverage.
+[template-data-typing](#template-data-typing) — write the handler tests first if
+both are taken up. One finding of that review was **declined** and is
+deliberately absent: `//go:build linux` for the `/proc` reader in
+[internal/health/machine.go](../internal/health/machine.go). That code is
+parameterised by root directory, calls nothing platform-specific, already
+degrades gracefully when `/proc` is missing (`TestMachineSamplerWithoutProc`),
+and tagging it would only delete cross-platform test coverage.
 
 **Version:** no bearing on semver; `candidate`.
 
