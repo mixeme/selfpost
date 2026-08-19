@@ -10,9 +10,14 @@ login in the `saslpasswd2` argv
 2026-08-13 full-tree review against this document — send-log authorization for
 domain administrators, the atomic level-2 admit (`tryAdmit`), fail-closed
 session creation, and application-delete ordering: no findings, and nothing
-needed adding to the accepted risks. The inbound-relay path (port 25, maps,
-panel) is described under Mail path below and is **not yet** in that review
-history — it awaits a separate Fable pass before 1.4.0. (2) **Accepted risks** —
+needed adding to the accepted risks. The 2026-08-19 review (Fable) covered the
+whole diff from 1.3.0 (`7052395`) to HEAD past 1.9.1 — the inbound-relay path
+(port 25, maps, panel), DMARC aggregate-report ingestion, automatic rate
+limiting, application auth-IP allow-lists, and the new panel surface
+(handlers, templates, settings): no exploitable findings; two deliberate
+behaviours the pass examined are now recorded under Accepted risks
+(unauthenticated DMARC ingest, fail-open auth-IP enforcement).
+(2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
 
@@ -178,6 +183,27 @@ deferred item from the roadmap.
   until the tailer has read the log to the end, and touches nothing if
   `postqueue` is unreadable. See [architecture.md](architecture.md) § Log
   tailer.
+- **DMARC aggregate reports are accepted without authentication.** Anyone on
+  the internet can mail a fabricated report (or displace a genuine one — the
+  `UNIQUE(reporter, report_id, domain)` upsert is delete-then-insert) and skew
+  the alignment statistics the panel shows. Inherent to how `rua` works:
+  reporters are arbitrary third parties and the mailbox address is published in
+  DNS. The ingest already constrains the meaningful part — a report cannot be
+  filed under a domain this instance does not host, and the claimed domain is
+  cross-checked against the `+tag` of the delivery address — and the data is
+  advisory statistics only; nothing enforces off it. The trigger to revisit is
+  any feature that lets report contents drive an automatic action (policy
+  changes, rate limiting, alerting an operator into a config change).
+- **The application auth-IP allow-list is enforced fail-open.** The check runs
+  in the journal milter (`internal/milter/authip.go`) with
+  `default_action=accept` and skips on store errors, so if the milter is down
+  the restriction is not applied; the SASL login itself always succeeds. This
+  is documented in [guide.md](guide.md) as **not an authentication boundary** —
+  it is a blast-radius limiter for a leaked application password, on the same
+  fail-open path as level-2 rate limiting, and a milter outage already stops
+  the journal from recording sends at all. The trigger to revisit is a
+  requirement for the allow-list to hold as a security boundary — at which
+  point it must move to the SASL/smtpd layer and fail closed.
 - **Access to `mail.log` from the unprivileged panel.** The `/data/log`
   directory is `2750 postfix:selfpost` and the file is `0640`: `postlogd` (user
   `postfix`) writes, the panel reads through the shared `selfpost` group, and
