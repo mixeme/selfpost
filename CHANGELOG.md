@@ -103,6 +103,14 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Changed
 
+- [roadmap.md](docs/roadmap.md) now carries everything the 2026-08-19 code
+  review left unimplemented, so no finding lives only in a plan file:
+  `csrf-tokens` (the recorded §4.4 decision that never became a task),
+  `template-data-typing`, `structured-logging`, and
+  `review-2026-08-followups` for the small remainder (backup re-auth, the
+  missing service/handler/error-page tests, and nine minor findings that were
+  never in the phase tables). The review plan's status table links each row to
+  its roadmap item; the one declined finding is marked as declined in both.
 - Extracted `internal/configsafe` — the empty-value and forbidden-character
   check every generated config file shares. Each writer keeps its own forbidden
   set next to the file it protects (an OpenDKIM table and a Postfix map break on
@@ -414,7 +422,7 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
 - docs: agreed roadmap item **queue-retries** — show this Postfix's retry
   policy (first delay, backoff cap, queue lifetime) on Mail queue and on a
   delivery's history, reading `postconf -h` once at panel start so a manual
-  override is visible. Plan: [docs/plans/queue-retries.md](docs/plans/queue-retries.md).
+  override is visible. Plan: `docs/plans/queue-retries.md` (removed once shipped).
   Explanation only; no attempt counter and no panel knobs. Not yet
   implemented.
 
@@ -606,7 +614,7 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   RBAC in the doc-alignment pass above). Corrected stale
   `admin.dmarc_report_email` references in
   [roadmap.md](docs/roadmap.md) and
-  [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
+  `docs/plans/dmarc-reports.md` (removed once shipped) to the setting's
   actual home after migration `0005`. No behaviour change.
 
 - panel: code-review P6 cleanup — the unused `auth.RequireGlobal` middleware is
