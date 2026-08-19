@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mixeme/selfpost/internal/configsafe"
 	"github.com/mixeme/selfpost/internal/supervisor"
 )
 
@@ -202,18 +203,23 @@ func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTab
 	return []byte(kt.String()), []byte(st.String()), nil
 }
 
+// opendkimForbidden is what may never appear in a KeyTable or SigningTable
+// value: whitespace and the newline that would end the line, and the colon and
+// path separators that carry meaning inside a table entry.
+const opendkimForbidden = " \t\r\n:/\\"
+
 // assertConfigSafe rejects any domain/selector value that could break out of a
 // single table line. Domains are already whitelisted to [a-z0-9.-] and selectors
 // to a similar set before they reach here (security.md); this is defence in depth
 // against a validation gap ever letting whitespace, a newline or a field
 // separator through into a config file (security.md).
 func assertConfigSafe(domainName, selector string) error {
-	for _, v := range []string{domainName, selector} {
-		if v == "" {
-			return fmt.Errorf("opendkim: empty domain or selector")
-		}
-		if strings.ContainsAny(v, " \t\r\n:/\\") {
-			return fmt.Errorf("opendkim: unsafe character in %q", v)
+	for _, f := range []struct{ what, value string }{
+		{"domain", domainName},
+		{"selector", selector},
+	} {
+		if err := configsafe.Token(f.what, f.value, opendkimForbidden); err != nil {
+			return fmt.Errorf("opendkim: %w", err)
 		}
 	}
 	return nil

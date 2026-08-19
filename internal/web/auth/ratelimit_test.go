@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -121,5 +122,55 @@ func TestRateLimiterCapsBucketCount(t *testing.T) {
 	defer r.mu.Unlock()
 	if len(r.buckets) > 3 {
 		t.Fatalf("bucket count = %d, want at most 3", len(r.buckets))
+	}
+}
+
+// A flood of new addresses must not be able to reset the limiter for an address
+// that is already blocked: below the hard ceiling, blocked buckets survive
+// eviction even though the map is over its soft cap.
+func TestRateLimiterKeepsBlockedBucketsUnderPressure(t *testing.T) {
+	r := newRateLimiter(2, time.Minute)
+	r.maxBuckets = 3
+
+	blocked := []string{"203.0.113.7", "198.51.100.9", "192.0.2.5"}
+	for _, key := range blocked {
+		for i := 0; i < 2; i++ {
+			if !r.Allow(key) {
+				t.Fatalf("%s refused before reaching the limit", key)
+			}
+		}
+		if r.Allow(key) {
+			t.Fatalf("%s was not blocked after 2 attempts", key)
+		}
+	}
+
+	// Fresh addresses arrive and find nothing evictable.
+	for i := 0; i < 10; i++ {
+		r.Allow(fmt.Sprintf("198.51.100.%d", 100+i))
+	}
+
+	for _, key := range blocked {
+		if r.Allow(key) {
+			t.Fatalf("%s lost its block after new addresses arrived", key)
+		}
+	}
+}
+
+// Protecting blocked buckets is bounded: past maxBuckets * blockedBucketCeiling
+// they are evicted too, so an attacker cannot grow the map without limit by
+// burning through source addresses.
+func TestRateLimiterBoundsBlockedBuckets(t *testing.T) {
+	r := newRateLimiter(1, time.Minute)
+	r.maxBuckets = 2
+	hardCap := r.maxBuckets * blockedBucketCeiling
+
+	for i := 0; i < 100; i++ {
+		r.Allow(fmt.Sprintf("192.0.2.%d", i))
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.buckets) > hardCap {
+		t.Fatalf("bucket count = %d, want at most the hard cap %d", len(r.buckets), hardCap)
 	}
 }

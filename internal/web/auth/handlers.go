@@ -15,6 +15,13 @@ const (
 	sessionCookiePrefixed = "__Host-" + sessionCookieBase
 )
 
+// BcryptCost is the work factor for every panel password hash — the setup
+// account created here and the ones the settings and user pages write
+// (security.md). bcrypt records the cost inside the hash, so raising it only
+// affects passwords set from now on; existing hashes keep verifying at the
+// cost they were written with.
+const BcryptCost = 12
+
 func (m *Module) sessionCookie() string {
 	if m.cfg.CookieSecure {
 		return sessionCookiePrefixed
@@ -219,7 +226,7 @@ func (m *Module) submitSetup(w http.ResponseWriter, r *http.Request, token strin
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
 	if err != nil {
 		logf("panel: setup: hashing password failed: %v", err)
 		m.renderSetupForm(w, http.StatusInternalServerError, token, "Internal error. Please try again.")

@@ -1,6 +1,6 @@
-# nginx vhost for the SelfPost panel (spec 10.3). Proxies HTTPS to the panel
-# over the compose network; mail (465/587) is published directly by the
-# selfpost container and never touches nginx.
+# nginx vhost for the SelfPost panel. Proxies HTTPS to the panel over the
+# compose network; mail (465/587) is published directly by the selfpost
+# container and never touches nginx.
 
 server {
 	listen 80;

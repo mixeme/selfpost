@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/configsafe"
 )
 
 // InboundRoute is one inbound domain's Postfix map material: the relay
@@ -115,13 +117,15 @@ func assertInboundRouteSafe(r InboundRoute) error {
 	return nil
 }
 
+// texthashForbidden is what may never appear in a texthash line: whitespace and
+// the newline that would end it, the comma that separates values, and the
+// backslash.
+const texthashForbidden = " \t\r\n,\\"
+
 // assertMapToken rejects values that could break out of a texthash line.
 func assertMapToken(v, what string) error {
-	if v == "" {
-		return fmt.Errorf("postfix: empty %s", what)
-	}
-	if strings.ContainsAny(v, " \t\r\n,\\") {
-		return fmt.Errorf("postfix: unsafe character in %s %q", what, v)
+	if err := configsafe.Token(what, v, texthashForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
 	return nil
 }

@@ -98,14 +98,6 @@ func parseRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
 	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
 }
 
-func parseDomainRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
-	return parseRateLimitForm(r, l1Max)
-}
-
-func parseAppRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
-	return parseRateLimitForm(r, l1Max)
-}
-
 func parseAppAuthIPsForm(r *http.Request) (bool, []string, error) {
 	if err := r.ParseForm(); err != nil {
 		return false, nil, fmt.Errorf("invalid form submission")

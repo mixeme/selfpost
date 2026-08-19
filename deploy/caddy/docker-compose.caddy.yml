@@ -1,10 +1,10 @@
 
-# Alternative reverse-proxy: Caddy (spec 10.3) — the simplest option, fully
-# automatic ACME with no separate certbot container. Caddy writes certificates
-# as plain PEM under its own data directory, which this fragment bind-mounts
-# to the host so SelfPost can read the same files.
+# Alternative reverse-proxy: Caddy — the simplest option, fully automatic ACME
+# with no separate certbot container. Caddy writes certificates as plain PEM
+# under its own data directory, which this fragment bind-mounts to the host so
+# SelfPost can read the same files.
 #
-# NOTE (spec 10.3 explicitly flags this): Caddy's on-disk cert path includes
+# NOTE: Caddy's on-disk cert path includes
 # the ACME CA's name as a path segment, e.g.
 #   <data>/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>/<hostname>.crt
 # This has been stable across recent Caddy releases but is an internal

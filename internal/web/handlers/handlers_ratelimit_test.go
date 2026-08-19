@@ -8,7 +8,9 @@ import (
 	"testing"
 )
 
-func TestParseDomainRateLimitForm(t *testing.T) {
+// Domain and application limits are parsed by the same function; the form
+// fields and the level-1 backstop are identical for both scopes.
+func TestParseRateLimitForm(t *testing.T) {
 	t.Parallel()
 	form := func(vals url.Values) *http.Request {
 		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(vals.Encode()))
@@ -16,7 +18,7 @@ func TestParseDomainRateLimitForm(t *testing.T) {
 		return r
 	}
 
-	in, err := parseDomainRateLimitForm(form(url.Values{
+	in, err := parseRateLimitForm(form(url.Values{
 		"mode":           {"manual"},
 		"max_messages":   {"50"},
 		"window_seconds": {"3600"},
@@ -25,44 +27,12 @@ func TestParseDomainRateLimitForm(t *testing.T) {
 		t.Fatalf("valid domain = %+v err=%v", in, err)
 	}
 
-	in, err = parseDomainRateLimitForm(form(url.Values{"max_messages": {""}}), 100)
+	in, err = parseRateLimitForm(form(url.Values{"max_messages": {""}}), 100)
 	if err != nil || !in.clear {
 		t.Fatalf("empty max should clear: %+v err=%v", in, err)
 	}
 
-	_, err = parseDomainRateLimitForm(form(url.Values{
-		"mode":           {"manual"},
-		"max_messages":   {"150"},
-		"window_seconds": {"3600"},
-	}), 100)
-	if err == nil || !strings.Contains(err.Error(), "level-1") {
-		t.Fatalf("over L1 want error, got %v", err)
-	}
-}
-
-func TestParseAppRateLimitForm(t *testing.T) {
-	t.Parallel()
-	form := func(vals url.Values) *http.Request {
-		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(vals.Encode()))
-		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		return r
-	}
-
-	in, err := parseAppRateLimitForm(form(url.Values{
-		"mode":           {"manual"},
-		"max_messages":   {"80"},
-		"window_seconds": {"3600"},
-	}), 100)
-	if err != nil || in.maxMessages != 80 {
-		t.Fatalf("valid app limit = %+v err=%v", in, err)
-	}
-
-	in, err = parseAppRateLimitForm(form(url.Values{"max_messages": {""}}), 100)
-	if err != nil || !in.clear {
-		t.Fatalf("empty max should clear: %+v err=%v", in, err)
-	}
-
-	_, err = parseAppRateLimitForm(form(url.Values{
+	_, err = parseRateLimitForm(form(url.Values{
 		"mode":           {"manual"},
 		"max_messages":   {"150"},
 		"window_seconds": {"3600"},
@@ -99,21 +69,21 @@ func TestParseAppAuthIPsForm(t *testing.T) {
 	}
 }
 
-func TestParseDomainRateLimitFormAuto(t *testing.T) {
+func TestParseRateLimitFormAuto(t *testing.T) {
 	t.Parallel()
 	form := func(vals url.Values) *http.Request {
 		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(vals.Encode()))
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		return r
 	}
-	in, err := parseDomainRateLimitForm(form(url.Values{
+	in, err := parseRateLimitForm(form(url.Values{
 		"mode":            {"auto"},
 		"auto_multiplier": {"2.5"},
 	}), 100)
 	if err != nil || in.mode != "auto" || in.autoMultiplier != 2.5 {
 		t.Fatalf("auto domain = %+v err=%v", in, err)
 	}
-	_, err = parseDomainRateLimitForm(form(url.Values{
+	_, err = parseRateLimitForm(form(url.Values{
 		"mode":            {"auto"},
 		"auto_multiplier": {"10"},
 	}), 100)

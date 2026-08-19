@@ -15,16 +15,8 @@ rate limit is correct for a non-default level-1 window. Schema migration
 - Code review plan (`docs/plans/code-review-2026-08.md`) — full codebase audit
   covering architecture, code quality, security, GUI, tests, documentation, and
   AGPL compliance. 38 findings across 11 categories with a prioritised
-  implementation plan in 6 phases.
-
-### Removed
-
-- Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
-  `dmarc-reports`, `inbound-relay`, `panel-docs`, `queue-retries`,
-  `send-log-retention`. Only unimplemented plans remain in `docs/plans/`.
-
-### Added
-
+  implementation plan in 6 phases, and a status table recording what was
+  implemented, what was already in place, and what was declined.
 - Roadmap item and plan for `/preflight` installation check page
   ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
   infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
@@ -46,6 +38,21 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Fixed
 
+- The setup account's password is hashed at bcrypt cost `12` like every other
+  panel password; it was still being written at `bcrypt.DefaultCost` (10). The
+  work factor now has one definition, `auth.BcryptCost`. bcrypt records the
+  cost in the hash, so existing passwords keep verifying unchanged.
+- Login/setup rate limiter: protecting blocked buckets from eviction is now
+  bounded. Blocked buckets are still never evicted to make room, but past
+  `maxBuckets × 4` they are evicted too (nearest expiry first) — otherwise an
+  attacker with many source addresses could grow the bucket map without limit
+  by making each address fail its way to blocked. The overflow is logged at
+  most once per window.
+- `postqueue -p` output is bounded to 4 MiB (the timeout alone left the size of
+  the listing, and therefore the panel's allocation, up to the queue).
+- [schema-migrations.md](docs/schema-migrations.md): the schema section was
+  still headed `v9` while the chain head is `v10`, and three links pointed at
+  plan files deleted when those features shipped.
 - postqueue reader is now time-bounded: `postqueue -p` runs under a 5-second
   context timeout so a stuck queue command cannot hang the queue panel path
   indefinitely.
@@ -96,6 +103,18 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Changed
 
+- Extracted `internal/configsafe` — the empty-value and forbidden-character
+  check every generated config file shares. Each writer keeps its own forbidden
+  set next to the file it protects (an OpenDKIM table and a Postfix map break on
+  different characters); only the check itself is shared.
+- Build, deploy and migration comments no longer cite the archived
+  specification. The `spec N` references CHANGELOG `[0.5.0]` said were gone
+  survived in `build/`, `deploy/`, the first two migrations and the release
+  workflow; they are removed and the affected comment paragraphs re-wrapped.
+  Comments only — no build or configuration behaviour changes.
+- Dropped the `parseDomainRateLimitForm` / `parseAppRateLimitForm` pass-through
+  wrappers left behind when the two parsers were merged: nothing but their own
+  tests still called them.
 - Extracted shared helpers: `internal/atomicfile` (atomic temp-write+rename) and
   `internal/supervisor` (supervisorctl start/signal wrappers), and reused them in
   domain/postfix code paths.
@@ -129,6 +148,12 @@ rate limit is correct for a non-default level-1 window. Schema migration
   closed at `[1.8.0]`, next item inbound-antispam-panel); [development.md](docs/development.md)
   version-cut table through `1.9.1`; [schema-migrations.md](docs/schema-migrations.md)
   last-updated note. No behaviour change.
+
+### Removed
+
+- Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
+  `dmarc-reports`, `inbound-relay`, `panel-docs`, `queue-retries`,
+  `send-log-retention`. Only unimplemented plans remain in `docs/plans/`.
 
 ## [1.9.1] - 2026-08-19
 

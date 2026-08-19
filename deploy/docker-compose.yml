@@ -1,12 +1,12 @@
 
-# SelfPost — default deployment, reverse-proxy = Apache (spec 10, 10.5).
+# SelfPost — default deployment, reverse-proxy = Apache.
 #
-# This file only runs SelfPost itself. Apache is assumed to already be
-# installed on the HOST (the target audience for this project typically runs
-# Apache there already — spec 10.5) and reverse-proxies HTTPS for the panel;
-# it is not containerised here. See ../apache/selfpost-vhost.conf for a ready
-# vhost fragment, and docs/guide.md "Reverse proxy" for the
-# certbot steps that produce the PEM files this compose file mounts.
+# This file only runs SelfPost itself. Apache is assumed to already be installed
+# on the HOST (the target audience for this project typically runs Apache there
+# already) and reverse-proxies HTTPS for the panel; it is not containerised
+# here. See ../apache/selfpost-vhost.conf for a ready vhost fragment, and
+# docs/guide.md "Reverse proxy" for the certbot steps that produce the PEM files
+# this compose file mounts.
 #
 # Usage:
 #   1. Copy this file (and .env.example as .env) next to your own ./data and
@@ -15,10 +15,9 @@
 #      TLS paths are fixed in this file to match that bind mount, not .env.
 #   3. docker compose up -d
 #
-# The image tag below is FIXED on purpose (spec 10 p.10, 7.5.A): backup
-# restore compares the manifest version against the running binary's version,
-# so ":latest" would make that check meaningless. Bump the tag deliberately
-# when you want to upgrade.
+# The image tag below is FIXED on purpose: backup restore compares the manifest
+# version against the running binary's version, so ":latest" would make that
+# check meaningless. Bump the tag deliberately when you want to upgrade.
 
 services:
   selfpost:
@@ -27,11 +26,11 @@ services:
     environment:
       SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"
       # Path Postfix reads inside the container — matches the certs bind mount
-      # below. Point these at your reverse-proxy's PEM output (spec 10 p.2).
+      # below. Point these at your reverse-proxy's PEM output.
       TLS_CERT_FILE: /etc/postfix/tls/fullchain.pem
       TLS_KEY_FILE: /etc/postfix/tls/privkey.pem
-      # Set to true to also publish RFC 6409 submission (587/STARTTLS)
-      # alongside the primary 465/smtps listener (spec 5).
+      # Set to true to also publish RFC 6409 submission (587/STARTTLS) alongside
+      # the primary 465/smtps listener.
       SUBMISSION_ENABLE: "${SUBMISSION_ENABLE:-false}"
       INBOUND_RELAY_ENABLE: "${INBOUND_RELAY_ENABLE:-false}"
       DMARC_REPORTS_ENABLE: "${DMARC_REPORTS_ENABLE:-false}"
@@ -41,14 +40,14 @@ services:
       INBOUND_ANTISPAM_MILTER_ACTION: "${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
       INBOUND_RATE_LIMIT_MESSAGES_PER_IP: "${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}"
       INBOUND_MESSAGE_SIZE_LIMIT: "${INBOUND_MESSAGE_SIZE_LIMIT:-26214400}"
-      # Level-1 backstop rate limit (anvil, spec 5.5, 7.4); per-domain/app
-      # limits (level 2) are configured later from the panel itself.
+      # Level-1 backstop rate limit (anvil); per-domain/app limits (level 2) are
+      # configured later from the panel itself.
       RATE_LIMIT_MESSAGES_PER_IP: "${RATE_LIMIT_MESSAGES_PER_IP:-100}"
       RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-3600}"
       # How long the send log keeps rows before the background sweep deletes
-      # them (spec 7.3, 9) — the main driver of /data growth over time.
+      # them — the main driver of /data growth over time.
       SEND_LOG_RETENTION_DAYS: "${SEND_LOG_RETENTION_DAYS:-90}"
-      # Sliding idle timeout for the panel login session, in days (spec 7.6.6).
+      # Sliding idle timeout for the panel login session, in days.
       PANEL_SESSION_IDLE_DAYS: "${PANEL_SESSION_IDLE_DAYS:-7}"
       # Resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly, so they
       # report what the internet sees rather than what this host's own stub
@@ -59,27 +58,27 @@ services:
       # client spoof its rate-limit key.
       TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:-}"
     volumes:
-      # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
-      # sasldb2, sender map, setup token. Back this up (panel button or the
-      # selfpost-backup CLI) before you touch it directly.
-      # Postfix's mail.log is here too (./data/log, rotated daily, 14 files
-      # kept) so the delivery lines that resolve a queued send-log row survive
-      # a container recreate; it is diagnostics and is left out of backups.
+      # All persistent state lives under /data: SQLite DB, DKIM keys, sasldb2,
+      # sender map, setup token. Back this up (panel button or the
+      # selfpost-backup CLI) before you touch it directly. Postfix's mail.log is
+      # here too (./data/log, rotated daily, 14 files kept) so the delivery
+      # lines that resolve a queued send-log row survive a container recreate;
+      # it is diagnostics and is left out of backups.
       - ./data:/data
       # Read-only project root for full backups: docker-compose.yml, .env, and
       # certs/ are archived alongside /data (architecture.md § Persistence).
       - .:/selfpost-deploy:ro
-      # Read-only: SelfPost only ever reads certificates, never manages them
-      # (spec 10 p.2). Point this at wherever your reverse-proxy/certbot
-      # writes PEM files, e.g. /etc/letsencrypt on the host.
+      # Read-only: SelfPost only ever reads certificates, never manages them.
+      # Point this at wherever your reverse-proxy/certbot writes PEM files, e.g.
+      # /etc/letsencrypt on the host.
       - ./certs:/etc/postfix/tls:ro
     ports:
       # 465 (smtps, primary) and optionally 587 (submission/STARTTLS) are
-      # published directly — mail traffic bypasses Apache entirely, it only
-      # ever proxies the panel's HTTP(S) (spec 10 p.2-3). The panel itself
-      # (8080) is intentionally NOT published here: Apache reaches it over
-      # the host network at 127.0.0.1:8080 (see the vhost fragment), so the
-      # panel is never directly reachable from the internet without TLS.
+      # published directly — mail traffic bypasses Apache entirely, it only ever
+      # proxies the panel's HTTP(S). The panel itself (8080) is intentionally
+      # NOT published here: Apache reaches it over the host network at
+      # 127.0.0.1:8080 (see the vhost fragment), so the panel is never directly
+      # reachable from the internet without TLS.
       - "465:465"
       # 587 is mapped even when SUBMISSION_ENABLE=false; Postfix listens only
       # when the variable is true — see docs/guide.md "Published ports".
@@ -88,7 +87,7 @@ services:
       # when the variable is true.
       - "25:25"
       - "127.0.0.1:8080:8080"
-    # Hardening (spec 10 p.6). SelfPost's entrypoint still needs to run as
+    # Hardening. SelfPost's entrypoint still needs to run as
     # root very briefly to fix /data ownership and normalise permissions
     # under the shared `selfpost` group (see build/entrypoint.sh) before
     # supervisord drops the panel to an unprivileged user — so this cannot be

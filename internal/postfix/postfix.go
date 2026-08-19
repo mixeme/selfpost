@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mixeme/selfpost/internal/configsafe"
 	"github.com/mixeme/selfpost/internal/supervisor"
 )
 
@@ -123,6 +124,15 @@ func appendUnique(list []string, v string) []string {
 	return append(list, v)
 }
 
+// What may never reach a sender-map line: whitespace and the newline that would
+// end it, the comma that separates values, the colon a lookup key cannot carry,
+// and the backslash. A login additionally may not carry "@" — that would make it
+// look like an address.
+const (
+	senderMapAddressForbidden = " \t\r\n,:\\"
+	senderMapLoginForbidden   = " \t\r\n,:@\\"
+)
+
 // assertMapSafe rejects any address/login value that could break out of a single
 // map line or inject a directive. Addresses are validated to a strict whitelist
 // (letters, digits, '@', '.', '-', '_', '+') and logins to an even stricter one
@@ -130,14 +140,11 @@ func appendUnique(list []string, v string) []string {
 // letting whitespace, a newline or a comma (the value separator) through into
 // the file (security.md).
 func assertMapSafe(address, login string) error {
-	if address == "" || login == "" {
-		return fmt.Errorf("postfix: empty address or login")
+	if err := configsafe.Token("address", address, senderMapAddressForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
-	if strings.ContainsAny(address, " \t\r\n,:\\") {
-		return fmt.Errorf("postfix: unsafe character in address %q", address)
-	}
-	if strings.ContainsAny(login, " \t\r\n,:@\\") {
-		return fmt.Errorf("postfix: unsafe character in login %q", login)
+	if err := configsafe.Token("login", login, senderMapLoginForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
 	return nil
 }

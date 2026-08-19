@@ -9,14 +9,14 @@ set -e
 
 # SELFPOST_HOSTNAME is an identity, not a setting with a safe default: it must
 # simultaneously match the PTR/rDNS record, the certificate CN/SAN, and the
-# Cyrus SASL realm (spec 5.2 p.3, 8). The panel (main.go saslRealm()) and
-# postfix-config.sh each fall back independently when it's unset — to
-# `localhost` and to the container hostname respectively — so accounts get
-# written under one realm and looked up under another and authentication
-# silently fails for every application, while HELO also stops matching the
-# PTR record and mail that does go out lands in spam. No fallback can be
-# correct, so fail loudly here, before either side of that split has a chance
-# to run, rather than leave a green panel with broken mail.
+# Cyrus SASL realm. The panel (main.go saslRealm()) and postfix-config.sh each
+# fall back independently when it's unset — to `localhost` and to the container
+# hostname respectively — so accounts get written under one realm and looked up
+# under another and authentication silently fails for every application, while
+# HELO also stops matching the PTR record and mail that does go out lands in
+# spam. No fallback can be correct, so fail loudly here, before either side of
+# that split has a chance to run, rather than leave a green panel with broken
+# mail.
 if [ -z "$SELFPOST_HOSTNAME" ]; then
 	cat >&2 <<'EOF'
 FATAL: SELFPOST_HOSTNAME is not set.
@@ -52,11 +52,11 @@ case "$SELFPOST_HOSTNAME" in
 		;;
 esac
 
-# The persistent root /data is a host bind mount (spec 9), so it arrives owned
-# by the host user (typically root), not by the unprivileged panel user that
-# actually writes the SQLite database, setup token and DKIM keys (spec 7.6.8).
-# Fix its ownership here — the one place still running as root — before handing
-# off to supervisord, which starts the panel as the panel user.
+# The persistent root /data is a host bind mount, so it arrives owned by the
+# host user (typically root), not by the unprivileged panel user that actually
+# writes the SQLite database, setup token and DKIM keys. Fix its ownership here
+# — the one place still running as root — before handing off to supervisord,
+# which starts the panel as the panel user.
 #
 # Mode must stay world-traversable (0755): OpenDKIM and Postfix reach their
 # trees under /data as other users. Go's testing.TempDir is 0700, and a bare
@@ -71,7 +71,7 @@ chmod 755 /data
 # normalised on its own below.
 find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log ! -name postfix -exec chown -R panel:panel {} +
 
-# DKIM key tree (spec 6, 9). The panel (user `panel`) generates keys and writes
+# DKIM key tree. The panel (user `panel`) generates keys and writes
 # the OpenDKIM tables; OpenDKIM (user `opendkim`) must read them. Normalise the
 # tree on every start so it is correct whether /data is fresh, restarted, or
 # just restored from a backup:
@@ -89,7 +89,7 @@ find /data/opendkim -type d -exec chmod 2750 {} +
 chmod 0640 /data/opendkim/KeyTable /data/opendkim/SigningTable
 find /data/opendkim/keys -type f -name '*.private' -exec chmod 0640 {} +
 
-# Application SASL accounts (spec 5.1, 9). The panel (user `panel`) writes the
+# Application SASL accounts. The panel (user `panel`) writes the
 # sasldb2 via saslpasswd2; Postfix (user `postfix`) reads it to authenticate SMTP
 # clients. Share it through the `selfpost` group the same way as the DKIM tree:
 # setgid directory so new files inherit the group, and the database itself
@@ -99,8 +99,8 @@ chown -R panel:selfpost /data/sasl
 chmod 2750 /data/sasl
 [ -e /data/sasl/sasldb2 ] && chmod 0640 /data/sasl/sasldb2
 
-# Postfix state under /data (spec 5.1, architecture.md § Persistence). The panel
-# writes sender_login_maps; Postfix owns the on-disk queue tree under queue/.
+# Postfix state under /data (architecture.md § Persistence). The panel writes
+# sender_login_maps; Postfix owns the on-disk queue tree under queue/.
 mkdir -p /data/postfix/queue
 [ -e /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
 # Inbound relay maps (written by the panel when INBOUND_RELAY_ENABLE=true).
@@ -132,14 +132,14 @@ chown -R postfix:selfpost /data/log
 chmod 2750 /data/log
 find /data/log -type f -exec chmod 0640 {} +
 
-# Milter socket directories (spec 5 p.3, 7.3). Postfix (user `postfix`) must
-# actually CONNECT to both milter sockets — OpenDKIM's and the panel's
-# journal-milter — not just probe them at start-up. The sockets are
-# created by the opendkim and panel users respectively, so bridge them to
-# `postfix` through the shared `selfpost` group: group-owned + setgid dirs mean
-# each socket created inside inherits group `selfpost`, and group-traversable
-# (2750) lets postfix reach it. Without this, smtpd cannot talk to OpenDKIM and,
-# because signing is strict (default_action=tempfail), rejects all mail.
+# Milter socket directories. Postfix (user `postfix`) must actually CONNECT to
+# both milter sockets — OpenDKIM's and the panel's journal-milter — not just
+# probe them at start-up. The sockets are created by the opendkim and panel
+# users respectively, so bridge them to `postfix` through the shared `selfpost`
+# group: group-owned + setgid dirs mean each socket created inside inherits
+# group `selfpost`, and group-traversable (2750) lets postfix reach it. Without
+# this, smtpd cannot talk to OpenDKIM and, because signing is strict
+# (default_action=tempfail), rejects all mail.
 mkdir -p /run/opendkim /run/selfpost
 chown opendkim:selfpost /run/opendkim
 chown panel:selfpost /run/selfpost

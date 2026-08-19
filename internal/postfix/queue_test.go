@@ -41,3 +41,34 @@ func TestParseQueueIDsOnAnEmptyQueue(t *testing.T) {
 		t.Errorf("got %v, want no ids", ids)
 	}
 }
+
+// The queue listing is held in memory and rendered into a page, so a very large
+// queue must not size the panel's allocation: the writer keeps the cap and
+// reports the rest as dropped, while still accepting every write so postqueue
+// itself is never cut short.
+func TestLimitWriterCapsOutput(t *testing.T) {
+	w := &limitWriter{remaining: 8}
+	n, err := w.Write([]byte("12345"))
+	if n != 5 || err != nil {
+		t.Fatalf("first write = %d, %v", n, err)
+	}
+	if w.truncated {
+		t.Fatal("truncated before the cap was reached")
+	}
+	n, err = w.Write([]byte("67890"))
+	if n != 5 || err != nil {
+		t.Fatalf("second write = %d, %v", n, err)
+	}
+	if !w.truncated {
+		t.Fatal("write past the cap was not recorded as truncated")
+	}
+	if got := w.buf.String(); got != "12345678" {
+		t.Fatalf("kept %q, want the first 8 bytes", got)
+	}
+	if n, err := w.Write([]byte("more")); n != 4 || err != nil {
+		t.Fatalf("write after the cap = %d, %v (must still accept)", n, err)
+	}
+	if got := w.buf.String(); got != "12345678" {
+		t.Fatalf("buffer grew past the cap: %q", got)
+	}
+}

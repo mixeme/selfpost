@@ -1,9 +1,9 @@
 #!/bin/sh
-# Extracts a PEM cert/key pair for one domain out of Traefik's acme.json
-# (spec 10.3: "Traefik keeps certificates in acme.json, so a PEM extraction
-# step is required"). Run this on the host, after Traefik has issued or
-# renewed the certificate, and again on a schedule (cron/systemd timer) since
-# acme.json is not itself watched by SelfPost/Postfix.
+# Extracts a PEM cert/key pair for one domain out of Traefik's acme.json —
+# Traefik keeps its certificates there, so a PEM extraction step is required.
+# Run this on the host, after Traefik has issued or renewed the certificate, and
+# again on a schedule (cron/systemd timer) since acme.json is not itself watched
+# by SelfPost/Postfix.
 #
 # Requires jq. Usage: ./extract-cert.sh <acme.json path> <domain> <output dir>
 set -eu
