@@ -1,11 +1,15 @@
 package postfix
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
+
+const postqueueTimeout = 5 * time.Second
 
 // Queue returns Postfix's own human-readable mail-queue listing
 // (architecture.md § Panel HTTP surface): active, deferred and held messages,
@@ -14,8 +18,13 @@ import (
 // (security.md). The panel is responsible for escaping the output before
 // display (security.md); this function returns it as-is.
 func Queue() (string, error) {
-	cmd := exec.Command("postqueue", "-p")
+	ctx, cancel := context.WithTimeout(context.Background(), postqueueTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "postqueue", "-p")
 	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
+	}
 	if err != nil {
 		return "", fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(string(out)))
 	}

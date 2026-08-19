@@ -171,7 +171,7 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		logf("panel: create user hash: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Internal error. Please try again."})
@@ -240,7 +240,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: selected})
 			return
 		}
-		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
 			logf("panel: update user hash: %v", err)
 			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Internal error. Please try again.", FormUsername: username, FormRole: string(role), FormDomains: selected})

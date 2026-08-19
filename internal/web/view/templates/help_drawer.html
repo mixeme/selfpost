@@ -21,14 +21,14 @@
 {{end}}
 
 {{define "help_drawer"}}
-<label class="help-scrim" for="help-off"></label>
+<label class="help-scrim" for="help-off" role="button" aria-label="Close help"></label>
 <aside class="help-drawer">
-  <label class="help-close" for="help-off">Close</label>
+  <label class="help-close" for="help-off" role="button" aria-label="Close help">Close</label>
 
   <article class="help-pane help-pane-index">
     <h2>Help</h2>
     <p>Short notes for the card you opened — not a second copy of the
-    <a href="https://github.com/mixeme/selfpost/blob/main/docs/guide.md">operator guide</a>.</p>
+    <a href="{{.SourceURL}}/blob/main/docs/guide.md">operator guide</a>.</p>
     {{if .IsGlobal}}
     <p class="muted">Status</p>
     <ul class="toc"><li><label for="help-status">Status checks</label></li></ul>

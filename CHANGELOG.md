@@ -46,6 +46,9 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Fixed
 
+- postqueue reader is now time-bounded: `postqueue -p` runs under a 5-second
+  context timeout so a stuck queue command cannot hang the queue panel path
+  indefinitely.
 - DMARC panel layout classes now exist in
   `internal/web/view/static/panel.css` (`.pair`, `.attn`, `.desk-only`,
   `.phone-only`, `.phone-list`, `.check-row`), so desktop/mobile DMARC views and
@@ -57,6 +60,14 @@ rate limit is correct for a non-default level-1 window. Schema migration
   session sign-out when the password changed.
 - Login/setup rate-limiter bucket eviction now prefers the nearest-expiry bucket
   and does not evict currently blocked buckets.
+- Help page/drawer links now use `SourceURL` (`{{.SourceURL}}/blob/main/docs/...`)
+  instead of a hardcoded repository URL.
+- Help drawer close controls include accessibility attributes (`role="button"`,
+  `aria-label`) for the scrim and close action.
+- Password hashing now uses explicit bcrypt cost `12` in settings/user password
+  updates, instead of `bcrypt.DefaultCost`.
+- Test coverage expanded for DMARC map token injection rejection and email
+  validation edge cases (ASCII/local-part/domain/freemail cases).
 
 - **Port 25 no longer runs the submission milter chain.** `smtpd_milters` is
   now always overridden on `smtp/inet` — to the optional antispam milter, or

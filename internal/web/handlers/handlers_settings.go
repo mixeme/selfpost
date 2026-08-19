@@ -191,7 +191,7 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 
 	hash := user.PasswordHash
 	if repassword {
-		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
 			logf("panel: settings: hashing password failed: %v", err)
 			h.renderSettings(w, r, http.StatusInternalServerError,
