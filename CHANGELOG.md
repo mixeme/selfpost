@@ -46,6 +46,18 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Fixed
 
+- DMARC panel layout classes now exist in
+  `internal/web/view/static/panel.css` (`.pair`, `.attn`, `.desk-only`,
+  `.phone-only`, `.phone-list`, `.check-row`), so desktop/mobile DMARC views and
+  attention highlighting render as intended.
+- `dmarc-ingest` now bounds stdin with `io.LimitReader` (10 MiB) before parsing.
+- User-role update no longer contains a duplicate "last global admin" demotion
+  guard; one check now returns a context-specific message for self-demotion.
+- Settings flash text now reflects what actually changed and only mentions
+  session sign-out when the password changed.
+- Login/setup rate-limiter bucket eviction now prefers the nearest-expiry bucket
+  and does not evict currently blocked buckets.
+
 - **Port 25 no longer runs the submission milter chain.** `smtpd_milters` is
   now always overridden on `smtp/inet` — to the optional antispam milter, or
   to nothing. Previously, with `INBOUND_ANTISPAM_MILTER` unset, inbound mail
@@ -73,6 +85,11 @@ rate limit is correct for a non-default level-1 window. Schema migration
 
 ### Changed
 
+- Extracted shared helpers: `internal/atomicfile` (atomic temp-write+rename) and
+  `internal/supervisor` (supervisorctl start/signal wrappers), and reused them in
+  domain/postfix code paths.
+- `docs/roadmap.md`: shipped `panel-docs` now references CHANGELOG history
+  instead of a removed plan file.
 - [schema-migrations.md](docs/schema-migrations.md) notes that migration `0009`
   changed what the IP list *means* — permissive (those IPs got the application
   ceiling) before 1.9.0, restrictive (every other IP refused) after. Its

@@ -69,24 +69,34 @@ func (r *rateLimiter) makeRoom(now time.Time) {
 	}
 	r.sweep(now)
 	for len(r.buckets) >= r.maxBuckets {
-		r.evictOldest()
+		if !r.evictNearest() {
+			break
+		}
 	}
 }
 
-func (r *rateLimiter) evictOldest() {
-	var oldestKey string
-	var oldestEnds time.Time
+// evictNearest removes the bucket whose window ends soonest, skipping buckets
+// that are currently blocked (count >= max) so an attacker cannot flush active
+// rate-limit state by filling the map with new keys.
+func (r *rateLimiter) evictNearest() bool {
+	var bestKey string
+	var bestEnds time.Time
 	first := true
 	for k, b := range r.buckets {
-		if first || b.windowEnds.Before(oldestEnds) {
-			oldestKey = k
-			oldestEnds = b.windowEnds
+		if b.count >= r.max {
+			continue
+		}
+		if first || b.windowEnds.Before(bestEnds) {
+			bestKey = k
+			bestEnds = b.windowEnds
 			first = false
 		}
 	}
-	if oldestKey != "" {
-		delete(r.buckets, oldestKey)
+	if bestKey == "" {
+		return false
 	}
+	delete(r.buckets, bestKey)
+	return true
 }
 
 func (r *rateLimiter) sweep(now time.Time) {

@@ -7,10 +7,11 @@ package postfix
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/supervisor"
 )
 
 // Postfix manages the on-disk Postfix state the panel is responsible for. After
@@ -154,17 +155,5 @@ func assertMapSafe(address, login string) error {
 // Arguments are fixed literals — no user input is interpolated into the command,
 // and it never goes through a shell (security.md).
 func reloadViaSupervisor() error {
-	cmd := exec.Command("supervisorctl",
-		"-c", "/etc/supervisor/supervisord.conf",
-		"start", "postfix-reload")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// A reload already in flight is not a failure: that pending run reloads
-		// Postfix after our file is in place (the file is written before this).
-		if strings.Contains(string(out), "already started") {
-			return nil
-		}
-		return fmt.Errorf("reload postfix via supervisor: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	return supervisor.Start("postfix-reload")
 }

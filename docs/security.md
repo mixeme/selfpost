@@ -204,6 +204,15 @@ deferred item from the roadmap.
   the journal from recording sends at all. The trigger to revisit is a
   requirement for the allow-list to hold as a security boundary — at which
   point it must move to the SASL/smtpd layer and fail closed.
+- **Level-2 in-flight reservations can outlive a dropped SMTP session until TTL.**
+  The journal milter cannot observe connection-close directly through
+  go-milter, so if a client disconnects without an explicit `Abort`, its
+  in-memory reservation is released by TTL expiry, not immediately. The map is
+  bounded by key and TTL (currently 10 minutes), so the effect is temporary
+  over-counting on that app/domain key under churn. Accepted deliberately:
+  immediate cleanup would require protocol hooks the current milter interface
+  does not expose; the TTL bound keeps it finite. Trigger to revisit: sustained
+  high-volume false throttling attributable to orphaned reservations.
 - **Access to `mail.log` from the unprivileged panel.** The `/data/log`
   directory is `2750 postfix:selfpost` and the file is `0640`: `postlogd` (user
   `postfix`) writes, the panel reads through the shared `selfpost` group, and

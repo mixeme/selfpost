@@ -61,7 +61,7 @@ func parseRateLimitMode(raw string) (string, error) {
 	return raw, nil
 }
 
-func parseDomainRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
+func parseRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
 	if err := r.ParseForm(); err != nil {
 		return rateLimitInput{}, fmt.Errorf("invalid form submission")
 	}
@@ -98,42 +98,12 @@ func parseDomainRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error
 	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
 }
 
+func parseDomainRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
+	return parseRateLimitForm(r, l1Max)
+}
+
 func parseAppRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
-	if err := r.ParseForm(); err != nil {
-		return rateLimitInput{}, fmt.Errorf("invalid form submission")
-	}
-	if r.PostFormValue("clear") != "" {
-		return rateLimitInput{clear: true}, nil
-	}
-	mode, err := parseRateLimitMode(r.PostFormValue("mode"))
-	if err != nil {
-		return rateLimitInput{}, err
-	}
-
-	if mode == store.RateLimitModeAuto {
-		mult, err := parseAutoMultiplier(r.PostFormValue("auto_multiplier"))
-		if err != nil {
-			return rateLimitInput{}, err
-		}
-		return rateLimitInput{mode: mode, autoMultiplier: mult}, nil
-	}
-
-	rawMax := strings.TrimSpace(r.PostFormValue("max_messages"))
-	if rawMax == "" {
-		return rateLimitInput{clear: true}, nil
-	}
-	maxMessages, err := parsePositiveInt(rawMax, 0)
-	if err != nil || maxMessages <= 0 {
-		return rateLimitInput{}, fmt.Errorf("enter a message limit greater than zero")
-	}
-	if maxMessages > l1Max {
-		return rateLimitInput{}, fmt.Errorf("message limit cannot exceed the level-1 backstop (%d)", l1Max)
-	}
-	windowSeconds, err := parsePositiveInt(r.PostFormValue("window_seconds"), defaultRateLimitWindowSeconds)
-	if err != nil || windowSeconds <= 0 {
-		return rateLimitInput{}, fmt.Errorf("enter a time window greater than zero seconds")
-	}
-	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
+	return parseRateLimitForm(r, l1Max)
 }
 
 func parseAppAuthIPsForm(r *http.Request) (bool, []string, error) {
@@ -187,7 +157,7 @@ func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	in, err := parseDomainRateLimitForm(r, h.l1Messages())
+	in, err := parseRateLimitForm(r, h.l1Messages())
 	if err != nil {
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
@@ -195,7 +165,7 @@ func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request)
 		})
 		return
 	}
-	if err := h.applyDomainRateLimit(in, d.ID); err != nil {
+	if err := h.applyRateLimit(in, store.RateLimitScopeDomain, d.ID, h.domains); err != nil {
 		logf("panel: domain %d: save rate limit: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -213,7 +183,7 @@ func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	in, err := parseAppRateLimitForm(r, h.l1Messages())
+	in, err := parseRateLimitForm(r, h.l1Messages())
 	if err != nil {
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
@@ -221,7 +191,7 @@ func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if err := h.applyAppRateLimit(in, a.ID); err != nil {
+	if err := h.applyRateLimit(in, store.RateLimitScopeApp, a.ID, h.apps); err != nil {
 		logf("panel: application %d: save rate limit: %v", a.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -291,35 +261,18 @@ func (h *Handlers) recalcRateLimit(scope string, refID int64) error {
 	return h.store.RecalcAutoRateLimit(scope, refID, h.sendLogRetentionDays(), h.l1Messages(), h.l1Window())
 }
 
-func (h *Handlers) applyDomainRateLimit(in rateLimitInput, domainID int64) error {
-	if in.clear {
-		return h.domains.ClearRateLimit(domainID)
-	}
-	rl := store.RateLimit{
-		Scope:          store.RateLimitScopeDomain,
-		RefID:          domainID,
-		Mode:           in.mode,
-		MaxMessages:    in.maxMessages,
-		WindowSeconds:  in.windowSeconds,
-		AutoMultiplier: in.autoMultiplier,
-	}
-	if in.mode == store.RateLimitModeAuto {
-		rl.WindowSeconds = h.l1Window()
-		if err := h.domains.SaveRateLimit(domainID, rl); err != nil {
-			return err
-		}
-		return h.recalcRateLimit(store.RateLimitScopeDomain, domainID)
-	}
-	return h.domains.SaveRateLimit(domainID, rl)
+type rateLimitSaver interface {
+	ClearRateLimit(id int64) error
+	SaveRateLimit(id int64, rl store.RateLimit) error
 }
 
-func (h *Handlers) applyAppRateLimit(in rateLimitInput, appID int64) error {
+func (h *Handlers) applyRateLimit(in rateLimitInput, scope string, refID int64, saver rateLimitSaver) error {
 	if in.clear {
-		return h.apps.ClearRateLimit(appID)
+		return saver.ClearRateLimit(refID)
 	}
 	rl := store.RateLimit{
-		Scope:          store.RateLimitScopeApp,
-		RefID:          appID,
+		Scope:          scope,
+		RefID:          refID,
 		Mode:           in.mode,
 		MaxMessages:    in.maxMessages,
 		WindowSeconds:  in.windowSeconds,
@@ -327,10 +280,10 @@ func (h *Handlers) applyAppRateLimit(in rateLimitInput, appID int64) error {
 	}
 	if in.mode == store.RateLimitModeAuto {
 		rl.WindowSeconds = h.l1Window()
-		if err := h.apps.SaveRateLimit(appID, rl); err != nil {
+		if err := saver.SaveRateLimit(refID, rl); err != nil {
 			return err
 		}
-		return h.recalcRateLimit(store.RateLimitScopeApp, appID)
+		return h.recalcRateLimit(scope, refID)
 	}
-	return h.apps.SaveRateLimit(appID, rl)
+	return saver.SaveRateLimit(refID, rl)
 }

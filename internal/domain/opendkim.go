@@ -5,10 +5,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
-	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/supervisor"
 )
 
 // OpenDKIM manages the on-disk OpenDKIM state the panel is responsible for
@@ -191,7 +193,7 @@ func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTab
 		}
 		keyName := d.Name // one key per domain; the domain name is a fine handle
 		// Absolute key path so OpenDKIM resolves it independently of its CWD.
-		keyFile := filepath.Join(keysDir, d.Name, d.Selector+".private")
+		keyFile := path.Join(keysDir, d.Name, d.Selector+".private")
 		// KeyTable:     <key-name>  <domain>:<selector>:<key-path>
 		fmt.Fprintf(&kt, "%s %s:%s:%s\n", keyName, d.Name, d.Selector, keyFile)
 		// SigningTable (refile): <address-pattern>  <key-name>
@@ -226,12 +228,5 @@ func assertConfigSafe(domainName, selector string) error {
 // Arguments are fixed literals — no user input is interpolated into the command,
 // and it never goes through a shell (security.md).
 func reloadViaSupervisor() error {
-	cmd := exec.Command("supervisorctl",
-		"-c", "/etc/supervisor/supervisord.conf",
-		"signal", "USR1", "opendkim")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("reload opendkim via supervisor: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	return supervisor.Signal("USR1", "opendkim")
 }

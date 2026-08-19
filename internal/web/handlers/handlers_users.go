@@ -225,15 +225,11 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	if u.Role == store.RoleGlobal && role == store.RoleDomainAdmin {
 		n, err := h.store.CountGlobalUsers()
 		if err != nil || n <= 1 {
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Cannot demote the last global administrator.", FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
-			return
-		}
-	}
-
-	if u.ID == p.ID && u.Role == store.RoleGlobal && role == store.RoleDomainAdmin {
-		n, err := h.store.CountGlobalUsers()
-		if err != nil || n <= 1 {
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "You cannot demote yourself without another global administrator.", FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
+			msg := "Cannot demote the last global administrator."
+			if u.ID == p.ID {
+				msg = "You cannot demote yourself without another global administrator."
+			}
+			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
 			return
 		}
 	}

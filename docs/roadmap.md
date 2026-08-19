@@ -69,8 +69,9 @@ priority.
 
 ## panel-docs
 
-**Status:** done — shipped in `[1.8.0]` (2026-08-18). Plan:
-[plans/panel-docs.md](plans/panel-docs.md) (checklist complete).
+**Status:** done — shipped in `[1.8.0]` (2026-08-18). The implementation plan
+file was removed as shipped cleanup; release details remain in
+[CHANGELOG.md](../CHANGELOG.md).
 
 **Goal:** built-in operator documentation in the panel — short pages (or a
 help drawer) that explain what each Status check and other controls mean,

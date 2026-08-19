@@ -824,3 +824,39 @@ html:has(#help-export:checked) .help-pane-export { display: block; }
 @media (max-width: 66rem) {
   .help-drawer { width: 100vw; }
 }
+
+/* DMARC pages: paired cards side by side, same layout as .split but for two
+   summary cards at the top of a page. */
+.pair {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.2rem; margin-top: 1.2rem;
+}
+.pair > .card { margin-left: 0; margin-right: 0; min-width: 0; }
+.pair > .card + .card { margin-top: 0; }
+
+/* Attention card: elevated border when a DMARC report has failures. */
+.card.attn { border-color: var(--st-warn-fg); }
+
+/* Responsive visibility: hide elements on narrow/wide screens. */
+.desk-only { display: revert; }
+.phone-only, .phone-list { display: none; }
+@media (max-width: 48rem) {
+  .desk-only { display: none !important; }
+  .phone-only, .phone-list { display: revert !important; }
+}
+.phone-list { list-style: none; margin: 0; padding: 0; }
+.phone-list li { border-bottom: 1px solid var(--border); }
+.phone-list li:last-child { border-bottom: none; }
+.phone-list a {
+  display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
+  padding: 0.7rem 0; text-decoration: none; color: inherit;
+}
+.phone-list .when { grid-column: 1; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.phone-list .meta { grid-column: 2; font-size: 0.85rem; }
+.phone-list .subj { grid-column: 1 / -1; font-size: 0.85rem; color: var(--muted); }
+
+/* Checkbox-label row inside a form (IP restriction toggle). */
+.check-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0.5rem 0; cursor: pointer;
+}

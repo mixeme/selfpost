@@ -71,26 +71,29 @@ func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status
 }
 
 func settingsFlash(r *http.Request) string {
-	switch r.URL.Query().Get("updated") {
-	case "username":
-		return "Username changed."
-	case "password":
-		return "Password changed. Any other signed-in sessions were signed out."
-	case "both":
-		return "Username and password changed. Any other signed-in sessions were signed out."
-	case "email":
-		return "DMARC report address updated."
-	case "retention":
-		return "Send log retention updated."
-	case "username-email":
-		return "Username and DMARC report address updated."
-	case "password-email":
-		return "Password and DMARC report address updated. Any other signed-in sessions were signed out."
-	case "all":
-		return "Settings updated. Any other signed-in sessions were signed out."
-	default:
+	q := r.URL.Query()
+	var parts []string
+	if q.Has("u") {
+		parts = append(parts, "username")
+	}
+	if q.Has("p") {
+		parts = append(parts, "password")
+	}
+	if q.Has("e") {
+		parts = append(parts, "DMARC report address")
+	}
+	if q.Has("r") {
+		parts = append(parts, "send log retention")
+	}
+	if len(parts) == 0 {
 		return ""
 	}
+	msg := strings.Join(parts, ", ") + " updated."
+	msg = strings.ToUpper(msg[:1]) + msg[1:]
+	if q.Has("p") {
+		msg += " Any other signed-in sessions were signed out."
+	}
+	return msg
 }
 
 func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
@@ -240,36 +243,24 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logf("panel: user %d settings updated (username: %t, password: %t, dmarc email: %t, retention: %t)", user.ID, renaming, repassword, emailChanging, retentionChanging)
-	http.Redirect(w, r, "/settings?updated="+updatedFlag(renaming, repassword, emailChanging, retentionChanging), http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?"+updatedQuery(renaming, repassword, emailChanging, retentionChanging), http.StatusSeeOther)
 }
 
-func updatedFlag(renamed, repassword, emailChanged, retentionChanged bool) string {
-	changed := 0
+func updatedQuery(renamed, repassword, emailChanged, retentionChanged bool) string {
+	var params []string
 	if renamed {
-		changed++
+		params = append(params, "u=1")
 	}
 	if repassword {
-		changed++
+		params = append(params, "p=1")
 	}
 	if emailChanged {
-		changed++
+		params = append(params, "e=1")
 	}
 	if retentionChanged {
-		changed++
+		params = append(params, "r=1")
 	}
-	if changed > 1 {
-		return "all"
-	}
-	switch {
-	case renamed:
-		return "username"
-	case repassword:
-		return "password"
-	case emailChanged:
-		return "email"
-	default:
-		return "retention"
-	}
+	return strings.Join(params, "&")
 }
 
 // sendLogRetentionDays returns the effective delivery-journal retention window.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/store"
 )
+
+const maxIngestStdin = 10 << 20 // 10 MiB
 
 func runDMARCIngestMode() error {
 	cfg := loadConfig()
@@ -27,7 +30,7 @@ func runDMARCIngestMode() error {
 	if recipient == "" {
 		recipient = strings.ToLower(strings.TrimSpace(os.Getenv("ORIGINAL_RECIPIENT")))
 	}
-	if err := dmarc.IngestMessage(st, os.Stdin, recipient, time.Now().UTC()); err != nil {
+	if err := dmarc.IngestMessage(st, io.LimitReader(os.Stdin, maxIngestStdin), recipient, time.Now().UTC()); err != nil {
 		if incrErr := st.IncrDMARCParseFailures(); incrErr != nil {
 			log.Printf("dmarc ingest: record failure: %v", incrErr)
 		}
