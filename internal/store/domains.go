@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"modernc.org/sqlite"
@@ -181,4 +182,18 @@ func (s *Store) UpdateDomainDMARCRua(id int64, rua sql.NullString) error {
 		return ErrDomainNotFound
 	}
 	return nil
+}
+
+// DomainExists reports whether a sending domain with this name is configured.
+// Used by the DMARC ingest path to refuse reports for domains this relay does
+// not send for (security.md: report XML is attacker-supplied input).
+func (s *Store) DomainExists(name string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(
+		"SELECT COUNT(*) FROM domains WHERE name = ? COLLATE NOCASE", strings.TrimSpace(name),
+	).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("domain exists %q: %w", name, err)
+	}
+	return n > 0, nil
 }

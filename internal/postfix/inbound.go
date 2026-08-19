@@ -2,7 +2,6 @@ package postfix
 
 import (
 	"fmt"
-	"net"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -83,12 +82,10 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 	return []byte(relayB.String()), []byte(transportB.String()), []byte(recipB.String()), []byte(tlsB.String()), nil
 }
 
-// inboundNexthop is the Postfix next-hop [host]:port form that disables MX
-// lookup for the explicit upstream.
+// inboundNexthop is the Postfix next-hop [host]:port form. The brackets are
+// what disable the MX lookup, so the operator's explicit upstream is used as
+// given; they also delimit a bare IPv6 address.
 func inboundNexthop(host string, port int) string {
-	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
-		return "[" + host + "]:" + strconv.Itoa(port)
-	}
 	return "[" + host + "]:" + strconv.Itoa(port)
 }
 

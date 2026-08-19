@@ -125,7 +125,7 @@ New nav item **Inbound spam** (or subsection under **Inbound**) — journal tabl
 with filters (decision, domain, date range), list management on the same page or
 a tab. Mockup: add `docs/assets/panel-ui/inbound_spam.html` in the panel step.
 
-## Schema (migration `0010_inbound_spam_log.sql`)
+## Schema (migration `0011_inbound_spam_log.sql`)
 
 **`inbound_spam_log`**
 
@@ -238,7 +238,7 @@ Target version cut: **`1.10.0`** (MINOR). One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
-- [ ] Migration `0010_inbound_spam_log.sql` — **Composer**
+- [ ] Migration `0011_inbound_spam_log.sql` — **Composer**
 - [ ] Inbound journal-milter + Postfix wiring — **Composer**
 - [ ] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**

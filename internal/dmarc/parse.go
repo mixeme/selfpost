@@ -1,6 +1,7 @@
 package dmarc
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"encoding/xml"
@@ -73,9 +74,9 @@ type feedbackXML struct {
 	} `xml:"record"`
 }
 
-// ParseAggregate decodes gzip-compressed or raw DMARC aggregate XML.
+// ParseAggregate decodes gzip- or zip-compressed, or raw, DMARC aggregate XML.
 func ParseAggregate(raw []byte) (ParsedReport, error) {
-	data, err := maybeGunzip(raw)
+	data, err := decompress(raw)
 	if err != nil {
 		return ParsedReport{}, err
 	}
@@ -128,20 +129,59 @@ func dmarcRecordPasses(r ParsedRecord) bool {
 	return strings.EqualFold(r.SPFResult, "pass") || strings.EqualFold(r.DKIMResult, "pass")
 }
 
-func maybeGunzip(raw []byte) ([]byte, error) {
-	if len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
-		zr, err := gzip.NewReader(bytes.NewReader(raw))
-		if err != nil {
-			return nil, fmt.Errorf("dmarc gzip: %w", err)
+// maxAggregateXML bounds the decompressed payload, so a small archive cannot
+// expand into an unbounded allocation.
+const maxAggregateXML = 8 << 20
+
+// decompress unwraps the container the reporter used. Both are seen in the
+// wild: most senders gzip the XML, some (notably several Microsoft and Yahoo
+// endpoints) ship it as a single-entry zip.
+func decompress(raw []byte) ([]byte, error) {
+	switch {
+	case len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b:
+		return gunzip(raw)
+	case len(raw) >= 4 && raw[0] == 'P' && raw[1] == 'K' && raw[2] == 0x03 && raw[3] == 0x04:
+		return unzip(raw)
+	}
+	return raw, nil
+}
+
+func gunzip(raw []byte) ([]byte, error) {
+	zr, err := gzip.NewReader(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("dmarc gzip: %w", err)
+	}
+	defer zr.Close()
+	data, err := io.ReadAll(io.LimitReader(zr, maxAggregateXML))
+	if err != nil {
+		return nil, fmt.Errorf("dmarc gzip read: %w", err)
+	}
+	return data, nil
+}
+
+// unzip returns the first .xml entry of a zip archive. Directories and any
+// other members are skipped rather than trusted.
+func unzip(raw []byte) ([]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		return nil, fmt.Errorf("dmarc zip: %w", err)
+	}
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() || !strings.HasSuffix(strings.ToLower(f.Name), ".xml") {
+			continue
 		}
-		defer zr.Close()
-		data, err := io.ReadAll(io.LimitReader(zr, 8<<20))
+		rc, err := f.Open()
 		if err != nil {
-			return nil, fmt.Errorf("dmarc gzip read: %w", err)
+			return nil, fmt.Errorf("dmarc zip open %s: %w", f.Name, err)
+		}
+		data, err := io.ReadAll(io.LimitReader(rc, maxAggregateXML))
+		rc.Close()
+		if err != nil {
+			return nil, fmt.Errorf("dmarc zip read %s: %w", f.Name, err)
 		}
 		return data, nil
 	}
-	return raw, nil
+	return nil, fmt.Errorf("dmarc zip: no xml entry")
 }
 
 // TightenPolicyHint summarises whether raising p= looks reasonable.

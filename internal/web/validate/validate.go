@@ -3,8 +3,6 @@ package validate
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -145,107 +143,6 @@ func Email(addr string) error {
 	}
 	if _, blocked := freemailDomains[domain]; blocked {
 		return fmt.Errorf("use an address on a domain you control; public mail hosts cannot receive authorised DMARC reports")
-	}
-	return nil
-}
-
-const maxHostLen = 253
-
-// NormalizeHost trims, lower-cases, and strips wrapping IPv6 brackets so the
-// stored value is a bare hostname or IP, safe to wrap again when writing maps.
-func NormalizeHost(host string) string {
-	host = strings.ToLower(strings.TrimSpace(host))
-	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-		host = host[1 : len(host)-1]
-	}
-	return host
-}
-
-// Host enforces a whitelist for an upstream hostname or IP (security.md): a
-// dotted domain, a single DNS label (LAN names), or an IPv4/IPv6 address.
-func Host(host string) error {
-	if host == "" {
-		return fmt.Errorf("host is required")
-	}
-	if len(host) > maxHostLen {
-		return fmt.Errorf("host must be at most %d characters", maxHostLen)
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return nil
-	}
-	labels := strings.Split(host, ".")
-	for _, label := range labels {
-		if err := domainLabel(label); err != nil {
-			return fmt.Errorf("host is invalid: %w", err)
-		}
-	}
-	return nil
-}
-
-// Port checks a TCP port number parsed from form input.
-func Port(raw string) (int, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, fmt.Errorf("port is required")
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 1 || n > 65535 {
-		return 0, fmt.Errorf("port must be between 1 and 65535")
-	}
-	return n, nil
-}
-
-// TLSMode checks a Postfix smtp_tls_policy_maps level.
-func TLSMode(mode string) error {
-	switch mode {
-	case "may", "encrypt", "none":
-		return nil
-	default:
-		return fmt.Errorf("invalid TLS mode")
-	}
-}
-
-// RecipientMode checks an inbound-domain recipient policy.
-func RecipientMode(mode string) error {
-	switch mode {
-	case "list", "any":
-		return nil
-	default:
-		return fmt.Errorf("invalid recipient mode")
-	}
-}
-
-// MailboxInDomain checks that addr is a conservative mailbox on domain
-// (security.md). domain must already be normalised.
-func MailboxInDomain(addr, domain string) error {
-	at := strings.LastIndexByte(addr, '@')
-	if at <= 0 || at >= len(addr)-1 {
-		return fmt.Errorf("%q is not a valid email address", addr)
-	}
-	local, host := addr[:at], addr[at+1:]
-	if host != domain {
-		return fmt.Errorf("%q does not belong to domain %s", addr, domain)
-	}
-	if err := mailboxLocalPart(local); err != nil {
-		return fmt.Errorf("%q: %w", addr, err)
-	}
-	return nil
-}
-
-func mailboxLocalPart(local string) error {
-	if local == "" {
-		return fmt.Errorf("missing the part before '@'")
-	}
-	if local[0] == '.' || local[len(local)-1] == '.' {
-		return fmt.Errorf("local part must not start or end with '.'")
-	}
-	for i := 0; i < len(local); i++ {
-		c := local[i]
-		lower := c >= 'a' && c <= 'z'
-		digit := c >= '0' && c <= '9'
-		if !lower && !digit && c != '.' && c != '-' && c != '_' && c != '+' {
-			return fmt.Errorf("local part may contain only lower-case letters, digits, '.', '-', '_' and '+'")
-		}
 	}
 	return nil
 }

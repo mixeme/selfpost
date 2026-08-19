@@ -108,12 +108,12 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
 	logRows, logNote := h.deliveryLog(row)
 	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
-		"Title":                 "SelfPost — delivery",
-		"User":                  auth.CurrentUser(r),
-		"Active":                "deliveries",
-		"IsGlobal":              p.IsGlobal(),
-		"SendLogRetentionDays":  h.sendLogRetentionDays(),
-		"Row":      row,
+		"Title":                "SelfPost — delivery",
+		"User":                 auth.CurrentUser(r),
+		"Active":               "deliveries",
+		"IsGlobal":             p.IsGlobal(),
+		"SendLogRetentionDays": h.sendLogRetentionDays(),
+		"Row":                  row,
 		// The status in the panel's own badge vocabulary, so the headline reads
 		// the same way as every other health signal in the panel.
 		"Level":  deliveryLevel(row.Status),

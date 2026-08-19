@@ -330,8 +330,11 @@
               <div class="check-col">
                 <p class="check-col-title">Client IP allow-list
                   {{if .AuthIPRestrict}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">off</span>{{end}}</p>
-                <p class="muted">When enabled, only these addresses may authenticate
-                and submit mail as this application. When off, any client IP is allowed.</p>
+                <p class="muted">When enabled, only these addresses may submit mail as
+                this application; a login from anywhere else is refused with a 4xx at
+                <code>MAIL FROM</code>. When off, any client IP is allowed. Like the
+                level-2 rate limit this runs in the journal-milter and is fail-open —
+                it is a sending control, not an authentication boundary.</p>
                 <form method="post" action="/applications/{{.ID}}/authips">
                   <label class="check-row">
                     <input type="checkbox" name="auth_ip_restrict" value="1"

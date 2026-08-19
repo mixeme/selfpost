@@ -9,9 +9,9 @@ import (
 	"net/http"
 
 	"github.com/mixeme/selfpost/internal/app"
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
-	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/legal"
@@ -118,21 +118,21 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
 	h := handlers.New(st, domains, apps, inboundSvc, dmarcSvc, handlers.Config{
-		Hostname:               cfg.Hostname,
-		SubmissionEnabled:      cfg.SubmissionEnabled,
-		MailLogPath:            cfg.MailLogPath,
-		DataDir:                cfg.DataDir,
-		DBPath:                 cfg.DBPath,
-		DeployRoot:             cfg.DeployRoot,
-		Version:                cfg.Version,
-		TLSCertFile:            cfg.TLSCertFile,
-		OpenDKIMSocket:         cfg.OpenDKIMSocket,
-		JournalSocket:          cfg.JournalSocket,
-		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
-		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
-		RetryPolicy:                 cfg.RetryPolicy,
-		InboundEnabled:              cfg.InboundEnabled,
-		DMARCEnabled:                cfg.DMARCEnabled,
+		Hostname:                   cfg.Hostname,
+		SubmissionEnabled:          cfg.SubmissionEnabled,
+		MailLogPath:                cfg.MailLogPath,
+		DataDir:                    cfg.DataDir,
+		DBPath:                     cfg.DBPath,
+		DeployRoot:                 cfg.DeployRoot,
+		Version:                    cfg.Version,
+		TLSCertFile:                cfg.TLSCertFile,
+		OpenDKIMSocket:             cfg.OpenDKIMSocket,
+		JournalSocket:              cfg.JournalSocket,
+		RateLimitMessagesPerIP:     cfg.RateLimitMessagesPerIP,
+		RateLimitWindowSeconds:     cfg.RateLimitWindowSeconds,
+		RetryPolicy:                cfg.RetryPolicy,
+		InboundEnabled:             cfg.InboundEnabled,
+		DMARCEnabled:               cfg.DMARCEnabled,
 		SendLogRetentionEnvDefault: cfg.SendLogRetentionEnvDefault,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil

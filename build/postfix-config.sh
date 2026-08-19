@@ -301,6 +301,13 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 			"smtp_tls_policy_maps="
 	fi
 
+	# Milters on port 25. main.cf's chain (OpenDKIM strict + journal-milter) is
+	# for the SUBMISSION path only: OpenDKIM must not gate someone else's
+	# inbound mail (a signing outage would defer it), and the journal-milter
+	# would file inbound mail into the outbound send log under the *sender's*
+	# domain — polluting Deliveries and letting a forged From: consume that
+	# domain's level-2 rate-limit budget. So smtpd_milters is always overridden
+	# here: either the optional antispam milter, or nothing at all.
 	INBOUND_MILTERS=""
 	if [ "${INBOUND_RELAY_ENABLE}" = "true" ] && [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
 		case "${INBOUND_ANTISPAM_MILTER}" in
@@ -346,9 +353,7 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		"smtp/inet/smtpd_client_message_rate_limit=${PORT25_RATE}" \
 		"smtp/inet/message_size_limit=${PORT25_SIZE}"
 	master_cf_set_smtp_inet_o smtpd_recipient_restrictions "${RECIPIENT_RESTRICTIONS}"
-	if [ -n "${INBOUND_MILTERS}" ]; then
-		master_cf_set_smtp_inet_o smtpd_milters "${INBOUND_MILTERS}"
-	fi
+	master_cf_set_smtp_inet_o smtpd_milters "${INBOUND_MILTERS}"
 else
 	postconf -MX "smtp/inet" 2>/dev/null || true
 	postconf -MX "dmarc-ingest/unix-pipe" 2>/dev/null || true

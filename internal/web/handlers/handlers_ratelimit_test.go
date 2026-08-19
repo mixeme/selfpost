@@ -82,7 +82,7 @@ func TestParseAppAuthIPsForm(t *testing.T) {
 
 	restrict, ips, err := parseAppAuthIPsForm(form(url.Values{
 		"auth_ip_restrict": {"1"},
-		"auth_allowed_ips":   {"203.0.113.10"},
+		"auth_allowed_ips": {"203.0.113.10"},
 	}))
 	if err != nil || !restrict || len(ips) != 1 {
 		t.Fatalf("enabled with IP = restrict=%v ips=%v err=%v", restrict, ips, err)
@@ -107,15 +107,15 @@ func TestParseDomainRateLimitFormAuto(t *testing.T) {
 		return r
 	}
 	in, err := parseDomainRateLimitForm(form(url.Values{
-		"mode":             {"auto"},
-		"auto_multiplier":  {"2.5"},
+		"mode":            {"auto"},
+		"auto_multiplier": {"2.5"},
 	}), 100)
 	if err != nil || in.mode != "auto" || in.autoMultiplier != 2.5 {
 		t.Fatalf("auto domain = %+v err=%v", in, err)
 	}
 	_, err = parseDomainRateLimitForm(form(url.Values{
-		"mode":             {"auto"},
-		"auto_multiplier":  {"10"},
+		"mode":            {"auto"},
+		"auto_multiplier": {"10"},
 	}), 100)
 	if err == nil {
 		t.Fatal("multiplier out of range should fail")

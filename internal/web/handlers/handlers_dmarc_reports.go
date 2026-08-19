@@ -14,9 +14,9 @@ import (
 
 type dmarcListRow struct {
 	store.DMARCReportSummary
-	DomainID       int64
-	ReceivedLabel  string
-	PeriodLabel    string
+	DomainID      int64
+	ReceivedLabel string
+	PeriodLabel   string
 }
 
 func (h *Handlers) requireDMARC(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {

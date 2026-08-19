@@ -18,6 +18,15 @@ import (
 
 // IngestMessage parses a raw RFC 5322 message from r and stores any DMARC
 // aggregate attachment it finds.
+//
+// The report XML is unauthenticated input: anyone who can reach an allow-listed
+// rua= address can post one, and the address form is predictable. So the domain
+// the report claims is checked twice before anything is stored — it must be a
+// domain this relay actually sends for, and, when the report arrived at a
+// per-domain hosted address (dmarc-reports+<domain>@<hostname>), it must be the
+// domain that address is tagged for. Without this a stranger could file reports
+// under someone else's domain, skew the panel's alignment figures, and push
+// genuine reports out through the retention cap.
 func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt time.Time) error {
 	raw, err := io.ReadAll(io.LimitReader(r, 12<<20))
 	if err != nil {
@@ -29,6 +38,10 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 	}
 	parsed, err := ParseAggregate(payload)
 	if err != nil {
+		return err
+	}
+	recipient = strings.ToLower(strings.TrimSpace(recipient))
+	if err := checkReportDomain(st, parsed.Domain, recipient); err != nil {
 		return err
 	}
 	rep := store.DMARCReport{
@@ -46,7 +59,7 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 		PolicyASPF:   parsed.PolicyASPF,
 		PassCount:    parsed.PassCount,
 		FailCount:    parsed.FailCount,
-		Recipient:    strings.ToLower(strings.TrimSpace(recipient)),
+		Recipient:    recipient,
 	}
 	for _, rec := range parsed.Records {
 		rep.Records = append(rep.Records, store.DMARCReportRecord{
@@ -62,6 +75,26 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 		return err
 	}
 	return st.PruneDMARCReports()
+}
+
+// checkReportDomain refuses a report whose policy domain is not one of this
+// relay's sending domains, or that contradicts the +tag of the address it was
+// delivered to.
+func checkReportDomain(st *store.Store, domain, recipient string) error {
+	if domain == "" {
+		return fmt.Errorf("dmarc report: no policy domain")
+	}
+	if tagged := TaggedDomain(recipient); tagged != "" && tagged != domain {
+		return fmt.Errorf("dmarc report: domain %q does not match the address it was sent to (%s)", domain, recipient)
+	}
+	ok, err := st.DomainExists(domain)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("dmarc report: %q is not a domain configured on this relay", domain)
+	}
+	return nil
 }
 
 func extractAggregatePayload(raw []byte) ([]byte, error) {

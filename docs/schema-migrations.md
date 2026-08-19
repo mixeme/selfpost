@@ -18,13 +18,14 @@ Documentation.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 9` |
-| Files | `0001_init.sql` … `0009_application_auth_ips.sql` (9 files) |
+| Chain head | `user_version = 10` |
+| Files | `0001_init.sql` … `0010_send_log_app_login_index.sql` (10 files) |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 1.x MINOR releases must boot a `1.0.0` data directory |
 
-Last updated with release **1.9.0** (`0009_application_auth_ips`); **1.9.1**
-had no schema change.
+Last updated in **[Unreleased]** (`0010_send_log_app_login_index`); **1.9.1**
+had no schema change. The release column below records the cut a migration
+shipped in — fill `0010`'s in at the next version cut.
 
 ---
 
@@ -42,6 +43,7 @@ had no schema change.
 0002_sessions.sql          → user_version 2
 …
 0009_application_auth_ips.sql → user_version 9
+0010_send_log_app_login_index.sql → user_version 10
 ```
 
 **Implication:** never delete, rename, or reorder migration files while 1.x must
@@ -63,6 +65,7 @@ replace the embedded set (see [Planned 2.x squash](#planned-2x-squash)).
 | 7 | `0007_rate_limit_auto.sql` | 1.6.0 | DDL | `rate_limits.mode`, `auto_multiplier`, `auto_updated_at` |
 | 8 | `0008_dmarc_reports.sql` | 1.7.0 | DDL | `dmarc_reports`, `dmarc_report_records` |
 | 9 | `0009_application_auth_ips.sql` | 1.9.0 | DDL + data | `applications.auth_ip_restrict`, `auth_allowed_ips`; move legacy app `rate_limits.allowed_ips` into auth columns; clear those IPs on rate limits |
+| 10 | `0010_send_log_app_login_index.sql` | Unreleased | DDL | `idx_send_log_app_login_created_at` — app-scoped rate-limit counts and per-application send statistics were scanning the `created_at` range |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 1.x images.
@@ -117,11 +120,17 @@ code. A 2.x baseline should define `users` directly and omit `admin`.
 
 ### Application trusted IPs (0009)
 
-Before 1.9.0, client IP restriction for an application lived in
-`rate_limits.allowed_ips` (`scope = application`). Migration 0009 copies non-empty
-values into `applications.auth_allowed_ips`, sets `auth_ip_restrict = 1`, and
-clears `rate_limits.allowed_ips` for application scope. Level-2 limits no longer
-carry IP bindings; auth and rate limiting are separate concerns.
+Before 1.9.0, client IPs for an application lived in `rate_limits.allowed_ips`
+(`scope = application`). Migration 0009 copies non-empty values into
+`applications.auth_allowed_ips`, sets `auth_ip_restrict = 1`, and clears
+`rate_limits.allowed_ips` for application scope. Level-2 limits no longer carry
+IP bindings; auth and rate limiting are separate concerns.
+
+Note that the two columns do not mean the same thing: the old list was
+*permissive* (those IPs got the application ceiling, every other IP fell back
+to the domain limit), the new one is *restrictive* (every IP not on the list is
+refused for that application). The conversion branch only fires for a database
+that carried application-scope `allowed_ips` from before 1.9.0.
 
 ### Profile DMARC email (0004 → 0005)
 

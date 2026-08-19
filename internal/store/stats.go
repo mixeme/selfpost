@@ -15,7 +15,7 @@ type SendStats struct {
 	Total       int64
 	PeakPerHour int64
 	AvgPerHour  float64
-	WindowDays  int   // actual days queried (min(30, retention))
+	WindowDays  int     // actual days queried (min(30, retention))
 	WindowHours float64 // hours used for the average-rate denominator
 }
 

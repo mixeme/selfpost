@@ -5,8 +5,75 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+Review pass over `1.4.0`…`1.9.1`: port 25 no longer shares the submission
+milter chain, DMARC reports are validated before they are stored, and the auto
+rate limit is correct for a non-default level-1 window. Schema migration
+`0010` (index only). Upgrading is a tag bump.
+
+### Added
+
+- SQLite migration `0010_send_log_app_login_index.sql` —
+  `idx_send_log_app_login_created_at`. The journal-milter counts an
+  application's messages on every `MAIL FROM`, and the domain page computes
+  per-application statistics on every render; both were scanning the
+  `created_at` range because `app_login` was unindexed.
+- DMARC aggregate reports are accepted as **zip** as well as gzip or plain XML
+  (several reporters ship a single-entry zip; those reports previously counted
+  as parse failures).
+- e2e: `checkPort25ConfigCombinations` regenerates the Postfix configuration
+  inside the container for all four combinations of `INBOUND_RELAY_ENABLE` /
+  `DMARC_REPORTS_ENABLE` / `INBOUND_ANTISPAM_MILTER` and requires
+  `postfix check` to pass. The `1.9.1` crash-loop shipped in `1.4.0` and
+  survived three releases because the suite only ever exercised the flags-off
+  path.
+
+### Fixed
+
+- **Port 25 no longer runs the submission milter chain.** `smtpd_milters` is
+  now always overridden on `smtp/inet` — to the optional antispam milter, or
+  to nothing. Previously, with `INBOUND_ANTISPAM_MILTER` unset, inbound mail
+  inherited main.cf's chain: OpenDKIM (strict, `tempfail`) could defer relayed
+  mail during a signing outage, and the journal-milter filed inbound mail into
+  the outbound send log under the **sender's** domain — so Deliveries showed
+  other people's mail, and a forged `From:` on an inbound message consumed that
+  sending domain's level-2 rate-limit budget. [architecture.md](docs/architecture.md)
+  already described the intended behaviour; the code now matches it.
+- **DMARC reports are validated before they are stored.** A report is accepted
+  only when the domain in `policy_published` is a sending domain configured
+  here and, for a per-domain hosted address, matches that address's `+tag`.
+  The rua address form is predictable, so anyone able to reach it could
+  previously file reports under any domain, skew the panel's alignment figures
+  and the tighten-`p=` hint, and evict genuine reports through the 500-report
+  retention cap.
+- Auto level-2 rate limit: the ceiling is now scaled to the level-1 window
+  before the multiplier is applied. `ceil(avg msg/h × multiplier)` was stored
+  as the ceiling for a window of `RATE_LIMIT_WINDOW_SECONDS`, so any window
+  other than the default `3600` shifted the effective allowance by
+  `window/3600` (a 1800s window allowed twice the intended rate). A domain
+  that has sent anything now also gets a floor of 1.
+- Single-domain export no longer drops rate limits silently when the store
+  errors — the error is returned instead of being swallowed by `err == nil && ok`.
+
 ### Changed
 
+- [schema-migrations.md](docs/schema-migrations.md) notes that migration `0009`
+  changed what the IP list *means* — permissive (those IPs got the application
+  ceiling) before 1.9.0, restrictive (every other IP refused) after. Its
+  conversion branch only fires for a database that carried application-scope
+  `allowed_ips` from before 1.9.0.
+- Panel help, [guide.md](docs/guide.md) and [architecture.md](docs/architecture.md):
+  the client IP allow-list is a **sending** control, not an authentication
+  boundary — the SASL login still succeeds, the check runs in the
+  journal-milter at `MAIL FROM`, and it is fail-open like the rate limits.
+  architecture.md's rate-limit description still documented the pre-1.9.0
+  trusted-IP semantics.
+- Removed unused duplicates of the inbound validators (`Host`, `Port`,
+  `TLSMode`, `RecipientMode`, `MailboxInDomain`, `NormalizeHost`) from
+  `internal/web/validate` — the live path uses `internal/inbound/validate.go`;
+  the copies were reachable only from their own tests.
+- `gofmt` across `cmd/` and `internal/` (10 files had drifted); dead branch
+  removed from `postfix.inboundNexthop`.
+- The planned inbound-antispam migration is renumbered `0011_inbound_spam_log.sql`.
 - Operator and as-built docs aligned with the code after a full pass —
   [architecture.md](docs/architecture.md) (port 25 opens for inbound relay
   and/or DMARC ingest; antispam requires inbound relay; DMARC pipe transport

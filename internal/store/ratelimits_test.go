@@ -154,8 +154,8 @@ func TestRateLimitActive(t *testing.T) {
 	inactive := []RateLimit{
 		{},
 		{Scope: RateLimitScopeDomain, AllowedIPs: []string{"203.0.113.1"}}, // no ceiling
-		{Scope: RateLimitScopeDomain, MaxMessages: 5},                     // no window
-		{Scope: RateLimitScopeApp, MaxMessages: 5},                        // no window
+		{Scope: RateLimitScopeDomain, MaxMessages: 5},                      // no window
+		{Scope: RateLimitScopeApp, MaxMessages: 5},                         // no window
 	}
 	for i, rl := range inactive {
 		if rl.Active() {
@@ -259,5 +259,42 @@ func TestAutoRateLimitZeroTrafficInactive(t *testing.T) {
 	rl, ok, _ := st.GetRateLimit(RateLimitScopeDomain, d.ID)
 	if ok && rl.Active() {
 		t.Fatalf("zero traffic auto should be inactive: %+v", rl)
+	}
+}
+
+// The auto ceiling counts messages per level-1 window, so the per-hour average
+// must be scaled to that window: half an hour of traffic, not a full hour's.
+func TestComputeAutoMaxMessagesScalesToWindow(t *testing.T) {
+	stats := SendStats{Total: 100, AvgPerHour: 10}
+	cases := []struct {
+		name          string
+		windowSeconds int
+		want          int
+	}{
+		{"one hour", 3600, 20},
+		{"half an hour", 1800, 10},
+		{"two hours", 7200, 40},
+		{"unset falls back to an hour", 0, 20},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := computeAutoMaxMessages(stats, 2.0, 1000, tc.windowSeconds)
+			if got != tc.want {
+				t.Fatalf("max = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestComputeAutoMaxMessagesBounds(t *testing.T) {
+	if got := computeAutoMaxMessages(SendStats{}, 2.0, 1000, 3600); got != 0 {
+		t.Fatalf("no traffic: max = %d, want 0 (inactive)", got)
+	}
+	// A trickle still has to leave room for one message.
+	if got := computeAutoMaxMessages(SendStats{Total: 1, AvgPerHour: 0.001}, 1.0, 1000, 3600); got != 1 {
+		t.Fatalf("trickle: max = %d, want 1", got)
+	}
+	if got := computeAutoMaxMessages(SendStats{Total: 100, AvgPerHour: 500}, 2.0, 100, 3600); got != 100 {
+		t.Fatalf("capped: max = %d, want the level-1 ceiling 100", got)
 	}
 }

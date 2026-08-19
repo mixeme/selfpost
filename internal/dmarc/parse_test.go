@@ -1,6 +1,7 @@
 package dmarc
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"testing"
@@ -76,6 +77,9 @@ func TestIngestMessageStoresReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
+	if _, err := st.AddDomain("example.com", "selfpost"); err != nil {
+		t.Fatal(err)
+	}
 
 	var gz bytes.Buffer
 	zw := gzip.NewWriter(&gz)
@@ -113,4 +117,100 @@ func TestHostedReportAddress(t *testing.T) {
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
+}
+
+func TestIngestMessageRejectsUnknownDomain(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	if err := IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports@mail.example.com", time.Now().UTC()); err == nil {
+		t.Fatal("report for an unconfigured domain was accepted")
+	}
+	list, err := st.ListDMARCReports(nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("stored %d report(s) for an unconfigured domain", len(list))
+	}
+}
+
+// A report claiming example.com must not be accepted at the address tagged for
+// another domain, even when both domains are configured here.
+func TestIngestMessageRejectsTagMismatch(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if _, err := st.AddDomain("example.com", "selfpost"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddDomain("other.example", "selfpost"); err != nil {
+		t.Fatal(err)
+	}
+
+	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)),
+		"dmarc-reports+other.example@mail.example.com", time.Now().UTC())
+	if err == nil {
+		t.Fatal("report was accepted at an address tagged for another domain")
+	}
+}
+
+func TestTaggedDomain(t *testing.T) {
+	cases := map[string]string{
+		"dmarc-reports+example.com@mail.example.com": "example.com",
+		"dmarc-reports@mail.example.com":             "",
+		"postmaster+example.com@mail.example.com":    "",
+		"not-an-address":                             "",
+	}
+	for addr, want := range cases {
+		if got := TaggedDomain(addr); got != want {
+			t.Errorf("TaggedDomain(%q) = %q, want %q", addr, got, want)
+		}
+	}
+}
+
+func TestParseAggregateFromZip(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("report.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte(sampleXML)); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ParseAggregate(buf.Bytes())
+	if err != nil {
+		t.Fatalf("ParseAggregate(zip): %v", err)
+	}
+	if got.Domain != "example.com" || got.PassCount != 10 {
+		t.Fatalf("zip report = %+v", got)
+	}
+}
+
+// gzipMessage wraps xml in the single-part gzip message the ingest pipe sees.
+func gzipMessage(t *testing.T, xml string) string {
+	t.Helper()
+	var gz bytes.Buffer
+	zw := gzip.NewWriter(&gz)
+	if _, err := zw.Write([]byte(xml)); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return "From: noreply@google.com\r\n" +
+		"To: dmarc-reports@mail.example.com\r\n" +
+		"Subject: Report\r\n" +
+		"Content-Type: application/gzip; name=\"report.xml.gz\"\r\n" +
+		"\r\n" + gz.String()
 }

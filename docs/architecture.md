@@ -73,7 +73,11 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
 - **587/submission** — only when `SUBMISSION_ENABLE=true`; STARTTLS with
   `smtpd_tls_security_level=encrypt`.
 - **25/smtp inet** — when `INBOUND_RELAY_ENABLE=true` and/or
-  `DMARC_REPORTS_ENABLE=true`. No SASL, no OpenDKIM, no journal-milter.
+  `DMARC_REPORTS_ENABLE=true`. No SASL, no OpenDKIM, no journal-milter —
+  `smtpd_milters` is always overridden on this service (to the antispam milter
+  or to nothing), because main.cf's submission chain would otherwise let a
+  signing outage defer relayed mail and would file inbound mail into the
+  outbound send log under the sender's domain.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,
@@ -117,9 +121,12 @@ One process, four roles:
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
-   ceilings apply to every client IP; an application ceiling with trusted IPs
-   raises the limit for those IPs only and skips the domain check (guide § Rate
-   limiting). The level-2 count is the stored send-log rows plus the messages
+   ceilings apply to every client IP; an application ceiling **overrides** the
+   domain one for that login, higher or lower (guide § Rate limiting). Since
+   1.9.0 the client IP allow-list is a separate, restrictive control on the
+   application (`applications.auth_ip_restrict`), checked here at `MAIL FROM`
+   and fail-open like the rest of this milter — not an authentication
+   boundary. The level-2 count is the stored send-log rows plus the messages
    this process has admitted but not yet written (`internal/milter/inflight.go`),
    so concurrent sessions cannot each spend the same last slot; a reservation
    is released at end-of-message, on ABORT, or after a 10-minute TTL.

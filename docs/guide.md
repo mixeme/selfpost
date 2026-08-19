@@ -729,6 +729,13 @@ only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
 does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
 defer instead.
 
+**Inbound mail is not in Deliveries.** Port 25 runs its own milter chain: the
+optional anti-spam milter, and nothing else. OpenDKIM does not sign relayed
+mail (and a signing outage therefore cannot defer it), and the journal-milter
+does not file it — [Deliveries](#deliveries) stays a record of what *you* sent.
+This also keeps a forged `From:` on inbound mail from counting against a
+sending domain's [level-2 rate limit](#rate-limiting--level-2-domain-and-application).
+
 Inbound configuration lives in SQLite and `/data/postfix/` map files, so it
 is included in a [full backup](#full-backup-and-restore). Single-domain
 export/import is sending domains only.
@@ -767,6 +774,15 @@ them. Summaries are pruned (500 kept, 90 days max).
 alone, `check_recipient_access` permits only configured report addresses;
 everything else is rejected. With inbound relay enabled too, both allow-lists
 apply.
+
+**Reports are checked before they are stored.** The address form is
+predictable, so the report XML is treated as untrusted input: a report is
+accepted only when the domain it claims in `policy_published` is a sending
+domain configured here, and — when it arrived at a per-domain hosted address —
+only when that domain matches the address's `+tag`. Anything else is refused
+and counted in *parse failures* on the DMARC page, so a stranger cannot file
+reports under your domain or push genuine ones out through the retention cap.
+Reports are accepted as gzip, zip, or plain XML.
 
 Parsed report data lives in SQLite and is included in a
 [full backup](#full-backup-and-restore).
@@ -844,9 +860,16 @@ sending as that domain. When unset, only level 1 applies for non-privileged
 senders.
 
 **Client IP allow-list (application)** — optional restriction on an
-application: when enabled, list one or more client IPs that may authenticate
-and submit mail as that application. When disabled, any client IP is allowed.
-This is independent of rate limits.
+application: when enabled, list one or more client IPs that may **submit** mail
+as that application; a session from any other address is refused with a 4xx at
+`MAIL FROM`. When disabled, any client IP is allowed. This is independent of
+rate limits, and it takes exact addresses only — CIDR ranges are not parsed.
+
+It is **not an authentication boundary.** The SASL login itself still succeeds;
+the check runs in the journal-milter, on the same fail-open path as level 2
+(below), so if the milter is unavailable the restriction is skipped rather than
+enforced. Use it to narrow where an application may send from, not to contain a
+leaked password — for that, regenerate the password.
 
 **Level 2 — application** — optional override of the domain limit for one
 application (≤ level 1). The ceiling may be **higher or lower** than the domain
@@ -868,7 +891,10 @@ hours and on demand via **Recalculate now**.
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
 a store error, or the connecting client's IP is not available to the
 milter, level 2 is skipped and the message is accepted rather than held up.
-Level 1 is the backstop that keeps working even when level 2 cannot run.
+The same applies if the milter itself is down — Postfix is configured to
+accept rather than defer when it cannot reach it. Level 1 is the backstop
+that keeps working even when level 2 cannot run, and it is the only one of
+the two that does not depend on the panel process.
 
 ### Deliveries
 

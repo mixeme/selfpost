@@ -131,8 +131,11 @@
     shown once.</p>
     <p>Address mode is which From addresses this application may use: any
     address of the domain, or a fixed list. Client IP allow-list, when enabled,
-    restricts which addresses may authenticate as this application; when off,
-    any client IP is allowed. The level-2 rate limit <em>overrides</em> the
+    restricts which client addresses may <em>submit</em> as this application;
+    when off, any client IP is allowed. It is checked in the journal-milter at
+    <code>MAIL FROM</code>, alongside the level-2 limit and fail-open like it,
+    so it narrows sending rather than blocking the SASL login itself. The
+    level-2 rate limit <em>overrides</em> the
     domain limit for that application — you can set a ceiling above or below
     the domain (still ≤ level&nbsp;1). Independent of the client IP allow-list.</p>
     {{template "help_more" true}}
