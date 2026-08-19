@@ -10,6 +10,12 @@ milter chain, DMARC reports are validated before they are stored, and the auto
 rate limit is correct for a non-default level-1 window. Schema migration
 `0010` (index only). Upgrading is a tag bump.
 
+### Removed
+
+- Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
+  `dmarc-reports`, `inbound-relay`, `panel-docs`, `queue-retries`,
+  `send-log-retention`. Only unimplemented plans remain in `docs/plans/`.
+
 ### Added
 
 - Roadmap item and plan for `/preflight` installation check page
