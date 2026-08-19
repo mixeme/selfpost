@@ -10,6 +10,13 @@ milter chain, DMARC reports are validated before they are stored, and the auto
 rate limit is correct for a non-default level-1 window. Schema migration
 `0010` (index only). Upgrading is a tag bump.
 
+### Added
+
+- Code review plan (`docs/plans/code-review-2026-08.md`) — full codebase audit
+  covering architecture, code quality, security, GUI, tests, documentation, and
+  AGPL compliance. 38 findings across 11 categories with a prioritised
+  implementation plan in 6 phases.
+
 ### Removed
 
 - Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
