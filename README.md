@@ -4,15 +4,16 @@
 
 # SelfPost
 
-Self-hosted outbound SMTP relay with a web control panel, shipped as a single
-Docker image. Postfix, OpenDKIM, and a small Go panel run together under
-`supervisord`; you configure domains, DKIM keys, and SASL applications once,
-then point your apps at the SMTP endpoint.
+Self-hosted SMTP relay with a web panel — one Docker image, no provider.
 
-SelfPost sends mail straight to the internet from **your own IP**, with per-domain
-DKIM signing. It is outbound by default — no mailboxes or webmail. An optional
-inbound relay (backup-MX / forwarder on port 25) can be turned on; it forwards
-to an upstream, it does not store mail.
+Postfix, OpenDKIM, and a small Go panel run together under `supervisord`; you
+configure domains, DKIM keys, and SASL applications once, then point your apps
+at the SMTP endpoint.
+
+SelfPost sends mail straight to the internet from **your own IP**, with
+per-domain DKIM signing. No mailboxes or webmail. An optional inbound relay
+(backup-MX / forwarder on port 25) forwards to an upstream; it does not store
+mail.
 
 **For:** operators who run their own VPS or home server and want a simple relay
 they control, without a third-party SMTP provider.

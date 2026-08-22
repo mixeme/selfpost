@@ -15,6 +15,12 @@ GUI, tests, documentation, AGPL compliance; 38 findings) produced most of what
 follows. Its four open items live in [roadmap.md](docs/roadmap.md); its working
 document is not part of the release.
 
+### Changed
+
+- README hero line and a **Positioning** block in `docs/product.md` record the
+  tagline (`YOUR SMTP. YOUR RULES.`) and hero copy; the stamp subtitle stays
+  `SELF-HOSTED SMTP RELAY`. `docs/assets/selfpost-proof.html` updated to match.
+
 ### Added
 
 - Roadmap item and plan for `/preflight` installation check page

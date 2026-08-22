@@ -10,13 +10,24 @@ in [guide.md](guide.md); as-built technical detail in
 
 ## Purpose
 
-SelfPost is a self-hosted **outbound SMTP relay** with a web control panel,
-shipped as a single Docker image. It sends mail directly to the internet from
-your own IP with per-domain DKIM signing.
+SelfPost is a self-hosted **SMTP relay** with a web control panel, shipped as a
+single Docker image. It sends mail directly from your server with per-domain
+DKIM signing; an optional inbound relay forwards mail on port 25 without
+storing it.
 
 **Primary workflow:** configure the relay once (domains, DKIM, SASL
 applications), then point scripts and apps at the SMTP endpoint. SelfPost
 delivers as the configured sending domain.
+
+## Positioning
+
+| | Text |
+|---|---|
+| Stamp subtitle | SELF-HOSTED SMTP RELAY |
+| Tagline | YOUR SMTP. YOUR RULES. |
+| Hero line (README, GitHub) | Self-hosted SMTP relay with a web panel — one Docker image, no provider. |
+
+Brand assets and metrics: [docs/assets/selfpost-proof.html](assets/selfpost-proof.html).
 
 ---
 
