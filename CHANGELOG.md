@@ -168,6 +168,8 @@ document is not part of the release.
 
 ### Removed
 
+- Unused legacy asset `docs/assets/icon.png` (superseded by the four brand SVGs
+  and `internal/web/static/favicon.png`; nothing referenced it).
 - Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
   `dmarc-reports`, `inbound-relay`, `panel-docs`, `queue-retries`,
   `send-log-retention`. Only unimplemented plans remain in `docs/plans/`.
