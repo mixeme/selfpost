@@ -36,6 +36,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
+| panel-redesign | Panel visual redesign (layout grammar) | candidate | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): the next feature is
@@ -291,6 +292,31 @@ degrades gracefully when `/proc` is missing (`TestMachineSamplerWithoutProc`),
 and tagging it would only delete cross-platform test coverage.
 
 **Version:** no bearing on semver; `candidate`.
+
+---
+
+## panel-redesign
+
+**Goal:** a panel layout grammar so screens stop inventing per-page widths to
+hide empty space. Forms stay on a reading measure; ops pages use the remaining
+column; cards fill their cells. Givens (hybrid WA layout CSS + own `measure` /
+`fill`, no JS component library, new mockups rather than
+[docs/assets/panel-ui/](assets/panel-ui/index.html)):
+[plans/panel-redesign.md](plans/panel-redesign.md).
+
+**Boundary:** visual CSS and templates after mockups. No new routes or mail-path
+behaviour. Not a front-end framework, not Web Awesome components, not Pico /
+Bootstrap. The older HTML mockups in `docs/assets/panel-ui/` are not the brief.
+
+**Done when:** mockups exist that use only the frozen vocabulary, then — once
+this item is agreed — the live panel matches them without one-off `max-width`
+exceptions. The givens file itself is not “done”.
+
+**Dependencies / risks:** competes with feature work for attention; easy to
+start restyling `internal/web` before the vocabulary is proven on paper.
+Vendoring WA CSS needs NOTICE / licence rows. CSP stays `default-src 'self'`.
+
+**Version:** `1.x` MINOR when implementation is agreed; `candidate` until then.
 
 ---
 

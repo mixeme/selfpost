@@ -23,6 +23,10 @@ document is not part of the release.
 
 ### Added
 
+- Roadmap item and givens for a panel visual redesign
+  ([docs/plans/panel-redesign.md](docs/plans/panel-redesign.md)) — layout
+  grammar (`measure` / `fill` plus Web Awesome layout CSS), no JS component
+  library, new mockups rather than `docs/assets/panel-ui/`. Status: candidate.
 - Roadmap item and plan for `/preflight` installation check page
   ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
   infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
