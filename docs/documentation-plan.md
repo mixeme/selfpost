@@ -77,8 +77,8 @@
 
 1. **Нет раздела «эксплуатация»** — прямое требование ТЗ 11 п. 7
    ([specification.md:427](specification.md)). В README нет ни слова про
-   `/status` (проверки PTR/hostname), `/sendlog` (журнал отправки, фильтры),
-   `/queue` (очередь Postfix), `/logtail` (хвост `mail.log`), `/reload`,
+   `/status` (проверки PTR/hostname), `/deliveries` (журнал отправки, фильтры),
+   `/mail-queue` (очередь Postfix), `/system-log` (хвост `mail.log`), `/reload`,
    `/account`, `/backup` — при том что всё это реализовано
    ([internal/web/web.go:152](../internal/web/web.go:152)–188). Не описана и
    процедура апгрейда (бамп тега → `docker compose up -d`), хотя раздел

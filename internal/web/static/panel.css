@@ -88,20 +88,48 @@ details form { margin-top: 0.6rem; }
 @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
+/* Two deliberate rows, not one. The six page entries need about 660px and the
+   session block another 260px, against the 738px the panel is wide — so the bar
+   was wrapping on its own, and the session landed left-aligned directly under
+   the entries, reading as a third row of navigation. Shortening labels would buy
+   the ~200px back but undo the point of naming each entry after its page. Rows
+   rather than columns: a two-column grid of entries came out a third taller
+   (107px against 83px) and no easier to read.
+   The session sits on top, at the right edge, and the page entries below — the
+   usual arrangement, and the layout template puts the session first so the
+   reading and tab order follow what the eye sees rather than being flipped by a
+   CSS `order`. The cost is that Sign out is the bar's first tab stop; nothing
+   activates on focus, so that is a reordering, not a hazard. */
 .nav {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
-  gap: 0.4rem 1rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
   border-bottom: 1px solid #e2e5e9;
 }
 @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
-.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: baseline; }
-.nav .links a, .nav .links [aria-current] { padding: 0.2rem 0.5rem; border-radius: 6px; }
-.nav .links [aria-current] {
+.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
+/* Pushed to the far edge so the two rows read as two blocks rather than as one
+   ragged list that happened to wrap. */
+.nav .session { justify-content: flex-end; }
+/* Each entry pairs an icon with its label, so the entry itself is a flex row
+   rather than a run of text — that is also why the bar centres its items
+   instead of aligning them on the text baseline. Account is included: it is a
+   page like the others and would otherwise be the one bare word in the bar. */
+.nav a, .nav [aria-current] {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.2rem 0.5rem; border-radius: 6px;
+}
+.nav [aria-current] {
   font-weight: 600; color: #1b1f24; background: #e6ebf5; box-shadow: inset 0 -2px 0 #2563eb;
 }
 @media (prefers-color-scheme: dark) {
-  .nav .links [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
+  .nav [aria-current] { color: #e6e8eb !important; background: #22303f !important; }
 }
+/* Sign out carries an icon too, so it needs the same row layout; its padding
+   and colours come from the compact button rule further down. */
+.nav button { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* The icons draw in the entry's own colour, so the active entry's darker text,
+   a link's blue and Sign out's red all carry through without a rule apiece. */
+.nav .icon { width: 1rem; height: 1rem; flex: none; }
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
    everywhere. The class suffix is the check's own status value. */

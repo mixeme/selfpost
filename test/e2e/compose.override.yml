@@ -30,6 +30,10 @@ services:
       SELFPOST_HOSTNAME: mail.e2e.test
       # Plain HTTP panel for the test client — no reverse proxy in this stand.
       PANEL_COOKIE_SECURE: "false"
+      # The panel's deliverability checks query resolvers directly rather than
+      # the container's own (see internal/dnscheck), so the fake zone has to be
+      # named here too — `dns:` below only redirects the system resolver.
+      SELFPOST_DNS_RESOLVERS: 10.77.0.10:53
       # High enough that the whole suite's other ~10 sends (positive path,
       # level-2 test, the various rejected attempts) never trip it by
       # accident — only the dedicated level-1 test (negative check 4, which

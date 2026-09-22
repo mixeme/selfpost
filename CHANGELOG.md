@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-03
+
+### Fixed
+
+- panel: the PTR (reverse DNS) check no longer reports a correctly published
+  record as wrong. The checks went through the container's own resolver, which
+  forwards to the host's systemd-resolved — and systemd-resolved answers the
+  reverse lookup of the machine's own IP from the local hostname instead of
+  asking public DNS. A server with `203.0.113.10 → selfpost.example.com` in DNS
+  was told its PTR pointed at the provider-assigned hostname. All four
+  deliverability checks (PTR, SPF, DKIM, DMARC) now query recursive resolvers
+  directly, so the panel reports what a receiving mail server actually sees.
+  Set `SELFPOST_DNS_RESOLVERS` if outbound port 53 is closed or you run your
+  own recursor; it defaults to 1.1.1.1, 8.8.8.8 and 9.9.9.9.
+
+### Changed
+
+- panel: the three monitoring pages now live at URLs that match their nav
+  labels — Deliveries at `/deliveries` (was `/sendlog`), Mail queue at
+  `/mail-queue` (was `/queue`), System log at `/system-log` (was `/logtail`).
+  Bookmarks to the old paths stop working.
+
+- panel: each entry in the navigation bar now carries an icon beside its label,
+  so the bar is scannable at a glance instead of a row of similar-length words.
+  The icons are inline SVG drawn in the entry's own colour — no extra request,
+  no exemption from the panel's Content-Security-Policy — and are hidden from
+  screen readers, which still announce the label alone.
+
+- panel: the navigation bar is laid out as two rows on purpose — the signed-in
+  user, Account and Sign out along the top right, the page entries below. It no
+  longer fits on one line and used to wrap on its own, which left the session
+  block sitting left-aligned under the entries as if it were more navigation.
+
 ## [0.2.0] - 2026-08-03
 
 - panel: every authenticated page now ends with the running version

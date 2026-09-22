@@ -3,7 +3,7 @@
 
 <div class="card">
   <h2>Filter</h2>
-  <form method="get" action="/sendlog">
+  <form method="get" action="/deliveries">
     <label for="domain">Domain</label>
     <select id="domain" name="domain">
       <option value="">All domains</option>
@@ -19,6 +19,6 @@
 </div>
 
 <div class="card">
-  {{template "sendlog_rows" .}}
+  {{template "deliveries_rows" .}}
 </div>
 {{end}}

@@ -103,10 +103,11 @@ type cached[T any] struct {
 	expires time.Time
 }
 
-// New returns a Checker using the process resolver and the package's default
-// timeout and cache lifetimes.
-func New() *Checker {
-	return newChecker(net.DefaultResolver, lookupTimeout, serverTTL, domainTTL)
+// New returns a Checker querying the given recursive resolvers (empty means
+// DefaultResolvers) with the package's default timeout and cache lifetimes.
+// The lookups deliberately bypass the system resolver — see externalResolver.
+func New(resolvers []string) *Checker {
+	return newChecker(newExternalResolver(resolvers), lookupTimeout, serverTTL, domainTTL)
 }
 
 func newChecker(r resolver, timeout, srvTTL, domTTL time.Duration) *Checker {
