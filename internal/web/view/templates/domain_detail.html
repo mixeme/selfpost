@@ -170,8 +170,11 @@
     </div>
 
     {{if .SameDomainRUA}}
-    <p class="error">The report address is on this sending domain. SelfPost does
-    not receive inbound mail — use a mailbox on another domain.</p>
+    <p class="error">The report address is on this sending domain.{{if not .DMARCIngestEnabled}}
+    SelfPost does not receive inbound mail — use a mailbox on another domain.{{end}}</p>
+    {{end}}
+    {{if and .DMARCIngestEnabled .ResolvedDMARCEmail}}
+    <p class="muted"><a href="/dmarc/domains/{{.Domain.ID}}">View DMARC reports</a> for this domain.</p>
     {{end}}
 
     {{if .NeedsReportAuth}}
@@ -385,6 +388,7 @@
           <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
           <select id="dmarc_rua_mode" name="dmarc_rua_mode" data-custom-mode="custom">
             <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
+            {{if .DMARCIngestEnabled}}<option value="hosted"{{if eq .DMARCRuaMode "hosted"}} selected{{end}}>SelfPost hosted ({{.HostedDMARCEmail}})</option>{{end}}
             <option value="none"{{if eq .DMARCRuaMode "none"}} selected{{end}}>No aggregate reports</option>
             <option value="custom"{{if eq .DMARCRuaMode "custom"}} selected{{end}}>Custom address</option>
           </select>

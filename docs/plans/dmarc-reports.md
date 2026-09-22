@@ -1,6 +1,7 @@
 # Plan: dmarc-reports
 
-**Status:** candidate
+**Status:** done — shipped in `[1.7.0]` (2026-08-18); security review (Fable)
+of the ingest path pending.
 
 ---
 
@@ -51,15 +52,28 @@ remain a separate, opt-in feature that does not forward mail upstream.
 
 ## Implementation checklist
 
+**Ingest path.** `DMARC_REPORTS_ENABLE=true` enables `smtp/inet` on 25 (shared
+with inbound relay when both are on). Postfix `relay_domains` +
+`transport_maps` route allow-listed recipients to a `dmarc-ingest` pipe
+(`panel -dmarc-ingest`). `check_recipient_access` on `dmarc_recipients` is the
+allow-list; no SASL, no local mailboxes.
+
+**Schema.** Migration `0008_dmarc_reports.sql`: `dmarc_reports` (summary per
+aggregate) + `dmarc_report_records` (per-source rows). Dedup on
+`(reporter, report_id, domain)`.
+
+**Retention.** Max 500 reports; drop older than 90 days; prune after each
+ingest.
+
 Target version cut: **`1.7.0`** (MINOR). One commit per step; code only after
 roadmap status is **agreed**. Expand the sketch sections above before step 1
 if still thin. See [development.md](../development.md) § Plan checklists.
 
-- [ ] Expand plan: ingest path, `dmarc_reports` schema, retention caps — **Sonnet**
-- [ ] Opt-in inbound SMTP for report addresses only (allow-list) — **Opus**
-- [ ] Worker: gzip/XML parse → SQLite — **Opus**
-- [ ] Panel: domain roll-up + parsed report (panel-ui mockups) — **Sonnet**
-- [ ] Tie-in `dmarc_report_email` / `domains.dmarc_rua` — **Sonnet**
-- [ ] Tests and [guide.md](../guide.md) — **Sonnet**
+- [x] Expand plan: ingest path, `dmarc_reports` schema, retention caps — **Sonnet**
+- [x] Opt-in inbound SMTP for report addresses only (allow-list) — **Opus**
+- [x] Worker: gzip/XML parse → SQLite — **Opus**
+- [x] Panel: domain roll-up + parsed report (panel-ui mockups) — **Sonnet**
+- [x] Tie-in `dmarc_report_email` / `domains.dmarc_rua` — **Sonnet**
+- [x] Tests and [guide.md](../guide.md) — **Sonnet**
 - [ ] Security review ingest path — **Fable**
-- [ ] `go vet`, `go test` on touched packages — **Haiku**
+- [x] `go vet`, `go test` on touched packages — **Haiku**

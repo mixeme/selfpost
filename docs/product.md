@@ -60,7 +60,9 @@ domain administrators with assigned domains). The optional **inbound relay**
 (backup-MX / forwarder on port 25) ships in `[1.4.0]`, off by default behind
 `INBOUND_RELAY_ENABLE`; it is relay/forward, not IMAP/webmail. **Send-log
 retention in Settings** ships in `[1.5.0]`. **30-day send statistics** and
-**auto level-2 rate limits** ship in `[1.6.0]`. Items marked *candidate* in the
+**auto level-2 rate limits** ship in `[1.6.0]`. **DMARC aggregate report
+ingest** ships in `[1.7.0]`, off by default behind `DMARC_REPORTS_ENABLE`.
+Items marked *candidate* in the
 [roadmap](roadmap.md) require explicit approval before coding.
 
 ---

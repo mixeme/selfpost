@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-18
+
+Optional DMARC aggregate report ingest: accept `rua=` mail on port 25, parse
+gzip/XML into SQLite, and show summaries in the panel.
+
+### Added
+
+- Optional DMARC aggregate report ingest (`DMARC_REPORTS_ENABLE`): port 25
+  accepts only configured `rua=` addresses, gzip/XML is parsed into SQLite, and
+  the panel shows per-domain roll-ups and individual reports under *DMARC*.
+- Per-domain **SelfPost hosted** `rua=` mode when ingest is enabled
+  (`dmarc-reports+<domain>@<hostname>`).
+
 ## [1.6.0] - 2026-08-18
 
 30-day sending statistics per domain and application, plus optional auto

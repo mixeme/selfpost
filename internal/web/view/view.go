@@ -22,6 +22,7 @@ type Engine struct {
 	fragments      map[string]*template.Template
 	version        string
 	inboundEnabled bool
+	dmarcEnabled   bool
 }
 
 // pageFiles maps a logical page name to its template files. Every page
@@ -45,6 +46,9 @@ var pageFiles = map[string][]string{
 	"inbound":        {"templates/inbound.html"},
 	"inbound_domain": {"templates/inbound_domain.html"},
 	"inbound_delete": {"templates/inbound_delete.html"},
+	"dmarc":          {"templates/dmarc.html"},
+	"dmarc_domain":   {"templates/dmarc_domain.html"},
+	"dmarc_report":   {"templates/dmarc_report.html"},
 	"deliveries":     {"templates/deliveries.html", "templates/deliveries_rows.html"},
 	"delivery":       {"templates/delivery.html"},
 	"mail_queue":     {"templates/mail_queue.html", "templates/mail_queue_body.html"},
@@ -92,6 +96,11 @@ func (e *Engine) SetInboundEnabled(v bool) {
 	e.inboundEnabled = v
 }
 
+// SetDMARCEnabled controls whether the DMARC nav item is shown.
+func (e *Engine) SetDMARCEnabled(v bool) {
+	e.dmarcEnabled = v
+}
+
 // templateFuncs supplies helpers shared across page templates.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
@@ -135,6 +144,7 @@ func (e *Engine) Render(w http.ResponseWriter, status int, page string, data any
 		m["Copyright"] = legal.CopyrightLine
 		m["SourceURL"] = legal.SourceURL
 		m["InboundEnabled"] = e.inboundEnabled
+		m["DMARCEnabled"] = e.dmarcEnabled
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {

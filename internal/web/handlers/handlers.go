@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/mixeme/selfpost/internal/app"
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
@@ -38,6 +39,8 @@ type Config struct {
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE: the inbound panel and
 	// routes exist only when this is true.
 	InboundEnabled bool
+	// DMARCEnabled mirrors DMARC_REPORTS_ENABLE.
+	DMARCEnabled bool
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start; used
 	// as bootstrap and fallback when the settings row is missing or invalid.
 	SendLogRetentionEnvDefault int
@@ -49,6 +52,7 @@ type Handlers struct {
 	domains *domain.Service
 	apps    *app.Service
 	inbound *inbound.Service
+	dmarc   *dmarc.Service
 	cfg     Config
 	view    *view.Engine
 	dns     *dnscheck.Checker
@@ -62,6 +66,7 @@ func New(
 	domains *domain.Service,
 	apps *app.Service,
 	inboundSvc *inbound.Service,
+	dmarcSvc *dmarc.Service,
 	cfg Config,
 	v *view.Engine,
 	dns *dnscheck.Checker,
@@ -73,6 +78,7 @@ func New(
 		domains: domains,
 		apps:    apps,
 		inbound: inboundSvc,
+		dmarc:   dmarcSvc,
 		cfg:     cfg,
 		view:    v,
 		dns:     dns,

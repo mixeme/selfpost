@@ -22,7 +22,7 @@
 
 services:
   selfpost:
-    image: ghcr.io/mixeme/selfpost:1.6.0
+    image: ghcr.io/mixeme/selfpost:1.7.0
     restart: unless-stopped
     environment:
       SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"
@@ -34,6 +34,9 @@ services:
       # alongside the primary 465/smtps listener (spec 5).
       SUBMISSION_ENABLE: "${SUBMISSION_ENABLE:-false}"
       INBOUND_RELAY_ENABLE: "${INBOUND_RELAY_ENABLE:-false}"
+      DMARC_REPORTS_ENABLE: "${DMARC_REPORTS_ENABLE:-false}"
+      DMARC_RATE_LIMIT_MESSAGES_PER_IP: "${DMARC_RATE_LIMIT_MESSAGES_PER_IP:-20}"
+      DMARC_MESSAGE_SIZE_LIMIT: "${DMARC_MESSAGE_SIZE_LIMIT:-5242880}"
       INBOUND_ANTISPAM_MILTER: "${INBOUND_ANTISPAM_MILTER:-}"
       INBOUND_ANTISPAM_MILTER_ACTION: "${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
       INBOUND_RATE_LIMIT_MESSAGES_PER_IP: "${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}"

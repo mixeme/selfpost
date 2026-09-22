@@ -11,6 +11,7 @@ import (
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/legal"
@@ -85,6 +86,8 @@ type Config struct {
 	RetryPolicy postfix.RetryPolicy
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE.
 	InboundEnabled bool
+	// DMARCEnabled mirrors DMARC_REPORTS_ENABLE.
+	DMARCEnabled bool
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start.
 	SendLogRetentionEnvDefault int
 }
@@ -101,19 +104,20 @@ type Server struct {
 // that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
 // apps owns application SASL accounts and the Postfix sender map
 // (architecture.md § Mail path).
-func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, cfg Config, setupTokenPath string) (*Server, error) {
+func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, dmarcSvc *dmarc.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	v, err := view.New(cfg.Version)
 	if err != nil {
 		return nil, err
 	}
 	v.SetInboundEnabled(cfg.InboundEnabled)
+	v.SetDMARCEnabled(cfg.DMARCEnabled)
 	a := auth.New(st, auth.Config{
 		CookieSecure:      cfg.CookieSecure,
 		Hostname:          cfg.Hostname,
 		SessionIdleDays:   cfg.SessionIdleDays,
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
-	h := handlers.New(st, domains, apps, inboundSvc, handlers.Config{
+	h := handlers.New(st, domains, apps, inboundSvc, dmarcSvc, handlers.Config{
 		Hostname:               cfg.Hostname,
 		SubmissionEnabled:      cfg.SubmissionEnabled,
 		MailLogPath:            cfg.MailLogPath,
@@ -128,6 +132,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
 		RetryPolicy:                 cfg.RetryPolicy,
 		InboundEnabled:              cfg.InboundEnabled,
+		DMARCEnabled:                cfg.DMARCEnabled,
 		SendLogRetentionEnvDefault: cfg.SendLogRetentionEnvDefault,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
@@ -186,6 +191,12 @@ func (s *Server) Handler() http.Handler {
 		authed.HandleFunc("POST /inbound/{id}/recipients", h.HandleInboundRecipients)
 		authed.HandleFunc("GET /inbound/{id}/delete", h.HandleInboundDeleteConfirm)
 		authed.HandleFunc("POST /inbound/{id}/delete", h.HandleInboundDelete)
+	}
+
+	if s.cfg.DMARCEnabled {
+		authed.HandleFunc("GET /dmarc", h.HandleDMARCList)
+		authed.HandleFunc("GET /dmarc/reports/{id}", h.HandleDMARCReport)
+		authed.HandleFunc("GET /dmarc/domains/{id}", h.HandleDMARCDomain)
 	}
 
 	authed.HandleFunc("/settings", h.HandleSettings)
