@@ -1,0 +1,62 @@
+{{define "content"}}
+<h1>Help</h1>
+
+<p class="muted">Short operator notes inside the panel — not a second copy of
+the full guide. The cards keep their readings and controls; this page (and the
+drawer opened from each card's «?») holds the explanations that do not belong
+on the card itself.</p>
+
+<div class="card">
+  <h2>On this panel</h2>
+  {{if .IsGlobal}}
+  <ul>
+    <li><label for="help-status">Status checks</label> — Machine, TLS, PTR,
+    queue</li>
+    <li><a href="/mail-queue">Mail queue retries</a> — time-based, no attempt
+    budget (on the queue page)</li>
+    {{if .InboundEnabled}}
+    <li><a href="/inbound">Inbound</a> — not mailboxes; listed recipients or any
+    address at the domain</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <p class="muted">Domain page</p>
+  <ul>
+    <li><label for="help-dns">DNS status</label></li>
+    <li><label for="help-records">DKIM and SPF records</label></li>
+    <li><label for="help-dmarc">DMARC record</label></li>
+    <li><label for="help-connection">Connection settings</label></li>
+    <li><label for="help-apps">Applications</label></li>
+    <li><label for="help-domain-settings">Domain settings</label></li>
+    <li><label for="help-export">Export domain</label></li>
+  </ul>
+  <p class="muted">Topics marked as labels open the same text in the help
+  drawer. For installation, backup, and environment variables see the
+  <a href="https://github.com/mixeme/selfpost/blob/main/docs/guide.md">operator
+  guide</a> in the repository.</p>
+</div>
+
+{{if .IsGlobal}}
+<div class="card">
+  <h2>Machine</h2>
+  <p>CPU and memory are the container's own readings, not the host's spare
+  capacity. Network is a short window, not a daily total. High CPU with an empty
+  queue usually means something else on the box — not SelfPost being slow to
+  send.</p>
+</div>
+
+<div class="card">
+  <h2>TLS certificate</h2>
+  <p>Port 465 presents the certificate the reverse proxy (or the image)
+  mounted. The panel does not issue certificates. A warn here is expires soon;
+  an error is missing or unreadable, and clients will refuse submission.</p>
+</div>
+
+<div class="card">
+  <h2>Hostname / reverse DNS</h2>
+  <p>Forward-confirmed reverse DNS: the A/AAAA for
+  <code>SELFPOST_HOSTNAME</code> must reverse to that same name. PTR is set at
+  the hosting provider, not in this panel.</p>
+</div>
+{{end}}
+{{end}}

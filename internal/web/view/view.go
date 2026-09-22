@@ -54,6 +54,7 @@ var pageFiles = map[string][]string{
 	"mail_queue":     {"templates/mail_queue.html", "templates/mail_queue_body.html"},
 	"system_log":     {"templates/system_log.html", "templates/system_log_body.html"},
 	"status":         {"templates/status.html", "templates/status_body.html"},
+	"help":           {"templates/help.html"},
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -73,7 +74,7 @@ func New(version string) (*Engine, error) {
 		version:   version,
 	}
 	for name, files := range pageFiles {
-		patterns := append([]string{"templates/layout.html"}, files...)
+		patterns := append([]string{"templates/layout.html", "templates/help_drawer.html"}, files...)
 		tmpl, err := template.New("layout.html").Funcs(templateFuncs()).ParseFS(assetsFS, patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
@@ -104,6 +105,20 @@ func (e *Engine) SetDMARCEnabled(v bool) {
 // templateFuncs supplies helpers shared across page templates.
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"dict": func(values ...any) (map[string]any, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict: odd argument count")
+			}
+			m := make(map[string]any, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict: key %d is not a string", i)
+				}
+				m[key] = values[i+1]
+			}
+			return m, nil
+		},
 		// back builds the map back_link reads; keeps href and label paired at
 		// the call site instead of repeating the <a class="back"> markup.
 		"back": func(href, label string) map[string]string {

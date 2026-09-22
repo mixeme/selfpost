@@ -3,7 +3,10 @@
 {{define "wide"}}wide{{end}}
 
 {{define "content"}}
-<h1>Status</h1>
+<div class="page-head">
+  <h1>Status</h1>
+  <label class="help-link" for="help-status" title="What these checks mean">?</label>
+</div>
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 

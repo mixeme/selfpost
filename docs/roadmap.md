@@ -29,7 +29,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
-| panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
+| panel-docs | In-panel operator documentation | agreed | 6/6 | [plans/panel-docs.md](plans/panel-docs.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding): the next feature is **panel-docs** once

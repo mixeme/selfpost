@@ -756,3 +756,71 @@ button.copy { flex: none; }
 .encrypt .encrypt-fields { margin-top: 0; }
 .encrypt-fields label { margin-top: 0.7rem; }
 .encrypt-fields .muted { margin: 0.5rem 0 0; font-size: 0.85rem; }
+
+/* Screen-reader accessible controls that drive UI state (help drawer panes). */
+.ctrl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.page-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 0.5rem 1rem; margin-bottom: 1rem;
+}
+.page-head h1 { margin: 0; }
+
+.card-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 0.5rem 0.75rem; margin-bottom: 0.7rem;
+}
+.card-head h2 { margin: 0; }
+
+.help-link {
+  flex: none; width: 1.35rem; height: 1.35rem; display: inline-flex; align-items: center;
+  justify-content: center; border-radius: 50%; border: 1px solid var(--control-border);
+  color: var(--muted); text-decoration: none; font-family: var(--font-mono);
+  font-size: 0.75rem; font-weight: 600; background: var(--card-bg); cursor: pointer; margin: 0;
+}
+.help-link:hover { color: var(--accent-text); border-color: var(--accent-fill); }
+
+/* Help drawer — CSS checkbox/radio, no script required. */
+.help-drawer {
+  display: none; position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(26rem, 100vw); z-index: 30;
+  background: var(--card-bg); border-left: 1px solid var(--border);
+  padding: 1.25rem 1.35rem 2rem; overflow-y: auto;
+}
+html:has(input[name="help"]:checked):not(:has(#help-off:checked)) .help-drawer,
+html:has(input[name="help"]:checked):not(:has(#help-off:checked)) .help-scrim { display: block; }
+.help-pane { display: none; }
+html:has(#help-index:checked) .help-pane-index,
+html:has(#help-status:checked) .help-pane-status,
+html:has(#help-password:checked) .help-pane-password,
+html:has(#help-dns:checked) .help-pane-dns,
+html:has(#help-records:checked) .help-pane-records,
+html:has(#help-dmarc:checked) .help-pane-dmarc,
+html:has(#help-connection:checked) .help-pane-connection,
+html:has(#help-apps:checked) .help-pane-apps,
+html:has(#help-domain-settings:checked) .help-pane-domain-settings,
+html:has(#help-export:checked) .help-pane-export { display: block; }
+.help-scrim {
+  display: none; position: fixed; inset: 0; z-index: 25;
+  background: rgba(18, 22, 28, 0.28); cursor: pointer;
+}
+.help-drawer h2 { margin-top: 1.2rem; }
+.help-drawer h2:first-of-type,
+.help-pane h2 { margin-top: 0; }
+.help-drawer .toc { list-style: none; margin: 0.7rem 0 0; padding: 0; }
+.help-drawer .toc li { margin: 0.35rem 0 0; }
+.help-drawer .toc label {
+  margin: 0; font-weight: 600; color: var(--accent-text); cursor: pointer;
+}
+.help-drawer .more { margin-top: 1.2rem; font-size: 0.85rem; }
+.help-drawer .more label {
+  display: inline; margin: 0; font-weight: 600; color: var(--accent-text); cursor: pointer;
+}
+.help-close {
+  position: absolute; top: 0.8rem; right: 0.8rem; margin: 0; padding: 0.35rem 0.6rem;
+  font-size: 0.8rem; font-weight: 600; background: var(--surface-bg); color: var(--fg);
+  border: 1px solid var(--control-border); border-radius: 5px; cursor: pointer;
+}
+@media (max-width: 66rem) {
+  .help-drawer { width: 100vw; }
+}

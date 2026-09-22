@@ -569,9 +569,6 @@ func forEachTemplate(t *testing.T, fn func(name, body string)) {
 	}
 }
 
-// The retry-policy card is static HTML on mail_queue (outside the HTMX
-// fragment), so rendering the page with a fixture must print those strings
-// rather than falling back to empty template fields.
 func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
 	engine, err := New("test")
 	if err != nil {
@@ -602,5 +599,83 @@ func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
 	}
 	if strings.Contains(out, "compiled-in defaults") {
 		t.Error("RetryFromDefaults was unset; the fallback note should stay off")
+	}
+}
+
+func TestAuthenticatedLayoutIncludesHelpDrawer(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := engine.Page("help").ExecuteTemplate(&buf, "layout.html", map[string]any{
+		"Title": "t", "User": "admin", "Active": "help", "IsGlobal": true,
+	}); err != nil {
+		t.Fatalf("execute help layout: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		`id="help-off"`, `class="help-drawer"`, `help-pane-status`,
+		`for="help-dns"`, `href="/help"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("authenticated layout missing %q", want)
+		}
+	}
+}
+
+func TestLoginPageOmitsHelpDrawer(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := engine.Page("login").ExecuteTemplate(&buf, "layout.html", map[string]any{
+		"Title": "t", "Active": "",
+	}); err != nil {
+		t.Fatalf("execute login: %v", err)
+	}
+	if strings.Contains(buf.String(), "help-drawer") {
+		t.Error("login page should not include the help drawer")
+	}
+}
+
+func TestStatusPageHasHelpEntry(t *testing.T) {
+	out := renderStatusPage(t, statusPageData())
+	if !strings.Contains(out, `for="help-status"`) {
+		t.Error("status page is missing the help entry point")
+	}
+}
+
+func TestDomainDetailHasHelpOnCards(t *testing.T) {
+	body, err := fs.ReadFile(assetsFS, "templates/domain_detail.html")
+	if err != nil {
+		t.Fatalf("read domain_detail: %v", err)
+	}
+	src := string(body)
+	for _, want := range []string{
+		`"ID" "dns"`, `"ID" "records"`, `"ID" "dmarc"`, `"ID" "connection"`,
+		`"ID" "apps"`, `"ID" "domain-settings"`, `"ID" "export"`,
+		`card-head`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("domain_detail missing %q", want)
+		}
+	}
+}
+
+func TestNavIncludesHelp(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
+		"User": "admin", "Active": "domains", "IsGlobal": true,
+	}); err != nil {
+		t.Fatalf("execute nav: %v", err)
+	}
+	if !strings.Contains(buf.String(), `href="/help"`) {
+		t.Error("nav is missing Help link")
 	}
 }

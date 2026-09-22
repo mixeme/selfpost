@@ -159,6 +159,8 @@ func (s *Server) Handler() http.Handler {
 
 	authed := http.NewServeMux()
 	authed.HandleFunc("GET /{$}", redirectHome)
+	authed.HandleFunc("GET /help", h.HandleHelp)
+
 	authed.HandleFunc("GET /status", h.HandleStatus)
 	authed.HandleFunc("GET /status/fragment", h.HandleStatusFragment)
 	authed.HandleFunc("POST /status/recheck", h.HandleStatusRecheck)

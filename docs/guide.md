@@ -311,6 +311,18 @@ Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
 After sign-in the panel opens on **Status** — the place to answer "is the
 service healthy and will mail be accepted?"
 
+### In-panel help
+
+The panel carries short operator notes so day-to-day work does not require
+opening this guide. **Help** in the navigation opens an index; each Status or
+domain card's «?» opens the same text in a side drawer (CSS only, no extra
+script). That content explains what a check or control *means* — kernel
+counters, TLS on port 465, forward-confirmed PTR, DNS publish hints, rate
+limits, and similar. It is not a second copy of this document: installation,
+reverse-proxy setup, backup/restore, environment variables, and security
+assumptions stay here in `docs/guide.md` (linked from the drawer and Help
+page).
+
 ### Status
 
 `/status` shows supervised processes (Postfix, OpenDKIM, panel), TLS

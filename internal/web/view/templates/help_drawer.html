@@ -1,0 +1,157 @@
+{{/* Hidden radios drive which help pane is visible — CSS :has(), no script. */}}
+{{define "help_inputs"}}
+<input class="ctrl" type="radio" name="help" id="help-off" checked>
+<input class="ctrl" type="radio" name="help" id="help-index">
+<input class="ctrl" type="radio" name="help" id="help-status">
+<input class="ctrl" type="radio" name="help" id="help-password">
+<input class="ctrl" type="radio" name="help" id="help-dns">
+<input class="ctrl" type="radio" name="help" id="help-records">
+<input class="ctrl" type="radio" name="help" id="help-dmarc">
+<input class="ctrl" type="radio" name="help" id="help-connection">
+<input class="ctrl" type="radio" name="help" id="help-apps">
+<input class="ctrl" type="radio" name="help" id="help-domain-settings">
+<input class="ctrl" type="radio" name="help" id="help-export">
+{{end}}
+
+{{define "help_more"}}<p class="more muted"><label for="help-index">All topics</label>{{if .}} · <a href="/help">Help page</a>{{end}}</p>{{end}}
+
+{{/* card_help — «?» on a card head; .ID is the topic slug (dns, records, …). */}}
+{{define "card_help"}}
+<label class="help-link" for="help-{{.ID}}" title="{{.Title}}">?</label>
+{{end}}
+
+{{define "help_drawer"}}
+<label class="help-scrim" for="help-off"></label>
+<aside class="help-drawer">
+  <label class="help-close" for="help-off">Close</label>
+
+  <article class="help-pane help-pane-index">
+    <h2>Help</h2>
+    <p>Short notes for the card you opened — not a second copy of the
+    <a href="https://github.com/mixeme/selfpost/blob/main/docs/guide.md">operator guide</a>.</p>
+    {{if .IsGlobal}}
+    <p class="muted">Status</p>
+    <ul class="toc"><li><label for="help-status">Status checks</label></li></ul>
+    {{end}}
+    <p class="muted">Domain</p>
+    <ul class="toc">
+      <li><label for="help-password">New application password</label></li>
+      <li><label for="help-dns">DNS status</label></li>
+      <li><label for="help-records">DKIM and SPF records</label></li>
+      <li><label for="help-dmarc">DMARC record</label></li>
+      <li><label for="help-connection">Connection settings</label></li>
+      <li><label for="help-apps">Applications</label></li>
+      <li><label for="help-domain-settings">Domain settings</label></li>
+      <li><label for="help-export">Export domain</label></li>
+    </ul>
+  </article>
+
+  <article class="help-pane help-pane-status">
+    <h2>Status checks</h2>
+    <p>The cards keep the readings. This drawer is what used to sit under them
+    as paragraphs.</p>
+    <h2>Machine</h2>
+    <p>CPU and memory are the container's readings, not the host's spare
+    capacity. Network is a short rate window between refreshes, not a daily
+    total. High CPU with an empty queue usually means something else on the box
+    — not SelfPost being slow to send.</p>
+    <h2>TLS certificate</h2>
+    <p>Port 465 presents the certificate the reverse proxy (or the image)
+    mounted. The panel does not issue certificates. A warn here is expires
+    soon; an error is missing or unreadable, and clients will refuse
+    submission.</p>
+    <h2>Hostname / reverse DNS</h2>
+    <p>Forward-confirmed reverse DNS: the A/AAAA for
+    <code>SELFPOST_HOSTNAME</code> must reverse to that same name. PTR is set
+    at the hosting provider, not in this panel. Receiving networks use this
+    pair as a cheap reputation check.</p>
+    <h2>Mail queue</h2>
+    <p>Deferred mail is retried on a time schedule (first delay, doubling cap,
+    queue lifetime). There is no attempt budget — see the retry-policy card on
+  <em>Mail queue</em>.</p>
+    {{if .InboundEnabled}}
+    <h2>Inbound</h2>
+    <p>When <code>INBOUND_RELAY_ENABLE</code> is on, port 25 accepts mail for
+    configured domains and forwards it upstream — not to local mailboxes.
+    Recipients are a list or any address at the domain.</p>
+    {{end}}
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-password">
+    <h2>New application password</h2>
+    <p>Shown <strong>once only</strong> and not stored. Copy it now — if it is
+    lost, regenerate a new one. The previous password stops working
+    immediately.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-dns">
+    <h2>DNS status</h2>
+    <p>The badge is the worst of DKIM, SPF and DMARC. Results are cached a few
+    minutes — use <em>Re-check</em> after publishing.</p>
+    <p>SPF is a shallow check: the literal address only, no
+    <code>include:</code> or <code>redirect=</code>. Report authorization is
+    required only when <code>rua=</code> points at a domain this server does
+    not accept.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-records">
+    <h2>DKIM and SPF records</h2>
+    <p>DKIM is not a secret. The selector on this page is the one this server
+    signs with. Merge the SPF example into an existing record if the domain
+    already has one — do not publish a second TXT.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-dmarc">
+    <h2>DMARC record</h2>
+    <p><code>p=none</code> does not affect delivery. Tighten to
+    <code>p=quarantine</code> then <code>p=reject</code> once reports look
+    clean. The report address is set under Domain settings (or the Settings
+    default).</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-connection">
+    <h2>Connection settings</h2>
+    <p>Same host for every domain. Authenticate with an application login from
+    this page. Auth is required on every port. The password is shown once at
+    create or regenerate.</p>
+    <p>465 is implicit TLS; 587 is STARTTLS submission when that port is
+    enabled.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-apps">
+    <h2>Applications</h2>
+    <p>SASL logins for this domain. Login is unique across domains; letters,
+    digits, <code>.</code>, <code>-</code> and <code>_</code>. The password is
+    shown once.</p>
+    <p>Address mode is which From addresses this application may use: any
+    address of the domain, or a fixed list. A trusted-IP override gives those
+    clients a higher ceiling than the domain (still ≤ level 1) and skips the
+    domain check; everyone else uses the domain limit if set, otherwise level
+    1.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-domain-settings">
+    <h2>Domain settings</h2>
+    <p>Aggregate reports (<code>rua=</code>) inherit the Settings default, or
+    you override them per domain. Level 2 is an optional ceiling for all
+    senders on this domain; it must be ≤ level 1. Application overrides live on
+    each application.</p>
+    {{template "help_more" true}}
+  </article>
+
+  <article class="help-pane help-pane-export">
+    <h2>Export domain</h2>
+    <p>The file is a secret: it carries the DKIM key and application
+    passwords, so published DNS does not have to change on the other instance.
+    Transfer it securely, or encrypt it as <code>.spde</code>.</p>
+    {{template "help_more" true}}
+  </article>
+</aside>
+{{end}}
