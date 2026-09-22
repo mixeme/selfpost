@@ -1,4 +1,6 @@
-![SelfPost](docs/assets/selfpost-stamp.svg)
+<p align="center">
+  <img src="docs/assets/selfpost-stamp.svg" alt="SelfPost" width="440">
+</p>
 
 # SelfPost
 
@@ -190,7 +192,13 @@ service healthy and will mail be accepted?"
 
 - **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
   TLS certificate validity and expiry, milter socket presence, and a short
-  Postfix queue summary. The hostname block compares `SELFPOST_HOSTNAME`
+  Postfix queue summary. The **Machine** card adds the resource usage of the
+  host underneath — processor (with the load average), memory and swap, and
+  per-interface network throughput and totals — read from the kernel's
+  counters; CPU and throughput are measured between refreshes, so they appear
+  one refresh after the page opens. A fully busy processor or a machine out of
+  memory is a warning here, because both delay or kill the mail path;
+  throughput is only reported. The hostname block compares `SELFPOST_HOSTNAME`
   against the PTR record the internet publishes for this server's IP
   (forward-confirmed reverse DNS); use *Re-check* after changing DNS. The
   **Reload configuration** button re-applies OpenDKIM tables and the Postfix
@@ -201,9 +209,13 @@ service healthy and will mail be accepted?"
   (level 2) are configured here. *Export domain* writes a single-domain archive;
   *Import a domain* on the Backup page reads one back in.
 - **Deliveries** (`/deliveries`) — searchable send log with server-side filters
-  by domain and application. Each row shows status `queued` (accepted, not yet
+  by domain and application. A row identifies its message and nothing more —
+  time, sender, recipient, subject and status `queued` (accepted, not yet
   delivered), `sent` (handed off successfully), or `rejected` (refused — for
-  example by a level-2 rate limit). Retention is controlled by
+  example by a level-2 rate limit); *Details* opens that row's own page
+  (`/deliveries/{id}`) with the sending domain, the application it was
+  submitted under, the Postfix queue id to search the system log for, and when
+  the status was last reported. Retention is controlled by
   `SEND_LOG_RETENTION_DAYS`.
 - **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
   trying to deliver or deferring.

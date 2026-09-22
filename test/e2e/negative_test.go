@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 )
@@ -54,11 +53,11 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 	}
 
 	if err := waitFor("a rejected row for l2app in the send log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
-		rows, err := sc.panel.sendLogRows(senderDomain)
+		rows, err := sc.panel.sendLogRows(senderDomain, login)
 		if err != nil {
 			return false, err
 		}
-		if strings.Contains(rows, "l2app") && containsCell(rows, "rejected") {
+		if containsCell(rows, "rejected") {
 			return true, nil
 		}
 		return false, fmt.Errorf("no rejected row for l2app yet")

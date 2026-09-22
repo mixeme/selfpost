@@ -5,6 +5,142 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-08
+
+### Added
+
+- A page per delivery (`/deliveries/{id}`), reached from the *Details* link on
+  every send-log row. It carries what the log itself no longer shows — the
+  sending domain, the application the message was submitted under, the Postfix
+  queue id to search the system log for, when the status was last reported —
+  so the journal can grow fields without the table having to find columns for
+  them. *Back* returns to the page and filters the row was opened from, rebuilt
+  from the log's own parameters only.
+
+- A **DNS** badge in the domain list, one per row, carrying the same
+  ok/warn/error/unknown vocabulary as the rest of the panel: the worst of that
+  domain's DKIM, SPF and DMARC checks, so a domain whose records were never
+  published is visible without opening it. The badge links to that domain's
+  DNS status card. The checks run concurrently across the listed domains —
+  each carries its own timeout, and in series a dead resolver would multiply
+  that wait by the number of domains — and share the checker's cache with the
+  domain page, so a repeat view costs no lookups. A domain whose DKIM key
+  cannot be read stays "unknown" rather than being reported as misconfigured,
+  since the missing half is this server's.
+- Machine metrics on the status page: a **Machine** card reporting the
+  processor (busy percentage, core count, load average), memory and swap, and
+  network throughput and totals per interface, read from the kernel's counters
+  in `/proc` (`internal/health/machine.go`). CPU and throughput are differences
+  between two readings, so they are measured against the previous poll of the
+  status fragment and reported as still being measured until a second reading
+  exists — a page opened after a long idle stretch re-baselines rather than
+  presenting that stretch as the current load. A fully busy processor (≥90%)
+  warns and an exhausted machine (≥97% of memory in use) errors, both counting
+  towards the page's headline verdict, since either delays or kills the mail
+  path; throughput is reported and never graded. Counters that cannot be read
+  — no `/proc` outside Linux — leave the card in place showing "unknown". The
+  usage bars are `<meter>` elements: the panel's CSP has no inline-style
+  exemption, so a bar's length has to travel on an attribute.
+- An index of the current page's own sections in the navigation column, for the
+  two pages long enough to need one: the domain page (nine cards, from the DNS
+  records to publish down to the danger zone) and the status page (eight). Each
+  card carries an id and the page's template defines the list
+  (`{{define "sections"}}`); every other page defines nothing and shows no
+  index. `panel.js` marks the section currently in view, looking its targets up
+  by id on each pass so the status page swapping its cards out every five
+  seconds cannot leave it measuring boxes that have left the document. The
+  links are plain fragment links and work with JavaScript blocked; only the
+  highlight needs it.
+
+### Changed
+
+- Every panel page is laid out in one column of the same width, so moving
+  between them no longer shifts the navigation and the cards sideways. The
+  column used to be the 48rem reading measure, which the send log, the mail
+  queue and the system log widened to 64rem for their tables — and since the
+  navigation and the page are centred as a pair, that difference moved
+  everything on screen on the way between two pages. The column is now 64rem
+  throughout, with the reading measure kept inside it: a page's heading, cards,
+  back link and version footer are held to 48rem and centred in the column,
+  and the three pages made of data opt out and take the column whole. Which
+  pages those are is declared by the page itself (a `wide` block in its
+  template, the same mechanism as the section index) rather than derived from
+  the navigation entry, so a single delivery's page — prose, but filed under
+  the send log — keeps the measure. The scrollbar's width is now reserved on
+  every page as well: without it a short page and a long one were laid out in
+  viewports differing by that width, which moved the same things again.
+
+- The mark's small-size variant — the tab icon and the `SP` initials it
+  carries — sets its S in Medium where the wordmark sets it in ExtraLight.
+  Against the P's SemiBold the ExtraLight S is a 0.90 stem against 3.40,
+  which at 16px is a quarter of a pixel against most of one, so the pair
+  rasterised to a P with a smudge beside it. Medium gives up the
+  Self/Post weight play, which needs more pixels than this variant exists
+  to work in, in exchange for both letters being there. The variants big
+  enough to carry the contrast keep it. `favicon.png` is regenerated to
+  match, and the outlines are IBM Plex Sans as before — the same
+  font-size, letter-spacing and baseline, with only the S's weight moved.
+- The stamp's `SELF-HOSTED SMTP RELAY` line is set at 11.5/0.15 instead of
+  7.2/2.8, and no longer carries `opacity=".78"`. At the old size its stems
+  rasterised to about half a device pixel, so more than half its ink landed
+  as antialiasing — the typical pixel reached 2.1:1 against the brown rather
+  than the 7.3:1 the two colours are worth, and none reached full strength.
+  The line keeps its footprint and its monospaced cells: the width the
+  tracking was spending went to the glyphs, whose cap height rises from 5.2
+  to 8.3. The mark is used at 330px on the login and setup pages, which is
+  where this was worst. `internal/web/static/logo.svg` is a copy of
+  `docs/assets/selfpost-stamp.svg` and both carry the change, as does the
+  proof sheet the outlines are drawn from.
+- The delivery log lists what identifies a message and nothing else: time,
+  sender, recipient, subject, status. Domain and application, which were a
+  column each, remain the log's two filters and now appear per message on the
+  delivery page. The two dropped columns were the widest thing in the table
+  after the addresses, and both repeat down the page whenever a filter is set.
+- Subjects are decoded for display as well as on the way in, so the rows the
+  journal-milter recorded before it decoded them itself — the ones an operator
+  is most likely to still be reading — show their text rather than
+  `=?utf-8?Q?…?=`. The decoder moved to `internal/mailhdr` and is shared by the
+  milter and the panel; it is idempotent, so a row decoded once passes through
+  unchanged.
+- The panel's navigation is a column down the left edge instead of a bar across
+  the top. As a bar it did not fit on one row — six page entries and the
+  session block against the panel's width — and had to be split into two,
+  costing the top of every page; standing it up removes the compromise, gives
+  the entries one left edge to scan down, and leaves room under them for the
+  section index above. It is sticky, so both lists stay in view on the long
+  pages, and the current entry is marked down its leading edge rather than
+  underlined. Below the width the two columns need, it lies back down into the
+  wrapping rows it used to be — no drawer and no hamburger, since six entries
+  fit. The markup now lists the blocks in the order they are drawn, so the tab
+  order follows the eye instead of starting at Sign out.
+- An application's mode and rate-limit fields open under its row of controls
+  instead of inside it. Both panels were `<details>`, so each opened where its
+  own toggle sat and cut the row of four in half, pushing New password and
+  Delete below a block of fields — the buttons moved every time a panel was
+  opened or closed. The toggle is now a hidden checkbox with its label drawn as
+  the button, and the panel is the last child of the row, so the four controls
+  keep their places and what a panel reveals is laid out beneath all of them.
+  It stays keyboard-reachable and, being pure CSS, still works with JavaScript
+  blocked, as the disclosure did. Inside a panel the submit buttons take the
+  ordinary form spacing back from the compact row style that was leaving them
+  flush against the field above, and Save limit and Remove limit — two posts,
+  hence two forms — share one row, the first button bound to its form by the
+  `form` attribute rather than by sitting inside it.
+- The mark at the head of the navigation column takes the column's full width
+  instead of the 110px it kept from the bar. In a row that size was all there
+  was room for; in a column it left the mark ending halfway across, with no
+  edge shared with anything below it. At the column's width its edges line up
+  with the page entries under it, as the full mark already does with the card
+  beneath it on the signed-out pages. Where the column lies back down into a
+  bar it returns to the compact size, which is what fits beside the entries.
+- The import card reads the file's extension instead of asking whether the file
+  is encrypted. The checkbox was a question the server never consulted — it
+  decides from the envelope's magic bytes — so the answer could only be wrong.
+  Choosing a `.spde` file reveals the password field and a `.json` file hides
+  it; an unrecognised extension reveals it, and with no file chosen the field
+  stays hidden, since there is nothing yet for a password to open. With
+  JavaScript blocked the field is shown, so an encrypted import still works.
+
 ## [0.5.0] - 2026-08-06
 
 ### Fixed

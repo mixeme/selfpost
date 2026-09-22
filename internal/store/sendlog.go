@@ -1,6 +1,8 @@
 package store
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -104,6 +106,37 @@ type SendLogRow struct {
 	Subject   string
 	Status    string
 	CreatedAt time.Time
+	// UpdatedAt is when the status last changed — the log-tailer's report of
+	// the delivery attempt. It equals CreatedAt while a row is still queued.
+	UpdatedAt time.Time
+}
+
+// ErrSendLogNotFound is returned by GetSendLog for an id that no longer exists.
+// Send-log rows are pruned on the retention window, so a bookmarked delivery
+// disappearing is expected, not a fault.
+var ErrSendLogNotFound = errors.New("send-log entry not found")
+
+// GetSendLog returns a single send-log row by id, for the delivery detail page
+// the log links each row to.
+func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
+	var (
+		row                  SendLogRow
+		createdAt, updatedAt string
+	)
+	err := s.db.QueryRow(
+		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at
+		 FROM send_log WHERE id = ?`, id,
+	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin, &row.From, &row.To,
+		&row.Subject, &row.Status, &createdAt, &updatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return SendLogRow{}, ErrSendLogNotFound
+	}
+	if err != nil {
+		return SendLogRow{}, fmt.Errorf("get send_log %d: %w", id, err)
+	}
+	row.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	row.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	return row, nil
 }
 
 // SendLogFilter narrows QuerySendLog/CountSendLog by domain and/or
@@ -119,7 +152,7 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
 	rows, err := s.db.Query(
-		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at
+		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at
 		 FROM send_log`+where+`
 		 ORDER BY id DESC
 		 LIMIT ? OFFSET ?`,
@@ -133,14 +166,15 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 	var out []SendLogRow
 	for rows.Next() {
 		var (
-			row       SendLogRow
-			createdAt string
+			row                  SendLogRow
+			createdAt, updatedAt string
 		)
 		if err := rows.Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin,
-			&row.From, &row.To, &row.Subject, &row.Status, &createdAt); err != nil {
+			&row.From, &row.To, &row.Subject, &row.Status, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan send_log row: %w", err)
 		}
 		row.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		row.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 		out = append(out, row)
 	}
 	return out, rows.Err()

@@ -84,6 +84,11 @@ type Server struct {
 	sessions *sessionStore
 	setup    *setupManager
 	dns      *dnscheck.Checker
+	// machine reads the host's CPU, memory and network counters for the
+	// status page. It has to be one shared sampler for the whole server:
+	// CPU and throughput are differences between successive readings, so a
+	// per-request sampler would never have a previous one to subtract.
+	machine health.MachineSampler
 
 	loginLimiter *rateLimiter
 	setupLimiter *rateLimiter
@@ -193,6 +198,7 @@ func (s *Server) Handler() http.Handler {
 	// and /body endpoints return HTML, not JSON).
 	authed.HandleFunc("GET /deliveries", s.handleDeliveries)
 	authed.HandleFunc("GET /deliveries/rows", s.handleDeliveriesRows)
+	authed.HandleFunc("GET /deliveries/{id}", s.handleDelivery)
 	authed.HandleFunc("GET /mail-queue", s.handleMailQueue)
 	authed.HandleFunc("GET /mail-queue/body", s.handleMailQueueBody)
 	authed.HandleFunc("GET /system-log", s.handleSystemLog)

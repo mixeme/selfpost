@@ -166,7 +166,7 @@ func TestE2E(t *testing.T) {
 		}
 
 		if err := waitFor("send-log row to reach status=sent", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
-			rows, err := sc.panel.sendLogRows(senderDomain)
+			rows, err := sc.panel.sendLogRows(senderDomain, "")
 			if err != nil {
 				return false, err
 			}

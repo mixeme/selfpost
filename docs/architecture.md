@@ -133,9 +133,10 @@ unless noted.
 | `/healthz` | Liveness (no auth) |
 | `/setup/*` | One-time admin bootstrap |
 | `/login`, `/logout` | Session auth |
-| `/status` | Process, cert, socket, PTR checks |
+| `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
 | `/deliveries` | Send log with filters |
+| `/deliveries/{id}` | One send-log row in full |
 | `/mail-queue` | Postfix queue view |
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |

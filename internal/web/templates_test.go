@@ -29,6 +29,79 @@ func TestEveryPageResolvesNav(t *testing.T) {
 	}
 }
 
+// The section index each long page shows in the navigation column works by
+// overriding an empty "sections" block defined in the layout, which only holds
+// as long as the layout is parsed before the page's own files (see pageFiles).
+// Reverse that order and every index would silently disappear — the empty
+// definition would win and no page would fail to render — so the two ends are
+// asserted here: the long pages produce a list, and a page that defines nothing
+// produces nothing at all.
+func TestSectionIndexIsOnTheLongPagesOnly(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	// Anchors the index links to, taken from the page's own cards.
+	wantAnchors := map[string]string{
+		"status":        `href="#certificate"`,
+		"domain_detail": `href="#danger"`,
+	}
+	for name, page := range tmpl.pages {
+		var buf bytes.Buffer
+		// The domain page's index hides the freshly generated credential entry
+		// unless one is on the page, so the data map carries the key it reads.
+		if err := page.ExecuteTemplate(&buf, "sections", map[string]any{"NewCred": nil}); err != nil {
+			t.Fatalf("execute sections for %q: %v", name, err)
+		}
+		out := buf.String()
+		anchor, wanted := wantAnchors[name]
+		switch {
+		case wanted && !strings.Contains(out, anchor):
+			t.Errorf("page %q shows no section index (expected %s):\n%s", name, anchor, out)
+		case !wanted && strings.TrimSpace(out) != "":
+			t.Errorf("page %q is not long enough to carry a section index:\n%s", name, out)
+		}
+	}
+}
+
+// A section link that points at no card is a link that does nothing, and
+// nothing about rendering the page says so. Every anchor the index offers must
+// name an element the same page defines an id for.
+func TestSectionLinksPointAtCardsThatExist(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	// The pages that carry an index; both are checked with a credential shown,
+	// which is the domain page's one conditional entry.
+	for _, name := range []string{"status", "domain_detail"} {
+		var index bytes.Buffer
+		if err := tmpl.pages[name].ExecuteTemplate(&index, "sections", map[string]any{"NewCred": true}); err != nil {
+			t.Fatalf("execute sections for %q: %v", name, err)
+		}
+		// The cards are spread over the page's template files, so the ids are
+		// collected from the files rather than from a rendered page — rendering
+		// one would need the whole of a handler's data map.
+		ids := map[string]bool{}
+		for _, file := range pageFiles[name] {
+			body, err := fs.ReadFile(assetsFS, file)
+			if err != nil {
+				t.Fatalf("read %s: %v", file, err)
+			}
+			// Cards only: a form field's id is not somewhere a section link may
+			// land, so matching those too would weaken the check.
+			for _, m := range regexp.MustCompile(`class="card[^"]*" id="([a-z-]+)"`).FindAllStringSubmatch(string(body), -1) {
+				ids[m[1]] = true
+			}
+		}
+		for _, m := range regexp.MustCompile(`href="#([a-z-]+)"`).FindAllStringSubmatch(index.String(), -1) {
+			if !ids[m[1]] {
+				t.Errorf("page %q indexes #%s, which no card on it carries", name, m[1])
+			}
+		}
+	}
+}
+
 // The version comes from render(), not from each handler's data map, so the
 // footer is only correct as long as every page composes with the layout and
 // render keeps supplying the key. Both are asserted here rather than trusted.
@@ -142,6 +215,32 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	}
 }
 
+// Whether a page takes the whole column or the reading measure is declared by
+// the page's own "wide" block (see layout.html), which the layout stamps into
+// <main>'s class list. A page that loses the block does not fail to render — it
+// silently comes back at the measure, with its table squeezed into two thirds
+// of the column — so the set is asserted here, in both directions.
+func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
+	tmpl, err := loadTemplates()
+	if err != nil {
+		t.Fatalf("loadTemplates: %v", err)
+	}
+	wide := map[string]bool{"deliveries": true, "mail_queue": true, "system_log": true}
+	for name, page := range tmpl.pages {
+		var buf bytes.Buffer
+		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
+			t.Fatalf("execute the wide block of %s: %v", name, err)
+		}
+		got := strings.TrimSpace(buf.String())
+		switch {
+		case wide[name] && got != "wide":
+			t.Errorf("page %q no longer declares itself wide (%q); its data falls back to the reading measure", name, got)
+		case !wide[name] && got != "":
+			t.Errorf("page %q declares itself %q; only the pages that are tables of data or raw log lines take the whole column", name, got)
+		}
+	}
+}
+
 // Since the panel root redirects to the status page, a link left pointing at
 // "/" silently lands on the wrong screen instead of failing — so no template may
 // contain one.
@@ -211,12 +310,68 @@ func TestLayoutReferencesOnlyEmbeddedAssets(t *testing.T) {
 }
 
 func TestStatusPageRendersEveryCheck(t *testing.T) {
+	out := renderStatusPage(t, statusPageData())
+	for _, want := range []string{
+		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
+		"203.0.113.10 → no PTR record", `action="/reload"`,
+		`hx-get="/status/fragment"`, `class="st st-error"`,
+		// The machine card: the bars carry their reading in an attribute
+		// (the CSP rules out sizing them with a style), and the figures are
+		// printed beside them for anything that does not render a meter.
+		`<meter value="12"`, `<meter value="50"`,
+		"load average 0.31, 0.24, 0.19", "2.0 GiB used of 4.0 GiB",
+		"eth0: 1.0 MiB in, 512.0 KiB out",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("status page is missing %q", want)
+		}
+	}
+}
+
+// A machine whose counters could not be read — no /proc, or a first reading
+// with nothing to compare against — must leave the card in place with its rows
+// blank, the same way an unreachable supervisord costs one line and not the
+// page.
+func TestStatusPageWithoutMachineMetrics(t *testing.T) {
+	data := statusPageData()
+	data["Machine"] = health.Machine{
+		CPU:     health.CPU{Status: health.StatusUnknown, Detail: "The kernel's processor counters (/proc/stat) could not be read here."},
+		Memory:  health.Memory{Status: health.StatusUnknown, Detail: "The kernel's memory counters (/proc/meminfo) could not be read here."},
+		Network: health.Network{Status: health.StatusUnknown, Detail: "The kernel's network counters (/proc/net/dev) could not be read here."},
+		Status:  health.StatusUnknown,
+	}
+
+	out := renderStatusPage(t, data)
+	if strings.Contains(out, "<meter") {
+		t.Error("a bar was drawn for a reading that does not exist")
+	}
+	for _, want := range []string{
+		`<h2>Machine <span class="st st-unknown">`,
+		"/proc/stat", "/proc/meminfo", "/proc/net/dev",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("degraded machine card is missing %q", want)
+		}
+	}
+}
+
+func renderStatusPage(t *testing.T, data map[string]any) string {
+	t.Helper()
 	tmpl, err := loadTemplates()
 	if err != nil {
 		t.Fatalf("loadTemplates: %v", err)
 	}
 	var buf bytes.Buffer
-	err = tmpl.pages["status"].ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := tmpl.pages["status"].ExecuteTemplate(&buf, "layout.html", data); err != nil {
+		t.Fatalf("execute status page: %v", err)
+	}
+	return buf.String()
+}
+
+// statusPageData is one plausible reading of every check the status page shows,
+// so a test can render the page and vary the one part it is about.
+func statusPageData() map[string]any {
+	return map[string]any{
 		"Title":  "SelfPost — status",
 		"User":   "admin",
 		"Active": "status",
@@ -232,6 +387,26 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 			NotAfter: time.Now().Add(30 * 24 * time.Hour), DaysLeft: 30,
 			Status: health.StatusOK, Detail: "Valid for another 30 day(s).",
 		},
+		"Machine": health.Machine{
+			CPU: health.CPU{
+				Measured: true, BusyPct: 12.4, Cores: 4,
+				Load: [3]float64{0.31, 0.24, 0.19}, HasLoad: true,
+				Status: health.StatusOK, Detail: "4 core(s) · load average 0.31, 0.24, 0.19",
+			},
+			Memory: health.Memory{
+				Measured: true, TotalBytes: 4 << 30, UsedBytes: 2 << 30, UsedPct: 50,
+				Status: health.StatusOK, Detail: "2.0 GiB used of 4.0 GiB; 2.0 GiB available to new work.",
+			},
+			Network: health.Network{
+				Measured: true, RxRate: 2048, TxRate: 1024,
+				Interfaces: []health.Interface{
+					{Name: "eth0", RxBytes: 1 << 20, TxBytes: 1 << 19, RxRate: 2048, TxRate: 1024, Measured: true},
+				},
+				Status: health.StatusOK,
+			},
+			Window: 5 * time.Second,
+			Status: health.StatusOK,
+		},
 		"Sockets": []health.Socket{
 			{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening."},
 		},
@@ -244,19 +419,6 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 			Detail:  "No address has a reverse record.",
 			Records: []string{"203.0.113.10 → no PTR record"},
 		},
-	})
-	if err != nil {
-		t.Fatalf("execute status page: %v", err)
-	}
-	out := buf.String()
-	for _, want := range []string{
-		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
-		"203.0.113.10 → no PTR record", `action="/reload"`,
-		`hx-get="/status/fragment"`, `class="st st-error"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("status page is missing %q", want)
-		}
 	}
 }
 

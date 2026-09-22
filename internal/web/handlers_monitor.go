@@ -4,9 +4,11 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/mixeme/selfpost/internal/logtail"
+	"github.com/mixeme/selfpost/internal/mailhdr"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -50,6 +52,58 @@ func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
 	s.renderFragment(w, http.StatusOK, "deliveries_rows", data)
 }
 
+// handleDelivery renders one send-log row in full. The log itself carries only
+// what identifies a message at a glance — when, who to and from, what about,
+// how it ended — and every remaining field (domain, application, queue id, when
+// the status was last reported) lives here, one page per row, so widening the
+// journal never costs the table a column.
+func (s *Server) handleDelivery(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		http.NotFound(w, r)
+		return
+	}
+	row, err := s.store.GetSendLog(id)
+	if err != nil {
+		// A row pruned on the retention window is gone, not broken.
+		if errors.Is(err, store.ErrSendLogNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		logf("panel: delivery %d: %v", id, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	row.Subject = mailhdr.DecodeSubject(row.Subject)
+	s.render(w, http.StatusOK, "delivery", map[string]any{
+		"Title":  "SelfPost — delivery",
+		"User":   currentUser(r),
+		"Active": "deliveries",
+		"Row":    row,
+		// Where the row came from, so "Back" returns to the page and filters
+		// the operator was looking at rather than the top of an unfiltered log.
+		"BackURL": deliveriesBackURL(r),
+	})
+}
+
+// deliveriesBackURL rebuilds the delivery-log URL a detail page was opened
+// from. Only the log's own parameters are carried over, and each is re-encoded
+// by url.Values, so nothing a visitor appends to the link can travel back into
+// the page as markup or as a different destination.
+func deliveriesBackURL(r *http.Request) string {
+	q := r.URL.Query()
+	back := url.Values{}
+	for _, k := range []string{"domain", "app", "p"} {
+		if v := q.Get(k); v != "" {
+			back.Set(k, v)
+		}
+	}
+	if len(back) == 0 {
+		return "/deliveries"
+	}
+	return "/deliveries?" + back.Encode()
+}
+
 // sendLogData reads the domain/app filters and page number off the query
 // string, queries the store, and assembles everything the template needs
 // (filter dropdown options plus the current selection, rows, and pagination).
@@ -68,6 +122,12 @@ func (s *Server) sendLogData(r *http.Request) (map[string]any, error) {
 	rows, err := s.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
 	if err != nil {
 		return nil, err
+	}
+	// Decode on the way out as well as on the way in: rows the journal-milter
+	// wrote before it decoded subjects itself still hold the raw header, and
+	// they are the ones an operator is most likely to be looking at.
+	for i := range rows {
+		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
 	}
 	domains, err := s.store.ListDomains()
 	if err != nil {

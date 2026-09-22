@@ -1,0 +1,55 @@
+{{define "content"}}
+<h1>Delivery</h1>
+
+<a class="back" href="{{.BackURL}}">&larr; Back to deliveries</a>
+
+<div class="card">
+  <h2>Message</h2>
+  <p class="muted">One recipient of one message, as the journal-milter recorded
+  it when Postfix accepted it. The delivery log lists these; everything the list
+  has no room for is here.</p>
+
+  <label>Time</label>
+  <span class="code">{{.Row.CreatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
+
+  <label>From</label>
+  <span class="code">{{.Row.From}}</span>
+
+  <label>To</label>
+  <span class="code">{{if .Row.To}}{{.Row.To}}{{else}}—{{end}}</span>
+
+  <label>Subject</label>
+  <span class="code">{{if .Row.Subject}}{{.Row.Subject}}{{else}}—{{end}}</span>
+
+  <label>Status</label>
+  <span class="code">{{.Row.Status}}</span>
+</div>
+
+<div class="card">
+  <h2>Origin</h2>
+  <p class="muted">Which sending domain and which application's SASL account the
+  message was submitted under — the two filters the delivery log offers.</p>
+
+  <label>Domain</label>
+  <span class="code">{{if .Row.Domain}}{{.Row.Domain}}{{else}}—{{end}}</span>
+
+  <label>Application</label>
+  <span class="code">{{if .Row.AppLogin}}{{.Row.AppLogin}}{{else}}—{{end}}</span>
+</div>
+
+<div class="card">
+  <h2>Handling</h2>
+  <p class="muted">Postfix's own identifiers for this message. The queue id is
+  what to search the system log for; a rejected message never got one, because
+  it was refused before it was queued.</p>
+
+  <label>Queue id</label>
+  <span class="code">{{if .Row.QueueID}}{{.Row.QueueID}}{{else}}—{{end}}</span>
+
+  <label>Status last reported</label>
+  <span class="code">{{.Row.UpdatedAt.Format "2006-01-02 15:04:05"}} UTC</span>
+
+  <label>Journal id</label>
+  <span class="code">{{.Row.ID}}</span>
+</div>
+{{end}}

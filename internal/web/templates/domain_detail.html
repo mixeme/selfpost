@@ -7,7 +7,7 @@
 {{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
 
 {{if .NewCred}}
-<div class="card credential">
+<div class="card credential" id="new-credential">
   <h2>New application password</h2>
   <p class="muted">This password is shown <strong>once only</strong> and is not
   stored. Copy it now — if it is lost, regenerate a new one.</p>
@@ -24,7 +24,7 @@
 </div>
 {{end}}
 
-<div class="card">
+<div class="card" id="dkim">
   <h2>DKIM DNS record</h2>
   <p class="muted">Publish this TXT record in the DNS for <strong>{{.Domain.Name}}</strong>.
   It is not a secret and can be viewed at any time.</p>
@@ -47,7 +47,7 @@
   <p class="muted">Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
 </div>
 
-<div class="card">
+<div class="card" id="spf-dmarc">
   <h2>SPF and DMARC records</h2>
   <p class="muted">These two are not generated the way the DKIM record above is —
   they are policy, and the domain may already publish an SPF record for other
@@ -91,7 +91,7 @@
   <code>p=reject</code> once the reports come back clean.</p>
 </div>
 
-<div class="card">
+<div class="card" id="dns-status">
   <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
   <p class="muted">What DNS publishes for <strong>{{.Domain.Name}}</strong> right
   now, checked against the key this server signs with. Results are cached for a
@@ -121,7 +121,7 @@
   </form>
 </div>
 
-<div class="card">
+<div class="card" id="settings">
   <h2>Sending server settings</h2>
   <p class="muted">Point the mail client or script at these settings and
   authenticate with an application login and password from the
@@ -146,7 +146,7 @@
 
 {{/* Create form above the list, the same order the domains page uses for
      "Add a sending domain" above "Domains". */}}
-<div class="card">
+<div class="card" id="add-application">
   <h2>Add an application</h2>
   <form method="post" action="/domains/{{.Domain.ID}}/applications">
     <label for="login">Login</label>
@@ -173,7 +173,7 @@
   be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
 </div>
 
-<div class="card">
+<div class="card" id="applications">
   <h2>Applications</h2>
   <p class="muted">Each application is a SASL login/password an app or script
   uses to send mail as this domain. A login may send from any address of the
@@ -188,9 +188,26 @@
           {{if eq .AddressMode $.Wildcard}}Any address of the domain — *@{{$.Domain.Name}}
           {{else}}Fixed list — {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}{{end}}
         </p>
+        <!-- The two panels are opened by a checkbox and a label rather than by
+             <details>, so that the controls stay a single row of buttons and
+             what a panel reveals is laid out under all four of them instead of
+             splitting the row in two. The checkbox precedes both its label and
+             its panel, which is what lets the CSS alone show them (no script
+             involved) — see .panel-toggle in panel.css. -->
         <div class="actions">
-          <details>
-            <summary>Edit mode</summary>
+          <input class="panel-toggle t-mode" id="mode-{{.ID}}" type="checkbox">
+          <label class="toggle for-mode" for="mode-{{.ID}}">Edit mode</label>
+          <input class="panel-toggle t-limit" id="limit-{{.ID}}" type="checkbox">
+          <label class="toggle for-limit" for="limit-{{.ID}}">Rate limit{{if .HasLimit}} (active){{end}}</label>
+          <form class="inline" method="post" action="/applications/{{.ID}}/password"
+                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
+            <button type="submit">New password</button>
+          </form>
+          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
+                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+          <div class="panel panel-mode">
             <form method="post" action="/applications/{{.ID}}/mode">
               <label>Address mode</label>
               <select name="mode" data-list-mode="{{$.List}}">
@@ -204,34 +221,32 @@
               </div>
               <button type="submit">Save mode</button>
             </form>
-          </details>
-          <details>
-            <summary>Rate limit{{if .HasLimit}} (active){{end}}</summary>
-            <form method="post" action="/applications/{{.ID}}/ratelimit">
+          </div>
+          <div class="panel panel-limit">
+            <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
               <label>Expected client IPs (one per line or comma-separated)</label>
               <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
               <label>Message limit</label>
               <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
               <label>Window (seconds)</label>
               <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
-              <button type="submit">Save limit</button>
             </form>
-            {{if .HasLimit}}
-            <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                  data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
-              <input type="hidden" name="clear" value="1">
-              <button type="submit" class="danger">Remove limit</button>
-            </form>
-            {{end}}
-          </details>
-          <form class="inline" method="post" action="/applications/{{.ID}}/password"
-                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
-            <button type="submit">New password</button>
-          </form>
-          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
-                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
-            <button type="submit" class="danger">Delete</button>
-          </form>
+            <!-- Saving and removing the limit are two posts, so they are two
+                 forms and could not share a line while the Save button sat
+                 inside the block form above. It is bound to that form by id
+                 instead (the form attribute, no script involved), which lets
+                 both buttons stand together in one row under the fields. -->
+            <div class="panel-buttons">
+              <button type="submit" form="rl-{{.ID}}">Save limit</button>
+              {{if .HasLimit}}
+              <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
+                    data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
+                <input type="hidden" name="clear" value="1">
+                <button type="submit" class="danger">Remove limit</button>
+              </form>
+              {{end}}
+            </div>
+          </div>
         </div>
       </li>
     {{end}}
@@ -241,7 +256,7 @@
   {{end}}
 </div>
 
-<div class="card">
+<div class="card" id="rate-limit">
   <h2>Sending rate limit (domain)</h2>
   <p class="muted">Optional level-2 limit (spec 7.4): cap how many messages this
   domain may send from its expected client IP(s) within a time window, summed
@@ -276,7 +291,7 @@
   {{end}}
 </div>
 
-<div class="card">
+<div class="card" id="export">
   <h2>Export domain</h2>
   <p class="muted">Download this domain to move it to another SelfPost instance:
   its DKIM key, selector and every application with its working password. On
@@ -292,10 +307,33 @@
   </form>
 </div>
 
-<div class="card">
+<div class="card" id="danger">
   <h2>Danger zone</h2>
   <p class="muted">Deleting this domain also deletes its DKIM key and every
   application bound to it.</p>
   <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
+</div>
+{{end}}
+
+{{/* The domain page's section index, shown in the navigation column (see the
+     "sections" block in layout.html). This is the panel's longest page — the
+     DNS records to publish, the checks on them, the applications and two rate
+     limits — and setting a domain up means going back and forth between them.
+     The freshly generated password is only listed while it is on the page: it
+     is the one card that is not always there, and the one nothing should scroll
+     away from silently. */}}
+{{define "sections"}}
+<div class="sections">
+  <p class="sections-title">On this page</p>
+  {{if .NewCred}}<a href="#new-credential">New application password</a>{{end}}
+  <a href="#dkim">DKIM DNS record</a>
+  <a href="#spf-dmarc">SPF and DMARC records</a>
+  <a href="#dns-status">DNS status</a>
+  <a href="#settings">Sending server settings</a>
+  <a href="#add-application">Add an application</a>
+  <a href="#applications">Applications</a>
+  <a href="#rate-limit">Sending rate limit</a>
+  <a href="#export">Export domain</a>
+  <a href="#danger">Danger zone</a>
 </div>
 {{end}}

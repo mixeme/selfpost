@@ -46,16 +46,52 @@
   }
 }
 * { box-sizing: border-box; }
+/* The scrollbar's width is reserved whether or not the page is long enough to
+   need one. Without it a short page (Account) and a long one (Status) are laid
+   out in viewports differing by the scrollbar's width, and everything on the
+   page — the navigation column included — shifts sideways on the way between
+   them. The panel is a set of pages an operator moves through, so that shift
+   read as the layout jumping. */
+html { scrollbar-gutter: stable; }
 body {
   font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
 }
+/* The two columns — navigation on the left, page on the right — centred as a
+   pair. The navigation is a fixed width and the page keeps the measure it had:
+   the column is added beside the content, not taken out of it. */
+.shell { display: flex; justify-content: center; align-items: flex-start; gap: 1.75rem; }
+/* One column for every page. It used to be the reading measure, 48rem, which
+   the three pages holding data widened to 64rem — and since the shell centres
+   the navigation and the page as a pair, that difference moved the navigation
+   column and the left edge of every card on the way between two pages. The
+   column is now the wider of the two everywhere, so nothing moves; the reading
+   measure is kept inside it by the rule below rather than by the column.
+   No auto margins: inside the shell they would eat the free space and push the
+   navigation column off to the far edge, so the centring is the shell's job
+   (justify-content above). */
+main { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 64rem; }
 /* 48rem is a reading measure: right for the forms and prose that make up most
-   of the panel, and the width the navigation bar's two rows were sized for.
-   Page-specific overrides below widen or narrow it for the pages that need
-   something else. */
-main { max-width: 48rem; margin: 0 auto; }
-h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+   of the panel, and too narrow for the pages that are tables of data. Every
+   page therefore keeps its content at that measure, centred in the column, and
+   the pages made of data opt out (main.wide below) and take the column whole.
+   The cap is on <main>'s children rather than on .card so a page's heading, its
+   back link and the version footer travel with the cards: capping the cards
+   alone would leave the heading spanning the column with the card it belongs to
+   floating in the middle — the misalignment that gave login and setup their own
+   narrow column (main.page-login further down). */
+main > * { max-width: 48rem; margin-left: auto; margin-right: auto; }
+/* The three monitoring pages are the ones that opt out: six columns of send
+   log, and raw mail.log lines that are long by nature, which at the measure
+   left Subject and Status fighting over the last inch and wrapped every second
+   log line. The class is declared by the page itself (the "wide" block in
+   layout.html) rather than derived from the page name, since a delivery's own
+   page is prose and shares the send log's name in the navigation. */
+main.wide > * { max-width: none; }
+/* Longhands, not the margin shorthand: the shorthand would re-zero the auto
+   side margins above and pin the heading to the column's edge, a measure's
+   worth to the left of the card under it. */
+h1 { font-size: 1.4rem; margin-top: 0; margin-bottom: 1rem; }
 /* The full mark, on the two pages that have no navigation bar to carry the
    compact one. It takes the column's width so its edges line up with the card
    below it, capped at that column's own 24rem; height stays automatic because
@@ -77,7 +113,7 @@ input {
    button: a <button>, or an <a> carrying .btn/.danger where the action is a
    plain navigation (the delete confirmation page, the full queue view).
    Several of these used to render as bold blue text instead — a POST wrapped
-   in form.inline, a <details> toggle, the delete links — which read as links
+   in form.inline, a disclosure toggle, the delete links — which read as links
    and left two appearances for the same kind of control. They all get the
    button look now: filled for a card's own action, and the compact outlined
    variant further down where actions cluster (table rows, the nav bar). Bare
@@ -95,13 +131,6 @@ button:hover, a.btn:hover { background: #1d4ed8; }
 /* form.inline only exists so a POST can sit next to other content without a
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
-/* The three monitoring pages hold data instead of prose — seven columns of
-   send-log, and raw mail.log lines that are long by nature — and at the
-   default measure the send-log's Subject and Status were fighting over the
-   last inch while the log pages wrapped every second line. They get a wider
-   measure; every other page keeps the default one. The class comes from the
-   layout, which stamps the page name onto <main>. */
-main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64rem; }
 /* The signed-out pages are a single card and nothing else, and .card.narrow
    centres itself inside whatever holds it — so at the panel's usual width the
    card floated in the middle while the mark and the heading stayed at the far
@@ -136,7 +165,13 @@ td.subject span {
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 0.85rem; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
 h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
-.back { display: inline-block; margin-bottom: 1rem; }
+/* The back link is a block so it takes the measure and lines up with the
+   heading above it and the card below: auto side margins centre a block, but
+   they do nothing for an inline-block, which would have stayed at the column's
+   edge while everything around it moved in. Its own text stays at the left of
+   that block — only the click target grows to the line, as it does for the
+   navigation entries. */
+.back { display: block; margin-bottom: 1rem; }
 /* Build version, closing every authenticated page. Quiet on purpose: it is
    reference material, not something to read on the way past. */
 .version { margin-top: 1.6rem; text-align: right; font-size: 0.8rem; color: #6b7280; }
@@ -149,10 +184,9 @@ textarea { resize: vertical; }
 button.danger, a.danger { background: #b42318; }
 button.danger:hover, a.danger:hover { background: #912018; }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
-   compact rule below); the marker is dropped because the pressed background
+   compact rule below); it carries no marker because the pressed background
    already shows the open state. */
-.actions summary { display: inline-block; list-style: none; cursor: pointer; }
-.actions summary::-webkit-details-marker { display: none; }
+.actions > label.toggle { display: inline-block; cursor: pointer; }
 /* Applications are a list of blocks, not table rows. As a table it fell apart:
    four columns of which the last held six controls — two of them <details>
    panels with textareas — never fit the panel's default width. The controls
@@ -166,63 +200,163 @@ button.danger:hover, a.danger:hover { background: #912018; }
 .app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
 .app-addr { margin: 0.15rem 0 0; word-break: break-all; }
 .app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
-/* An open panel claims a row to itself: its textareas and number inputs want
-   the block's full width, not the width of the summary that opened them. */
-.app .actions > details[open] { flex: 1 0 100%; }
-details form { margin-top: 0.6rem; }
+/* Mode and rate limit open under the whole row rather than inside it. As
+   <details> the panel sat where its summary was, so opening one cut the row of
+   four controls in half and pushed the rest below a block of fields — the
+   buttons moved every time a panel opened or closed. The panels are therefore
+   the last children of the row, and the checkbox that opens each one is
+   visually hidden earlier in the row with its label drawn as the button. The
+   checkbox stays in the tab order and keeps its focus ring on the label, so it
+   works from the keyboard, and being pure CSS it also works with JavaScript
+   blocked, as <details> did. */
+.app .actions > .panel-toggle {
+  position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none;
+}
+.app .actions > .panel { display: none; flex: 1 0 100%; }
+.app .actions > .t-mode:checked ~ .panel-mode,
+.app .actions > .t-limit:checked ~ .panel-limit { display: block; }
+.app .actions > .t-mode:checked ~ .for-mode,
+.app .actions > .t-limit:checked ~ .for-limit { background: var(--surface-open-bg); }
+.app .actions > .t-mode:focus-visible ~ .for-mode,
+.app .actions > .t-limit:focus-visible ~ .for-limit { outline: 2px solid #2563eb; outline-offset: 2px; }
+.panel form { margin-top: 0.6rem; }
+/* A panel's own submit is a form button, not one of the controls in the row
+   above, so it takes back the spacing the compact .actions rule zeroes out:
+   without it Save sits flush against the field it saves and against the
+   Remove button under it, reading as one stack of edges. */
+.app .actions > .panel button { margin-top: 0.9rem; }
+/* Where a panel has two of them (save the limit, remove it) they share one row
+   under the fields, which the row itself spaces off instead of each button.
+   The buttons align on their tops rather than stretching: one of the two is
+   wrapped in a form, and that wrapper's margin would otherwise make the row
+   taller than a button and stretch the unwrapped one to match it. */
+.app .actions > .panel .panel-buttons {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem; margin-top: 0.9rem;
+}
+.app .actions > .panel .panel-buttons button,
+.app .actions > .panel .panel-buttons form { margin-top: 0; }
 .credential { border-color: var(--credential-border); background: var(--credential-bg); }
 /* Panel navigation: rendered once from the layout, so it is present on every
    authenticated page without each content template having to include it. */
-/* Two deliberate rows, not one. The six page entries need about 660px and the
-   session block another 260px, against the 738px the panel is wide — so the bar
-   was wrapping on its own, and the session landed left-aligned directly under
-   the entries, reading as a third row of navigation. Shortening labels would buy
-   the ~200px back but undo the point of naming each entry after its page. Rows
-   rather than columns: a two-column grid of entries came out a third taller
-   (107px against 83px) and no easier to read.
-   The session sits on top, at the right edge, and the page entries below — the
-   usual arrangement, and the layout template puts the session first so the
-   reading and tab order follow what the eye sees rather than being flipped by a
-   CSS `order`. The cost is that Sign out is the bar's first tab stop; nothing
-   activates on focus, so that is a reordering, not a hazard. */
+/* A column down the left edge rather than a bar across the top. The six page
+   entries need about 660px and the session block another 260px, against the
+   738px the panel was wide, so as a bar it had to be split over two rows — and
+   even then it cost the top of every page. Standing it up removes that: the
+   entries share one left edge to scan down, the session sits at the foot where
+   it is out of the way, and there is room between them for the current page's
+   own sections (.sections below), which is what makes the long pages navigable.
+   Sticky, so both lists stay in view while the page scrolls past them. The
+   layout template lists the blocks in the order they are drawn, so reading and
+   tab order follow the eye without a CSS `order`. */
 .nav {
-  display: flex; flex-direction: column; align-items: stretch;
-  gap: 0.5rem; margin-bottom: 1.2rem; padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--border);
+  position: sticky; top: 2rem; align-self: flex-start;
+  flex: none; width: 13.5rem;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.75rem;
+  /* A viewport shorter than the column would otherwise cut off whatever hangs
+     below the fold — with no page scroll left to reach it, since the column is
+     stuck to the viewport. */
+  max-height: calc(100vh - 4rem); overflow-y: auto;
 }
-.nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
-/* The top row: mark at one edge, session block at the other. Splitting them to
-   the edges is what makes the two rows read as two blocks rather than as one
-   ragged list that happened to wrap. */
-.nav .top { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; }
-.nav .session { justify-content: flex-end; }
-/* The mark is a link, but not one of the bar's entries: it takes none of the
+.nav .links, .nav .session { display: flex; flex-direction: column; gap: 0.1rem; }
+/* The session is the column's last block and the only one that is not
+   navigation, so it is ruled off from the entries above it. */
+.nav .session { padding-top: 0.75rem; border-top: 1px solid var(--border); }
+/* The signed-in administrator's name: a label above the two controls, not one
+   of them. It may be long and there is nothing to break it on, so it is allowed
+   to break mid word rather than widen the column. */
+.nav .session .muted { padding: 0 0.6rem; font-size: 0.85rem; overflow-wrap: anywhere; }
+/* The mark is a link, but not one of the column's entries: it takes none of the
    padding and rounding the entry rule below applies, so its own edge lines up
-   with the page rather than sitting half a step inside it. The stamp carries
-   about 4px of field inside the file at this size, which is what puts it level
-   with the icons of the row underneath. */
+   with the entries' icons rather than sitting half a step inside them. */
 .nav .brand { padding: 0; }
-/* width/height are on the element too, so the row reserves the space before the
-   SVG has loaded; these keep the ratio if the box is ever squeezed. The stamp's
-   proportions are part of the mark — it is never scaled unevenly. */
-.nav .brand img { display: block; width: 110px; height: auto; }
+/* The mark takes the column's full width, so its edges line up with the entries
+   below it rather than ending halfway across — the same way .mark fills the
+   card column on the pages that carry no navigation. width/height are on the
+   element too, so the column reserves the right height before the SVG has
+   loaded; height stays automatic because the stamp's proportions are part of
+   the mark — it is never scaled unevenly. */
+.nav .brand img { display: block; width: 100%; height: auto; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
-   rather than a run of text — that is also why the bar centres its items
-   instead of aligning them on the text baseline. Account is included: it is a
-   page like the others and would otherwise be the one bare word in the bar. */
+   rather than a run of text — that is also why the entries centre their items
+   instead of aligning them on the text baseline. In the column the entry fills
+   the width, so the whole strip is the click target and the hover and active
+   backgrounds read as one stack of bars. Account is included: it is a page like
+   the others and would otherwise be the one bare word in the column. */
+/* No underline: in a row the entries were separated by space alone and the
+   underline was what marked them as links, but a column of them reads as a
+   list of links already, and eight underlines down the left edge is a lot of
+   line for no added meaning. The hover background carries the affordance. */
 .nav a, .nav [aria-current] {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.2rem 0.5rem; border-radius: 6px;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.6rem; border-radius: 6px; text-decoration: none;
 }
+.nav a:hover { background: var(--surface-bg); }
+/* The marker moved with the bar: a rule under the entry made sense in a row,
+   where the entries sat side by side; standing up, the current entry is marked
+   down its leading edge, which is the edge every entry shares. */
 .nav [aria-current] {
-  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 0 -2px 0 #2563eb;
+  font-weight: 600; color: var(--fg); background: var(--nav-active-bg); box-shadow: inset 2px 0 0 #2563eb;
 }
 /* Sign out carries an icon too, so it needs the same row layout; its padding
    and colours come from the compact button rule further down. */
-.nav button { display: inline-flex; align-items: center; gap: 0.4rem; }
+.nav button { display: flex; align-items: center; gap: 0.5rem; }
 /* The icons draw in the entry's own colour, so the active entry's darker text,
    a link's blue and Sign out's red all carry through without a rule apiece. */
 .nav .icon { width: 1rem; height: 1rem; flex: none; }
+/* The current page's own sections, listed under the page entries. The domain
+   page and the status page are eight and nine cards tall, and the only way to
+   the card you came for was to scroll past all the ones you did not. Only pages
+   that long carry an index — it comes from the page's own "sections" template
+   (see layout.html), so a page with two cards renders nothing here. */
+.sections {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding-top: 0.75rem; border-top: 1px solid var(--border);
+}
+.sections-title {
+  margin: 0 0 0.25rem 0.6rem;
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #6b7280;
+}
+/* Quieter and a step in from the page entries: this is an index of one page,
+   subordinate to the list of pages above it. */
+.nav .sections a {
+  padding: 0.2rem 0.6rem 0.2rem 0.9rem;
+  font-size: 0.85rem; color: #6b7280; text-decoration: none;
+}
+.nav .sections a:hover { color: var(--fg); }
+/* panel.js marks the section the page is scrolled to. Without JavaScript
+   nothing is marked and the list is still a working index. */
+.nav .sections a.current { color: var(--fg); font-weight: 600; background: var(--nav-active-bg); }
+/* Jumping to a card should not leave it touching the top edge of the window. */
+.card[id] { scroll-margin-top: 1rem; }
+/* Below the width the two columns need (13.5rem of navigation, 1.75rem of gap
+   and the 48rem measure, plus the body's padding — the measure, not the column
+   it sits in: a page column short of its 64rem is only a page column that has
+   not reached its cap, while a measure that no longer fits is a page that has),
+   the column lies back down
+   into a bar above the page — the same wrapping rows it used to be. A drawer
+   behind a hamburger would save more height, but it would need script to open,
+   and the panel's navigation is six entries: they fit. */
+@media (max-width: 66rem) {
+  .shell { flex-direction: column; align-items: stretch; gap: 1.2rem; }
+  main { margin: 0 auto; }
+  .nav {
+    position: static; width: auto; max-height: none; overflow-y: visible;
+    flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.4rem 1.2rem;
+    padding-bottom: 0.6rem; border-bottom: 1px solid var(--border);
+  }
+  /* Lying down there is no column for the mark to span, and at its full width
+     it would take a row to itself above the entries, so it goes back to the
+     compact size it had — enough to read beside them. */
+  .nav .brand img { width: 110px; }
+  /* Each block keeps its own group of entries together and wraps as one; the
+     rules that separated the blocks vertically become the space between them. */
+  .nav .links, .nav .session, .nav .sections {
+    flex-direction: row; flex-wrap: wrap; align-items: center;
+    gap: 0.2rem 0.6rem; padding-top: 0; border-top: 0;
+  }
+  .sections-title { margin: 0; }
+}
 /* Status badges: one vocabulary (ok/warn/error/unknown) shared by the server
    status page and the per-domain DNS checks, so a colour means the same thing
    everywhere. The class suffix is the check's own status value. */
@@ -235,6 +369,25 @@ details form { margin-top: 0.6rem; }
 .st-warn { background: var(--st-warn-bg); color: var(--st-warn-fg); border-color: var(--st-warn-border); }
 .st-error { background: var(--st-error-bg); color: var(--st-error-fg); border-color: var(--st-error-border); }
 .st-unknown { background: var(--st-unknown-bg); color: var(--st-unknown-fg); border-color: var(--st-unknown-border); }
+/* In the domain list the badge is also the link to that domain's DNS section,
+   so it must not pick up the link colour and underline that would fight with
+   the badge's own palette. */
+a.st, a.st:hover { color: inherit; text-decoration: none; }
+a.st:hover { filter: brightness(1.08); }
+/* Usage bars on the status page's machine card. <meter> rather than a div sized
+   from the reading, because the CSP forbids inline styles (see the note at the
+   top of this file) and a bar's length has to travel on an attribute. The
+   element grades itself from low/high/optimum, so the colour matches the
+   badges' meaning without this file restating the thresholds — and a browser
+   that does not render meters falls back to the percentage beside it, which is
+   printed either way. */
+meter { width: 5rem; height: 0.7rem; vertical-align: middle; margin-right: 0.4rem; }
+/* The card's own two narrow columns. Cells may break mid word by default (see
+   the th, td rule above), which the detail column needs and these two must not
+   have: the resource names and the readings are short, and the long detail
+   beside them would otherwise win the width and leave "Memory" broken across
+   two lines. */
+.metric { white-space: nowrap; }
 .code-row { display: flex; align-items: flex-start; gap: 0.5rem; }
 .code-row .code { flex: 1; min-width: 0; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
@@ -243,34 +396,37 @@ details form { margin-top: 0.6rem; }
    overrides this with .danger below since signing out is a deliberate,
    singular action. .actions is the shared hook: a cell that holds controls, or
    the control row of an application. */
-button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
+button.copy, .actions button, .actions > label.toggle, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
   background: var(--surface-bg); color: #2563eb; border: 1px solid var(--control-border);
 }
-button.copy:hover, .actions button:hover, .actions summary:hover,
+button.copy:hover, .actions button:hover, .actions > label.toggle:hover,
 .actions a.danger:hover, .nav button:hover { background: var(--surface-bg-hover); }
 button.copy { flex: none; margin-top: 0.3rem; }
-.actions details[open] > summary { background: var(--surface-open-bg); }
 .actions button.danger, .actions a.danger, .nav button.danger {
   color: var(--danger-fg); background: var(--danger-bg); border-color: var(--danger-border);
 }
 .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: var(--danger-bg-hover); }
 
-/* The optional "encrypt this download" block on the backup, export and import
-   forms. Its label is the one checkbox in the panel, so it opts out of the
+/* The optional "encrypt this download" block on the backup and export forms.
+   Its label is the one checkbox in the panel, so it opts out of the
    block-level label rule above and sits on one line with its box; the fields it
    reveals are indented under it to read as its consequence rather than as three
    more fields of the form. panel.js hides the inner block until the box is
    ticked (and empties it when unticked); without JavaScript everything stays
-   visible, which the server handles identically. */
+   visible, which the server handles identically. The import form reuses the
+   same indented .encrypt-fields look for its password field, but reveals it
+   by file extension instead of a checkbox (see panel.js). */
 .encrypt { margin-top: 1.2rem; }
 .encrypt label.check {
   display: flex; align-items: center; gap: 0.5rem; margin: 0; font-weight: 600;
 }
 .encrypt label.check input { width: auto; margin: 0; }
 .encrypt-fields {
-  margin-left: 1.6rem; padding-left: 0.9rem; border-left: 2px solid var(--border);
+  margin-top: 1.2rem; margin-left: 1.6rem; padding-left: 0.9rem;
+  border-left: 2px solid var(--border);
 }
+.encrypt .encrypt-fields { margin-top: 0; }
 .encrypt-fields label { margin-top: 0.7rem; }
 .encrypt-fields .muted { margin: 0.5rem 0 0; font-size: 0.85rem; }

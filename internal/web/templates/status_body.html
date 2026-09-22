@@ -1,11 +1,11 @@
 {{define "status_body"}}
 <div id="status-body" hx-get="/status/fragment" hx-trigger="every 5s" hx-swap="outerHTML">
-  <div class="card">
+  <div class="card" id="overall">
     <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
     <p class="muted">{{.OverallHeading}}</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="processes">
     <h2>Processes <span class="st st-{{.ProcessStatus}}">{{.ProcessStatus}}</span></h2>
     {{if .ProcessError}}
     <p class="error">Could not ask supervisord for the process list.</p>
@@ -25,7 +25,54 @@
     {{end}}
   </div>
 
-  <div class="card">
+  <div class="card" id="machine">
+    <h2>Machine <span class="st st-{{.Machine.Status}}">{{.Machine.Status}}</span></h2>
+    <p class="muted">Processor, memory and network of the machine this container
+    runs on, read from the kernel's counters. CPU and throughput are rates, so
+    they describe{{if .Machine.WindowText}} the {{.Machine.WindowText}}{{end}}
+    since the previous refresh rather than this instant.</p>
+    <table>
+      <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="metric">CPU</td>
+          <td class="metric">
+            {{if .Machine.CPU.Measured}}
+            <meter value="{{.Machine.CPU.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.CPU.BusyText}}</meter>
+            {{.Machine.CPU.BusyText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">{{.Machine.CPU.Detail}}</td>
+        </tr>
+        <tr>
+          <td class="metric">Memory</td>
+          <td class="metric">
+            {{if .Machine.Memory.Measured}}
+            <meter value="{{.Machine.Memory.Percent}}" min="0" max="100" low="70" high="90" optimum="10">{{.Machine.Memory.PctText}}</meter>
+            {{.Machine.Memory.PctText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">{{.Machine.Memory.Detail}}</td>
+        </tr>
+        <tr>
+          <td class="metric">Network</td>
+          <td class="metric">
+            {{if .Machine.Network.Measured}}
+            ↓ {{.Machine.Network.InRateText}}<br>↑ {{.Machine.Network.OutRateText}}
+            {{else}}<span class="muted">—</span>{{end}}
+          </td>
+          <td class="muted">
+            {{range .Machine.Network.Interfaces}}
+            <div>{{.Name}}: {{.InText}} in, {{.OutText}} out{{if .Measured}} (↓ {{.InRateText}} ↑ {{.OutRateText}}){{end}}</div>
+            {{end}}
+            {{if .Machine.Network.Detail}}<div>{{.Machine.Network.Detail}}</div>{{end}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" id="queue">
     <h2>Mail queue <span class="st st-{{.QueueStatus}}">{{.QueueStatus}}</span></h2>
     {{if .QueueError}}
     <p class="error">{{.QueueError}}</p>
@@ -35,7 +82,7 @@
     {{end}}
   </div>
 
-  <div class="card">
+  <div class="card" id="certificate">
     <h2>TLS certificate <span class="st st-{{.Cert.Status}}">{{.Cert.Status}}</span></h2>
     <p class="muted">The certificate Postfix serves on port 465{{if .Cert.Subject}} ({{.Cert.Subject}}){{end}}.
     It is supplied by the reverse proxy through a read-only mount; SelfPost only reads it.</p>
@@ -46,7 +93,7 @@
     <p class="{{if eq .Cert.Status "ok"}}muted{{else}}error{{end}}">{{.Cert.Detail}}</p>
   </div>
 
-  <div class="card">
+  <div class="card" id="sockets">
     <h2>Milter sockets <span class="st st-{{.SocketStatus}}">{{.SocketStatus}}</span></h2>
     <table>
       <thead><tr><th>Milter</th><th>Socket</th><th>State</th></tr></thead>

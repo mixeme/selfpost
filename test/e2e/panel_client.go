@@ -189,9 +189,17 @@ func (c *panelClient) setRateLimit(path, allowedIP string, maxMessages, windowSe
 }
 
 // sendLogRows returns the raw /deliveries/rows HTML fragment, filtered to one
-// domain, for polling a row's status without parsing full HTML into structs.
-func (c *panelClient) sendLogRows(domain string) (string, error) {
-	_, body, err := c.get("/deliveries/rows?domain=" + url.QueryEscape(domain))
+// domain and optionally to one application login, for polling a row's status
+// without parsing full HTML into structs. The application is a filter rather
+// than something to search the returned rows for: the log's columns identify a
+// message (time, from, to, subject, status) and the sending application is only
+// named on a row's own /deliveries/{id} page.
+func (c *panelClient) sendLogRows(domain, app string) (string, error) {
+	q := url.Values{"domain": {domain}}
+	if app != "" {
+		q.Set("app", app)
+	}
+	_, body, err := c.get("/deliveries/rows?" + q.Encode())
 	return body, err
 }
 
@@ -202,15 +210,18 @@ func (c *panelClient) status() (*http.Response, error) {
 	return resp, err
 }
 
-// applicationID scrapes an application's numeric id off its domain page row,
-// keyed by login — needed to build /applications/{id}/ratelimit, which the
-// add-application response (just the login/password) does not carry.
+// applicationID scrapes an application's numeric id off its block on the domain
+// page, keyed by login — needed to build /applications/{id}/ratelimit, which the
+// add-application response (just the login/password) does not carry. The id is
+// taken from the first action posted under that login, whichever it is, so
+// reordering the block's controls does not break the scrape; only the login
+// heading itself is anchored on.
 func (c *panelClient) applicationID(domainID, login string) (string, error) {
 	_, body, err := c.get("/domains/" + domainID)
 	if err != nil {
 		return "", err
 	}
-	pattern := `(?s)<td class="code">` + regexp.QuoteMeta(login) + `</td>.*?/applications/(\d+)/mode`
+	pattern := `(?s)<p class="app-login">` + regexp.QuoteMeta(login) + `</p>.*?/applications/(\d+)/`
 	m := regexp.MustCompile(pattern).FindStringSubmatch(body)
 	if m == nil {
 		return "", fmt.Errorf("could not find application id for login %q", login)

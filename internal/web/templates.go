@@ -35,6 +35,7 @@ var pageFiles = map[string][]string{
 	"domain_detail": {"templates/domain_detail.html", "templates/encrypt_fields.html"},
 	"domain_delete": {"templates/domain_delete.html"},
 	"deliveries":    {"templates/deliveries.html", "templates/deliveries_rows.html"},
+	"delivery":      {"templates/delivery.html"},
 	"mail_queue":    {"templates/mail_queue.html", "templates/mail_queue_body.html"},
 	"system_log":    {"templates/system_log.html", "templates/system_log_body.html"},
 	"status":        {"templates/status.html", "templates/status_body.html"},
