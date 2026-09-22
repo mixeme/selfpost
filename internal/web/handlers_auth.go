@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,7 +13,7 @@ import (
 // TLS in front, so CookieSecure — it carries the __Host- prefix, which turns
 // what the cookie's attributes merely promise into something the browser
 // enforces: Secure, Path=/ and, the point of the exercise, no Domain
-// attribute, so no other host may set a cookie by this name (phase 14.B).
+// attribute, so no other host may set a cookie by this name.
 // The prefix is only valid on a Secure cookie, so a development instance on
 // plain HTTP has to keep the bare name: with the prefix the browser would
 // discard the Set-Cookie outright and logging in would silently never stick.
@@ -42,7 +42,7 @@ func (s *Server) sessionCookie() string {
 // is denial of service, not compromise; refusing the request and saying so in
 // the log is what makes it diagnosable instead of an endless login loop. The
 // __Host- prefix prevents this outright, but only where it applies — this
-// check also covers the plain-HTTP development shape (phase 14.B).
+// check also covers the plain-HTTP development shape.
 func (s *Server) sessionToken(r *http.Request) (string, bool) {
 	name := s.sessionCookie()
 	var token string
@@ -127,7 +127,7 @@ func (s *Server) renderLogin(w http.ResponseWriter, status int, formErr string) 
 }
 
 func (s *Server) submitLogin(w http.ResponseWriter, r *http.Request) {
-	// Brute-force throttle by client IP (spec 7.6.5).
+	// Brute-force throttle by client IP (security.md).
 	if !s.loginLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		s.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return

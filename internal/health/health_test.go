@@ -163,3 +163,28 @@ func writeCert(t *testing.T, path, cn string, validFor time.Duration) {
 		t.Fatal(err)
 	}
 }
+
+func TestLivenessFromParsedProcesses(t *testing.T) {
+	allRunning := `opendkim                         RUNNING   pid 21, uptime 0:04:10
+panel                            RUNNING   pid 22, uptime 0:04:09
+postfix                          RUNNING   pid 23, uptime 0:04:08
+postfix-reload                   STOPPED   Not started
+`
+	procs := parseProcesses(allRunning)
+	for _, p := range procs {
+		if mailPathPrograms[p.Name] && p.Status != StatusOK {
+			t.Fatalf("%s should be ok for liveness, got %q", p.Name, p.Status)
+		}
+	}
+
+	postfixDead := `opendkim                         RUNNING   pid 21, uptime 0:04:10
+panel                            RUNNING   pid 22, uptime 0:04:09
+postfix                          FATAL     Exited too quickly
+`
+	procs = parseProcesses(postfixDead)
+	for _, p := range procs {
+		if p.Name == "postfix" && p.Status == StatusOK {
+			t.Fatal("postfix FATAL should not grade as OK")
+		}
+	}
+}

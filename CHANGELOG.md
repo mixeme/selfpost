@@ -5,6 +5,186 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-06
+
+### Fixed
+
+- A bounce could be recorded as a successful delivery. The log-tailer's
+  delivery-line pattern matched `status=` greedily, so it took the *last*
+  occurrence on the line — and Postfix appends the remote server's reply
+  verbatim, which the far end controls. A rejection whose reply text contained
+  `status=sent` was filed as `sent` in the send log. The pattern now takes the
+  first `status=` after the recipient, which is the real field
+  (`internal/logtail/logtail.go`); found while extending `TestParseDelivery`.
+- Log-tailer resumes where it stopped instead of jumping to end-of-file on
+  every start (phase 3, `docs/code-review.md`): the read position and a
+  fingerprint of the log's head are persisted (`logtail_state`, migration
+  `0003`), so delivery lines written while the panel was down are parsed and
+  their send-log rows no longer stay `queued` forever. A log that changed
+  identity while the panel was down is read from the start; a first-ever start,
+  with nothing stored, still begins at the end. Container recreate remains a
+  gap — `mail.log` is not in `/data` (`docs/security.md`).
+- Level-2 rate limit no longer overshoots under concurrency: messages that
+  passed the check at MAIL FROM but have not reached the send log yet are
+  counted alongside the stored rows (`internal/milter/inflight.go`), so
+  parallel SMTP sessions cannot each spend the same last slot. Slots are
+  released at end-of-message, on ABORT, and after a 10-minute TTL, so a client
+  that drops mid-transaction cannot hold one — the limiter stays fail-open.
+
+### Changed
+
+- The project has a single public home: `github.com/mixeme/selfpost`. Codeberg
+  is being retired, so the Go module path moved with it — `go.mod`,
+  `test/e2e/go.mod`, every import, the `Makefile` `MODULE` variable and the
+  `-ldflags` version stamp in `build/Dockerfile` and `docs/development.md`. An
+  import path pointing at a host that is going away would break `go get` and
+  `go install` outright, which is why this is not only a documentation change.
+  README no longer lists a primary/mirror pair.
+- Code comments no longer cite the archived specification. References like
+  "spec 7.6.1" or "spec 5.1" pointed into `docs/archive/specification-v1.0.md`,
+  which is explicitly not a source of truth; each is now a reference to the
+  live document that owns the subject — `docs/architecture.md` (with section),
+  `docs/product.md`, `docs/security.md`, or the README. Comments only; no
+  behaviour is affected.
+- `docs/code-review.md` is gone. Its plan is finished — phases 0 (bar the
+  release-commit steps), 1, 1.5, 2 and 3 are all closed — and the rest of the
+  document had become a second copy of what `architecture.md`, `security.md`
+  and the code comments already say. What was genuinely open moved to
+  `docs/roadmap.md`: splitting `internal/web` into subpackages, a consolidated
+  documentation index in the README, the adaptive polling interval for an idle
+  but visible tab, and `CONTRIBUTING.md`. The review text stays in git history
+  (`522425a`); the CHANGELOG entries below that cite it are left as written.
+- `docs/architecture.md` gained a *Code layers* section: a diagram of
+  handlers → services → store plus the adapters, and the reason the services
+  layer exists (multi-store writes and their rollback) — closing item A2 of
+  `docs/code-review.md`.
+- Phase 1 doc/code hygiene (`docs/code-review.md`): removed ~30 stale
+  "Phase N" / historical-staging references from code and shell-script
+  comments (`cmd/panel`, `internal/*`, `build/*`) now that v1.0 is done;
+  fixed a stale dashboard comment (`internal/web/handlers_domains.go`)
+  claiming applications/send-log were unimplemented; added a CSRF ADR to
+  `docs/security.md` (why Origin-check, not tokens); resolved `docs/logo` in
+  `docs/roadmap.md` (directory doesn't exist, criterion already met); added a
+  `gofmt -l` check to CI (`.github/workflows/test.yml`).
+- Phase 2 GUI polish (`docs/code-review.md`): the monitoring pages stop
+  polling while their tab is hidden — the skip is done in an
+  `htmx:beforeRequest` listener (`internal/web/static/panel.js`) rather than
+  htmx's own trigger filter, which is evaluated with `new Function` and would
+  be blocked by the panel's CSP. Dark mode is now a single reassignment of CSS
+  custom properties under `prefers-color-scheme: dark` instead of a cascade of
+  `!important` overrides, and the duplicate `main { max-width }` rule is
+  consolidated into one base rule with documented per-page overrides
+  (`internal/web/static/panel.css`).
+
+### Security
+
+- Pre-release security review (plan § D, model Fable, 2026-08-06): full pass
+  over the diff from the v1.0 audit (Phase 11, `bd64e80`) to HEAD plus the
+  complete spec 7.6 checklist. No exploitable findings; one defence-in-depth
+  fix below. Accepted risks in `docs/security.md` unchanged.
+- `saslpasswd2` argv: the application login is now passed after a `--`
+  end-of-options marker (`internal/app/sasl.go`), so a login starting with
+  `-` (legal under the whitelist) can never be parsed as a flag by getopt.
+
+### Added
+
+- Optional password encryption for the two secret-bearing downloads (plan
+  phase 1.5, `docs/code-review.md`): an *Encrypt with a password* checkbox on
+  the full-backup and domain-export forms writes a `.spbk` / `.spde` envelope
+  instead of the plain `.tar.gz` / `.json` — scrypt key derivation and
+  AES-256-GCM over 64 KiB chunks, each authenticated with the header, its
+  counter and an end-of-stream flag, so a truncated or altered file refuses to
+  open (`internal/secretfile`). Unticked, both downloads are byte-for-byte what
+  they were.
+- Domain import accepts an encrypted export: the envelope is detected by its
+  magic bytes, and a password field appears next to the file picker
+  (`internal/web/handlers_backup.go`, `templates/encrypt_fields.html`).
+- `selfpost-backup` writes encrypted archives and reads them back:
+  `-decrypt` (with `-i`/`-o`) turns a `.spbk` into the plain `.tar.gz` a
+  restore unpacks. The password comes from `SELFPOST_BACKUP_PASSWORD` or
+  `-password-file`, never from argv.
+- `TestParseDelivery` covers the exotic mail.log shapes the review asked for
+  (`docs/code-review.md` § 3): a `status=` quoted inside the remote reply, the
+  null recipient of a double bounce, `orig_to=` alongside `to=`, an
+  unrecognised status word, a capitalised one, and a cleanup line.
+- docs: README *Encrypting a backup or export*; `docs/security.md` §
+  *Резервная копия и экспорт домена* + accepted risk (encryption is opt-in);
+  `docs/architecture.md` persistence § envelope summary.
+- docs: `docs/roadmap.md` v1.x tail — retire `implementation-plan.md` in the
+  release commit (move to `docs/archive/`, retarget its references in README,
+  docs, Makefile, release workflow and the e2e test comment).
+- docs: `docs/code-review.md` — phase 1.5 plan for optional password encryption
+  of full backup (`.spbk`) and domain export (`.spde`); checkbox UI pattern;
+  remove session-resurrection-from-backup as accepted risk.
+- docs: `docs/code-review.md` — full codebase review (architecture, code quality,
+  documentation, GUI, legacy, risks) with prioritized implementation plan and
+  model routing; cross-links in `implementation-plan.md` and `progress.md`.
+- docs (D6): Docker `HEALTHCHECK` probes `/healthz`; endpoint returns 503 unless
+  opendkim, panel, and postfix are RUNNING (`internal/health.Liveness`).
+- docs (D6): README *Container health* — scope of `/healthz` vs authenticated Status.
+- docs (D7): `cmd/panel/envdoc_test.go` — regression test that every
+  `loadConfig` and build-script env key is listed in README documentation.
+- docs (D8): `docs/architecture.md` — as-built processes, mail path, routes,
+  persistence (verified against code).
+- docs (D8): `docs/development.md` — local Go workflow, `make e2e`, dev-server
+  loop, commit/CHANGELOG protocol, agent rules.
+- docs (D9): `docs/product.md` — product purpose, assumptions, out-of-scope,
+  multi-domain model.
+- docs (D9): `docs/security.md` — self-contained mandatory security checklist
+  (former spec §7.6).
+- docs (D9): `specification.md` archived to
+  `docs/archive/specification-v1.0.md`; live docs updated (`progress.md`,
+  `implementation-plan.md`, `roadmap.md`, `documentation-plan.md`).
+- docs (D1): README *Operations* — panel screens (`/status`, domains,
+  deliveries, mail queue, system log, backup, account), upgrade procedure,
+  session behaviour (sliding idle, monitoring polls do not extend, password
+  change signs out other sessions), and `mail.log` rotation cadence.
+- docs (D1): README *Rate limiting* — level-1 anvil limits
+  (`RATE_LIMIT_MESSAGES_PER_IP`, `RATE_LIMIT_WINDOW_SECONDS`) and level-2
+  per-domain/application limits from the panel; fixes the `.env.example` link
+  that pointed at a missing section.
+- docs (D2): README environment-variable reference — public `.env` table with
+  code-accurate defaults, `TRUSTED_PROXY_CIDR` security note, explicit
+  internal-variable list; `TRUSTED_PROXY_CIDR` wired through
+  `deploy/docker-compose.yml`.
+
+### Removed
+
+- docs: `security.md` — accepted risk «restore old backup revives session rows»
+  (not a concern in operator deployment).
+
+### Changed
+
+- docs: `implementation-plan.md` trimmed to the sole open v1.x gate — pre-release
+  security review (§ D); closed B.1–C.4 material moved to as-built and ops docs.
+- docs: `architecture.md` — sessions (SQLite, idle renew, password change),
+  `mail.log` rotation (rename + `postfix reload`), `SELFPOST_HOSTNAME` startup
+  gate, log-tailer known gaps.
+- docs: `development.md` — expanded e2e stack and `release.yml` matrix workflow.
+- docs: `security.md` — accepted risk for send-log rows stuck at `queued` after
+  panel restart or container recreate.
+- docs: `roadmap.md` — optional send-log / `mail.log` follow-ups under v1.x tail.
+- docs: `progress.md`, `documentation-plan.md` — cross-links updated for the new layout.
+- docs: `documentation-plan.md` marked closed (D1–D9); trimmed to package
+  checklist, code-verification method, and ongoing maintenance rules.
+- docs: `roadmap.md` — v1.x doc/deploy tail (Codeberg Quick start, compose
+  image tag at release, `docs/logo`); archived-spec references replaced with
+  `product.md` / `security.md` / `development.md`.
+- docs: `progress.md` — documentation pass closed; deferred polish in roadmap.
+- `/healthz` now checks supervisord mail-path processes, not HTTP alone.
+- `build/Dockerfile`: `curl` for `HEALTHCHECK`; probe on port 8080.
+- docs (D3): README backup — stopped-container `tar` of `./data` (with live-container
+  WAL warning), `manifest.json` consumed after a matching restore.
+- docs (D4): README status banner (v1.0 implemented, links to open questions and
+  documentation pass); new *Published ports* note for 587; compose usage comment
+  corrected (TLS via `./certs` bind mount, not `.env`).
+- docs (D5): `implementation-plan.md` B.1 — password change signs out other
+  sessions only (implementation diverged from original plan; README was already
+  correct).
+- docs: documentation plan now targets retiring `specification.md` after D9 —
+  migration map to `product.md`, `architecture.md`, `development.md`, and
+  expanded `security.md`; D9 added to the release gate.
+
 ## [0.4.0] - 2026-08-04
 
 ### Added

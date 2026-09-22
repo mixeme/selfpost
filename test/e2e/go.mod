@@ -1,4 +1,4 @@
-module codeberg.org/mix/selfpost/test/e2e
+module github.com/mixeme/selfpost/test/e2e
 
 go 1.26
 

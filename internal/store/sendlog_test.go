@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// readSendLog returns every send_log row ordered by id. Phase 6 has no read
-// query yet (the monitoring UI is Phase 7), so tests read the table directly.
+// readSendLog returns every send_log row ordered by id. The monitoring UI has
+// no equivalent read query, so tests read the table directly.
 type sendLogRow struct {
 	QueueID  string
 	Domain   string
@@ -40,7 +40,8 @@ func readSendLog(t *testing.T, s *Store) []sendLogRow {
 func TestInsertQueuedAndUpdateStatus(t *testing.T) {
 	st := openTestStore(t)
 
-	// Two recipients on the same queue-id → two independent rows (spec 7.3.3).
+	// Two recipients on the same queue-id → two independent rows (architecture.md
+	// § Persistence).
 	for _, to := range []string{"a@example.net", "b@example.net"} {
 		if err := st.InsertQueued(SendLogEntry{
 			QueueID:  "ABC123",

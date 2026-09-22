@@ -1,3 +1,8 @@
+> **Исторический снимок v1.0, не источник истины.** Актуальные документы:
+> [product.md](../product.md), [architecture.md](../architecture.md),
+> [development.md](../development.md), [security.md](../security.md),
+> [README.md](../../README.md).
+
 # Техническое задание: SelfPost
 
 **Версия:** 1.0

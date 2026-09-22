@@ -7,17 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
-// setupTokenTTL is the lifetime of a setup token (spec 7.6.1). After it
+// setupTokenTTL is the lifetime of a setup token (security.md). After it
 // elapses the token is regenerated and re-announced on the next /setup hit.
 const setupTokenTTL = 10 * time.Minute
 
 // setupManager owns the one-time administrator setup token. The token itself is
 // ephemeral (regenerated on restart or expiry) and lives only in memory; the
 // persistent "setup complete" fact is the presence of the admin row in the
-// store, so once that exists the token is gone for good (spec 7.6.1).
+// store, so once that exists the token is gone for good (security.md).
 type setupManager struct {
 	store     *store.Store
 	hostname  string
@@ -71,8 +71,8 @@ func (m *setupManager) activeToken() (string, bool) {
 
 // validate reports whether provided matches the active token, using a
 // constant-time comparison to avoid leaking a correct prefix via timing
-// (spec 7.6.1). A mismatch does NOT regenerate or invalidate the token: failed
-// attempts must not let an attacker DoS a legitimate setup (spec 7.6.1).
+// (security.md). A mismatch does NOT regenerate or invalidate the token: failed
+// attempts must not let an attacker DoS a legitimate setup (security.md).
 func (m *setupManager) validate(provided string) bool {
 	token, ok := m.activeToken()
 	if !ok {
@@ -94,13 +94,13 @@ func (m *setupManager) complete() {
 // regenerateLocked mints a fresh token, announces it and mirrors it to disk.
 // Caller holds m.mu.
 func (m *setupManager) regenerateLocked() {
-	m.token = randomToken(16) // 128 bits of entropy (spec 7.6.1)
+	m.token = randomToken(16) // 128 bits of entropy (security.md)
 	m.expiresAt = time.Now().Add(setupTokenTTL)
 	m.announce(m.token)
 }
 
 // announce prints the setup link to the container log and writes it to the
-// token file so it can be read either way (spec 7.6.1).
+// token file so it can be read either way (security.md).
 func (m *setupManager) announce(token string) {
 	url := m.setupURL(token)
 	logf("panel: ==================================================================")

@@ -9,23 +9,25 @@ import (
 	"time"
 )
 
-// Rate-limit scopes (spec 7.4). A level-2 limit is attached either to a domain
-// (counted across all its applications and IPs) or to a single application.
+// Rate-limit scopes (README § Rate limiting). A level-2 limit is attached
+// either to a domain (counted across all its applications and IPs) or to a
+// single application.
 const (
 	RateLimitScopeDomain = "domain"
 	RateLimitScopeApp    = "application"
 )
 
-// RateLimit is a differentiated level-2 rate limit (spec 7.4): an optional set
-// of expected client IPs plus a message ceiling over a sliding window, attached
-// to a domain or an application. It is enforced in the journal-milter; level 1
-// (Postfix anvil, spec 5) is the IP backstop that always applies even when this
-// is absent or the milter is down.
+// RateLimit is a differentiated level-2 rate limit (README § Rate limiting):
+// an optional set of expected client IPs plus a message ceiling over a sliding
+// window, attached to a domain or an application. It is enforced in the
+// journal-milter; level 1 (Postfix anvil, architecture.md § Mail path) is the
+// IP backstop that always applies even when this is absent or the milter is
+// down.
 //
-// Both the IP binding and the ceiling are optional in the schema, but a limit is
-// only enforced when it is Active(): the design deliberately allows an admin to
-// leave the IP binding empty for apps that send from changing IPs, in which case
-// only level 1 protects them (spec 7.4's caveat).
+// Both the IP binding and the ceiling are optional in the schema, but a limit
+// is only enforced when it is Active(): the design deliberately allows an
+// admin to leave the IP binding empty for apps that send from changing IPs, in
+// which case only level 1 protects them (README § Rate limiting).
 type RateLimit struct {
 	Scope         string
 	RefID         int64
@@ -35,8 +37,9 @@ type RateLimit struct {
 }
 
 // Active reports whether the limit is fully configured and should be enforced.
-// A missing IP binding, ceiling or window leaves the differentiated limit inert
-// (spec 7.4): the IP binding is what scopes the limit to a known sender.
+// A missing IP binding, ceiling or window leaves the differentiated limit
+// inert (README § Rate limiting): the IP binding is what scopes the limit to a
+// known sender.
 func (r RateLimit) Active() bool {
 	return len(r.AllowedIPs) > 0 && r.MaxMessages > 0 && r.WindowSeconds > 0
 }
@@ -76,7 +79,7 @@ func (s *Store) GetRateLimit(scope string, refID int64) (RateLimit, bool, error)
 }
 
 // SetRateLimit upserts the level-2 limit for a domain or application. The caller
-// (panel) has already validated the IPs and numbers (spec 7.6.2); values are
+// (panel) has already validated the IPs and numbers (security.md); values are
 // stored via bound parameters and read back live by the milter.
 func (s *Store) SetRateLimit(rl RateLimit) error {
 	_, err := s.db.Exec(
@@ -148,12 +151,13 @@ func (s *Store) RateLimit(scope, ref string) (RateLimit, bool, error) {
 	return rl, true, nil
 }
 
-// CountMessages returns how many distinct messages the reference (a domain name
-// or an application login) has queued since t, for the level-2 sliding window
-// (spec 7.4). It counts distinct queue-ids — one message with many recipients is
-// one message, matching level 1's per-message semantics — and excludes rows that
-// were themselves rejected by a limit (they were never sent). It reuses the send
-// log the journal already writes (spec 7.4: "переиспользует данные журнала").
+// CountMessages returns how many distinct messages the reference (a domain
+// name or an application login) has queued since t, for the level-2 sliding
+// window (README § Rate limiting). It counts distinct queue-ids — one message
+// with many recipients is one message, matching level 1's per-message
+// semantics — and excludes rows that were themselves rejected by a limit (they
+// were never sent). It reuses the send log the journal already writes (README
+// § Rate limiting — the limiter reuses the send log).
 func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error) {
 	var column string
 	switch scope {

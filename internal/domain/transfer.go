@@ -3,19 +3,20 @@ package domain
 import (
 	"fmt"
 
-	"codeberg.org/mix/selfpost/internal/buildinfo"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/buildinfo"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
-// FormatDomainExport identifies a single-domain export file (spec 7.5.B).
+// FormatDomainExport identifies a single-domain export file (architecture.md §
+// Persistence).
 const FormatDomainExport = "selfpost-domain-export"
 
 // DomainExport is the serialisable form of one sending domain, for moving it
-// between two independently running SelfPost instances (spec 7.5.B). It carries
-// the DKIM private key (so the published DNS record stays valid) and each
-// application's working password (so credentials transfer without regeneration).
-// The file is therefore as sensitive as a full backup and must be handled as a
-// secret.
+// between two independently running SelfPost instances (architecture.md §
+// Persistence). It carries the DKIM private key (so the published DNS record
+// stays valid) and each application's working password (so credentials
+// transfer without regeneration). The file is therefore as sensitive as a full
+// backup and must be handled as a secret.
 type DomainExport struct {
 	Format         string      `json:"format"`
 	Version        string      `json:"version"`
@@ -35,8 +36,8 @@ type AppExport struct {
 
 // Export builds the transferable representation of a domain: its DKIM key, its
 // selector and every application with its address mode and working password
-// (spec 7.5.B). The returned struct is marshalled to JSON by the caller and
-// offered as a secret download.
+// (architecture.md § Persistence). The returned struct is marshalled to JSON
+// by the caller and offered as a secret download.
 func (s *Service) Export(id int64) (DomainExport, error) {
 	d, err := s.store.GetDomain(id)
 	if err != nil {
@@ -73,17 +74,18 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 	return exp, nil
 }
 
-// Import re-creates a domain from an export file on this instance (spec 7.5.B):
-// it stores the imported DKIM key (so the published DNS record needs no change),
-// registers the domain and rebuilds the OpenDKIM tables, then re-creates each
-// application with its working password and rebuilds the Postfix sender map.
+// Import re-creates a domain from an export file on this instance
+// (architecture.md § Persistence): it stores the imported DKIM key (so the
+// published DNS record needs no change), registers the domain and rebuilds the
+// OpenDKIM tables, then re-creates each application with its working password
+// and rebuilds the Postfix sender map.
 //
-// exp.Domain must already be normalised and validated by the caller (spec
-// 7.6.2); the selector is checked for config-injection safety here. A domain or
-// login that already exists is rejected (store.ErrDomainExists /
-// store.ErrLoginExists) rather than merged. If any step fails, everything the
-// import created is rolled back, so a partial import never leaves the instance
-// in an inconsistent state.
+// exp.Domain must already be normalised and validated by the caller
+// (security.md); the selector is checked for
+// config-injection safety here. A domain or login that already exists is
+// rejected (store.ErrDomainExists / store.ErrLoginExists) rather than merged.
+// If any step fails, everything the import created is rolled back, so a
+// partial import never leaves the instance in an inconsistent state.
 func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 	if exp.Format != FormatDomainExport {
 		return store.Domain{}, fmt.Errorf("not a SelfPost domain export (format %q)", exp.Format)

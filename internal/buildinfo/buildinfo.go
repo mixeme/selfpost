@@ -3,8 +3,8 @@ package buildinfo
 
 // Version is the SelfPost release. It is set at build time with
 //
-//	-ldflags "-X codeberg.org/mix/selfpost/internal/buildinfo.Version=<tag>"
+//	-ldflags "-X github.com/mixeme/selfpost/internal/buildinfo.Version=<tag>"
 //
 // and must match the Docker image tag; it is used for the backup/restore
-// compatibility check (spec 7.5.A). Defaults to "dev" for local/unstamped builds.
+// compatibility check (architecture.md § Persistence). Defaults to "dev" for local/unstamped builds.
 var Version = "dev"

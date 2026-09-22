@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"codeberg.org/mix/selfpost/internal/postfix"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/postfix"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // fakeMaps records the last set of bindings passed to a rebuild and can be told

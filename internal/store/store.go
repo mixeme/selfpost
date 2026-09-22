@@ -1,7 +1,7 @@
 // Package store owns the SelfPost SQLite database: the single file under /data
 // that persists the administrator account, sending domains and applications,
-// the send log and rate-limit settings (spec 9). It exposes typed queries so
-// the rest of the panel never builds SQL by hand.
+// the send log and rate-limit settings (architecture.md § Persistence). It
+// exposes typed queries so the rest of the panel never builds SQL by hand.
 package store
 
 import (

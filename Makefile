@@ -9,7 +9,7 @@
 # Go, so no cgo is required) — see spec 7.1.
 
 VERSION ?= dev
-MODULE  := codeberg.org/mix/selfpost
+MODULE  := github.com/mixeme/selfpost
 LDFLAGS := -X $(MODULE)/internal/buildinfo.Version=$(VERSION)
 GOFLAGS := -trimpath
 

@@ -16,9 +16,10 @@ var ErrDomainExists = errors.New("domain already exists")
 // ErrDomainNotFound is returned when a domain id/name does not exist.
 var ErrDomainNotFound = errors.New("domain not found")
 
-// Domain is a sending domain managed through the panel (spec 4.1). The DKIM key
-// material itself lives on disk under /data; this row records the selector and
-// metadata. AppCount is populated by the listing queries, not stored.
+// Domain is a sending domain managed through the panel (product.md §
+// Multi-domain model). The DKIM key material itself lives on disk under /data;
+// this row records the selector and metadata. AppCount is populated by the
+// listing queries, not stored.
 type Domain struct {
 	ID           int64
 	Name         string
@@ -28,7 +29,7 @@ type Domain struct {
 }
 
 // AddDomain inserts a new sending domain. The caller is responsible for having
-// validated name (spec 7.6.2) before it reaches SQL; the query is parameterised
+// validated name (security.md) before it reaches SQL; the query is parameterised
 // regardless. A duplicate name maps to ErrDomainExists.
 func (s *Store) AddDomain(name, selector string) (Domain, error) {
 	now := time.Now().UTC()
@@ -49,7 +50,7 @@ func (s *Store) AddDomain(name, selector string) (Domain, error) {
 	return Domain{ID: id, Name: name, DKIMSelector: selector, CreatedAt: now}, nil
 }
 
-// ListDomains returns every domain with its bound-application count (spec 7.2.2),
+// ListDomains returns every domain with its bound-application count (product.md),
 // ordered by name.
 func (s *Store) ListDomains() ([]Domain, error) {
 	rows, err := s.db.Query(`
@@ -92,7 +93,7 @@ func (s *Store) GetDomain(id int64) (Domain, error) {
 }
 
 // DeleteDomain removes a domain. Its applications and their address/binding rows
-// go with it via ON DELETE CASCADE (spec 7.2.4). Returns ErrDomainNotFound if no
+// go with it via ON DELETE CASCADE (product.md). Returns ErrDomainNotFound if no
 // such row existed.
 func (s *Store) DeleteDomain(id int64) error {
 	res, err := s.db.Exec("DELETE FROM domains WHERE id = ?", id)

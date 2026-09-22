@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/dnscheck"
-	"codeberg.org/mix/selfpost/internal/domain"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // newCred carries a freshly generated login/password to the template so it can
-// be shown exactly once (spec 7.6.1). It is never read back from storage.
+// be shown exactly once (security.md). It is never read back from storage.
 type newCred struct {
 	Login    string
 	Password string
@@ -29,9 +29,12 @@ type detailView struct {
 	FormMode  string
 	FormAddrs string
 	NewCred   *newCred
-	// RateLimitErr surfaces a validation error from a domain- or application-level
-	// rate-limit form (spec 7.4) as a page banner.
+	// RateLimitErr surfaces a validation error from a domain- or
+	// application-level rate-limit form (README § Rate limiting) as a page
+	// banner.
 	RateLimitErr string
+	// ExportErr surfaces a rejected encryption password from the export card.
+	ExportErr string
 }
 
 // appRateLimitView pairs an application with its differentiated rate-limit
@@ -45,9 +48,9 @@ type appRateLimitView struct {
 	WindowVal string // window seconds, defaulted when unset
 }
 
-// handleDomainDetail shows a single domain: its DKIM DNS record (spec 7.2.10)
+// handleDomainDetail shows a single domain: its DKIM DNS record (product.md)
 // and its applications with the controls to add, edit, delete and re-issue
-// credentials (spec 7.2.5-9).
+// credentials (product.md).
 func (s *Server) handleDomainDetail(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.lookupDomain(w, r)
 	if !ok {
@@ -97,8 +100,8 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 	}
 
 	// What DNS actually publishes for the domain today, checked against the key
-	// this server signs with (phase 13.B). Cached by the checker, so
-	// re-rendering the page after a form post costs nothing.
+	// this server signs with. Cached by the checker, so re-rendering the page
+	// after a form post costs nothing.
 	dns, srv := s.domainDNS(d, record, false)
 
 	s.render(w, status, "domain_detail", map[string]any{
@@ -131,6 +134,8 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 		"Wildcard":          store.AddressModeWildcard,
 		"List":              store.AddressModeList,
 		"RateLimitErr":      view.RateLimitErr,
+		"ExportErr":         view.ExportErr,
+		"MinPwLen":          minSecretFilePasswordLen,
 		"DomainHasRL":       domainRLok && domainRL.Active(),
 		"DomainRLIPs":       strings.Join(domainRL.AllowedIPs, "\n"),
 		"DomainRLMax":       intOrBlank(domainRL.MaxMessages),
@@ -139,7 +144,7 @@ func (s *Server) renderDomainDetail(w http.ResponseWriter, r *http.Request, stat
 }
 
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
-// records (phase 13.B). The server's own address comes from the (separately
+// records. The server's own address comes from the (separately
 // cached) hostname check, so the SPF heuristic knows which IP it is looking for
 // and no extra environment variable is needed. That server result is returned
 // alongside, because the page's suggested SPF record is built from the same
@@ -210,7 +215,7 @@ func detailFlash(r *http.Request) string {
 }
 
 // handleAddApplication creates an application on a domain and renders the page
-// back with the generated password shown once (spec 7.2.5, 7.6.1). Because the
+// back with the generated password shown once (product.md, security.md). Because the
 // password cannot be recovered later, this deliberately renders inline rather
 // than redirecting.
 func (s *Server) handleAddApplication(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +254,7 @@ func (s *Server) handleAddApplication(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleUpdateAppMode switches an application's address mode / list (spec 7.2.7).
+// handleUpdateAppMode switches an application's address mode / list (product.md).
 func (s *Server) handleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.lookupApplication(w, r)
 	if !ok {
@@ -278,7 +283,7 @@ func (s *Server) handleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRegenPassword issues a new password for an application and shows it once
-// (spec 7.2.9, 7.6.1). Rendered inline, like creation, so the password is visible.
+// (product.md, security.md). Rendered inline, like creation, so the password is visible.
 func (s *Server) handleRegenPassword(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.lookupApplication(w, r)
 	if !ok {
@@ -302,7 +307,7 @@ func (s *Server) handleRegenPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteApplication removes an application and returns to its domain page
-// (spec 7.2.8).
+// (product.md).
 func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.lookupApplication(w, r)
 	if !ok {
@@ -339,7 +344,7 @@ func (s *Server) lookupApplication(w http.ResponseWriter, r *http.Request) (stor
 
 // splitAddresses turns the textarea/field input (addresses separated by
 // newlines, commas or whitespace) into a raw slice. Normalisation and
-// validation happen in the app service (spec 7.6.2).
+// validation happen in the app service (security.md).
 func splitAddresses(s string) []string {
 	return strings.FieldsFunc(s, func(r rune) bool {
 		return r == '\n' || r == '\r' || r == ',' || r == ' ' || r == '\t' || r == ';'

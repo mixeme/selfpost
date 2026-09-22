@@ -14,8 +14,8 @@ import (
 const certWarnDays = 14
 
 // Certificate is the state of the TLS certificate Postfix serves on 465/587
-// (spec 8: TLS_CERT_FILE). The panel only reads it — the file is supplied by
-// the reverse proxy through a read-only mount.
+// (README § Environment variables: TLS_CERT_FILE). The panel only reads it —
+// the file is supplied by the reverse proxy through a read-only mount.
 type Certificate struct {
 	Path     string
 	Subject  string

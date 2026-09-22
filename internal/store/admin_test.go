@@ -28,7 +28,7 @@ func TestUpdateAdmin(t *testing.T) {
 }
 
 // An update before setup must not create the account: only the one-time setup
-// flow may do that (spec 7.6.1).
+// flow may do that (security.md).
 func TestUpdateAdminWithoutAdmin(t *testing.T) {
 	st := openTestStore(t)
 

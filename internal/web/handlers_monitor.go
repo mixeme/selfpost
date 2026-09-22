@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"codeberg.org/mix/selfpost/internal/logtail"
-	"codeberg.org/mix/selfpost/internal/postfix"
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/logtail"
+	"github.com/mixeme/selfpost/internal/postfix"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
-// sendLogPageSize bounds each send-log page (spec 7.2's monitoring screens
+// sendLogPageSize bounds each send-log page (product.md's monitoring screens
 // call for pagination); logTailLines bounds how much of mail.log the log view
 // shows per refresh.
 const (
@@ -20,10 +20,10 @@ const (
 )
 
 // handleDeliveries renders the Deliveries page over the send log: server-side
-// filters by domain/application and pagination (spec 7.3.3). The row table
-// itself is the "deliveries_rows" fragment, shared verbatim with
-// handleDeliveriesRows so the initial page and its HTMX-polled refreshes never
-// diverge.
+// filters by domain/application and pagination (architecture.md §
+// Persistence). The row table itself is the "deliveries_rows" fragment, shared
+// verbatim with handleDeliveriesRows so the initial page and its HTMX-polled
+// refreshes never diverge.
 func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 	data, err := s.sendLogData(r)
 	if err != nil {
@@ -38,7 +38,8 @@ func (s *Server) handleDeliveries(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeliveriesRows serves the HTMX polling fragment for the delivery table
-// (spec 7.1: fragment endpoints return HTML, not JSON).
+// (architecture.md § Panel HTTP surface: fragment endpoints return HTML, not
+// JSON).
 func (s *Server) handleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
 	data, err := s.sendLogData(r)
 	if err != nil {
@@ -110,7 +111,8 @@ func parsePage(v string) int {
 	return n
 }
 
-// handleMailQueue renders the Mail queue page (spec 7.2.11).
+// handleMailQueue renders the Mail queue page (architecture.md § Panel HTTP
+// surface).
 func (s *Server) handleMailQueue(w http.ResponseWriter, r *http.Request) {
 	out, errText := readQueue()
 	s.render(w, http.StatusOK, "mail_queue", map[string]any{
@@ -143,7 +145,8 @@ func readQueue() (string, string) {
 	return out, ""
 }
 
-// handleSystemLog renders the System log page over mail.log (spec 7.2.13).
+// handleSystemLog renders the System log page over mail.log (architecture.md §
+// Panel HTTP surface).
 func (s *Server) handleSystemLog(w http.ResponseWriter, r *http.Request) {
 	lines, errText := s.readLogTail()
 	s.render(w, http.StatusOK, "system_log", map[string]any{

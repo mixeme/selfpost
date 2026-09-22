@@ -8,11 +8,11 @@ import (
 )
 
 // handleSetup serves the one-time administrator creation flow at
-// /setup/<token> (spec 7.6.1). Once an administrator exists the whole route
+// /setup/<token> (security.md). Once an administrator exists the whole route
 // returns 404; an invalid or expired token is indistinguishable from a missing
 // page, also 404.
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
-	// Route-specific rate limit, separate from login (spec 7.6.1).
+	// Route-specific rate limit, separate from login (security.md).
 	if !s.setupLimiter.Allow(clientIP(r, s.trustedProxies)) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
@@ -92,7 +92,7 @@ func (s *Server) submitSetup(w http.ResponseWriter, r *http.Request, token strin
 		return
 	}
 
-	// Setup is now permanently complete: burn the token (spec 7.6.1).
+	// Setup is now permanently complete: burn the token (security.md).
 	s.setup.complete()
 	logf("panel: administrator %q created; setup link is now disabled", username)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)

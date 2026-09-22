@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 func TestSPFExample(t *testing.T) {

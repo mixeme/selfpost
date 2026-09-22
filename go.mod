@@ -1,4 +1,4 @@
-module codeberg.org/mix/selfpost
+module github.com/mixeme/selfpost
 
 go 1.26
 

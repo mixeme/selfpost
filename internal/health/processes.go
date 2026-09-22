@@ -25,11 +25,12 @@ type Process struct {
 	Status Status
 }
 
-// Processes returns the state of every supervised program (spec 4's three
-// processes plus the reload/cert/logrotate helpers).
+// Processes returns the state of every supervised program (architecture.md §
+// Image and processes — the three processes plus the reload/cert/logrotate
+// helpers).
 //
 // The command takes fixed arguments and no user input, so it never goes through
-// a shell (spec 7.6.3). `supervisorctl status` deliberately exits non-zero when
+// a shell (security.md). `supervisorctl status` deliberately exits non-zero when
 // some program is not running, so the output is parsed first and the exit status
 // only matters when nothing could be parsed from it.
 func Processes() ([]Process, error) {

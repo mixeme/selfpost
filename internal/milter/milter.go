@@ -1,13 +1,14 @@
 // Package milter implements the SelfPost journal-milter: a lightweight milter
-// (spec 7.3) attached to Postfix's smtpd_milters alongside OpenDKIM. On the
-// receive path it reads the SASL login, From, recipients and Subject of each
-// accepted message and records one send-log row per (queue-id, recipient),
-// giving the panel a structured, filterable history that raw mail.log cannot.
+// (architecture.md § Mail path) attached to Postfix's smtpd_milters alongside
+// OpenDKIM. On the receive path it reads the SASL login, From, recipients and
+// Subject of each accepted message and records one send-log row per (queue-id,
+// recipient), giving the panel a structured, filterable history that raw
+// mail.log cannot.
 //
 // It is monitoring only: it never rejects, and every callback returns Continue
 // or Accept so a failure of this milter can never block the relay. Postfix is
 // configured with default_action=accept for this milter's socket, so even a
-// crash or hang fails open (spec 7.3).
+// crash or hang fails open (architecture.md § Mail path).
 package milter
 
 import (
@@ -21,13 +22,14 @@ import (
 
 	"github.com/emersion/go-milter"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // Store is the persistence the milter needs on the receive path: recording
-// accepted messages (spec 7.3) and, for level-2 rate limiting (spec 7.4),
-// looking up the configured limits and counting recent messages. *store.Store
-// satisfies it; tests substitute a fake.
+// accepted messages (architecture.md § Mail path) and, for level-2 rate
+// limiting (README § Rate limiting), looking up the configured limits and
+// counting recent messages. *store.Store satisfies it; tests substitute a
+// fake.
 type Store interface {
 	InsertQueued(e store.SendLogEntry) error
 	InsertRejected(e store.SendLogEntry) error
@@ -37,26 +39,31 @@ type Store interface {
 
 // session accumulates the fields of one message as the milter callbacks fire.
 // Milter macros arrive per-stage and do not accumulate, so each value is
-// captured at the stage that carries it (spec 7.3 / Phase 0 spike): SASL login
-// and From at MAIL, each recipient at RCPT, Subject in the headers, and the
-// queue-id at end-of-message. go-milter creates one session per connection; a
-// connection may carry several messages, so per-message fields are reset at
-// MailFrom (the start of every transaction).
+// captured at the stage that carries it (architecture.md § Mail path): SASL
+// login and From at MAIL, each recipient at RCPT, Subject in the headers, and
+// the queue-id at end-of-message. go-milter creates one session per
+// connection; a connection may carry several messages, so per-message fields
+// are reset at MailFrom (the start of every transaction).
 type session struct {
 	milter.NoOpMilter
 	rec Store
+	// flight is shared by every session of the process; it holds the messages
+	// that passed the level-2 check but are not in the send log yet. Nil is a
+	// valid zero value (no in-flight accounting).
+	flight *inflight
 
 	clientIP string // captured once per connection
 
-	login   string
-	from    string
-	rcpts   []string
-	subject string
+	login    string
+	from     string
+	rcpts    []string
+	subject  string
+	reserved []*reservation // level-2 slots held by the current message
 }
 
 // Connect captures the client IP, which comes from the addr parameter rather
-// than a macro (the {client_addr} macro was empty in the spike). It is the
-// rate-limit key for Phase 8; here it is recorded for completeness.
+// than a macro (the {client_addr} macro was empty in testing). It is the
+// rate-limit key; here it is recorded for completeness.
 func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milter.Modifier) (milter.Response, error) {
 	if addr != nil {
 		s.clientIP = addr.String()
@@ -69,9 +76,10 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 // macros). This is also the earliest stage where both the sending domain (from
 // the sender) and the application (the login) are known, so the level-2 rate
 // limit is enforced here: over the limit, the message is refused with a 4xx
-// tempfail before recipients are even offered (spec 7.4). Enforcement is
-// fail-open — see overLimit.
+// tempfail before recipients are even offered (README § Rate limiting).
+// Enforcement is fail-open — see overLimit.
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
+	s.releaseReservations() // a previous transaction that ended without EOM/ABORT
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
 	s.rcpts = nil
@@ -127,14 +135,26 @@ func decodeSubject(v string) string {
 // rows are written. We accept (this milter is done) without ever rejecting.
 func (s *session) Body(m *milter.Modifier) (milter.Response, error) {
 	s.record(macro(m, "i"))
+	// The rows are in the send log now, so the stored count sees this message
+	// and its level-2 slots are no longer needed.
+	s.releaseReservations()
 	return milter.RespAccept, nil
+}
+
+// Abort ends the current transaction without an end-of-message (client RSET, or
+// Postfix rejecting the message for its own reasons). No send-log row will be
+// written, so the level-2 slots this message held must go back.
+func (s *session) Abort(m *milter.Modifier) error {
+	s.releaseReservations()
+	s.rcpts = nil
+	s.subject = ""
+	return nil
 }
 
 // macro reads a milter macro, tolerating Postfix's convention of wrapping
 // multi-character macro names in curly braces (e.g. {auth_authen}) while
 // single-character names (e.g. i) arrive bare. go-milter stores whatever name
-// Postfix sends verbatim, so a lookup must try both forms — this is exactly the
-// distinction the SASL-less Phase 0 spike could not observe.
+// Postfix sends verbatim, so a lookup must try both forms.
 func macro(m *milter.Modifier, name string) string {
 	if v, ok := m.Macros[name]; ok {
 		return v
@@ -143,7 +163,8 @@ func macro(m *milter.Modifier, name string) string {
 }
 
 // record writes one send-log row per recipient. Failures are logged, never
-// propagated: journalling must not affect mail acceptance (spec 7.3).
+// propagated: journalling must not affect mail acceptance (architecture.md §
+// Mail path).
 func (s *session) record(queueID string) {
 	domain := domainOf(s.from)
 	rcpts := s.rcpts
@@ -180,8 +201,9 @@ func cleanAddress(a string) string {
 }
 
 // domainOf returns the lower-cased domain of an email address, or "" if there
-// is no domain part. Sender binding (Phase 4) guarantees the From domain equals
-// the application's domain, so this is the sending domain (spec 7.3).
+// is no domain part. Sender binding guarantees the From domain equals the
+// application's domain, so this is the sending domain (architecture.md § Mail
+// path).
 func domainOf(addr string) string {
 	if i := strings.LastIndexByte(addr, '@'); i >= 0 {
 		return strings.ToLower(addr[i+1:])
@@ -192,8 +214,9 @@ func domainOf(addr string) string {
 // Serve runs the journal-milter on ln until ctx is cancelled. Each connection
 // gets a fresh session bound to rec. It returns nil on a clean shutdown.
 func Serve(ctx context.Context, ln net.Listener, rec Store) error {
+	flight := &inflight{} // shared: the level-2 window spans all connections
 	srv := &milter.Server{
-		NewMilter: func() milter.Milter { return &session{rec: rec} },
+		NewMilter: func() milter.Milter { return &session{rec: rec, flight: flight} },
 		Actions:   0,                // read-only: we make no message modifications
 		Protocol:  milter.OptNoBody, // the journal needs headers/EOM, not the body
 	}

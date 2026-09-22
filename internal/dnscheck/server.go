@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 // checkServer resolves the panel's own hostname and confirms the reverse

@@ -145,7 +145,7 @@ func (c *panelClient) dkimRecord(domainID string) (name, value string, err error
 }
 
 // addApplication submits the add-application form and returns the one-shot
-// login/password the panel renders inline (spec 7.6.1 — never recoverable
+// login/password the panel renders inline (security.md — never recoverable
 // later, so this is the only place to read it).
 func (c *panelClient) addApplication(domainID, login, mode, addresses string) (appLogin, password string, err error) {
 	resp, body, err := c.postForm("/domains/"+domainID+"/applications", url.Values{
@@ -170,8 +170,9 @@ func (c *panelClient) addApplication(domainID, login, mode, addresses string) (a
 	return appLogin, password, nil
 }
 
-// setRateLimit saves a level-2 differentiated limit (spec 7.4) on either a
-// domain (/domains/{id}/ratelimit) or an application (/applications/{id}/ratelimit).
+// setRateLimit saves a level-2 differentiated limit (README § Rate limiting)
+// on either a domain (/domains/{id}/ratelimit) or an application
+// (/applications/{id}/ratelimit).
 func (c *panelClient) setRateLimit(path, allowedIP string, maxMessages, windowSeconds int) error {
 	resp, body, err := c.postForm(path, url.Values{
 		"allowed_ips":    {allowedIP},

@@ -32,7 +32,7 @@ func post(secFetchSite, origin string) *http.Request {
 	return r
 }
 
-// The full matrix the origin check has to get right (phase 14.A). The row that
+// The full matrix the origin check has to get right. The row that
 // matters most is "same-site": a neighbouring host on example.com is same-site
 // as far as the session cookie's SameSite=Lax is concerned, so this check is
 // the only thing standing between it and a forged POST.

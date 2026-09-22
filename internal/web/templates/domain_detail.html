@@ -283,8 +283,11 @@
   import the DNS record stays the same, so no DNS change is needed.</p>
   <p class="muted"><strong>The export file is a secret</strong> — it contains the
   private DKIM key and application passwords. Transfer it securely and delete it
-  after the import.</p>
-  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/export">
+  after the import, or encrypt it below and move a <code>.spde</code> file
+  instead; the import form asks for the password.</p>
+  {{if .ExportErr}}<p class="error">{{.ExportErr}}</p>{{end}}
+  <form method="post" action="/domains/{{.Domain.ID}}/export">
+    {{template "encryptfields" .}}
     <button type="submit">Export domain</button>
   </form>
 </div>

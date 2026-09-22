@@ -25,7 +25,7 @@ func TestValidateLogin(t *testing.T) {
 }
 
 func TestValidateSenderAddressDomainOwnership(t *testing.T) {
-	// The critical check (spec 7.6.2): an address must belong to the app's domain.
+	// The critical check (security.md): an address must belong to the app's domain.
 	if err := validateSenderAddress("alerts@example.com", "example.com"); err != nil {
 		t.Errorf("same-domain address rejected: %v", err)
 	}

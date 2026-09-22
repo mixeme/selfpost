@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"codeberg.org/mix/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // renewThreshold bounds how often an active session's expiry is written back
@@ -16,7 +16,7 @@ const renewThreshold = time.Hour
 
 // sessionStore persists login sessions in the database (plan B.1): a login
 // survives a container restart or redeploy. Only the SHA-256 of the token is
-// stored, never the token itself (spec 7.6.6's crypto-random bearer token), so
+// stored, never the token itself (security.md's crypto-random bearer token), so
 // a stolen database file or backup archive cannot be replayed as a session —
 // it only extends the login of whichever browser still holds the original
 // cookie.

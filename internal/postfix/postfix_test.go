@@ -7,7 +7,7 @@ import (
 
 func TestRenderSenderLoginMaps(t *testing.T) {
 	// Deliberately unsorted, with two logins sharing one wildcard key
-	// (many-to-one, spec 5.1 §4) to exercise merge + sort.
+	// (many-to-one, architecture.md § Mail path) to exercise merge + sort.
 	bindings := []Binding{
 		{"@zeta.example", "z1"},
 		{"alerts@alpha.example", "a-listed"},

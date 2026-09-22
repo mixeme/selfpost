@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"codeberg.org/mix/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/health"
 )
 
 // checkDKIM compares the TXT record published at <selector>._domainkey.<domain>

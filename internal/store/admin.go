@@ -10,7 +10,7 @@ import (
 // ErrNoAdmin is returned by GetAdmin when primary setup has not happened yet.
 var ErrNoAdmin = errors.New("no administrator account")
 
-// Admin is the single panel administrator (spec 7.6.1).
+// Admin is the single panel administrator (security.md).
 type Admin struct {
 	Username     string
 	PasswordHash string
@@ -19,7 +19,7 @@ type Admin struct {
 
 // AdminExists reports whether the administrator account has been created. This
 // doubles as the "primary setup complete" flag: once true, the /setup route is
-// permanently gone (spec 7.6.1).
+// permanently gone (security.md).
 func (s *Store) AdminExists() (bool, error) {
 	var n int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM admin").Scan(&n); err != nil {

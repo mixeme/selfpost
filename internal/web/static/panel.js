@@ -36,7 +36,7 @@
   // Forms that delete something or invalidate a working credential carry a
   // data-confirm message. The prompt lives here rather than in an inline
   // onsubmit attribute because the panel's Content-Security-Policy allows no
-  // inline script (phase 14.A). The listener is delegated from the document,
+  // inline script. The listener is delegated from the document,
   // so it also covers markup swapped in by HTMX. With JavaScript disabled the
   // form submits without asking — exactly as the inline handler behaved.
   document.addEventListener("submit", function (ev) {
@@ -72,7 +72,54 @@
     });
   }
 
+  // --- Encryption password fields shown only when asked for --------------
+  // The backup, export and import forms carry an optional password block. It
+  // is hidden until the checkbox next to it is ticked, and cleared when it is
+  // unticked, so a password typed and then abandoned is never submitted. With
+  // JavaScript blocked the block stays visible and the forms behave exactly as
+  // the server reads them: the checkbox alone decides whether encryption
+  // happens.
+  function syncEncryptFields(box) {
+    var form = box.closest("form");
+    var fields = form && form.querySelector("[data-encrypt-fields]");
+    if (!fields) {
+      return;
+    }
+    fields.hidden = !box.checked;
+    if (!box.checked) {
+      fields.querySelectorAll("input").forEach(function (input) {
+        input.value = "";
+      });
+    }
+  }
+
+  function initEncryptFields(root) {
+    root.querySelectorAll("input[data-encrypt-toggle]").forEach(function (box) {
+      syncEncryptFields(box);
+      box.addEventListener("change", function () {
+        syncEncryptFields(box);
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initAddressFields(document);
+    initEncryptFields(document);
+  });
+
+  // --- Skip polling while the tab is hidden ------------------------------
+  // The monitoring pages (status, mail queue, system log, deliveries) poll
+  // every 5s via hx-trigger="every 5s". htmx has a built-in way to make that
+  // conditional (an event filter, hx-trigger="every 5s [expr]"), but it
+  // evaluates the filter with `new Function`, which the panel's CSP
+  // (default-src 'self', no 'unsafe-eval') would silently break. Skipping the
+  // request here instead needs nothing beyond what the CSP already allows: a
+  // request due while the tab is hidden is simply not sent, and the next
+  // request after it becomes visible again picks up on schedule as usual.
+  document.body.addEventListener("htmx:beforeRequest", function (ev) {
+    var trigger = ev.target.getAttribute && ev.target.getAttribute("hx-trigger");
+    if (document.hidden && trigger && trigger.indexOf("every") !== -1) {
+      ev.preventDefault();
+    }
   });
 })();
