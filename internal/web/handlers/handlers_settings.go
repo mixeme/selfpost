@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +30,7 @@ func (h *Handlers) HandleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.renderSettings(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, p.IsGlobal())
+		h.renderSettings(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, h.sendLogRetentionDays(), p.IsGlobal())
 	case http.MethodPost:
 		h.submitSettings(w, r)
 	default:
@@ -38,7 +39,7 @@ func (h *Handlers) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string, showDMARC bool) {
+func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status int, formErr, formUsername, formDMARCEmail string, formSendLogRetentionDays int, showDMARC bool) {
 	var reportAuth dnscheck.Result
 	if showDMARC && formDMARCEmail != "" {
 		if hub := dnscheck.EmailDomain(formDMARCEmail); hub != "" {
@@ -52,6 +53,7 @@ func (h *Handlers) renderSettings(w http.ResponseWriter, r *http.Request, status
 	data["Active"] = "settings"
 	data["FormUsername"] = formUsername
 	data["FormDMARCEmail"] = formDMARCEmail
+	data["FormSendLogRetentionDays"] = formSendLogRetentionDays
 	data["ShowDMARC"] = showDMARC
 	data["ReportAuthName"] = dnscheck.ReportAuthRecordName(dnscheck.EmailDomain(formDMARCEmail))
 	data["ReportAuthExample"] = dnscheck.ReportAuthExample()
@@ -74,6 +76,8 @@ func settingsFlash(r *http.Request) string {
 		return "Username and password changed. Any other signed-in sessions were signed out."
 	case "email":
 		return "DMARC report address updated."
+	case "retention":
+		return "Send log retention updated."
 	case "username-email":
 		return "Username and DMARC report address updated."
 	case "password-email":
@@ -86,23 +90,23 @@ func settingsFlash(r *http.Request) string {
 }
 
 func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
-	if !h.auth.AllowLoginAttempt(r) {
-		p, _ := h.principal(r)
-		h.renderSettings(w, r, http.StatusTooManyRequests,
-			"Too many attempts. Please wait and try again.", auth.CurrentUser(r), "", p.IsGlobal())
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		p, _ := h.principal(r)
-		h.renderSettings(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "", p.IsGlobal())
-		return
-	}
-
 	p, ok := h.principal(r)
 	if !ok {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	currentRetention := h.sendLogRetentionDays()
+
+	if !h.auth.AllowLoginAttempt(r) {
+		h.renderSettings(w, r, http.StatusTooManyRequests,
+			"Too many attempts. Please wait and try again.", auth.CurrentUser(r), "", currentRetention, p.IsGlobal())
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		h.renderSettings(w, r, http.StatusBadRequest, "Invalid form submission.", auth.CurrentUser(r), "", currentRetention, p.IsGlobal())
+		return
+	}
+
 	user, err := h.store.GetUser(p.ID)
 	if err != nil {
 		logf("panel: settings: get user failed: %v", err)
@@ -115,49 +119,66 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 	password := r.PostFormValue("new_password")
 	confirm := r.PostFormValue("new_password_confirm")
 	dmarcEmail := strings.TrimSpace(r.PostFormValue("dmarc_report_email"))
+	formRetention := currentRetention
 	if !p.IsGlobal() {
 		dmarcEmail = user.DMARCReportEmail
+	} else if raw := strings.TrimSpace(r.PostFormValue("send_log_retention_days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			h.renderSettings(w, r, http.StatusBadRequest, "Send log retention must be a whole number of days.", username, dmarcEmail, currentRetention, true)
+			return
+		}
+		formRetention = parsed
 	}
 	if username == "" {
 		username = user.Username
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
-		h.renderSettings(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail, p.IsGlobal())
+		h.renderSettings(w, r, http.StatusUnauthorized, "Current password is incorrect.", username, dmarcEmail, formRetention, p.IsGlobal())
 		return
 	}
 
 	renaming := username != user.Username
 	if renaming {
 		if err := validate.Username(username); err != nil {
-			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
 	}
 
 	if p.IsGlobal() {
 		if err := validate.Email(dmarcEmail); err != nil {
-			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, true)
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, formRetention, true)
 			return
 		}
 	}
 
 	emailChanging := p.IsGlobal() && dmarcEmail != user.DMARCReportEmail
 
+	retentionChanging := false
+	if p.IsGlobal() && formRetention != currentRetention {
+		if err := store.ValidateSendLogRetentionDays(formRetention); err != nil {
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, formRetention, true)
+			return
+		}
+		retentionChanging = true
+	}
+
 	repassword := password != "" || confirm != ""
 	if repassword {
 		if password != confirm {
-			h.renderSettings(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, "New passwords do not match.", username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
 		if err := validate.AdminPassword(password); err != nil {
-			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, p.IsGlobal())
+			h.renderSettings(w, r, http.StatusBadRequest, err.Error(), username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
 	}
-	if !renaming && !repassword && !emailChanging {
+	if !renaming && !repassword && !emailChanging && !retentionChanging {
 		h.renderSettings(w, r, http.StatusBadRequest,
-			"Nothing to change: enter a new username, password, or DMARC report address.", username, dmarcEmail, p.IsGlobal())
+			"Nothing to change: enter a new username, password, DMARC report address, or send log retention.", username, dmarcEmail, formRetention, p.IsGlobal())
 		return
 	}
 
@@ -167,25 +188,36 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logf("panel: settings: hashing password failed: %v", err)
 			h.renderSettings(w, r, http.StatusInternalServerError,
-				"Internal error. Please try again.", username, dmarcEmail, p.IsGlobal())
+				"Internal error. Please try again.", username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
 		hash = string(newHash)
 	}
 
-	if err := h.store.UpdateUser(user.ID, username, hash, dmarcEmail); err != nil {
-		logf("panel: settings: update user failed: %v", err)
-		msg := "Could not save the changes. Please check the logs and try again."
-		if errors.Is(err, store.ErrUserNotFound) {
-			msg = "There is no user account to update."
-		}
-		if errors.Is(err, store.ErrUserExists) {
-			msg = "That username is already in use."
-			h.renderSettings(w, r, http.StatusConflict, msg, username, dmarcEmail, p.IsGlobal())
+	if renaming || repassword || emailChanging {
+		if err := h.store.UpdateUser(user.ID, username, hash, dmarcEmail); err != nil {
+			logf("panel: settings: update user failed: %v", err)
+			msg := "Could not save the changes. Please check the logs and try again."
+			if errors.Is(err, store.ErrUserNotFound) {
+				msg = "There is no user account to update."
+			}
+			if errors.Is(err, store.ErrUserExists) {
+				msg = "That username is already in use."
+				h.renderSettings(w, r, http.StatusConflict, msg, username, dmarcEmail, formRetention, p.IsGlobal())
+				return
+			}
+			h.renderSettings(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
-		h.renderSettings(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, p.IsGlobal())
-		return
+	}
+
+	if retentionChanging {
+		if err := h.store.SetSendLogRetentionDays(formRetention); err != nil {
+			logf("panel: settings: set send-log retention failed: %v", err)
+			h.renderSettings(w, r, http.StatusInternalServerError,
+				"Could not save send log retention. Please check the logs and try again.", username, dmarcEmail, formRetention, true)
+			return
+		}
 	}
 
 	if token, ok := h.auth.SessionToken(r); ok {
@@ -197,25 +229,48 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logf("panel: user %d settings updated (username: %t, password: %t, dmarc email: %t)", user.ID, renaming, repassword, emailChanging)
-	http.Redirect(w, r, "/settings?updated="+updatedFlag(renaming, repassword, emailChanging), http.StatusSeeOther)
+	logf("panel: user %d settings updated (username: %t, password: %t, dmarc email: %t, retention: %t)", user.ID, renaming, repassword, emailChanging, retentionChanging)
+	http.Redirect(w, r, "/settings?updated="+updatedFlag(renaming, repassword, emailChanging, retentionChanging), http.StatusSeeOther)
 }
 
-func updatedFlag(renamed, repassword, emailChanged bool) string {
-	switch {
-	case renamed && repassword && emailChanged:
+func updatedFlag(renamed, repassword, emailChanged, retentionChanged bool) string {
+	changed := 0
+	if renamed {
+		changed++
+	}
+	if repassword {
+		changed++
+	}
+	if emailChanged {
+		changed++
+	}
+	if retentionChanged {
+		changed++
+	}
+	if changed > 1 {
 		return "all"
-	case renamed && emailChanged:
-		return "username-email"
-	case repassword && emailChanged:
-		return "password-email"
-	case renamed && repassword:
-		return "both"
+	}
+	switch {
 	case renamed:
 		return "username"
 	case repassword:
 		return "password"
-	default:
+	case emailChanged:
 		return "email"
+	default:
+		return "retention"
 	}
+}
+
+// sendLogRetentionDays returns the effective delivery-journal retention window.
+func (h *Handlers) sendLogRetentionDays() int {
+	days, err := h.store.GetSendLogRetentionDays(h.cfg.SendLogRetentionEnvDefault)
+	if err != nil {
+		logf("panel: send-log retention: %v", err)
+		if h.cfg.SendLogRetentionEnvDefault > 0 {
+			return h.cfg.SendLogRetentionEnvDefault
+		}
+		return store.SendLogRetentionDaysDefault
+	}
+	return days
 }

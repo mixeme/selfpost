@@ -38,6 +38,9 @@ type Config struct {
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE: the inbound panel and
 	// routes exist only when this is true.
 	InboundEnabled bool
+	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start; used
+	// as bootstrap and fallback when the settings row is missing or invalid.
+	SendLogRetentionEnvDefault int
 }
 
 // Handlers holds dependencies for authenticated panel routes.

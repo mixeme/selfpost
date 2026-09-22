@@ -8,6 +8,10 @@
 {{define "content"}}
 <h1>Deliveries</h1>
 
+<p class="muted">Rows older than {{.SendLogRetentionDays}} days are deleted
+automatically.{{if .IsGlobal}} Change retention on
+<a href="/settings">Settings</a>.{{end}}</p>
+
 <div class="card">
   <h2>Filter</h2>
   <form method="get" action="/deliveries">

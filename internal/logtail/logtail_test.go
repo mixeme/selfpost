@@ -212,7 +212,7 @@ func TestFollowTailsAndRotates(t *testing.T) {
 	cs := &captureStore{}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- Run(ctx, path, cs, 90) }()
+	go func() { done <- Run(ctx, path, cs, func() int { return 90 }) }()
 
 	// Give follow() time to open at EOF (it seeks to end immediately on start,
 	// so the seed line above is ignored), then append a delivery line.
@@ -295,7 +295,7 @@ func startRun(t *testing.T, path string, cs *captureStore) func() {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- Run(ctx, path, cs, 90) }()
+	go func() { done <- Run(ctx, path, cs, func() int { return 90 }) }()
 	// follow() opens and seeks on start; give it a moment before the caller
 	// appends, so the append is not raced by the initial open.
 	time.Sleep(50 * time.Millisecond)

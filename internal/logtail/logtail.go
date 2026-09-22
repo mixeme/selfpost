@@ -39,17 +39,15 @@ type StatusStore interface {
 // is a var so tests can shorten it.
 var pollInterval = time.Second
 
+// retentionInterval is how often the retention sweep runs (also once at
+// startup). It is a var so tests can shorten it.
+var retentionInterval = 6 * time.Hour
+
 // queueIDs lists the messages Postfix currently holds, for the reconcile sweep.
 // It is a var so tests can answer without a running Postfix.
 var queueIDs = postfix.QueueIDs
 
 const (
-	// retentionInterval is how often the retention sweep runs (also once at
-	// startup). The window itself is configurable; the cadence need not be.
-	retentionInterval = 6 * time.Hour
-	// defaultRetentionDays applies when the configured value is unset/invalid
-	// (guide § Environment variables: SEND_LOG_RETENTION_DAYS).
-	defaultRetentionDays = 90
 	// reconcileInterval is how often the sweep compares stuck rows against the
 	// Postfix queue, and reconcileGrace how long a row is left alone first.
 	// The grace covers the ordinary lag between the milter writing the row and
@@ -58,6 +56,10 @@ const (
 	reconcileInterval = 5 * time.Minute
 	reconcileGrace    = 2 * time.Minute
 )
+
+// RetentionDays returns the send-log retention window in days. The log-tailer
+// calls it on every prune cycle so a panel change takes effect without restart.
+type RetentionDays func() int
 
 // deliveryRe matches a Postfix delivery line and captures queue-id, recipient
 // and status, e.g.
@@ -98,11 +100,11 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 }
 
 // Run follows path and updates send-log statuses until ctx is cancelled, while
-// a background sweep prunes rows older than retentionDays. Reading resumes at
+// a background sweep prunes rows older than retention(). Reading resumes at
 // the offset the previous run persisted, so a restart parses the delivery lines
 // written while the panel was down. It returns nil on a clean shutdown.
-func Run(ctx context.Context, path string, st StatusStore, retentionDays int) error {
-	go retentionLoop(ctx, st, retentionDays)
+func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays) error {
+	go retentionLoop(ctx, st, retention)
 
 	// The reconcile sweep must not run against a backlog the tailer has not
 	// read yet: on a restart the log holds the very lines that resolve the rows
@@ -192,11 +194,12 @@ func reconcile(st StatusStore, cutoff time.Time) {
 }
 
 // retentionLoop prunes expired send-log rows immediately and then periodically.
-func retentionLoop(ctx context.Context, st StatusStore, retentionDays int) {
-	if retentionDays <= 0 {
-		retentionDays = defaultRetentionDays
-	}
+func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays) {
 	prune := func() {
+		retentionDays := retention()
+		if retentionDays <= 0 {
+			retentionDays = store.SendLogRetentionDaysDefault
+		}
 		cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
 		n, err := st.DeleteSendLogBefore(cutoff)
 		if err != nil {

@@ -85,6 +85,8 @@ type Config struct {
 	RetryPolicy postfix.RetryPolicy
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE.
 	InboundEnabled bool
+	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start.
+	SendLogRetentionEnvDefault int
 }
 
 // Server is the panel HTTP application.
@@ -124,8 +126,9 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		JournalSocket:          cfg.JournalSocket,
 		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
-		RetryPolicy:            cfg.RetryPolicy,
-		InboundEnabled:         cfg.InboundEnabled,
+		RetryPolicy:                 cfg.RetryPolicy,
+		InboundEnabled:              cfg.InboundEnabled,
+		SendLogRetentionEnvDefault: cfg.SendLogRetentionEnvDefault,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }

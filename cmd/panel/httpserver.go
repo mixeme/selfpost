@@ -96,8 +96,9 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		DNSResolvers:           cfg.dnsResolvers,
 		RateLimitMessagesPerIP: cfg.rateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.rateLimitWindowSeconds,
-		RetryPolicy:            retryPolicy,
-		InboundEnabled:         cfg.inboundEnabled,
+		RetryPolicy:                 retryPolicy,
+		InboundEnabled:              cfg.inboundEnabled,
+		SendLogRetentionEnvDefault: cfg.retentionDays,
 	}, cfg.setupTokenPath)
 }
 

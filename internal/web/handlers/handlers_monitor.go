@@ -108,10 +108,11 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
 	logRows, logNote := h.deliveryLog(row)
 	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
-		"Title":    "SelfPost — delivery",
-		"User":     auth.CurrentUser(r),
-		"Active":   "deliveries",
-		"IsGlobal": p.IsGlobal(),
+		"Title":                 "SelfPost — delivery",
+		"User":                  auth.CurrentUser(r),
+		"Active":                "deliveries",
+		"IsGlobal":              p.IsGlobal(),
+		"SendLogRetentionDays":  h.sendLogRetentionDays(),
 		"Row":      row,
 		// The status in the panel's own badge vocabulary, so the headline reads
 		// the same way as every other health signal in the panel.
@@ -270,10 +271,8 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) 
 		return nil, "Could not read the mail log."
 	}
 	if len(lines) == 0 {
-		// Send-log rows outlive mail.log: retention is ninety days by default
-		// and rotation keeps fourteen files, so an older message having nothing
-		// left to show is the normal end state, not a fault.
-		return nil, "Nothing for this queue id in the current mail log. Its lines have most likely been rotated away."
+		days := h.sendLogRetentionDays()
+		return nil, fmt.Sprintf("Nothing for this queue id in the current mail log. Its lines have most likely been rotated away (send-log rows are kept for %d days).", days)
 	}
 	out := make([]deliveryLogRow, len(lines))
 	for i, line := range lines {
@@ -386,17 +385,18 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 		lastPage = int((total + sendLogPageSize - 1) / sendLogPageSize)
 	}
 	return map[string]any{
-		"Rows":          view,
-		"FilterDomains": domainNames,
-		"FilterApps":    logins,
-		"FilterDomain":  filter.Domain,
-		"FilterApp":     filter.AppLogin,
-		"Page":          page,
-		"PrevPage":      page - 1,
-		"NextPage":      page + 1,
-		"LastPage":      lastPage,
-		"HasPrev":       page > 1,
-		"HasNext":       page < lastPage,
+		"Rows":                 view,
+		"FilterDomains":        domainNames,
+		"FilterApps":           logins,
+		"FilterDomain":         filter.Domain,
+		"FilterApp":            filter.AppLogin,
+		"Page":                 page,
+		"PrevPage":             page - 1,
+		"NextPage":             page + 1,
+		"LastPage":             lastPage,
+		"HasPrev":              page > 1,
+		"HasNext":              page < lastPage,
+		"SendLogRetentionDays": h.sendLogRetentionDays(),
 	}, nil
 }
 

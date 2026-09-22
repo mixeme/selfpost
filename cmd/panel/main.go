@@ -249,6 +249,10 @@ func run() error {
 		}
 	}
 
+	if err := st.EnsureSendLogRetentionDays(cfg.retentionDays); err != nil {
+		return fmt.Errorf("bootstrap send-log retention: %w", err)
+	}
+
 	var wg sync.WaitGroup
 	errc := make(chan error, 3)
 
@@ -258,7 +262,16 @@ func run() error {
 	}{
 		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg, st) }},
 		{"journal-milter", func(ctx context.Context) error { return serveJournal(ctx, cfg, st) }},
-		{"log-tailer", func(ctx context.Context) error { return logtail.Run(ctx, cfg.mailLog, st, cfg.retentionDays) }},
+		{"log-tailer", func(ctx context.Context) error {
+			return logtail.Run(ctx, cfg.mailLog, st, func() int {
+				days, err := st.GetSendLogRetentionDays(cfg.retentionDays)
+				if err != nil {
+					log.Printf("send-log retention: %v", err)
+					return cfg.retentionDays
+				}
+				return days
+			})
+		}},
 	}
 
 	for _, r := range roles {
