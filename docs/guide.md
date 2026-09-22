@@ -169,7 +169,7 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.5.0`. Intermediate
+deliberately never `:latest`. The current pin is `1.6.0`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check (see
 [Full backup and restore](#full-backup-and-restore)): the panel binary's
@@ -719,6 +719,18 @@ application ceiling and skip the domain check. Other IPs stay under the
 domain limit (or level 1 alone). An application override without trusted
 IPs is inactive.
 
+**Manual and auto mode** — each domain and application limit can be
+**Manual** (you set the ceiling and window) or **Auto**. Auto derives
+`max_messages` from sending statistics: `ceil(average msg/h × multiplier)`
+over the level-1 window (`RATE_LIMIT_WINDOW_SECONDS`), capped at level 1.
+The panel shows 30-day statistics (total, peak and average msg/h) on the
+domain page; level-1 refusals are not in the send log, so totals
+under-count strict IP limits. When retention is below 30 days, statistics
+use `min(30, retention)` days. With no traffic in the window, auto stays
+inactive until messages are sent. Auto limits are recalculated every six
+hours and on demand via **Recalculate now**. Application auto ceilings stay
+strictly above an active domain limit when possible.
+
 **Level 2 is best-effort, not a guarantee.** It runs inside the
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
 a store error, or the connecting client's IP is not available to the
@@ -750,10 +762,11 @@ default until it is changed there.
 ### Exporting and importing a single domain
 
 Domain page → *Export domain* to write the file, *Backup* → *Import a
-domain* to read it back in. This moves one domain — its DKIM key and its
-applications' **working** SASL passwords — to a different SelfPost instance
-without regenerating anything, so DNS (the DKIM TXT record) doesn't need to
-change. Unlike a full restore (see [Full backup and
+domain* to read it back in. This moves one domain — its DKIM key, its
+applications' **working** SASL passwords, and configured **rate limits**
+(mode, ceilings, multipliers, trusted IPs) — to a different SelfPost
+instance without regenerating anything, so DNS (the DKIM TXT record)
+doesn't need to change. Unlike a full restore (see [Full backup and
 restore](#full-backup-and-restore)), this works across different
 hostnames/instances. *Import* is global-administrator only; *export* is
 available to any user who can access the domain, **including a domain-admin**

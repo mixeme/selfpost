@@ -147,14 +147,11 @@ func (s *Service) RateLimit(domainID int64) (store.RateLimit, bool, error) {
 // SaveRateLimit stores the domain-level rate limit. The caller has validated the
 // numbers (security.md); the milter reads the row live, so no reload is needed.
 // Domain limits do not use an IP allowlist.
-func (s *Service) SaveRateLimit(domainID int64, ips []string, maxMessages, windowSeconds int) error {
-	return s.store.SetRateLimit(store.RateLimit{
-		Scope:         store.RateLimitScopeDomain,
-		RefID:         domainID,
-		AllowedIPs:    ips, // unused for domain enforcement; kept empty by the panel
-		MaxMessages:   maxMessages,
-		WindowSeconds: windowSeconds,
-	})
+func (s *Service) SaveRateLimit(domainID int64, rl store.RateLimit) error {
+	rl.Scope = store.RateLimitScopeDomain
+	rl.RefID = domainID
+	rl.AllowedIPs = nil
+	return s.store.SetRateLimit(rl)
 }
 
 // ClearRateLimit removes the domain-level rate limit, falling back to level 1

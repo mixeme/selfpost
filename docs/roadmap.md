@@ -28,43 +28,22 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
 | panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): the next feature is
-**domain-stats-auto-ratelimit** once agreed (panel retention ≥ 30 days helps
-the stats window). send-log-retention shipped in
-[CHANGELOG.md](../CHANGELOG.md) `[1.5.0]`; inbound-relay in `[1.4.0]`;
-queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
-`[1.3.0]`. Candidates need explicit agreement before they join the queue.
+**Recommended order** (not binding): the next feature is **dmarc-reports** once
+agreed. domain-stats-auto-ratelimit shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.6.0]`; send-log-retention in `[1.5.0]`;
+inbound-relay in `[1.4.0]`; queue-retries in `[1.3.1]`; the 2026-08-13
+full-tree review follow-ups are in `[1.3.0]`. Candidates need explicit
+agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
 is `done/total` checklist steps in that plan ([development.md](development.md)
 § Plan checklists).
-
----
-
-## domain-stats-auto-ratelimit
-
-**Goal:** 30-day sending statistics per domain and application (total, peak and
-average msg/h) on the domain page, plus optional **auto** level-2 rate limits
-computed as `ceil(avg_hourly × multiplier)` over the level-1 window.
-
-**Boundary:** extension of v1.0 manual L2 limits; does not change Postfix
-level 1. Stats exclude level-1 refusals (not in send log). Auto with zero
-traffic stays inactive.
-
-**Done when:** see
-[plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md).
-
-**Dependencies / risks:** send log data and preferably
-[send-log-retention](#send-log-retention) ≥ 30 days; aggregate query cost on
-large logs; rate-limit path needs security review.
-**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 
 ---
 
