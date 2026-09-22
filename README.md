@@ -24,7 +24,7 @@ send log and DNS checks in the panel, encrypted backups.
 - Web panel — domains, applications, deliveries, mail queue, system log, backup
 - Multi-domain relay — each SASL application is bound to one sending domain
 - DNS status checks (PTR, SPF, DKIM, DMARC) with in-panel re-check
-- Two-level rate limiting — IP backstop (Postfix) and per-domain/per-app limits
+- Two-level rate limiting — IP backstop (Postfix), per-domain ceilings, and trusted-IP app overrides
 - Full-server backup and single-domain export/import (optional password encryption)
 - Single Docker image; data in a `./data` bind mount
 
@@ -95,7 +95,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:1.1.0
+  ghcr.io/mixeme/selfpost:1.2.5
 ```
 
 **Get the setup URL** (pick one):

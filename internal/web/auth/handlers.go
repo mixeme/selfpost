@@ -61,7 +61,7 @@ func (m *Module) clearSessionCookies(w http.ResponseWriter) {
 
 // HandleLogin serves the login form (GET) and authenticates (POST).
 func (m *Module) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	exists, err := m.store.AdminExists()
+	exists, err := m.store.UserExists()
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -106,22 +106,21 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PostFormValue("username"))
 	password := r.PostFormValue("password")
 
-	admin, err := m.store.GetAdmin()
+	user, err := m.store.GetUserByUsername(username)
 	if err != nil {
-		if !errors.Is(err, store.ErrNoAdmin) {
-			logf("panel: login: get admin failed: %v", err)
+		if !errors.Is(err, store.ErrUserNotFound) {
+			logf("panel: login: get user failed: %v", err)
 		}
 		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
 		return
 	}
 
-	pwErr := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(password))
-	if username != admin.Username || pwErr != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
 		return
 	}
 
-	token := m.sessions.Create(admin.Username)
+	token := m.sessions.Create(user.Username)
 	m.setSessionCookie(w, token)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -222,13 +221,13 @@ func (m *Module) submitSetup(w http.ResponseWriter, r *http.Request, token strin
 		return
 	}
 
-	if err := m.store.CreateAdmin(username, string(hash)); err != nil {
-		if exists, _ := m.store.AdminExists(); exists {
+	if err := m.store.CreateGlobalUser(username, string(hash)); err != nil {
+		if exists, _ := m.store.UserExists(); exists {
 			m.setup.complete()
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		logf("panel: setup: create admin failed: %v", err)
+		logf("panel: setup: create user failed: %v", err)
 		m.renderSetupForm(w, http.StatusInternalServerError, token, "Internal error. Please try again.")
 		return
 	}

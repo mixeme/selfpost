@@ -8,9 +8,11 @@ import (
 )
 
 // overLimit reports whether the message currently being received should be
-// refused under a level-2 differentiated limit (guide § Rate limiting). It
-// checks the domain-level and application-level limits in turn; either being
-// exceeded is enough to refuse.
+// refused under a level-2 differentiated limit (guide § Rate limiting).
+//
+// Trusted application IPs (app limit active and client IP listed) use only the
+// app ceiling and skip the domain check. Everyone else is under the domain
+// ceiling when one is configured; otherwise only level 1 applies.
 //
 // It is deliberately fail-open: any store error, or the absence of a usable
 // limit, is treated as "not over limit" so a malfunction of the level-2
@@ -26,46 +28,48 @@ func (s *session) overLimit() bool {
 	if s.clientIP == "" {
 		return false // no client IP to key on; level-2 does not apply
 	}
-	checks := []struct{ scope, ref string }{
-		{store.RateLimitScopeDomain, domainOf(s.from)},
-		{store.RateLimitScopeApp, s.login},
-	}
-	var taken []*reservation
-	for _, c := range checks {
-		if c.ref == "" {
-			continue
-		}
-		rl, ok, err := s.rec.RateLimit(c.scope, c.ref)
+
+	if s.login != "" {
+		rl, ok, err := s.rec.RateLimit(store.RateLimitScopeApp, s.login)
 		if err != nil {
-			log.Printf("journal-milter: rate-limit lookup %s %q: %v (fail-open)", c.scope, c.ref, err)
-			continue
+			log.Printf("journal-milter: rate-limit lookup application %q: %v (fail-open)", s.login, err)
+		} else if ok && rl.Active() && rl.AllowsIP(s.clientIP) {
+			return s.enforceLimit(store.RateLimitScopeApp, s.login, rl)
 		}
-		// No limit configured, an inert draft, or a client IP outside the
-		// registered set: the differentiated limit does not apply here.
-		if !ok || !rl.Active() || !rl.AllowsIP(s.clientIP) {
-			continue
-		}
-		since := time.Now().Add(-time.Duration(rl.WindowSeconds) * time.Second)
-		n, err := s.rec.CountMessages(c.scope, c.ref, since)
-		if err != nil {
-			log.Printf("journal-milter: rate-limit count %s %q: %v (fail-open)", c.scope, c.ref, err)
-			continue
-		}
-		key := c.scope + "|" + c.ref
-		n += s.flight.count(key, since)
-		if n >= int64(rl.MaxMessages) {
-			log.Printf("journal-milter: %s %q over limit: %d/%d in %ds from %s — refusing 4xx",
-				c.scope, c.ref, n, rl.MaxMessages, rl.WindowSeconds, s.clientIP)
-			// The message is refused, so the slots claimed for the limits
-			// checked before this one must not stay claimed.
-			for _, r := range taken {
-				s.flight.release(r)
-			}
-			return true
-		}
-		taken = append(taken, s.flight.reserve(key))
 	}
-	s.reserved = append(s.reserved, taken...)
+
+	domain := domainOf(s.from)
+	if domain == "" {
+		return false
+	}
+	rl, ok, err := s.rec.RateLimit(store.RateLimitScopeDomain, domain)
+	if err != nil {
+		log.Printf("journal-milter: rate-limit lookup domain %q: %v (fail-open)", domain, err)
+		return false
+	}
+	if !ok || !rl.Active() {
+		return false
+	}
+	return s.enforceLimit(store.RateLimitScopeDomain, domain, rl)
+}
+
+// enforceLimit counts recent messages for scope/ref and refuses when at or
+// above the ceiling. On admit it reserves an in-flight slot on the session.
+func (s *session) enforceLimit(scope, ref string, rl store.RateLimit) bool {
+	since := time.Now().Add(-time.Duration(rl.WindowSeconds) * time.Second)
+	n, err := s.rec.CountMessages(scope, ref, since)
+	if err != nil {
+		log.Printf("journal-milter: rate-limit count %s %q: %v (fail-open)", scope, ref, err)
+		return false
+	}
+	key := scope + "|" + ref
+	n += s.flight.count(key, since)
+	if n >= int64(rl.MaxMessages) {
+		log.Printf("journal-milter: %s %q over limit: %d/%d in %ds from %s — refusing 4xx",
+			scope, ref, n, rl.MaxMessages, rl.WindowSeconds, s.clientIP)
+		return true
+	}
+	s.reserved = append(s.reserved, s.flight.reserve(key))
 	return false
 }
 

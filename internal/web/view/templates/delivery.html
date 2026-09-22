@@ -18,7 +18,7 @@
   <span class="st st-{{.Level}}">{{.Row.Status}}</span>
 </p>
 
-<a class="back" href="{{.BackURL}}">&larr; Back to deliveries</a>
+{{template "back_link" (back .BackURL "Back to deliveries")}}
 
 {{/* The two columns: what was recorded on the left, in what order it happened
      on the right. They are a pair — the facts are only worth reading against

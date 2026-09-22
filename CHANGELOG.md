@@ -5,6 +5,208 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-08-13
+
+Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.
+
+### Changed
+
+- panel: rate-limit forms refined — level-1 backstop as muted copy on the
+  domain settings form (`N messages / Ws — Settings`) and in message-limit
+  labels (`max N`); Settings shows the L1 ceiling in a code-row. Domain,
+  application, and Edit-toggle limit state use the shared `st` badge instead of
+  bold text or parenthetical copy. Address mode and trusted-IP override columns
+  carry muted leads and matched control height; trusted-IP help sits under the
+  IP field. Domain settings pairs DMARC reports with the level-2 rate limit
+  using CSS subgrid so titles, fields, and Save / Remove buttons line up across
+  columns.
+
+## [1.2.4] - 2026-08-12
+
+Level-2 rate-limit semantics inverted after 1.2.3, plus a small DNS field
+height fix. Upgrading is a tag bump; no migration.
+
+### Changed
+
+- rate limiting (level 2): domain ceilings apply to every client IP (no IP
+  allowlist). An application ceiling with trusted IPs is an override
+  **above** the domain limit (still ≤ level 1) and skips the domain check for
+  those IPs; without IPs the application override is inactive. When no domain
+  ceiling is set, non-privileged senders use level 1 only. The panel shows the
+  level-1 backstop on domain/application forms and Settings, rejects maxima
+  above level 1, and requires an application override to exceed the domain
+  maximum. Operator guide and architecture updated.
+
+### Fixed
+
+- panel: on the domain DNS status grid, the Type (TXT) field height matches
+  the Host fields.
+
+## [1.2.3] - 2026-08-12
+
+Domain detail layout and panel polish after 1.2.2. Upgrading is a tag bump; no
+migration.
+
+### Changed
+
+- panel: the domain detail page is wide with paired cards (DKIM+SPF ‖ DMARC;
+  connection settings ‖ add application; export ‖ danger). DNS status,
+  Applications and Domain settings are full-width. DNS status is two rows
+  (DKIM ‖ SPF, DMARC ‖ report authorization) with Host ‖ Type (narrow TXT)
+  and a Value label when records are present. Domain settings pairs DMARC
+  report mode with the optional level-2 domain rate limit; application Edit
+  opens address mode and an optional level-2 application rate limit side by
+  side (with a note that domain level-2 and global level-1 still apply); the
+  custom `rua=` address field is shown only for Custom address. The in-nav
+  “On this page” section index is removed. Shorter blurbs; *Sending server
+  settings* renamed **Connection settings**.
+- panel: Domains list — **Add domain** sits beside the domain field; the
+  lead blurb under the form is dropped.
+- panel: page URLs, browser titles, and headings are aligned — **Settings** is
+  now `/settings` (legacy `/account` redirects with 308); the domains list title
+  is `SelfPost — domains`; Status, Users, and user create/edit titles match their
+  nav labels and `<h1>` text; the backup page title is `SelfPost — backup &
+  migration` to reflect domain import as well as full backup. Operator guide and
+  architecture route tables updated.
+
+### Fixed
+
+- image: `mail.log` rotation no longer silently stops when the build context
+  ships `logrotate-mail.conf` with group/other write bits (common after a
+  Windows checkout sync). Runtime `COPY --chmod` pins config and script modes
+  in the Dockerfile; `logrotate-loop.sh` refuses a config logrotate would
+  ignore. E2e checks mode `644`, forced rotation, and a group-writable context
+  build.
+
+## [1.2.2] - 2026-08-12
+
+Status page layout after 1.2.1: paired cards in a wide column, denser machine
+and check copy, and a user-form checkbox fix. Upgrading is a tag bump; no
+migration.
+
+### Changed
+
+- panel: **Status** is wide again so paired cards fill the column. Layout:
+  Overall; Machine ‖ Processes; Mail queue ‖ TLS certificate; Milter sockets ‖
+  Hostname / reverse DNS; Configuration. Dropped lead blurbs on Machine, TLS
+  certificate, and Hostname (and Hostname's trailing detail line); milter
+  socket paths omitted from the table; queue link reads **View queue**; milter
+  ok detail is `Listening` without a trailing period and sits in its own
+  Detail column beside the status badge; CPU detail is only core and thread
+  counts (no load average); memory detail is `N used of M` without the
+  «available to new work» clause; network detail lists per-interface totals
+  only (rates stay in the Usage column). No «On this page» section index —
+  the paired layout is short enough. Hostname stays in the polled fragment so
+  the pair survives HTMX refresh. In-panel docs for the removed blurbs filed
+  as roadmap `panel-docs`.
+
+### Fixed
+
+- panel: cards inside `.split` used `margin: 0 auto`, which in a CSS grid
+  shrinks each card to its content and centres it in the track instead of
+  filling half the row. Side margins are cancelled for `.split > .card`
+  (Status, Settings, and a delivery's message/history).
+- panel: on the user create/edit form, **Assigned domains** checkboxes stacked
+  the box above the domain name (and stretched it full-width) because the form's
+  block-label and full-width input rules applied to them. Checkbox rows now use
+  the shared `label.check` layout; the fieldset has matching spacing.
+
+## [1.2.1] - 2026-08-11
+
+Panel refinements after 1.2.0: navigation icons, status-badge centreing,
+drill-down back-link placement, and safeguards for the sole global
+administrator. Upgrading is a tag bump; no migration.
+
+### Fixed
+
+- panel: status badge text sat low in the box (and below the heading or label
+  beside it). IBM Plex Mono sits low in its em square; the previous top-heavy
+  padding made that worse. Bottom padding is now heavier so the word centres
+  optically.
+- panel: the **Users** navigation icon was two full silhouettes with staggered
+  baselines, so the pair looked lopsided at 16 px. The rear person is now a
+  right-side crescent (head + shoulder) behind a full front silhouette aligned
+  with `icon-account`.
+- panel: the **Settings** navigation icon was a sun-with-rays (circle plus
+  spokes), not a gear. It now uses a toothed cog so it matches the other
+  session icons and the 1.2.0 release note.
+- panel: the user create/edit form placed «Back to users» at the bottom of the
+  card instead of under the heading like the delivery, domain, and domain-delete
+  pages. A shared `back_link` template now renders every drill-down up-link, and
+  `TestDrillDownPagesPlaceBackLinkAboveContent` guards its position.
+
+### Changed
+
+- panel: the user edit form disables role change and delete for the only global
+  administrator, with a short note, instead of allowing the action and showing
+  an error on submit.
+- panel: the user create/edit form hides **Assigned domains** when the role is
+  global administrator, since that role manages every domain anyway.
+- panel: **Settings** shows panel credentials and DMARC aggregate reports side
+  by side for global administrators (the same `.split` layout as a delivery's
+  message and history). Domain-scoped users keep the single narrow card.
+
+## [1.2.0] - 2026-08-11
+
+The second MINOR after 1.0.0: domain administrators with per-domain scope, a
+panel visual refresh on the SelfPost palette, and refinements to navigation and
+the send log. Upgrading runs one SQLite migration (`0005_panel_users`); the
+single administrator becomes a global user.
+
+### Added
+
+- panel: **domain-admin role** — global administrators manage panel users and
+  assign domains; domain administrators see only their domains (applications,
+  DKIM/DNS, per-domain DMARC, deliveries, export, L2 limits). Status, full
+  backup, mail queue, system log, domain add/delete, and `/reload` stay
+  global-only. SQLite migration `0005_panel_users` migrates the single
+  administrator into a global user; sessions and full backup restore carry users
+  and domain bindings.
+
+### Fixed
+
+- Docker build: `LICENSE` is no longer excluded by `.dockerignore`, so the
+  runtime image can copy it into `/usr/share/doc/selfpost/` as AGPL requires. A
+  clean build failed once the cached layer was invalidated.
+- panel: on signed-in pages with a narrow card (**Settings**, the user form)
+  the heading, flash, card and footer now share one left edge. `.card.narrow`
+  had overridden only `max-width` while `main > *` still centred siblings on
+  the 48rem measure, so the card floated 12rem to the right of the title.
+  `main:has(> .card.narrow) > *` keeps the stack on 24rem without narrowing
+  the column, so the navigation stays put; login/setup are unchanged.
+
+### Changed
+
+- panel: navigation session icons are distinct — **Settings** uses a gear,
+  the signed-in user line carries the single-user icon, and **Users** a
+  two-person group mark instead of the same account silhouette for all three.
+- panel: `/` redirects domain administrators to `/domains`; global users still
+  land on `/status`. Navigation hides global-only sections for domain
+  administrators.
+- panel: **Sign out** in the navigation column uses the same type size and
+  weight as the page entries above it; only the red tint and border mark it as
+  destructive.
+- panel: **visual style** brought in line with the SelfPost mark — brick accent
+  and warm paper in place of the blue-on-cool-grey defaults, IBM Plex Sans and
+  IBM Plex Mono served by the panel itself, squarer corners, and column
+  headings, status badges and small labels set in the mono face. Light and dark
+  schemes both keep their contrast; no page, control or workflow changed. The
+  send log stops breaking `Details` and `deferred` across two lines when a row
+  is tight. Badge padding and line-height are tuned so lowercase labels sit
+  centred in the box. The three WOFF2 files add ~76 KB to the image and are
+  served from the panel's own origin, so the Content-Security-Policy is
+  unchanged (`default-src 'self'`).
+- panel: the send log's **status is a badge**, in the same ok/warn/error/unknown
+  colours the status page and the DNS checks use, instead of the one place in
+  the panel where a status was bare text. The mapping is the one the delivery
+  page already applied — `sent` is ok, `deferred` a warning, `bounced` and
+  `rejected` errors, `queued` unknown because nothing has gone wrong yet.
+- docs: [roadmap.md](docs/roadmap.md) and [product.md](docs/product.md) no
+  longer list domain-admin or visual-style as open work — both ship in this line.
+  Completed plan files (`domain-admin`, `visual-style`, `web-split`,
+  `narrow-page-alignment`) are removed; history stays in git and the entries
+  above. Inbound relay is the main agreed 1.x+ item left on the roadmap.
+
 ## [1.1.0] - 2026-08-10
 
 The first MINOR after 1.0.0: send-only DMARC guidance in the panel, AGPL

@@ -24,6 +24,10 @@ type Config struct {
 	TLSCertFile       string
 	OpenDKIMSocket    string
 	JournalSocket     string
+	// Level-1 Postfix anvil backstop (env RATE_LIMIT_*), shown in the panel
+	// and used to cap domain/app level-2 ceilings (guide § Rate limiting).
+	RateLimitMessagesPerIP int
+	RateLimitWindowSeconds int
 }
 
 // Handlers holds dependencies for authenticated panel routes.

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
 )
 
 // After log rotation renames mail.log away, Postfix takes about a second to
@@ -252,6 +253,11 @@ func getBody(t *testing.T, h http.HandlerFunc, target string) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req = auth.RequestWithPrincipal(req, auth.Principal{
+		ID:       1,
+		Username: "admin",
+		Role:     auth.RoleGlobal,
+	})
 	if rest, ok := strings.CutPrefix(req.URL.Path, "/deliveries/"); ok && rest != "rows" {
 		req.SetPathValue("id", rest)
 	}

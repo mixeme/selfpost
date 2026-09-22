@@ -1,17 +1,12 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 )
 
-type ctxKey int
-
-const usernameKey ctxKey = 0
-
 // RequireAuth wraps a handler so only requests with a valid session cookie
 // reach it; everyone else is redirected to the login page. The authenticated
-// username is stashed in the request context for downstream handlers.
+// principal is stashed in the request context for downstream handlers.
 func (m *Module) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, ok := m.sessionToken(r)
@@ -27,7 +22,13 @@ func (m *Module) RequireAuth(next http.Handler) http.Handler {
 		if isSessionActivity(r) && m.sessions.Touch(token) {
 			m.setSessionCookie(w, token)
 		}
-		ctx := context.WithValue(r.Context(), usernameKey, username)
+		u, err := m.store.GetUserByUsername(username)
+		if err != nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		p := principalFromUser(u)
+		ctx := withPrincipal(r.Context(), p)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -42,4 +43,16 @@ func CurrentUser(r *http.Request) string {
 		return v
 	}
 	return ""
+}
+
+// RequireGlobal wraps a handler that only global administrators may reach.
+func RequireGlobal(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p, ok := CurrentPrincipal(r.Context())
+		if !ok || !p.IsGlobal() {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -141,7 +141,7 @@ Requires Go 1.26+ and `CGO_ENABLED=0`.
 
 ```sh
 make build        # bin/panel, bin/selfpost-backup (VERSION=dev by default)
-make build VERSION=1.1.0
+make build VERSION=1.2.3
 ```
 
 Or directly:
@@ -162,8 +162,10 @@ docker build -f build/Dockerfile -t selfpost:dev --build-arg VERSION=dev .
 ```
 
 The Dockerfile has a build stage (`go vet`, `go build` with `VERSION`) and a
-runtime stage (Debian + mail stack). See [architecture.md](architecture.md) §
-Image and processes.
+runtime stage (Debian + mail stack). Runtime config and scripts use `COPY
+--chmod` so file modes in the image do not depend on how the build context was
+synced (e.g. a Windows checkout widening permissions on `logrotate-mail.conf`).
+See [architecture.md](architecture.md) § Image and processes.
 
 ---
 

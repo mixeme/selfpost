@@ -194,15 +194,18 @@ func (c *panelClient) addApplication(domainID, login, mode, addresses string) (a
 	return appLogin, password, nil
 }
 
-// setRateLimit saves a level-2 differentiated limit (guide § Rate limiting)
-// on either a domain (/domains/{id}/ratelimit) or an application
-// (/applications/{id}/ratelimit).
+// setRateLimit saves a level-2 limit (guide § Rate limiting) on an application
+// (/applications/{id}/ratelimit). allowedIP is required for the trusted-IP
+// override; domain ceilings are posted without IPs.
 func (c *panelClient) setRateLimit(path, allowedIP string, maxMessages, windowSeconds int) error {
-	resp, body, err := c.postForm(path, url.Values{
-		"allowed_ips":    {allowedIP},
+	vals := url.Values{
 		"max_messages":   {fmt.Sprintf("%d", maxMessages)},
 		"window_seconds": {fmt.Sprintf("%d", windowSeconds)},
-	})
+	}
+	if allowedIP != "" {
+		vals.Set("allowed_ips", allowedIP)
+	}
+	resp, body, err := c.postForm(path, vals)
 	if err != nil {
 		return err
 	}

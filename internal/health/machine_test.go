@@ -47,7 +47,7 @@ func TestCPUUsageOverTwoReadings(t *testing.T) {
 	// 1000 ticks pass, 250 of them idle: 75% busy.
 	prev := cpuTimes{total: 10000, idle: 8000}
 	cur := cpuTimes{total: 11000, idle: 8250}
-	got := cpuUsage(prev, cur, 4, [3]float64{0.5, 0.4, 0.3}, true, nil)
+	got := cpuUsage(prev, cur, 4, 8, [3]float64{0.5, 0.4, 0.3}, true, nil)
 	if !got.Measured {
 		t.Fatalf("reading not marked measured: %+v", got)
 	}
@@ -57,15 +57,21 @@ func TestCPUUsageOverTwoReadings(t *testing.T) {
 	if got.Status != StatusOK {
 		t.Errorf("status = %q, want ok", got.Status)
 	}
-	if got.Cores != 4 || !got.HasLoad {
-		t.Errorf("cores/load not reported: %+v", got)
+	if got.Cores != 4 || got.Threads != 8 || !got.HasLoad {
+		t.Errorf("cores/threads/load not reported: %+v", got)
+	}
+	if got.Detail != "4 cores · 8 threads" {
+		t.Errorf("detail = %q, want cores and threads only", got.Detail)
 	}
 }
 
 func TestCPUUsageWarnsWhenFullyBusy(t *testing.T) {
-	got := cpuUsage(cpuTimes{total: 10000, idle: 5000}, cpuTimes{total: 11000, idle: 5010}, 1, [3]float64{}, true, nil)
+	got := cpuUsage(cpuTimes{total: 10000, idle: 5000}, cpuTimes{total: 11000, idle: 5010}, 1, 1, [3]float64{}, true, nil)
 	if got.Status != StatusWarn {
 		t.Errorf("99%% busy graded %q, want warn (%s)", got.Status, got.Detail)
+	}
+	if got.Detail != "1 cores · 1 threads" {
+		t.Errorf("detail = %q, want topology only (no warn prose)", got.Detail)
 	}
 	if got.HasLoad {
 		t.Error("a missing load average should not be reported as zeros")
@@ -84,14 +90,41 @@ func TestCPUUsageWithoutAUsableWindow(t *testing.T) {
 		{"no previous reading", cpuTimes{}, cpuTimes{total: 11000, idle: 8250}, false},
 		{"counters did not advance", cpuTimes{total: 11000, idle: 8250}, cpuTimes{total: 11000, idle: 8250}, true},
 	} {
-		got := cpuUsage(c.prev, c.cur, 2, [3]float64{}, c.fresh, nil)
+		got := cpuUsage(c.prev, c.cur, 2, 2, [3]float64{}, c.fresh, nil)
 		if got.Measured || got.Status != StatusUnknown {
 			t.Errorf("%s: measured=%v status=%q, want unmeasured/unknown", c.name, got.Measured, got.Status)
 		}
 	}
 
-	if got := cpuUsage(cpuTimes{}, cpuTimes{}, 0, [3]float64{}, false, os.ErrNotExist); got.Status != StatusUnknown {
+	if got := cpuUsage(cpuTimes{}, cpuTimes{}, 0, 0, [3]float64{}, false, os.ErrNotExist); got.Status != StatusUnknown {
 		t.Errorf("unreadable /proc/stat: status %q, want unknown", got.Status)
+	}
+}
+
+func TestReadCPUTopology(t *testing.T) {
+	dir := t.TempDir()
+	const cpuinfo = `processor	: 0
+physical id	: 0
+core id		: 0
+
+processor	: 1
+physical id	: 0
+core id		: 0
+
+processor	: 2
+physical id	: 0
+core id		: 1
+
+processor	: 3
+physical id	: 0
+core id		: 1
+`
+	if err := os.WriteFile(filepath.Join(dir, "cpuinfo"), []byte(cpuinfo), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cores, threads := readCPUTopology(dir)
+	if cores != 2 || threads != 4 {
+		t.Errorf("topology = %d cores / %d threads, want 2/4", cores, threads)
 	}
 }
 
@@ -104,8 +137,7 @@ func TestReadMemory(t *testing.T) {
 	if got.TotalBytes != 4*1024*1024*1024 {
 		t.Errorf("total = %d bytes (%s), want 4 GiB", got.TotalBytes, got.TotalText())
 	}
-	// 4 GiB total, 2 GiB available to new work: half used, cache included in
-	// what is available.
+	// 4 GiB total, 2 GiB MemAvailable: half used (cache counted as available).
 	if got.Percent() != 50 {
 		t.Errorf("used = %.1f%% (%s), want 50%%", got.UsedPct, got.PctText())
 	}
@@ -221,8 +253,11 @@ func TestMachineSamplerNeedsTwoReadings(t *testing.T) {
 	if !first.Memory.Measured {
 		t.Error("memory is a level, not a rate: it must be reported on the first sample")
 	}
-	if first.CPU.Cores != 2 {
-		t.Errorf("cores = %d, want 2", first.CPU.Cores)
+	if first.CPU.Cores != 2 || first.CPU.Threads != 2 {
+		t.Errorf("cores/threads = %d/%d, want 2/2", first.CPU.Cores, first.CPU.Threads)
+	}
+	if first.CPU.Detail != "2 cores · 2 threads" {
+		t.Errorf("detail = %q, want topology only", first.CPU.Detail)
 	}
 	if !first.CPU.HasLoad || first.CPU.Load[0] != 0.42 {
 		t.Errorf("load average not read: %+v", first.CPU.Load)

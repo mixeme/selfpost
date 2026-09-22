@@ -21,7 +21,12 @@ func serveStatic(path string, headers map[string]string) *httptest.ResponseRecor
 // prompted this: a browser given no ETag and no Last-Modified caches it on a
 // guess, and a rebranded panel keeps serving the old mark from the tab.
 func TestStaticAssetsCarryETag(t *testing.T) {
-	for _, name := range []string{"favicon.png", "favicon.svg", "panel.css", "panel.js", "htmx.min.js"} {
+	for _, name := range []string{
+		"favicon.png", "favicon.svg", "panel.css", "panel.js", "htmx.min.js",
+		// The fonts are the assets this matters most for: they are the largest
+		// thing the panel serves and the ones a browser is most willing to keep.
+		"ibm-plex-sans.woff2", "ibm-plex-mono-400.woff2", "ibm-plex-mono-600.woff2",
+	} {
 		rec := serveStatic("/static/"+name, nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s: got status %d, want 200", name, rec.Code)

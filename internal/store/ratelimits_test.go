@@ -152,27 +152,35 @@ func TestDeleteRateLimitsForDomain(t *testing.T) {
 func TestRateLimitActiveAndAllowsIP(t *testing.T) {
 	inactive := []RateLimit{
 		{},
-		{AllowedIPs: []string{"203.0.113.1"}}, // no ceiling
-		{AllowedIPs: []string{"203.0.113.1"}, MaxMessages: 5}, // no window
-		{MaxMessages: 5, WindowSeconds: 60},                   // no IPs
+		{Scope: RateLimitScopeDomain, AllowedIPs: []string{"203.0.113.1"}}, // no ceiling
+		{Scope: RateLimitScopeDomain, MaxMessages: 5},                      // no window
+		{Scope: RateLimitScopeApp, MaxMessages: 5, WindowSeconds: 60},      // app needs IPs
+		{Scope: RateLimitScopeApp, AllowedIPs: []string{"203.0.113.1"}, MaxMessages: 5}, // no window
 	}
 	for i, rl := range inactive {
 		if rl.Active() {
 			t.Fatalf("case %d: %+v should be inactive", i, rl)
 		}
 	}
-	active := RateLimit{AllowedIPs: []string{"203.0.113.1", "2001:db8::1"}, MaxMessages: 5, WindowSeconds: 60}
-	if !active.Active() {
-		t.Fatalf("should be active: %+v", active)
+	domainActive := RateLimit{Scope: RateLimitScopeDomain, MaxMessages: 5, WindowSeconds: 60}
+	if !domainActive.Active() {
+		t.Fatalf("domain without IPs should be active: %+v", domainActive)
 	}
-	if !active.AllowsIP("203.0.113.1") || !active.AllowsIP("2001:db8::1") {
+	appActive := RateLimit{
+		Scope: RateLimitScopeApp, AllowedIPs: []string{"203.0.113.1", "2001:db8::1"},
+		MaxMessages: 5, WindowSeconds: 60,
+	}
+	if !appActive.Active() {
+		t.Fatalf("should be active: %+v", appActive)
+	}
+	if !appActive.AllowsIP("203.0.113.1") || !appActive.AllowsIP("2001:db8::1") {
 		t.Fatalf("registered IPs should match")
 	}
 	// Equivalent textual form of the IPv6 address must still match.
-	if !active.AllowsIP("2001:0db8:0000:0000:0000:0000:0000:0001") {
+	if !appActive.AllowsIP("2001:0db8:0000:0000:0000:0000:0000:0001") {
 		t.Fatalf("expanded IPv6 form should match")
 	}
-	if active.AllowsIP("198.51.100.7") || active.AllowsIP("not-an-ip") || active.AllowsIP("") {
+	if appActive.AllowsIP("198.51.100.7") || appActive.AllowsIP("not-an-ip") || appActive.AllowsIP("") {
 		t.Fatalf("unregistered/invalid IPs must not match")
 	}
 }

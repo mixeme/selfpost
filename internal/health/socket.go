@@ -36,7 +36,7 @@ func CheckSocket(name, path string, required bool) Socket {
 	default:
 		s.Present = true
 		s.Status = StatusOK
-		s.Detail = "Listening."
+		s.Detail = "Listening"
 	}
 	return s
 }

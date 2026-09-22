@@ -26,15 +26,14 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Plan |
 |---|---|---|---|
-| domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
 | inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — |
-| visual-style | Обновление визуального стиля | candidate | — |
 | dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
+| panel-docs | In-panel operator documentation | candidate | — |
 
-**Recommended order** (not binding): **domain-admin →
-inbound-relay** — role-wide authorisation first, then the inbound relay vertical
-slice. Deviating is allowed; there are no hard phases here.
+**Recommended order** (not binding): **inbound-relay** first among agreed
+items — it is the largest remaining 1.x+ extension. Candidates need explicit
+agreement before they join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the checklist in its linked plan.
@@ -57,30 +56,8 @@ engine stays outside the image, only the attachment point is provided.
 
 **Dependencies / risks:** a finished outbound path; open relay and backscatter;
 a wider attack surface (port 25 accepting mail).
-**Order:** recommended after [domain-admin](plans/domain-admin.md).
 **Version:** target bump `1.x`; `2.x` possible — to be settled once the
 implementation lands.
-
----
-
-## domain-admin
-
-**Goal:** a role with access to one or several assigned domains (the list is
-set by the global administrator) — applications, DKIM/DNS, and the send log for
-each of them; without global operations (adding domains, full backup, the
-queue, `mail.log`).
-
-**Boundary:** an extension of v1.0 — [product.md](product.md) fixes a single
-administrator. Not a second all-powerful admin, but limited access to the
-assigned domains (one or several).
-
-**Done when:** see [plans/domain-admin.md](plans/domain-admin.md).
-
-**Dependencies / risks:** a users table, the role in the session, authorisation
-in every handler, setup and backup. **Order:** recommended **before**
-[inbound-relay](plans/inbound-relay.md).
-**Version:** `1.x` MINOR, given a compatible migration of the current
-administrator into a global one.
 
 ---
 
@@ -98,28 +75,6 @@ it.
 
 **Dependencies / risks:** with a single developer and no PRs, this is low
 priority.
-**Version:** no bearing on semver.
-
----
-
-## visual-style
-
-**Goal:** refresh the control panel's visual design — typography, colour tokens,
-spacing, and component styling — without changing operator workflows or panel
-behaviour.
-
-**Boundary:** presentation only (`panel.css`, templates, static assets); no new
-features. Styling must stay compatible with the panel CSP — rules live in
-`panel.css`, not inline (see [security.md](security.md) and the stylesheet
-header).
-
-**Done when:** the panel reflects an agreed visual direction (starting
-reference: [assets/selfpost-proof.html](assets/selfpost-proof.html)); light and
-dark schemes remain supported; readability and contrast are preserved.
-
-**Dependencies / risks:** CSP constraints on how styles are applied; visual
-regression across pages; low priority relative to functional work — take up
-after explicit agreement, independently of the feature roadmap order.
 **Version:** no bearing on semver.
 
 ---
@@ -147,4 +102,28 @@ source of truth for `rua=` in DNS guidance.
 inbound-relay depending on how port 25 acceptance is structured.
 
 **Version:** `1.x` MINOR.
+
+---
+
+## panel-docs
+
+**Goal:** built-in operator documentation in the panel — short pages (or a
+help drawer) that explain what each Status check and other controls mean,
+without sending the operator out to `docs/guide.md`.
+
+**Boundary:** in-panel help only; not a second copy of the full operator guide.
+Seed content includes the Status blurbs removed from the cards in favour of a
+denser layout — Machine (kernel counters / rate window), TLS certificate
+(port 465, reverse-proxy mount), Hostname / reverse DNS (forward-confirmed
+reverse DNS, PTR at the hosting provider), and similar notes for other panel
+surfaces as they lose inline commentary.
+
+**Done when:** an operator can open help from the panel for those topics; the
+removed Status blurbs are preserved there (or equivalent); no requirement to
+read the git tree for day-to-day meaning of a card.
+
+**Dependencies / risks:** copy ownership and translation; keeping help in sync
+when checks change; not bloating every page with a second column of prose.
+
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 

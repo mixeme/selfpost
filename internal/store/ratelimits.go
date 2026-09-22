@@ -18,36 +18,40 @@ const (
 )
 
 // RateLimit is a differentiated level-2 rate limit (guide § Rate limiting):
-// an optional set of expected client IPs plus a message ceiling over a sliding
-// window, attached to a domain or an application. It is enforced in the
-// journal-milter; level 1 (Postfix anvil, architecture.md § Mail path) is the
-// IP backstop that always applies even when this is absent or the milter is
-// down.
+// a message ceiling over a sliding window, attached to a domain or an
+// application. It is enforced in the journal-milter; level 1 (Postfix anvil,
+// architecture.md § Mail path) is the IP backstop that always applies even
+// when this is absent or the milter is down.
 //
-// Both the IP binding and the ceiling are optional in the schema, but a limit
-// is only enforced when it is Active(): the design deliberately allows an
-// admin to leave the IP binding empty for apps that send from changing IPs, in
-// which case only level 1 protects them (guide § Rate limiting).
+// Domain limits apply to every client IP once max and window are set. Application
+// limits additionally require AllowedIPs: those trusted addresses get the app
+// ceiling (above the domain) and skip the domain check; other IPs stay under
+// the domain limit or level 1 alone (guide § Rate limiting).
 type RateLimit struct {
 	Scope         string
 	RefID         int64
-	AllowedIPs    []string // canonical client IPs this limit applies to
+	AllowedIPs    []string // trusted client IPs for an application override
 	MaxMessages   int
 	WindowSeconds int
 }
 
 // Active reports whether the limit is fully configured and should be enforced.
-// A missing IP binding, ceiling or window leaves the differentiated limit
-// inert (guide § Rate limiting): the IP binding is what scopes the limit to a
-// known sender.
+// Domain: max and window only. Application: also needs at least one trusted IP
+// (the privilege that raises the ceiling above the domain).
 func (r RateLimit) Active() bool {
-	return len(r.AllowedIPs) > 0 && r.MaxMessages > 0 && r.WindowSeconds > 0
+	if r.MaxMessages <= 0 || r.WindowSeconds <= 0 {
+		return false
+	}
+	if r.Scope == RateLimitScopeApp {
+		return len(r.AllowedIPs) > 0
+	}
+	// Domain (and any unset/legacy scope treated as domain-style): no IP list.
+	return true
 }
 
-// AllowsIP reports whether ip is one of the limit's registered client IPs. The
-// comparison parses both sides so equivalent textual forms of the same address
-// match; a client IP outside the list means the differentiated limit does not
-// apply to it (level 1 still does).
+// AllowsIP reports whether ip is one of the application's trusted client IPs.
+// Used only for application overrides; domain limits do not consult this list.
+// Equivalent textual forms of the same address match.
 func (r RateLimit) AllowsIP(ip string) bool {
 	c := net.ParseIP(ip)
 	if c == nil {
@@ -183,8 +187,8 @@ func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error)
 }
 
 // scanRateLimit reads the three stored columns, tolerating NULL numeric columns
-// (an IP-only draft) by leaving the corresponding field zero, which makes the
-// limit inert via Active().
+// by leaving the corresponding field zero, which makes the limit inert via
+// Active() until max and window are both set.
 func scanRateLimit(r scanRow) (RateLimit, error) {
 	var (
 		ips        sql.NullString

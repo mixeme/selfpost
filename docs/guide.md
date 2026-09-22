@@ -189,7 +189,7 @@ service healthy and will mail be accepted?"
 - **Status** (`/status`) — supervised processes (Postfix, OpenDKIM, panel),
   TLS certificate validity and expiry, milter socket presence, and a short
   Postfix queue summary. The **Machine** card adds the resource usage of the
-  host underneath — processor (with the load average), memory and swap, and
+  host underneath — processor (core and thread counts), memory and swap, and
   per-interface network throughput and totals — read from the kernel's
   counters; CPU and throughput are measured between refreshes, so they appear
   one refresh after the page opens. A fully busy processor or a machine out of
@@ -202,7 +202,8 @@ service healthy and will mail be accepted?"
   shows after manual edits under `/data`.
 - **Domains** (`/domains`) — add sending domains, inspect each domain's DKIM
   TXT value, SPF/DMARC checks, and SASL applications. Per-domain rate limits
-  (level 2) are configured here. *Export domain* writes a single-domain archive;
+  (level 2) and trusted-IP application overrides are configured here.
+  *Export domain* writes a single-domain archive;
   *Import a domain* on the Backup page reads one back in.
 - **Deliveries** (`/deliveries`) — searchable send log with server-side filters
   by domain and application. A row identifies its message and nothing more —
@@ -229,7 +230,7 @@ service healthy and will mail be accepted?"
 - **Backup** (`/backup`) — download a full-server backup; the same page hosts
   the domain-import form (`POST /domains/import`). See
   [Backup, restore, and moving a single domain](#backup-restore-and-moving-a-single-domain).
-- **Settings** (`/account`) — change the administrator username and/or password.
+- **Settings** (`/settings`) — change the administrator username and/or password.
   Application SASL logins are separate and are not changed here.
 
 **Sessions.** A login survives a container restart: sessions live in SQLite, not
@@ -269,8 +270,10 @@ docker compose exec selfpost cat /data/setup-token
 
 ## Rate limiting
 
-SelfPost applies two independent limits; both can refuse a submission, but only
-level 2 writes a `rejected` row in the send log.
+SelfPost applies two independent layers; both can refuse a submission, but only
+level 2 writes a `rejected` row in the send log. Level-2 ceilings set in the
+panel cannot exceed level 1 (the panel shows the level-1 values and rejects
+higher numbers).
 
 **Level 1 (IP backstop)** — always on, configured via `.env`:
 
@@ -278,14 +281,20 @@ level 2 writes a `rejected` row in the send log.
 - `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
 
 This is an anvil limit per connecting client IP. It keeps working even if the
-journal-milter (level 2) is down.
+journal-milter (level 2) is down. There is no per-IP bypass.
 
-**Level 2 (per domain / per application)** — optional, configured in the panel
-on each domain's page or on an individual application. You set a message
-ceiling, a time window, and optionally restrict the limit to specific client
-IPs; an empty IP list means the differentiated limit does not apply. When
-exceeded, Postfix returns a 4xx and the refusal is recorded in Deliveries as
-`rejected`.
+**Level 2 — domain** — optional, on each domain's page. A message ceiling and
+window for **every** client IP sending as that domain. When unset, only
+level 1 applies for non-privileged senders.
+
+**Level 2 — application (trusted IPs)** — optional override on an application:
+list one or more client IPs and a ceiling **strictly above** the domain limit
+(still ≤ level 1). Connections from those IPs use the application ceiling and
+skip the domain check. Other IPs stay under the domain limit (or level 1 alone).
+An application override without trusted IPs is inactive.
+
+When a level-2 ceiling is exceeded, Postfix returns a 4xx and the refusal is
+recorded in Deliveries as `rejected`.
 
 ## Backup, restore, and moving a single domain
 
@@ -381,7 +390,7 @@ but it can look like an open port in external scans.
 ## Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.1.0`. Intermediate
+deliberately never `:latest`. The current pin is `1.2.5`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check above:
 the panel binary's embedded version and the image tag that produced it are the
