@@ -1,3 +1,5 @@
+![SelfPost](docs/assets/selfpost-stamp.svg)
+
 # SelfPost
 
 Self-hosted outbound SMTP relay with a web control panel, shipped as a single

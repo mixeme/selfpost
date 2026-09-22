@@ -5,6 +5,61 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-04
+
+### Added
+
+- The project's mark is now in use rather than only on file. The README opens
+  with the full stamp; the panel carries the compact one at the left of its
+  navigation bar, linking to the status page, and the full one above the card
+  on the two pages that have no navigation — sign-in and first-run setup. The
+  browser tab icon changes with it, from the earlier envelope drawing to the
+  stamp's small-size variant, so the tab, the panel and the README are one
+  identity. The four brand files in `docs/assets/` had their wordmark converted
+  from live text to outlines: they were set in IBM Plex Sans, which is not
+  installed on the machines that render them, and the light/semibold contrast
+  between *Self* and *Post* — the whole of the mark — collapsed into whatever
+  fallback the viewer happened to have.
+
+### Changed
+
+- panel: the sign-in and setup pages are now a column the width of their own
+  card. Both are a single narrow card, which centred itself while the heading
+  above it stayed at the panel's left edge; adding the mark would have made
+  that three alignments on a page with four elements.
+
+- panel: the three monitoring pages — Deliveries, Mail queue, System log — are
+  now laid out wider (64rem against the 48rem the rest of the panel keeps).
+  They carry data rather than prose: the send-log's seven columns had no room
+  to breathe, and the raw `mail.log` lines wrapped every second line.
+
+### Fixed
+
+- panel: Deliveries now shows the subject as text rather than as its MIME
+  encoding. A subject in any non-Latin alphabet reaches the milter as RFC 2047
+  encoded-words (`=?utf-8?Q?=D0=9F…?=`), and the panel printed that verbatim —
+  unreadable, and as one unbreakable run wide enough to push the Status column
+  outside the card. Subjects are decoded when the message is journalled and
+  capped at 200 characters; the column clips anything still too long to one
+  line, with the full text in the tooltip. Rows logged before this release keep
+  their raw string. Subjects in the legacy single-byte charsets (windows-1251,
+  koi8-r) are still stored as sent — there is no decoder for them.
+
+- panel: table cells may now break inside a word, so no single long value can
+  push a table past the edge of its card. A 40-character recipient address did
+  it just as readily as an undecoded subject: a column is at least as wide as
+  the longest unbreakable run it holds, and email addresses have nothing to
+  break on. Timestamps are exempt and stay on one line.
+
+- panel: the Applications list on a domain page no longer comes apart. It was a
+  four-column table whose last column held six controls, two of them expanding
+  panels with textareas — far more than the width of a column, so the controls
+  broke into a staircase, the login cell grew into a block as tall as the row,
+  and the two text columns were left stranded on the baseline halfway down it.
+  An application is now a block rather than a row: the login on one line, mode
+  and addresses on the next, and the controls in a single wrapping row, with an
+  opened panel claiming the full width for its fields.
+
 ## [0.3.0] - 2026-08-03
 
 ### Fixed

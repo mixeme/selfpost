@@ -17,6 +17,13 @@ body {
 }
 main { max-width: 42rem; margin: 0 auto; }
 h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+/* The full mark, on the two pages that have no navigation bar to carry the
+   compact one. It takes the column's width so its edges line up with the card
+   below it, capped at that column's own 24rem; height stays automatic because
+   the stamp's proportions are part of the mark and it is never scaled unevenly.
+   The subtitle stops resolving below 280px, which a 320px viewport still clears
+   once the body's padding is taken off. */
+.mark { display: block; width: 100%; max-width: 24rem; height: auto; margin-bottom: 1.4rem; }
 .card {
   background: #fff; border: 1px solid #e2e5e9; border-radius: 10px;
   padding: 1.5rem; margin: 0 auto;
@@ -50,14 +57,47 @@ button:hover, a.btn:hover { background: #1d4ed8; }
    form's block layout; its button is styled like any other. */
 form.inline { display: inline; margin: 0; }
 main { max-width: 48rem; }
+/* 48rem is a reading measure: right for the forms and prose that make up most
+   of the panel, and the width the navigation bar's two rows were sized for. The
+   three monitoring pages hold data instead — seven columns of send-log, and raw
+   mail.log lines that are long by nature — and at that width the send-log's
+   Subject and Status were fighting over the last inch while the log pages wrapped
+   every second line. They get a wider measure; every other page keeps the narrow
+   one. The class comes from the layout, which stamps the page name onto <main>. */
+main.page-deliveries, main.page-mail_queue, main.page-system_log { max-width: 64rem; }
+/* The signed-out pages are a single card and nothing else, and .card.narrow
+   centres itself inside whatever holds it — so at the panel's usual width the
+   card floated in the middle while the mark and the heading stayed at the far
+   left, three alignments on a page with four elements. Narrowing the column to
+   the card's own width makes the three line up and puts the block as a whole in
+   the middle of the page. */
+main.page-login, main.page-setup { max-width: 24rem; }
 .card + .card { margin-top: 1.2rem; }
 .flash { background: #ecfdf3; border: 1px solid #abefc6; color: #067647; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1.2rem; }
 @media (prefers-color-scheme: dark) { .flash { background: #0d2818 !important; border-color: #1a5336 !important; color: #75d99b !important; } }
 table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; }
+/* A table column is at least as wide as the longest unbreakable run inside it,
+   and the panel's tables are full of runs with nothing to break on: email
+   addresses, domains, queue ids. One 40-character recipient was enough to widen
+   the send-log past its card and hang Status over the edge. Cells may break mid
+   word, so a column can always be squeezed to the width available. */
+th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid #e2e5e9; overflow-wrap: anywhere; }
+/* The exception: a timestamp broken across two lines is unreadable, and it is
+   short enough to never be the reason a row does not fit. */
+td.time { white-space: nowrap; }
 @media (prefers-color-scheme: dark) { th, td { border-color: #2b3138 !important; } }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }
 td.actions { text-align: right; }
+/* Subject is the one cell whose text we do not control. Breaking mid word (the
+   rule above) keeps it inside the card, but a long subject would do it by
+   growing the row several lines tall, which buries the rows around it. So the
+   subject is clipped to one line instead, with the whole of it in the tooltip.
+   The clamp sits on an inner block box rather than the cell because max-width
+   on a <td> is only advisory in the automatic table layout. */
+td.subject span {
+  display: block; max-width: 18rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .code { display: block; white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 0.85rem; background: #f0f2f4; border: 1px solid #e2e5e9; border-radius: 6px; padding: 0.7rem 0.8rem; margin: 0.3rem 0 0; }
 @media (prefers-color-scheme: dark) { .code { background: #14171a !important; border-color: #2b3138 !important; } }
@@ -77,12 +117,28 @@ textarea { resize: vertical; }
 }
 button.danger, a.danger { background: #b42318; }
 button.danger:hover, a.danger:hover { background: #912018; }
-td.actions form.inline, td.actions details { margin: 0.4rem 0 0 0.5rem; }
 /* The disclosure toggle is an action too, so it is drawn as a button (see the
    compact rule below); the marker is dropped because the pressed background
    already shows the open state. */
-td.actions summary { display: inline-block; list-style: none; cursor: pointer; }
-td.actions summary::-webkit-details-marker { display: none; }
+.actions summary { display: inline-block; list-style: none; cursor: pointer; }
+.actions summary::-webkit-details-marker { display: none; }
+/* Applications are a list of blocks, not table rows. As a table it fell apart:
+   four columns of which the last held six controls — two of them <details>
+   panels with textareas — never fit the panel's 48rem. The controls wrapped
+   into a staircase, .code on the login cell grew into a slab as tall as the
+   row, and the two text cells sat on the baseline halfway down it. One block
+   per application gives the identity a line of its own and the controls a row
+   of their own, at the width they actually need. */
+.apps { list-style: none; margin: 1.2rem 0 0; padding: 0; }
+.app { padding: 0.9rem 0; border-top: 1px solid #e2e5e9; }
+.app:last-child { padding-bottom: 0; }
+@media (prefers-color-scheme: dark) { .app { border-color: #2b3138 !important; } }
+.app-login { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+.app-addr { margin: 0.15rem 0 0; word-break: break-all; }
+.app .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+/* An open panel claims a row to itself: its textareas and number inputs want
+   the block's full width, not the width of the summary that opened them. */
+.app .actions > details[open] { flex: 1 0 100%; }
 details form { margin-top: 0.6rem; }
 .credential { border-color: #f5c518; background: #fffbeb; }
 @media (prefers-color-scheme: dark) { .credential { background: #2a2408 !important; border-color: #6b5a10 !important; } }
@@ -107,9 +163,21 @@ details form { margin-top: 0.6rem; }
 }
 @media (prefers-color-scheme: dark) { .nav { border-color: #2b3138 !important; } }
 .nav .links, .nav .session { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; align-items: center; }
-/* Pushed to the far edge so the two rows read as two blocks rather than as one
+/* The top row: mark at one edge, session block at the other. Splitting them to
+   the edges is what makes the two rows read as two blocks rather than as one
    ragged list that happened to wrap. */
+.nav .top { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; }
 .nav .session { justify-content: flex-end; }
+/* The mark is a link, but not one of the bar's entries: it takes none of the
+   padding and rounding the entry rule below applies, so its own edge lines up
+   with the page rather than sitting half a step inside it. The stamp carries
+   about 4px of field inside the file at this size, which is what puts it level
+   with the icons of the row underneath. */
+.nav .brand { padding: 0; }
+/* width/height are on the element too, so the row reserves the space before the
+   SVG has loaded; these keep the ratio if the box is ever squeezed. The stamp's
+   proportions are part of the mark — it is never scaled unevenly. */
+.nav .brand img { display: block; width: 110px; height: auto; }
 /* Each entry pairs an icon with its label, so the entry itself is a flex row
    rather than a run of text — that is also why the bar centres its items
    instead of aligning them on the text baseline. Account is included: it is a
@@ -152,30 +220,32 @@ details form { margin-top: 0.6rem; }
 .code-row .code { flex: 1; min-width: 0; }
 /* Compact outlined button: same affordance as the filled one but quiet enough
    that several can sit together without shouting — the Copy buttons beside a
-   value, the per-application actions in a table row. Sign out overrides this
-   with .danger below since signing out is a deliberate, singular action. */
-button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+   value, the controls of a table row or of an application block. Sign out
+   overrides this with .danger below since signing out is a deliberate,
+   singular action. .actions is the shared hook: a cell that holds controls, or
+   the control row of an application. */
+button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
   margin: 0; padding: 0.45rem 0.7rem; font-size: 0.8rem; font-weight: 600;
   border-radius: 6px; white-space: nowrap;
   background: #eef1f5; color: #2563eb; border: 1px solid #cfd4da;
 }
-button.copy:hover, td.actions button:hover, td.actions summary:hover,
-td.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
+button.copy:hover, .actions button:hover, .actions summary:hover,
+.actions a.danger:hover, .nav button:hover { background: #e2e7ee; }
 button.copy { flex: none; margin-top: 0.3rem; }
-td.actions details[open] > summary { background: #dde3ec; }
-td.actions button.danger, td.actions a.danger, .nav button.danger {
+.actions details[open] > summary { background: #dde3ec; }
+.actions button.danger, .actions a.danger, .nav button.danger {
   color: #b42318; background: #fef3f2; border-color: #fecdca;
 }
-td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
+.actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #fee4e2; }
 @media (prefers-color-scheme: dark) {
-  button.copy, td.actions button, td.actions summary, td.actions a.danger, .nav button {
+  button.copy, .actions button, .actions summary, .actions a.danger, .nav button {
     background: #22262b !important; border-color: #2b3138 !important;
   }
-  button.copy:hover, td.actions button:hover, td.actions summary:hover,
-  td.actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
-  td.actions details[open] > summary { background: #313841 !important; }
-  td.actions button.danger, td.actions a.danger, .nav button.danger {
+  button.copy:hover, .actions button:hover, .actions summary:hover,
+  .actions a.danger:hover, .nav button:hover { background: #2b3138 !important; }
+  .actions details[open] > summary { background: #313841 !important; }
+  .actions button.danger, .actions a.danger, .nav button.danger {
     color: #f5a29b !important; background: #2d1211 !important; border-color: #6b201a !important;
   }
-  td.actions button.danger:hover, td.actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
+  .actions button.danger:hover, .actions a.danger:hover, .nav button.danger:hover { background: #3d1a18 !important; }
 }

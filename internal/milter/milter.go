@@ -13,6 +13,7 @@ package milter
 import (
 	"context"
 	"log"
+	"mime"
 	"net"
 	"net/textproto"
 	"strings"
@@ -92,9 +93,33 @@ func (s *session) RcptTo(rcpt string, m *milter.Modifier) (milter.Response, erro
 // Header captures the Subject. Only the first Subject header is kept.
 func (s *session) Header(name, value string, m *milter.Modifier) (milter.Response, error) {
 	if s.subject == "" && textproto.CanonicalMIMEHeaderKey(name) == "Subject" {
-		s.subject = value
+		s.subject = decodeSubject(value)
 	}
 	return milter.RespContinue, nil
+}
+
+// subjectMaxRunes caps what the journal keeps of a subject. A Subject header
+// may legally run to hundreds of characters; the log only needs enough to
+// recognise the message, and the panel shows one row per recipient.
+const subjectMaxRunes = 200
+
+// decodeSubject turns the raw Subject header into display text. Anything
+// non-ASCII arrives as RFC 2047 encoded-words (=?utf-8?Q?=D0=9F…?=), which the
+// panel would otherwise show verbatim: unreadable, and — being one unbreakable
+// run — wide enough to push the send-log table out of its card. Go's decoder
+// covers the UTF-8 and ASCII charsets senders use in practice; for anything
+// else (windows-1251, koi8-r) it fails and the raw header is kept, which is no
+// worse than before. Truncation is applied after decoding so the cap counts
+// characters of the subject, not bytes of its encoding.
+func decodeSubject(v string) string {
+	if dec, err := (&mime.WordDecoder{}).DecodeHeader(v); err == nil {
+		v = dec
+	}
+	v = strings.TrimSpace(v)
+	if r := []rune(v); len(r) > subjectMaxRunes {
+		v = string(r[:subjectMaxRunes]) + "…"
+	}
+	return v
 }
 
 // Body fires at end-of-message, when the queue-id macro {i} is set and the

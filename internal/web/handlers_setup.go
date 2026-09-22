@@ -42,9 +42,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderSetupForm(w http.ResponseWriter, status int, token, formErr string) {
 	s.render(w, status, "setup", map[string]any{
-		"Title": "SelfPost — Create administrator",
-		"Token": token,
-		"Error": formErr,
+		"Title":  "SelfPost — Create administrator",
+		"Active": "setup",
+		"Token":  token,
+		"Error":  formErr,
 	})
 }
 

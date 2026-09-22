@@ -98,6 +98,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// a failing form.
 		s.render(w, http.StatusOK, "login", map[string]any{
 			"Title":     "SelfPost — Sign in",
+			"Active":    "login",
 			"SetupHint": true,
 		})
 		return
@@ -115,9 +116,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderLogin(w http.ResponseWriter, status int, formErr string) {
+	// Active names the page for the layout even though no navigation is drawn
+	// here: it is what puts page-login on <main>, which the stylesheet uses to
+	// give the signed-out pages a column the width of their own card.
 	s.render(w, status, "login", map[string]any{
-		"Title": "SelfPost — Sign in",
-		"Error": formErr,
+		"Title":  "SelfPost — Sign in",
+		"Active": "login",
+		"Error":  formErr,
 	})
 }
 
