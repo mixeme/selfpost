@@ -1,12 +1,9 @@
 # Plan: inbound-relay (inbound relay)
 
-**Status:** agreed  
-**Version:** target bump **1.x** MINOR; **`2.x` possible** — to be settled once
-the implementation lands (do not fix a major in advance).  
-**Order:** queue-retries shipped in `[1.3.1]`; this is next as the largest
-remaining 1.x+ **feature**. The 2026-08-13 full-tree review follow-ups closed
-in `[1.3.0]`. The domain-admin role and `internal/web` split have shipped —
-see [CHANGELOG](../../CHANGELOG.md) `[1.2.0]`.
+**Status:** done — shipped in `[1.4.0]` (2026-08-17)  
+**Version:** 1.4.0 MINOR (flag off is compatible; not a 2.x break).  
+**Order:** after queue-retries `[1.3.1]`. One checklist step remains:
+security review of the inbound path (Fable).
 
 ---
 
@@ -175,18 +172,18 @@ Target version cut: **`1.4.0`** (MINOR). One commit per step; see
 [development.md](../development.md) § Plan checklists. UI reference:
 [panel-ui inbound mockups](../assets/panel-ui/inbound.html).
 
-- [ ] Migration: inbound domain / recipient / transport tables under `/data` — **Opus**
-- [ ] `INBOUND_RELAY_ENABLE` (default false) in entrypoint + `postfix-config.sh` — **Opus**
-- [ ] `master.cf`: inbound `smtp inet` on 25; separate from 465/587 — **Opus**
-- [ ] Generate `relay_domains`, `transport_maps`, `relay_recipient_maps` (injection-safe) — **Opus**
-- [ ] `smtpd_relay_restrictions` / recipient maps — no open relay, no backscatter — **Opus**
-- [ ] `internal/store` CRUD + validation (domain, host, port) — **Opus**
-- [ ] Panel: list, add, domain detail, recipients, danger zone (mockups) — **Sonnet**
-- [ ] Rate limit + `message_size_limit` on inbound smtpd — **Opus**
-- [ ] Optional `INBOUND_ANTISPAM_MILTER` + compose fragment — **Opus**
-- [ ] DNS MX copy in README/guide; `.env.example` — **Sonnet**
-- [ ] Backup/export inbound config (per plan optional flag) — **Opus**
-- [ ] Unit + handler tests; image build and container smoke — **Opus**
-- [ ] [guide.md](../guide.md) and [security.md](../security.md) — **Sonnet**
+- [x] Migration: inbound domain / recipient / transport tables under `/data` — **Opus**
+- [x] `INBOUND_RELAY_ENABLE` (default false) in entrypoint + `postfix-config.sh` — **Opus**
+- [x] `master.cf`: inbound `smtp inet` on 25; separate from 465/587 — **Opus**
+- [x] Generate `relay_domains`, `transport_maps`, `relay_recipient_maps` (injection-safe) — **Opus**
+- [x] `smtpd_relay_restrictions` / recipient maps — no open relay, no backscatter — **Opus**
+- [x] `internal/store` CRUD + validation (domain, host, port) — **Opus**
+- [x] Panel: list, add, domain detail, recipients, danger zone (mockups) — **Sonnet**
+- [x] Rate limit + `message_size_limit` on inbound smtpd — **Opus**
+- [x] Optional `INBOUND_ANTISPAM_MILTER` + compose fragment — **Opus**
+- [x] DNS MX copy in README/guide; `.env.example` — **Sonnet**
+- [x] Backup/export inbound config (per plan optional flag) — **Opus**
+- [x] Unit + handler tests; image build and container smoke — **Opus**
+- [x] [guide.md](../guide.md) and [security.md](../security.md) — **Sonnet**
 - [ ] Security review inbound path — **Fable**
-- [ ] `go vet`, `go test`, e2e if applicable — **Haiku**
+- [x] `go vet`, `go test`, e2e if applicable — **Haiku**

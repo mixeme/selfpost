@@ -178,6 +178,35 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	if strings.Index(out, "Status") > strings.Index(out, "Domains") {
 		t.Errorf("Status is not the first navigation entry:\n%s", out)
 	}
+	if strings.Contains(out, `href="/inbound"`) || strings.Contains(out, "Inbound") {
+		t.Errorf("Inbound nav is shown while InboundEnabled is unset:\n%s", out)
+	}
+}
+
+func TestNavShowsInboundWhenEnabled(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	engine.SetInboundEnabled(true)
+	var buf bytes.Buffer
+	if err := engine.Page("status").ExecuteTemplate(&buf, "nav", map[string]any{
+		"User":           "admin",
+		"Active":         "status",
+		"IsGlobal":       true,
+		"InboundEnabled": true,
+	}); err != nil {
+		t.Fatalf("execute nav: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `href="/inbound"`) || !strings.Contains(out, "Inbound") {
+		t.Errorf("Inbound nav is missing while InboundEnabled is true:\n%s", out)
+	}
+	dom := strings.Index(out, `href="/domains"`)
+	inb := strings.Index(out, `href="/inbound"`)
+	if dom < 0 || inb < 0 || inb < dom {
+		t.Errorf("Inbound should follow Domains:\n%s", out)
+	}
 }
 
 // Whether a page takes the whole column or the reading measure is declared by
@@ -190,7 +219,11 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	wide := map[string]bool{"settings": true, "deliveries": true, "delivery": true, "mail_queue": true, "status": true, "system_log": true, "domain_detail": true}
+	wide := map[string]bool{
+		"settings": true, "deliveries": true, "delivery": true, "mail_queue": true,
+		"status": true, "system_log": true, "domain_detail": true,
+		"inbound": true, "inbound_domain": true,
+	}
 	for name, page := range engine.Pages() {
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
@@ -281,11 +314,13 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 
 func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 	drillDown := map[string]bool{
-		"user_form.html":     true,
-		"user_delete.html":   true,
-		"domain_detail.html": true,
-		"domain_delete.html": true,
-		"delivery.html":      true,
+		"user_form.html":      true,
+		"user_delete.html":    true,
+		"domain_detail.html":  true,
+		"domain_delete.html":  true,
+		"inbound_domain.html": true,
+		"inbound_delete.html": true,
+		"delivery.html":       true,
 	}
 	forEachTemplate(t, func(name, body string) {
 		if !drillDown[name] {

@@ -49,6 +49,15 @@ var globalOnlyRoutes = []route{
 	{"GET", "/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteConfirm }, map[string]string{"id": "1"}},
 	{"POST", "/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteDomain }, map[string]string{"id": "1"}},
 	{"POST", "/reload", func(h *Handlers) http.HandlerFunc { return h.HandleReload }, nil},
+
+	{"GET", "/inbound", func(h *Handlers) http.HandlerFunc { return h.HandleInboundList }, nil},
+	{"POST", "/inbound", func(h *Handlers) http.HandlerFunc { return h.HandleAddInbound }, nil},
+	{"GET", "/inbound/1", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDetail }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/1/dns-recheck", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDNSRecheck }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/1/upstream", func(h *Handlers) http.HandlerFunc { return h.HandleInboundTransport }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/1/recipients", func(h *Handlers) http.HandlerFunc { return h.HandleInboundRecipients }, map[string]string{"id": "1"}},
+	{"GET", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDeleteConfirm }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDelete }, map[string]string{"id": "1"}},
 }
 
 // A domain administrator has an account on the panel, so authentication is not

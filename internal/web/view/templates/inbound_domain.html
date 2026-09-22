@@ -1,0 +1,118 @@
+{{define "wide"}}wide{{end}}
+
+{{define "content"}}
+<h1>{{.Domain.Name}}</h1>
+
+{{template "back_link" (back "/inbound" "All inbound domains")}}
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+<div class="card" id="dns-status">
+  <h2>DNS status <span class="st st-{{.MX.Status}}">{{.MX.Status}}</span></h2>
+  <p class="muted">Cached a few minutes — use <em>Re-check</em> after publishing.
+  Unlike outbound, inbound needs an MX pointing at this server.</p>
+  <label>MX <span class="st st-{{.MX.Status}}">{{.MX.Status}}</span></label>
+  <div class="field-pair host-type">
+    <div>
+      <label>Host / name</label>
+      <span class="code">{{.Domain.Name}}</span>
+    </div>
+    <div class="field-type">
+      <label>Type</label>
+      <span class="code">MX</span>
+    </div>
+  </div>
+  <label>Value</label>
+  {{if .MX.Records}}
+  <span class="code">{{range .MX.Records}}{{.}}
+{{end}}</span>
+  {{else}}
+  <span class="code muted">No MX records found.</span>
+  {{end}}
+  {{if eq .MX.Status "ok"}}
+  <p class="muted">{{.MX.Detail}}</p>
+  {{else}}
+  <p class="error">{{.MX.Detail}}</p>
+  {{end}}
+  <form method="post" action="/inbound/{{.Domain.ID}}/dns-recheck">
+    <button type="submit">Re-check</button>
+  </form>
+</div>
+
+<div class="split">
+  <div class="card">
+    <h2>Upstream</h2>
+    <p class="muted">Where accepted mail is handed off. Not a mailbox.</p>
+    <form method="post" action="/inbound/{{.Domain.ID}}/upstream">
+      <label for="host">Host</label>
+      <input id="host" name="host" type="text" value="{{.Domain.Host}}"
+             autocomplete="off" autocapitalize="none" spellcheck="false" required>
+      <label for="port">Port</label>
+      <input id="port" name="port" type="text" inputmode="numeric" value="{{.Domain.Port}}" required>
+      <label for="tls_mode">TLS to upstream</label>
+      <select id="tls_mode" name="tls_mode">
+        <option value="may" {{if eq .Domain.TLSMode "may"}}selected{{end}}>Opportunistic</option>
+        <option value="encrypt" {{if eq .Domain.TLSMode "encrypt"}}selected{{end}}>Required</option>
+        <option value="none" {{if eq .Domain.TLSMode "none"}}selected{{end}}>Off</option>
+      </select>
+      {{if .TransportErr}}<p class="error">{{.TransportErr}}</p>{{end}}
+      <button type="submit">Save upstream</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>MX record to publish</h2>
+    <p class="muted">Add this MX so the internet delivers here. Keep any existing
+    primary MX if this is backup-MX.</p>
+    <div class="field-pair host-type">
+      <div>
+        <label>Host / name</label>
+        <div class="code-row">
+          <span class="code">{{.Domain.Name}}</span>
+          <button type="button" class="copy">Copy</button>
+        </div>
+      </div>
+      <div class="field-type">
+        <label>Type</label>
+        <span class="code">MX</span>
+      </div>
+    </div>
+    <label>Value</label>
+    <div class="code-row">
+      <span class="code">{{.MXValue}}</span>
+      <button type="button" class="copy">Copy</button>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="card">
+    <h2>Valid recipients</h2>
+    <p class="muted">Who this domain accepts on port 25. Same idea as an
+    application's address mode: a list, or any address at the domain.</p>
+    <form method="post" action="/inbound/{{.Domain.ID}}/recipients">
+      <label for="recipient_mode">Who to accept</label>
+      <select id="recipient_mode" name="recipient_mode" data-list-mode="list">
+        <option value="list" {{if eq .Domain.RecipientMode "list"}}selected{{end}}>Listed addresses only</option>
+        <option value="any" {{if eq .Domain.RecipientMode "any"}}selected{{end}}>Any recipient at this domain</option>
+      </select>
+      <div data-addresses>
+        <label for="addresses">Addresses (one per line or comma-separated)</label>
+        <textarea id="addresses" name="addresses" rows="6">{{.RecipientText}}</textarea>
+        <p class="muted">Unknown recipients are rejected at RCPT so this relay
+        does not generate backscatter.</p>
+      </div>
+      <p class="muted">Every address at this domain is accepted and forwarded when
+      “any recipient” is selected. Prefer a list unless the upstream rejects
+      unknowns — otherwise this relay may generate backscatter.</p>
+      {{if .RecipientErr}}<p class="error">{{.RecipientErr}}</p>{{end}}
+      <button type="submit">Save recipients</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Danger zone</h2>
+    <p class="muted">Stops accepting mail for this domain. Does not touch
+    outbound sending domains.</p>
+    <p><a class="danger" href="/inbound/{{.Domain.ID}}/delete">Delete inbound domain</a></p>
+  </div>
+</div>
+{{end}}

@@ -10,7 +10,9 @@ login in the `saslpasswd2` argv
 2026-08-13 full-tree review against this document — send-log authorization for
 domain administrators, the atomic level-2 admit (`tryAdmit`), fail-closed
 session creation, and application-delete ordering: no findings, and nothing
-needed adding to the accepted risks. (2) **Accepted risks** —
+needed adding to the accepted risks. The inbound-relay path (port 25, maps,
+panel) is described under Mail path below and is **not yet** in that review
+history — it awaits a separate Fable pass before 1.4.0. (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
 
@@ -77,8 +79,17 @@ The panel is exposed to the internet — the items below are **not optional**.
 
 ### Mail path (security-relevant)
 
-- **Not an open relay** — SASL only; `reject_unauth_destination`;
+- **Not an open relay** — SASL only on 465/587; `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
+- **Inbound relay (optional, `INBOUND_RELAY_ENABLE`)** — port 25 is not an
+  open relay either: SASL is off; `smtpd_relay_restrictions` /
+  `smtpd_recipient_restrictions` are `reject_unauth_destination` and
+  `reject_unlisted_recipient`; maps list only configured domains and
+  recipients. Domains with no upstream host are omitted from the maps so mail
+  is never accepted with nowhere to send it. Prefer recipient mode `list` to
+  refuse unknown addresses at RCPT (no backscatter). OpenDKIM is not attached
+  on inbound. An optional antispam milter is inbound-only; default action is
+  fail-open (`accept`).
 - TLS is mandatory before credentials are transmitted (465 wrapper / 587
   `encrypt`).
 - `TRUSTED_PROXY_CIDR` — only explicitly trusted proxies may supply

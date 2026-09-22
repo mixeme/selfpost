@@ -172,6 +172,13 @@ func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "reload failed", http.StatusInternalServerError)
 		return
 	}
+	if h.cfg.InboundEnabled && h.inbound != nil {
+		if err := h.inbound.Resync(); err != nil {
+			logf("panel: manual reload (inbound): %v", err)
+			http.Error(w, "reload failed", http.StatusInternalServerError)
+			return
+		}
+	}
 	http.Redirect(w, r, "/status?reloaded=1", http.StatusSeeOther)
 }
 

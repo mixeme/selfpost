@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -347,7 +348,12 @@ func serverWithTwoDomains(t *testing.T) (*Handlers, map[string]store.Domain) {
 		domains[d.name] = dom
 	}
 
-	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, domains
+	return &Handlers{
+		store:   st,
+		inbound: inbound.NewService(st, &recordingMaps{}),
+		view:    mustView(t),
+		cfg:     Config{Version: "test", InboundEnabled: true},
+	}, domains
 }
 
 var globalPrincipal = auth.Principal{ID: 1, Username: "admin", Role: auth.RoleGlobal}

@@ -1,0 +1,50 @@
+{{define "wide"}}wide{{end}}
+
+{{define "content"}}
+<h1>Inbound</h1>
+
+<p class="muted">Backup-MX / forwarder. Accepts on port 25 only for listed
+domains. Recipients are either an allow-list or any address at that domain.
+Off by default in Compose.</p>
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+<div class="card">
+  <h2>Forwarding</h2>
+  <form method="post" action="/inbound">
+    <label for="name">Add inbound domain</label>
+    <div class="input-row">
+      <input id="name" name="name" type="text" placeholder="lists.example.com"
+             autocomplete="off" autocapitalize="none" spellcheck="false"
+             value="{{.FormName}}" autofocus required>
+      <button type="submit">Add domain</button>
+    </div>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  </form>
+  {{if .Domains}}
+  <table>
+    <thead>
+      <tr><th>Domain</th><th>DNS</th><th>Upstream</th><th>Recipients</th><th>TLS</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Domains}}
+      <tr>
+        <td><a href="/inbound/{{.ID}}">{{.Name}}</a></td>
+        <td><a class="st st-{{.DNS}}" href="/inbound/{{.ID}}">{{.DNS}}</a></td>
+        <td class="muted">{{.Upstream}}</td>
+        <td>{{.RcptLabel}}</td>
+        <td><span class="st st-{{if eq .TLSMode "encrypt"}}ok{{else}}unknown{{end}}">{{.TLSLabel}}</span></td>
+        <td class="actions"><a class="danger" href="/inbound/{{.ID}}/delete">Delete</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <p class="muted">The <em>DNS</em> badge is the MX check: at least one MX must
+  point at this server. Results are cached for a few minutes; open a domain for
+  the lookup and a <em>Re-check</em> button.</p>
+  {{else}}
+  <p class="muted">No inbound domains yet. Add one above, then set the upstream
+  on its page. Mail is not accepted until an upstream host is saved.</p>
+  {{end}}
+</div>
+{{end}}

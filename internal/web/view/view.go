@@ -18,9 +18,10 @@ var assetsFS embed.FS
 
 // Engine holds parsed page and fragment templates.
 type Engine struct {
-	pages     map[string]*template.Template
-	fragments map[string]*template.Template
-	version   string
+	pages          map[string]*template.Template
+	fragments      map[string]*template.Template
+	version        string
+	inboundEnabled bool
 }
 
 // pageFiles maps a logical page name to its template files. Every page
@@ -31,21 +32,24 @@ type Engine struct {
 // encryption fields on the two secret downloads) list that partial the same
 // way.
 var pageFiles = map[string][]string{
-	"setup":         {"templates/setup.html"},
-	"login":         {"templates/login.html"},
-	"dashboard":     {"templates/dashboard.html"},
-	"settings":      {"templates/settings.html"},
-	"users":         {"templates/users.html"},
-	"user_form":     {"templates/user_form.html"},
-	"user_delete":   {"templates/user_delete.html"},
-	"backup":        {"templates/backup.html", "templates/encrypt_fields.html"},
-	"domain_detail": {"templates/domain_detail.html", "templates/encrypt_fields.html"},
-	"domain_delete": {"templates/domain_delete.html"},
-	"deliveries":    {"templates/deliveries.html", "templates/deliveries_rows.html"},
-	"delivery":      {"templates/delivery.html"},
-	"mail_queue":    {"templates/mail_queue.html", "templates/mail_queue_body.html"},
-	"system_log":    {"templates/system_log.html", "templates/system_log_body.html"},
-	"status":        {"templates/status.html", "templates/status_body.html"},
+	"setup":          {"templates/setup.html"},
+	"login":          {"templates/login.html"},
+	"dashboard":      {"templates/dashboard.html"},
+	"settings":       {"templates/settings.html"},
+	"users":          {"templates/users.html"},
+	"user_form":      {"templates/user_form.html"},
+	"user_delete":    {"templates/user_delete.html"},
+	"backup":         {"templates/backup.html", "templates/encrypt_fields.html"},
+	"domain_detail":  {"templates/domain_detail.html", "templates/encrypt_fields.html"},
+	"domain_delete":  {"templates/domain_delete.html"},
+	"inbound":        {"templates/inbound.html"},
+	"inbound_domain": {"templates/inbound_domain.html"},
+	"inbound_delete": {"templates/inbound_delete.html"},
+	"deliveries":     {"templates/deliveries.html", "templates/deliveries_rows.html"},
+	"delivery":       {"templates/delivery.html"},
+	"mail_queue":     {"templates/mail_queue.html", "templates/mail_queue_body.html"},
+	"system_log":     {"templates/system_log.html", "templates/system_log_body.html"},
+	"status":         {"templates/status.html", "templates/status_body.html"},
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -80,6 +84,12 @@ func New(version string) (*Engine, error) {
 		e.fragments[name] = tmpl
 	}
 	return e, nil
+}
+
+// SetInboundEnabled controls whether the Inbound nav item is shown. The
+// listener and routes are gated the same way (INBOUND_RELAY_ENABLE).
+func (e *Engine) SetInboundEnabled(v bool) {
+	e.inboundEnabled = v
 }
 
 // templateFuncs supplies helpers shared across page templates.
@@ -124,6 +134,7 @@ func (e *Engine) Render(w http.ResponseWriter, status int, page string, data any
 		m["Version"] = e.version
 		m["Copyright"] = legal.CopyrightLine
 		m["SourceURL"] = legal.SourceURL
+		m["InboundEnabled"] = e.inboundEnabled
 	}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {

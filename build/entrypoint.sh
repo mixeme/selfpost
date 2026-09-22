@@ -103,6 +103,13 @@ chmod 2750 /data/sasl
 # writes sender_login_maps; Postfix owns the on-disk queue tree under queue/.
 mkdir -p /data/postfix/queue
 [ -e /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
+# Inbound relay maps (written by the panel when INBOUND_RELAY_ENABLE=true).
+# Empty files keep postfix check happy if the flag is on before any domain exists.
+for f in relay_domains transport relay_recipients tls_policy; do
+	[ -e "/data/postfix/$f" ] || : > "/data/postfix/$f"
+	chown panel:selfpost "/data/postfix/$f"
+	chmod 0640 "/data/postfix/$f"
+done
 chown panel:selfpost /data/postfix
 chmod 2750 /data/postfix
 chown panel:selfpost /data/postfix/sender_login_maps
