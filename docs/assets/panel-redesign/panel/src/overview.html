@@ -1,0 +1,50 @@
+<!-- title: Overview | section: overview -->
+    <div class="sp-head">
+      <div class="sp-postmark sp-warn"><span>SELFPOST</span><b>WARN</b><span>1 OF 6 CHECKS</span></div>
+      <div class="sp-grow">
+        <p class="sp-kicker">mail.example.org</p>
+        <h1 class="title is-3">Mail is flowing. One thing needs attention.</h1>
+        <p class="sp-lead">The TLS certificate expires in 12 days and has not renewed yet.</p>
+      </div>
+      <div class="sp-muted sp-small">Updated 14:02:31 UTC<br>refreshes every 10 s</div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Server health</h2><div class="sp-end"><a href="health.html">All details</a></div><a class="sp-help" href="help.html#checks" title="What these checks mean"><i class="ti ti-help-circle"></i></a></div>
+      <div class="sp-health">
+        <a href="health.html#machine"><span class="sp-h-icon"><i class="ti ti-cpu"></i></span><span><span class="sp-h-name">Machine</span><span class="sp-h-value">CPU 12 %</span><span class="sp-h-sub">RAM 41 % · 62 kB/s</span></span></a>
+        <a href="health.html#processes"><span class="sp-h-icon"><i class="ti ti-server-cog"></i></span><span><span class="sp-h-name">Processes</span><span class="sp-h-value">5 of 5 running</span><span class="sp-h-sub">up 18 days</span></span></a>
+        <a href="health.html#certificate" class="sp-warn"><span class="sp-h-icon"><i class="ti ti-certificate"></i></span><span><span class="sp-h-name">TLS certificate</span><span class="sp-h-value">Expires in 12 days</span><span class="sp-h-sub">renewal has not run</span></span></a>
+        <a href="out-queue.html"><span class="sp-h-icon"><i class="ti ti-stack-2"></i></span><span><span class="sp-h-name">Queues</span><span class="sp-h-value">Both empty</span><span class="sp-h-sub">outbound and inbound</span></span></a>
+        <a href="health.html#sockets"><span class="sp-h-icon"><i class="ti ti-plug-connected"></i></span><span><span class="sp-h-name">Milter sockets</span><span class="sp-h-value">3 of 3 answering</span><span class="sp-h-sub">incl. the spam filter</span></span></a>
+        <a href="health.html#hostname"><span class="sp-h-icon"><i class="ti ti-arrows-exchange"></i></span><span><span class="sp-h-name">Reverse DNS</span><span class="sp-h-value">Forward = reverse</span><span class="sp-h-sub">203.0.113.25</span></span></a>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Outbound domains</h2><div class="sp-end"><a href="out-domains.html">Manage</a></div></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Domain</th><th>DNS</th><th>Apps</th><th>30 days</th></tr></thead>
+            <tbody>
+              <tr><td><a href="out-domain.html"><strong>example.org</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-danger is-light">SPF</span> <span class="tag is-success is-light">DMARC</span></td><td>2</td><td class="sp-muted">1 284 msg</td></tr>
+              <tr><td><a href="out-domain.html"><strong>shop.example.org</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-success is-light">SPF</span> <span class="tag is-success is-light">DMARC</span></td><td>1</td><td class="sp-muted">18 920 msg</td></tr>
+              <tr><td><a href="out-domain.html"><strong>notify.acme.io</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-success is-light">SPF</span> <span class="tag is-warning is-light">DMARC</span></td><td>3</td><td class="sp-muted">402 msg</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>Inbound domains</h2><div class="sp-end"><a href="in-domains.html">Manage</a></div></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Domain</th><th>MX</th><th>Upstream</th></tr></thead>
+            <tbody>
+              <tr><td><a href="in-domain.html"><strong>lists.example.org</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-muted sp-mono sp-small">mx.internal:25</td></tr>
+              <tr><td><a href="in-domain.html"><strong>acme.io</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-muted sp-mono sp-small">10.0.4.12:2525</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>

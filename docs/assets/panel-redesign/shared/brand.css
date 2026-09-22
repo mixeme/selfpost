@@ -1,0 +1,48 @@
+/* Brand layer shared by the three redesign directions: the panel's own fonts
+   and the palette of the mark (docs/assets/selfpost-proof.html). Each
+   direction maps these tokens onto its library's variables in its own
+   theme.css — nothing here knows about Pico, Tabler or Bulma.
+
+   Mockup note: no inline style="" and no inline <script> anywhere in this
+   folder, so every screen is drawable under the panel's CSP as it stands. */
+
+@font-face {
+  font-family: "IBM Plex Sans"; font-style: normal; font-weight: 100 700;
+  font-display: swap;
+  src: url("../../../../internal/web/view/static/ibm-plex-sans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400;
+  font-display: swap;
+  src: url("../../../../internal/web/view/static/ibm-plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono"; font-style: normal; font-weight: 600;
+  font-display: swap;
+  src: url("../../../../internal/web/view/static/ibm-plex-mono-600.woff2") format("woff2");
+}
+
+:root {
+  --sp-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sp-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --sp-paper: #f4f2ed;        /* page */
+  --sp-stamp-paper: #f3ede1;  /* the mark's own paper */
+  --sp-sheet: #fff;
+  --sp-ink: #12161c;
+  --sp-ink-2: #2a313b;
+  --sp-muted: #5c6774;        /* 5:1 on the paper and on the tinted cards; #6b7684 was 4.1:1 */
+  --sp-rule: #dedcd7;
+  --sp-rule-strong: #cbc8c1;
+  --sp-well: #efede9;         /* code / read-only values */
+
+  --sp-brick: #7a3b2e;
+  --sp-brick-dark: #632f25;
+  --sp-brick-tint: #ede4de;
+  --sp-on-brick: #f6ede2;
+
+  --sp-ok: #2c6b43;    --sp-ok-bg: #edf6ef;    --sp-ok-rule: #c2e0cc;
+  --sp-warn: #8a5510;  --sp-warn-bg: #fbf2e2;  --sp-warn-rule: #ebd5a6;
+  --sp-fail: #b42318;  --sp-fail-bg: #fbedea;  --sp-fail-rule: #efccc4;
+  --sp-idle: #6b7684;  --sp-idle-bg: #efede9;  --sp-idle-rule: #dedcd7;
+}

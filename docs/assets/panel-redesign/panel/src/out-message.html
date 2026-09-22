@@ -1,0 +1,46 @@
+<!-- title: Message · Outbound log | section: outbound | page: log -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="out-log.html">Outbound log</a> /</p>
+        <h1 class="title is-4">[FIRING] disk usage above 90 % on db-2</h1>
+        <p class="sp-route"><span>alerts@example.org</span><i class="ti ti-arrow-right sp-muted"></i><span>noc@example.org</span><span class="tag is-warning is-light">deferred</span></p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Message</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Domain</dt><dd><a href="out-domain.html">example.org</a></dd></div>
+              <div><dt>Application</dt><dd class="sp-mono"><a href="out-app.html">alerts</a></dd></div>
+              <div><dt>Accepted</dt><dd>2026-09-21 13:58:07 UTC</dd></div>
+              <div><dt>Status reported</dt><dd>2026-09-21 13:58:09 UTC</dd></div>
+              <div><dt>Queue id</dt><dd class="sp-mono">4XcB7k2Jm9z1</dd></div>
+              <div><dt>Journal id</dt><dd class="sp-mono">184220</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>History</h2></div>
+          <div class="sp-box-body">
+            <ol class="sp-timeline">
+              <li><time>13:58:07 UTC</time><strong>Accepted</strong> from <span class="sp-mono">alerts</span> at 198.51.100.7</li>
+              <li class="sp-warn"><time>13:58:09 UTC</time><strong>Deferred</strong> — the receiving server asked to retry later</li>
+              <li class="sp-pending"><time>next attempt ≈ 14:08 UTC</time>Still in the <a href="out-queue.html">queue</a>; kept for 5 days, then bounced</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">03</span><h2>Delivery log</h2><div class="sp-end">Lines from <code>mail.log</code> with this queue id</div></div>
+<pre class="sp-log"><span class="sp-d">13:58:07</span> postfix/smtpd[2114]: 4XcB7k2Jm9z1: client=unknown[198.51.100.7], sasl_username=alerts
+<span class="sp-d">13:58:07</span> postfix/cleanup[2120]: 4XcB7k2Jm9z1: message-id=&lt;a81f0c@alertmanager&gt;
+<span class="sp-d">13:58:07</span> opendkim[39]: 4XcB7k2Jm9z1: DKIM-Signature field added (s=sp2026, d=example.org)
+<span class="sp-d">13:58:09</span> <span class="sp-w">postfix/smtp[2123]: 4XcB7k2Jm9z1: to=&lt;noc@example.org&gt;, relay=mx1.example.org[192.0.2.10]:25, delay=1.9, status=deferred (host mx1.example.org said: 451 4.7.1 Greylisted, try again in 5 minutes)</span></pre>
+    </div>

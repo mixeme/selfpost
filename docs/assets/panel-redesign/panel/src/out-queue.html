@@ -1,0 +1,30 @@
+<!-- title: Outbound queue | section: outbound | page: queue -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Outbound</p>
+        <h1 class="title is-3">Outbound queue</h1>
+        <p class="sp-lead">Messages accepted from applications and still waiting for the receiving server. Refreshes every 10 s.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Waiting</h2><div class="sp-end">1 message · 3.1 kB</div></div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Queue id</th><th>Arrived, UTC</th><th>From</th><th>To</th><th>Last reply</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono">4XcB7k2Jm9z1</td><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:58:07</td><td>alerts@<wbr>example.org</td><td>noc@<wbr>example.org</td><td class="sp-muted">451 4.7.1 Greylisted, try again in 5 minutes</td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">02</span><h2>How retries work</h2><div class="sp-end">This Postfix's policy, read at panel start</div></div>
+      <div class="sp-box-body">
+        <dl class="sp-facts">
+          <div><dt>First retry</dt><dd class="sp-big">5 min</dd></div>
+          <div><dt>Later retries</dt><dd class="sp-big">doubling</dd><dd class="sp-muted">capped at 66 min</dd></div>
+          <div><dt>Kept in queue</dt><dd class="sp-big">5 days</dd></div>
+          <div><dt>Then</dt><dd class="sp-big">bounced</dd><dd class="sp-muted">no attempt counter, only time</dd></div>
+        </dl>
+      </div>
+    </div>

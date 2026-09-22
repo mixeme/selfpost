@@ -121,11 +121,14 @@ No separate feature flag beyond inbound relay + existing antispam env vars.
 
 ### UI
 
-New nav item **Inbound spam** (or subsection under **Inbound**) — journal table
-with filters (decision, domain, date range), list management on the same page or
-a tab. Mockup: add `docs/assets/panel-ui/inbound_spam.html` in the panel step.
+The journal is **Inbound › Log** and list management is a new **Inbound ›
+Filter lists** page (global-only: the lists are instance-wide) — see
+[panel-redesign.md](panel-redesign.md) § Room for roadmap items. The journal
+table has filters (decision, domain, date range). Mockups are drawn first, in
+`docs/assets/panel-redesign/panel/src/` under that plan's design contract —
+not in the superseded `docs/assets/panel-ui/`.
 
-## Schema (migration `0010_inbound_spam_log.sql`)
+## Schema (migration `0011_inbound_spam_log.sql`)
 
 **`inbound_spam_log`**
 
@@ -218,7 +221,9 @@ flowchart LR
 
 ## Dependencies
 
-- [inbound-relay.md](inbound-relay.md) (shipped).
+- Inbound relay, shipped in `[1.4.0]` — as built in
+  [architecture.md](../architecture.md) § Mail path. Its plan file was removed
+  once it shipped.
 
 ## Model routing (this plan)
 
@@ -238,7 +243,7 @@ Target version cut: **`1.10.0`** (MINOR). One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
-- [ ] Migration `0010_inbound_spam_log.sql` — **Composer**
+- [ ] Migration `0011_inbound_spam_log.sql` — **Composer**
 - [ ] Inbound journal-milter + Postfix wiring — **Composer**
 - [ ] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**

@@ -1,0 +1,99 @@
+<!-- title: lists.example.org · Inbound domains | section: inbound | page: domains -->
+    <div class="sp-head">
+      <div class="sp-postmark"><span>DNS</span><b>OK</b><span>MX POINTS HERE</span></div>
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="in-domains.html">Inbound domains</a> /</p>
+        <h1 class="title is-3">lists.example.org</h1>
+        <p class="sp-lead">Accepted on port 25, handed to <span class="sp-mono">mx.internal:25</span> over required TLS · 4 recipients</p>
+      </div>
+      <div class="buttons">
+        <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-3">
+        <aside class="menu sp-side">
+          <p class="menu-label">This domain</p>
+          <ul class="menu-list">
+            <li><a class="is-active" href="#dns"><i class="ti ti-world-check"></i>MX record <span class="tag is-success is-light">ok</span></a></li>
+            <li><a href="#upstream"><i class="ti ti-arrow-forward-up"></i>Upstream</a></li>
+            <li><a href="#recipients"><i class="ti ti-address-book"></i>Recipients <span class="tag is-light">4</span></a></li>
+            <li><a href="#filter"><i class="ti ti-shield-check"></i>Spam filter <span class="tag is-success is-light">on</span></a></li>
+          </ul>
+          <p class="menu-label">See also</p>
+          <ul class="menu-list">
+            <li><a href="in-log.html"><i class="ti ti-list-details"></i>Log for this domain</a></li>
+          </ul>
+          <p class="menu-label">Rarely changed</p>
+          <ul class="menu-list">
+            <li><a class="has-text-danger" href="in-domain-delete.html"><i class="ti ti-trash has-text-danger"></i>Delete domain</a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="column is-9">
+        <div class="box" id="dns">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>MX record</h2><div class="sp-end">Checked 1 min ago</div><a class="sp-help" href="help.html#inbound" title="Backup-MX and forwarding"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>MX</h3><span class="tag is-success is-light">published</span><small>Keep any existing primary MX if this is a backup-MX</small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="lists.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="MX"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="10 mail.example.org."></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+          </div>
+        </div>
+
+        <div class="columns">
+          <div class="column is-6">
+            <div class="box" id="upstream">
+              <div class="sp-box-head"><span class="sp-no">02</span><h2>Upstream</h2><div class="sp-end">Not a mailbox</div></div>
+              <div class="sp-box-body">
+                <form class="sp-form" method="post" action="#">
+                  <div class="sp-row">
+                    <div class="field"><label class="label" for="host">Host</label><div class="control"><input class="input sp-mono" id="host" name="host" value="mx.internal" autocomplete="off" spellcheck="false" required></div></div>
+                    <div class="field"><label class="label" for="port">Port</label><div class="control"><input class="input sp-mono" id="port" name="port" inputmode="numeric" value="25" required></div></div>
+                  </div>
+                  <div class="field"><label class="label" for="tls">TLS to upstream</label>
+                    <div class="control"><div class="select is-fullwidth"><select id="tls" name="tls_mode"><option>Opportunistic</option><option selected>Required</option><option>Off</option></select></div></div></div>
+                  <button type="submit" class="button is-primary">Save upstream</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="column is-6">
+            <div class="box" id="recipients">
+              <div class="sp-box-head"><span class="sp-no">03</span><h2>Valid recipients</h2></div>
+              <div class="sp-box-body">
+                <form class="sp-form" method="post" action="#">
+                  <div class="field"><label class="label" for="rmode">Who to accept</label>
+                    <div class="control"><div class="select is-fullwidth"><select id="rmode" name="recipient_mode"><option selected>Listed addresses only</option><option>Any recipient at this domain</option></select></div></div></div>
+                  <div class="field"><label class="label" for="addresses">Addresses</label>
+                    <div class="control"><textarea class="textarea sp-mono" id="addresses" name="addresses" rows="4">announce@lists.example.org
+dev@lists.example.org
+owner@lists.example.org
+security@lists.example.org</textarea></div>
+                    <p class="help">Unknown recipients are rejected at RCPT, so this relay generates no backscatter. Prefer a list unless the upstream itself rejects unknowns.</p></div>
+                  <button type="submit" class="button is-primary">Save recipients</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="box" id="filter">
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>Spam filter</h2><div class="sp-end"><span class="tag is-success is-light">on</span></div></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Engine</dt><dd>rspamd, for every inbound domain of this server</dd></div>
+              <div><dt>Suspicious mail</dt><dd>Held — <a href="in-quarantine.html">1 message in quarantine</a> for this domain</dd></div>
+              <div><dt>Spam</dt><dd>Refused at the door; see <em>reject</em> in the <a href="in-log.html">log</a></dd></div>
+              <div><dt>Allow and deny lists</dt><dd class="sp-muted">Kept by the global administrator, one pair for the whole server</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>

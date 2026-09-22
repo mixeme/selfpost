@@ -1,0 +1,73 @@
+<!-- title: Filter lists | section: inbound | page: filter-lists -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Inbound · global role</p>
+        <h1 class="title is-3">Filter lists</h1>
+        <p class="sp-lead">Correct the spam filter by hand: senders it must always let through, and senders it must always turn away. One pair of lists for the whole instance.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Add an entry</h2><a class="sp-help" href="help.html#inbound" title="How the lists are applied"><i class="ti ti-help-circle"></i></a></div>
+      <div class="sp-box-body">
+        <form class="sp-form" method="post" action="#">
+          <div class="columns">
+            <div class="column is-3">
+              <div class="field"><label class="label" for="list">List</label>
+                <div class="control"><div class="select is-fullwidth"><select id="list" name="list_type"><option>Deny — always turn away</option><option>Allow — always let through</option></select></div></div></div>
+            </div>
+            <div class="column is-3">
+              <div class="field"><label class="label" for="etype">Entry is</label>
+                <div class="control"><div class="select is-fullwidth"><select id="etype" name="entry_type"><option>a sender address</option><option>a sender domain</option><option>a client IP or CIDR</option></select></div></div></div>
+            </div>
+            <div class="column is-6">
+              <div class="field"><label class="label" for="value">Value</label>
+                <div class="control"><input class="input sp-mono" id="value" name="value" placeholder="promo@bulk.example" autocomplete="off" autocapitalize="none" spellcheck="false" required></div></div>
+            </div>
+          </div>
+          <div class="field"><label class="label" for="note">Note</label>
+            <div class="control"><input class="input" id="note" name="note" placeholder="Why — for whoever reads this list next year"></div></div>
+          <button type="submit" class="button is-primary"><i class="ti ti-plus"></i>Add entry</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Deny</h2><div class="sp-end">3 entries · wins over Allow</div></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="sp-mono sp-small">@bulk.example <span class="tag is-light">domain</span></td><td class="sp-muted">newsletter nobody subscribed to</td><td class="sp-muted sp-nowrap sp-small">2026-09-02</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+              <tr><td class="sp-mono sp-small">198.51.100.0/24 <span class="tag is-light">ip</span></td><td class="sp-muted">dictionary attack on lists.example.org</td><td class="sp-muted sp-nowrap sp-small">2026-08-19</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+              <tr><td class="sp-mono sp-small">win@lottery.example <span class="tag is-light">address</span></td><td class="sp-muted">—</td><td class="sp-muted sp-nowrap sp-small">2026-07-30</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>Allow</h2><div class="sp-end">2 entries</div></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="sp-mono sp-small">@partner.example <span class="tag is-light">domain</span></td><td class="sp-muted">invoices were scored as spam</td><td class="sp-muted sp-nowrap sp-small">2026-09-11</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+              <tr><td class="sp-mono sp-small">noreply@github.example <span class="tag is-light">address</span></td><td class="sp-muted">security advisories</td><td class="sp-muted sp-nowrap sp-small">2026-06-04</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">04</span><h2>Where the lists go</h2><div class="sp-end"><span class="tag is-success is-light">applied</span></div></div>
+      <div class="sp-box-body">
+        <dl class="sp-facts">
+          <div><dt>Applied by</dt><dd>rspamd, from map files</dd></div>
+          <div><dt>Files</dt><dd class="sp-mono sp-small">/data/antispam/allow.map<br>/data/antispam/deny.map</dd></div>
+          <div><dt>Last written</dt><dd>2026-09-11 08:40 UTC</dd></div>
+          <div><dt>When the filter is off</dt><dd class="sp-muted">The lists are kept and editable, but nothing reads them until <code>INBOUND_ANTISPAM_MILTER</code> is set.</dd></div>
+        </dl>
+      </div>
+    </div>

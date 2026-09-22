@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="status.html"><img src="../../selfpost-stamp-compact.svg" alt="SelfPost"></a>
+    </div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item is-active" href="status.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="domain.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="domain.html">Domains</a>
+            <a class="navbar-item" href="#">Log</a>
+            <a class="navbar-item" href="#">Queue</a>
+            <a class="navbar-item" href="#">DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Domains</a>
+            <a class="navbar-item" href="#">Log</a>
+            <a class="navbar-item" href="#">Queue</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">System log</a>
+            <a class="navbar-item" href="#">Backup</a>
+            <a class="navbar-item" href="#">Users</a>
+            <a class="navbar-item" href="#">Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="#">Account</a>
+            <a class="navbar-item" href="#">Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html">Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div class="container sp-page">
+    <div class="level mb-5">
+      <div class="level-left">
+        <div>
+          <p class="sp-kicker">mail.example.org</p>
+          <h1 class="title is-3 mb-0">Overview</h1>
+        </div>
+      </div>
+      <div class="level-right sp-muted is-size-7">Updated 14:02:31 UTC · refreshes every 10 s</div>
+    </div>
+
+    <div class="box sp-health">
+      <a href="#"><div class="sp-h-name">Machine</div><div class="sp-h-value">12 % CPU</div><div class="sp-h-sub">41 % memory</div></a>
+      <a href="#"><div class="sp-h-name">Processes</div><div class="sp-h-value">5 of 5</div><div class="sp-h-sub">running</div></a>
+      <a href="#"><div class="sp-h-name">Queues</div><div class="sp-h-value">Empty</div><div class="sp-h-sub">outbound and inbound</div></a>
+      <a href="#" class="warn"><div class="sp-h-name">TLS certificate</div><div class="sp-h-value">12 days</div><div class="sp-h-sub">renewal has not run</div></a>
+      <a href="#"><div class="sp-h-name">Milter sockets</div><div class="sp-h-value">2 of 2</div><div class="sp-h-sub">answering</div></a>
+      <a href="#"><div class="sp-h-name">Reverse DNS</div><div class="sp-h-value">Match</div><div class="sp-h-sub">203.0.113.25</div></a>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><h2>Outbound domains</h2><div class="sp-end"><a class="button is-small is-primary" href="#">Add domain</a></div></div>
+          <table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Domain</th><th>DNS</th><th>Apps</th><th>30 days</th></tr></thead>
+            <tbody>
+              <tr><td><a href="domain.html"><strong>example.org</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-danger is-light">SPF</span> <span class="tag is-success is-light">DMARC</span></td><td>2</td><td class="sp-muted">1 284 msg</td></tr>
+              <tr><td><a href="#"><strong>shop.example.org</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-success is-light">SPF</span> <span class="tag is-success is-light">DMARC</span></td><td>1</td><td class="sp-muted">18 920 msg</td></tr>
+              <tr><td><a href="#"><strong>notify.acme.io</strong></a></td><td><span class="tag is-success is-light">DKIM</span> <span class="tag is-success is-light">SPF</span> <span class="tag is-warning is-light">DMARC</span></td><td>3</td><td class="sp-muted">402 msg</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><h2>Inbound domains</h2><div class="sp-end"><a class="button is-small" href="#">Add domain</a></div></div>
+          <table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Domain</th><th>MX</th><th>Upstream</th></tr></thead>
+            <tbody>
+              <tr><td><a href="#"><strong>lists.example.org</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-muted sp-mono is-size-7">mx.internal:25</td></tr>
+              <tr><td><a href="#"><strong>acme.io</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-muted sp-mono is-size-7">10.0.4.12:2525</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+
+</body>
+</html>

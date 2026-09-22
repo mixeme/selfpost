@@ -1,0 +1,22 @@
+/* Cover sheet for the three directions. No library on purpose: it must not
+   look like any one of them. */
+body { margin: 0; background: var(--sp-paper); color: var(--sp-ink); font: 16px/1.55 var(--sp-sans); }
+main { max-width: 68rem; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+h1 { font-size: 2rem; font-weight: 600; margin: .2rem 0 1rem; text-wrap: balance; }
+h2 { font-size: 1.15rem; font-weight: 600; margin: 2.6rem 0 .8rem; }
+h3 { font-size: 1.4rem; font-weight: 600; margin: .1rem 0 .6rem; }
+.kicker { font-family: var(--sp-mono); font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--sp-brick); margin: 0; }
+.lead { max-width: 46rem; color: var(--sp-ink-2); }
+ul { padding-left: 1.2rem; max-width: 52rem; }
+li { margin-bottom: .5rem; }
+a { color: var(--sp-brick); }
+code { font-family: var(--sp-mono); font-size: .85em; background: var(--sp-well); padding: .1em .35em; border-radius: 3px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.2rem; }
+.cards section { background: var(--sp-sheet); border: 1px solid var(--sp-rule); border-top: 3px solid var(--sp-brick); padding: 1.3rem 1.4rem; display: flex; flex-direction: column; }
+.cards p { margin: 0 0 1rem; }
+.links { margin-top: auto !important; margin-bottom: 0 !important; display: flex; gap: 1.1rem; font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; background: var(--sp-sheet); border: 1px solid var(--sp-rule); font-size: .93rem; }
+th, td { text-align: left; vertical-align: top; padding: .6rem .9rem; border-bottom: 1px solid var(--sp-rule); }
+thead th { font-family: var(--sp-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); font-weight: 400; }
+tbody th { font-weight: 600; white-space: nowrap; }

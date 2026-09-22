@@ -29,3 +29,21 @@ func IsHostedOnHostname(addr, hostname string) bool {
 	at := strings.LastIndex(addr, "@")
 	return addr[at+1:] == hostname
 }
+
+// TaggedDomain returns the domain a hosted report address is tagged for
+// (dmarc-reports+<domain>@<hostname> → <domain>), or "" when addr carries no
+// such tag. Used to check a report's claimed domain against the address it
+// actually arrived at.
+func TaggedDomain(addr string) string {
+	addr = strings.ToLower(strings.TrimSpace(addr))
+	at := strings.LastIndex(addr, "@")
+	if at <= 0 {
+		return ""
+	}
+	local := addr[:at]
+	plus := strings.Index(local, "+")
+	if plus < 0 || local[:plus] != DefaultLocalPart {
+		return ""
+	}
+	return local[plus+1:]
+}

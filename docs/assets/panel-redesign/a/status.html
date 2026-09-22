@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="sp-bar">
+  <div class="sp-wrap">
+    <nav>
+      <ul>
+        <li><a class="sp-brand" href="status.html"><img src="../../selfpost-stamp-compact.svg" alt="SelfPost"></a></li>
+      </ul>
+      <ul class="sp-sections">
+        <li><a href="status.html" aria-current="page">Overview</a></li>
+        <li><a href="domain.html">Outbound</a></li>
+        <li><a href="#">Inbound</a></li>
+        <li><a href="#">Server</a></li>
+      </ul>
+      <ul class="sp-user">
+        <li>
+          <details class="dropdown">
+            <summary>admin</summary>
+            <ul dir="rtl">
+              <li><a href="#">Account</a></li>
+              <li><a href="#">Help</a></li>
+              <li><a href="login.html">Sign out</a></li>
+            </ul>
+          </details>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main class="sp-wrap">
+  <div class="sp-head">
+    <div>
+      <p class="sp-kicker">mail.example.org</p>
+      <h1>Overview</h1>
+    </div>
+    <small>Updated 14:02:31 UTC · refreshes every 10 s</small>
+  </div>
+
+  <section class="sp-sheet sp-verdict">
+    <div class="sp-postmark warn"><span>SELFPOST</span><b>WARN</b><span>1 OF 6 CHECKS</span></div>
+    <div>
+      <h2>Mail is flowing. One thing needs attention.</h2>
+      <p>The TLS certificate expires in 12 days and has not renewed yet. Everything else is healthy.</p>
+    </div>
+  </section>
+
+  <section class="sp-sheet sp-ledger">
+    <header><span class="sp-no">01</span><h2>Checks</h2><small>Open a row for its detail</small></header>
+
+    <details>
+      <summary><strong>Processes</strong><span class="sp-muted">5 of 5 running</span><span class="sp-tag ok">ok</span></summary>
+      <div class="sp-detail">
+        <table>
+          <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>postfix</td><td><span class="sp-tag ok">running</span></td><td class="sp-muted">pid 41, uptime 18 days</td></tr>
+            <tr><td>opendkim</td><td><span class="sp-tag ok">running</span></td><td class="sp-muted">pid 39, uptime 18 days</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details open>
+      <summary><strong>TLS certificate</strong><span class="sp-muted">Expires in 12 days — renewal has not run</span><span class="sp-tag warn">warn</span></summary>
+      <div class="sp-detail">
+        <dl class="sp-kv">
+          <dt>Expires</dt><dd><span class="sp-value">2026-10-03 09:14 UTC</span></dd>
+          <dt>Names</dt><dd><span class="sp-value">mail.example.org</span></dd>
+        </dl>
+        <p class="sp-note">Renewal normally runs 30 days before expiry. Check that port 80 is reachable and look for <code>acme</code> lines in the <a href="#">system log</a>.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><strong>Machine</strong><span class="sp-muted">CPU 12 % · memory 41 % · ↓ 18 kB/s ↑ 44 kB/s</span><span class="sp-tag ok">ok</span></summary>
+      <div class="sp-detail">
+        <table>
+          <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>CPU</td><td><meter value="12" min="0" max="100" low="70" high="90" optimum="10"></meter>12 %</td><td class="sp-muted">2 cores, load 0.21</td></tr>
+            <tr><td>Memory</td><td><meter value="41" min="0" max="100" low="70" high="90" optimum="10"></meter>41 %</td><td class="sp-muted">812 MB of 1.9 GB</td></tr>
+            <tr><td>Network</td><td>↓ 18 kB/s · ↑ 44 kB/s</td><td class="sp-muted">eth0: 2.1 GB in, 6.4 GB out</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary><strong>Queues</strong><span class="sp-muted">Outbound empty · inbound empty</span><span class="sp-tag ok">ok</span></summary>
+      <div class="sp-detail"><p>No messages are waiting. Open the <a href="#">outbound queue</a> or the <a href="#">inbound queue</a>.</p></div>
+    </details>
+
+    <details>
+      <summary><strong>Milter sockets</strong><span class="sp-muted">2 of 2 answering</span><span class="sp-tag ok">ok</span></summary>
+      <div class="sp-detail">
+        <table>
+          <thead><tr><th>Milter</th><th>State</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr><td>opendkim</td><td><span class="sp-tag ok">ok</span></td><td class="sp-muted">inet:127.0.0.1:8891</td></tr>
+            <tr><td>journal-milter</td><td><span class="sp-tag ok">ok</span></td><td class="sp-muted">unix:/run/selfpost/journal.sock</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary><strong>Hostname and reverse DNS</strong><span class="sp-muted">mail.example.org ⇄ 203.0.113.25</span><span class="sp-tag ok">ok</span></summary>
+      <div class="sp-detail">
+        <dl class="sp-kv">
+          <dt>Hostname</dt><dd><span class="sp-value">mail.example.org</span></dd>
+          <dt>Lookup</dt><dd><span class="sp-value">mail.example.org → 203.0.113.25<br>203.0.113.25 → mail.example.org</span></dd>
+        </dl>
+        <form method="post" action="#"><button type="submit" class="outline secondary sp-btn-sm">Re-check DNS</button></form>
+      </div>
+    </details>
+  </section>
+
+  <footer class="sp-foot">
+    SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty
+  </footer>
+</main>
+
+</body>
+</html>

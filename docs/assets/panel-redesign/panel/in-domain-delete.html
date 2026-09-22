@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete lists.example.org · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand"><a class="navbar-item" href="overview.html"><img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="overview.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="out-domains.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a>
+            <a class="navbar-item" href="out-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="in-domains.html">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item is-active" href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a>
+            <a class="navbar-item" href="in-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a>
+            <a class="navbar-item" href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="health.html">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="health.html"><i class="ti ti-heartbeat"></i>Health</a>
+            <a class="navbar-item" href="preflight.html"><i class="ti ti-checklist"></i>Preflight</a>
+            <a class="navbar-item" href="system-log.html"><i class="ti ti-file-text"></i>System log</a>
+            <a class="navbar-item" href="backup.html"><i class="ti ti-archive"></i>Backup</a>
+            <a class="navbar-item" href="users.html"><i class="ti ti-users"></i>Users</a>
+            <a class="navbar-item" href="settings.html"><i class="ti ti-settings"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="account.html"><i class="ti ti-user-circle"></i>admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>
+            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="sp-perf" aria-hidden="true"></div>
+<div class="sp-subnav"><div class="container"><a href="in-domains.html" aria-current="page"><i class="ti ti-world-download"></i>Domains</a><a href="in-log.html"><i class="ti ti-list-details"></i>Log</a><a href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a><a href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a><a href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a></div></div>
+<main>
+  <div class="container sp-page">
+<div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="in-domains.html">Inbound domains</a> / <a href="in-domain.html">lists.example.org</a> /</p>
+        <h1 class="title is-3">Delete lists.example.org</h1>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box sp-danger-zone">
+          <div class="sp-box-head"><span class="sp-no"><i class="ti ti-alert-triangle"></i></span><h2>This cannot be undone</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Deleting the inbound domain <strong>lists.example.org</strong> will:</p>
+            <ul class="sp-list-check">
+              <li><i class="ti ti-x"></i>stop accepting mail for it on port 25 — senders get a relay-denied reply;</li>
+              <li><i class="ti ti-x"></i>remove its upstream and its 4 listed recipients.</li>
+            </ul>
+            <p class="sp-muted mb-4">Remove or repoint the MX record first, or mail for the domain will bounce. Outbound domains are not touched.</p>
+            <form method="post" action="in-domains.html">
+              <div class="buttons">
+                <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>Delete lists.example.org</button>
+                <a class="button is-text" href="in-domain.html">Keep it</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!-- title: Delete acme-ops | section: server | page: users -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="users.html">Users</a> / <a href="user.html">acme-ops</a> /</p>
+        <h1 class="title is-3">Delete acme-ops</h1>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box sp-danger-zone">
+          <div class="sp-box-head"><span class="sp-no"><i class="ti ti-alert-triangle"></i></span><h2>This cannot be undone</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Deleting the panel user <strong>acme-ops</strong> will:</p>
+            <ul class="sp-list-check">
+              <li><i class="ti ti-x"></i>end any signed-in session of this user at once;</li>
+              <li><i class="ti ti-x"></i>remove the assignments to <strong>all outbound domains</strong> and to <strong>acme.io</strong> (inbound).</li>
+            </ul>
+            <p class="sp-muted mb-4">The domains, their applications and passwords, upstreams and recipients are not affected.</p>
+            <form method="post" action="users.html">
+              <div class="buttons">
+                <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>Delete acme-ops</button>
+                <a class="button is-text" href="user.html">Keep it</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>

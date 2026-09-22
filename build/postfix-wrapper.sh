@@ -1,6 +1,6 @@
 #!/bin/sh
-# Postfix start wrapper (spec 4): solves the cold-start race where Postfix would
-# try to reach the milter sockets before they are listening.
+# Postfix start wrapper: solves the cold-start race where Postfix would try to
+# reach the milter sockets before they are listening.
 #
 # It blocks until BOTH milter sockets — OpenDKIM and the panel's journal-milter
 # — are present, then execs `postfix start-fg`. If they are not ready within the

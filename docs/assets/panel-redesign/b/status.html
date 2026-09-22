@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.5.1/dist/css/tabler.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="page">
+
+  <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="status.html"><img src="../../selfpost-stamp-compact.svg" alt="SelfPost"></a>
+      <div class="navbar-collapse collapse show">
+        <ul class="navbar-nav">
+          <li class="nav-item active"><a class="nav-link" href="status.html"><span class="nav-link-icon"><i class="ti ti-activity-heartbeat"></i></span><span class="nav-link-title">Overview</span></a></li>
+
+          <li class="sp-nav-label">Outbound</li>
+          <li class="nav-item"><a class="nav-link" href="domain.html"><span class="nav-link-icon"><i class="ti ti-world-upload"></i></span><span class="nav-link-title">Domains</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-list-details"></i></span><span class="nav-link-title">Log</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-stack-2"></i></span><span class="nav-link-title">Queue</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span><span class="nav-link-title">DMARC reports</span></a></li>
+
+          <li class="sp-nav-label">Inbound</li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-world-download"></i></span><span class="nav-link-title">Domains</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-list-details"></i></span><span class="nav-link-title">Log</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-stack-2"></i></span><span class="nav-link-title">Queue</span></a></li>
+
+          <li class="sp-nav-label">Server</li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-file-text"></i></span><span class="nav-link-title">System log</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-archive"></i></span><span class="nav-link-title">Backup</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-users"></i></span><span class="nav-link-title">Users</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-settings"></i></span><span class="nav-link-title">Settings</span></a></li>
+        </ul>
+        <ul class="navbar-nav sp-nav-foot">
+          <li class="sp-nav-user">Signed in as admin</li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-user-circle"></i></span><span class="nav-link-title">Account</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="#"><span class="nav-link-icon"><i class="ti ti-help"></i></span><span class="nav-link-title">Help</span></a></li>
+          <li class="nav-item"><a class="nav-link" href="login.html"><span class="nav-link-icon"><i class="ti ti-logout"></i></span><span class="nav-link-title">Sign out</span></a></li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+
+  <div class="page-wrapper">
+    <div class="page-header">
+      <div class="container-xl">
+        <div class="row g-2 align-items-center">
+          <div class="col">
+            <div class="page-pretitle">mail.example.org</div>
+            <h2 class="page-title">Overview</h2>
+          </div>
+          <div class="col-auto text-secondary small">Updated 14:02:31 UTC · refreshes every 10 s</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="container-xl">
+
+        <div class="alert alert-warning bg-white" role="alert">
+          <div class="d-flex">
+            <div><i class="ti ti-alert-triangle alert-icon"></i></div>
+            <div>
+              <h4 class="alert-title">Mail is flowing. One thing needs attention.</h4>
+              <div class="text-secondary">The TLS certificate expires in 12 days and has not renewed yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row row-cards mb-3">
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-cpu sp-tile-icon"></i><div><div class="fw-semibold">Machine</div><div class="text-secondary small">CPU 12 % · mem 41 %</div></div><span class="status status-green"><span class="status-dot"></span>OK</span></div></div></div>
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-server-cog sp-tile-icon"></i><div><div class="fw-semibold">Processes</div><div class="text-secondary small">5 of 5 running</div></div><span class="status status-green"><span class="status-dot"></span>OK</span></div></div></div>
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-stack-2 sp-tile-icon"></i><div><div class="fw-semibold">Queues</div><div class="text-secondary small">Both empty</div></div><span class="status status-green"><span class="status-dot"></span>OK</span></div></div></div>
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-certificate sp-tile-icon"></i><div><div class="fw-semibold">TLS certificate</div><div class="text-secondary small">Expires in 12 days</div></div><span class="status status-yellow"><span class="status-dot"></span>Warn</span></div></div></div>
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-plug-connected sp-tile-icon"></i><div><div class="fw-semibold">Milter sockets</div><div class="text-secondary small">2 of 2 answering</div></div><span class="status status-green"><span class="status-dot"></span>OK</span></div></div></div>
+          <div class="col-sm-6 col-lg-4"><div class="card card-sm sp-tile"><div class="card-body"><i class="ti ti-arrows-exchange sp-tile-icon"></i><div><div class="fw-semibold">Reverse DNS</div><div class="text-secondary small">Forward = reverse</div></div><span class="status status-green"><span class="status-dot"></span>OK</span></div></div></div>
+        </div>
+
+        <div class="row row-deck row-cards">
+          <div class="col-lg-6">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Machine</h3><div class="card-actions"><span class="badge bg-green-lt">ok</span></div></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr><td>CPU</td><td><progress class="sp-bar" value="12" max="100"></progress>12 %</td><td class="text-secondary">2 cores, load 0.21</td></tr>
+                    <tr><td>Memory</td><td><progress class="sp-bar" value="41" max="100"></progress>41 %</td><td class="text-secondary">812 MB of 1.9 GB</td></tr>
+                    <tr><td>Network</td><td>↓ 18 kB/s · ↑ 44 kB/s</td><td class="text-secondary">eth0: 2.1 GB in, 6.4 GB out</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Processes</h3><div class="card-actions"><span class="badge bg-green-lt">ok</span></div></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr><td>postfix</td><td><span class="badge bg-green-lt">running</span></td><td class="text-secondary">pid 41, uptime 18 days</td></tr>
+                    <tr><td>opendkim</td><td><span class="badge bg-green-lt">running</span></td><td class="text-secondary">pid 39, uptime 18 days</td></tr>
+                    <tr><td>journal-milter</td><td><span class="badge bg-green-lt">running</span></td><td class="text-secondary">pid 40, uptime 18 days</td></tr>
+                    <tr><td>panel</td><td><span class="badge bg-green-lt">running</span></td><td class="text-secondary">pid 44, uptime 18 days</td></tr>
+                    <tr><td>dmarc-ingest</td><td><span class="badge bg-green-lt">running</span></td><td class="text-secondary">pid 47, uptime 18 days</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">TLS certificate</h3><div class="card-actions"><span class="badge bg-yellow-lt">warn</span></div></div>
+              <div class="card-body">
+                <div class="datagrid">
+                  <div class="datagrid-item"><div class="datagrid-title">Expires</div><div class="datagrid-content font-monospace">2026-10-03 09:14 UTC</div></div>
+                  <div class="datagrid-item"><div class="datagrid-title">Names</div><div class="datagrid-content font-monospace">mail.example.org</div></div>
+                </div>
+                <p class="text-secondary mt-3 mb-0">Renewal normally runs 30 days before expiry. Check port 80 and the <a href="#">system log</a>.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Milter sockets</h3><div class="card-actions"><span class="badge bg-green-lt">ok</span></div></div>
+              <table class="table table-vcenter card-table">
+                <thead><tr><th>Milter</th><th>State</th></tr></thead>
+                <tbody>
+                  <tr><td>opendkim<div class="text-secondary small font-monospace">inet:127.0.0.1:8891</div></td><td><span class="badge bg-green-lt">ok</span></td></tr>
+                  <tr><td>journal-milter<div class="text-secondary small font-monospace">unix:/run/selfpost/journal.sock</div></td><td><span class="badge bg-green-lt">ok</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Hostname and reverse DNS</h3><div class="card-actions"><span class="badge bg-green-lt">ok</span></div></div>
+              <div class="card-body">
+                <div class="datagrid">
+                  <div class="datagrid-item"><div class="datagrid-title">Hostname</div><div class="datagrid-content font-monospace">mail.example.org</div></div>
+                  <div class="datagrid-item"><div class="datagrid-title">Lookup</div><div class="datagrid-content font-monospace">→ 203.0.113.25<br>← mail.example.org</div></div>
+                </div>
+              </div>
+              <div class="card-footer"><form method="post" action="#"><button type="submit" class="btn btn-sm"><i class="ti ti-refresh me-1"></i>Re-check DNS</button></form></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer class="footer footer-transparent">
+      <div class="container-xl sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</div>
+    </footer>
+  </div>
+</div>
+</body>
+</html>

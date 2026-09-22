@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="sp-signin">
+  <div class="sp-signin-card">
+    <img src="../../selfpost-stamp.svg" alt="SelfPost">
+    <section class="sp-sheet">
+      <header><span class="sp-no">→</span><h2>Sign in</h2></header>
+      <div class="sp-body">
+        <form method="post" action="status.html">
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" required>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit">Sign in</button>
+        </form>
+      </div>
+    </section>
+    <p class="sp-tagline">YOUR SMTP. YOUR RULES.</p>
+  </div>
+</div>
+
+<footer class="sp-wrap sp-foot">
+  © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty
+</footer>
+
+</body>
+</html>

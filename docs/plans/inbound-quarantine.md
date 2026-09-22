@@ -22,6 +22,15 @@ so we can compare approaches before committing.
 reference to them) under `/data`, retention, release workflow, and a wider
 attack/backup surface — closer to "mini-mailbox" than pure relay.
 
+## Mockup
+
+A target look is drawn — list and detail —
+[in-quarantine](../assets/panel-redesign/panel/in-quarantine.html),
+[in-quarantine-message](../assets/panel-redesign/panel/in-quarantine-message.html)
+— under the design contract of [panel-redesign.md](panel-redesign.md). It
+assumes answers to the questions below (SelfPost holds the mail, release goes
+to the upstream, 14 days, headers only in the panel); it does not settle them.
+
 ## Open questions (to decide before a checklist)
 
 1. **Where mail lives**
@@ -43,7 +52,8 @@ attack/backup surface — closer to "mini-mailbox" than pure relay.
 
 ## Context (as-built)
 
-- Inbound relay forwards or rejects; no local delivery ([inbound-relay.md](inbound-relay.md)).
+- Inbound relay forwards or rejects; no local delivery
+  ([architecture.md](../architecture.md) § Mail path).
 - Optional `INBOUND_ANTISPAM_MILTER` — external rspamd may quarantine on its
   own today, without panel integration.
 - DMARC `p=quarantine` is unrelated (outbound policy for receivers).
@@ -56,7 +66,8 @@ attack/backup surface — closer to "mini-mailbox" than pure relay.
 
 ## Dependencies
 
-- [inbound-relay.md](inbound-relay.md) (shipped).
+- Inbound relay, shipped in `[1.4.0]` — as built in
+  [architecture.md](../architecture.md) § Mail path.
 - Sensible to decide **after** or **alongside**
   [inbound-antispam-panel.md](inbound-antispam-panel.md) (journal/lists), but
   not blocked on it for design discussion.

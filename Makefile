@@ -1,12 +1,13 @@
 # SelfPost build.
 #
 # The version is stamped into both binaries and MUST match the Docker image tag
-# (spec 7.5.A: backup/restore compatibility check). Override on the command line:
+# (architecture.md § Persistence: backup/restore compatibility check). Override
+# on the command line:
 #
 #     make build VERSION=1.3.0
 #
 # CGO is disabled to keep the binaries fully static (modernc.org/sqlite is pure
-# Go, so no cgo is required) — see spec 7.1.
+# Go, so no cgo is required).
 
 VERSION ?= dev
 MODULE  := github.com/mixeme/selfpost

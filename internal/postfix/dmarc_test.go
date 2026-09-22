@@ -33,3 +33,21 @@ func TestRenderDMARCMapsEmpty(t *testing.T) {
 		t.Fatalf("expected empty maps")
 	}
 }
+
+func TestRenderDMARCMapsRejectsInjectionTokens(t *testing.T) {
+	_, _, _, err := renderDMARCMaps(DMARCMapsConfig{
+		Recipients: []string{"dmarc@example.com\nattacker@example.com"},
+		Domains:    []string{"example.com"},
+	})
+	if err == nil {
+		t.Fatal("expected recipient token validation error")
+	}
+
+	_, _, _, err = renderDMARCMaps(DMARCMapsConfig{
+		Recipients: []string{"dmarc@example.com"},
+		Domains:    []string{"example.com attacker"},
+	})
+	if err == nil {
+		t.Fatal("expected domain token validation error")
+	}
+}

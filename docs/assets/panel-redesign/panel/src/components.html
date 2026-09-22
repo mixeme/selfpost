@@ -1,0 +1,222 @@
+<!-- title: Components | section: reference -->
+    <div class="sp-head">
+      <div class="sp-postmark"><span>SELFPOST</span><b>REF</b><span>DESIGN CONTRACT</span></div>
+      <div class="sp-grow">
+        <p class="sp-kicker">Reference · page_head</p>
+        <h1 class="title is-3">Components</h1>
+        <p class="sp-lead">Every building block of the panel, in every state it has. A screen is assembled from these and from plain Bulma — nothing else. The title of each box is the name of its template partial.</p>
+      </div>
+      <div class="buttons"><a class="button" href="../index.html"><i class="ti ti-arrow-left"></i>Cover sheet</a></div>
+    </div>
+
+    <div class="notification is-success is-light"><i class="ti ti-circle-check"></i><strong>flash</strong> — the result of the last action, between page_head and the first box. Success, or…</div>
+    <div class="notification is-danger is-light"><i class="ti ti-alert-circle"></i>…<strong>flash, error</strong> — a failure that belongs to the page, not to one field. A field's error stays under the field in Bulma's <code>help is-danger</code>.</div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">00</span><h2>Page layouts</h2><div class="sp-end">A page is exactly one of these</div></div>
+      <div class="sp-box-body">
+        <dl class="sp-facts">
+          <div><dt>list</dt><dd>page_head, then full-width boxes: the add form first, the table second. <a href="out-domains.html">Example</a></dd></div>
+          <div><dt>detail</dt><dd>page_head, then <code>columns</code>: <code>is-3</code> side menu + <code>is-9</code> boxes. <a href="out-domain.html">Example</a></dd></div>
+          <div><dt>form</dt><dd>page_head, then boxes in equal <code>columns</code>, one submit row under them. <a href="out-app.html">Example</a></dd></div>
+          <div><dt>signed out</dt><dd>The split brand / form screen, no navbar. <a href="login.html">Example</a></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>postmark</h2><div class="sp-end">Worst status of the page's checks</div></div>
+          <div class="sp-box-body">
+            <div class="buttons">
+              <div class="sp-postmark"><span>SELFPOST</span><b>OK</b><span>6 OF 6 CHECKS</span></div>
+              <div class="sp-postmark sp-warn"><span>SELFPOST</span><b>WARN</b><span>1 OF 6 CHECKS</span></div>
+              <div class="sp-postmark sp-fail"><span>DNS</span><b>FAIL</b><span>1 OF 3 RECORDS</span></div>
+            </div>
+            <p class="sp-muted">Only inside page_head, at most one per page, and only where the page has a verdict to give.</p>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>status_tag</h2><div class="sp-end">One mapping, one function</div></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Status</th><th>Tag</th><th>Bulma classes</th></tr></thead>
+            <tbody>
+              <tr><td>ok, published, running, sent</td><td><span class="tag is-success is-light">ok</span></td><td class="sp-mono sp-small">tag is-success is-light</td></tr>
+              <tr><td>warn, deferred, quiet</td><td><span class="tag is-warning is-light">warn</span></td><td class="sp-mono sp-small">tag is-warning is-light</td></tr>
+              <tr><td>error, fail, mismatch, bounced</td><td><span class="tag is-danger is-light">fail</span></td><td class="sp-mono sp-small">tag is-danger is-light</td></tr>
+              <tr><td>unknown, off, neutral counts</td><td><span class="tag is-light">off</span></td><td class="sp-mono sp-small">tag is-light</td></tr>
+              <tr><td>held: quarantine · role: global</td><td><span class="tag is-primary is-light">quarantine</span></td><td class="sp-mono sp-small">tag is-primary is-light</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>box · box_head</h2><div class="sp-end">The end slot: a note, a tag, a link or a filter form</div><a class="sp-help" href="help.html#checks" title="Optional: the section's Help topic"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-box-body"><p class="mb-2">The <i class="ti ti-help-circle"></i> after the end slot is <code>sp-help</code>: an optional link to the section's topic on the Help page. It replaces today's help drawer.</p><p>box_body — padded content. A <code>table</code> or a run of <code>sp-record</code> blocks sits directly in the box, without box_body.</p></div>
+          <div class="sp-box-foot"><span>box_foot — a legend, paging</span><span class="sp-end">end slot</span></div>
+        </div>
+        <div class="box sp-danger-zone">
+          <div class="sp-box-head"><span class="sp-no"><i class="ti ti-alert-triangle"></i></span><h2>box · sp-danger-zone</h2></div>
+          <div class="sp-box-body"><p>For destructive confirmations and the "delete" entry of a settings page. The number may be an icon when the box is not part of a sequence.</p></div>
+        </div>
+        <div class="box sp-credential">
+          <div class="sp-box-head"><span class="sp-no"><i class="ti ti-eye"></i></span><h2>box · sp-credential</h2><div class="sp-end">Shown once</div></div>
+          <div class="sp-box-body"><p>Only for a secret the panel will never show again.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">04</span><h2>health_card</h2><div class="sp-end">Overview only · each card links to its detail</div></div>
+      <div class="sp-health">
+        <a href="#"><span class="sp-h-icon"><i class="ti ti-server-cog"></i></span><span><span class="sp-h-name">Name</span><span class="sp-h-value">Verdict in words</span><span class="sp-h-sub">ok · one supporting fact</span></span></a>
+        <a href="#" class="sp-warn"><span class="sp-h-icon"><i class="ti ti-certificate"></i></span><span><span class="sp-h-name">Name</span><span class="sp-h-value">Expires in 12 days</span><span class="sp-h-sub">sp-warn</span></span></a>
+        <a href="#" class="sp-fail"><span class="sp-h-icon"><i class="ti ti-plug-connected-x"></i></span><span><span class="sp-h-name">Name</span><span class="sp-h-value">1 of 2 answering</span><span class="sp-h-sub">sp-fail</span></span></a>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">05</span><h2>dns_record · copy_field</h2><div class="sp-end">One block per record</div></div>
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>Record</h3><span class="tag is-success is-light">published</span><small>A one-line note</small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="copy_field — single line"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="2" readonly>copy_field — multi-line, for a DKIM key</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+          </div>
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>Record</h3><span class="tag is-danger is-light">mismatch</span><small>"In DNS now" appears only when it differs</small></div>
+            <div class="field"><label class="label">In DNS now</label>
+              <div class="control"><input class="input is-danger" readonly value="what the resolver returned"></div>
+              <p class="help is-danger">What is wrong and the exact fix.</p></div>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">07</span><h2>Table conventions</h2><div class="sp-end">Always inside <code>table-container</code> · an address breaks after its @</div></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Time, UTC</th><th>Name</th><th>sp-clip</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td><a href="#"><strong>the row's link</strong></a></td><td class="sp-clip">A long subject is clipped with an ellipsis instead of wrapping the row</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="#">Details</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+            </tbody>
+          </table></div>
+          <div class="sp-box-foot"><span>Page 1 of 9</span><a href="#">Older →</a></div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">09</span><h2>log_pane</h2><div class="sp-end">sp-d time · sp-w warning · sp-e error</div></div>
+<pre class="sp-log"><span class="sp-d">13:58:07</span> an ordinary line
+<span class="sp-d">13:58:09</span> <span class="sp-w">a deferred delivery — sp-w</span>
+<span class="sp-d">13:57:41</span> <span class="sp-e">a reject or a bounce — sp-e</span></pre>
+        </div>
+      </div>
+
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">06</span><h2>facts</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Label</dt><dd>Value</dd></div>
+              <div><dt>Mono value</dt><dd class="sp-mono">4XcB7k2Jm9z1</dd></div>
+              <div><dt>sp-big</dt><dd class="sp-big">5 days</dd><dd class="sp-muted">a supporting line</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">08</span><h2>timeline</h2></div>
+          <div class="sp-box-body">
+            <ol class="sp-timeline">
+              <li><time>13:58:07 UTC</time><strong>Done</strong> — default</li>
+              <li class="sp-warn"><time>13:58:09 UTC</time><strong>Deferred</strong> — sp-warn</li>
+              <li class="sp-fail"><time>14:40:00 UTC</time><strong>Bounced</strong> — sp-fail</li>
+              <li class="sp-pending"><time>not yet</time>Expected next — sp-pending</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">10</span><h2>empty_state</h2></div>
+          <div class="sp-empty"><i class="ti ti-stack-2"></i>One sentence: what is absent and why that is fine.</div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">11</span><h2>confirm_list</h2></div>
+          <div class="sp-box-body">
+            <ul class="sp-list-check">
+              <li><i class="ti ti-x"></i>each thing that will be lost, one per line;</li>
+              <li><i class="ti ti-x"></i>inside an sp-danger-zone box, above the danger button.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-3">
+        <aside class="menu sp-side">
+          <p class="menu-label">side_menu</p>
+          <ul class="menu-list">
+            <li><a class="is-active" href="#"><i class="ti ti-world-check"></i>Current <span class="tag is-danger is-light">1</span></a></li>
+            <li><a href="#"><i class="ti ti-apps"></i>Section <span class="tag is-light">2</span></a></li>
+          </ul>
+          <p class="menu-label">Rarely changed</p>
+          <ul class="menu-list">
+            <li><a class="has-text-danger" href="#"><i class="ti ti-trash has-text-danger"></i>Delete</a></li>
+          </ul>
+        </aside>
+      </div>
+      <div class="column is-9">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">12</span><h2>Form rows · route · help_topic</h2></div>
+          <div class="sp-box-body">
+            <div class="sp-form">
+              <div class="sp-row">
+                <div class="field"><label class="label">sp-row — a wide field</label><div class="control"><input class="input" value="host"></div></div>
+                <div class="field"><label class="label">and a short one</label><div class="control"><input class="input" value="25"></div></div>
+              </div>
+              <div class="sp-pair">
+                <div class="field"><label class="label">sp-pair — two equal fields</label><div class="control"><input class="input" type="password"></div></div>
+                <div class="field"><label class="label">Repeat</label><div class="control"><input class="input" type="password"></div><p class="help">Help text lives in Bulma's <code>help</code>.</p></div>
+              </div>
+            </div>
+            <p class="sp-route"><span>from@example.org</span><i class="ti ti-arrow-right sp-muted"></i><span>to@example.net</span><span class="tag is-warning is-light">deferred</span></p>
+          </div>
+          <div class="sp-help-topic"><h3>help_topic</h3><p>A heading and a paragraph; topics stack inside one box on the Help page.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">13</span><h2>shell</h2><div class="sp-end">Owned by the layout — a screen never writes it</div></div>
+      <div class="sp-box-body">
+        <dl class="sp-facts">
+          <div><dt>Name</dt><dd>The wordmark, not the stamp: at nav size the stamp's perforation is under a pixel and its brick field dissolves into the bar. The stamp lives on sign-in, setup and the favicon.</dd></div>
+          <div><dt>Edge</dt><dd>Built like the mark: the brick field, then the stamp's paper margin, and the perforation along the outer edge of that margin — round holes, flat teeth, the ink hairline. One tile, <code>perf-edge.svg</code>.</dd></div>
+          <div><dt>Sibling strip</dt><dd>The pages of the current group, under the edge. Five or six entries; past that the group is split.</dd></div>
+          <div><dt>Menus</dt><dd>Bulma hover dropdowns, no JavaScript. The user menu holds Account, Help and Sign out.</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">14</span><h2>Type scale</h2><div class="sp-end">Three sizes · nothing to be read is under 13px</div></div>
+      <div class="table-container"><table class="table is-fullwidth">
+        <thead><tr><th>Size</th><th>Looks like</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-small">body · 16px</td><td>The quick brown fox, 203.0.113.25</td><td class="sp-muted">Text, table cells, inputs, selects, buttons, menus and their dropdowns</td></tr>
+          <tr><td class="sp-mono sp-small">--sp-fs-s · 14px</td><td class="sp-small">The quick brown fox, <span class="sp-mono">203.0.113.25</span></td><td class="sp-muted">Supporting text: labels, <code>help</code>, notes in a box head or foot, mono values (<code>sp-small</code>), logs, the footer</td></tr>
+          <tr><td class="sp-mono sp-small">--sp-fs-xs · 13px</td><td><span class="sp-kicker">Upper-case mono label</span> <span class="tag is-light">tag</span></td><td class="sp-muted">Upper-case mono micro-labels (kicker, table head, <code>dt</code>, box title) and tags — nothing else</td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot">Bulma's <code>is-small</code> and <code>is-size-7</code> are not used: a control is never small, and <code>sp-small</code> replaces the helper. The postmark's fine print is an imprint, not text.</div>
+    </div>

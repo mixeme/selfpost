@@ -5,6 +5,303 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- Panel redesign, account e-mail and notifications: a user's e-mail is its own
+  field (2.0 baseline `users.email`, today `dmarc_report_email`) — edited under
+  **Account**, seen and set by the global administrator on the user form and in
+  the users list; DMARC may *use* it, as one choice beside the hosted address,
+  another address or none (Settings and domain settings). **Account** gains a
+  Notifications box and **Settings** a switch for the new roadmap candidate
+  `panel-notifications`; `password-reset` is added as a candidate too. The
+  inbound spam filter becomes visible: a *Spam filter* box on every inbound
+  domain, a tag on the inbound domains list, its socket among the milter
+  sockets. Preflight loses a box that only filled space — the test form now
+  shares its box with its result — and the plan's layout rule and contract say
+  so: what stands beside a form must be real. The role is labelled by its reach,
+  `global` or `domain` — everyone in the panel is an administrator — and each
+  assignment list on the user form gains **All**, a per-user flag that covers
+  domains added later. The DMARC default report address is a **user's**
+  setting, not the server's: it moves from Server › Settings to **Account**
+  with its report-authorization record, and a domain follows the default of a
+  *named* user, so two people sharing a domain never pull it two ways.
+- Panel redesign, contrast: a sweep of every text node against its real ground
+  found the solid red button at 3:1 (Bulma derives a solid button's text from
+  the fill's lightness; brick had been patched, red had not), the muted grey
+  at 4.1:1, the amber postmark at 4.0 and Bulma's menu labels at 4.2. Solid
+  buttons are white on colour, muted is `#5c6774`, the postmark uses the warn
+  token; all 33 screens now measure 4.5:1 or better. The sweep is kept as
+  `panel/audit.js` — text size, contrast, overflow, clipped values, missing
+  icons — and its clean output joins the evidence a restyle step must show.
+- Panel redesign, header (owner's choice: variant A, with the perforation on a
+  light edge as on the mark): the navbar carries the **wordmark** instead of
+  the stamp — `docs/assets/selfpost-wordmark.svg` and `-ink`, the stamp's own
+  outlines, recorded in `docs/product.md` — and under the brick bar runs the
+  stamp's paper margin with the perforation along its outer edge: round holes,
+  flat teeth, the ink hairline (`panel/perf-edge.svg`). All 33 screens rebuilt;
+  the components page documents the shell; the comparison sheet is removed.
+  The six health cards now split into six, three or two columns, so one card
+  is never left alone on a row. Three corrections after the owner's review:
+  the paper edge is 8px under the 60px bar — it had been scaled from the hole
+  size to 16px, where the mark's margin is a tenth of the brick field; the
+  health row is compact again (71px: smaller icons, each line a block with its
+  own line height, a verdict never wraps and stretches the row); and a
+  read-only value is as tall as the Copy button joined to it. `check.py` no
+  longer counts `min-width: 0` as setting a width. Text sizes: the filter
+  controls in a box head and the navbar's dropdown entries are 15px like the
+  bar itself (they had Bulma's `is-small` and its .875rem dropdown); `check.py`
+  now rejects `is-small` on anything but a progress bar.
+- Panel redesign, type scale: about 40 % of the panel's text measured under
+  13px (labels 11.7, table heads 10.5, fact labels 10.2, tags and help 11.3).
+  Body is now 16px with two tokens under it — `--sp-fs-s` 14px for supporting
+  text and `--sp-fs-xs` 13px for upper-case mono labels and tags; Bulma's
+  small sizes are overridden or dropped (`sp-small` replaces `is-size-7`), and
+  `check.py` fails any font size under the floor. Every table now sits in a
+  `table-container` (enforced), addresses in tables break after the `@`, the
+  inbound log folds the client IP under the sender; all screens fit without
+  scrolling at 1280px and up. Documented on the components page and in the
+  plan (§ Type and tables).
+- Panel redesign, header comparison sheet
+  ([docs/assets/panel-redesign/header/](docs/assets/panel-redesign/header/index.html)):
+  at nav size the stamp dissolves into the brick bar and the perforated edge
+  was drawn inverted (round bumps instead of round holes). Three replacements
+  beside the current header — **A** wordmark with the stamp's real hole-to-tooth
+  perforation bitten into the bar, **B** wordmark on a plain bar, **C** a
+  stamp-paper header with an ink hairline and brick only behind the name. The
+  wordmark is cut from the stamp's own outlines. Pending the owner's choice;
+  the mockups are unchanged. `.claude/launch.json` serves the mockups locally
+  (`python -m http.server 8765` from the repository root).
+- Panel redesign, the roadmap's screens: **Inbound › Filter lists** and the
+  adjusted **Inbound › Log** (client, decision, engine and reason; *Allow /
+  Deny sender*) for inbound-antispam-panel, **Inbound › Quarantine** (list and
+  held message with Release / Discard) for inbound-quarantine, and **Server ›
+  Preflight** for preflight — all from existing components; 33 screens. Their
+  paths join § Routes; the quarantine and preflight plans link their mockups.
+  A mockup is the target look, not a decision to build: each item keeps its
+  status, and quarantine's open questions stay open.
+- Panel redesign, two owner decisions recorded in
+  `docs/plans/panel-redesign.md`: **no compatibility** — the redesign is
+  `2.0.0`, old paths are removed without redirects, the SQLite migration chain
+  is replaced by one baseline and 2.0 starts from an empty data directory
+  (schema-squash ships as a step of this plan, without its upgrade gate; the
+  only live installation is the owner's); and
+  **inbound delegation** — a domain administrator manages assigned inbound
+  domains, granted separately from outbound (`user_inbound_domains`, a second
+  list on the user form, per-domain authorization under `/inbound/`). Mockups `users`, `user`,
+  `user-delete` redrawn for the two lists. Checklist `3/21`.
+- Panel redesign, routes: the owner decided that paths follow the new names
+  and structure. `docs/plans/panel-redesign.md` § Routes maps every screen to
+  its new path (`/overview`, `/outbound/…`, `/inbound/…`, `/server/…`,
+  `/account`) with the rules that come along — one `<page>/fragment` name, the
+  application form as a single POST, 301s from old GET paths for one MINOR,
+  subtree `requireGlobal()` under security review, and
+  `TestRoutesFollowNavigation`. Mockups gained what the first pass missed: the
+  *Reload configuration* box (now on Server › Health), the `flash` component
+  and the `sp-help` link that replaces the help drawer. Checklist `1/17`.
+- Panel redesign, design contract:
+  [docs/plans/panel-redesign.md](docs/plans/panel-redesign.md) rewritten for
+  the accepted direction — three layers (Bulma as shipped, adapters, own `sp-`
+  components), three page layouts, what an implementer must not do, the guard
+  tests that land before any template, a `design-first` CI step and
+  evidence-based acceptance. A
+  [components page](docs/assets/panel-redesign/panel/components.html) shows
+  every building block in every state; `panel/check.py` lints the mockups
+  against the contract and writes `panel/outlines.json`, the per-screen
+  component skeleton an implementation is compared with. Own modifier classes
+  renamed to carry the `sp-` prefix so the vocabulary is machine-checkable.
+  Agent rule `.cursor/rules/panel-design.mdc`; roadmap row updated (`0/15`).
+- Panel redesign, stage 2: the accepted direction drawn on every screen —
+  29 pages under [docs/assets/panel-redesign/panel/](docs/assets/panel-redesign/index.html).
+  Direction C (Bulma) is the base, with A's postal signature (postmark verdict,
+  numbered mono section heads, the stamp's perforated edge) and B's icons.
+  Overview keeps verdicts only and the tables move to a new **Server › Health**
+  page; the own password becomes **Account**; queues are drawn as tables
+  (needs `postqueue -j`) and **Inbound** gets its own Log and Queue. Pages are
+  built from fragments by `panel/build.py`; the built HTML is committed.
+  Mockups only; nothing in `internal/web` changes.
+- Panel redesign, stage 1: three directions drawn on the three key screens
+  (Overview, an outbound domain, sign-in) under
+  [docs/assets/panel-redesign/](docs/assets/panel-redesign/index.html) —
+  **A** Pico CSS ("Blank"), **B** Tabler ("Console"), **C** Bulma ("Counter"),
+  with a cover sheet comparing size, JavaScript, CSP fit and own CSS. All three
+  share a navigation grouped by mail direction (Overview · Outbound · Inbound ·
+  Server, with a symmetric Log and Queue on both sides), one block per DNS
+  record instead of separate "status" and "records to publish" cards, and
+  applications as a table. Mockups only; nothing in `internal/web` changes.
+  The brief behind them supersedes the "no component library" decision in
+  `docs/plans/panel-redesign.md`; that file is rewritten once a direction is
+  accepted.
+- Roadmap item and givens for a panel visual redesign
+  ([docs/plans/panel-redesign.md](docs/plans/panel-redesign.md)) — layout
+  grammar (`measure` / `fill` plus Web Awesome layout CSS), no JS component
+  library, new mockups rather than `docs/assets/panel-ui/`. Status: candidate.
+- Roadmap item and plan for `/preflight` installation check page
+  ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
+  infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
+  DKIM socket, test email). Status: candidate.
+
+## [1.9.2] - 2026-09-22
+
+Review pass over `1.4.0`…`1.9.1`: port 25 no longer shares the submission
+milter chain, DMARC reports are validated before they are stored, and the auto
+rate limit is correct for a non-default level-1 window. Schema migration
+`0010` (index only). Upgrading is a tag bump.
+
+A full-tree code review on 2026-08-19 (architecture, code quality, security,
+GUI, tests, documentation, AGPL compliance; 38 findings) produced most of what
+follows. Its four open items live in [roadmap.md](docs/roadmap.md); its working
+document is not part of the release.
+
+### Added
+
+- SQLite migration `0010_send_log_app_login_index.sql` —
+  `idx_send_log_app_login_created_at`. The journal-milter counts an
+  application's messages on every `MAIL FROM`, and the domain page computes
+  per-application statistics on every render; both were scanning the
+  `created_at` range because `app_login` was unindexed.
+- DMARC aggregate reports are accepted as **zip** as well as gzip or plain XML
+  (several reporters ship a single-entry zip; those reports previously counted
+  as parse failures).
+- e2e: `checkPort25ConfigCombinations` regenerates the Postfix configuration
+  inside the container for all four combinations of `INBOUND_RELAY_ENABLE` /
+  `DMARC_REPORTS_ENABLE` / `INBOUND_ANTISPAM_MILTER` and requires
+  `postfix check` to pass. The `1.9.1` crash-loop shipped in `1.4.0` and
+  survived three releases because the suite only ever exercised the flags-off
+  path.
+
+### Changed
+
+- README hero line and a **Positioning** block in `docs/product.md` record the
+  tagline (`YOUR SMTP. YOUR RULES.`) and hero copy; the stamp subtitle stays
+  `SELF-HOSTED SMTP RELAY`. `docs/assets/selfpost-proof.html` updated to match.
+
+### Fixed
+
+- The setup account's password is hashed at bcrypt cost `12` like every other
+  panel password; it was still being written at `bcrypt.DefaultCost` (10). The
+  work factor now has one definition, `auth.BcryptCost`. bcrypt records the
+  cost in the hash, so existing passwords keep verifying unchanged.
+- Login/setup rate limiter: protecting blocked buckets from eviction is now
+  bounded. Blocked buckets are still never evicted to make room, but past
+  `maxBuckets × 4` they are evicted too (nearest expiry first) — otherwise an
+  attacker with many source addresses could grow the bucket map without limit
+  by making each address fail its way to blocked. The overflow is logged at
+  most once per window.
+- `postqueue -p` output is bounded to 4 MiB (the timeout alone left the size of
+  the listing, and therefore the panel's allocation, up to the queue).
+- [schema-migrations.md](docs/schema-migrations.md): the schema section was
+  still headed `v9` while the chain head is `v10`, and three links pointed at
+  plan files deleted when those features shipped.
+- postqueue reader is now time-bounded: `postqueue -p` runs under a 5-second
+  context timeout so a stuck queue command cannot hang the queue panel path
+  indefinitely.
+- DMARC panel layout classes now exist in
+  `internal/web/view/static/panel.css` (`.pair`, `.attn`, `.desk-only`,
+  `.phone-only`, `.phone-list`, `.check-row`), so desktop/mobile DMARC views and
+  attention highlighting render as intended.
+- `dmarc-ingest` now bounds stdin with `io.LimitReader` (10 MiB) before parsing.
+- User-role update no longer contains a duplicate "last global admin" demotion
+  guard; one check now returns a context-specific message for self-demotion.
+- Settings flash text now reflects what actually changed and only mentions
+  session sign-out when the password changed.
+- Help page/drawer links now use `SourceURL` (`{{.SourceURL}}/blob/main/docs/...`)
+  instead of a hardcoded repository URL.
+- Help drawer close controls include accessibility attributes (`role="button"`,
+  `aria-label`) for the scrim and close action.
+- Test coverage expanded for DMARC map token injection rejection and email
+  validation edge cases (ASCII/local-part/domain/freemail cases).
+- **Port 25 no longer runs the submission milter chain.** `smtpd_milters` is
+  now always overridden on `smtp/inet` — to the optional antispam milter, or
+  to nothing. Previously, with `INBOUND_ANTISPAM_MILTER` unset, inbound mail
+  inherited main.cf's chain: OpenDKIM (strict, `tempfail`) could defer relayed
+  mail during a signing outage, and the journal-milter filed inbound mail into
+  the outbound send log under the **sender's** domain — so Deliveries showed
+  other people's mail, and a forged `From:` on an inbound message consumed that
+  sending domain's level-2 rate-limit budget. [architecture.md](docs/architecture.md)
+  already described the intended behaviour; the code now matches it.
+- **DMARC reports are validated before they are stored.** A report is accepted
+  only when the domain in `policy_published` is a sending domain configured
+  here and, for a per-domain hosted address, matches that address's `+tag`.
+  The rua address form is predictable, so anyone able to reach it could
+  previously file reports under any domain, skew the panel's alignment figures
+  and the tighten-`p=` hint, and evict genuine reports through the 500-report
+  retention cap.
+- Auto level-2 rate limit: the ceiling is now scaled to the level-1 window
+  before the multiplier is applied. `ceil(avg msg/h × multiplier)` was stored
+  as the ceiling for a window of `RATE_LIMIT_WINDOW_SECONDS`, so any window
+  other than the default `3600` shifted the effective allowance by
+  `window/3600` (a 1800s window allowed twice the intended rate). A domain
+  that has sent anything now also gets a floor of 1.
+- Single-domain export no longer drops rate limits silently when the store
+  errors — the error is returned instead of being swallowed by `err == nil && ok`.
+
+### Changed
+
+- [roadmap.md](docs/roadmap.md) now carries everything the 2026-08-19 code
+  review left unimplemented, so no finding lives only in a plan file:
+  `csrf-tokens` (the recorded §4.4 decision that never became a task),
+  `template-data-typing`, `structured-logging`, and
+  `review-2026-08-followups` for the small remainder (backup re-auth, the
+  missing service/handler/error-page tests, and nine minor findings that were
+  never carried into the review's own phase tables). Each roadmap row stands on
+  its own — file, symptom, and what "done" means — and the declined finding
+  (`//go:build linux` for the `/proc` reader) is recorded as declined so it is
+  not raised again. The review's working document is gone from `docs/plans/`
+  now that nothing depends on it; git history keeps it.
+- Extracted `internal/configsafe` — the empty-value and forbidden-character
+  check every generated config file shares. Each writer keeps its own forbidden
+  set next to the file it protects (an OpenDKIM table and a Postfix map break on
+  different characters); only the check itself is shared.
+- Build, deploy and migration comments no longer cite the archived
+  specification. The `spec N` references CHANGELOG `[0.5.0]` said were gone
+  survived in `build/`, `deploy/`, the first two migrations and the release
+  workflow; they are removed and the affected comment paragraphs re-wrapped.
+  Comments only — no build or configuration behaviour changes.
+- Dropped the `parseDomainRateLimitForm` / `parseAppRateLimitForm` pass-through
+  wrappers left behind when the two parsers were merged: nothing but their own
+  tests still called them.
+- Extracted shared helpers: `internal/atomicfile` (atomic temp-write+rename) and
+  `internal/supervisor` (supervisorctl start/signal wrappers), and reused them in
+  domain/postfix code paths.
+- `docs/roadmap.md`: shipped `panel-docs` now references CHANGELOG history
+  instead of a removed plan file.
+- [schema-migrations.md](docs/schema-migrations.md) notes that migration `0009`
+  changed what the IP list *means* — permissive (those IPs got the application
+  ceiling) before 1.9.0, restrictive (every other IP refused) after. Its
+  conversion branch only fires for a database that carried application-scope
+  `allowed_ips` from before 1.9.0.
+- Panel help, [guide.md](docs/guide.md) and [architecture.md](docs/architecture.md):
+  the client IP allow-list is a **sending** control, not an authentication
+  boundary — the SASL login still succeeds, the check runs in the
+  journal-milter at `MAIL FROM`, and it is fail-open like the rate limits.
+  architecture.md's rate-limit description still documented the pre-1.9.0
+  trusted-IP semantics.
+- Removed unused duplicates of the inbound validators (`Host`, `Port`,
+  `TLSMode`, `RecipientMode`, `MailboxInDomain`, `NormalizeHost`) from
+  `internal/web/validate` — the live path uses `internal/inbound/validate.go`;
+  the copies were reachable only from their own tests.
+- `gofmt` across `cmd/` and `internal/` (10 files had drifted); dead branch
+  removed from `postfix.inboundNexthop`.
+- The planned inbound-antispam migration is renumbered `0011_inbound_spam_log.sql`.
+- Operator and as-built docs aligned with the code after a full pass —
+  [architecture.md](docs/architecture.md) (port 25 opens for inbound relay
+  and/or DMARC ingest; antispam requires inbound relay; DMARC pipe transport
+  and map paths; `/help` and `/dmarc*` routes; four panel roles including
+  rate-limit recalc; restore Resync vs manual reload); [guide.md](docs/guide.md)
+  and [README.md](README.md) (image pin `1.9.1`, port 25 conditions, combined
+  listener limits, reload vs Resync); [roadmap.md](docs/roadmap.md) (`panel-docs`
+  closed at `[1.8.0]`, next item inbound-antispam-panel); [development.md](docs/development.md)
+  version-cut table through `1.9.1`; [schema-migrations.md](docs/schema-migrations.md)
+  last-updated note. No behaviour change.
+
+### Removed
+
+- Unused legacy asset `docs/assets/icon.png` (superseded by the four brand SVGs
+  and `internal/web/static/favicon.png`; nothing referenced it).
+- Plan documents for already-shipped features: `domain-stats-auto-ratelimit`,
+  `dmarc-reports`, `inbound-relay`, `panel-docs`, `queue-retries`,
+  `send-log-retention`. Only unimplemented plans remain in `docs/plans/`.
+
 ## [1.9.1] - 2026-08-19
 
 Port-25 Postfix startup when inbound relay, DMARC ingest, or the inbound antispam
@@ -239,6 +536,14 @@ tag bump; no schema migration.
   parsed aggregate report (aligned vs third-party fail), not a hub-only
   summary.
 
+### Fixed
+
+- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
+  after the manifest merge via the GitHub Packages API. The `[1.3.0]` merge job
+  called `docker buildx imagetools rm`, which is not a valid subcommand — cleanup
+  failed with a warning and the side-effect tags stayed in the registry until
+  this fix.
+
 ## [1.3.0] - 2026-08-14
 
 Security and quality after 1.2.5: domain-admin send-log authorization,
@@ -256,7 +561,7 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
 - docs: agreed roadmap item **queue-retries** — show this Postfix's retry
   policy (first delay, backoff cap, queue lifetime) on Mail queue and on a
   delivery's history, reading `postconf -h` once at panel start so a manual
-  override is visible. Plan: [docs/plans/queue-retries.md](docs/plans/queue-retries.md).
+  override is visible. Plan: `docs/plans/queue-retries.md` (removed once shipped).
   Explanation only; no attempt counter and no panel knobs. Not yet
   implemented.
 
@@ -323,11 +628,6 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   the same Resync on demand. The `internal/backup` package comment now matches
   this behaviour.
 
-- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
-  after the manifest merge via the GitHub Packages API. The merge job had called
-  `docker buildx imagetools rm`, which is not a valid subcommand — cleanup failed
-  with a warning and the side-effect tags stayed in the registry.
-
 ### Changed
 
 - docs: operator and as-built docs aligned with the code after a full
@@ -377,15 +677,13 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   (`vX.Y.Z`) or a manual `workflow_dispatch` with an explicit SemVer version — a
   bare git tag push no longer starts the build. `release.yml` listens for
   `release: published`, checks out that tag (not `main` HEAD), e2e-gates each
-  native arch build, merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one manifest,
-  then removes the per-arch tags from GHCR via the GitHub Packages API so
-  operators see only `ghcr.io/mixeme/selfpost:X.Y.Z` (what
-  `deploy/docker-compose.yml` pins). A dispatch whose version input is missing
-  or not `X.Y.Z` fails in `prepare`. [development.md](docs/development.md)
-  documents draft vs published releases, why deleting a release tag converts
-  it back to draft, and Gitea → GitHub tag-mirror pitfalls (do not prune release
-  tags on GitHub; a mirrored `v1.0.0` still runs that tag's `on: push: tags`
-  workflow).
+  native arch build, and merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one
+  manifest. Reliable removal of the per-arch side-effect tags from GHCR landed
+  in `[1.3.1]`. A dispatch whose version input is missing or not `X.Y.Z` fails
+  in `prepare`. [development.md](docs/development.md) documents draft vs
+  published releases, why deleting a release tag converts it back to draft, and
+  Gitea → GitHub tag-mirror pitfalls (do not prune release tags on GitHub; a
+  mirrored `v1.0.0` still runs that tag's `on: push: tags` workflow).
 
 - test: the authorization and sign-in surfaces that had no tests now have them.
   The login limiter is covered for its ceiling, its per-address scope, the reset
@@ -455,7 +753,7 @@ Plex. Upgrading from 1.2.x is a tag bump; no migration.
   RBAC in the doc-alignment pass above). Corrected stale
   `admin.dmarc_report_email` references in
   [roadmap.md](docs/roadmap.md) and
-  [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
+  `docs/plans/dmarc-reports.md` (removed once shipped) to the setting's
   actual home after migration `0005`. No behaviour change.
 
 - panel: code-review P6 cleanup — the unused `auth.RequireGlobal` middleware is
@@ -482,7 +780,9 @@ Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.
   carry muted leads and matched control height; trusted-IP help sits under the
   IP field. Domain settings pairs DMARC reports with the level-2 rate limit
   using CSS subgrid so titles, fields, and Save / Remove buttons line up across
-  columns.
+  columns. Domain page Export and Danger cards stack naturally again — a
+  shared-baseline flex pin on `.split` cards made mismatched body lengths look
+  worse than a plain stack.
 
 ## [1.2.4] - 2026-08-12
 
@@ -1289,9 +1589,10 @@ database, or the on-disk layout. Upgrading is a tag bump.
   Bookmarks to the old paths stop working.
 
 - panel: each entry in the navigation bar now carries an icon beside its label,
-  so the bar is scannable at a glance instead of a row of similar-length words.
-  The icons are inline SVG drawn in the entry's own colour — no extra request,
-  no exemption from the panel's Content-Security-Policy — and are hidden from
+  so the bar is scannable at a glance instead of a row of similar-length words —
+  Backup uses a filing-cabinet mark; Sign out has its own icon too. The icons
+  are inline SVG drawn in the entry's own colour — no extra request, no
+  exemption from the panel's Content-Security-Policy — and are hidden from
   screen readers, which still announce the label alone.
 
 - panel: the navigation bar is laid out as two rows on purpose — the signed-in
@@ -1431,6 +1732,11 @@ database, or the on-disk layout. Upgrading is a tag bump.
   login/password and on the sending server name.
 - panel: the *Addresses* field is hidden while an application's address mode is
   *Any address of the domain*, where the server ignores it.
+- deploy: `cap_add` gains `CAP_FOWNER` and `CAP_FSETID` so the entrypoint can
+  chmod and set the setgid bit on `/data` directories it has just chowned under
+  `cap_drop: ALL`, and `CAP_KILL` so supervisord can signal OpenDKIM across uids
+  when domains are added or removed. Production boot under the hardened compose
+  file exposed both gaps after Phase 10.
 - ci: disable provenance attestation on release image push, so the ghcr.io
   manifest list shows only `linux/amd64`/`linux/arm64` (no `unknown/unknown`).
 - ci: run `go vet` and `go test ./...` on every push to `main` and every pull

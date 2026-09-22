@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="columns is-gapless sp-signin">
+  <div class="column is-half sp-signin-brand">
+    <div>
+      <img src="../../selfpost-stamp.svg" alt="SelfPost">
+      <p>YOUR SMTP. YOUR RULES.</p>
+    </div>
+  </div>
+  <div class="column is-half sp-signin-form">
+    <form method="post" action="status.html">
+      <h1 class="title is-3">Sign in</h1>
+      <div class="field">
+        <label class="label" for="username">Username</label>
+        <div class="control"><input class="input" id="username" name="username" autocomplete="username" required></div>
+      </div>
+      <div class="field">
+        <label class="label" for="password">Password</label>
+        <div class="control"><input class="input" id="password" name="password" type="password" autocomplete="current-password" required></div>
+      </div>
+      <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Sign in</button></div>
+    </form>
+    <p class="sp-foot">© 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.5.1/dist/css/tabler.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body class="d-flex flex-column">
+<div class="page page-center">
+  <div class="container container-tight py-4">
+    <div class="text-center mb-4"><img class="sp-signin-mark" src="../../selfpost-stamp.svg" alt="SelfPost"></div>
+    <div class="card card-md">
+      <div class="card-body">
+        <h2 class="h2 text-center mb-4">Sign in</h2>
+        <form method="post" action="status.html">
+          <div class="mb-3">
+            <label class="form-label" for="username">Username</label>
+            <input class="form-control" id="username" name="username" autocomplete="username" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="form-footer"><button type="submit" class="btn btn-primary w-100">Sign in</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="text-center sp-tagline mt-4">YOUR SMTP. YOUR RULES.</div>
+    <div class="text-center sp-foot mt-3">© 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</div>
+  </div>
+</div>
+</body>
+</html>

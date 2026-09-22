@@ -1,0 +1,107 @@
+<!-- title: example.org · Outbound domains | section: outbound | page: domains -->
+    <div class="sp-head">
+      <div class="sp-postmark sp-fail"><span>DNS</span><b>FAIL</b><span>1 OF 3 RECORDS</span></div>
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="out-domains.html">Outbound domains</a> /</p>
+        <h1 class="title is-3">example.org</h1>
+        <p class="sp-lead">1 284 messages in 30 days · peak 96 msg/h · average 1.8 msg/h</p>
+      </div>
+      <div class="buttons">
+        <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form>
+        <a class="button is-primary" href="out-app.html"><i class="ti ti-plus"></i>Add application</a>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-3">
+        <aside class="menu sp-side">
+          <p class="menu-label">This domain</p>
+          <ul class="menu-list">
+            <li><a class="is-active" href="#dns"><i class="ti ti-world-check"></i>DNS records <span class="tag is-danger is-light">1</span></a></li>
+            <li><a href="#apps"><i class="ti ti-apps"></i>Applications <span class="tag is-light">2</span></a></li>
+            <li><a href="#connection"><i class="ti ti-plug"></i>Connection</a></li>
+          </ul>
+          <p class="menu-label">See also</p>
+          <ul class="menu-list">
+            <li><a href="out-log.html"><i class="ti ti-list-details"></i>Log for this domain</a></li>
+            <li><a href="dmarc-domain.html"><i class="ti ti-report-analytics"></i>DMARC reports</a></li>
+          </ul>
+          <p class="menu-label">Rarely changed</p>
+          <ul class="menu-list">
+            <li><a href="out-domain-settings.html#reports"><i class="ti ti-mail-forward"></i>Report address</a></li>
+            <li><a href="out-domain-settings.html#limit"><i class="ti ti-gauge"></i>Rate limit <span class="tag is-success is-light">auto</span></a></li>
+            <li><a href="out-domain-settings.html#export"><i class="ti ti-file-export"></i>Export</a></li>
+            <li><a class="has-text-danger" href="out-domain-delete.html"><i class="ti ti-trash has-text-danger"></i>Delete domain</a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="column is-9">
+        <div class="box" id="dns">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>DNS records</h2><div class="sp-end">Checked 3 min ago</div><a class="sp-help" href="help.html#dns" title="What to publish and why"><i class="ti ti-help-circle"></i></a></div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="sp2026._domainkey.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="3" readonly>v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3kqV0mJd8e2f1Yb7Qw5uT9sLr4nHc6pZaXo1vKe0yWm2gBt8RjN5dCq3hUf7lPs9aEi4oMz6xTb1kGv0nYw…IDAQAB</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+          </div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>SPF</h3><span class="tag is-danger is-light">mismatch</span><small>Merge into the existing record — never publish a second one</small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=spf1 ip4:203.0.113.25 ~all"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+            <div class="field"><label class="label">In DNS now</label>
+              <div class="control"><input class="input is-danger" readonly value="v=spf1 include:_spf.google.com ~all"></div>
+              <p class="help is-danger">The published record does not authorize 203.0.113.25. Add <code>ip4:203.0.113.25</code> before <code>~all</code>. Shallow check: <code>include:</code> is not followed.</p></div>
+          </div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address: <a href="out-domain-settings.html#reports">admin's default</a></small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="_dmarc.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div>
+              <p class="help"><code>p=none</code> does not affect delivery. Tighten to <code>quarantine</code>, then <code>reject</code>, once the <a href="dmarc-domain.html">reports</a> look clean.</p></div>
+          </div>
+        </div>
+
+        <div class="box" id="apps">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Applications</h2><div class="sp-end">SASL logins that may send as this domain</div><a class="sp-help" href="help.html#apps" title="What an application is"><i class="ti ti-help-circle"></i></a></div>
+          <div class="table-container"><table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Login</th><th>May send as</th><th>30 days</th><th>Limits</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="sp-mono"><strong>prod-server</strong></td><td>*@example.org</td><td class="sp-muted">1 102 msg · peak 96/h</td><td><span class="tag is-success is-light">200 / h</span></td>
+                <td class="sp-actions"><a href="out-app.html">Edit</a><a href="out-app-created.html">New password</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+              <tr><td class="sp-mono"><strong>alerts</strong></td><td>alerts@example.org, noc@example.org</td><td class="sp-muted">182 msg · peak 14/h</td><td><span class="tag is-light">domain</span> <span class="tag is-success is-light">2 IPs</span></td>
+                <td class="sp-actions"><a href="out-app.html">Edit</a><a href="out-app-created.html">New password</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+            </tbody>
+          </table></div>
+          <div class="sp-box-foot">New password and Delete ask for confirmation; the old password stops working at once.</div>
+        </div>
+
+        <div class="box" id="connection">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>Connection</h2><div class="sp-end">The same for every domain</div></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Server</dt><dd class="sp-mono">mail.example.org</dd></div>
+              <div><dt>Port 465</dt><dd>SSL/TLS (implicit)</dd></div>
+              <div><dt>Port 587</dt><dd>STARTTLS (submission)</dd></div>
+              <div><dt>Authentication</dt><dd>Application login, required on every port</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>

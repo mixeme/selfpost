@@ -1,0 +1,44 @@
+<!-- title: Settings | section: server | page: settings -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Server</p>
+        <h1 class="title is-3">Settings</h1>
+        <p class="sp-lead">What holds for the whole instance, whoever is signed in. Your own name, e-mail, notifications and DMARC report address are under <a href="account.html">Account</a>.</p>
+      </div>
+    </div>
+
+    <form class="sp-form" method="post" action="#">
+      <div class="columns">
+        <div class="column is-6">
+          <div class="box">
+            <div class="sp-box-head"><span class="sp-no">01</span><h2>Log retention</h2></div>
+            <div class="sp-box-body">
+              <div class="field"><label class="label" for="ret">Keep outbound log rows, days</label>
+                <div class="control"><input class="input" id="ret" name="send_log_retention_days" type="number" min="7" max="365" value="30" required></div>
+                <p class="help">The main driver of <code>/data</code> growth. Does not affect <code>mail.log</code> rotation (fourteen daily files).</p></div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="sp-box-head"><span class="sp-no">02</span><h2>Notifications</h2></div>
+            <div class="sp-box-body">
+              <div class="field"><label class="checkbox"><input type="checkbox" name="notify" checked> Send notification e-mails</label></div>
+              <p class="help">Sent through this relay from <span class="sp-mono">postmaster@mail.example.org</span>. Each user picks the events under <a href="account.html">Account</a>; a user without an e-mail gets none.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="column is-6">
+          <div class="box" id="rate-limits">
+            <div class="sp-box-head"><span class="sp-no">03</span><h2>Sending rate limits</h2><div class="sp-end">Read-only</div></div>
+            <div class="sp-box-body">
+              <dl class="sp-facts">
+                <div><dt>Level 1 · per client IP</dt><dd class="sp-big">600 / h</dd><dd class="sp-muted">Set in <code>.env</code>; restart to change. Nothing below may exceed it.</dd></div>
+                <div><dt>Level 2 · domain, application</dt><dd>Set on each <a href="out-domain-settings.html#limit">domain</a> and <a href="out-app.html">application</a>.</dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="buttons"><button type="submit" class="button is-primary">Save settings</button></div>
+    </form>

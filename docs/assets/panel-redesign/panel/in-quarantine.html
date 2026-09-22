@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quarantine · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand"><a class="navbar-item" href="overview.html"><img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="overview.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="out-domains.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a>
+            <a class="navbar-item" href="out-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="in-domains.html">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a>
+            <a class="navbar-item" href="in-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item is-active" href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a>
+            <a class="navbar-item" href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="health.html">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="health.html"><i class="ti ti-heartbeat"></i>Health</a>
+            <a class="navbar-item" href="preflight.html"><i class="ti ti-checklist"></i>Preflight</a>
+            <a class="navbar-item" href="system-log.html"><i class="ti ti-file-text"></i>System log</a>
+            <a class="navbar-item" href="backup.html"><i class="ti ti-archive"></i>Backup</a>
+            <a class="navbar-item" href="users.html"><i class="ti ti-users"></i>Users</a>
+            <a class="navbar-item" href="settings.html"><i class="ti ti-settings"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="account.html"><i class="ti ti-user-circle"></i>admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>
+            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="sp-perf" aria-hidden="true"></div>
+<div class="sp-subnav"><div class="container"><a href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a><a href="in-log.html"><i class="ti ti-list-details"></i>Log</a><a href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a><a href="in-quarantine.html" aria-current="page"><i class="ti ti-mail-pause"></i>Quarantine</a><a href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a></div></div>
+<main>
+  <div class="container sp-page">
+<div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Inbound</p>
+        <h1 class="title is-3">Quarantine</h1>
+        <p class="sp-lead">Mail the filter found suspicious enough to hold, but not to refuse. Release hands a message to its upstream as if it had just arrived; Discard deletes it. Anything left is deleted after 14 days.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head">
+        <span class="sp-no">01</span><h2>Held messages</h2>
+        <form class="sp-end" method="get" action="#">
+          <div class="select"><select name="domain"><option>All domains</option><option>lists.example.org</option><option>acme.io</option></select></div>
+          <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
+        </form>
+      </div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Held, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Why</th><th>Size</th><th>Deleted in</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:59:02</td><td>invoice@<wbr>partner-billing.example</td><td>owner@<wbr>lists.example.org</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Outstanding invoice — action required</strong></a></td><td class="sp-muted sp-small">score 9.8 · PHISHING</td><td class="sp-muted sp-nowrap">48 kB</td><td class="sp-nowrap">14 days</td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-20 22:14:40</td><td>no-reply@<wbr>shipping-update.example</td><td>jobs@<wbr>acme.io</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Your parcel could not be delivered</strong></a></td><td class="sp-muted sp-small">score 8.1 · URL_SHORTENER</td><td class="sp-muted sp-nowrap">12 kB</td><td class="sp-nowrap">13 days</td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-09 07:02:11</td><td>m.ortega@<wbr>supplier.example</td><td>owner@<wbr>lists.example.org</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Fwd: scanned contract (3 attachments)</strong></a></td><td class="sp-muted sp-small">score 7.4 · MIME_ARCHIVE</td><td class="sp-muted sp-nowrap">2.9 MB</td><td class="sp-nowrap"><span class="tag is-warning is-light">2 days</span></td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot"><span>3 messages · 3.0 MB of 500 MB</span><span class="sp-end">A domain administrator sees only their assigned inbound domains</span></div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+</body>
+</html>

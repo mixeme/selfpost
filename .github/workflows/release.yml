@@ -1,19 +1,19 @@
 name: release
 
-# Publishes an immutable, version-tagged image on ghcr.io (spec 10.1).
+# Publishes an immutable, version-tagged image on ghcr.io.
 # Ordinary commits and bare git tag pushes do not publish anything. A published
 # GitHub Release runs this workflow directly (same pattern as gosentry / imap-scrub).
 # You can also run it manually via workflow_dispatch with an explicit SemVer X.Y.Z.
 #
-# Native per-architecture builds (see docs/development.md), not qemu:
-# running the full Postfix/OpenDKIM stack under emulation for the e2e gate
-# below is impractically slow. Each arch builds, e2e-gates and pushes its own
-# tag on its own native runner; a merge job then combines them into the one
-# manifest tag documented in deploy/docker-compose.yml. "test, then push" (not
-# push-by-digest then test) is deliberate: it means the bytes that get tagged
-# are exactly the bytes that passed e2e. Per-arch tags are pushed only so
-# imagetools can assemble the multi-arch manifest; merge removes them from GHCR
-# so operators see a single version tag (spec 10.1).
+# Native per-architecture builds (see docs/development.md), not qemu: running
+# the full Postfix/OpenDKIM stack under emulation for the e2e gate below is
+# impractically slow. Each arch builds, e2e-gates and pushes its own tag on its
+# own native runner; a merge job then combines them into the one manifest tag
+# documented in deploy/docker-compose.yml. "test, then push" (not push-by-digest
+# then test) is deliberate: it means the bytes that get tagged are exactly the
+# bytes that passed e2e. Per-arch tags are pushed only so imagetools can
+# assemble the multi-arch manifest; merge removes them from GHCR so operators
+# see a single version tag.
 on:
   release:
     types: [published]

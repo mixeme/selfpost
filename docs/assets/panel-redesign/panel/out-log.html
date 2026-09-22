@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outbound log · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand"><a class="navbar-item" href="overview.html"><img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="overview.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="out-domains.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a>
+            <a class="navbar-item is-active" href="out-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="in-domains.html">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a>
+            <a class="navbar-item" href="in-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a>
+            <a class="navbar-item" href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="health.html">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="health.html"><i class="ti ti-heartbeat"></i>Health</a>
+            <a class="navbar-item" href="preflight.html"><i class="ti ti-checklist"></i>Preflight</a>
+            <a class="navbar-item" href="system-log.html"><i class="ti ti-file-text"></i>System log</a>
+            <a class="navbar-item" href="backup.html"><i class="ti ti-archive"></i>Backup</a>
+            <a class="navbar-item" href="users.html"><i class="ti ti-users"></i>Users</a>
+            <a class="navbar-item" href="settings.html"><i class="ti ti-settings"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="account.html"><i class="ti ti-user-circle"></i>admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>
+            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="sp-perf" aria-hidden="true"></div>
+<div class="sp-subnav"><div class="container"><a href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a><a href="out-log.html" aria-current="page"><i class="ti ti-list-details"></i>Log</a><a href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a><a href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a></div></div>
+<main>
+  <div class="container sp-page">
+<div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Outbound</p>
+        <h1 class="title is-3">Outbound log</h1>
+        <p class="sp-lead">Every message an application handed to the relay. Rows older than 30 days are deleted — change that in <a href="settings.html">Settings</a>.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head">
+        <span class="sp-no">01</span><h2>Messages</h2>
+        <form class="sp-end" method="get" action="#">
+          <div class="select"><select name="domain"><option>All domains</option><option>example.org</option><option>shop.example.org</option><option>notify.acme.io</option></select></div>
+          <div class="select"><select name="app"><option>All applications</option><option>prod-server</option><option>alerts</option></select></div>
+          <div class="select"><select name="status"><option>Any status</option><option>sent</option><option>deferred</option><option>bounced</option><option>rate-limited</option></select></div>
+          <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
+        </form>
+      </div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td>shop@<wbr>shop.example.org</td><td>m.keller@<wbr>gmx.de</td><td class="sp-clip">Your order #48213 has shipped</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:50</td><td>shop@<wbr>shop.example.org</td><td>anna.lind@<wbr>outlook.com</td><td class="sp-clip">Your order #48212 has shipped</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:58:07</td><td>alerts@<wbr>example.org</td><td>noc@<wbr>example.org</td><td class="sp-clip">[FIRING] disk usage above 90 % on db-2</td><td><span class="tag is-warning is-light">deferred</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:41:19</td><td>no-reply@<wbr>notify.acme.io</td><td>j.doe@<wbr>nonexistent.example</td><td class="sp-clip">Reset your password</td><td><span class="tag is-danger is-light">bounced</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:40:02</td><td>prod@<wbr>example.org</td><td>billing@<wbr>partner.example</td><td class="sp-clip">Invoice 2026-0917</td><td><span class="tag is-light">rate-limited</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:12:44</td><td>shop@<wbr>shop.example.org</td><td>p.novak@<wbr>seznam.cz</td><td class="sp-clip">We received your return request</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot"><span>Page 1 of 412</span><a href="#">Older →</a><span class="sp-end">New rows appear on their own</span></div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+</body>
+</html>

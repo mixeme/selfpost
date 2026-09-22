@@ -1,0 +1,23 @@
+<!-- title: Users | section: server | page: users -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Server</p>
+        <h1 class="title is-3">Users</h1>
+        <p class="sp-lead">Who may sign in to this panel. Everyone here is an administrator; the role is the reach — <em>global</em> is the whole server, <em>domain</em> is the domains assigned, outbound and inbound separately.</p>
+      </div>
+      <a class="button is-primary" href="user.html"><i class="ti ti-user-plus"></i>Create user</a>
+    </div>
+
+    <div class="notification is-success is-light"><i class="ti ti-circle-check"></i>User <strong>acme-ops</strong> created.</div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Panel users</h2><div class="sp-end">3 users</div></div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Username</th><th>E-mail</th><th>Role</th><th>Outbound domains</th><th>Inbound domains</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><strong>admin</strong> <span class="tag is-light">you</span></td><td class="sp-muted">mix@example.org</td><td><span class="tag is-primary is-light">global</span></td><td class="sp-muted">All</td><td class="sp-muted">All</td><td class="sp-actions"><a href="user.html">Edit</a></td></tr>
+          <tr><td><strong>shop-team</strong></td><td class="sp-muted">team@shop.example.org</td><td><span class="tag is-light">domain</span></td><td class="sp-muted">shop.example.org</td><td class="sp-muted">—</td><td class="sp-actions"><a href="user.html">Edit</a></td></tr>
+          <tr><td><strong>acme-ops</strong></td><td class="sp-muted">ops@acme.io</td><td><span class="tag is-light">domain</span></td><td class="sp-muted">All</td><td class="sp-muted">acme.io</td><td class="sp-actions"><a href="user.html">Edit</a></td></tr>
+        </tbody>
+      </table></div>
+    </div>

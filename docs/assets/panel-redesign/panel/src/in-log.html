@@ -1,0 +1,33 @@
+<!-- title: Inbound log | section: inbound | page: log -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Inbound</p>
+        <h1 class="title is-3">Inbound log</h1>
+        <p class="sp-lead">What port 25 decided about each message, one row per recipient. Accepts come from the inbound journal, rejects from <code>mail.log</code>; the filter's reasons appear when the spam filter is on.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head">
+        <span class="sp-no">01</span><h2>Messages</h2>
+        <form class="sp-end" method="get" action="#">
+          <div class="select"><select name="domain"><option>All domains</option><option>lists.example.org</option><option>acme.io</option></select></div>
+          <div class="select"><select name="decision"><option>Any decision</option><option>accept</option><option>reject</option><option>tempfail</option><option>quarantine</option></select></div>
+          <input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">
+          <input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">
+          <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
+        </form>
+      </div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Time, UTC</th><th>From · client</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:00:18</td><td>t.berg@<wbr>uni.example<br><span class="sp-mono sp-muted sp-small">192.0.2.77</span></td><td>dev@<wbr>lists.example.org</td><td class="sp-clip">Re: [dev] patch series v3</td><td><span class="tag is-success is-light">accept</span></td><td class="sp-muted sp-small">rspamd · score 0.4</td><td class="sp-actions"><a href="in-filter-lists.html">Deny sender</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:59:02</td><td>invoice@<wbr>partner-billing.example<br><span class="sp-mono sp-muted sp-small">203.0.113.140</span></td><td>owner@<wbr>lists.example.org</td><td class="sp-clip">Outstanding invoice — action required</td><td><span class="tag is-primary is-light">quarantine</span></td><td class="sp-muted sp-small">rspamd · score 9.8 · PHISHING, FORGED_SENDER</td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:57:41</td><td>promo@<wbr>bulk.example<br><span class="sp-mono sp-muted sp-small">198.51.100.90</span></td><td>sales@<wbr>lists.example.org</td><td class="sp-clip sp-muted">—</td><td><span class="tag is-danger is-light">reject</span></td><td class="sp-muted sp-small">postfix · 550 5.1.1 unknown recipient</td><td class="sp-actions"><a href="in-filter-lists.html">Deny sender</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:51:30</td><td>billing@<wbr>partner.example<br><span class="sp-mono sp-muted sp-small">198.51.100.12</span></td><td>owner@<wbr>lists.example.org</td><td class="sp-clip">Invoice 2026-0917</td><td><span class="tag is-danger is-light">reject</span></td><td class="sp-muted sp-small">rspamd · score 16.2 · BAYES_SPAM</td><td class="sp-actions"><a href="in-filter-lists.html">Allow sender</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:44:02</td><td>hr@<wbr>partner.example<br><span class="sp-mono sp-muted sp-small">192.0.2.31</span></td><td>jobs@<wbr>acme.io</td><td class="sp-clip">Application: backend engineer</td><td><span class="tag is-warning is-light">tempfail</span></td><td class="sp-muted sp-small">selfpost · upstream 10.0.4.12 timed out</td><td class="sp-actions"></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:30:55</td><td>noreply@<wbr>github.example<br><span class="sp-mono sp-muted sp-small">192.0.2.200</span></td><td>security@<wbr>lists.example.org</td><td class="sp-clip">[advisory] new report</td><td><span class="tag is-success is-light">accept</span></td><td class="sp-muted sp-small">rspamd · allow list</td><td class="sp-actions"></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot"><span>Page 1 of 38</span><a href="#">Older →</a><span class="sp-end">Allow / Deny sender opens <a href="in-filter-lists.html">Filter lists</a> with the entry filled in · global administrator only</span></div>
+    </div>

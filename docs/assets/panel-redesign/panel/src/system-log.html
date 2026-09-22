@@ -1,0 +1,22 @@
+<!-- title: System log | section: server | page: system-log -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Server</p>
+        <h1 class="title is-3">System log</h1>
+        <p class="sp-lead">The tail of <code>mail.log</code> — Postfix, OpenDKIM and the milters. For one message, open it from a log page instead.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Recent lines</h2><div class="sp-end">Last 200 · refreshes every 10 s</div></div>
+<pre class="sp-log"><span class="sp-d">Sep 21 14:01:52</span> postfix/smtp[2131]: 4XcB9q0Lw2z1: to=&lt;m.keller@gmx.de&gt;, relay=mx00.gmx.net[212.227.15.9]:25, delay=0.8, status=sent (250 Requested mail action okay)
+<span class="sp-d">Sep 21 14:01:52</span> postfix/qmgr[58]: 4XcB9q0Lw2z1: removed
+<span class="sp-d">Sep 21 14:00:18</span> postfix/smtpd[2129]: connect from mail.uni.example[192.0.2.77]
+<span class="sp-d">Sep 21 14:00:18</span> postfix/smtp[2130]: 4XcB8z5Tn1z1: to=&lt;dev@lists.example.org&gt;, relay=mx.internal[10.0.4.2]:25, status=sent (250 2.0.0 Ok: queued)
+<span class="sp-d">Sep 21 13:58:09</span> <span class="sp-w">postfix/smtp[2123]: 4XcB7k2Jm9z1: to=&lt;noc@example.org&gt;, relay=mx1.example.org[192.0.2.10]:25, status=deferred (451 4.7.1 Greylisted, try again in 5 minutes)</span>
+<span class="sp-d">Sep 21 13:57:41</span> <span class="sp-e">postfix/smtpd[2119]: NOQUEUE: reject: RCPT from bulk.example[198.51.100.90]: 550 5.1.1 &lt;sales@lists.example.org&gt;: Recipient address rejected: unknown recipient</span>
+<span class="sp-d">Sep 21 13:44:02</span> <span class="sp-w">postfix/smtp[2101]: 4XcB2m7Hd4z1: to=&lt;jobs@acme.io&gt;, relay=none, status=deferred (connect to 10.0.4.12[10.0.4.12]:2525: Connection timed out)</span>
+<span class="sp-d">Sep 21 13:41:19</span> <span class="sp-e">postfix/smtp[2098]: 4XcB1c3Rk8z1: to=&lt;j.doe@nonexistent.example&gt;, status=bounced (Host or domain name not found)</span>
+<span class="sp-d">Sep 21 13:40:02</span> <span class="sp-w">journal-milter[40]: rate limit: app=prod-server 201/200 in 3600s — tempfail at MAIL FROM</span>
+<span class="sp-d">Sep 21 13:00:00</span> opendkim[39]: key table reloaded (3 domains)</pre>
+    </div>

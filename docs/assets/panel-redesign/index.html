@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel redesign · three directions</title>
+<link rel="stylesheet" href="shared/brand.css">
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+<main>
+  <p class="kicker">SelfPost · panel redesign · stage 2</p>
+  <h1>The accepted direction, every screen</h1>
+  <p class="lead">Direction <strong>C</strong> (Bulma) was picked as the base: the important things in view, details one
+  or two clicks away. It takes the postal signature of <strong>A</strong> — the postmark verdict, numbered mono section
+  heads, the stamp's perforated paper edge under a brick bar that carries the wordmark — and the icons of <strong>B</strong>. Thirty-three screens and a components page live in
+  <a href="panel/overview.html">panel/</a>. Serve this folder from the repository root: the pages load the panel's own
+  fonts and mark by relative path.</p>
+
+  <h2>Screen map</h2>
+  <div class="scroll">
+  <table>
+    <tbody>
+      <tr><th>Signed out</th><td><a href="panel/login.html">Sign in</a> · <a href="panel/setup.html">Create administrator</a></td></tr>
+      <tr><th>Overview</th><td><a href="panel/overview.html">Overview</a> — postmark verdict, six health cards, both domain lists</td></tr>
+      <tr><th>Outbound</th><td><a href="panel/out-domains.html">Domains</a> · <a href="panel/out-domain.html">domain</a> ·
+        <a href="panel/out-domain-settings.html">domain settings</a> · <a href="panel/out-app.html">application form</a> ·
+        <a href="panel/out-app-created.html">password shown once</a> · <a href="panel/out-domain-delete.html">delete domain</a><br>
+        <a href="panel/out-log.html">Log</a> · <a href="panel/out-message.html">message</a> ·
+        <a href="panel/out-queue.html">Queue</a> · <a href="panel/dmarc.html">DMARC reports</a> ·
+        <a href="panel/dmarc-domain.html">by domain</a> · <a href="panel/dmarc-report.html">one report</a></td></tr>
+      <tr><th>Inbound</th><td><a href="panel/in-domains.html">Domains</a> · <a href="panel/in-domain.html">domain</a> ·
+        <a href="panel/in-domain-delete.html">delete domain</a> · <a href="panel/in-log.html">Log</a> ·
+        <a href="panel/in-queue.html">Queue</a> (empty state)<br>
+        <a href="panel/in-quarantine.html">Quarantine</a> · <a href="panel/in-quarantine-message.html">held message</a> ·
+        <a href="panel/in-filter-lists.html">Filter lists</a> — roadmap items, drawn as their target look</td></tr>
+      <tr><th>Server</th><td><a href="panel/health.html">Health</a> · <a href="panel/preflight.html">Preflight</a> (roadmap) · <a href="panel/system-log.html">System log</a> ·
+        <a href="panel/backup.html">Backup</a> · <a href="panel/users.html">Users</a> · <a href="panel/user.html">user form</a> ·
+        <a href="panel/user-delete.html">delete user</a> · <a href="panel/settings.html">Settings</a></td></tr>
+      <tr><th>User menu</th><td><a href="panel/account.html">Account</a> · <a href="panel/help.html">Help</a></td></tr>
+      <tr><th>Contract</th><td><a href="panel/components.html">Components</a> — every building block in every state ·
+        <a href="../../plans/panel-redesign.md">the plan</a> · <code>panel/check.py</code> lints the mockups and writes <code>panel/outlines.json</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>What changed against today's panel</h2>
+  <ul>
+    <li><strong>Overview shows verdicts, Health shows tables.</strong> Process lists, socket paths and interface counters moved to
+      <em>Server › Health</em>, one click from each card.</li>
+    <li><strong>Every page is one of three layouts</strong>: a list (form on top, table below), a detail page (sticky side menu +
+      numbered boxes), or a form page (boxes in equal columns). No page picks its own width.</li>
+    <li><strong>Own password is Account</strong>, instance defaults are Settings. Export sits with the domain, import with Backup,
+      and each links to the other.</li>
+    <li><strong>Queues are tables</strong>, not a <code>postqueue -p</code> dump — this needs <code>postqueue -j</code> parsing.
+      The inbound queue is the same queue filtered by recipient domain.</li>
+    <li><strong>Confirm pages say what will be lost</strong> as a list, beside a hint for the usual alternative (export before delete).</li>
+    <li>Own components on top of Bulma: postmark, perforated edge, numbered box head, health card, DNS record block, facts grid,
+      timeline, log pane. The mockup's <code>theme.css</code> is about 200 lines.</li>
+    <li><code>panel/build.py</code> wraps the fragments in <code>panel/src/</code> with the shared navbar; the built pages are committed,
+      so nothing has to be run to view them.</li>
+  </ul>
+
+  <h2>Stage 1 · three directions on three key screens</h2>
+  <p class="lead">Kept for the record: Overview, an outbound domain and sign-in, drawn three ways.</p>
+
+  <h2>Shared by all three</h2>
+  <ul>
+    <li><strong>Navigation by mail direction.</strong> Overview · <em>Outbound</em> (Domains, Log, Queue, DMARC reports) ·
+      <em>Inbound</em> (Domains, Log, Queue) · <em>Server</em> (System log, Backup, Users, Settings). Account, Help and
+      Sign out live with the user name. Eleven flat entries become four groups.</li>
+    <li><strong>One block per DNS record.</strong> Today "DNS status" and "records to publish" show every host twice.
+      Here a record is one block: its status, what to publish, and — only on a mismatch — what DNS holds now.</li>
+    <li><strong>The domain page stops being nine cards.</strong> DNS and applications are the page; limits, report address,
+      export and delete are "rarely changed" and sit behind one click.</li>
+    <li><strong>Applications are a table</strong>; editing one is its own form page instead of a three-column panel inside a list row.</li>
+    <li>Brand carriers stay: the stamp, brick, IBM Plex. No inline <code>style</code> or script in any mockup.</li>
+  </ul>
+
+  <h2>The directions</h2>
+  <div class="cards">
+    <section>
+      <p class="kicker">A · Pico CSS 2.1</p>
+      <h3>Blank</h3>
+      <p>The panel as a postal form: one centred sheet, numbered sections, mono field labels, a postmark for the
+      verdict. Overview is a ledger — one row per check, the row opens into its detail. Sections on the first
+      header row, the section's pages on the second.</p>
+      <p class="links"><a href="a/status.html">Overview</a><a href="a/domain.html">Domain</a><a href="a/login.html">Sign in</a></p>
+    </section>
+    <section>
+      <p class="kicker">B · Tabler 1.5 (Bootstrap 5)</p>
+      <h3>Console</h3>
+      <p>The classic admin kit: ink sidebar with every page one click away, status tiles, cards and tables in a
+      12-column grid, read-only input groups with Copy. Almost nothing is ours; it also looks the most like
+      every other admin panel.</p>
+      <p class="links"><a href="b/status.html">Overview</a><a href="b/domain.html">Domain</a><a href="b/login.html">Sign in</a></p>
+    </section>
+    <section>
+      <p class="kicker">C · Bulma 1.0</p>
+      <h3>Counter</h3>
+      <p>Brick top bar with CSS-only hover menus. Overview is the whole service on one screen: a health strip over
+      the outbound and inbound domain lists. The domain page gets a sticky side menu. Softer, rounder, the
+      boldest use of the brand colour.</p>
+      <p class="links"><a href="c/status.html">Overview</a><a href="c/domain.html">Domain</a><a href="c/login.html">Sign in</a></p>
+    </section>
+  </div>
+
+  <h2>What each one costs</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th></th><th>A · Pico</th><th>B · Tabler</th><th>C · Bulma</th></tr></thead>
+    <tbody>
+      <tr><th>Licence</th><td>MIT</td><td>MIT</td><td>MIT</td></tr>
+      <tr><th>Vendored CSS (minified)</th><td>83 KB</td><td>694 KB</td><td>678 KB</td></tr>
+      <tr><th>JavaScript</th><td>none</td><td>none for these screens; Bootstrap bundle only if dropdowns / modals are wanted</td><td>none</td></tr>
+      <tr><th>Build step</th><td>none</td><td>none</td><td>none (a Sass build could trim it; not needed)</td></tr>
+      <tr><th>CSP <code>default-src 'self'</code></th>
+        <td>needs <code>img-src 'self' data:</code> — 14 <code>data:</code> SVGs (select chevron, checkbox tick)</td>
+        <td>needs <code>img-src 'self' data:</code> — 28 <code>data:</code> SVGs</td>
+        <td>works as is — no <code>data:</code> URIs</td></tr>
+      <tr><th>Our own CSS in the mockup</th><td>≈ 200 lines</td><td>≈ 80 lines</td><td>≈ 100 lines</td></tr>
+      <tr><th>Markup style</th><td>semantic HTML, few classes — closest to today's templates</td><td>class-heavy Bootstrap markup</td><td>class-based, moderate</td></tr>
+      <tr><th>Own components</th><td>sheet, ledger row, postmark, record block</td><td>sidebar group label, record block</td><td>health strip, record block</td></tr>
+      <tr><th>Recognisable</th><td>most</td><td>least</td><td>middle</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Open points</h2>
+  <ul>
+    <li>Icons in B come from Tabler Icons (MIT) through its webfont for the mockup; the panel would vendor only the used glyphs as an SVG sprite.</li>
+    <li><em>Inbound log</em> rides on the agreed <code>inbound-antispam-panel</code> journal; <em>Inbound queue</em> is a new filter over the one Postfix queue and needs its own roadmap row.</li>
+    <li>Dark scheme and the narrow-screen shell are not drawn at this stage; all three libraries ship both.</li>
+    <li>The earlier <a href="../panel-ui/index.html">panel-ui</a> experiment and <a href="../../plans/panel-redesign.md">panel-redesign.md</a> are superseded by whichever direction is accepted.</li>
+  </ul>
+</main>
+</body>
+</html>

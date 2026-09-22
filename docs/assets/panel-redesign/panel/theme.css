@@ -1,0 +1,257 @@
+/* The accepted direction: C ("Counter", Bulma) as the base, the postal
+   signature of A (postmark, numbered mono section heads, the stamp's
+   perforation) and the icons of B. Bulma carries navbar, dropdowns, columns,
+   boxes, tables, tags, menu, forms; what follows is brand mapping plus the
+   handful of components that are SelfPost's own. */
+
+:root {
+  --bulma-family-primary: var(--sp-sans);
+  --bulma-family-secondary: var(--sp-sans);
+  --bulma-family-code: var(--sp-mono);
+  --bulma-primary-h: 10deg; --bulma-primary-s: 45%; --bulma-primary-l: 33%;
+  --bulma-link-h: 10deg;    --bulma-link-s: 45%;    --bulma-link-l: 33%;
+  --bulma-success-h: 138deg; --bulma-success-s: 42%; --bulma-success-l: 30%;
+  --bulma-warning-h: 36deg;  --bulma-warning-s: 85%; --bulma-warning-l: 55%;
+  --bulma-danger-h: 4deg;    --bulma-danger-s: 76%;  --bulma-danger-l: 40%;
+  --bulma-radius: 6px; --bulma-radius-large: 10px;
+  --bulma-body-size: 16px;
+  /* The type scale. Three sizes carry all running text; nothing a person has
+     to read is below 13px. check.py enforces the floor.
+       body  16px  text, inputs, buttons, menus, table cells
+       s     14px  supporting text: labels, help, notes, footers, mono values, logs
+       xs    13px  upper-case mono micro-labels and tags only */
+  --sp-fs-s: .875rem;
+  --sp-fs-xs: .8125rem;
+  --bulma-link-text: var(--sp-brick);
+  --bulma-link-text-hover: var(--sp-brick-dark);
+}
+/* Bulma picks a button's text colour from the lightness of its fill; our brick
+   and our red are dark enough to land on the wrong side and get near-black
+   text (3:1). Solid buttons are white on colour; the light variants keep
+   Bulma's dark-on-tint. */
+.button.is-primary:not(.is-light), .button.is-primary:not(.is-light):hover,
+.button.is-danger:not(.is-light), .button.is-danger:not(.is-light):hover { color: #fff; }
+a strong { color: inherit; }
+html, body { background: var(--sp-paper); }
+body { color: var(--sp-ink); min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; }
+code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; padding: .1em .35em; font-size: .95em; }
+.ti { font-size: 1.15em; vertical-align: -.12em; }
+.button .ti { margin-right: .35rem; }
+.sp-muted { color: var(--sp-muted); }
+/* Bulma ships these at .75rem; on the scale they are s or xs. `sp-small`
+   replaces Bulma's `is-size-7` helper, which is .75rem and !important. */
+.help, .label { font-size: var(--sp-fs-s); }
+.tag, .menu-label { font-size: var(--sp-fs-xs); }
+.menu-label { color: var(--sp-muted); }  /* Bulma's grey is 4.2:1 on the paper */
+.sp-small { font-size: var(--sp-fs-s); }
+.sp-mono { font-family: var(--sp-mono); }
+.sp-nowrap { white-space: nowrap; }
+
+/* ---- navbar, the perforated edge under it, sibling pages below */
+.navbar.is-primary { --bulma-navbar-height: 4rem; }
+/* The name, not the stamp: at this size the stamp's perforation is under a
+   pixel and its brick field dissolves into the bar. The stamp stays where it
+   has room — sign-in, setup, the favicon. */
+.navbar-brand img { max-height: none; height: 1.45rem; }
+.navbar.is-primary .navbar-item, .navbar.is-primary .navbar-link { color: var(--sp-on-brick); font-weight: 500; }
+.navbar.is-primary .navbar-link::after { border-color: var(--sp-on-brick); }
+.navbar.is-primary .navbar-link .ti { margin-right: .4rem; }
+/* Bulma shrinks dropdown items to .875rem; a menu entry is read as often as
+   the bar it hangs from, so it gets the bar's size. */
+.navbar-dropdown { border-top: 0; box-shadow: 0 8px 24px rgb(18 22 28 / .14); font-size: 1rem; }
+.navbar.is-primary .navbar-dropdown .navbar-item { color: var(--sp-ink); font-weight: 400; padding-right: 2rem; }
+.navbar.is-primary .navbar-dropdown .navbar-item .ti { margin-right: .6rem; color: var(--sp-muted); }
+.navbar.is-primary .navbar-dropdown .navbar-item.is-active { color: var(--sp-brick); font-weight: 600; background: var(--sp-brick-tint); }
+.navbar.is-primary .navbar-dropdown .navbar-item.is-active .ti { color: var(--sp-brick); }
+.navbar.is-primary .sp-current > .navbar-link, .navbar.is-primary a.navbar-item.sp-current { background: rgb(0 0 0 / .18); }
+/* The header is built like the mark: a brick field, then the stamp's paper
+   margin, and the perforation runs along the outer edge of that margin — round
+   holes, flat teeth, the mark's ink hairline (perf-edge.svg is one tooth and
+   one hole at the mark's 2.2 / 7.03 ratio). On the mark the margin is one
+   pitch deep and a tenth of the brick field's height; here that is 8px under
+   a 60px bar — a little over a tenth, so a 2.5px hole still reads as round. */
+.sp-perf {
+  height: 8px;
+  background:
+    url("perf-edge.svg") repeat-x left bottom / 8px 4px,
+    linear-gradient(var(--sp-stamp-paper), var(--sp-stamp-paper)) no-repeat left top / 100% 4px;
+}
+.sp-subnav { border-bottom: 1px solid var(--sp-rule); margin-top: -1px; }
+.sp-subnav .container { display: flex; gap: 1.8rem; overflow-x: auto; }
+.sp-subnav a { color: var(--sp-muted); padding: .75rem 0 .65rem; white-space: nowrap; border-bottom: 2px solid transparent; }
+.sp-subnav a .ti { margin-right: .4rem; }
+.sp-subnav a:hover { color: var(--sp-ink); }
+.sp-subnav a[aria-current] { color: var(--sp-ink); font-weight: 600; border-bottom-color: var(--sp-brick); }
+
+/* ---- page head */
+.sp-page { padding-block: 1.8rem 2.5rem; }
+.sp-head { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.sp-head .sp-grow { flex: 1; min-width: 14rem; }
+.sp-kicker { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); letter-spacing: .1em; text-transform: uppercase; color: var(--sp-muted); }
+.sp-kicker a { color: inherit; }
+.sp-kicker a:hover { color: var(--sp-brick); }
+.title { color: var(--sp-ink); font-weight: 600; }
+.sp-head .title { margin: 0; overflow-wrap: anywhere; }
+.sp-head .sp-lead { color: var(--sp-muted); margin-top: .2rem; max-width: 48rem; }
+.sp-head .buttons { margin: 0; }
+.sp-head .buttons > * { margin-bottom: 0; }
+
+/* ---- postmark */
+.sp-postmark {
+  flex: none; width: 6rem; height: 6rem; border-radius: 50%; transform: rotate(-9deg);
+  border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 3px; margin: .3rem .5rem;
+  display: grid; place-content: center; text-align: center; color: var(--sp-ok);
+  font-family: var(--sp-mono); font-weight: 600; letter-spacing: .08em; line-height: 1.15;
+}
+.sp-postmark.sp-warn { color: var(--sp-warn); }
+.sp-postmark.sp-fail { color: var(--sp-fail); }
+.sp-postmark b { font-size: 1.3rem; display: block; }
+/* Below the floor on purpose: an imprint, and the heading beside it says the same in words. */
+.sp-postmark span { font-size: .6rem; display: block; }
+
+/* ---- box with a numbered mono head */
+.box { box-shadow: none; border: 1px solid var(--sp-rule); padding: 0; overflow: hidden; }
+.box > .sp-box-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; padding: .7rem 1.25rem; border-bottom: 1px solid var(--sp-rule);
+}
+.sp-box-head form.sp-end { justify-content: flex-end; }
+/* Bulma's .input is 100% wide; in the filter row it takes a flex basis instead, so it sits beside the selects. */
+.sp-box-head form.sp-end > .input { flex: 0 1 10.5rem; }
+.sp-box-head .sp-no { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); font-weight: 600; color: var(--sp-brick); }
+.sp-box-head h2 { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; margin: 0; }
+.sp-box-head .sp-end { margin-left: auto; color: var(--sp-muted); font-size: var(--sp-fs-s); display: flex; gap: .6rem; align-items: center; }
+.sp-box-head .sp-help { color: var(--sp-muted); line-height: 1; }
+.sp-box-head .sp-help:hover { color: var(--sp-brick); }
+.sp-box-head .sp-end + .sp-help { margin-left: 0; }
+.sp-box-head h2 + .sp-help { margin-left: auto; }
+.notification { border: 1px solid transparent; padding: .8rem 1.25rem; }
+.notification.is-success.is-light { border-color: var(--sp-ok-rule); }
+.notification.is-danger.is-light { border-color: var(--sp-fail-rule); }
+.notification .ti { margin-right: .5rem; }
+.box > .sp-box-body { padding: 1.25rem; }
+.box > .sp-box-body > :last-child { margin-bottom: 0; }
+/* A table never sits bare in a box: the container lets a wide one scroll
+   sideways instead of being cut off by the box's rounded overflow. */
+.box > .table-container, .box > .table-container > .table { margin: 0; }
+.sp-box-foot .sp-end { margin-left: auto; }
+/* A filter form in the head keeps full-size controls; the head gives up its
+   own padding to them instead of shrinking the text. */
+.sp-box-head form.sp-end { margin-block: -.35rem; font-size: 1rem; }
+.box > .sp-box-foot {padding: .7rem 1.25rem; border-top: 1px solid var(--sp-rule); color: var(--sp-muted); font-size: var(--sp-fs-s); display: flex; gap: 1rem; align-items: center; }
+.box.sp-danger-zone { border-color: var(--sp-fail-rule); }
+.box.sp-danger-zone .sp-box-head { background: var(--sp-fail-bg); border-color: var(--sp-fail-rule); }
+.box.sp-credential { border-color: #e0c874; }
+.box.sp-credential .sp-box-head { background: #fcf6e4; border-color: #e0c874; }
+
+.table { background: transparent; }
+.table thead th { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); }
+/* Addresses in tables carry a <wbr> after the @ (one template function), so a
+   long one breaks where it reads naturally and its column can still shrink;
+   `overflow-wrap: anywhere` would do it too, but mid-word. */
+.table td, .table th { vertical-align: middle; padding: .55rem .6rem; }
+.box > .table-container td:first-child, .box > .table-container th:first-child { padding-left: 1.25rem; }
+.box > .table-container td:last-child, .box > .table-container th:last-child { padding-right: 1.25rem; }
+.table td.sp-actions { text-align: right; white-space: nowrap; }
+.table td.sp-actions a { margin-left: .9rem; }
+.table td.sp-clip { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag { font-family: var(--sp-mono); font-weight: 600; letter-spacing: .04em; }
+.sp-empty { padding: 2.2rem 1.25rem; text-align: center; color: var(--sp-muted); }
+.sp-empty .ti { font-size: 2rem; display: block; margin-bottom: .4rem; color: var(--sp-rule-strong); }
+
+/* ---- health cards */
+/* Six cards: six, three or two columns — never a count that leaves one card alone on a row. */
+.sp-health { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; }
+.sp-health > a {
+  display: flex; gap: .7rem; align-items: center; padding: .75rem 1rem; color: var(--sp-ink); min-width: 0;
+  border-right: 1px solid var(--sp-rule); border-bottom: 1px solid var(--sp-rule); margin: 0 -1px -1px 0;
+}
+.sp-health > a:hover { background: var(--sp-paper); }
+.sp-health > a > span:last-child { min-width: 0; }
+.sp-h-icon { flex: none; width: 2.1rem; height: 2.1rem; border-radius: 7px; display: grid; place-content: center; background: var(--sp-ok-bg); color: var(--sp-ok); }
+.sp-h-icon .ti { font-size: 1.25rem; vertical-align: 0; }
+.sp-health > a.sp-warn { background: var(--sp-warn-bg); }
+.sp-health > a.sp-warn .sp-h-icon { background: #f6e2b8; color: #8a5510; }
+.sp-health > a.sp-fail { background: var(--sp-fail-bg); }
+.sp-health > a.sp-fail .sp-h-icon { background: #f5d3cc; color: var(--sp-fail); }
+/* Each line is a block with its own tight line height; a verdict is two or
+   three words and never wraps — a wrapped card would stretch the whole row. */
+.sp-h-name, .sp-h-value, .sp-h-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-h-name { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); line-height: 1.3; }
+.sp-h-value { font-weight: 600; line-height: 1.3; }
+.sp-h-sub { font-size: var(--sp-fs-s); color: var(--sp-muted); line-height: 1.3; }
+
+/* ---- facts, records, side menu */
+.sp-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem 1.5rem; margin: 0; }
+.sp-facts dt { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); }
+.sp-facts dd { margin: 0; overflow-wrap: anywhere; }
+.sp-facts dd.sp-big { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+.sp-side { position: sticky; top: 1.5rem; }
+.menu-label { font-family: var(--sp-mono); letter-spacing: .1em; }
+.menu-list a { display: flex; align-items: center; gap: .55rem; }
+.menu-list a .ti { color: var(--sp-muted); }
+.menu-list a.is-active .ti { color: inherit; }
+.menu-list a .tag { margin-left: auto; }
+.sp-record { padding: 1.25rem; }
+.sp-record + .sp-record { border-top: 1px solid var(--sp-rule); }
+.sp-record-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .75rem; }
+.sp-record-head h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+.sp-record-head small { margin-left: auto; color: var(--sp-muted); text-align: right; }
+.sp-record .label, .sp-form .label { font-weight: 500; color: var(--sp-ink-2); margin-bottom: .25rem; }
+.sp-record .label { font-weight: 400; color: var(--sp-muted); }
+.input[readonly], .textarea[readonly] { font-family: var(--sp-mono); font-size: var(--sp-fs-s); background: var(--sp-well); box-shadow: none; }
+/* Bulma sizes a control from its own font; the smaller mono text made the
+   value shorter than the Copy button joined to it. */
+.input[readonly] { height: 2.5rem; }
+.textarea[readonly] { min-height: 2.5rem; }
+.textarea[readonly] { resize: none; min-height: 0; }
+.sp-record .field:not(:last-child) { margin-bottom: .6rem; }
+.sp-row { display: grid; grid-template-columns: 1fr 7rem; gap: .75rem; }
+.sp-pair { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+
+/* ---- logs, timeline, help */
+.sp-log {
+  margin: 0; padding: 1rem 1.25rem; background: #191c21; color: #d9d5cc; border-radius: 0;
+  font-family: var(--sp-mono); font-size: var(--sp-fs-s); line-height: 1.6; overflow-x: auto; white-space: pre;
+}
+.sp-log .sp-w { color: #e0b15c; } .sp-log .sp-e { color: #ef8f82; } .sp-log .sp-d { color: #7f8894; }
+.sp-timeline { list-style: none; margin: 0; padding: 0; }
+.sp-timeline li { position: relative; padding: 0 0 1.1rem 1.6rem; border-left: 2px solid var(--sp-rule); margin-left: .4rem; }
+.sp-timeline li:last-child { padding-bottom: 0; border-left-color: transparent; }
+.sp-timeline li::before { content: ""; position: absolute; left: -7px; top: .25rem; width: 12px; height: 12px; border-radius: 50%; background: var(--sp-ok); box-shadow: 0 0 0 3px #fff; }
+.sp-timeline li.sp-warn::before { background: #d9962b; }
+.sp-timeline li.sp-fail::before { background: var(--sp-fail); }
+.sp-timeline li.sp-pending::before { background: #fff; border: 2px solid var(--sp-rule-strong); }
+.sp-timeline time { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); color: var(--sp-muted); display: block; }
+.sp-route { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; font-family: var(--sp-mono); font-size: var(--sp-fs-s); margin-top: .3rem; }
+.sp-help-topic + .sp-help-topic { border-top: 1px solid var(--sp-rule); }
+.sp-help-topic { padding: 1rem 1.25rem; }
+.sp-help-topic h3 { font-weight: 600; margin-bottom: .3rem; }
+.sp-list-check { list-style: none; margin: 0 0 1rem; }
+.sp-list-check li { padding-left: 1.7rem; position: relative; margin-bottom: .45rem; }
+.sp-list-check li .ti { position: absolute; left: 0; top: .15rem; color: var(--sp-fail); }
+
+/* ---- signed-out pages */
+.sp-signin { min-height: 100vh; margin: 0; }
+.sp-signin-brand { background: var(--sp-brick); display: grid; place-content: center; text-align: center; padding: 3rem; position: relative; }
+.sp-signin-brand::after {
+  content: ""; position: absolute; top: 0; bottom: 0; right: -7px; width: 7px; z-index: 1;
+  background: radial-gradient(circle at 0 7px, var(--sp-brick) 5px, transparent 5.6px); background-size: 7px 14px;
+}
+.sp-signin-brand img { width: 20rem; max-width: 100%; height: auto; }
+.sp-signin-brand p { font-family: var(--sp-mono); letter-spacing: .18em; font-size: var(--sp-fs-xs); color: var(--sp-on-brick); margin-top: 1.6rem; }
+.sp-signin-form { display: flex; flex-direction: column; justify-content: center; padding: 3rem; }
+.sp-signin-form form { width: 22rem; max-width: 100%; margin-inline: auto; }
+.sp-foot { color: var(--sp-muted); font-size: var(--sp-fs-s); padding-block: 1.5rem 0; }
+.sp-foot a { color: inherit; text-decoration: underline; }
+.sp-signin-form .sp-foot { text-align: center; margin-top: 2.5rem; }
+
+@media (max-width: 1407px) { .sp-health { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1023px) { .sp-box-head form.sp-end { flex-wrap: wrap; } }
+@media (max-width: 768px) {
+  .sp-health { grid-template-columns: repeat(2, 1fr); }
+  .sp-row, .sp-pair { grid-template-columns: 1fr; }
+  .sp-record-head { flex-wrap: wrap; }
+  .sp-record-head small { margin-left: 0; text-align: left; flex-basis: 100%; }
+  .sp-postmark { display: none; }
+}

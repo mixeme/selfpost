@@ -1,7 +1,7 @@
 
-# Alternative reverse-proxy: Traefik (spec 10.3). Traefik does NOT write plain
-# PEM files — everything (cert + key) lives bundled inside acme.json. SelfPost
-# needs separate PEM files for Postfix, so an extraction step is required; see
+# Alternative reverse-proxy: Traefik. Traefik does NOT write plain PEM files —
+# everything (cert + key) lives bundled inside acme.json. SelfPost needs
+# separate PEM files for Postfix, so an extraction step is required; see
 # extract-cert.sh in this directory and the cron/systemd-timer note below.
 #
 # Merge with the base file — run this from the deploy/ directory (Compose

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>example.org · Outbound domains · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<header class="sp-bar">
+  <div class="sp-wrap">
+    <nav>
+      <ul>
+        <li><a class="sp-brand" href="status.html"><img src="../../selfpost-stamp-compact.svg" alt="SelfPost"></a></li>
+      </ul>
+      <ul class="sp-sections">
+        <li><a href="status.html">Overview</a></li>
+        <li><a href="domain.html" aria-current="true">Outbound</a></li>
+        <li><a href="#">Inbound</a></li>
+        <li><a href="#">Server</a></li>
+      </ul>
+      <ul class="sp-user">
+        <li>
+          <details class="dropdown">
+            <summary>admin</summary>
+            <ul dir="rtl">
+              <li><a href="#">Account</a></li>
+              <li><a href="#">Help</a></li>
+              <li><a href="login.html">Sign out</a></li>
+            </ul>
+          </details>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<div class="sp-pages">
+  <div class="sp-wrap">
+    <a href="#" aria-current="true">Domains</a>
+    <a href="#">Log</a>
+    <a href="#">Queue</a>
+    <a href="#">DMARC reports</a>
+  </div>
+</div>
+
+<main class="sp-wrap">
+  <div class="sp-head">
+    <div>
+      <p class="sp-kicker"><a href="#">Outbound domains</a> /</p>
+      <h1>example.org</h1>
+    </div>
+    <small>1 284 messages in 30 days · peak 96 msg/h · average 1.8 msg/h</small>
+  </div>
+
+  <section class="sp-sheet">
+    <header><span class="sp-no">01</span><h2>Connection</h2><small>The same for every domain</small></header>
+    <div class="sp-body sp-cols">
+      <dl class="sp-kv">
+        <dt>Server</dt>
+        <dd><span class="sp-value">mail.example.org</span><button type="button" class="outline sp-copy">Copy</button></dd>
+      </dl>
+      <dl class="sp-kv">
+        <dt>Ports</dt>
+        <dd><span class="sp-value">465 — SSL/TLS (implicit)<br>587 — STARTTLS (submission)</span></dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="sp-sheet">
+    <header>
+      <span class="sp-no">02</span><h2>DNS records</h2>
+      <small>Checked 3 min ago</small>
+      <form method="post" action="#"><button type="submit" class="outline secondary sp-btn-sm">Re-check</button></form>
+    </header>
+
+    <div class="sp-record">
+      <div class="sp-record-head"><h3>DKIM</h3><span class="sp-tag ok">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+      <dl class="sp-kv">
+        <dt>Host</dt><dd><span class="sp-value">sp2026._domainkey.example.org</span><button type="button" class="outline sp-copy">Copy</button></dd>
+        <dt>Type</dt><dd><span class="sp-value plain">TXT</span></dd>
+        <dt>Value</dt><dd><span class="sp-value">v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3kqV0mJd8e2f1Yb7Qw5uT9sLr4nHc6pZaXo1vKe0yWm2gBt8RjN5dCq3hUf7lPs9aEi4oMz6xTb1kGv0nYw…IDAQAB</span><button type="button" class="outline sp-copy">Copy</button></dd>
+      </dl>
+    </div>
+
+    <div class="sp-record">
+      <div class="sp-record-head"><h3>SPF</h3><span class="sp-tag fail">mismatch</span><small>Merge into the existing record — never publish a second one</small></div>
+      <dl class="sp-kv">
+        <dt>Host</dt><dd><span class="sp-value">example.org</span><button type="button" class="outline sp-copy">Copy</button></dd>
+        <dt>Type</dt><dd><span class="sp-value plain">TXT</span></dd>
+        <dt>Value</dt><dd><span class="sp-value">v=spf1 ip4:203.0.113.25 ~all</span><button type="button" class="outline sp-copy">Copy</button></dd>
+        <dt>In DNS now</dt><dd><span class="sp-value">v=spf1 include:_spf.google.com ~all</span></dd>
+      </dl>
+      <p class="sp-note fail">The published record does not authorize 203.0.113.25. Add <code>ip4:203.0.113.25</code> before <code>~all</code>.</p>
+    </div>
+
+    <div class="sp-record">
+      <div class="sp-record-head"><h3>DMARC</h3><span class="sp-tag ok">published</span><small>Report address from <a href="#">Settings</a></small></div>
+      <dl class="sp-kv">
+        <dt>Host</dt><dd><span class="sp-value">_dmarc.example.org</span><button type="button" class="outline sp-copy">Copy</button></dd>
+        <dt>Type</dt><dd><span class="sp-value plain">TXT</span></dd>
+        <dt>Value</dt><dd><span class="sp-value">v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org</span><button type="button" class="outline sp-copy">Copy</button></dd>
+      </dl>
+      <p class="sp-note"><code>p=none</code> does not affect delivery. Tighten to <code>quarantine</code>, then <code>reject</code>, once the <a href="#">reports</a> look clean.</p>
+    </div>
+  </section>
+
+  <section class="sp-sheet">
+    <header>
+      <span class="sp-no">03</span><h2>Applications</h2>
+      <small>SASL logins that may send as this domain</small>
+      <a href="#" role="button" class="sp-btn-sm">Add application</a>
+    </header>
+    <table class="sp-apps">
+      <thead><tr><th>Login</th><th>May send as</th><th>30 days</th><th>Limits</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="sp-login">prod-server</td>
+          <td>*@example.org</td>
+          <td>1 102 msg · peak 96/h</td>
+          <td><span class="sp-tag ok">200 / h</span></td>
+          <td><a class="sp-link-btn" href="#">Edit</a><a class="sp-link-btn" href="#">New password</a><a class="sp-link-btn danger" href="#">Delete</a></td>
+        </tr>
+        <tr>
+          <td class="sp-login">alerts</td>
+          <td>alerts@example.org, noc@example.org</td>
+          <td>182 msg · peak 14/h</td>
+          <td><span class="sp-tag">domain</span> <span class="sp-tag ok">2 IPs</span></td>
+          <td><a class="sp-link-btn" href="#">Edit</a><a class="sp-link-btn" href="#">New password</a><a class="sp-link-btn danger" href="#">Delete</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="sp-sheet sp-ledger">
+    <header><span class="sp-no">04</span><h2>Domain settings</h2><small>Rarely changed</small></header>
+    <details>
+      <summary><strong>DMARC reports</strong><span class="sp-muted">Same as Settings — dmarc@mail.example.org</span><span class="sp-tag">default</span></summary>
+      <div class="sp-detail"><p class="sp-muted">The form opens here.</p></div>
+    </details>
+    <details>
+      <summary><strong>Rate limit</strong><span class="sp-muted">Auto ×3 — 288 messages / hour, recalculated yesterday</span><span class="sp-tag ok">active</span></summary>
+      <div class="sp-detail"><p class="sp-muted">The form opens here.</p></div>
+    </details>
+    <details>
+      <summary><strong>Export</strong><span class="sp-muted">DKIM key and applications as one file, optionally encrypted</span><span></span></summary>
+      <div class="sp-detail"><p class="sp-muted">The form opens here.</p></div>
+    </details>
+    <details>
+      <summary><strong>Delete domain</strong><span class="sp-muted">Removes the DKIM key and both applications</span><span></span></summary>
+      <div class="sp-detail"><p class="sp-muted">The confirmation opens here.</p></div>
+    </details>
+  </section>
+
+  <footer class="sp-foot">
+    SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty
+  </footer>
+</main>
+
+</body>
+</html>

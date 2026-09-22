@@ -1,0 +1,80 @@
+/* Direction B — "Console". Tabler (Bootstrap 5 admin kit) carries the shell,
+   cards, tables, badges, input groups and the sign-in page as shipped; this
+   file only re-points Tabler's variables at the brand and adds the two things
+   Tabler has no word for: a sidebar group label and the DNS record block. */
+
+:root, [data-bs-theme=light] {
+  --tblr-font-sans-serif: var(--sp-sans);
+  --tblr-font-monospace: var(--sp-mono);
+  --tblr-body-bg: var(--sp-paper);
+  --tblr-body-color: var(--sp-ink);
+  --tblr-secondary: var(--sp-muted);
+  --tblr-border-color: var(--sp-rule);
+  --tblr-border-radius: 3px;
+  --tblr-border-radius-lg: 4px;
+
+  --tblr-primary: #7a3b2e;
+  --tblr-primary-rgb: 122, 59, 46;
+  --tblr-link-color: #7a3b2e;
+  --tblr-link-color-rgb: 122, 59, 46;
+  --tblr-link-hover-color: #632f25;
+  --tblr-link-hover-color-rgb: 99, 47, 37;
+
+  --tblr-green: #2c6b43;  --tblr-green-rgb: 44, 107, 67;
+  --tblr-yellow: #b5700f; --tblr-yellow-rgb: 181, 112, 15;
+  --tblr-red: #b42318;    --tblr-red-rgb: 180, 35, 24;
+  --tblr-success: #2c6b43; --tblr-success-rgb: 44, 107, 67;
+  --tblr-warning: #b5700f; --tblr-warning-rgb: 181, 112, 15;
+  --tblr-danger: #b42318;  --tblr-danger-rgb: 180, 35, 24;
+}
+body { font-feature-settings: normal; }
+.btn-primary { --tblr-btn-hover-bg: #632f25; --tblr-btn-active-bg: #632f25; }
+code, .font-monospace { font-family: var(--sp-mono); }
+
+/* ---- sidebar: ink, with the stamp on its own paper */
+.navbar-vertical {
+  --tblr-navbar-bg: var(--sp-ink); background: var(--sp-ink);
+  --tblr-navbar-color: #aab2bd; --tblr-navbar-hover-color: #fff; --tblr-navbar-active-color: #fff;
+  --tblr-navbar-border-color: transparent;
+}
+.navbar-vertical .navbar-brand { padding: 1.1rem 0 .9rem; justify-content: flex-start; }
+.navbar-vertical .navbar-brand img { height: 52px; width: auto; }
+.navbar-vertical .nav-link { padding-block: .42rem; }
+.navbar-vertical .nav-link-icon { font-size: 1.15rem; }
+.navbar-vertical .nav-item.active > .nav-link {
+  background: rgb(255 255 255 / .07); box-shadow: inset 3px 0 0 #c4705e; color: #fff;
+}
+.sp-nav-label {
+  font-family: var(--sp-mono); font-size: .66rem; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: #6f7a88; padding: 1.1rem 1.5rem .3rem;
+}
+.sp-nav-foot { margin-top: auto; padding-bottom: .8rem; border-top: 1px solid rgb(255 255 255 / .08); padding-top: .6rem; }
+.sp-nav-user { color: #6f7a88; font-size: .8rem; padding: .3rem 1.5rem; }
+
+/* ---- page */
+.page-pretitle { font-family: var(--sp-mono); letter-spacing: .1em; }
+.card-title { font-weight: 600; }
+.table thead th { font-family: var(--sp-mono); letter-spacing: .08em; }
+.sp-tile .card-body { display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; }
+.sp-tile .sp-tile-icon { font-size: 1.5rem; color: var(--sp-muted); }
+.sp-tile .fw-semibold { line-height: 1.2; }
+.sp-tile .status { margin-left: auto; }
+progress.sp-bar {
+  appearance: none; -webkit-appearance: none; width: 8rem; height: .4rem; border: 0;
+  border-radius: 1rem; overflow: hidden; vertical-align: middle; margin-right: .6rem; background: var(--sp-well);
+}
+progress.sp-bar::-webkit-progress-bar { background: var(--sp-well); }
+progress.sp-bar::-webkit-progress-value { background: var(--tblr-green); }
+progress.sp-bar::-moz-progress-bar { background: var(--tblr-green); }
+
+/* ---- the DNS record block: Tabler's read-only input group, plus a status */
+.sp-record + .sp-record { border-top: 1px solid var(--sp-rule); }
+.sp-record .form-control[readonly], .sp-record textarea[readonly] {
+  font-family: var(--sp-mono); font-size: .8rem; background: var(--sp-well);
+}
+.sp-record textarea { resize: none; }
+.sp-record .form-label { font-size: .75rem; color: var(--sp-muted); margin-bottom: .25rem; }
+
+.sp-foot { color: var(--sp-muted); font-size: .8rem; }
+.sp-signin-mark { width: 15rem; height: auto; }
+.sp-tagline { font-family: var(--sp-mono); font-size: .72rem; letter-spacing: .16em; color: var(--sp-muted); }

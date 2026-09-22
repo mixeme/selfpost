@@ -19,14 +19,14 @@ const FormatDomainExport = "selfpost-domain-export"
 // transfer without regeneration). The file is therefore as sensitive as a full
 // backup and must be handled as a secret.
 type DomainExport struct {
-	Format         string      `json:"format"`
-	Version        string      `json:"version"`
-	Domain         string      `json:"domain"`
-	DKIMSelector   string      `json:"dkim_selector"`
-	DKIMPrivateKey string      `json:"dkim_private_key"`    // PKCS#1 PEM
-	DMARCRua       *string     `json:"dmarc_rua,omitempty"` // nil = inherit profile; set = override ("" = none)
+	Format         string           `json:"format"`
+	Version        string           `json:"version"`
+	Domain         string           `json:"domain"`
+	DKIMSelector   string           `json:"dkim_selector"`
+	DKIMPrivateKey string           `json:"dkim_private_key"`    // PKCS#1 PEM
+	DMARCRua       *string          `json:"dmarc_rua,omitempty"` // nil = inherit profile; set = override ("" = none)
 	RateLimit      *RateLimitExport `json:"rate_limit,omitempty"`
-	Applications   []AppExport `json:"applications"`
+	Applications   []AppExport      `json:"applications"`
 }
 
 // RateLimitExport is the transferable level-2 limit for a domain or application.
@@ -40,13 +40,13 @@ type RateLimitExport struct {
 
 // AppExport is one application within a DomainExport.
 type AppExport struct {
-	Login            string   `json:"login"`
-	AddressMode      string   `json:"address_mode"`
-	Addresses        []string `json:"addresses,omitempty"` // list mode only
-	Password         string   `json:"password"`
-	AuthIPRestrict   bool     `json:"auth_ip_restrict,omitempty"`
-	AuthAllowedIPs   []string `json:"auth_allowed_ips,omitempty"`
-	RateLimit        *RateLimitExport `json:"rate_limit,omitempty"`
+	Login          string           `json:"login"`
+	AddressMode    string           `json:"address_mode"`
+	Addresses      []string         `json:"addresses,omitempty"` // list mode only
+	Password       string           `json:"password"`
+	AuthIPRestrict bool             `json:"auth_ip_restrict,omitempty"`
+	AuthAllowedIPs []string         `json:"auth_allowed_ips,omitempty"`
+	RateLimit      *RateLimitExport `json:"rate_limit,omitempty"`
 }
 
 // Export builds the transferable representation of a domain: its DKIM key, its
@@ -78,7 +78,11 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 		s := d.DMARCRua.String
 		exp.DMARCRua = &s
 	}
-	if rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeDomain, id); err == nil && ok {
+	rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeDomain, id)
+	if err != nil {
+		return DomainExport{}, fmt.Errorf("export rate limit for %s: %w", d.Name, err)
+	}
+	if ok {
 		exp.RateLimit = exportRateLimit(rl)
 	}
 	for _, a := range apps {
@@ -94,8 +98,12 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 			AuthIPRestrict: a.AuthIPRestrict,
 			AuthAllowedIPs: a.AuthAllowedIPs,
 		}
-		if rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeApp, a.ID); err == nil && ok {
-			appExp.RateLimit = exportRateLimit(rl)
+		appRL, ok, err := s.store.GetRateLimit(store.RateLimitScopeApp, a.ID)
+		if err != nil {
+			return DomainExport{}, fmt.Errorf("export rate limit for %s: %w", a.Login, err)
+		}
+		if ok {
+			appExp.RateLimit = exportRateLimit(appRL)
 		}
 		exp.Applications = append(exp.Applications, appExp)
 	}

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Message · Outbound log · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand"><a class="navbar-item" href="overview.html"><img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="overview.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="out-domains.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a>
+            <a class="navbar-item is-active" href="out-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="in-domains.html">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a>
+            <a class="navbar-item" href="in-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a>
+            <a class="navbar-item" href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="health.html">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="health.html"><i class="ti ti-heartbeat"></i>Health</a>
+            <a class="navbar-item" href="preflight.html"><i class="ti ti-checklist"></i>Preflight</a>
+            <a class="navbar-item" href="system-log.html"><i class="ti ti-file-text"></i>System log</a>
+            <a class="navbar-item" href="backup.html"><i class="ti ti-archive"></i>Backup</a>
+            <a class="navbar-item" href="users.html"><i class="ti ti-users"></i>Users</a>
+            <a class="navbar-item" href="settings.html"><i class="ti ti-settings"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="account.html"><i class="ti ti-user-circle"></i>admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>
+            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="sp-perf" aria-hidden="true"></div>
+<div class="sp-subnav"><div class="container"><a href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a><a href="out-log.html" aria-current="page"><i class="ti ti-list-details"></i>Log</a><a href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a><a href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a></div></div>
+<main>
+  <div class="container sp-page">
+<div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="out-log.html">Outbound log</a> /</p>
+        <h1 class="title is-4">[FIRING] disk usage above 90 % on db-2</h1>
+        <p class="sp-route"><span>alerts@example.org</span><i class="ti ti-arrow-right sp-muted"></i><span>noc@example.org</span><span class="tag is-warning is-light">deferred</span></p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Message</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Domain</dt><dd><a href="out-domain.html">example.org</a></dd></div>
+              <div><dt>Application</dt><dd class="sp-mono"><a href="out-app.html">alerts</a></dd></div>
+              <div><dt>Accepted</dt><dd>2026-09-21 13:58:07 UTC</dd></div>
+              <div><dt>Status reported</dt><dd>2026-09-21 13:58:09 UTC</dd></div>
+              <div><dt>Queue id</dt><dd class="sp-mono">4XcB7k2Jm9z1</dd></div>
+              <div><dt>Journal id</dt><dd class="sp-mono">184220</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>History</h2></div>
+          <div class="sp-box-body">
+            <ol class="sp-timeline">
+              <li><time>13:58:07 UTC</time><strong>Accepted</strong> from <span class="sp-mono">alerts</span> at 198.51.100.7</li>
+              <li class="sp-warn"><time>13:58:09 UTC</time><strong>Deferred</strong> — the receiving server asked to retry later</li>
+              <li class="sp-pending"><time>next attempt ≈ 14:08 UTC</time>Still in the <a href="out-queue.html">queue</a>; kept for 5 days, then bounced</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">03</span><h2>Delivery log</h2><div class="sp-end">Lines from <code>mail.log</code> with this queue id</div></div>
+<pre class="sp-log"><span class="sp-d">13:58:07</span> postfix/smtpd[2114]: 4XcB7k2Jm9z1: client=unknown[198.51.100.7], sasl_username=alerts
+<span class="sp-d">13:58:07</span> postfix/cleanup[2120]: 4XcB7k2Jm9z1: message-id=&lt;a81f0c@alertmanager&gt;
+<span class="sp-d">13:58:07</span> opendkim[39]: 4XcB7k2Jm9z1: DKIM-Signature field added (s=sp2026, d=example.org)
+<span class="sp-d">13:58:09</span> <span class="sp-w">postfix/smtp[2123]: 4XcB7k2Jm9z1: to=&lt;noc@example.org&gt;, relay=mx1.example.org[192.0.2.10]:25, delay=1.9, status=deferred (host mx1.example.org said: 451 4.7.1 Greylisted, try again in 5 minutes)</span></pre>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+</body>
+</html>

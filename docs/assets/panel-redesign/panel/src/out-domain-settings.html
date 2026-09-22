@@ -1,0 +1,75 @@
+<!-- title: Settings · example.org | section: outbound | page: domains -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="out-domains.html">Outbound domains</a> / <a href="out-domain.html">example.org</a> /</p>
+        <h1 class="title is-3">Domain settings</h1>
+        <p class="sp-lead">The things set once and rarely touched: where DMARC reports go, the sending ceiling, moving the domain elsewhere.</p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box" id="reports">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>DMARC report address</h2></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="label" for="rua">Aggregate reports (rua=)</label>
+                <div class="control"><div class="select is-fullwidth"><select id="rua" name="dmarc_rua_mode">
+                  <option selected>admin's default — mix@example.org</option>
+                  <option>SelfPost hosted (example.org@dmarc.mail.example.org)</option>
+                  <option>My default instead — (you are admin)</option>
+                  <option>No aggregate reports</option>
+                  <option>Custom address</option>
+                </select></div></div>
+                <p class="help">A default belongs to a user and is set under their <a href="account.html#dmarc">Account</a>; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish.</p></div>
+              <button type="submit" class="button is-primary">Save report address</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="box" id="export">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>Export domain</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">One file with the DKIM key and every application's password hash — import it on another SelfPost and the published DNS needs no change. <strong>The file is a secret.</strong></p>
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="checkbox"><input type="checkbox" name="encrypt" checked> Encrypt with a password (<code>.spde</code>)</label></div>
+              <div class="sp-pair">
+                <div class="field"><label class="label" for="encpw">Password</label><div class="control"><input class="input" id="encpw" type="password" placeholder="at least 12 characters"></div></div>
+                <div class="field"><label class="label" for="encpw2">Repeat password</label><div class="control"><input class="input" id="encpw2" type="password"></div></div>
+              </div>
+              <p class="help mb-3">Keep this password: SelfPost does not store it, and the file cannot be opened without it.</p>
+              <button type="submit" class="button"><i class="ti ti-download"></i>Export domain</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-6">
+        <div class="box" id="limit">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Rate limit</h2><div class="sp-end"><span class="tag is-success is-light">active</span></div><a class="sp-help" href="help.html#limits" title="Levels 1 and 2"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="label" for="mode">Limit mode</label>
+                <div class="control"><div class="select is-fullwidth"><select id="mode" name="mode"><option>Manual</option><option selected>Auto (from statistics)</option></select></div></div></div>
+              <div class="field"><label class="label" for="mult">Multiplier (1.5–10, default 3)</label>
+                <div class="control"><input class="input" id="mult" name="auto_multiplier" type="number" min="1.5" max="10" step="0.1" value="3"></div>
+                <p class="help">Computed limit: <strong>288</strong> messages / 3600 s. Peak was 96 msg/h. Last recalculated yesterday 03:00 UTC.</p></div>
+              <div class="buttons">
+                <button type="submit" class="button is-primary">Save limit</button>
+                <button type="submit" class="button" formaction="#recalc">Recalculate now</button>
+                <button type="submit" class="button is-danger is-light" formaction="#clear">Remove limit</button>
+              </div>
+            </form>
+            <p class="sp-muted mt-4">Applies to every sender on this domain and cannot exceed level 1 (600 messages / 3600 s per client IP, set in <code>.env</code>). An application may carry its own limit above or below this one.</p>
+          </div>
+        </div>
+
+        <div class="box sp-danger-zone">
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>Delete domain</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Removes the DKIM key and both applications. Asks once more before doing it.</p>
+            <a class="button is-danger is-light" href="out-domain-delete.html"><i class="ti ti-trash"></i>Delete example.org…</a>
+          </div>
+        </div>
+      </div>
+    </div>

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # SelfPost — single Debian-slim image running postfix + opendkim + panel under
-# supervisord (spec 4). Build from the repository root:
+# supervisord. Build from the repository root:
 #
 #     docker build -f build/Dockerfile -t selfpost:dev --build-arg VERSION=dev .
 
@@ -10,7 +10,7 @@ FROM golang:1.26-bookworm AS build
 
 WORKDIR /src
 
-# Version stamped into both binaries; MUST match the image tag (spec 7.5.A).
+# Version stamped into both binaries; MUST match the image tag.
 ARG VERSION=dev
 
 # Module metadata first for layer caching.
@@ -52,13 +52,13 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
       curl \
  && rm -rf /var/lib/apt/lists/*
 
-# Unprivileged user for the panel process (spec 7.6.8).
+# Unprivileged user for the panel process.
 RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
 
-# Shared group bridging the unprivileged services (spec 5.1, 6): the panel
-# generates per-domain DKIM keys, application SASL accounts (sasldb2) and the
-# Postfix sender map, while OpenDKIM and Postfix (different users) must read
-# them. Membership in this group — plus setgid dirs under /data (set up in
+# Shared group bridging the unprivileged services: the panel generates
+# per-domain DKIM keys, application SASL accounts (sasldb2) and the Postfix
+# sender map, while OpenDKIM and Postfix (different users) must read them.
+# Membership in this group — plus setgid dirs under /data (set up in
 # entrypoint.sh) — lets OpenDKIM read the panel-owned keys and lets Postfix read
 # the sasldb2/sender map, and lets the panel reach the supervisor control socket
 # to signal OpenDKIM/Postfix reloads without any process running as root.
@@ -67,15 +67,15 @@ RUN groupadd --system selfpost \
  && usermod -aG selfpost opendkim \
  && usermod -aG selfpost postfix
 
-# The panel reads the mail queue with `postqueue -p` (spec 7.2.11, and the
-# status page's queue card). postqueue is setgid postdrop, which normally gives
-# it the group needed to reach Postfix's showq socket — but the documented
-# deployment runs with `no-new-privileges`, which disables setgid transitions,
-# so the panel would always see "Permission denied". Making `panel` a real
-# member of postdrop grants the same access without relying on a setgid
-# escalation the hardening deliberately forbids. postdrop membership is
-# read-side only: it does not let the panel bypass any Postfix restriction that
-# a local user does not already have through the world-executable sendmail.
+# The panel reads the mail queue with `postqueue -p` (and the status page's
+# queue card). postqueue is setgid postdrop, which normally gives it the group
+# needed to reach Postfix's showq socket — but the documented deployment runs
+# with `no-new-privileges`, which disables setgid transitions, so the panel
+# would always see "Permission denied". Making `panel` a real member of postdrop
+# grants the same access without relying on a setgid escalation the hardening
+# deliberately forbids. postdrop membership is read-side only: it does not let
+# the panel bypass any Postfix restriction that a local user does not already
+# have through the world-executable sendmail.
 RUN usermod -aG postdrop panel
 
 # Runtime directories: milter sockets and the consolidated persistent root.
@@ -118,5 +118,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
 
 # The entrypoint fixes /data ownership (bind mount) as root, then execs
-# supervisord, which becomes PID 1 and owns process supervision (spec 4).
+# supervisord, which becomes PID 1 and owns process supervision.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

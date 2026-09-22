@@ -4,7 +4,7 @@
 If any managed program exhausts its restart retries and enters FATAL, this
 listener signals supervisord (its parent) to terminate, so the whole container
 exits and Docker's `restart` policy can recreate it cleanly — rather than
-lingering "alive" with a dead Postfix/OpenDKIM/panel (spec 4).
+lingering "alive" with a dead Postfix/OpenDKIM/panel.
 
 Communication with supervisord uses the event listener protocol over stdin and
 stdout, so stdout must carry only protocol tokens.

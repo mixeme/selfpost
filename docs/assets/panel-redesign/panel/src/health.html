@@ -1,0 +1,88 @@
+<!-- title: Health | section: server | page: health -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Server</p>
+        <h1 class="title is-3">Health</h1>
+        <p class="sp-lead">Everything behind the six cards on Overview. Refreshes every 10 s.</p>
+      </div>
+      <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box" id="machine">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Machine</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>CPU</td><td><progress class="progress is-small is-success mb-1" value="12" max="100"></progress>12 %</td><td class="sp-muted">2 cores, load 0.21</td></tr>
+              <tr><td>Memory</td><td><progress class="progress is-small is-success mb-1" value="41" max="100"></progress>41 %</td><td class="sp-muted">812 MB of 1.9 GB</td></tr>
+              <tr><td>Network</td><td class="sp-nowrap">↓ 18 kB/s · ↑ 44 kB/s</td><td class="sp-muted">eth0: 2.1 GB in, 6.4 GB out</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box" id="processes">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Processes</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>postfix</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 41, uptime 18 days</td></tr>
+              <tr><td>opendkim</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 39, uptime 18 days</td></tr>
+              <tr><td>journal-milter</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 40, uptime 18 days</td></tr>
+              <tr><td>panel</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 44, uptime 18 days</td></tr>
+              <tr><td>dmarc-ingest</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 47, uptime 18 days</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-4">
+        <div class="box" id="certificate">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>TLS certificate</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Expires</dt><dd class="sp-mono">2026-10-03 09:14 UTC</dd></div>
+              <div><dt>Names</dt><dd class="sp-mono">mail.example.org</dd></div>
+            </dl>
+            <p class="mt-4 has-text-danger">Expires in 12 days — renewal has not run.</p>
+            <p class="sp-muted">Renewal normally runs 30 days before expiry. Check that port 80 is reachable and look for <code>acme</code> lines in the <a href="system-log.html">system log</a>.</p>
+          </div>
+        </div>
+      </div>
+      <div class="column is-4">
+        <div class="box" id="sockets">
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>Milter sockets</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Milter</th><th>State</th></tr></thead>
+            <tbody>
+              <tr><td>opendkim<br><span class="sp-muted sp-mono sp-small">inet:127.0.0.1:8891</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
+              <tr><td>journal-milter<br><span class="sp-muted sp-mono sp-small">unix:/run/selfpost/journal.sock</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
+              <tr><td>rspamd <span class="sp-muted">· inbound spam filter</span><br><span class="sp-muted sp-mono sp-small">inet:antispam:11332</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+      <div class="column is-4">
+        <div class="box" id="hostname">
+          <div class="sp-box-head"><span class="sp-no">05</span><h2>Hostname and reverse DNS</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Hostname</dt><dd class="sp-mono">mail.example.org</dd></div>
+              <div><dt>Lookup</dt><dd class="sp-mono">→ 203.0.113.25<br>← mail.example.org</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" id="configuration">
+      <div class="sp-box-head"><span class="sp-no">06</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
+      <div class="sp-box-body">
+        <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+        <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
+      </div>
+    </div>

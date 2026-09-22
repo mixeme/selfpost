@@ -1,7 +1,7 @@
 
-# Alternative reverse-proxy: nginx (spec 10.3). PEM files land on the host
-# exactly like the Apache+certbot scenario — nginx and certbot are close
-# cousins here, both writing/reading plain PEM under /etc/letsencrypt.
+# Alternative reverse-proxy: nginx. PEM files land on the host exactly like the
+# Apache+certbot scenario — nginx and certbot are close cousins here, both
+# writing/reading plain PEM under /etc/letsencrypt.
 #
 # This is a FRAGMENT, not a full replacement for ../docker-compose.yml: it
 # adds an nginx + certbot pair and removes the panel's host port publish (nginx
@@ -29,9 +29,9 @@ services:
     volumes: !override
       - ./data:/data
       - .:/selfpost-deploy:ro
-      # Same host directory certbot below writes into — plain bind mount,
-      # no named volume, so the PEM files are as directly inspectable as in
-      # the Apache scenario (spec 10.3).
+      # Same host directory certbot below writes into — plain bind mount, no
+      # named volume, so the PEM files are as directly inspectable as in the
+      # Apache scenario.
       - ./nginx/certbot-etc/live/mail.example.com:/etc/postfix/tls:ro
 
   nginx:

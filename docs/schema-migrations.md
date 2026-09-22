@@ -18,12 +18,14 @@ Documentation.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 9` |
-| Files | `0001_init.sql` … `0009_application_auth_ips.sql` (9 files) |
+| Chain head | `user_version = 10` |
+| Files | `0001_init.sql` … `0010_send_log_app_login_index.sql` (10 files) |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 1.x MINOR releases must boot a `1.0.0` data directory |
 
-Last updated with release **1.9.0** (`0009_application_auth_ips`).
+Last updated in **[1.9.2]** (`0010_send_log_app_login_index`); **1.9.1**
+had no schema change. The release column below records the cut a migration
+shipped in.
 
 ---
 
@@ -41,6 +43,7 @@ Last updated with release **1.9.0** (`0009_application_auth_ips`).
 0002_sessions.sql          → user_version 2
 …
 0009_application_auth_ips.sql → user_version 9
+0010_send_log_app_login_index.sql → user_version 10
 ```
 
 **Implication:** never delete, rename, or reorder migration files while 1.x must
@@ -62,17 +65,19 @@ replace the embedded set (see [Planned 2.x squash](#planned-2x-squash)).
 | 7 | `0007_rate_limit_auto.sql` | 1.6.0 | DDL | `rate_limits.mode`, `auto_multiplier`, `auto_updated_at` |
 | 8 | `0008_dmarc_reports.sql` | 1.7.0 | DDL | `dmarc_reports`, `dmarc_report_records` |
 | 9 | `0009_application_auth_ips.sql` | 1.9.0 | DDL + data | `applications.auth_ip_restrict`, `auth_allowed_ips`; move legacy app `rate_limits.allowed_ips` into auth columns; clear those IPs on rate limits |
+| 10 | `0010_send_log_app_login_index.sql` | 1.9.2 | DDL | `idx_send_log_app_login_created_at` — app-scoped rate-limit counts and per-application send statistics were scanning the `created_at` range |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 1.x images.
 
-Feature plans that introduced schema work: [inbound-relay](plans/inbound-relay.md),
-[domain-stats-auto-ratelimit](plans/domain-stats-auto-ratelimit.md),
-[dmarc-reports](plans/dmarc-reports.md).
+The feature plans that introduced schema work (`inbound-relay`,
+`domain-stats-auto-ratelimit`, `dmarc-reports`) were deleted once they
+shipped; what each migration was for is the table above, and the release it
+came with is in [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
-## Schema after head (v9)
+## Schema after head (v10)
 
 Tables present in a fully migrated database:
 
@@ -94,7 +99,7 @@ Tables present in a fully migrated database:
 | `dmarc_reports` | 0008 | Parsed aggregate report summaries |
 | `dmarc_report_records` | 0008 | Per-source rows inside a report |
 
-**Not present after v9:** `admin` (dropped in 0005).
+**Not present after v10:** `admin` (dropped in 0005).
 
 ---
 
@@ -116,11 +121,17 @@ code. A 2.x baseline should define `users` directly and omit `admin`.
 
 ### Application trusted IPs (0009)
 
-Before 1.9.0, client IP restriction for an application lived in
-`rate_limits.allowed_ips` (`scope = application`). Migration 0009 copies non-empty
-values into `applications.auth_allowed_ips`, sets `auth_ip_restrict = 1`, and
-clears `rate_limits.allowed_ips` for application scope. Level-2 limits no longer
-carry IP bindings; auth and rate limiting are separate concerns.
+Before 1.9.0, client IPs for an application lived in `rate_limits.allowed_ips`
+(`scope = application`). Migration 0009 copies non-empty values into
+`applications.auth_allowed_ips`, sets `auth_ip_restrict = 1`, and clears
+`rate_limits.allowed_ips` for application scope. Level-2 limits no longer carry
+IP bindings; auth and rate limiting are separate concerns.
+
+Note that the two columns do not mean the same thing: the old list was
+*permissive* (those IPs got the application ceiling, every other IP fell back
+to the domain limit), the new one is *restrictive* (every IP not on the list is
+refused for that application). The conversion branch only fires for a database
+that carried application-scope `allowed_ips` from before 1.9.0.
 
 ### Profile DMARC email (0004 → 0005)
 
@@ -164,19 +175,19 @@ git; fresh 2.x installs only run the baseline plus post-2.x files.
 Tracked as [schema-squash](roadmap.md#schema-squash). **Not** a reason to cut 2.x
 on its own — only bundled with another breaking change or an explicit major.
 
-**Goal:** embed one baseline SQL file equal to the v9 schema (plus any later 1.x
-migrations if 2.x is cut later), instead of the full 1.x chain. Fresh 2.x
-`/data` directories skip create-then-drop `admin`.
+**Goal:** embed one baseline SQL file equal to the schema at whatever the 1.x
+chain head is when the squash ships (`v10` today), instead of the full 1.x
+chain. Fresh 2.x `/data` directories skip create-then-drop `admin`.
 
 **Upgrade gate (required when squash ships):**
 
 | `user_version` | 2.x behaviour |
 |---|---|
 | `0` (empty DB) | Apply baseline; set `user_version` to new chain head |
-| `>= 9` (fully migrated 1.x) | Skip; schema already matches baseline |
-| `1`…`8` (mid-chain 1.x) | **Refuse to start** — run the last 1.x image once, then 2.x |
+| `>= N` (fully migrated 1.x) | Skip; schema already matches baseline |
+| `1`…`N-1` (mid-chain 1.x) | **Refuse to start** — run the last 1.x image once, then 2.x |
 
-Adjust the `>= N` and `1`…`N-1` thresholds to the chain head at cut time.
+`N` is the chain head at cut time (`10` today).
 
 **Done when:** baseline embedded; gate tested; [guide.md](guide.md) states that
 2.x will not open an unfinished 1.x database.

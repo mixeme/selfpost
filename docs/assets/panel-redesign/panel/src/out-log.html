@@ -1,0 +1,32 @@
+<!-- title: Outbound log | section: outbound | page: log -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Outbound</p>
+        <h1 class="title is-3">Outbound log</h1>
+        <p class="sp-lead">Every message an application handed to the relay. Rows older than 30 days are deleted — change that in <a href="settings.html">Settings</a>.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head">
+        <span class="sp-no">01</span><h2>Messages</h2>
+        <form class="sp-end" method="get" action="#">
+          <div class="select"><select name="domain"><option>All domains</option><option>example.org</option><option>shop.example.org</option><option>notify.acme.io</option></select></div>
+          <div class="select"><select name="app"><option>All applications</option><option>prod-server</option><option>alerts</option></select></div>
+          <div class="select"><select name="status"><option>Any status</option><option>sent</option><option>deferred</option><option>bounced</option><option>rate-limited</option></select></div>
+          <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
+        </form>
+      </div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td>shop@<wbr>shop.example.org</td><td>m.keller@<wbr>gmx.de</td><td class="sp-clip">Your order #48213 has shipped</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:50</td><td>shop@<wbr>shop.example.org</td><td>anna.lind@<wbr>outlook.com</td><td class="sp-clip">Your order #48212 has shipped</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:58:07</td><td>alerts@<wbr>example.org</td><td>noc@<wbr>example.org</td><td class="sp-clip">[FIRING] disk usage above 90 % on db-2</td><td><span class="tag is-warning is-light">deferred</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:41:19</td><td>no-reply@<wbr>notify.acme.io</td><td>j.doe@<wbr>nonexistent.example</td><td class="sp-clip">Reset your password</td><td><span class="tag is-danger is-light">bounced</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:40:02</td><td>prod@<wbr>example.org</td><td>billing@<wbr>partner.example</td><td class="sp-clip">Invoice 2026-0917</td><td><span class="tag is-light">rate-limited</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:12:44</td><td>shop@<wbr>shop.example.org</td><td>p.novak@<wbr>seznam.cz</td><td class="sp-clip">We received your return request</td><td><span class="tag is-success is-light">sent</span></td><td class="sp-actions"><a href="out-message.html">Details</a></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot"><span>Page 1 of 412</span><a href="#">Older →</a><span class="sp-end">New rows appear on their own</span></div>
+    </div>

@@ -7,10 +7,12 @@ package postfix
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/configsafe"
+	"github.com/mixeme/selfpost/internal/supervisor"
 )
 
 // Postfix manages the on-disk Postfix state the panel is responsible for. After
@@ -122,6 +124,15 @@ func appendUnique(list []string, v string) []string {
 	return append(list, v)
 }
 
+// What may never reach a sender-map line: whitespace and the newline that would
+// end it, the comma that separates values, the colon a lookup key cannot carry,
+// and the backslash. A login additionally may not carry "@" — that would make it
+// look like an address.
+const (
+	senderMapAddressForbidden = " \t\r\n,:\\"
+	senderMapLoginForbidden   = " \t\r\n,:@\\"
+)
+
 // assertMapSafe rejects any address/login value that could break out of a single
 // map line or inject a directive. Addresses are validated to a strict whitelist
 // (letters, digits, '@', '.', '-', '_', '+') and logins to an even stricter one
@@ -129,14 +140,11 @@ func appendUnique(list []string, v string) []string {
 // letting whitespace, a newline or a comma (the value separator) through into
 // the file (security.md).
 func assertMapSafe(address, login string) error {
-	if address == "" || login == "" {
-		return fmt.Errorf("postfix: empty address or login")
+	if err := configsafe.Token("address", address, senderMapAddressForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
-	if strings.ContainsAny(address, " \t\r\n,:\\") {
-		return fmt.Errorf("postfix: unsafe character in address %q", address)
-	}
-	if strings.ContainsAny(login, " \t\r\n,:@\\") {
-		return fmt.Errorf("postfix: unsafe character in login %q", login)
+	if err := configsafe.Token("login", login, senderMapLoginForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
 	return nil
 }
@@ -154,17 +162,5 @@ func assertMapSafe(address, login string) error {
 // Arguments are fixed literals — no user input is interpolated into the command,
 // and it never goes through a shell (security.md).
 func reloadViaSupervisor() error {
-	cmd := exec.Command("supervisorctl",
-		"-c", "/etc/supervisor/supervisord.conf",
-		"start", "postfix-reload")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// A reload already in flight is not a failure: that pending run reloads
-		// Postfix after our file is in place (the file is written before this).
-		if strings.Contains(string(out), "already started") {
-			return nil
-		}
-		return fmt.Errorf("reload postfix via supervisor: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
+	return supervisor.Start("postfix-reload")
 }

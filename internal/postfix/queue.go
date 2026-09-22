@@ -1,11 +1,45 @@
 package postfix
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 )
+
+const postqueueTimeout = 5 * time.Second
+
+// maxQueueOutput bounds how much of `postqueue -p` the panel keeps. A deferred
+// queue with a very large backlog prints one paragraph per message, and the
+// whole listing is held in memory and then rendered into a page — so the read
+// is capped and the remainder reported as truncated rather than being allowed
+// to size the panel's memory by the size of the queue.
+const maxQueueOutput = 4 << 20
+
+// limitWriter keeps the first remaining bytes written to it and drops the rest,
+// recording that it did. Writes always report full consumption so postqueue is
+// never killed by a short write; the extra output is simply discarded.
+type limitWriter struct {
+	buf       bytes.Buffer
+	remaining int
+	truncated bool
+}
+
+func (l *limitWriter) Write(p []byte) (int, error) {
+	keep := len(p)
+	if keep > l.remaining {
+		keep = l.remaining
+		l.truncated = true
+	}
+	if keep > 0 {
+		l.buf.Write(p[:keep])
+		l.remaining -= keep
+	}
+	return len(p), nil
+}
 
 // Queue returns Postfix's own human-readable mail-queue listing
 // (architecture.md § Panel HTTP surface): active, deferred and held messages,
@@ -14,12 +48,24 @@ import (
 // (security.md). The panel is responsible for escaping the output before
 // display (security.md); this function returns it as-is.
 func Queue() (string, error) {
-	cmd := exec.Command("postqueue", "-p")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(string(out)))
+	ctx, cancel := context.WithTimeout(context.Background(), postqueueTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "postqueue", "-p")
+	out := &limitWriter{remaining: maxQueueOutput}
+	cmd.Stdout = out
+	cmd.Stderr = out
+	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
 	}
-	return string(out), nil
+	if err != nil {
+		return "", fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(out.buf.String()))
+	}
+	text := out.buf.String()
+	if out.truncated {
+		text += fmt.Sprintf("\n[listing truncated at %d bytes]\n", maxQueueOutput)
+	}
+	return text, nil
 }
 
 // QueueIDs returns the set of queue ids Postfix is still holding — everything

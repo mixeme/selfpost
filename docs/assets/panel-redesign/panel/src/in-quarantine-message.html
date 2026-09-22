@@ -1,0 +1,77 @@
+<!-- title: Held message · Quarantine | section: inbound | page: quarantine -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="in-quarantine.html">Quarantine</a> /</p>
+        <h1 class="title is-4">Outstanding invoice — action required</h1>
+        <p class="sp-route"><span>invoice@partner-billing.example</span><i class="ti ti-arrow-right sp-muted"></i><span>owner@lists.example.org</span><span class="tag is-primary is-light">quarantine</span></p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Message</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Inbound domain</dt><dd><a href="in-domain.html">lists.example.org</a></dd></div>
+              <div><dt>Client</dt><dd class="sp-mono">203.0.113.140</dd></div>
+              <div><dt>Held</dt><dd>2026-09-21 13:59:02 UTC</dd></div>
+              <div><dt>Deleted on</dt><dd>2026-10-05 · in 14 days</dd></div>
+              <div><dt>Size</dt><dd>48 kB · 1 attachment (<span class="sp-mono">invoice.html</span>)</dd></div>
+              <div><dt>Would go to</dt><dd class="sp-mono">mx.internal:25</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Why it was held</h2><div class="sp-end">rspamd · score 9.8</div></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Symbol</th><th>Score</th></tr></thead>
+            <tbody>
+              <tr><td class="sp-mono sp-small">PHISHING</td><td>5.0</td></tr>
+              <tr><td class="sp-mono sp-small">FORGED_SENDER</td><td>3.0</td></tr>
+              <tr><td class="sp-mono sp-small">HTML_ATTACHMENT</td><td>1.8</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">03</span><h2>Headers</h2><div class="sp-end">The body and attachments are never rendered in the panel</div></div>
+<pre class="sp-log"><span class="sp-d">Received:</span> from mail.partner-billing.example (unknown [203.0.113.140]) by mail.example.org
+<span class="sp-d">From:</span> "Partner Billing" &lt;invoice@partner-billing.example&gt;
+<span class="sp-d">Reply-To:</span> <span class="sp-w">payments.dept@freemail.example</span>
+<span class="sp-d">To:</span> owner@lists.example.org
+<span class="sp-d">Subject:</span> Outstanding invoice — action required
+<span class="sp-d">Date:</span> Mon, 21 Sep 2026 13:58:57 +0000
+<span class="sp-d">Authentication-Results:</span> <span class="sp-e">spf=fail dkim=none dmarc=fail</span></pre>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>Release</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Hands the message to <span class="sp-mono">mx.internal:25</span> unchanged, as if it had just arrived. It leaves the quarantine.</p>
+            <form class="sp-form" method="post" action="in-quarantine.html">
+              <div class="field"><label class="checkbox"><input type="checkbox" name="allow_sender"> Also add <span class="sp-mono">invoice@partner-billing.example</span> to the Allow list</label></div>
+              <button type="submit" class="button is-primary"><i class="ti ti-send"></i>Release to upstream</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box sp-danger-zone">
+          <div class="sp-box-head"><span class="sp-no"><i class="ti ti-alert-triangle"></i></span><h2>Discard</h2></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Deletes the message now instead of in 14 days. The sender is not told. This cannot be undone.</p>
+            <form class="sp-form" method="post" action="in-quarantine.html">
+              <div class="field"><label class="checkbox"><input type="checkbox" name="deny_sender" checked> Also add <span class="sp-mono">@partner-billing.example</span> to the Deny list</label></div>
+              <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>Discard message</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>

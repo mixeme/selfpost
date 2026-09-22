@@ -1,0 +1,27 @@
+<!-- title: Quarantine | section: inbound | page: quarantine -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Inbound</p>
+        <h1 class="title is-3">Quarantine</h1>
+        <p class="sp-lead">Mail the filter found suspicious enough to hold, but not to refuse. Release hands a message to its upstream as if it had just arrived; Discard deletes it. Anything left is deleted after 14 days.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head">
+        <span class="sp-no">01</span><h2>Held messages</h2>
+        <form class="sp-end" method="get" action="#">
+          <div class="select"><select name="domain"><option>All domains</option><option>lists.example.org</option><option>acme.io</option></select></div>
+          <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
+        </form>
+      </div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Held, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Why</th><th>Size</th><th>Deleted in</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:59:02</td><td>invoice@<wbr>partner-billing.example</td><td>owner@<wbr>lists.example.org</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Outstanding invoice — action required</strong></a></td><td class="sp-muted sp-small">score 9.8 · PHISHING</td><td class="sp-muted sp-nowrap">48 kB</td><td class="sp-nowrap">14 days</td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-20 22:14:40</td><td>no-reply@<wbr>shipping-update.example</td><td>jobs@<wbr>acme.io</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Your parcel could not be delivered</strong></a></td><td class="sp-muted sp-small">score 8.1 · URL_SHORTENER</td><td class="sp-muted sp-nowrap">12 kB</td><td class="sp-nowrap">13 days</td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-09 07:02:11</td><td>m.ortega@<wbr>supplier.example</td><td>owner@<wbr>lists.example.org</td><td class="sp-clip"><a href="in-quarantine-message.html"><strong>Fwd: scanned contract (3 attachments)</strong></a></td><td class="sp-muted sp-small">score 7.4 · MIME_ARCHIVE</td><td class="sp-muted sp-nowrap">2.9 MB</td><td class="sp-nowrap"><span class="tag is-warning is-light">2 days</span></td><td class="sp-actions"><a href="in-quarantine-message.html">Review</a></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot"><span>3 messages · 3.0 MB of 500 MB</span><span class="sp-end">A domain administrator sees only their assigned inbound domains</span></div>
+    </div>

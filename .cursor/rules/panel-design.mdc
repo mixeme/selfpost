@@ -1,0 +1,39 @@
+---
+description: The panel's design is fixed by accepted mockups; implement it, do not reinterpret it.
+globs: internal/web/view/**,docs/assets/panel-redesign/**
+alwaysApply: false
+---
+
+# Panel design contract
+
+Source of truth, in this order: the mockups in
+[docs/assets/panel-redesign/panel/](docs/assets/panel-redesign/index.html),
+the [components page](docs/assets/panel-redesign/panel/components.html),
+`panel/outlines.json`, then
+[docs/plans/panel-redesign.md](docs/plans/panel-redesign.md). Read the plan's
+**The contract** and **Enforcement** sections before touching a template.
+
+You are implementing a finished design. You are not designing.
+
+- Build pages only from Bulma classes in the `BULMA` list of `panel/check.py`
+  and from the `sp-` components on the components page, through their
+  partials. No other class, no hand-written component markup, no inline style.
+- No selector in `panel.css` that names a page or an id, uses `!important`, or
+  sets a width outside `WIDTH_OK`. If a page looks wrong, the layout choice is
+  wrong — do not patch it locally.
+- If a screen seems to need a component, state or layout that does not exist:
+  **stop and ask.** Do not approximate it, and do not substitute a look of
+  your own.
+- Never edit a mockup, `outlines.json`, `check.py`, the vendored Bulma or a
+  guard test to make your work pass. A failing guard means the implementation
+  is wrong. Design changes go mockup-first in a separate `design:` commit on
+  the owner's explicit instruction.
+- "Done" is evidence, not a description: passing `go test ./internal/web/...`
+  output plus a screenshot of each restyled page from the running container,
+  saved under `docs/assets/panel-redesign/evidence/` beside its mockup's name.
+  Report every difference from the mockup you could not remove; do not
+  describe a different result as the requested one.
+
+After editing a fragment in `panel/src/`: `python panel/build.py`, then
+`python panel/check.py` (add `--write` only when the structure change is the
+point of the commit).

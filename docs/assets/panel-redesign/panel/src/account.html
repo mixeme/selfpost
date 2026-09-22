@@ -1,0 +1,88 @@
+<!-- title: Account | section: user -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Signed in as admin · global</p>
+        <h1 class="title is-3">Account</h1>
+        <p class="sp-lead">Who you are to this panel, what it should tell you about, and where reports about your domains go. Applications keep their own logins and passwords and are not affected.</p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-5">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Profile</h2></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="label" for="username">Username</label><div class="control has-icons-left"><input class="input" id="username" name="username" value="admin" autocomplete="username" spellcheck="false" required><span class="icon is-left"><i class="ti ti-user"></i></span></div></div>
+              <div class="field"><label class="label" for="email">E-mail</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="mix@example.org" autocomplete="email"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
+                <p class="help">Where the panel writes to you: the notifications on the right and a password-reset link. It can also receive DMARC reports — your choice, under <a href="#dmarc">DMARC reports</a>.</p></div>
+              <button type="submit" class="button is-primary">Save profile</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Password</h2></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="label" for="cur">Current password</label><div class="control"><input class="input" id="cur" name="current_password" type="password" autocomplete="current-password" required></div></div>
+              <div class="sp-pair">
+                <div class="field"><label class="label" for="new">New password</label><div class="control"><input class="input" id="new" name="new_password" type="password" autocomplete="new-password" required></div></div>
+                <div class="field"><label class="label" for="new2">Repeat</label><div class="control"><input class="input" id="new2" name="new_password_confirm" type="password" autocomplete="new-password" required></div></div>
+              </div>
+              <p class="help mb-3">Changing it signs out every other session of this account; this one stays signed in.</p>
+              <button type="submit" class="button">Change password</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="column is-7">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">03</span><h2>Notifications</h2><div class="sp-end">Sent to mix@example.org</div></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="#">
+              <p class="sp-kicker mb-2">Your domains</p>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev" checked> A DNS record stops matching — DKIM, SPF, DMARC or an inbound MX</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev" checked> A domain or an application reaches its rate limit and mail is being refused</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev" checked> An inbound domain's upstream cannot be reached and mail is piling up</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev"> DMARC reports start showing failures for a domain</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev"> Mail is held in quarantine</label></div>
+              <p class="sp-kicker mt-4 mb-2">The server · global role</p>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev" checked> The TLS certificate is within 14 days of expiry</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev" checked> A process or a milter socket stops answering</label></div>
+              <div class="field"><label class="checkbox"><input type="checkbox" name="ev"> Messages sit in a queue for more than a day</label></div>
+              <p class="help mb-3">One message when a problem starts and one when it clears — never a stream. A domain administrator is told only about the domains assigned to them.</p>
+              <button type="submit" class="button is-primary">Save notifications</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="box" id="dmarc">
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>DMARC reports</h2><div class="sp-end"><span class="tag is-success is-light">authorized</span></div><a class="sp-help" href="help.html#dmarc" title="What the reports are and where they go"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-record">
+            <form class="sp-form" method="post" action="#">
+              <div class="field"><label class="label" for="rua">My default report address</label>
+                <div class="control"><div class="select is-fullwidth"><select id="rua" name="dmarc_default">
+                  <option>SelfPost hosted — read them under DMARC reports</option>
+                  <option selected>My account e-mail — mix@example.org</option>
+                  <option>Another address…</option>
+                  <option>No reports</option>
+                </select></div></div>
+                <p class="help">Used by every outbound domain whose report address is set to <em>admin's default</em> — 2 of your 3 now. Changing it changes the DMARC record those domains must publish. The hosted address is parsed by SelfPost; any other just receives the raw XML.</p></div>
+              <button type="submit" class="button is-primary">Save report address</button>
+            </form>
+          </div>
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>Report authorization</h3><span class="tag is-success is-light">published</span><small>Needed because the address is on another domain than the senders</small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="*._report._dmarc.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>

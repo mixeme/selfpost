@@ -116,7 +116,7 @@ func (s *Store) recalcAutoRateLimit(rl RateLimit, retentionDays, l1Max, l1Window
 		return fmt.Errorf("unknown scope %q", rl.Scope)
 	}
 
-	maxMsgs := computeAutoMaxMessages(stats, mult, l1Max)
+	maxMsgs := computeAutoMaxMessages(stats, mult, l1Max, l1Window)
 
 	rl.MaxMessages = maxMsgs
 	rl.WindowSeconds = l1Window
@@ -128,14 +128,26 @@ func (s *Store) recalcAutoRateLimit(rl RateLimit, retentionDays, l1Max, l1Window
 	return s.SetRateLimit(rl)
 }
 
-func computeAutoMaxMessages(stats SendStats, multiplier float64, l1Max int) int {
+// computeAutoMaxMessages turns an average send rate into a ceiling for one
+// level-1 window. AvgPerHour is per hour, the ceiling counts messages per
+// windowSeconds, so the rate is scaled to the window before the multiplier is
+// applied — otherwise a window other than the default 3600s would silently
+// shift the effective allowance by windowSeconds/3600. The result is never
+// below 1 for a domain that has sent anything, and never above level 1.
+func computeAutoMaxMessages(stats SendStats, multiplier float64, l1Max, windowSeconds int) int {
 	if stats.Total == 0 {
 		return 0
 	}
-	max := int(math.Ceil(stats.AvgPerHour * multiplier))
+	if windowSeconds <= 0 {
+		windowSeconds = 3600
+	}
+	perWindow := stats.AvgPerHour * float64(windowSeconds) / 3600
+	max := int(math.Ceil(perWindow * multiplier))
+	if max < 1 {
+		max = 1
+	}
 	if max > l1Max {
 		max = l1Max
 	}
 	return max
 }
-

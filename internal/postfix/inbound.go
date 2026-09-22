@@ -2,11 +2,12 @@ package postfix
 
 import (
 	"fmt"
-	"net"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/configsafe"
 )
 
 // InboundRoute is one inbound domain's Postfix map material: the relay
@@ -83,12 +84,10 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 	return []byte(relayB.String()), []byte(transportB.String()), []byte(recipB.String()), []byte(tlsB.String()), nil
 }
 
-// inboundNexthop is the Postfix next-hop [host]:port form that disables MX
-// lookup for the explicit upstream.
+// inboundNexthop is the Postfix next-hop [host]:port form. The brackets are
+// what disable the MX lookup, so the operator's explicit upstream is used as
+// given; they also delimit a bare IPv6 address.
 func inboundNexthop(host string, port int) string {
-	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
-		return "[" + host + "]:" + strconv.Itoa(port)
-	}
 	return "[" + host + "]:" + strconv.Itoa(port)
 }
 
@@ -118,13 +117,15 @@ func assertInboundRouteSafe(r InboundRoute) error {
 	return nil
 }
 
+// texthashForbidden is what may never appear in a texthash line: whitespace and
+// the newline that would end it, the comma that separates values, and the
+// backslash.
+const texthashForbidden = " \t\r\n,\\"
+
 // assertMapToken rejects values that could break out of a texthash line.
 func assertMapToken(v, what string) error {
-	if v == "" {
-		return fmt.Errorf("postfix: empty %s", what)
-	}
-	if strings.ContainsAny(v, " \t\r\n,\\") {
-		return fmt.Errorf("postfix: unsafe character in %s %q", what, v)
+	if err := configsafe.Token(what, v, texthashForbidden); err != nil {
+		return fmt.Errorf("postfix: %w", err)
 	}
 	return nil
 }

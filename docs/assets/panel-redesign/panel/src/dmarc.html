@@ -1,0 +1,33 @@
+<!-- title: DMARC reports | section: outbound | page: dmarc -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Outbound</p>
+        <h1 class="title is-3">DMARC reports</h1>
+        <p class="sp-lead">How receivers saw mail claiming to be from your domains. Aggregate (<code>rua=</code>) only; open a report for the parsed XML.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Ingest</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
+      <div class="sp-box-body">
+        <dl class="sp-facts">
+          <div><dt>Last report</dt><dd>2026-09-21 06:12 UTC</dd></div>
+          <div><dt>This week</dt><dd>14 kept · 0 parse failures</dd></div>
+          <div><dt>Hosted address</dt><dd class="sp-mono">dmarc@mail.example.org</dd></div>
+          <div><dt>Retention</dt><dd>500 reports or 90 days</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">02</span><h2>Recent reports</h2></div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Received, UTC</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 06:12</td><td><a href="dmarc-domain.html">example.org</a></td><td class="sp-muted">google.com</td><td>20 Sep</td><td>412</td><td>0</td><td class="sp-actions"><a href="dmarc-report.html">View</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 04:40</td><td><a href="dmarc-domain.html">shop.example.org</a></td><td class="sp-muted">Outlook.com</td><td>20 Sep</td><td>1 903</td><td><span class="tag is-warning is-light">7</span></td><td class="sp-actions"><a href="dmarc-report.html">View</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-20 23:58</td><td><a href="dmarc-domain.html">example.org</a></td><td class="sp-muted">Yahoo</td><td>19 Sep</td><td>38</td><td>0</td><td class="sp-actions"><a href="dmarc-report.html">View</a></td></tr>
+          <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-20 06:09</td><td><a href="dmarc-domain.html">notify.acme.io</a></td><td class="sp-muted">google.com</td><td>19 Sep</td><td>61</td><td>0</td><td class="sp-actions"><a href="dmarc-report.html">View</a></td></tr>
+        </tbody>
+      </table></div>
+    </div>

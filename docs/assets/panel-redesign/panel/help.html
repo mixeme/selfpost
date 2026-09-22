@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand"><a class="navbar-item" href="overview.html"><img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="overview.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="out-domains.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="out-domains.html"><i class="ti ti-world-upload"></i>Domains</a>
+            <a class="navbar-item" href="out-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="out-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="dmarc.html"><i class="ti ti-report-analytics"></i>DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="in-domains.html">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="in-domains.html"><i class="ti ti-world-download"></i>Domains</a>
+            <a class="navbar-item" href="in-log.html"><i class="ti ti-list-details"></i>Log</a>
+            <a class="navbar-item" href="in-queue.html"><i class="ti ti-stack-2"></i>Queue</a>
+            <a class="navbar-item" href="in-quarantine.html"><i class="ti ti-mail-pause"></i>Quarantine</a>
+            <a class="navbar-item" href="in-filter-lists.html"><i class="ti ti-filter"></i>Filter lists</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="health.html">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="health.html"><i class="ti ti-heartbeat"></i>Health</a>
+            <a class="navbar-item" href="preflight.html"><i class="ti ti-checklist"></i>Preflight</a>
+            <a class="navbar-item" href="system-log.html"><i class="ti ti-file-text"></i>System log</a>
+            <a class="navbar-item" href="backup.html"><i class="ti ti-archive"></i>Backup</a>
+            <a class="navbar-item" href="users.html"><i class="ti ti-users"></i>Users</a>
+            <a class="navbar-item" href="settings.html"><i class="ti ti-settings"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="account.html"><i class="ti ti-user-circle"></i>admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>
+            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="sp-perf" aria-hidden="true"></div>
+
+<main>
+  <div class="container sp-page">
+<div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Reference</p>
+        <h1 class="title is-3">Help</h1>
+        <p class="sp-lead">What each screen checks and what to do when it is not green. Every numbered section on a page links to its topic here.</p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-3">
+        <aside class="menu sp-side">
+          <p class="menu-label">Overview</p>
+          <ul class="menu-list">
+            <li><a class="is-active" href="#checks"><i class="ti ti-activity-heartbeat"></i>Health checks</a></li>
+            <li><a href="#certificate"><i class="ti ti-certificate"></i>TLS certificate</a></li>
+            <li><a href="#rdns"><i class="ti ti-arrows-exchange"></i>Reverse DNS</a></li>
+          </ul>
+          <p class="menu-label">Outbound</p>
+          <ul class="menu-list">
+            <li><a href="#dns"><i class="ti ti-world-check"></i>DNS records</a></li>
+            <li><a href="#apps"><i class="ti ti-apps"></i>Applications</a></li>
+            <li><a href="#limits"><i class="ti ti-gauge"></i>Rate limits</a></li>
+            <li><a href="#queue"><i class="ti ti-stack-2"></i>Queue and retries</a></li>
+            <li><a href="#dmarc"><i class="ti ti-report-analytics"></i>DMARC reports</a></li>
+          </ul>
+          <p class="menu-label">Inbound</p>
+          <ul class="menu-list">
+            <li><a href="#inbound"><i class="ti ti-inbox"></i>Backup-MX and forwarding</a></li>
+          </ul>
+        </aside>
+      </div>
+      <div class="column is-9">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Overview</h2></div>
+          <div class="sp-help-topic" id="checks"><h3>Health checks</h3><p>Six checks, the worst of them is the postmark. <span class="tag is-success is-light">ok</span> needs nothing; <span class="tag is-warning is-light">warn</span> still delivers mail but will stop doing so if ignored; <span class="tag is-danger is-light">fail</span> means mail is being lost or refused now.</p></div>
+          <div class="sp-help-topic" id="certificate"><h3>TLS certificate</h3><p>The certificate Postfix presents on 465 and 587. It warns 14 days before expiry and fails once expired — clients that verify certificates then refuse to connect.</p></div>
+          <div class="sp-help-topic" id="rdns"><h3>Hostname and reverse DNS</h3><p>The hostname must resolve to this server's address, and that address must resolve back to the hostname. Large receivers reject or spam-folder mail from hosts where the two disagree. The PTR record is set at your hosting provider, not in your DNS zone.</p></div>
+        </div>
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Outbound</h2></div>
+          <div class="sp-help-topic" id="dns"><h3>DNS records</h3><p>DKIM proves the message was signed by this relay, SPF lists the addresses allowed to send for the domain, DMARC tells receivers what to do when both fail and where to report. Publish all three exactly as shown; merge SPF into an existing record rather than adding a second one.</p></div>
+          <div class="sp-help-topic" id="apps"><h3>Applications</h3><p>An application is one SASL login. It may send as any address of its domain or only as listed addresses. The password is shown once at creation or regeneration and is not stored in readable form.</p></div>
+          <div class="sp-help-topic" id="limits"><h3>Rate limits</h3><p>Level 1 is a per-IP ceiling set in <code>.env</code>. Level 2 is optional, per domain and per application, manual or computed from 30-day statistics, and can never exceed level 1.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+</body>
+</html>

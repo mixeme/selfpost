@@ -29,14 +29,14 @@ const (
 // hashed — so it can be shown exactly once at creation/regeneration
 // (security.md). Addresses is populated only in 'list' mode.
 type Application struct {
-	ID              int64
-	DomainID        int64
-	Login           string
-	AddressMode     string
-	CreatedAt       time.Time
-	Addresses       []string
-	AuthIPRestrict  bool     // when true, only AuthAllowedIPs may submit as this login
-	AuthAllowedIPs  []string // client IPs permitted when AuthIPRestrict is set
+	ID             int64
+	DomainID       int64
+	Login          string
+	AddressMode    string
+	CreatedAt      time.Time
+	Addresses      []string
+	AuthIPRestrict bool     // when true, only AuthAllowedIPs may submit as this login
+	AuthAllowedIPs []string // client IPs permitted when AuthIPRestrict is set
 }
 
 // AllowsAuthFromIP reports whether a client at ip may submit mail authenticated

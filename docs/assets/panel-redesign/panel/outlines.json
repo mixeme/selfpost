@@ -1,0 +1,466 @@
+{
+ "account": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-5": [
+      "box[Profile]:body",
+      "box[Password]:body"
+     ]
+    },
+    {
+     "is-7": [
+      "box[Notifications]:body",
+      "box[DMARC reports]:record×2"
+     ]
+    }
+   ]
+  }
+ ],
+ "backup": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Full backup]:body"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Import a domain]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "dmarc-domain": [
+  "head+postmark+actions",
+  {
+   "columns": [
+    {
+     "is-5": [
+      "box[Sources · 7 days]:table"
+     ]
+    },
+    {
+     "is-7": [
+      "box[Reports]:table"
+     ]
+    }
+   ]
+  }
+ ],
+ "dmarc-report": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Report]:body"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Published policy]:body"
+     ]
+    }
+   ]
+  },
+  "box[Records]:table"
+ ],
+ "dmarc": [
+  "head",
+  "box[Ingest]:body",
+  "box[Recent reports]:table"
+ ],
+ "health": [
+  "head+actions",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Machine]:table"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Processes]:table"
+     ]
+    }
+   ]
+  },
+  {
+   "columns": [
+    {
+     "is-4": [
+      "box[TLS certificate]:body"
+     ]
+    },
+    {
+     "is-4": [
+      "box[Milter sockets]:table"
+     ]
+    },
+    {
+     "is-4": [
+      "box[Hostname and reverse DNS]:body"
+     ]
+    }
+   ]
+  },
+  "box[Configuration]:body"
+ ],
+ "help": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-3": [
+      "side_menu"
+     ]
+    },
+    {
+     "is-9": [
+      "box[Overview]:help×3",
+      "box[Outbound]:help×3"
+     ]
+    }
+   ]
+  }
+ ],
+ "in-domain-delete": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box.sp-danger-zone[This cannot be undone]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "in-domain": [
+  "head+postmark+actions",
+  {
+   "columns": [
+    {
+     "is-3": [
+      "side_menu"
+     ]
+    },
+    {
+     "is-9": [
+      "box[MX record]:record",
+      {
+       "columns": [
+        {
+         "is-6": [
+          "box[Upstream]:body"
+         ]
+        },
+        {
+         "is-6": [
+          "box[Valid recipients]:body"
+         ]
+        }
+       ]
+      },
+      "box[Spam filter]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "in-domains": [
+  "head",
+  "box[Add a domain]:body",
+  "box[Domains]:table"
+ ],
+ "in-filter-lists": [
+  "head",
+  "box[Add an entry]:body",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Deny]:table"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Allow]:table"
+     ]
+    }
+   ]
+  },
+  "box[Where the lists go]:body"
+ ],
+ "in-log": [
+  "head",
+  "box[Messages]:table"
+ ],
+ "in-quarantine-message": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box[Message]:body"
+     ]
+    },
+    {
+     "is-5": [
+      "box[Why it was held]:table"
+     ]
+    }
+   ]
+  },
+  "box[Headers]:log",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Release]:body"
+     ]
+    },
+    {
+     "is-6": [
+      "box.sp-danger-zone[Discard]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "in-quarantine": [
+  "head",
+  "box[Held messages]:table"
+ ],
+ "in-queue": [
+  "head",
+  "box[Waiting]:empty",
+  "box[How retries work]:body"
+ ],
+ "out-app-created": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box.sp-credential[Shown once]:record"
+     ]
+    },
+    {
+     "is-5": [
+      "box[Connect with]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "out-app": [
+  "head+actions",
+  {
+   "form": [
+    {
+     "columns": [
+      {
+       "is-4": [
+        "box[Sender]:body"
+       ]
+      },
+      {
+       "is-4": [
+        "box[Client IP allow-list]:body"
+       ]
+      },
+      {
+       "is-4": [
+        "box[Rate limit]:body"
+       ]
+      }
+     ]
+    },
+    "submit_row"
+   ]
+  }
+ ],
+ "out-domain-delete": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box.sp-danger-zone[This cannot be undone]:body"
+     ]
+    },
+    {
+     "is-5": [
+      "box[Moving it instead?]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "out-domain-settings": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[DMARC report address]:body",
+      "box[Export domain]:body"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Rate limit]:body",
+      "box.sp-danger-zone[Delete domain]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "out-domain": [
+  "head+postmark+actions",
+  {
+   "columns": [
+    {
+     "is-3": [
+      "side_menu"
+     ]
+    },
+    {
+     "is-9": [
+      "box[DNS records]:record×3",
+      "box[Applications]:table",
+      "box[Connection]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "out-domains": [
+  "head",
+  "box[Add a domain]:body",
+  "box[Domains]:table"
+ ],
+ "out-log": [
+  "head",
+  "box[Messages]:table"
+ ],
+ "out-message": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box[Message]:body"
+     ]
+    },
+    {
+     "is-5": [
+      "box[History]:body"
+     ]
+    }
+   ]
+  },
+  "box[Delivery log]:log"
+ ],
+ "out-queue": [
+  "head",
+  "box[Waiting]:table",
+  "box[How retries work]:body"
+ ],
+ "overview": [
+  "head+postmark",
+  "box[Server health]:health",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box[Outbound domains]:table"
+     ]
+    },
+    {
+     "is-5": [
+      "box[Inbound domains]:table"
+     ]
+    }
+   ]
+  }
+ ],
+ "preflight": [
+  "head+postmark+actions",
+  "box[Checks]:table",
+  "box[Send a test e-mail]:body"
+ ],
+ "settings": [
+  "head",
+  {
+   "form": [
+    {
+     "columns": [
+      {
+       "is-6": [
+        "box[Log retention]:body",
+        "box[Notifications]:body"
+       ]
+      },
+      {
+       "is-6": [
+        "box[Sending rate limits]:body"
+       ]
+      }
+     ]
+    },
+    "submit_row"
+   ]
+  }
+ ],
+ "system-log": [
+  "head",
+  "box[Recent lines]:log"
+ ],
+ "user-delete": [
+  "head",
+  {
+   "columns": [
+    {
+     "is-7": [
+      "box.sp-danger-zone[This cannot be undone]:body"
+     ]
+    }
+   ]
+  }
+ ],
+ "user": [
+  "head+actions",
+  {
+   "form": [
+    {
+     "columns": [
+      {
+       "is-6": [
+        "box[Account]:body"
+       ]
+      },
+      {
+       "is-6": [
+        "box[Outbound domains]:body",
+        "box[Inbound domains]:body"
+       ]
+      }
+     ]
+    },
+    "submit_row"
+   ]
+  }
+ ],
+ "users": [
+  "head+actions",
+  "box[Panel users]:table"
+ ]
+}

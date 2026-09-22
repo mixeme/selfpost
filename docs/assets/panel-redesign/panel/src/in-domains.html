@@ -1,0 +1,33 @@
+<!-- title: Inbound domains | section: inbound | page: domains -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker">Inbound</p>
+        <h1 class="title is-3">Inbound domains</h1>
+        <p class="sp-lead">Backup-MX / forwarder. Port 25 accepts mail only for the domains listed here and hands it to their upstream. No mailboxes.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Add a domain</h2></div>
+      <div class="sp-box-body">
+        <form class="sp-form" method="post" action="in-domain.html">
+          <div class="field has-addons">
+            <div class="control is-expanded has-icons-left"><input class="input" name="name" type="text" placeholder="lists.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required><span class="icon is-left"><i class="ti ti-world"></i></span></div>
+            <div class="control"><button type="submit" class="button is-primary"><i class="ti ti-plus"></i>Add domain</button></div>
+          </div>
+          <p class="help">Mail is not accepted until an upstream host is saved on the domain's page. Adding and deleting domains is for a global administrator; a domain administrator sees the list without this form and without Delete.</p>
+        </form>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">02</span><h2>Domains</h2><div class="sp-end">Spam filter <span class="tag is-success is-light">on</span> · 2 domains</div></div>
+      <div class="table-container"><table class="table is-fullwidth is-hoverable">
+        <thead><tr><th>Domain</th><th>DNS</th><th>Upstream</th><th>Recipients</th><th>TLS to upstream</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><a href="in-domain.html"><strong>lists.example.org</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-mono sp-muted">mx.internal:25</td><td>4 addresses</td><td><span class="tag is-success is-light">required</span></td><td class="sp-actions"><a href="in-domain.html">Open</a><a class="has-text-danger" href="in-domain-delete.html">Delete</a></td></tr>
+          <tr><td><a href="in-domain.html"><strong>acme.io</strong></a></td><td><span class="tag is-success is-light">MX</span></td><td class="sp-mono sp-muted">10.0.4.12:2525</td><td>any address</td><td><span class="tag is-light">opportunistic</span></td><td class="sp-actions"><a href="in-domain.html">Open</a><a class="has-text-danger" href="in-domain-delete.html">Delete</a></td></tr>
+        </tbody>
+      </table></div>
+      <div class="sp-box-foot">The MX tag is green when at least one MX of the domain points at this server.</div>
+    </div>

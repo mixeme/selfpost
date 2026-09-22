@@ -1,0 +1,47 @@
+<!-- title: Outlook.com · 20 Sep · DMARC | section: outbound | page: dmarc -->
+    <div class="sp-head">
+      <div class="sp-grow">
+        <p class="sp-kicker"><a href="dmarc.html">DMARC reports</a> / <a href="dmarc-domain.html">shop.example.org</a> /</p>
+        <h1 class="title is-4">Outlook.com · 20 Sep 2026</h1>
+        <p class="sp-route"><span>shop.example.org</span><span class="tag is-success is-light">1 903 pass</span><span class="tag is-warning is-light">7 fail</span></p>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Report</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>Reporter</dt><dd>Outlook.com</dd></div>
+              <div><dt>Report id</dt><dd class="sp-mono sp-small">5f1c9a0e7b2d4e61a3</dd></div>
+              <div><dt>Window</dt><dd>20 Sep 00:00 – 21 Sep 00:00 UTC</dd></div>
+              <div><dt>Received</dt><dd>2026-09-21 04:40 UTC</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box">
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Published policy</h2></div>
+          <div class="sp-box-body">
+            <dl class="sp-facts">
+              <div><dt>p / sp / pct</dt><dd class="sp-mono">none / none / 100</dd></div>
+              <div><dt>adkim / aspf</dt><dd class="sp-mono">r / r</dd></div>
+              <div><dt>rua</dt><dd class="sp-mono sp-small">dmarc@mail.example.org</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="sp-box-head"><span class="sp-no">03</span><h2>Records</h2><div class="sp-end">Parsed from the aggregate XML</div></div>
+      <div class="table-container"><table class="table is-fullwidth">
+        <thead><tr><th>Source</th><th>Count</th><th>Disposition</th><th>SPF</th><th>DKIM</th><th>Header from</th></tr></thead>
+        <tbody>
+          <tr><td class="sp-mono sp-small">203.0.113.25 <span class="tag is-light">this relay</span></td><td>1 903</td><td><span class="tag is-success is-light">none</span></td><td><span class="tag is-success is-light">pass</span></td><td><span class="tag is-success is-light">pass</span></td><td>shop.example.org</td></tr>
+          <tr><td class="sp-mono sp-small">198.51.100.44</td><td>7</td><td><span class="tag is-warning is-light">none</span></td><td><span class="tag is-danger is-light">fail</span></td><td><span class="tag is-danger is-light">fail</span></td><td>shop.example.org</td></tr>
+        </tbody>
+      </table></div>
+    </div>

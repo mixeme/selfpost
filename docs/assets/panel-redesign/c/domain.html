@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>example.org · Outbound domains · SelfPost</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css">
+<link rel="stylesheet" href="../shared/brand.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<nav class="navbar is-primary" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="status.html"><img src="../../selfpost-stamp-compact.svg" alt="SelfPost"></a>
+    </div>
+    <div class="navbar-menu is-active">
+      <div class="navbar-start">
+        <a class="navbar-item" href="status.html">Overview</a>
+        <div class="navbar-item has-dropdown is-hoverable sp-current">
+          <a class="navbar-link" href="domain.html">Outbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item is-active" href="domain.html">Domains</a>
+            <a class="navbar-item" href="#">Log</a>
+            <a class="navbar-item" href="#">Queue</a>
+            <a class="navbar-item" href="#">DMARC reports</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Inbound</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Domains</a>
+            <a class="navbar-item" href="#">Log</a>
+            <a class="navbar-item" href="#">Queue</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Server</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">System log</a>
+            <a class="navbar-item" href="#">Backup</a>
+            <a class="navbar-item" href="#">Users</a>
+            <a class="navbar-item" href="#">Settings</a>
+          </div>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">admin</a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" href="#">Account</a>
+            <a class="navbar-item" href="#">Help</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" href="login.html">Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div class="container sp-page">
+    <div class="level mb-5">
+      <div class="level-left">
+        <div>
+          <p class="sp-kicker"><a href="status.html">Outbound domains</a> /</p>
+          <h1 class="title is-3 mb-0">example.org</h1>
+        </div>
+      </div>
+      <div class="level-right">
+        <div class="buttons">
+          <form method="post" action="#"><button type="submit" class="button">Re-check DNS</button></form>
+          <a class="button is-primary" href="#">Add application</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column is-3">
+        <aside class="menu sp-side">
+          <p class="menu-label">This domain</p>
+          <ul class="menu-list">
+            <li><a class="is-active" href="#dns">DNS records <span class="tag is-danger is-light">1</span></a></li>
+            <li><a href="#apps">Applications <span class="tag is-light">2</span></a></li>
+            <li><a href="#connection">Connection</a></li>
+          </ul>
+          <p class="menu-label">Rarely changed</p>
+          <ul class="menu-list">
+            <li><a href="#">DMARC reports</a></li>
+            <li><a href="#">Rate limit <span class="tag is-success is-light">active</span></a></li>
+            <li><a href="#">Export</a></li>
+            <li><a class="has-text-danger" href="#">Delete domain</a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="column is-9">
+        <div class="box" id="dns">
+          <div class="sp-box-head"><h2>DNS records</h2><div class="sp-end">Checked 3 min ago</div></div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+            <div class="sp-row">
+              <div class="field">
+                <label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="sp2026._domainkey.example.org"></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+              </div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field">
+              <label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="3" readonly>v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3kqV0mJd8e2f1Yb7Qw5uT9sLr4nHc6pZaXo1vKe0yWm2gBt8RjN5dCq3hUf7lPs9aEi4oMz6xTb1kGv0nYw…IDAQAB</textarea></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+            </div>
+          </div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>SPF</h3><span class="tag is-danger is-light">mismatch</span><small>Merge into the existing record — never publish a second one</small></div>
+            <div class="sp-row">
+              <div class="field">
+                <label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="example.org"></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+              </div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field">
+              <label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=spf1 ip4:203.0.113.25 ~all"></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+            </div>
+            <div class="field">
+              <label class="label">In DNS now</label>
+              <div class="control"><input class="input" readonly value="v=spf1 include:_spf.google.com ~all"></div>
+              <p class="help is-danger">The published record does not authorize 203.0.113.25. Add <code>ip4:203.0.113.25</code> before <code>~all</code>.</p>
+            </div>
+          </div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address from <a href="#">Settings</a></small></div>
+            <div class="sp-row">
+              <div class="field">
+                <label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="_dmarc.example.org"></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+              </div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field">
+              <label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org"></div><div class="control"><button type="button" class="button">Copy</button></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="box" id="apps">
+          <div class="sp-box-head"><h2>Applications</h2><div class="sp-end">SASL logins that may send as this domain</div></div>
+          <table class="table is-fullwidth is-hoverable">
+            <thead><tr><th>Login</th><th>May send as</th><th>30 days</th><th>Limits</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="sp-mono"><strong>prod-server</strong></td><td>*@example.org</td><td class="sp-muted">1 102 msg · peak 96/h</td>
+                <td><span class="tag is-success is-light">200 / h</span></td>
+                <td><div class="buttons are-small is-right is-flex-wrap-nowrap"><a class="button" href="#">Edit</a><a class="button" href="#">New password</a><a class="button is-danger is-light" href="#">Delete</a></div></td>
+              </tr>
+              <tr>
+                <td class="sp-mono"><strong>alerts</strong></td><td>alerts@example.org, noc@example.org</td><td class="sp-muted">182 msg · peak 14/h</td>
+                <td><span class="tag is-light">domain</span> <span class="tag is-success is-light">2 IPs</span></td>
+                <td><div class="buttons are-small is-right is-flex-wrap-nowrap"><a class="button" href="#">Edit</a><a class="button" href="#">New password</a><a class="button is-danger is-light" href="#">Delete</a></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="columns">
+          <div class="column">
+            <div class="box" id="connection">
+              <div class="sp-box-head"><h2>Connection</h2><div class="sp-end">Same for every domain</div></div>
+              <p class="sp-mono">mail.example.org</p>
+              <p class="sp-mono sp-muted">465 SSL/TLS · 587 STARTTLS</p>
+            </div>
+          </div>
+          <div class="column">
+            <div class="box">
+              <div class="sp-box-head"><h2>Sent, 30 days</h2></div>
+              <div class="sp-stats">
+                <div><b>1 284</b><span class="sp-muted">messages</span></div>
+                <div><b>96</b><span class="sp-muted">peak / h</span></div>
+                <div><b>1.8</b><span class="sp-muted">average / h</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+  </div>
+</main>
+
+</body>
+</html>

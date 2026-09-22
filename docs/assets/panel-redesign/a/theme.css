@@ -1,0 +1,206 @@
+/* Direction A — "Blank" (the postal form). Pico CSS v2 carries every generic
+   control (type, buttons, inputs, tables, details, dropdown); this file maps
+   the brand onto Pico's variables and adds only what is SelfPost's own:
+   the two-row header, the sheet, numbered form sections, the postmark and
+   the DNS record block. */
+
+/* :root[...] rather than [data-theme=light] alone: Pico declares its light
+   palette on :root:not([data-theme=dark]), which a bare attribute selector
+   loses to. */
+:root[data-theme=light] {
+  --pico-font-family-sans-serif: var(--sp-sans);
+  --pico-font-family-monospace: var(--sp-mono);
+  --pico-font-family: var(--sp-sans);
+  --pico-border-radius: 2px;
+  --pico-spacing: .9rem;
+  --pico-typography-spacing-vertical: .9rem;
+  --pico-form-element-spacing-vertical: .5rem;
+  --pico-form-element-spacing-horizontal: .75rem;
+
+  --pico-background-color: var(--sp-paper);
+  --pico-color: var(--sp-ink);
+  --pico-muted-color: var(--sp-muted);
+  --pico-muted-border-color: var(--sp-rule);
+  --pico-h1-color: var(--sp-ink); --pico-h2-color: var(--sp-ink);
+  --pico-h3-color: var(--sp-ink); --pico-h4-color: var(--sp-ink);
+
+  --pico-primary: var(--sp-brick);
+  --pico-primary-background: var(--sp-brick);
+  --pico-primary-border: var(--sp-brick);
+  --pico-primary-underline: rgb(122 59 46 / .35);
+  --pico-primary-hover: var(--sp-brick-dark);
+  --pico-primary-hover-background: var(--sp-brick-dark);
+  --pico-primary-hover-border: var(--sp-brick-dark);
+  --pico-primary-hover-underline: var(--sp-brick-dark);
+  --pico-primary-focus: rgb(122 59 46 / .25);
+  --pico-primary-inverse: #fff;
+
+  --pico-secondary: var(--sp-ink-2);
+  --pico-secondary-background: var(--sp-ink-2);
+  --pico-secondary-border: var(--sp-ink-2);
+  --pico-secondary-hover: var(--sp-ink);
+  --pico-secondary-hover-background: var(--sp-ink);
+  --pico-secondary-hover-border: var(--sp-ink);
+  --pico-secondary-focus: rgb(18 22 28 / .2);
+  --pico-secondary-inverse: #fff;
+
+  --pico-form-element-background-color: #fff;
+  --pico-form-element-border-color: var(--sp-rule-strong);
+  --pico-form-element-active-border-color: var(--sp-brick);
+  --pico-form-element-focus-color: rgb(122 59 46 / .25);
+  --pico-table-border-color: var(--sp-rule);
+  --pico-code-background-color: var(--sp-well);
+  --pico-code-color: var(--sp-ink);
+  --pico-dropdown-background-color: #fff;
+  --pico-dropdown-border-color: var(--sp-rule);
+  --pico-dropdown-hover-background-color: var(--sp-brick-tint);
+}
+
+/* Pico grows the root font with the viewport (up to 131%). An ops panel wants
+   one size everywhere. */
+:root { font-size: 15px; }
+body { min-height: 100vh; display: flex; flex-direction: column; }
+h1 { font-size: 1.7rem; font-weight: 600; margin: 0; }
+small, .sp-muted { color: var(--sp-muted); }
+code, .sp-mono { font-family: var(--sp-mono); font-size: .88em; }
+
+/* ---- header: sections on the first row, the section's pages on the second */
+.sp-wrap { width: 100%; max-width: 72rem; margin-inline: auto; padding-inline: 1.5rem; }
+.sp-bar { background: var(--sp-sheet); border-bottom: 1px solid var(--sp-rule); }
+.sp-bar nav { align-items: center; }
+.sp-bar nav li { padding-block: .45rem; }
+.sp-brand img { height: 46px; width: auto; display: block; }
+.sp-sections a {
+  font-family: var(--sp-mono); font-size: .8rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; text-decoration: none;
+  color: var(--sp-muted); padding: .5rem .8rem; margin: 0; border-radius: 0;
+}
+.sp-sections a:hover { color: var(--sp-ink); }
+.sp-sections a[aria-current] { color: var(--sp-brick); box-shadow: inset 0 -3px 0 var(--sp-brick); }
+.sp-user summary { font-size: .9rem; }
+.sp-pages { background: var(--sp-paper); border-bottom: 1px solid var(--sp-rule); }
+.sp-pages .sp-wrap { display: flex; gap: 1.6rem; }
+.sp-pages a { color: var(--sp-muted); text-decoration: none; padding: .6rem 0; font-size: .95rem; }
+.sp-pages a:hover { color: var(--sp-ink); }
+.sp-pages a[aria-current] { color: var(--sp-ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--sp-ink); }
+
+/* ---- the sheet: one column, one width, every page */
+main.sp-wrap { flex: 1; padding-block: 1.8rem 2.5rem; }
+.sp-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+.sp-head .sp-kicker { font-family: var(--sp-mono); font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--sp-muted); margin: 0 0 .15rem; }
+.sp-head .sp-kicker a { color: inherit; }
+.sp-head-actions { display: flex; gap: .5rem; align-items: center; }
+.sp-head-actions > * { margin: 0; }
+.sp-sheet { background: var(--sp-sheet); border: 1px solid var(--sp-rule); margin-bottom: 1.4rem; }
+.sp-sheet > header {
+  display: flex; align-items: baseline; gap: .8rem; padding: .7rem 1.2rem;
+  border-bottom: 1px solid var(--sp-rule);
+}
+.sp-sheet > header .sp-no { font-family: var(--sp-mono); font-size: .75rem; color: var(--sp-brick); font-weight: 600; }
+.sp-sheet > header h2 {
+  font-family: var(--sp-mono); font-size: .8rem; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; margin: 0; flex: 1;
+}
+.sp-sheet > header small { font-size: .85rem; }
+.sp-sheet > .sp-body { padding: 1.1rem 1.2rem; }
+.sp-sheet > .sp-body > :last-child { margin-bottom: 0; }
+.sp-foot { color: var(--sp-muted); font-size: .8rem; border-top: 1px solid var(--sp-rule); padding-block: 1rem; }
+.sp-foot a { color: inherit; }
+
+/* ---- status tag and the postmark */
+.sp-tag {
+  display: inline-block; font-family: var(--sp-mono); font-size: .72rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; padding: .1rem .5rem;
+  border: 1px solid var(--sp-idle-rule); background: var(--sp-idle-bg); color: var(--sp-idle);
+  border-radius: 2px; white-space: nowrap; text-decoration: none;
+}
+.sp-tag.ok { color: var(--sp-ok); background: var(--sp-ok-bg); border-color: var(--sp-ok-rule); }
+.sp-tag.warn { color: var(--sp-warn); background: var(--sp-warn-bg); border-color: var(--sp-warn-rule); }
+.sp-tag.fail { color: var(--sp-fail); background: var(--sp-fail-bg); border-color: var(--sp-fail-rule); }
+
+.sp-verdict { display: flex; align-items: center; gap: 1.5rem; padding: 1.3rem 1.4rem; }
+.sp-verdict h2 { margin: 0 0 .2rem; font-size: 1.35rem; font-weight: 600; }
+.sp-verdict p { margin: 0; color: var(--sp-muted); }
+.sp-postmark {
+  flex: none; width: 5.6rem; height: 5.6rem; border-radius: 50%;
+  border: 2px solid currentColor; outline: 1px solid currentColor; outline-offset: 3px;
+  display: grid; place-content: center; text-align: center; transform: rotate(-9deg);
+  font-family: var(--sp-mono); font-weight: 600; letter-spacing: .08em; line-height: 1.15;
+  color: var(--sp-ok);
+}
+.sp-postmark.warn { color: var(--sp-warn); }
+.sp-postmark.fail { color: var(--sp-fail); }
+.sp-postmark b { font-size: 1.25rem; display: block; }
+.sp-postmark span { font-size: .55rem; display: block; }
+
+/* ---- ledger: one row per check, the row opens into its detail */
+.sp-ledger details { margin: 0; padding: 0; border-bottom: 1px solid var(--sp-rule); }
+.sp-ledger details:last-child { border-bottom: 0; }
+.sp-ledger summary {
+  display: grid; grid-template-columns: 13rem 1fr auto 1.2rem; gap: 1rem; align-items: center;
+  padding: .75rem 1.2rem; margin: 0; color: var(--sp-ink);
+}
+.sp-ledger summary::after { grid-column: 4; margin: 0; float: none; }
+.sp-ledger summary:hover { background: var(--sp-paper); }
+.sp-ledger summary strong { font-weight: 600; }
+.sp-ledger summary span.sp-muted { font-size: .93rem; }
+.sp-ledger .sp-detail { padding: .2rem 1.2rem 1.1rem 15.2rem; }
+.sp-ledger .sp-detail table { margin: 0; font-size: .93rem; }
+.sp-ledger .sp-detail > :last-child { margin-bottom: 0; }
+.sp-ledger meter { width: 9rem; height: .7rem; vertical-align: middle; margin-right: .5rem; }
+
+/* ---- label / value / copy: the DNS record block and connection settings */
+.sp-record { padding: 1.1rem 1.2rem; border-bottom: 1px solid var(--sp-rule); }
+.sp-record:last-child { border-bottom: 0; }
+.sp-record-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .7rem; }
+.sp-record-head h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.sp-record-head small { margin-left: auto; }
+.sp-kv { display: grid; grid-template-columns: 6.5rem 1fr; gap: .45rem 1rem; align-items: start; margin: 0; }
+.sp-kv dt {
+  font-family: var(--sp-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--sp-muted); padding-top: .5rem; margin: 0;
+}
+.sp-kv dd { margin: 0; display: flex; gap: .4rem; align-items: stretch; min-width: 0; }
+.sp-value {
+  flex: 1; min-width: 0; font-family: var(--sp-mono); font-size: .86rem; line-height: 1.5;
+  background: var(--sp-well); border: 1px solid var(--sp-rule); padding: .4rem .65rem;
+  overflow-wrap: anywhere; border-radius: 2px;
+}
+.sp-value.plain { background: none; border-color: transparent; padding-left: 0; font-family: var(--sp-sans); font-size: .95rem; }
+.sp-copy {
+  flex: none; align-self: flex-start; height: 2.15rem; margin: 0; padding: 0 .7rem; font-size: .8rem;
+  --pico-background-color: #fff; --pico-border-color: var(--sp-rule-strong); --pico-color: var(--sp-ink-2);
+}
+.sp-copy:hover { --pico-background-color: var(--sp-paper); --pico-border-color: var(--sp-ink-2); --pico-color: var(--sp-ink); }
+.sp-note { margin: .7rem 0 0 7.5rem; font-size: .9rem; color: var(--sp-muted); }
+.sp-note.fail { color: var(--sp-fail); }
+.sp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 0 2.4rem; }
+
+/* ---- applications */
+.sp-apps { margin: 0; font-size: .95rem; }
+.sp-apps td, .sp-apps th { padding-inline: 1.2rem .4rem; vertical-align: middle; }
+.sp-apps th { font-family: var(--sp-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); font-weight: 400; }
+.sp-apps td:last-child { text-align: right; padding-right: 1.2rem; white-space: nowrap; }
+.sp-apps .sp-login { font-family: var(--sp-mono); font-weight: 600; }
+.sp-link-btn { font-size: .9rem; margin-left: .9rem; }
+.sp-link-btn.danger { color: var(--sp-fail); --pico-underline: rgb(180 35 24 / .35); text-decoration-color: rgb(180 35 24 / .35); }
+.sp-btn-sm { padding: .35rem .8rem; font-size: .9rem; margin: 0; width: auto; }
+
+/* ---- sign-in */
+.sp-signin { flex: 1; display: grid; place-content: center; padding: 2rem 1.5rem; }
+.sp-signin-card { width: 23rem; max-width: 100%; }
+.sp-signin-card img { display: block; width: 15rem; height: auto; margin: 0 auto 1.6rem; }
+.sp-signin-card .sp-body { padding: 1.4rem 1.4rem 1.2rem; }
+.sp-signin-card button { margin-bottom: 0; }
+.sp-tagline { text-align: center; font-family: var(--sp-mono); font-size: .75rem; letter-spacing: .16em; color: var(--sp-muted); margin-top: 1.2rem; }
+
+@media (max-width: 48rem) {
+  .sp-ledger summary { grid-template-columns: 1fr auto 1.2rem; }
+  .sp-ledger summary span.sp-muted { grid-column: 1 / -1; grid-row: 2; }
+  .sp-ledger summary::after { grid-column: 3; }
+  .sp-ledger .sp-detail { padding-left: 1.2rem; }
+  .sp-kv { grid-template-columns: 1fr; gap: .15rem; }
+  .sp-kv dt { padding-top: .5rem; }
+  .sp-note { margin-left: 0; }
+  .sp-pages .sp-wrap { overflow-x: auto; white-space: nowrap; }
+}

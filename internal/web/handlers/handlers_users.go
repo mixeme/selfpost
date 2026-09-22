@@ -171,7 +171,7 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		logf("panel: create user hash: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Internal error. Please try again."})
@@ -225,15 +225,11 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	if u.Role == store.RoleGlobal && role == store.RoleDomainAdmin {
 		n, err := h.store.CountGlobalUsers()
 		if err != nil || n <= 1 {
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Cannot demote the last global administrator.", FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
-			return
-		}
-	}
-
-	if u.ID == p.ID && u.Role == store.RoleGlobal && role == store.RoleDomainAdmin {
-		n, err := h.store.CountGlobalUsers()
-		if err != nil || n <= 1 {
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "You cannot demote yourself without another global administrator.", FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
+			msg := "Cannot demote the last global administrator."
+			if u.ID == p.ID {
+				msg = "You cannot demote yourself without another global administrator."
+			}
+			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
 			return
 		}
 	}
@@ -244,7 +240,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: selected})
 			return
 		}
-		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
 			logf("panel: update user hash: %v", err)
 			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Internal error. Please try again.", FormUsername: username, FormRole: string(role), FormDomains: selected})
