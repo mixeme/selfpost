@@ -1,0 +1,52 @@
+
+# Alternative reverse-proxy: Traefik (spec 10.3). Traefik does NOT write plain
+# PEM files — everything (cert + key) lives bundled inside acme.json. SelfPost
+# needs separate PEM files for Postfix, so an extraction step is required; see
+# extract-cert.sh in this directory and the cron/systemd-timer note below.
+#
+# Merge with the base file — run this from the deploy/ directory (Compose
+# resolves every relative path in both files against the directory of the
+# FIRST -f file, i.e. deploy/, which is why paths below are ./traefik/...):
+#
+#   docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
+
+services:
+  selfpost:
+    ports: !override
+      - "465:465"
+      - "587:587"
+    volumes: !override
+      - ./data:/data
+      # Populated by extract-cert.sh from traefik's acme.json — see below.
+      - ./traefik/extracted-certs:/etc/postfix/tls:ro
+    labels:
+      # Traefik only proxies the panel; it never sees the mail ports.
+      # These live on the selfpost service (not traefik's) because the
+      # docker provider reads routing labels off the container being routed
+      # to, not off traefik itself.
+      - traefik.enable=true
+      - traefik.http.routers.selfpost.rule=Host(`mail.example.com`)
+      - traefik.http.routers.selfpost.entrypoints=websecure
+      - traefik.http.routers.selfpost.tls.certresolver=le
+      - traefik.http.services.selfpost.loadbalancer.server.port=8080
+
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    depends_on:
+      - selfpost
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --certificatesresolvers.le.acme.email=you@example.com
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/letsencrypt:/letsencrypt

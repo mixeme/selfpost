@@ -1,0 +1,101 @@
+
+# SelfPost — default deployment, reverse-proxy = Apache (spec 10, 10.5).
+#
+# This file only runs SelfPost itself. Apache is assumed to already be
+# installed on the HOST (the target audience for this project typically runs
+# Apache there already — spec 10.5) and reverse-proxies HTTPS for the panel;
+# it is not containerised here. See ../apache/selfpost-vhost.conf for a ready
+# vhost fragment, and the "Reverse proxy" section of ../../README.md for the
+# certbot steps that produce the PEM files this compose file mounts.
+#
+# Usage:
+#   1. Copy this file (and .env.example as .env) next to your own ./data and
+#      ./certs directories, or adjust the paths below.
+#   2. Fill in .env (hostname, at least one strong TLS_CERT/KEY path).
+#   3. docker compose up -d
+#
+# The image tag below is FIXED on purpose (spec 10 p.10, 7.5.A): backup
+# restore compares the manifest version against the running binary's version,
+# so ":latest" would make that check meaningless. Bump the tag deliberately
+# when you want to upgrade.
+
+services:
+  selfpost:
+    image: ghcr.io/mixeme/selfpost:0.1.0
+    restart: unless-stopped
+    environment:
+      SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"
+      # Path Postfix reads inside the container — matches the certs bind mount
+      # below. Point these at your reverse-proxy's PEM output (spec 10 p.2).
+      TLS_CERT_FILE: /etc/postfix/tls/fullchain.pem
+      TLS_KEY_FILE: /etc/postfix/tls/privkey.pem
+      # Set to true to also publish RFC 6409 submission (587/STARTTLS)
+      # alongside the primary 465/smtps listener (spec 5).
+      SUBMISSION_ENABLE: "${SUBMISSION_ENABLE:-false}"
+      # Level-1 backstop rate limit (anvil, spec 5.5, 7.4); per-domain/app
+      # limits (level 2) are configured later from the panel itself.
+      RATE_LIMIT_MESSAGES_PER_IP: "${RATE_LIMIT_MESSAGES_PER_IP:-100}"
+      RATE_LIMIT_WINDOW_SECONDS: "${RATE_LIMIT_WINDOW_SECONDS:-3600}"
+      # How long the send log keeps rows before the background sweep deletes
+      # them (spec 7.3, 9) — the main driver of /data growth over time.
+      SEND_LOG_RETENTION_DAYS: "${SEND_LOG_RETENTION_DAYS:-90}"
+      # Sliding idle timeout for the panel login session, in days (spec 7.6.6).
+      PANEL_SESSION_IDLE_DAYS: "${PANEL_SESSION_IDLE_DAYS:-7}"
+    volumes:
+      # All persistent state lives under /data (spec 9): SQLite DB, DKIM keys,
+      # sasldb2, sender map, setup token. Back this up (panel button or the
+      # selfpost-backup CLI) before you touch it directly.
+      - ./data:/data
+      # Read-only: SelfPost only ever reads certificates, never manages them
+      # (spec 10 p.2). Point this at wherever your reverse-proxy/certbot
+      # writes PEM files, e.g. /etc/letsencrypt on the host.
+      - ./certs:/etc/postfix/tls:ro
+    ports:
+      # 465 (smtps, primary) and optionally 587 (submission/STARTTLS) are
+      # published directly — mail traffic bypasses Apache entirely, it only
+      # ever proxies the panel's HTTP(S) (spec 10 p.2-3). The panel itself
+      # (8080) is intentionally NOT published here: Apache reaches it over
+      # the host network at 127.0.0.1:8080 (see the vhost fragment), so the
+      # panel is never directly reachable from the internet without TLS.
+      - "465:465"
+      - "587:587"
+      - "127.0.0.1:8080:8080"
+    # Hardening (spec 10 p.6). SelfPost's entrypoint still needs to run as
+    # root very briefly to fix /data ownership and normalise permissions
+    # under the shared `selfpost` group (see build/entrypoint.sh) before
+    # supervisord drops the panel to an unprivileged user — so this cannot be
+    # `user: panel` or a fully read-only rootfs without breaking that startup
+    # self-healing. What IS applied: no privilege escalation past what the
+    # image already grants, and every Linux capability dropped except the
+    # small set the root startup phase and Postfix/OpenDKIM genuinely need:
+    #   - NET_BIND_SERVICE — bind 465/587 (and 25 outbound) below 1024;
+    #   - CHOWN            — entrypoint re-owns /data (bind mount) to `panel`;
+    #   - FOWNER           — entrypoint then chmods those now panel-owned /data
+    #                        dirs/files while still root (owner-check bypass);
+    #   - FSETID           — set the setgid bit (2750) on the shared /data dirs
+    #                        when the process gid differs from the dir's group;
+    #   - SETUID/SETGID    — supervisord drops the panel to the unprivileged
+    #                        `panel` user; Postfix switches to its own users;
+    #   - DAC_OVERRIDE     — cross-user file access within the `selfpost` group.
+    #   - KILL             — supervisord (root) sends SIGUSR1 to opendkim (a
+    #                        different uid) on domain add/remove to reload its
+    #                        KeyTable/SigningTable; without it os.kill() fails
+    #                        with EPERM even though the caller is root, because
+    #                        the kernel's signal permission check for
+    #                        cross-uid kill() still consults CAP_KILL.
+    # FOWNER/FSETID are required by build/entrypoint.sh's permission
+    # self-healing; without them chmod fails with EPERM and the container
+    # crash-loops on start.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - FOWNER
+      - FSETID
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+      - KILL

@@ -1,0 +1,13 @@
+# Development-only material (secrets, server access notes) — never published.
+dev/
+
+# Build artifacts (binaries are built on the dev server, not committed).
+/bin/
+*.exe
+
+# Local Go caches / test output, if ever present.
+*.out
+
+# e2e scratch stand (generated cert, DKIM zone, sink dump, /data bind mount)
+# — recreated fresh by every `make e2e` run, never checked in.
+/test/e2e/.stage/

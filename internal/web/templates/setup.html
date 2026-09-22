@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>Create administrator</h1>
+<div class="card narrow">
+  <p class="muted">This one-time link creates the single panel administrator.
+  After you submit, the link stops working for good.</p>
+  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <form method="post" action="/setup/{{.Token}}">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" autofocus required>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="new-password" required>
+
+    <label for="password_confirm">Confirm password</label>
+    <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required>
+
+    <button type="submit">Create administrator</button>
+  </form>
+</div>
+{{end}}

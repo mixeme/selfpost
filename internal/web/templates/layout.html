@@ -1,0 +1,54 @@
+{{define "layout.html"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="icon" href="/static/favicon.png" type="image/png">
+<link rel="stylesheet" href="/static/panel.css">
+{{/* Unless told otherwise, htmx injects a stylesheet element of its own into
+     the head for the request-indicator classes. The panel uses no
+     hx-indicator, and that injected element would be the one thing the
+     Content-Security-Policy (phase 14.A) has to make an exception for, so it
+     is switched off here. */}}
+<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/panel.js" defer></script>
+</head>
+<body>
+<main>
+{{if .User}}{{template "nav" .}}{{end}}
+{{template "content" .}}
+{{/* The running version, on every authenticated page: it is what a backup
+     manifest is checked against on restore and the first thing to establish
+     when something behaves unexpectedly. Only for signed-in administrators —
+     the login and setup pages must not advertise it to the internet. */}}
+{{if .User}}<footer class="version">SelfPost {{.Version}}</footer>{{end}}
+</main>
+</body>
+</html>{{end}}
+
+{{/* nav is the panel's navigation bar. It is rendered here, from the layout, so
+     every authenticated page has it without the page's own template having to
+     remember to include it; .Active names the current page so it is highlighted
+     instead of linking to itself. Unauthenticated pages (login, setup) carry no
+     .User and get no nav. */}}
+{{define "nav"}}
+<nav class="nav">
+  <div class="links">
+    {{if eq .Active "status"}}<span aria-current="page">Status</span>{{else}}<a href="/status">Status</a>{{end}}
+    {{if eq .Active "domains"}}<span aria-current="page">Domains</span>{{else}}<a href="/domains">Domains</a>{{end}}
+    {{if eq .Active "sendlog"}}<span aria-current="page">Deliveries</span>{{else}}<a href="/sendlog">Deliveries</a>{{end}}
+    {{if eq .Active "queue"}}<span aria-current="page">Mail queue</span>{{else}}<a href="/queue">Mail queue</a>{{end}}
+    {{if eq .Active "logtail"}}<span aria-current="page">System log</span>{{else}}<a href="/logtail">System log</a>{{end}}
+    {{if eq .Active "backup"}}<span aria-current="page">Backup</span>{{else}}<a href="/backup">Backup</a>{{end}}
+  </div>
+  <div class="session">
+    <span class="muted">{{.User}}</span>
+    {{if eq .Active "account"}}<span aria-current="page">Account</span>{{else}}<a href="/account">Account</a>{{end}}
+    <form class="inline" method="post" action="/logout">
+      <button type="submit" class="danger">Sign out</button>
+    </form>
+  </div>
+</nav>
+{{end}}

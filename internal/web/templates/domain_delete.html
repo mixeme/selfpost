@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>Delete {{.Domain.Name}}</h1>
+
+<a class="back" href="/domains/{{.Domain.ID}}">&larr; Back to {{.Domain.Name}}</a>
+
+<div class="card">
+  <h2>Confirm deletion</h2>
+  <p>You are about to delete <strong>{{.Domain.Name}}</strong>. This will:</p>
+  <ul>
+    <li>permanently delete its DKIM signing key;</li>
+    <li>delete
+      {{if eq .Domain.AppCount 0}}its (currently none) bound applications{{else}}
+      <strong>all {{.Domain.AppCount}} bound application(s)</strong>, including
+      their SASL credentials and sender bindings{{end}};</li>
+    <li>reload OpenDKIM so the domain is no longer signed.</li>
+  </ul>
+  <p class="muted">This cannot be undone. The published DKIM DNS record becomes
+  invalid; remove it from DNS if you do not plan to re-add the domain.</p>
+
+  <form method="post" action="/domains/{{.Domain.ID}}/delete">
+    <button type="submit" class="danger">Delete {{.Domain.Name}}</button>
+  </form>
+</div>
+{{end}}

@@ -1,0 +1,82 @@
+
+# Hermetic e2e stand override for ../../deploy/docker-compose.yml (plan C.4).
+#
+# Applied as a second -f on top of the SHIPPED compose file, not a separate
+# test compose — the whole point is to exercise cap_drop/cap_add/
+# no-new-privileges exactly as documented, not a laxer stand-in. Run only via
+# `make e2e`, which also sets --project-directory to a scratch stage
+# directory so the base file's relative ./data and ./certs bind mounts land
+# there instead of next to a real deployment, and -p selfpost-e2e so the
+# containers/network never collide with a prod stack on the same host.
+#
+# `ports:` and `networks:` use the compose-spec `!override` merge tag to fully
+# replace the base file's list rather than concatenate with it (the default
+# merge behaviour for sequences) — otherwise the real 465/587/8080 would stay
+# published here too and collide with a prod container on the same host.
+
+services:
+  selfpost:
+    build:
+      # Resolved relative to --project-directory (.stage), NOT this file's own
+      # directory — compose build.context paths follow the project directory,
+      # unlike bind-mount volume paths, which is the same reason ./data and
+      # ./certs above need no path here at all.
+      context: ../../..
+      dockerfile: build/Dockerfile
+      args:
+        VERSION: e2e
+    image: selfpost:e2e
+    environment:
+      SELFPOST_HOSTNAME: mail.e2e.test
+      # Plain HTTP panel for the test client — no reverse proxy in this stand.
+      PANEL_COOKIE_SECURE: "false"
+      # High enough that the whole suite's other ~10 sends (positive path,
+      # level-2 test, the various rejected attempts) never trip it by
+      # accident — only the dedicated level-1 test (negative check 4, which
+      # loops well past this count) is meant to hit it.
+      RATE_LIMIT_MESSAGES_PER_IP: "50"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+    ports: !override
+      - "20465:465"
+      - "20587:587"
+      - "127.0.0.1:20080:8080"
+    dns:
+      - 10.77.0.10
+    networks: !override
+      e2e:
+    depends_on:
+      - coredns
+      - sink
+
+  # Fake authoritative DNS for e2e.test (plan C.4): serves the DKIM/host
+  # records the test harness publishes, so Postfix's outbound MX lookup for
+  # the sink and the panel's own dnscheck resolve inside the isolated network
+  # instead of hitting the real internet.
+  coredns:
+    image: coredns/coredns:latest
+    command: ["-conf", "/dns/Corefile"]
+    volumes:
+      - ./dns-stage:/dns
+    networks:
+      e2e:
+        ipv4_address: 10.77.0.10
+    ports:
+      - "20053:53/udp"
+
+  # Sink-MX: accepts any inbound mail and dumps each transaction to its own
+  # file under ./mail-stage, which the harness reads directly to check the
+  # DKIM-Signature header Postfix/OpenDKIM produced.
+  sink:
+    build:
+      context: ../sink
+    volumes:
+      - ./mail-stage:/mail
+    networks:
+      e2e:
+        ipv4_address: 10.77.0.11
+
+networks:
+  e2e:
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24

@@ -1,0 +1,305 @@
+{{define "content"}}
+<h1>{{.Domain.Name}}</h1>
+
+<a class="back" href="/domains">&larr; All domains</a>
+
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
+
+{{if .NewCred}}
+<div class="card credential">
+  <h2>New application password</h2>
+  <p class="muted">This password is shown <strong>once only</strong> and is not
+  stored. Copy it now — if it is lost, regenerate a new one.</p>
+  <label>Login</label>
+  <div class="code-row">
+    <span class="code">{{.NewCred.Login}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+  <label>Password</label>
+  <div class="code-row">
+    <span class="code">{{.NewCred.Password}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+</div>
+{{end}}
+
+<div class="card">
+  <h2>DKIM DNS record</h2>
+  <p class="muted">Publish this TXT record in the DNS for <strong>{{.Domain.Name}}</strong>.
+  It is not a secret and can be viewed at any time.</p>
+
+  <label>Host / name</label>
+  <div class="code-row">
+    <span class="code">{{.Record.Name}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>Type</label>
+  <span class="code">TXT</span>
+
+  <label>Value</label>
+  <div class="code-row">
+    <span class="code">{{.Record.Value}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <p class="muted">Mail is signed with selector <strong>{{.Domain.DKIMSelector}}</strong>.</p>
+</div>
+
+<div class="card">
+  <h2>SPF and DMARC records</h2>
+  <p class="muted">These two are not generated the way the DKIM record above is —
+  they are policy, and the domain may already publish an SPF record for other
+  senders. What follows is what this server expects to see and what the checks
+  below look for. Publish both as TXT records.</p>
+
+  <label>SPF — host / name</label>
+  <div class="code-row">
+    <span class="code">{{.Domain.Name}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>SPF — value</label>
+  <div class="code-row">
+    <span class="code">{{.SPFExample}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <p class="muted">A domain may have only one SPF record. If it already has one,
+  do not add a second — add this server's mechanism to the existing record
+  instead, before its <code>all</code> term. <code>-all</code> at the end means
+  nothing else may send as the domain; use <code>~all</code> while other senders
+  are still being sorted out.</p>
+
+  <label>DMARC — host / name</label>
+  <div class="code-row">
+    <span class="code">{{.DMARCName}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>DMARC — value</label>
+  <div class="code-row">
+    <span class="code">{{.DMARCExample}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <p class="muted">Point <code>rua=</code> at a mailbox that is actually read —
+  the aggregate reports are how you find out who else sends as the domain.
+  <code>p=none</code> changes nothing about delivery, so it is safe to publish
+  straight away; tighten it to <code>p=quarantine</code> and then
+  <code>p=reject</code> once the reports come back clean.</p>
+</div>
+
+<div class="card">
+  <h2>DNS status <span class="st st-{{.DNS.Overall}}">{{.DNS.Overall}}</span></h2>
+  <p class="muted">What DNS publishes for <strong>{{.Domain.Name}}</strong> right
+  now, checked against the key this server signs with. Results are cached for a
+  few minutes — after publishing a record, use <em>Re-check</em>.</p>
+
+  <label>DKIM <span class="st st-{{.DNS.DKIM.Status}}">{{.DNS.DKIM.Status}}</span></label>
+  <p class="{{if eq .DNS.DKIM.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DKIM.Detail}}</p>
+  {{if .DNS.DKIM.Records}}<span class="code">{{range .DNS.DKIM.Records}}{{.}}
+{{end}}</span>{{end}}
+
+  <label>SPF <span class="st st-{{.DNS.SPF.Status}}">{{.DNS.SPF.Status}}</span></label>
+  <p class="{{if eq .DNS.SPF.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.SPF.Detail}}</p>
+  {{if .DNS.SPF.Records}}<span class="code">{{range .DNS.SPF.Records}}{{.}}
+{{end}}</span>{{end}}
+  <p class="muted">The SPF check is deliberately shallow: it looks for a
+  mechanism that literally covers this server's address and does not follow
+  <code>include:</code> or <code>redirect=</code>, so a record that authorises
+  the server through an include is reported as “cannot tell”, not as a failure.</p>
+
+  <label>DMARC <span class="st st-{{.DNS.DMARC.Status}}">{{.DNS.DMARC.Status}}</span></label>
+  <p class="{{if eq .DNS.DMARC.Status "ok"}}muted{{else}}error{{end}}">{{.DNS.DMARC.Detail}}</p>
+  {{if .DNS.DMARC.Records}}<span class="code">{{range .DNS.DMARC.Records}}{{.}}
+{{end}}</span>{{end}}
+
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
+    <button type="submit">Re-check</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Sending server settings</h2>
+  <p class="muted">Point the mail client or script at these settings and
+  authenticate with an application login and password from the
+  <strong>Applications</strong> section below. They are the same for every
+  domain on this server.</p>
+
+  <label>Server</label>
+  <div class="code-row">
+    <span class="code">{{.Hostname}}</span>
+    <button type="button" class="copy">Copy</button>
+  </div>
+
+  <label>Port and encryption</label>
+  <span class="code">465 — SSL/TLS (implicit){{if .SubmissionEnabled}}
+587 — STARTTLS (submission){{end}}</span>
+
+  <p class="muted">Authentication is required on every port. The username is the
+  application's login (see the table below) and the password is the one shown
+  once when that application was created or its password regenerated — if it was
+  lost, generate a new one.</p>
+</div>
+
+{{/* Create form above the list, the same order the domains page uses for
+     "Add a sending domain" above "Domains". */}}
+<div class="card">
+  <h2>Add an application</h2>
+  <form method="post" action="/domains/{{.Domain.ID}}/applications">
+    <label for="login">Login</label>
+    <input id="login" name="login" type="text" placeholder="prod-server"
+           autocomplete="off" autocapitalize="none" spellcheck="false"
+           value="{{.FormLogin}}" required>
+
+    <label for="mode">Address mode</label>
+    <select id="mode" name="mode" data-list-mode="{{.List}}">
+      <option value="{{.Wildcard}}" {{if eq .FormMode .Wildcard}}selected{{end}}>Any address of the domain</option>
+      <option value="{{.List}}" {{if eq .FormMode .List}}selected{{end}}>Specific addresses (list)</option>
+    </select>
+
+    <div data-addresses>
+      <label for="addresses">Addresses (one per line or comma-separated)</label>
+      <textarea id="addresses" name="addresses" rows="3"
+                placeholder="alerts@{{.Domain.Name}}">{{.FormAddrs}}</textarea>
+    </div>
+
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <button type="submit">Create application</button>
+  </form>
+  <p class="muted">A strong password is generated and shown once. The login must
+  be unique across all domains and may contain letters, digits, '.', '-' and '_'.</p>
+</div>
+
+<div class="card">
+  <h2>Applications</h2>
+  <p class="muted">Each application is a SASL login/password an app or script
+  uses to send mail as this domain. A login may send from any address of the
+  domain (<em>wildcard</em>) or only from a fixed list of addresses.</p>
+
+  {{if .Apps}}
+  <table>
+    <thead>
+      <tr><th>Login</th><th>Mode</th><th>Addresses</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Apps}}
+      <tr>
+        <td class="code">{{.Login}}</td>
+        <td>{{if eq .AddressMode $.Wildcard}}Any address (@{{$.Domain.Name}}){{else}}List{{end}}</td>
+        <td class="muted">
+          {{if eq .AddressMode $.Wildcard}}*@{{$.Domain.Name}}{{else}}
+            {{range $i, $a := .Addresses}}{{if $i}}, {{end}}{{$a}}{{end}}
+          {{end}}
+        </td>
+        <td class="actions">
+          <details>
+            <summary>Edit mode</summary>
+            <form method="post" action="/applications/{{.ID}}/mode">
+              <label>Address mode</label>
+              <select name="mode" data-list-mode="{{$.List}}">
+                <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
+                <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
+              </select>
+              <div data-addresses>
+                <label>Addresses (one per line or comma-separated)</label>
+                <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
+{{end}}{{$a}}{{end}}</textarea>
+              </div>
+              <button type="submit">Save mode</button>
+            </form>
+          </details>
+          <details>
+            <summary>Rate limit{{if .HasLimit}} (active){{end}}</summary>
+            <form method="post" action="/applications/{{.ID}}/ratelimit">
+              <label>Expected client IPs (one per line or comma-separated)</label>
+              <textarea name="allowed_ips" rows="2" placeholder="203.0.113.10">{{.IPsText}}</textarea>
+              <label>Message limit</label>
+              <input name="max_messages" type="number" min="1" value="{{.MaxText}}" placeholder="500">
+              <label>Window (seconds)</label>
+              <input name="window_seconds" type="number" min="1" value="{{.WindowVal}}">
+              <button type="submit">Save limit</button>
+            </form>
+            {{if .HasLimit}}
+            <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
+                  data-confirm="Remove the rate limit for {{.Login}}? Only the global level-1 limit will apply.">
+              <input type="hidden" name="clear" value="1">
+              <button type="submit" class="danger">Remove limit</button>
+            </form>
+            {{end}}
+          </details>
+          <form class="inline" method="post" action="/applications/{{.ID}}/password"
+                data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
+            <button type="submit">New password</button>
+          </form>
+          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
+                data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="muted">No applications yet. Add one above to get started.</p>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2>Sending rate limit (domain)</h2>
+  <p class="muted">Optional level-2 limit (spec 7.4): cap how many messages this
+  domain may send from its expected client IP(s) within a time window, summed
+  across all its applications. It counts messages — one message to many
+  recipients counts once. Leave the IP list empty to disable it and rely only on
+  the global level-1 limit. Applications that send from changing IPs should be
+  left unbound here.</p>
+
+  <p class="muted">Status:
+    {{if .DomainHasRL}}<strong>active</strong>{{else}}inactive (level-1 only){{end}}.</p>
+
+  <form method="post" action="/domains/{{.Domain.ID}}/ratelimit">
+    <label for="d_ips">Expected client IPs (one per line or comma-separated)</label>
+    <textarea id="d_ips" name="allowed_ips" rows="2"
+              placeholder="203.0.113.10">{{.DomainRLIPs}}</textarea>
+
+    <label for="d_max">Message limit</label>
+    <input id="d_max" name="max_messages" type="number" min="1"
+           value="{{.DomainRLMax}}" placeholder="1000">
+
+    <label for="d_win">Window (seconds)</label>
+    <input id="d_win" name="window_seconds" type="number" min="1" value="{{.DomainRLWin}}">
+
+    <button type="submit">Save limit</button>
+  </form>
+  {{if .DomainHasRL}}
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
+        data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
+    <input type="hidden" name="clear" value="1">
+    <button type="submit" class="danger">Remove limit</button>
+  </form>
+  {{end}}
+</div>
+
+<div class="card">
+  <h2>Export domain</h2>
+  <p class="muted">Download this domain to move it to another SelfPost instance:
+  its DKIM key, selector and every application with its working password. On
+  import the DNS record stays the same, so no DNS change is needed.</p>
+  <p class="muted"><strong>The export file is a secret</strong> — it contains the
+  private DKIM key and application passwords. Transfer it securely and delete it
+  after the import.</p>
+  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/export">
+    <button type="submit">Export domain</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Danger zone</h2>
+  <p class="muted">Deleting this domain also deletes its DKIM key and every
+  application bound to it.</p>
+  <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
+</div>
+{{end}}

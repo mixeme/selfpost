@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>Deliveries</h1>
+
+<div class="card">
+  <h2>Filter</h2>
+  <form method="get" action="/sendlog">
+    <label for="domain">Domain</label>
+    <select id="domain" name="domain">
+      <option value="">All domains</option>
+      {{range .FilterDomains}}<option value="{{.}}" {{if eq . $.FilterDomain}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <label for="app">Application</label>
+    <select id="app" name="app">
+      <option value="">All applications</option>
+      {{range .FilterApps}}<option value="{{.}}" {{if eq . $.FilterApp}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <button type="submit">Filter</button>
+  </form>
+</div>
+
+<div class="card">
+  {{template "sendlog_rows" .}}
+</div>
+{{end}}

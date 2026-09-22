@@ -1,0 +1,16 @@
+# Authoritative fake zone for the e2e stand (plan C.4). Only e2e.test and its
+# subdomains are served — everything else is refused, which is fine: neither
+# the panel nor Postfix ever needs to resolve anything outside this zone here.
+#
+# The `file` plugin's own `reload` sub-directive (NOT the top-level `reload`
+# plugin, which only watches the Corefile itself) polls db.zone's mtime/serial
+# and reloads with no signal needed, so the test harness can rewrite the zone
+# file (to publish a domain's DKIM record) and just poll until the new record
+# is visible — no container restart, no sleep.
+e2e.test {
+    file /dns/db.zone {
+        reload 1s
+    }
+    log
+    errors
+}
