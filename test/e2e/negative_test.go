@@ -195,7 +195,7 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 }
 
 // testLevel1RateLimit is plan C.4 negative check 4: the native Postfix anvil
-// backstop (smtpd_client_message_rate_limit, README § Rate limiting), set by
+// backstop (smtpd_client_message_rate_limit, guide § Rate limiting), set by
 // the override to RATE_LIMIT_MESSAGES_PER_IP=50, rejects once exceeded. It
 // uses a dedicated application with no level-2 limit of its own, and retries
 // well past that count, so the result is unambiguous regardless of how much of

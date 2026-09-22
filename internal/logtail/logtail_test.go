@@ -2,8 +2,10 @@ package logtail
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -141,6 +143,10 @@ type captureStore struct {
 	state     store.LogtailState
 	haveState bool
 	stateErr  error
+
+	// queued is what ListQueuedOlderThan returns, for the reconcile sweep.
+	queued    []store.QueuedDelivery
+	queuedErr error
 }
 
 func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, error) {
@@ -151,6 +157,12 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 }
 
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
+
+func (c *captureStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.queued, c.queuedErr
+}
 
 func (c *captureStore) LogtailState(string) (store.LogtailState, bool, error) {
 	c.mu.Lock()
@@ -332,4 +344,261 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatal("condition not met within timeout")
+}
+
+// stubQueue makes the reconcile sweep answer from a fixed list of queue ids
+// instead of a running Postfix, or fail if err is non-nil.
+func stubQueue(t *testing.T, err error, ids ...string) *int {
+	t.Helper()
+	calls := 0
+	old := queueIDs
+	queueIDs = func() (map[string]struct{}, error) {
+		calls++
+		if err != nil {
+			return nil, err
+		}
+		set := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			set[id] = struct{}{}
+		}
+		return set, nil
+	}
+	t.Cleanup(func() { queueIDs = old })
+	return &calls
+}
+
+// A row stays "queued" forever when its delivery lines are gone for good. The
+// queue is what settles it: a message Postfix still holds is simply in flight
+// and must be left alone, while one it no longer holds will never be reported
+// on and is closed.
+func TestReconcileClosesOnlyWhatPostfixNoLongerHolds(t *testing.T) {
+	stubQueue(t, nil, "STILLQ")
+
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{QueueID: "STILLQ", To: "inflight@example.net"},
+		{QueueID: "GONEQ", To: "lost@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC())
+
+	got := cs.snapshot()
+	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.StatusBounced {
+		t.Fatalf("got %v, want only the message Postfix dropped closed as bounced", got)
+	}
+}
+
+// A queue that cannot be listed says nothing about any message — treating the
+// failure as an empty queue would close every stale row at once.
+func TestReconcileLeavesRowsAloneWhenTheQueueCannotBeRead(t *testing.T) {
+	stubQueue(t, errors.New("postqueue: Permission denied"))
+
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{QueueID: "GONEQ", To: "lost@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC())
+
+	if got := cs.snapshot(); len(got) != 0 {
+		t.Fatalf("got %v, want no row touched", got)
+	}
+}
+
+// With nothing stale to explain there is no reason to shell out to postqueue at
+// all — which is the normal state of a relay that is keeping up.
+func TestReconcileSkipsTheQueueWhenNoRowIsStuck(t *testing.T) {
+	calls := stubQueue(t, nil)
+
+	reconcile(&captureStore{}, time.Now().UTC())
+
+	if *calls != 0 {
+		t.Fatalf("queue listed %d time(s), want none", *calls)
+	}
+}
+
+// A delivery's page shows what Postfix wrote about that one message, so the
+// read has to pick its queue-id's lines out of everything else the mail path
+// logged around them — and only its own: queue ids are hexadecimal runs, and a
+// shorter one is regularly the tail of a longer one.
+func TestQueueLinesPicksOutOneMessage(t *testing.T) {
+	path := writeLog(t,
+		"host postfix/smtpd[20]: 41E862C00D9E: client=mail.example.com[203.0.113.4]",
+		"host postfix/qmgr[10]: 5900C2C00D9E: from=<other@example.com>, size=500, nrcpt=1 (queue active)",
+		"host postfix/cleanup[15]: 41E862C00D9E: message-id=<abc@example.com>",
+		// Same run of characters, longer id: not this message.
+		"host postfix/smtp[26]: FF41E862C00D9E: to=<z@example.net>, status=sent (250 OK)",
+		"host opendkim[30]: 41E862C00D9E: DKIM-Signature field added (s=mail d=example.com)",
+		"host postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=mx.example.net[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)",
+	)
+
+	lines, err := QueueLines(path, "41E862C00D9E", 200)
+	if err != nil {
+		t.Fatalf("QueueLines: %v", err)
+	}
+	if len(lines) != 4 {
+		t.Fatalf("got %d lines, want 4:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	// Oldest first: the page reads the message's history downwards.
+	if !strings.Contains(lines[0], "client=") || !strings.Contains(lines[3], "status=sent") {
+		t.Errorf("lines are not in the order they were logged:\n%s", strings.Join(lines, "\n"))
+	}
+	for _, line := range lines {
+		if strings.Contains(line, "FF41E862C00D9E") || strings.Contains(line, "5900C2C00D9E") {
+			t.Errorf("another message's line came back: %q", line)
+		}
+	}
+}
+
+// A message the milter refused has no queue id, so there is nothing to match
+// on — every line in the log would be someone else's.
+func TestQueueLinesWithoutAQueueIDMatchesNothing(t *testing.T) {
+	path := writeLog(t, "host postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, status=sent (250 OK)")
+
+	lines, err := QueueLines(path, "", 200)
+	if err != nil {
+		t.Fatalf("QueueLines: %v", err)
+	}
+	if lines != nil {
+		t.Errorf("got %v, want no lines", lines)
+	}
+}
+
+// The cap keeps the newest lines, not the first ones: what a message did last
+// is what its page is opened for.
+func TestQueueLinesCapKeepsTheLatest(t *testing.T) {
+	var log []string
+	for i := 0; i < 10; i++ {
+		log = append(log, "host postfix/smtp[26]: ABC123: attempt "+itoa(i))
+	}
+	path := writeLog(t, log...)
+
+	lines, err := QueueLines(path, "ABC123", 3)
+	if err != nil {
+		t.Fatalf("QueueLines: %v", err)
+	}
+	if len(lines) != 3 || !strings.HasSuffix(lines[0], "attempt 7") || !strings.HasSuffix(lines[2], "attempt 9") {
+		t.Errorf("cap did not keep the last three:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// Send-log rows outlive mail.log — retention is ninety days and rotation keeps
+// fourteen files — so a message whose lines are gone, or a log that is between
+// rotations and absent altogether, is an empty answer for the page to explain,
+// not an error for it to report.
+func TestQueueLinesOnAMessageWithNoLinesLeft(t *testing.T) {
+	path := writeLog(t, "host postfix/smtp[26]: 5900C2C00D9E: to=<z@example.net>, status=sent (250 OK)")
+
+	lines, err := QueueLines(path, "41E862C00D9E", 200)
+	if err != nil {
+		t.Fatalf("QueueLines: %v", err)
+	}
+	if lines != nil {
+		t.Errorf("got %v, want no lines", lines)
+	}
+}
+
+// writeLog creates a mail.log holding the given lines and returns its path.
+func writeLog(t *testing.T, lines ...string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "mail.log")
+	body := ""
+	for _, line := range lines {
+		body += line + "\n"
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	return path
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
+
+// The read is bounded, so on a log that has grown all day it starts in the
+// middle of a line. That fragment is not a line and must not come back as one,
+// and anything before the budget is out of reach — which the page reports the
+// same way as a message whose lines have rotated away.
+func TestQueueLinesReadsABoundedTail(t *testing.T) {
+	old := queueScanBytes
+	queueScanBytes = 120
+	t.Cleanup(func() { queueScanBytes = old })
+
+	path := writeLog(t,
+		"host postfix/smtp[26]: ABC123: too far back to reach, padded out past the budget with this run of filler text",
+		"host postfix/smtp[26]: ABC123: within the budget",
+	)
+
+	lines, err := QueueLines(path, "ABC123", 200)
+	if err != nil {
+		t.Fatalf("QueueLines: %v", err)
+	}
+	if len(lines) != 1 || !strings.HasSuffix(lines[0], "within the budget") {
+		t.Errorf("got %d lines, want only the one inside the budget:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+}
+
+// The delivery page shows a message's lines as a table of when and what, so the
+// timestamp has to come off the head of the line — in either of the two formats
+// a mail log arrives in — and nothing may be lost doing it.
+func TestSplitTimestamp(t *testing.T) {
+	cases := []struct {
+		name        string
+		line        string
+		stamp, rest string
+	}{
+		{
+			name:  "RFC 3339, which maillog_file_format selects on Postfix 3.9 and up",
+			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+		},
+		{
+			name:  "no fractional seconds, zone as Z",
+			line:  "2026-08-03T05:15:52Z mail postfix/qmgr[10]: 4A1B2C3D: removed",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail postfix/qmgr[10]: 4A1B2C3D: removed",
+		},
+		{
+			name:  "no zone at all",
+			line:  "2026-08-03T05:15:52 mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
+			stamp: "2026-08-03 05:15:52",
+			rest:  "mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
+		},
+		{
+			name:  "syslog's traditional format, space-padded day",
+			line:  "Aug  3 05:15:52 mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
+			stamp: "Aug  3 05:15:52",
+			rest:  "mail postfix/smtpd[20]: 4A1B2C3D: client=app.example.ru[203.0.113.4]",
+		},
+		{
+			// Copied off the live relay (Postfix 3.7, which has no
+			// maillog_file_format), so this is the shape the panel actually
+			// meets: zero-padded day, and the host is the container's name.
+			name:  "syslog's traditional format as the live relay writes it",
+			line:  "Aug 08 07:26:41 selfpost postfix/master[231]: daemon started -- version 3.7.11, configuration /etc/postfix",
+			stamp: "Aug 08 07:26:41",
+			rest:  "selfpost postfix/master[231]: daemon started -- version 3.7.11, configuration /etc/postfix",
+		},
+		{
+			name:  "unrecognised head keeps the whole line",
+			line:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+			stamp: "",
+			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
+		},
+		{
+			// A date-like run that is not the head of the line is not a stamp.
+			name:  "date inside the text is left alone",
+			line:  "mail postfix/smtp[26]: ABC: 220 mx.example.net ready at 2026-08-03T05:15:52+00:00",
+			stamp: "",
+			rest:  "mail postfix/smtp[26]: ABC: 220 mx.example.net ready at 2026-08-03T05:15:52+00:00",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stamp, rest := SplitTimestamp(c.line)
+			if stamp != c.stamp || rest != c.rest {
+				t.Errorf("SplitTimestamp(%q) = (%q, %q), want (%q, %q)", c.line, stamp, rest, c.stamp, c.rest)
+			}
+			// Whatever the split, the line's own text survives it whole.
+			if !strings.Contains(c.line, rest) {
+				t.Errorf("the text column is not part of the line it came from: %q", rest)
+			}
+		})
+	}
 }

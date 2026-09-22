@@ -1,5 +1,5 @@
 {{define "system_log_body"}}
-<div id="system-log-body" hx-get="/system-log/body" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="system-log-body" data-poll hx-get="/system-log/body" hx-trigger="load" hx-swap="outerHTML">
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
   <span class="code">{{if .Lines}}{{range .Lines}}{{.}}
 {{end}}{{else}}No log lines yet.{{end}}</span>

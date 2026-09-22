@@ -174,7 +174,7 @@ func (s *Service) Delete(id int64) error {
 	if err := s.sasl.Delete(a.Login); err != nil {
 		return err
 	}
-	// Drop the application's level-2 limit, if any (README § Rate limiting);
+	// Drop the application's level-2 limit, if any (guide § Rate limiting);
 	// rate_limits has no cascade of its own.
 	if err := s.store.DeleteRateLimit(store.RateLimitScopeApp, id); err != nil {
 		return err
@@ -182,7 +182,7 @@ func (s *Service) Delete(id int64) error {
 	return s.Resync()
 }
 
-// RateLimit returns the application-level differentiated rate limit (README §
+// RateLimit returns the application-level differentiated rate limit (guide §
 // Rate limiting), and whether one is configured, for the application's edit
 // form.
 func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
@@ -202,7 +202,7 @@ func (s *Service) SaveRateLimit(appID int64, ips []string, maxMessages, windowSe
 	})
 }
 
-// ClearRateLimit removes the application-level rate limit (README § Rate
+// ClearRateLimit removes the application-level rate limit (guide § Rate
 // limiting).
 func (s *Service) ClearRateLimit(appID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeApp, appID)

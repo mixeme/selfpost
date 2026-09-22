@@ -1,9 +1,10 @@
 {{/* Password fields shared by the full-backup and domain-export forms. The
      checkbox is the switch: unticked, the download keeps its historic plain
      form (.tar.gz / .json); ticked, the file is sealed in a password-encrypted
-     envelope (.spbk / .spde). The fields start hidden and are revealed by
-     panel.js — with JavaScript blocked they are simply always visible, and the
-     server still decides from the checkbox alone. */}}
+     envelope (.spbk = SelfPost backup, .spde = SelfPost domain export). The
+     fields start hidden and are revealed by panel.js — with JavaScript blocked
+     they are simply always visible, and the server still decides from the
+     checkbox alone. */}}
 {{define "encryptfields"}}
 <div class="encrypt">
   <label class="check">

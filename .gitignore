@@ -1,7 +1,7 @@
 # Development-only material (secrets, server access notes) — never published.
 dev/
 
-# Build artifacts (binaries are built on the dev server, not committed).
+# Build artifacts (not committed).
 /bin/
 *.exe
 

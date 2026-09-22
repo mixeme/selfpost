@@ -1,13 +1,13 @@
-// Package e2e is the hermetic container e2e gate (plan C.4): it drives the
-// shipped deploy/docker-compose.yml (plus a test-only override) exactly as an
+// Package e2e is the hermetic container e2e gate: it drives the shipped
+// deploy/docker-compose.yml (plus a test-only override) exactly as an
 // administrator and their applications would, so the class of failure unit
 // tests cannot see — broken container wiring — has one place to be caught
 // before an image is published.
 //
-// It is a separate module on purpose (see ../../docs/implementation-plan.md,
-// item C.4): `go test ./...` in the main module never pulls this in, and its
-// test-only dependencies (DKIM verification) never enter the shipped
-// binaries' build graph.
+// It is a separate module on purpose (see ../../docs/development.md):
+// `go test ./...` in the main module never pulls this in, and its test-only
+// dependencies (DKIM verification) never enter the shipped binaries' build
+// graph.
 package e2e
 
 import (
@@ -54,6 +54,10 @@ func TestMain(m *testing.M) {
 			fmt.Fprintf(os.Stderr, "\n==== logs: %s ====\n%s\n", svc, s.logs(svc))
 		}
 	}
+	// Panel/postfix-owned files under the /data bind mount outlive the
+	// container; reclaim ownership while selfpost is still up so a later
+	// prepareStage RemoveAll (or a local re-run) is not stuck on EACCES.
+	s.reclaimData()
 	s.down()
 	os.Exit(code)
 }
@@ -87,14 +91,27 @@ type scenario struct {
 func TestE2E(t *testing.T) {
 	sc := &scenario{}
 
-	t.Run("startup_processes_running", func(t *testing.T) {
+	// Ordered scenario: each step needs state from earlier ones. A failed
+	// subtest must stop the rest — otherwise sc.panel stays nil and the next
+	// step panics, masking the real failure (as seen on the v1.0.0 release CI).
+	run := func(name string, fn func(*testing.T)) {
+		if t.Failed() {
+			return
+		}
+		t.Run(name, fn)
+	}
+
+	run("startup_processes_running", func(t *testing.T) {
 		if err := checkSupervisorProcesses(h); err != nil {
+			t.Fatal(err)
+		}
+		if err := waitForPanelReady(); err != nil {
 			t.Fatal(err)
 		}
 	})
 
-	t.Run("setup_and_login", func(t *testing.T) {
-		token, err := readSetupToken(h.stageDir)
+	run("setup_and_login", func(t *testing.T) {
+		token, err := readSetupToken(h)
 		if err != nil {
 			t.Fatalf("read setup token: %v", err)
 		}
@@ -111,7 +128,7 @@ func TestE2E(t *testing.T) {
 		sc.panel = p
 	})
 
-	t.Run("add_domain_and_publish_dkim", func(t *testing.T) {
+	run("add_domain_and_publish_dkim", func(t *testing.T) {
 		id, err := sc.panel.addDomain(senderDomain)
 		if err != nil {
 			t.Fatalf("add domain: %v", err)
@@ -137,7 +154,7 @@ func TestE2E(t *testing.T) {
 		sc.zoneRecords = records
 	})
 
-	t.Run("add_application", func(t *testing.T) {
+	run("add_application", func(t *testing.T) {
 		login, password, err := sc.panel.addApplication(sc.domainID, "app1", "wildcard", "")
 		if err != nil {
 			t.Fatalf("add application: %v", err)
@@ -145,7 +162,7 @@ func TestE2E(t *testing.T) {
 		sc.appLogin, sc.appPassword = login, password
 	})
 
-	t.Run("send_verify_dkim_and_status", func(t *testing.T) {
+	run("send_verify_dkim_and_status", func(t *testing.T) {
 		token := uniqueToken("positive")
 		res := attemptSend(sendAttempt{
 			authLogin: sc.appLogin, authPassword: sc.appPassword,
@@ -179,25 +196,25 @@ func TestE2E(t *testing.T) {
 		}
 	})
 
-	t.Run("negative_level2_ratelimit_via_panel", func(t *testing.T) {
+	run("negative_level2_ratelimit_via_panel", func(t *testing.T) {
 		testLevel2RateLimit(t, sc)
 	})
-	t.Run("negative_sender_login_mismatch", func(t *testing.T) {
+	run("negative_sender_login_mismatch", func(t *testing.T) {
 		testSenderLoginMismatch(t, sc)
 	})
-	t.Run("negative_no_auth_rejected", func(t *testing.T) {
+	run("negative_no_auth_rejected", func(t *testing.T) {
 		testNoAuthRejected(t, sc)
 	})
-	t.Run("negative_foreign_relay_rejected", func(t *testing.T) {
+	run("negative_foreign_relay_rejected", func(t *testing.T) {
 		testForeignRelayRejected(t, sc)
 	})
-	t.Run("negative_journal_milter_fail_open", func(t *testing.T) {
+	run("negative_journal_milter_fail_open", func(t *testing.T) {
 		testJournalMilterFailOpen(t, sc)
 	})
-	t.Run("session_survives_restart", func(t *testing.T) {
+	run("session_survives_restart", func(t *testing.T) {
 		testSessionSurvivesRestart(t, sc)
 	})
-	t.Run("negative_level1_ratelimit", func(t *testing.T) {
+	run("negative_level1_ratelimit", func(t *testing.T) {
 		testLevel1RateLimit(t, sc)
 	})
 }

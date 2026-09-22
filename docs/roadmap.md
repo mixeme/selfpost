@@ -1,190 +1,121 @@
-# Дорожная карта: SelfPost 2.x.x
+# Roadmap: open work (1.x+)
 
-**Статус:** здесь собран объём, отнесённый к релизной линии **2.x.x** — вне
-базового объёма v1.0/v1.x (v1.x — только исходящий релей). Реализация —
-только после явного согласования ([product.md](product.md), [development.md](development.md) § Agent rules):
-[product.md](product.md) явно исключает часть этого объёма (приём входящей
-почты; несколько пользователей/роли), поэтому включение — сознательное
-расширение границ проекта, а не доработка по своей инициативе. Присутствие
-пункта здесь фиксирует намерение и дизайн; кодирование начинается отдельным
-решением.
+**Status:** a working tracker of extensions to the v1.0 boundary, each taken up
+only after explicit agreement ([product.md](product.md),
+[.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)). Detailed
+design lives in [plans/](plans/). Items marked `candidate` need an OK before
+any code is written.
 
-**Основа:** [product.md](product.md) v1.0. Несделанное для v1.0/v1.x
-— в [implementation-plan.md](implementation-plan.md). Хвост закрытого
-документационного прохода (D1–D9) — в секции ниже.
+**Reading this from outside the project:** nothing here is a commitment or a
+release promise. There are no dates, the order is a recommendation rather than
+a schedule, and an item can be dropped or reshaped once its plan is written.
+What the project *will not* do is a separate question, answered in
+[product.md](product.md) — an item's absence from this file does not mean it is
+planned but unlisted.
 
----
+**Versioning:** SemVer MINOR in the **1.x+** line by default (`1.1.0`…), as long
+as defaults and migrations stay compatible with `1.0.0`. A major `2.x` only for
+an explicit break.
 
-## v1.x — хвост документации и деплоя
-
-**Статус:** не блокирует релизный тег; перенесено из закрытого
-[documentation-plan.md](documentation-plan.md) (бывшая находка 11 и отложенный
-пункт D4). Делать по желанию или в релизном коммите, где указано.
-
-**Тег образа в compose + git tag — один релизный коммит (R1).** В
-[deploy/docker-compose.yml](../deploy/docker-compose.yml) поле `image:` бампить
-до версии релиза **в том же коммите**, что и git-тег `vX.Y.Z` — не раньше.
-Сейчас там `0.1.0`, то есть отстаёт от целевой версии; несовпадение мешает
-только до первого выката по тегу. Сам тег — последний шаг релизного гейта:
-содержательная часть (e2e C.4, ревизия § D) закрыта, режется по явной команде
-оператора ([progress.md](progress.md)). После тега `release.yml`
-собирает и публикует `ghcr.io/mixeme/selfpost:X.Y.Z`, поэтому compose с новым
-тегом и сам тег обязаны появиться вместе — иначе compose неделю ссылается на
-несуществующий образ.
-
-**Убрать `implementation-plan.md` — в релизном коммите.** Документ закрыт:
-уникального содержания в нём нет, § D (предрелизная ревизия безопасности)
-продублирован в [progress.md](progress.md), [security.md](security.md) и
-CHANGELOG `[Unreleased]/Security`, а разделы B.1–B.3 и C.4 вырезаны ещё в
-`22f86d1`. Держится до тега только потому, что описывает релизный гейт, пока тот
-формально не закрыт. При резке версии:
-
-1. Переместить в `docs/archive/` (рядом со `specification-v1.0.md`) — история
-   § D сохраняется, из активной документации уходит.
-2. Перецелить ссылки из кода и CI ([Makefile](../Makefile),
-   [.github/workflows/release.yml](../.github/workflows/release.yml),
-   [test/e2e/main_test.go](../test/e2e/main_test.go)) — они ссылаются на «план
-   C.4», секцию, которой в файле уже нет; актуальное описание e2e — в
-   [development.md](development.md).
-3. Перецелить ссылки из документации: [README.md](../README.md) («Open v1.x
-   questions» — открытых вопросов там нет) → [progress.md](progress.md);
-   [security.md](security.md), [documentation-plan.md](documentation-plan.md),
-   [progress.md](progress.md) и шапку этого файла → на
-   `progress.md`/`security.md`.
-4. В [progress.md](progress.md) убрать шаг «Открыть `implementation-plan.md`» —
-   он выполнен.
-
-**Готово, когда:** тег образа в compose совпадает с релизом и рядом стоит
-git-тег `vX.Y.Z`; `implementation-plan.md` в `docs/archive/`, ссылок на него в
-активных документах и в коде/CI не осталось.
-
-(Закрыто и действия не требует: `docs/logo` как каталога нет — критерию «либо
-содержит файлы, либо отсутствует» удовлетворяет; Quick start в
-[README.md](../README.md) тянет `docker-compose.yml` и `.env.example` с
-`raw.githubusercontent.com` — это и есть единственная площадка проекта, зеркал
-больше нет.)
-
-**Сводный индекс документации в README.** Ссылки на `docs/` разбросаны по
-тексту README (блок в шапке плюс упоминания по месту), единого списка нет —
-читателю, который ищет «а где вообще что», приходится вычитывать документ.
-Стоит одного абзаца со списком всех файлов `docs/` и одной строкой на каждый.
-Мелочь, но именно она делает набор документов набором, а не россыпью.
-
-**Опрос мониторинга у открытой, но незанятой вкладки.** Скрытая вкладка уже не
-опрашивает сервер (фильтр на `htmx:beforeRequest` в
-[panel.js](../internal/web/static/panel.js)). Остаток: вкладка на переднем
-плане, с которой не работают, всё равно ходит раз в 5 с. Кандидат — адаптивный
-интервал (5 с при активности, 30 с при простое) по `htmx:afterRequest` без
-изменения `hx-trigger`. Ценность низкая: нагрузка — один SQL-запрос и рендер
-фрагмента, так что это скорее гигиена, чем экономия. Допустимый исход —
-осознанно не делать.
-
-**Send-log vs `mail.log` (частично закрыто).** Persist позиции чтения сделан
-(таблица `logtail_state`, миграция `0003`): после
-рестарта панели log-tailer дочитывает пропущенный хвост. Остаётся пересоздание
-контейнера — `mail.log` не в `/data` и теряется вместе с ним, такие строки
-навсегда останутся `queued`. Кандидаты, если станет больно: volume для лога,
-сверка зависших строк через `postqueue`. As-built и принятый риск:
-[architecture.md](architecture.md) § Log tailer, [security.md](security.md).
+**Process:** [development.md](development.md). The history of closed phases is
+in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
-## Фаза O1 (→ 2.x.x) — Входящий релей (backup-MX / пересылка) — опция/плагин
+## Index
 
-**Цель:** возможность принимать почту на порт 25 для явно настроенных доменов и пересылать её на заданный вышестоящий backend (роль backup-MX / relay-forwarder), **как выключаемый по умолчанию модуль**, не затрагивающий поведение и поверхность атаки базового исходящего релея.
+| ID | Topic | Status | Plan |
+|---|---|---|---|
+| web-split | Splitting `internal/web` | **agreed** | [plans/web-split.md](plans/web-split.md) |
+| domain-admin | Domain administrator role | **agreed** | [plans/domain-admin.md](plans/domain-admin.md) |
+| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| contributing | `CONTRIBUTING.md` | candidate | — |
 
-**Зачем это нужно (сценарии):**
-- **Backup-MX** — принять почту, когда основной почтовый сервер домена временно недоступен, и передать её, когда он вернётся.
-- **Фронт для сервера без внешнего IP** — у оператора есть свой почтовый сервер, который по каким-то причинам **сам не может принимать почту из интернета** (нет статического/внешнего IP, за NAT, серый адрес, закрытый порт 25 на входящую и т.п.). SelfPost с публичным IP и корректным PTR выступает публичным входным узлом для домена (MX указывает на него) и пересылает почту на этот внутренний/недоступный извне сервер.
+**Recommended order** (not binding): **web-split → domain-admin →
+inbound-relay** — first the package split, then role-wide authorisation, then
+the new vertical slice of the inbound relay. Deviating is allowed; there are no
+hard phases here.
 
-**Граница объёма (критично — что это НЕ):**
-- **ЭТО:** приём на 25 для доменов из явного списка + пересылка (relay/forward) на upstream (`relay_domains` + `transport_maps` + `relay_recipient_maps`). Postfix здесь — чистый пересыльщик, без локальной доставки.
-- **ЭТО НЕ (out of scope, [product.md](product.md)):** локальная доставка в почтовые ящики, IMAP/POP3, webmail, Dovecot. Никаких mailbox'ов. SelfPost также **не реализует и не тянет в свой образ** движок антиспама/антивируса (rspamd/ClamAV) — но, в отличие от прежней формулировки, и **не** перекладывает фильтрацию на backend (см. блок «Антиспам» ниже): предоставляет точку подключения внешнего фильтра.
-
-**Почему как опция/плагин:**
-- Приём на порт 25 меняет модель угроз (open relay для входящей, backscatter, spam-ingress). Поэтому по умолчанию **выключено** флагом env `INBOUND_RELAY_ENABLE=false`; включение — осознанный шаг оператора.
-- Изоляция: отдельные таблицы SQLite, отдельные хендлеры/страницы панели, отдельная ветка генерации конфига. При выключенном флаге входной listener, таблицы и UI отсутствуют — базовый исходящий тракт байт-в-байт неизменен.
-
-**Что делать:**
-- Env-флаг `INBOUND_RELAY_ENABLE` (default false); при `true` — генерировать входной сервис и его конфиг из состояния панели тем же путём, что остальной конфиг (`postfix-config.sh`).
-- **`master.cf`:** входной `smtp inet` на 25 для приёма из интернета (сейчас 25 используется только на исходящую доставку). Отдельный от 465/587: на 25 **не** предлагается SASL и **не** разрешается отправка наружу — только приём для `relay_domains`.
-- **Анти-open-relay для входящей (обязательно):** `smtpd_relay_restrictions`/`smtpd_recipient_restrictions` входного smtpd принимают почту **только** для доменов из `relay_domains` и **только** для известных получателей (`relay_recipient_maps`); всё прочее — `reject_unauth_destination`/`reject_unlisted_recipient`. Открытый релей и приём «для кого угодно» невозможны.
-- **Backscatter:** предпочтительно знать валидных получателей (reject unknown recipient на этапе RCPT), чтобы не порождать bounce на несуществующие адреса.
-- **Панель управляет:** список входящих доменов; для каждого — upstream destination (`host:port`, транспорт), опциональный список валидных получателей, опциональный TLS к upstream. Строгая валидация домена/хоста/порта (whitelist), injection-safe запись map-файлов (как `sender_login_maps` в Фазе 4), `os/exec` без shell ([security.md](security.md)).
-- **Милтеры:** OpenDKIM на входящем тракте не нужен (чужую входящую не подписываем). journal-milter опционально переиспользовать для журнала входящих (доп. работа) либо на первом этапе оставить входящий без него; поведение fail-open сохраняется.
-- **Rate-limit/размер:** грубый лимит по client IP (`anvil`, как L1) и `message_size_limit` на входном smtpd.
-
-**Антиспам (важная, но опциональная возможность).** Это ценная опция, но она **не обязательна**: часть операторов вполне устроит **слепая пересылка без фильтрации** — например, когда backend сам умеет фильтровать по содержимому, стоит доверенный upstream, или объём/риск невелик. Поэтому антиспам-хук по умолчанию **выключен** (пустой `INBOUND_ANTISPAM_MILTER`), и входящий релей полностью работоспособен без него. Важно другое — где фильтрация возможна технически: при «слепом» relay целевой backend видит подключающимся IP адрес **SelfPost**, а не исходного отправителя, поэтому на backend'е ломается всё, что завязано на origin IP (DNSBL/репутация проверяются против IP SelfPost, SPF даёт fail — SelfPost не входит в SPF домена-отправителя). **Единственная точка, где ещё виден настоящий client IP — входной хоп на SelfPost**; поэтому тем, кому фильтрация нужна, она должна быть *подключаема именно здесь*, а не переложена на backend, который эту информацию уже потерял. Дизайн подключения:
-- **Движок антиспама — отдельный опциональный контейнер** (rspamd и т.п.), который оператор запускает **только если нужна эта опция** (тот же принцип, что reverse-proxy — отдельный контейнер вне образа SelfPost). SelfPost его **не содержит и не запускает** — образ и принцип «один контейнер, три процесса» неизменны, [product.md](product.md) out of scope не нарушается (SelfPost не реализует антиспам).
-- **SelfPost предоставляет точку подключения:** milter-хук на входном smtpd. Адрес движка задаётся env (например, `INBOUND_ANTISPAM_MILTER=inet:antispam:11332`, пусто → хук выключен) и добавляется в `smtpd_milters` **только входного** тракта (не на 465/587). Postfix передаёт milter'у настоящий client IP/HELO/PTR — фильтр видит истинный origin. `milter_default_action` для этого milter'а — конфигурируемый (fail-open vs tempfail); дефолт определить при реализации.
-- **Нативный backstop без зависимостей:** на том же входном хопе доступны средства Postfix по origin IP — `reject_rbl_client` (DNSBL), проверки HELO/PTR — работают даже без внешнего контейнера. Плюс сохранение аутентификации для downstream через ARC/`Received` там, где часть фильтрации всё же остаётся на backend.
-- **docker-compose:** задокументировать опциональный фрагмент antispam-сайдкара (как альтернативные фрагменты reverse-proxy) — контейнер поднимается вместе со стеком только при включённой опции.
-- **Персистентность:** новые таблицы и map-файлы под `/data` — попадают в полный бэкап автоматически (Фаза 9). Экспорт/импорт домена можно расширить входящей конфигурацией — опционально, пометить.
-- **DNS-документация:** для входящего домена нужна `MX`-запись, указывающая на сервер (в отличие от исходящего, где MX не требуется) — отразить в разделе DNS README.
-
-**Безопасность ([security.md](security.md)):** валидация ввода на сервере, экранирование записи в конфиги, `exec` без интерполяции, никакого open relay, защита от backscatter.
-
-**Готово, когда:** при `INBOUND_RELAY_ENABLE=true` и настроенном домене письмо на порт 25 для этого домена пересылается на заданный upstream; почта для ненастроенных доменов/получателей отклоняется (не open relay, не backscatter); при заданном `INBOUND_ANTISPAM_MILTER` входящая проходит через внешний фильтр с настоящим origin IP (проверено сайдкар-контейнером), при пустом — хук не мешает; при `INBOUND_RELAY_ENABLE=false` — входной порт/таблицы/UI отсутствуют, базовый исходящий релей неизменён; `build`/`vet`/`test`/образ зелёные.
-
-**Риски:** open relay/backscatter (снимается `relay_domains` + `relay_recipient_maps` + `reject_unauth_destination`); потеря origin IP для фильтрации на backend'е при пересылке (снимается milter-хуком антиспама + нативным DNSBL на входном хопе, где origin IP ещё виден); порт 25 на приём расширяет поверхность атаки (по умолчанию выключено). **Модель:** Opus (инфра/безопасность, риск open relay). **Внешняя зависимость деплоя:** опциональный antispam-контейнер — вне образа SelfPost, поднимается оператором при включении опции.
-
-**Зависимости:** не является частью v1.0, зависит только от готового исходящего тракта (уже реализован) и требует отдельного согласования ([development.md](development.md)) до кодирования.
+After a context reset, pick an item marked `agreed` or `in progress`, then work
+the checklist in its linked plan.
 
 ---
 
-## Роль администратора домена — кандидат на 2.x
+## inbound-relay
 
-**Что это.** Сейчас в панели ровно один субъект: `requireAuth` — булев гейт, а не роль ([web.go:182](../internal/web/web.go:182)), сессия не несёт ничего, кроме факта входа. Роль выдаёт доступ к одному домену и только к нему: приложения этого домена (создание, режим отправителя, перегенерация пароля, удаление, свой L2-лимит), DKIM/DNS-статус домена и журнал отправки, отфильтрованный по домену — фильтр в журнале уже есть ([handlers_monitor.go:49](../internal/web/handlers_monitor.go:49)). Вне роли остаётся то, что глобально по своей природе: добавление и удаление доменов, `/reload`, полный бэкап (это весь `/data` вместе с `sasldb2`, то есть все домены сразу), очередь и хвост `mail.log` — они серверные и к домену не привязаны.
+**Goal:** optional acceptance of mail on port 25 for explicitly configured
+domains, forwarded to an upstream (backup-MX / relay-forwarder). Off by default
+(`INBOUND_RELAY_ENABLE=false`); without the flag the outbound path is
+unchanged.
 
-**Почему 2.x, а не v1.x.** [product.md](product.md) относит «несколько пользователей
-панели, роли» к out of scope (один администратор), поэтому появление второго
-субъекта — расширение границ проекта, как и Фаза O1: сначала согласование
-([development.md](development.md)), только потом код. Цена — уровня фазы, а не патча: таблица пользователей и их привязка к доменам, роль в сессии, авторизация в каждом хендлере (а не только на маршруте — сейчас `{id}`/`{aid}` не сверяются ни с чем, кроме существования), пересмотр первичного setup'а и смены пароля под нескольких пользователей, учёт нового субъекта в бэкапе и экспорте домена.
+**Boundary:** an extension of v1.0 — [product.md](product.md) excludes inbound
+mail and mailboxes. This is relay/forward, not IMAP/POP3/webmail; an anti-spam
+engine stays outside the image, only the attachment point is provided.
 
-*(Прежняя формулировка этого пункта — «2FA и несколько администраторов» — заменена: 2FA снята с рассмотрения, а «несколько администраторов» уточнено до одной конкретной роли, потому что нужна не вторая копия всевластного админа, а ограниченный доступ владельца отдельного домена.)*
+**Done when:** see the criteria in
+[plans/inbound-relay.md](plans/inbound-relay.md).
 
----
-
-## `CONTRIBUTING.md` — кандидат на 2.x
-
-**Что это.** Точка входа для стороннего контрибьютора: dev loop (правка на
-Windows → сборка и прогон на Debian-сервере, потому что Docker локально нет),
-маршрутизация моделей по типу работы, протокол коммитов, требование
-`gofmt`/`vet`/`test`/`make e2e` до PR. Сейчас всё это есть, но в
-[development.md](development.md) и [progress.md](progress.md) — то есть на
-русском и вперемешку с внутренним состоянием проекта.
-
-**Почему 2.x, а не v1.x.** Файл имеет смысл, когда есть кому его читать: у
-проекта один разработчик и внешнего потока PR нет, поэтому сейчас
-`CONTRIBUTING.md` был бы документом без аудитории и ещё одним местом, где
-расходится правда о dev loop. Уместен вместе с тем, что реально открывает
-проект вовне: английская документация процесса (сейчас процессные документы —
-`progress.md`, `roadmap.md`, `development.md` — на русском, а README и
-`architecture.md` на английском; для EN-only контрибьютора это барьер) и
-первый внешний интерес после публикации релиза.
-
-**Готово, когда:** `CONTRIBUTING.md` в корне описывает dev loop, требования к
-проверкам перед PR и протокол коммитов; [development.md](development.md) не
-дублирует его, а ссылается.
+**Dependencies / risks:** a finished outbound path; open relay and backscatter;
+a wider attack surface (port 25 accepting mail).
+**Order:** recommended after [web-split](plans/web-split.md) and
+[domain-admin](plans/domain-admin.md).
+**Version:** target bump `1.x`; `2.x` possible — to be settled once the
+implementation lands.
 
 ---
 
-## Разбиение `internal/web` на подпакеты — кандидат на 2.x
+## domain-admin
 
-**Что это.** `internal/web` — самый крупный пакет проекта: 47 файлов, ~3030
-строк, в одной плоскости лежат хендлеры всех разделов панели, сессии,
-security-заголовки, проверка Origin, валидация форм и рендер шаблонов.
-Кандидаты на выделение — `web/handlers` и `web/auth`, либо разрез по доменам
-панели.
+**Goal:** a role with access to one or several assigned domains (the list is
+set by the global administrator) — applications, DKIM/DNS, and the send log for
+each of them; without global operations (adding domains, full backup, the
+queue, `mail.log`).
 
-**Почему 2.x, а не сейчас.** На нынешнем размере плоский пакет читается: имена
-файлов (`handlers_domains.go`, `handlers_apps.go`, `handlers_monitor.go`)
-работают не хуже каталогов, а разбиение потянуло бы за собой экспорт того, что
-сейчас пакетно-приватно, — то есть расширение внутреннего API ради
-косметики. Смысл появляется ровно тогда, когда пакет начнёт расти: обе задачи
-2.x выше добавляют в него код — роль администратора домена приносит
-авторизацию в каждый хендлер, входящий релей — отдельные страницы и хендлеры
-входящих доменов. Рефакторинг дешевле делать перед этим ростом, чем после.
+**Boundary:** an extension of v1.0 — [product.md](product.md) fixes a single
+administrator. Not a second all-powerful admin, but limited access to the
+assigned domains (one or several).
 
-**Готово, когда:** решение принято осознанно в момент старта 2.x — либо пакет
-разрезан, либо зафиксировано, что он остаётся плоским.
+**Done when:** see [plans/domain-admin.md](plans/domain-admin.md).
+
+**Dependencies / risks:** a users table, the role in the session, authorisation
+in every handler, setup and backup. **Order:** recommended after
+[web-split](plans/web-split.md), before
+[inbound-relay](plans/inbound-relay.md).
+**Version:** `1.x` MINOR, given a compatible migration of the current
+administrator into a global one.
+
+---
+
+## web-split
+
+**Goal:** deliberately split `internal/web` (or settle on keeping the package
+flat) before it grows under inbound-relay and domain-admin.
+
+**Boundary:** an internal refactor; the panel's behaviour for the operator does
+not change.
+
+**Done when:** the package is split along the chosen scheme, or it is settled
+that it stays flat — see [plans/web-split.md](plans/web-split.md).
+
+**Dependencies / risks:** exporting a package-private API. **Order:**
+recommended **first** among the agreed features (before domain-admin and
+inbound-relay).
+**Version:** `1.x`; on its own it does not force a break.
+
+---
+
+## contributing
+
+**Goal:** `CONTRIBUTING.md` in the root — the dev loop, the checks to run
+before a PR, the commit protocol; [development.md](development.md) links to it
+rather than repeating it.
+
+**Boundary:** process documentation; worth writing once there is an external
+flow of PRs.
+
+**Done when:** the file is in the root and development.md does not duplicate
+it.
+
+**Dependencies / risks:** with a single developer and no PRs, this is low
+priority.
+**Version:** no bearing on semver.

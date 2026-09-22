@@ -12,8 +12,7 @@ import (
 // SASLDB manages the Cyrus SASL account database (sasldb2) the panel maintains
 // for application credentials (architecture.md § Mail path). The panel is the
 // only writer; Postfix reads it to authenticate SMTP clients. Accounts are
-// created and removed with the standard saslpasswd2 tool ("эквивалент
-// saslpasswd2", per the plan).
+// created and removed with the standard saslpasswd2 tool.
 type SASLDB struct {
 	path  string // sasldb2 file, under /data so it survives restarts
 	realm string // SASL realm, so lookups match what Postfix's SASL uses

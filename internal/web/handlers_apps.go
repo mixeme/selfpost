@@ -30,7 +30,7 @@ type detailView struct {
 	FormAddrs string
 	NewCred   *newCred
 	// RateLimitErr surfaces a validation error from a domain- or
-	// application-level rate-limit form (README § Rate limiting) as a page
+	// application-level rate-limit form (guide § Rate limiting) as a page
 	// banner.
 	RateLimitErr string
 	// ExportErr surfaces a rejected encryption password from the export card.

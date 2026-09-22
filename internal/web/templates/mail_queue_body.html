@@ -1,5 +1,5 @@
 {{define "mail_queue_body"}}
-<div id="mail-queue-body" hx-get="/mail-queue/body" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="mail-queue-body" data-poll hx-get="/mail-queue/body" hx-trigger="load" hx-swap="outerHTML">
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
   <span class="code">{{if .Output}}{{.Output}}{{else}}Queue is empty.{{end}}</span>
 </div>

@@ -41,7 +41,7 @@ type Service struct {
 }
 
 // NewService builds the domain service. selectorDefault is the DKIM selector
-// assigned to new domains (README § Environment variables:
+// assigned to new domains (guide § Environment variables:
 // DKIM_SELECTOR_DEFAULT); it is operator-configured, not user input. apps is
 // used only on deletion, to clear the SASL accounts and sender-map bindings of
 // the domain's applications.
@@ -111,7 +111,7 @@ func (s *Service) Delete(id int64) error {
 	}
 	// Drop the domain's own level-2 limit and those of its applications while the
 	// application rows still exist (the cleanup query joins them). rate_limits
-	// has no cascade of its own (ref_id is a plain integer, README § Rate
+	// has no cascade of its own (ref_id is a plain integer, guide § Rate
 	// limiting; architecture.md § Persistence).
 	if err := s.store.DeleteRateLimitsForDomain(id); err != nil {
 		return fmt.Errorf("clear rate limits for %s: %w", d.Name, err)
@@ -138,7 +138,7 @@ func (s *Service) DKIMRecord(d store.Domain) (DKIMRecord, error) {
 	return s.odk.Record(d.Name, d.DKIMSelector)
 }
 
-// RateLimit returns the domain-level differentiated rate limit (README § Rate
+// RateLimit returns the domain-level differentiated rate limit (guide § Rate
 // limiting), and whether one is configured, for the domain's edit form.
 func (s *Service) RateLimit(domainID int64) (store.RateLimit, bool, error) {
 	return s.store.GetRateLimit(store.RateLimitScopeDomain, domainID)
@@ -158,7 +158,7 @@ func (s *Service) SaveRateLimit(domainID int64, ips []string, maxMessages, windo
 }
 
 // ClearRateLimit removes the domain-level rate limit, falling back to level 1
-// only (README § Rate limiting).
+// only (guide § Rate limiting).
 func (s *Service) ClearRateLimit(domainID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeDomain, domainID)
 }

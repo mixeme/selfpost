@@ -30,7 +30,7 @@ test:
 clean:
 	rm -rf bin
 
-# Hermetic container e2e (plan implementation-plan.md C.4): separate Go module
+# Hermetic container e2e (see docs/development.md): separate Go module
 # under test/e2e so its test-only dependencies (DKIM verification) never enter
 # this module's build graph. Builds the image fresh from this checkout, brings
 # up deploy/docker-compose.yml plus a test-only override on high ports and an

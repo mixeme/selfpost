@@ -16,6 +16,10 @@
 
 services:
   selfpost:
+    # Crash-looping with unless-stopped makes `compose exec` fail with
+    # "Container is restarting" and hides the entrypoint/supervisord exit
+    # reason; keep the stand exited so logs stay attached to one attempt.
+    restart: "no"
     build:
       # Resolved relative to --project-directory (.stage), NOT this file's own
       # directory — compose build.context paths follow the project directory,

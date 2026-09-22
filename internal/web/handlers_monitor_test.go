@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -90,6 +91,113 @@ func TestDeliveryPageShowsWhatTheLogOmits(t *testing.T) {
 	}
 }
 
+// The page's second column is the message's history: the two timestamps the
+// journal holds, stated as the steps they stand for, so a row is readable as
+// what happened to the message rather than as a list of fields.
+func TestDeliveryPageTellsTheMessagesHistory(t *testing.T) {
+	s, row := serverWithDelivery(t)
+
+	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	for _, want := range []string{
+		"Accepted and queued", "Delivered",
+		row.CreatedAt.Format("2006-01-02 15:04:05"),
+		row.UpdatedAt.Format("2006-01-02 15:04:05"),
+		// A delivered message is "ok" in the panel's own badge vocabulary, the
+		// same one the status page and the DNS checks use.
+		`class="st st-ok"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("delivery page is missing %q:\n%s", want, out)
+		}
+	}
+	// Accepted comes before delivered: a history read in the wrong order is
+	// worse than none.
+	if strings.Index(out, "Accepted and queued") > strings.Index(out, "Delivered") {
+		t.Errorf("the history is not in the order it happened:\n%s", out)
+	}
+}
+
+// A queued message has no second timestamp to state, so the step it is waiting
+// for is drawn as one that has not happened rather than dated with the moment
+// the row was written.
+func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
+	s, _ := serverWithDelivery(t)
+	if err := s.store.InsertQueued(store.SendLogEntry{
+		QueueID: "7F7F7F7F", Domain: "bs.example.ru", AppLogin: "Queuer3C",
+		From: "noreply@bs.example.ru", To: "waiting@example.ru", Subject: "Still going",
+	}); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	rows, err := s.store.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("query: %v (%d rows)", err, len(rows))
+	}
+
+	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(rows[0].ID))
+	for _, want := range []string{"Waiting for a delivery report", "pending", "not yet"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("delivery page does not mark the message as still waiting (%q):\n%s", want, out)
+		}
+	}
+}
+
+// The queue id used to be printed as something to go and search the system log
+// for by hand; the page does that search now, and shows only this message's
+// lines — as a table of when and what, so the seconds between the connection
+// and the reply line up down one edge.
+func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
+	s, row := serverWithDelivery(t)
+	s.cfg.MailLogPath = writeMailLog(t,
+		"2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]",
+		"2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)",
+		"2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)",
+	)
+
+	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	for _, want := range []string{
+		"<th>Time</th>", "<th>Message</th>",
+		// The stamp is split off into its own cell, without the microseconds
+		// and the offset that make it the widest thing on the line.
+		`<td class="time muted">2026-08-03 05:15:52</td>`,
+		`<td class="time muted">2026-08-03 05:16:03</td>`,
+		"client=mail.example.com", "status=sent (250 OK)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("delivery log table is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "99999999") {
+		t.Errorf("delivery page shows another message's log line:\n%s", out)
+	}
+}
+
+// A line whose head is not a timestamp still has to show in full; the format is
+// the log's, not ours, and a line we cannot split is a line we must not drop.
+func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
+	s, row := serverWithDelivery(t)
+	s.cfg.MailLogPath = writeMailLog(t, "host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status=sent (250 OK)")
+
+	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	if !strings.Contains(out, "host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;, status=sent (250 OK)") {
+		t.Errorf("an unstamped log line did not survive the split into columns:\n%s", out)
+	}
+}
+
+// Rows outlive mail.log, and a message the milter refused never reached the
+// queue at all. Neither is a fault, so neither may render as an error.
+func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
+	s, row := serverWithDelivery(t)
+	s.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
+
+	out := getBody(t, s.handleDelivery, "/deliveries/"+itoa(row.ID))
+	if !strings.Contains(out, "rotated away") {
+		t.Errorf("delivery page does not explain the empty delivery log:\n%s", out)
+	}
+	if strings.Contains(out, `class="error"`) || strings.Contains(out, "Could not read the mail log") {
+		t.Errorf("an aged-out delivery log is reported as a failure:\n%s", out)
+	}
+}
+
 // Send-log rows are pruned on the retention window, so a bookmarked delivery
 // that no longer exists is a 404, not a 500.
 func TestDeliveryPageNotFound(t *testing.T) {
@@ -159,3 +267,14 @@ func getBody(t *testing.T, h http.HandlerFunc, target string) string {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// writeMailLog creates a mail.log holding the given lines and returns its path,
+// for the pages that read the log rather than the journal.
+func writeMailLog(t *testing.T, lines ...string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "mail.log")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatalf("write mail.log: %v", err)
+	}
+	return path
+}

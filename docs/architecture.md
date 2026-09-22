@@ -2,9 +2,9 @@
 
 **Source of truth:** the code tree, not historical specs. Synchronise this file
 when env keys, routes, or mail-path behaviour change. Verification method:
-[documentation-plan.md](documentation-plan.md) §2.
+[development.md](development.md) § «Verifying docs against code».
 
-User install/operations: [README.md](../README.md). Product boundaries:
+User install/operations: [README.md](../README.md), [guide.md](guide.md). Product boundaries:
 [product.md](product.md).
 
 ---
@@ -26,7 +26,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
 | Program | User | Priority | Role |
 |---|---|---|---|
-| `opendkim` | opendkim | 100 | DKIM signing milter |
+| `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
 | `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer goroutine |
 | `postfix` | root (wrapper) | 300 | MTA — started only after both milter sockets exist |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
@@ -94,10 +94,20 @@ Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
 
 ### Log tailer and `mail.log` rotation
 
-`mail.log` lives under `/var/log` (not in `/data`). Rotation uses rename +
-`postfix reload` ([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not
-`copytruncate` — the latter can drop `status=sent` lines and leave send-log rows
-stuck at `queued`. After rename, logrotate runs `create 0644 root root` (Postfix
+`mail.log` lives at `/data/log/mail.log` — inside the persistent bind mount, so
+the delivery lines that resolve a `queued` send-log row are not lost when the
+container is recreated. `postlogd` writes it as user `postfix`; the panel reads
+it through the shared `selfpost` group (directory `2750 postfix:selfpost`, file
+`0640`, both normalised on every start by
+[build/entrypoint.sh](../build/entrypoint.sh)). The path is one default in two
+places, `maillog_file` in [build/postfix-config.sh](../build/postfix-config.sh)
+and `MAIL_LOG` in [cmd/panel/main.go](../cmd/panel/main.go). Backups exclude
+`log/`: it is diagnostic output, not state to restore.
+
+Rotation uses rename + `postfix reload`
+([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not `copytruncate` —
+the latter can drop `status=sent` lines and leave send-log rows stuck at
+`queued`. After rename, logrotate runs `create 0640 postfix selfpost` (postlogd
 recreates the file lazily on first write as mode `0600`, which the unprivileged
 panel user cannot read). `follow()` drains the old inode once more before
 switching descriptors; the panel treats a missing log file as an empty tail, not
@@ -112,21 +122,39 @@ the current file from the start; re-parsing lines is harmless because
 with nothing stored, begins at end-of-file, so installing the panel does not
 replay a pre-existing log.
 
-**Remaining gap:**
+**Queue reconcile** is the backstop for what the log cannot explain at all: a
+row still `queued` more than two minutes after it was accepted, whose queue id
+`postqueue -p` no longer lists, is marked `bounced` (swept every five minutes,
+[internal/logtail](../internal/logtail/logtail.go),
+[postfix.QueueIDs](../internal/postfix/queue.go)). Postfix having dropped the
+message means nothing more will ever be reported about it, so the row can only
+be closed on an assumption, and it is closed as a failure because a delivery the
+panel cannot evidence must not be shown as one. Three things keep the sweep from
+guessing where it need not: it starts only after the tailer has read to
+end-of-file once (on a restart the log itself holds the answer), the two-minute
+grace covers messages merely in flight, and a `postqueue` that cannot be read
+leaves every row untouched rather than closing them all. Now that the log
+survives the container, reaching this path means the lines are gone for good —
+rotated past fourteen files while the panel was down, or deleted.
 
-- **Container recreate** — `/var/log` is ephemeral; the log is lost with the
-  container, so the delivery lines for rows still `queued` are gone with it and
-  those rows stay `queued` forever.
-
-Possible follow-ups if this becomes painful: mount the mail log under `/data`, or
-reconcile stuck rows via `postqueue`.
+**Two one-shot reads** sit beside the follow loop and are unrelated to it, both
+serving panel pages on request: `TailLines` (the last *n* lines, for
+`/system-log`) and `QueueLines` (the lines carrying one queue-id, for
+`/deliveries/{id}`). `QueueLines` scans a bounded tail of the current file —
+finding a message's lines means reading rather than seeking — and matches the id
+anchored on the character before it, since queue ids are hexadecimal runs and a
+shorter one is regularly the tail of a longer one. Send-log rows outlive the log
+(retention 90 days, rotation 14 files), so an empty result is the expected end
+state for an older message and the page reports it as such, not as a failure.
 
 ---
 
 ## Panel HTTP surface
 
-Route table: [internal/web/web.go](../internal/web/web.go). Authenticated
-unless noted.
+Canonical routes: [internal/web/web.go](../internal/web/web.go). Authenticated
+unless noted. The table below is a summary — HTMX fragment endpoints
+(`/status/fragment`, `/deliveries/rows`, `/mail-queue/body`,
+`/system-log/body`, …) and every POST variant live in `web.go`.
 
 | Route | Purpose |
 |---|---|
@@ -135,16 +163,20 @@ unless noted.
 | `/login`, `/logout` | Session auth |
 | `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
 | `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
+| `/domains/import` | Domain import (`POST`; form on the Backup page) |
 | `/deliveries` | Send log with filters |
-| `/deliveries/{id}` | One send-log row in full |
+| `/deliveries/{id}` | One send-log row in full, with its `mail.log` lines |
 | `/mail-queue` | Postfix queue view |
 | `/system-log` | `mail.log` tail |
 | `/reload` | Reload OpenDKIM + Postfix maps |
-| `/backup` | Full backup download, domain import |
+| `/backup` | Full backup download (page also hosts the import form) |
 | `/account` | Admin username/password |
 
-HTMX polling refreshes monitoring fragments; polling does not extend session
-idle timeout (only non-`HX-Request` GET and mutating requests count as activity).
+HTMX polling refreshes monitoring fragments (5 s while the operator is active on
+the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
+`panel.js` via `data-poll`, not `hx-trigger="every …"`); polling does not extend
+session idle timeout (only non-`HX-Request` GET and mutating requests count as
+activity).
 
 ### Sessions
 
@@ -169,10 +201,12 @@ cookie and idle timeout has not expired.
 
 ## Code layers
 
-Handlers never touch SQLite or the filesystem directly; every write that has to
-land in more than one place (SQLite row, `sasldb2` entry, Postfix map, OpenDKIM
-table) goes through a service, which is also where the rollback of a partial
-failure lives. The adapters below the services are the only code that knows
+Multi-store writes that must land in more than one place (SQLite row,
+`sasldb2` entry, Postfix map, OpenDKIM table) go through a service, which is
+also where the rollback of a partial failure lives. Handlers may call
+`store` directly for single-table reads and simple writes (sessions, admin,
+send-log queries); the first-run setup-token file is read and written in
+`web` itself. The adapters below the services are the only code that knows
 about Postfix, OpenDKIM, DNS or the log file, which is what makes them
 substitutable in tests — `milter.Store`, `app.SenderMaps` and
 `logtail.StatusStore` are the seams the unit tests replace with fakes.
@@ -207,6 +241,7 @@ flowchart TB
   panel --> logtail
   backupcli --> backupPkg
   backupcli --> secretfile
+  web --> store
   web --> domainSvc
   web --> appSvc
   web --> backupPkg
@@ -237,6 +272,7 @@ single-connection trade-off that follows from it.
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
+| `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
 
 Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
@@ -247,17 +283,17 @@ Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
 `postfix reload` in `postrotate` — see § Log tailer above).
 
 **Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
-`/data` tree; version check on restore. Stopped-container `tar` of `./data` is
-safe (see README).
+`/data` tree, minus `log/`, the setup token and any `tls/`; version check on
+restore. Stopped-container `tar` of `./data` is safe (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
 scrypt → AES-256-GCM over 64 KiB chunks, each authenticated with the header,
 its counter and an end-of-stream flag (so truncation and reordering fail to
-open). Full backup `.tar.gz` → `.spbk`, domain export `.json` → `.spde`; the
-plain forms remain the default. Domain import detects the envelope by magic
-bytes; an encrypted full backup is converted back with `selfpost-backup
--decrypt` before restore.
+open). Full backup `.tar.gz` → `.spbk` (SelfPost backup), domain export
+`.json` → `.spde` (SelfPost domain export); the plain forms remain the
+default. Domain import detects the envelope by magic bytes; an encrypted full
+backup is converted back with `selfpost-backup -decrypt` before restore.
 
 ---
 
@@ -270,5 +306,5 @@ origin check, no CSRF tokens) are documented there separately.
 
 ## Configuration
 
-Public and internal env vars: [README § Environment variables](../README.md#environment-variables).
+Public and internal env vars: [guide § Environment variables](guide.md#environment-variables).
 Regression test: [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go).

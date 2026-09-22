@@ -17,7 +17,7 @@ const (
 	StatusDeferred = "deferred"
 	StatusBounced  = "bounced"
 	// StatusRejected marks a message the journal-milter refused with a 4xx under
-	// a level-2 rate limit (README § Rate limiting). Such a row never gets a
+	// a level-2 rate limit (guide § Rate limiting). Such a row never gets a
 	// queue-id and is excluded from the level-2 message count (it was never
 	// sent).
 	StatusRejected = "rejected"
@@ -55,7 +55,7 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 }
 
 // InsertRejected records a message the journal-milter refused under a level-2
-// rate limit (README § Rate limiting), so the rejection is visible in the
+// rate limit (guide § Rate limiting), so the rejection is visible in the
 // send-log UI. Only the fields known at MAIL FROM are set (domain, sender, app
 // login); there is no queue-id or recipient because the message was rejected
 // before it was queued.
@@ -91,6 +91,45 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// QueuedDelivery is a send-log row still waiting for a delivery result,
+// reduced to what the log-tailer's reconcile sweep needs to look it up in the
+// Postfix queue and, failing that, to close it (architecture.md § Log tailer).
+type QueuedDelivery struct {
+	QueueID string
+	To      string
+}
+
+// ListQueuedOlderThan returns the rows still marked "queued" that were accepted
+// before cutoff — old enough that Postfix should long since have reported a
+// result for them. Rows without a queue-id are skipped: the milter refused
+// those before Postfix ever saw the message, so the queue has nothing to say
+// about them.
+//
+// created_at is stored as RFC3339 UTC, so a lexical comparison against the same
+// format is chronologically correct.
+func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
+	rows, err := s.db.Query(
+		`SELECT queue_id, to_addr FROM send_log
+		 WHERE status = ? AND queue_id <> '' AND created_at < ?
+		 ORDER BY id`,
+		StatusQueued, cutoff.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list queued send_log rows: %w", err)
+	}
+	defer rows.Close()
+
+	var out []QueuedDelivery
+	for rows.Next() {
+		var d QueuedDelivery
+		if err := rows.Scan(&d.QueueID, &d.To); err != nil {
+			return nil, fmt.Errorf("scan queued send_log row: %w", err)
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
 }
 
 // SendLogRow is one row as returned to the monitoring UI (architecture.md §

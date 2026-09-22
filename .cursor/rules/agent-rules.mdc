@@ -1,0 +1,24 @@
+---
+description: Agent rules for the SelfPost repository (formerly spec §12)
+alwaysApply: true
+---
+
+# Agent rules
+
+1. **No git commits** without an explicit instruction in the prompt.
+2. After Go changes: `go build`, `go vet`; fix all issues. Run `go test` when
+   tests exist.
+3. Before calling a container task done: the image builds and the container starts.
+4. Iterate: minimal skeleton first, then features.
+5. Security requirements — `docs/security.md`; implement with the feature, not deferred.
+6. Do not implement out-of-scope items (`docs/product.md`); do not change fixed
+   assumptions without agreement.
+7. For large tasks: propose a plan before coding unless the user already approved one.
+8. Check licence compatibility of new Go dependencies (permissive or GPL-family for
+   AGPL-3.0).
+
+Model routing — `docs/development.md` § «Model routing». Pre-release security
+**review** (not authorship) — Fable.
+
+Commit protocol, CHANGELOG, and phase closure — `docs/development.md` §
+«Commits and release build» and «Phase closure».

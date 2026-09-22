@@ -5,6 +5,196 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-09
+
+A documentation and packaging release: no change to the mail path, the
+database, or the on-disk layout. Upgrading is a tag bump.
+
+### Added
+
+- `SECURITY.md` — how to report a vulnerability privately (GitHub private
+  vulnerability reporting, `public@mixeme.ru` as fallback), which releases get
+  fixes, and what is in and out of scope for a relay. No response time is
+  promised. Without it a finder's default move is a public issue, which
+  discloses a relay flaw to everyone the moment it is filed.
+- [docs/plans/](docs/plans/) — one document per agreed extension: the optional
+  inbound relay, the domain-admin role, and splitting the oversized `web`
+  package. Each states scope, open questions, and what has to be true before
+  coding starts. [docs/roadmap.md](docs/roadmap.md) is restructured around them
+  as a 1.x+ tracker instead of a 2.x wishlist, and now says how to read it from
+  outside the project: nothing in it is a commitment, there are no dates, and
+  the stated order is a recommendation.
+
+### Changed
+
+- The panel's **Account** entry is now called **Settings** — nav link, page
+  heading, browser title, and the operator guide. The route stays `/account`,
+  so existing links and bookmarks are unaffected.
+- The signed-in name in the panel's nav is now labelled `User:`, so it reads as
+  the current account rather than as a stray word above the Settings link.
+- [docs/product.md](docs/product.md) reframes the future line: the inbound
+  relay and the domain-admin role are agreed **1.x+** extensions tracked in the
+  roadmap and the plans, with the inbound relay targeting a MINOR bump by
+  default and a 2.x major still possible pending implementation. Only items the
+  roadmap still marks *candidate* need explicit approval before coding. It
+  previously put the whole line behind a 2.x.x that nothing had committed to.
+- [docs/security.md](docs/security.md) is now in English, matching the rest of
+  the published docs — it is linked from the README table and from
+  `SECURITY.md`, so a reader following either landed in Russian. Content is
+  unchanged: same requirements, same accepted risks, same ADR. The reviewing
+  model is no longer named in the text; the fact that a pre-release review ran,
+  and its date, stay. The roadmap and the plans are in English for the same
+  reason, and neither records the model assigned to an item any more.
+- The README documentation table now points at `SECURITY.md` for reporting a
+  vulnerability, and the `docs/security.md` row is renamed *Security design* —
+  with two files a reader could reasonably call "security", the table said
+  which is which only by accident. The roadmap row no longer calls the file
+  internal and Russian, because it is neither. `development.md` lists
+  `SECURITY.md` among the user-facing deliverables.
+- `docs/development.md` records the decision on authorship: SelfPost is written
+  by AI agents under a maintainer's direction and the project discloses that,
+  so the `Co-Authored-By` trailers, the model routing table, and the agent
+  rules file all stay. Written down to settle the question rather than have it
+  reopened at each release.
+- The two remaining Russian source comments are in English:
+  `deploy/traefik/extract-cert.sh` (quote from spec 10.3) and
+  `internal/app/sasl.go`, where the quotation from the closed plan is dropped
+  rather than translated — rendered in English it restated the sentence it was
+  attached to. The Cyrillic that remains is test data, where it is the point.
+
+### Fixed
+
+- The panel's static assets are served with a content ETag and
+  `Cache-Control: no-cache`. They are embedded in the binary, so their
+  modification times are the zero value and no `Last-Modified` was sent; with
+  no validator at all the browser was free to guess how long to keep them,
+  which is why a tab kept showing the previous favicon after the new mark
+  shipped. Each asset is now hashed once at startup, so an unchanged one costs
+  a bodyless 304 and a changed one is picked up on the next load. A browser
+  that cached an asset *before* this release still has nothing to revalidate
+  against, so that one copy has to be cleared by hand.
+
+## [1.0.0] - 2026-08-09
+
+### Added
+
+- A **Delivery log** on each delivery's page (`/deliveries/{id}`): the
+  `mail.log` lines Postfix wrote about that message, oldest first — the
+  connection to the receiving server, its reply, and the status that reply was
+  filed as. It is a table of two columns, when and what, so the seconds between
+  the connection and the reply line up down one edge; the timestamp is the
+  log's own wall clock without its microseconds and offset, and a line whose
+  head is not a timestamp keeps its whole text under *Message*
+  (`logtail.SplitTimestamp`, which reads both postlogd's format and syslog's).
+  The queue id was printed on this page as something to go and search
+  the system log for by hand; the search is done for the operator instead
+  (`logtail.QueueLines`). The read is a bounded tail of the current log and
+  matches only lines carrying this message's queue id, anchored so a shorter id
+  is not found inside a longer one. Send-log rows outlive `mail.log` — retention
+  is ninety days, rotation keeps fourteen files — so a message with no lines
+  left says so rather than reporting a failure.
+- A **History** block on the same page: the journal's two timestamps stated as
+  the steps they stand for — accepted and queued, then delivered, deferred,
+  bounced, or refused before queueing — each with the status it reached in the
+  panel's own ok/warn/error/unknown badge vocabulary. A message still queued
+  shows the delivery report it is waiting for as a step that has not happened.
+
+### Fixed
+
+- Postfix config: copy TLS cert/key from the (often `:ro`, host-owned) mount
+  into `/etc/postfix/tls-internal` as `root:root` before `postconf` /
+  `postfix check`. Bind-mounted keys owned by the CI/host UID made
+  `postfix check` fail and the container exit before supervisord started.
+- Postfix config: allow `maillog_file` under `/data` via
+  `maillog_file_prefixes=/var,/dev/stdout,/data`, and pin the `postlog`
+  master.cf service. After mail.log moved to `/data/log`, `postfix check`
+  fatally rejected the path (default prefixes are only `/var` and
+  `/dev/stdout`) and often left stderr/mail.log empty.
+- E2e: read `/data/setup-token` via `docker compose exec` (file is `0600`
+  panel-owned; host `ReadFile` got permission denied on CI). Reclaim `/data`
+  ownership before TempDir/stage cleanup so panel/postfix UIDs do not fail
+  Go's `RemoveAll`.
+- Entrypoint: check `SELFPOST_HOSTNAME` before `/data` setup (so a bad identity
+  fails with the FATAL text, not an earlier `set -e` abort), and `chmod 755
+  /data` after chown so OpenDKIM/Postfix can traverse bind mounts that arrive
+  as mode `0700` (Go `TempDir`, some host umasks) — otherwise KeyTable is
+  unreachable and the container crash-loops. E2e stand uses `restart: "no"` and
+  surfaces selfpost logs from the supervisor readiness check.
+- E2e gate: wait for host-published `/healthz` before panel setup, and stop
+  ordered `TestE2E` subtests after a failure so a nil panel client cannot panic
+  and mask the real error (release CI on both amd64 and arm64).
+- Release CI: retry `docker push` / `imagetools create` on transient GHCR
+  `unknown blob` (and similar) errors after layers already uploaded.
+- A send-log row could stay `queued` forever after the container was recreated.
+  `mail.log` moved from the ephemeral `/var/log` into the data volume
+  (`/data/log/mail.log`, `./data/log/` on the host), so the delivery lines that
+  resolve a queued row now outlive the container the same way the journal does.
+  `postlogd` writes the file as user `postfix` and the unprivileged panel reads
+  it through the shared `selfpost` group (directory `2750`, file `0640`,
+  re-normalised on every start); logrotate creates each new file the same way.
+  Existing deployments need no action beyond the upgrade — the directory is
+  created on first start — but the log written by the previous image is gone
+  with its container, and the tailer starts the new file from its end.
+- A row whose delivery lines are gone for good is no longer left `queued`
+  indefinitely: every five minutes the tailer compares rows still queued from
+  more than two minutes ago against `postqueue -p`, and marks `bounced` those
+  whose message Postfix no longer holds — it will never report on them again.
+  The sweep waits until the tailer has read the log to its end (on a restart the
+  log itself holds the answer) and does nothing at all if the queue cannot be
+  listed, so a message merely in flight, or a `postqueue` that fails, never
+  closes a row.
+
+### Changed
+
+- Document what `.spbk` and `.spde` stand for (SelfPost backup / SelfPost domain
+  export) in the operator guide, security notes, architecture, and the Backup /
+  Export panel copy.
+- Docs aligned with the code: setup URL is `/setup/<token>` (README and
+  guide; local trial rewrites the printed `https://<hostname>/…` link to
+  `http://127.0.0.1:8080/…`); domain import uses the file extension / magic
+  bytes for the password field, not an "encrypted" checkbox; architecture
+  layering and route table match `web`→`store` and `POST /domains/import`;
+  OpenDKIM drops to `opendkim` via `UserID`; guide drops the archived
+  "spec 7.5" pointer, clarifies `POSTFIX_SENDER_LOGIN_MAPS` vs panel writes,
+  and states logrotate keeps 14 daily files. Intermediate CHANGELOG cuts from
+  before the published `1.0.0` image are called out in the guide and
+  `development.md`. Roadmap points at CHANGELOG `[0.5.0]` Security and
+  refreshed `internal/web` size / symbol links.
+- Full backups no longer carry `/data/log`. It is Postfix's raw log plus its
+  fourteen rotated copies — diagnostic output rather than state to restore, and
+  otherwise by far the largest thing in the archive.
+- Monitoring screens (status, mail queue, system log, deliveries) use adaptive
+  HTMX polling: 5 s while the operator is active on the page, 30 s when the tab
+  is visible but idle, and no requests while the tab is hidden. Scheduling
+  lives in `panel.js` (`data-poll` markers) instead of `hx-trigger="every …"`,
+  which would need `unsafe-eval` under the panel's CSP.
+- Documentation package consolidated into `docs/development.md`: Documentation
+  map, user-facing deliverables, maintenance rules, and code-to-prose
+  verification table (from closed `documentation-plan.md`); resuming work,
+  model routing, commits, and phase closure (from closed `progress.md`).
+  `docs/archive/` removed — history is git + CHANGELOG. README Documentation
+  index lists operator docs plus the internal roadmap. Agent rules point at
+  `development.md`.
+- The delivery page is laid out in two columns: what the journal recorded on
+  the left, what happened to the message on the right, and the delivery log at
+  full width under both. The facts the page used to stack one per line — domain,
+  application, queue id, journal id and the two timestamps — are a grid of tiles
+  instead, since a page of mostly empty rows was what the full-width stack came
+  to for six short values. The subject heads the page and the sender, recipient
+  and outcome are the line under it, so what the message was and how it ended
+  are both on the first line. The page takes the whole column rather than the
+  reading measure, as the other three monitoring pages already did.
+- `docs/development.md` restructured into stack, dependencies, build, release,
+  testing, and CI; agent rules moved to `.cursor/rules/agent-rules.mdc`;
+  dev-host-specific workflow and `example.com` references removed from docs.
+- `docs/development.md` and `.cursor/rules/agent-rules.mdc` translated to
+  English; `roadmap.md` remains Russian (internal tracker).
+- Deploy pin and local-trial image tag set to `ghcr.io/mixeme/selfpost:1.0.0`
+  (compose and git tag `v1.0.0` cut together). Retired
+  `docs/implementation-plan.md` and `docs/v1.x-closure-plan.md`; Makefile,
+  `release.yml`, and e2e comments point at `docs/development.md`. Roadmap
+  v1.x documentation/deploy tail closed.
+
 ## [0.6.0] - 2026-08-08
 
 ### Added
@@ -244,7 +434,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   null recipient of a double bounce, `orig_to=` alongside `to=`, an
   unrecognised status word, a capitalised one, and a cleanup line.
 - docs: README *Encrypting a backup or export*; `docs/security.md` §
-  *Резервная копия и экспорт домена* + accepted risk (encryption is opt-in);
+  *Backup and domain export* + accepted risk (encryption is opt-in);
   `docs/architecture.md` persistence § envelope summary.
 - docs: `docs/roadmap.md` v1.x tail — retire `implementation-plan.md` in the
   release commit (move to `docs/archive/`, retarget its references in README,
@@ -582,5 +772,5 @@ of `docs/implementation-plan.md`).
 - Security pass against spec 7.6 (exec safety, config-write sanitization,
   server-side validation, rate limiting, session/cookie hardening, output
   escaping, non-root panel) — full compliance, no code changes required.
-- Live production deployment on `selfpost.example.com` with a real Let's
-  Encrypt certificate; end-to-end delivery confirmed (DKIM pass, SPF pass).
+- Live production deployment with a real Let's Encrypt certificate;
+  end-to-end delivery confirmed (DKIM pass, SPF pass).

@@ -16,6 +16,11 @@ import (
 func runEntrypoint(t *testing.T, hostnameEnv string) (output string, exitedZero bool) {
 	t.Helper()
 	dataDir := t.TempDir()
+	// Entrypoint also chmod 755 /data; mirror that here so a pre-fix image
+	// still gets a traversable bind mount under Go's 0700 TempDir.
+	if err := os.Chmod(dataDir, 0o755); err != nil {
+		t.Fatalf("chmod data dir: %v", err)
+	}
 
 	args := []string{
 		"run", "--rm",
@@ -72,13 +77,22 @@ func TestHostnameGate(t *testing.T) {
 func runEntrypointBackground(t *testing.T, hostnameEnv string) (output string, started bool) {
 	t.Helper()
 	dataDir := t.TempDir()
+	if err := os.Chmod(dataDir, 0o755); err != nil {
+		t.Fatalf("chmod data dir: %v", err)
+	}
 	certDir := t.TempDir()
 	if err := writeSelfSignedCert(certDir+"/fullchain.pem", certDir+"/privkey.pem"); err != nil {
 		t.Fatalf("generate throwaway TLS cert: %v", err)
 	}
 	name := "selfpost-e2e-hostname-check"
 	_ = exec.Command("docker", "rm", "-f", name).Run()
-	defer exec.Command("docker", "rm", "-f", name).Run()
+	defer func() {
+		// Make bind-mounted /data deletable by Go's TempDir cleanup: the panel
+		// leaves setup-token/db/opendkim owned by container UIDs.
+		_ = exec.Command("docker", "exec", name, "sh", "-c",
+			"chown -R root:root /data && chmod -R a+rwX /data").Run()
+		_ = exec.Command("docker", "rm", "-f", name).Run()
+	}()
 
 	up := exec.Command("docker", "run", "-d", "--name", name,
 		"-e", "SELFPOST_HOSTNAME="+hostnameEnv,

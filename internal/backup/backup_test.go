@@ -39,6 +39,10 @@ func seedDataDir(t *testing.T) (dataDir, dbPath string) {
 	writeFile(t, filepath.Join(dataDir, "setup-token"), "secret-token")
 	writeFile(t, filepath.Join(dataDir, "selfpost.db-wal"), "wal")
 	writeFile(t, filepath.Join(dataDir, "selfpost.db-shm"), "shm")
+	// Postfix's delivery log and its rotated files: diagnostic output, not
+	// state, and the bulkiest thing under /data.
+	writeFile(t, filepath.Join(dataDir, "log", "mail.log"), "Aug  8 07:26:41 mail postfix/smtp[1]: ABC: to=<a@example.net>, status=sent (ok)")
+	writeFile(t, filepath.Join(dataDir, "log", "mail.log.1"), "older")
 	return dataDir, dbPath
 }
 
@@ -104,7 +108,10 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 		}
 	}
 	// Excluded.
-	for _, name := range []string{"setup-token", "selfpost.db-wal", "selfpost.db-shm"} {
+	for _, name := range []string{
+		"setup-token", "selfpost.db-wal", "selfpost.db-shm",
+		"log/mail.log", "log/mail.log.1",
+	} {
 		if _, ok := files[name]; ok {
 			t.Errorf("archive should not contain %s", name)
 		}
