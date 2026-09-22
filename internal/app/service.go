@@ -166,12 +166,22 @@ func (s *Service) RegeneratePassword(id int64) (string, error) {
 // Delete removes an application: its SASL account, its registry row (and address
 // rows via cascade) and its sender-map bindings, then reloads Postfix (spec
 // 7.2.8). The domain and other applications are untouched.
+//
+// The order matches domain deletion: the SASL account goes first, while the
+// login is still in the registry. Dropping the row first would, on a
+// saslpasswd2 failure, leave an account that can still authenticate to Postfix
+// but that the panel no longer knows about — an orphan no operator can see or
+// remove. Failing before the row is deleted is recoverable: the application is
+// still listed and the delete can be retried.
 func (s *Service) Delete(id int64) error {
-	a, err := s.store.DeleteApplication(id)
+	a, err := s.store.GetApplication(id)
 	if err != nil {
 		return err
 	}
 	if err := s.sasl.Delete(a.Login); err != nil {
+		return err
+	}
+	if _, err := s.store.DeleteApplication(id); err != nil {
 		return err
 	}
 	// Drop the application's level-2 limit, if any (guide § Rate limiting);

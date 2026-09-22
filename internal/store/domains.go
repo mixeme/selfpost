@@ -75,6 +75,32 @@ func (s *Store) ListDomains() ([]Domain, error) {
 	return out, rows.Err()
 }
 
+// ListDomainsForUser returns domains assigned to userID with application counts,
+// ordered by name.
+func (s *Store) ListDomainsForUser(userID int64) ([]Domain, error) {
+	rows, err := s.db.Query(`
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
+		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
+		FROM domains d
+		INNER JOIN user_domains ud ON ud.domain_id = d.id
+		WHERE ud.user_id = ?
+		ORDER BY d.name`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list domains for user: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Domain
+	for rows.Next() {
+		d, err := scanDomain(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // GetDomain returns a single domain (with its application count) by id, or
 // ErrDomainNotFound.
 func (s *Store) GetDomain(id int64) (Domain, error) {

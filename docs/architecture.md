@@ -78,7 +78,14 @@ by the panel. Socket `/run/opendkim/opendkim.sock`.
 One process, three roles:
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
-   proxy only.
+   proxy only. On start it runs `postconf -h` once for the deferred-mail retry
+   parameters (`queue_run_delay`, `minimal_backoff_time`,
+   `maximal_backoff_time`, `maximal_queue_lifetime`, `bounce_queue_lifetime`,
+   `delay_warning_time`) and caches the snapshot on the handlers config. The
+   Mail queue card and a delivery's `deferred` / `bounced` history print those
+   numbers; they never call `postconf` per request. If `postconf` is missing,
+   the panel logs a warning and uses Postfix 3.x compiled-in defaults
+   (`300s` / `4000s` / `5d` / `0`) with a muted note on the card.
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
@@ -154,32 +161,39 @@ state for an older message and the page reports it as such, not as a failure.
 ## Panel HTTP surface
 
 Canonical routes: [internal/web/web.go](../internal/web/web.go). Authenticated
-unless noted. The table below is a summary — HTMX fragment endpoints
+unless noted. Routes marked **global** return **404** for domain administrators
+(`requireGlobal()` in
+[internal/web/handlers/authz.go](../internal/web/handlers/authz.go)). The table
+below is a summary — HTMX fragment endpoints
 (`/status/fragment`, `/deliveries/rows`, `/mail-queue/body`,
 `/system-log/body`, …) and every POST variant live in `web.go`.
 
 | Route | Purpose |
 |---|---|
 | `/healthz` | Liveness (no auth) |
+| `/license` | Embedded `LICENSE` text (no auth) |
 | `/setup/*` | One-time admin bootstrap |
 | `/login`, `/logout` | Session auth |
-| `/status` | Process, cert, socket, PTR checks; machine CPU/memory/network |
-| `/domains`, `/domains/*` | Domain and application CRUD, DKIM, L2 limits |
-| `/domains/import` | Domain import (`POST`; form on the Backup page) |
-| `/deliveries` | Send log with filters |
-| `/deliveries/{id}` | One send-log row in full, with its `mail.log` lines |
-| `/mail-queue` | Postfix queue view |
-| `/system-log` | `mail.log` tail |
-| `/reload` | Reload OpenDKIM + Postfix maps |
-| `/backup` | Full backup download (page also hosts the import form) |
-| `/settings` | Admin username/password and DMARC report address |
-| `/users`, `/users/*` | Panel user CRUD (global admin only) |
+| `/account` | 308 redirect to `/settings` (pre-1.2.3 route, kept as a compat shim) |
+| `/status`, `/status/*` | **Global.** Process, cert, socket, PTR checks; machine CPU/memory/network |
+| `/domains` | Domain list; `POST /domains` (add domain) is **global** |
+| `/domains/{id}`, `/domains/{id}/*` | Assigned-domain detail for domain-admins; delete domain is **global** |
+| `/domains/import` | **Global.** Domain import (`POST`; form on the Backup page) |
+| `/deliveries`, `/deliveries/{id}` | Send log with filters; scoped to assigned domains for domain-admins |
+| `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view; retry-policy card on the page (not the HTMX fragment) |
+| `/system-log`, `/system-log/*` | **Global.** `mail.log` tail |
+| `/reload` | **Global.** `POST` — reload OpenDKIM + Postfix maps |
+| `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
+| `/settings` | Username/password for any user; DMARC report default is **global** only |
+| `/users`, `/users/*` | **Global.** Panel user CRUD |
 
 HTMX polling refreshes monitoring fragments (5 s while the operator is active on
 the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
 `panel.js` via `data-poll`, not `hx-trigger="every …"`); polling does not extend
 session idle timeout (only non-`HX-Request` GET and mutating requests count as
-activity).
+activity). The Mail queue retry-policy card is outside that fragment: it is the
+start-up `postconf -h` snapshot (see [Panel binary](#panel-binary-cmdpanel)),
+not a live re-read.
 
 ### Sessions
 
@@ -192,13 +206,16 @@ holds the cookie works after process restart, redeploy, or full backup restore.
   absolute cap (regular use keeps the session alive indefinitely).
 - **Renewal** — DB `last_seen` and cookie `Max-Age` update at most once per hour
   (`renewThreshold` in [internal/web/auth/session.go](../internal/web/auth/session.go)).
-- **Password change** — all other sessions are deleted; the current session stays
-  active ([internal/store/sessions.go](../internal/store/sessions.go),
-  [handlers_account.go](../internal/web/handlers/handlers_account.go)).
+- **Password change on `/settings`** — changing your own password deletes
+  every other session for that user; the current session stays active
+  ([internal/store/sessions.go](../internal/store/sessions.go),
+  [handlers_settings.go](../internal/web/handlers/handlers_settings.go)).
+  A global administrator resetting another user's password on `/users` updates
+  the hash but does not delete that user's existing sessions.
 
-Restoring an **older** backup also restores session rows: a session invalidated
-after that backup was taken can become valid again if the browser still has the
-cookie and idle timeout has not expired.
+Restoring an **older** backup also restores session rows: a session removed
+after that backup was taken can become valid again if the browser still holds
+the cookie and the restored row's `expires_at` has not passed.
 
 ---
 
@@ -283,19 +300,27 @@ single-connection trade-off that follows from it.
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
+| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp (consumed on restore) |
 
-Not in `/data`: TLS certificates (reverse-proxy mount), Postfix queue
-(transit mail not migrated by design).
+Not in `/data`: TLS certificates for the panel (reverse-proxy mount) — though
+full backups also archive the operator's `./certs` PEM files when present.
 
 **Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90);
 `mail.log` via logrotate (14 rotated files, check every 6h, rename +
 `postfix reload` in `postrotate` — see § Log tailer above).
 
-**Backup:** panel button or `selfpost-backup` CLI — SQLite snapshot + tar of
-`/data` tree, minus `log/`, the setup token and any `tls/`; version check on
-restore. Stopped-container `tar` of `./data` is safe (see guide).
+**Restore:** panel button or `selfpost-backup` CLI — self-contained archive:
+`data/` (SQLite snapshot + tree minus `log/`, the setup token and any `tls/`
+under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
+version check on restore. Requires the project directory mounted read-only at
+`SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
+first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
+tables and Postfix's sender map are re-derived from SQLite and both daemons are
+reloaded, so drift between the extracted archive and the database is healed
+before mail flows (same step as `POST /reload` on demand). Stopped-container
+`tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
 ([internal/secretfile](../internal/secretfile/secretfile.go)): password →
@@ -317,5 +342,36 @@ origin check, no CSRF tokens) are documented there separately.
 
 ## Configuration
 
-Public and internal env vars: [guide § Environment variables](guide.md#environment-variables).
+Public env vars: [guide § Environment variables](guide.md#environment-variables).
 Regression test: [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go).
+
+**Internal env vars.** The following are read by the panel or startup scripts
+but are not part of the operator interface — not meant to be changed in a
+normal deployment; documented here so an accidental override reads as
+unsupported rather than as a missing doc:
+
+- **Panel paths and tuning:** `SELFPOST_DATA_DIR` (`/data`), `SELFPOST_DB_PATH`
+  (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
+  (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
+  `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`), `MAIL_LOG`
+  (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
+  here has to be matched in `build/postfix-config.sh`),
+  `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
+  (`/run/opendkim/opendkim.sock`), `OPENDKIM_DIR` (`/data/opendkim`),
+  `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
+  (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
+  `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
+  (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel
+  always writes `<POSTFIX_DIR>/sender_login_maps`, so overriding this env alone
+  desyncs the map Postfix reads from the file the panel maintains),
+  `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
+  `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
+  full backups; mount `.:/selfpost-deploy:ro` in compose).
+- **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
+  `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
+  `MILTER_WAIT_TIMEOUT` (`30` seconds).
+- **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — daily
+  `postfix reload` to pick up renewed certificates),
+  `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
+  hours; logrotate keeps 14 rotated files on a daily schedule, and each
+  rotation triggers `postfix reload`).

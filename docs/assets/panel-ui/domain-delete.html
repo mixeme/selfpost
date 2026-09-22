@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete example.com — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-domain-delete" data-page="domain-delete" data-nav="domains" data-title="Delete domain">
+<main class="stack">
+  <div>
+    <h1>Delete example.com</h1>
+    <a class="back" href="domain.html">&larr; Back to example.com</a>
+  </div>
+  <div class="measure">
+    <div class="card">
+      <h2>Confirm deletion</h2>
+      <p>You are about to delete <strong>example.com</strong>. This will:</p>
+      <ul>
+        <li>permanently delete its DKIM signing key;</li>
+        <li>delete <strong>all 2 bound applications</strong>, including their SASL credentials;</li>
+        <li>reload OpenDKIM so the domain is no longer signed.</li>
+      </ul>
+      <p class="muted">This cannot be undone.</p>
+      <div class="actions-row"><button type="button" class="danger">Delete example.com</button></div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System log — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-system-log" data-page="system-log" data-nav="log" data-title="System log" data-global-only="1">
+<main class="stack">
+  <h1>System log</h1>
+  <div class="fill">
+    <div class="card">
+      <h2>Recent log entries</h2>
+      <span class="code">Aug 15 20:14:08 mail postfix/smtp[230]: 4C3A1E2F1A: to=&lt;ada@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=6, delays=0.2/0.1/0.4/5.3, dsn=4.2.1, status=deferred (450 4.2.1 mailbox busy)
+Aug 15 20:14:02 mail postfix/qmgr[119]: 4C3A1E2F1A: from=&lt;billing@example.com&gt;, size=12288, nrcpt=1 (queue active)
+Aug 15 20:14:02 mail postfix/smtpd[221]: 4C3A1E2F1A: client=203.0.113.40[203.0.113.40], sasl_method=PLAIN, sasl_username=billing
+Aug 15 20:11:40 mail postfix/smtp[228]: 4B19D0AA01: to=&lt;list-bounces@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=0.9, status=sent (250 2.0.0 Ok)
+Aug 15 20:02:11 mail postfix/smtp[226]: 4B19C0BB12: to=&lt;noreply@blocked.example&gt;, status=bounced (host mx.blocked.example[203.0.113.99] said: 550 5.7.1 rejected)</span>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

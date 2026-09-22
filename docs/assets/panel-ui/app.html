@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SelfPost — panel mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<script>
+(function () {
+  var map = {
+    login: "login.html",
+    setup: "setup.html",
+    status: "status.html",
+    domains: "domains.html",
+    domain: "domain.html",
+    "domain-delete": "domain-delete.html",
+    deliveries: "deliveries.html",
+    delivery: "delivery.html",
+    "mail-queue": "mail-queue.html",
+    "system-log": "system-log.html",
+    backup: "backup.html",
+    users: "users.html",
+    "user-form": "user-form.html",
+    "user-delete": "user-delete.html",
+    settings: "settings.html",
+    inbound: "inbound.html",
+    "inbound-domain": "inbound-domain.html",
+    "inbound-backup": "inbound-backup.html",
+    "inbound-delete": "inbound-delete.html",
+    dmarc: "dmarc.html",
+    "dmarc-domain": "dmarc-domain.html",
+    "dmarc-report": "dmarc-report.html",
+    "dmarc-report-fail": "dmarc-report-fail.html",
+    help: "help.html"
+  };
+  var h = location.hash.replace(/^#/, "");
+  location.replace((map[h] || "status.html") + location.search);
+})();
+</script>
+</head>
+<body>
+<p>Макеты собраны отдельными страницами. Откройте <a href="status.html">Status</a> или <a href="index.html">оглавление</a>.</p>
+</body>
+</html>

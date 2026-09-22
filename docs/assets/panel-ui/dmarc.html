@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMARC reports — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-dmarc" data-page="dmarc" data-nav="dmarc" data-title="DMARC" data-global-only="1">
+<main class="stack">
+  <div class="page-head">
+    <h1>DMARC reports <span class="tag future">candidate</span></h1>
+  </div>
+  <p class="muted">Aggregate reports SelfPost accepted for <code>rua=</code>. Forensic (<code>ruf=</code>) is out of scope. Open a report for the parsed XML — not a dashboard.</p>
+  <div class="pair">
+    <div class="card">
+      <h2>Ingest <span class="st st-ok">ok</span></h2>
+      <p>Last report 6 hours ago. Port 25 accepts only the configured report address.</p>
+    </div>
+    <div class="card">
+      <h2>This week</h2>
+      <p>14 kept, 0 parse failures. Older summaries are pruned.</p>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Recent reports</h2>
+      <table class="desk-only">
+        <thead><tr><th>Received</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="time muted">2026-08-15 06:12</td>
+            <td><a href="dmarc-domain.html">example.com</a></td>
+            <td class="muted">google.com</td>
+            <td>14 Aug</td>
+            <td>412</td>
+            <td>6</td>
+            <td class="actions"><a href="dmarc-report.html">View</a></td>
+          </tr>
+          <tr>
+            <td class="time muted">2026-08-15 04:40</td>
+            <td>alerts.example.com</td>
+            <td class="muted">google.com</td>
+            <td>14 Aug</td>
+            <td>88</td>
+            <td>19</td>
+            <td class="actions"><a href="dmarc-report-fail.html">View</a></td>
+          </tr>
+          <tr>
+            <td class="time muted">2026-08-14 06:08</td>
+            <td><a href="dmarc-domain.html">example.com</a></td>
+            <td class="muted">google.com</td>
+            <td>13 Aug</td>
+            <td>390</td>
+            <td>2</td>
+            <td class="actions"><a href="dmarc-report.html">View</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li>
+          <a href="dmarc-report.html">
+            <span class="st st-ok">412 pass</span><span class="when">06:12</span>
+            <span class="meta">example.com · google.com · 14 Aug</span>
+            <span class="subj">6 fail</span>
+          </a>
+        </li>
+        <li>
+          <a href="dmarc-report-fail.html">
+            <span class="st st-error">19 fail</span><span class="when">04:40</span>
+            <span class="meta">alerts.example.com · google.com · 14 Aug</span>
+            <span class="subj">88 pass</span>
+          </a>
+        </li>
+        <li>
+          <a href="dmarc-report.html">
+            <span class="st st-ok">390 pass</span><span class="when">14 Aug</span>
+            <span class="meta">example.com · google.com · 13 Aug</span>
+            <span class="subj">2 fail</span>
+          </a>
+        </li>
+      </ul>
+      <p class="muted">Each row is one aggregate XML SelfPost parsed. Domain names open the roll-up for that sending domain.</p>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

@@ -167,6 +167,14 @@ func (o *OpenDKIM) Reload() error {
 	return o.reload()
 }
 
+// SetReloadHook replaces how configuration is applied after a rebuild. Tests
+// that cannot reach supervisord use this to verify file regeneration alone.
+func (o *OpenDKIM) SetReloadHook(fn func() error) {
+	if fn != nil {
+		o.reload = fn
+	}
+}
+
 // renderTables builds the KeyTable and SigningTable byte contents for a domain
 // set, sorted by name so the output is deterministic. Every domain is
 // re-checked for shell/config-injection safety before being written

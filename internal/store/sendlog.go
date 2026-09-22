@@ -178,15 +178,29 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 	return row, nil
 }
 
-// SendLogFilter narrows QuerySendLog/CountSendLog by domain and/or
-// application login. An empty field matches everything.
+// SendLogFilter narrows QuerySendLog/CountSendLog. It carries two kinds of
+// narrowing, and they behave in opposite ways on purpose.
+//
+// Domain and AppLogin are the operator's own filters, chosen in the UI: an
+// empty field matches everything.
+//
+// Domains and AllDomains are the authorization scope, which no query parameter
+// may widen. Domains is the exhaustive set of domain names the caller is
+// entitled to read, applied as an IN constraint; AllDomains lifts that
+// restriction and is the only way to read the whole journal. A zero-valued
+// filter therefore matches *no* rows: a caller that forgets to state a scope
+// gets an empty log rather than every tenant's mail, which is the failure mode
+// this struct exists to make impossible.
 type SendLogFilter struct {
-	Domain   string
-	AppLogin string
+	Domain     string
+	AppLogin   string
+	Domains    []string
+	AllDomains bool
 }
 
 // QuerySendLog returns send-log rows matching filter, newest first, for the
 // monitoring screen's server-side pagination (product.md's send-log view).
+// The filter's authorization scope is mandatory: see SendLogFilter.
 func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLogRow, error) {
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
@@ -233,6 +247,20 @@ func (s *Store) CountSendLog(filter SendLogFilter) (int64, error) {
 func sendLogWhere(f SendLogFilter) (string, []any) {
 	var clauses []string
 	var args []any
+	if !f.AllDomains {
+		// No scope is not "no restriction": a domain administrator whose last
+		// assignment was deleted owns nothing in the journal and must see
+		// nothing, and the same clause catches a caller that never set a scope.
+		if len(f.Domains) == 0 {
+			return " WHERE 1 = 0", nil
+		}
+		marks := make([]string, len(f.Domains))
+		for i, name := range f.Domains {
+			marks[i] = "?"
+			args = append(args, name)
+		}
+		clauses = append(clauses, "domain IN ("+strings.Join(marks, ", ")+")")
+	}
 	if f.Domain != "" {
 		clauses = append(clauses, "domain = ?")
 		args = append(args, f.Domain)

@@ -1,9 +1,39 @@
-{{/* A table of queue ids, sizes, senders and recipients: the whole column
-     rather than the reading measure (see the "wide" block in layout.html). */}}
+{{/* Mail queue is two cards in the whole column: the retry-policy snapshot
+     (static, outside the HTMX poll) and the live postqueue listing. */}}
 {{define "wide"}}wide{{end}}
 
 {{define "content"}}
 <h1>Mail queue</h1>
+
+<div class="card" id="retry-policy">
+  <h2>How delivery retries work</h2>
+  <p class="muted">This Postfix's policy, read once at panel start. There is
+  no maximum attempt count — only time. A deferred message stays in this
+  listing until it is delivered or the queue lifetime runs out.</p>
+  {{if .RetryFromDefaults}}
+  <p class="muted">Could not read the effective Postfix configuration;
+  showing compiled-in defaults. A live change is visible after the next
+  panel restart.</p>
+  {{end}}
+  <div class="facts retry-facts">
+    <div class="fact">
+      <span class="fact-label">First retry</span>
+      <span class="fact-value">{{.FirstRetry}}</span>
+    </div>
+    <div class="fact">
+      <span class="fact-label">Later retries</span>
+      <span class="fact-value">doubling, cap {{.BackoffCap}}</span>
+    </div>
+    <div class="fact">
+      <span class="fact-label">Kept in queue</span>
+      <span class="fact-value">{{.QueueLifetime}}</span>
+    </div>
+    <div class="fact">
+      <span class="fact-label">Then</span>
+      <span class="fact-value">bounced</span>
+    </div>
+  </div>
+</div>
 
 <div class="card">
   <h2>Pending messages</h2>

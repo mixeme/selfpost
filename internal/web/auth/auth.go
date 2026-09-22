@@ -51,6 +51,8 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		loginLimiter:   newRateLimiter(10, 15*time.Minute),
 		trustedProxies: cfg.TrustedProxyCIDRs,
 	}
+	m.setupLimiter.startSweeper()
+	m.loginLimiter.startSweeper()
 	m.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
 	return m
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -107,15 +108,15 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
 	logRows, logNote := h.deliveryLog(row)
 	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
-		"Title":  "SelfPost — delivery",
-		"User":   auth.CurrentUser(r),
-		"Active": "deliveries",
+		"Title":    "SelfPost — delivery",
+		"User":     auth.CurrentUser(r),
+		"Active":   "deliveries",
 		"IsGlobal": p.IsGlobal(),
-		"Row":    row,
+		"Row":      row,
 		// The status in the panel's own badge vocabulary, so the headline reads
 		// the same way as every other health signal in the panel.
 		"Level":  deliveryLevel(row.Status),
-		"Events": deliveryEvents(row),
+		"Events": deliveryEvents(row, h.cfg.RetryPolicy),
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
 		"LogRows": logRows,
@@ -173,7 +174,9 @@ type deliveryEvent struct {
 // timestamps *are* the history, and stating them as steps is what makes a row
 // whose created_at and updated_at differ by six hours legible as "queued for
 // six hours, then delivered" rather than as two dates in a list of fields.
-func deliveryEvents(row store.SendLogRow) []deliveryEvent {
+// policy supplies the human intervals for deferred and bounced copy, the same
+// strings the Mail queue card prints, so the two cannot drift.
+func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []deliveryEvent {
 	// A rejected message has no second step, and its first one is not an
 	// acceptance: the journal-milter refused it, so Postfix never queued it.
 	if row.Status == store.StatusRejected {
@@ -217,7 +220,8 @@ func deliveryEvents(row store.SendLogRow) []deliveryEvent {
 			Level:  "warn",
 			Status: store.StatusDeferred,
 			Title:  "Deferred, will be retried",
-			Detail: "The receiving server could not take the message yet. Postfix keeps it queued and retries until it is delivered or the queue lifetime runs out.",
+			Detail: fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
+				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime()),
 		})
 	case store.StatusBounced:
 		return append(events, deliveryEvent{
@@ -225,7 +229,8 @@ func deliveryEvents(row store.SendLogRow) []deliveryEvent {
 			Level:  "error",
 			Status: store.StatusBounced,
 			Title:  "Bounced",
-			Detail: "Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after the queue lifetime. The reason is in the delivery log below.",
+			Detail: fmt.Sprintf("Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after %s in the queue. The reason is in the delivery log below.",
+				policy.QueueLifetime()),
 		})
 	default:
 		// A status the log-tailer learns to write before this switch does.
@@ -299,47 +304,28 @@ func deliveriesBackURL(r *http.Request) string {
 // sendLogData reads the domain/app filters and page number off the query
 // string, queries the store, and assembles everything the template needs
 // (filter dropdown options plus the current selection, rows, and pagination).
+//
+// The invariant this function owes the journal: a principal who is not global
+// only ever reads rows for the domains assigned to them. That scope is stated
+// to the store as SendLogFilter.Domains and holds for every number of
+// assignments, including none — a domain administrator whose last domain was
+// deleted gets an empty log, not the whole one. The query parameters are
+// filters *within* that scope and can only narrow it: both are checked against
+// the assigned domains and their applications before the query runs, because a
+// dropdown that offers only permitted values is a courtesy to the browser, not
+// a check on the request.
 func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	p, ok := h.principal(r)
 	if !ok {
 		return nil, errors.New("no principal")
 	}
 	q := r.URL.Query()
-	filter := store.SendLogFilter{
-		Domain:   q.Get("domain"),
-		AppLogin: q.Get("app"),
-	}
 
 	assigned, err := h.assignedDomains(p)
 	if err != nil {
 		return nil, err
 	}
 	allowedNames := domainNameSet(assigned)
-
-	if !p.IsGlobal() {
-		if filter.Domain != "" && !allowedNames[filter.Domain] {
-			filter.Domain = ""
-		}
-		if filter.Domain == "" && len(assigned) == 1 {
-			filter.Domain = assigned[0].Name
-		}
-	}
-
-	page := parsePage(q.Get("p"))
-
-	total, err := h.store.CountSendLog(filter)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
-	if err != nil {
-		return nil, err
-	}
-	view := make([]sendLogRow, len(rows))
-	for i := range rows {
-		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
-		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
-	}
 
 	domainNames := make([]string, 0, len(assigned))
 	for _, d := range assigned {
@@ -362,8 +348,37 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	}
 	sort.Strings(logins)
 
-	if !p.IsGlobal() && filter.AppLogin != "" && !loginSet[filter.AppLogin] {
-		filter.AppLogin = ""
+	filter := store.SendLogFilter{
+		Domain:   q.Get("domain"),
+		AppLogin: q.Get("app"),
+		// A global administrator reads the whole journal, including rows left
+		// behind by a domain that has since been deleted.
+		Domains:    domainNames,
+		AllDomains: p.IsGlobal(),
+	}
+	if !p.IsGlobal() {
+		if filter.Domain != "" && !allowedNames[filter.Domain] {
+			filter.Domain = ""
+		}
+		if filter.AppLogin != "" && !loginSet[filter.AppLogin] {
+			filter.AppLogin = ""
+		}
+	}
+
+	page := parsePage(q.Get("p"))
+
+	total, err := h.store.CountSendLog(filter)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
+	if err != nil {
+		return nil, err
+	}
+	view := make([]sendLogRow, len(rows))
+	for i := range rows {
+		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
+		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
 	}
 
 	lastPage := 1
@@ -402,13 +417,18 @@ func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, errText := readQueue()
+	policy := h.cfg.RetryPolicy
 	h.view.Render(w, http.StatusOK, "mail_queue", map[string]any{
-		"Title":    "SelfPost — mail queue",
-		"User":     auth.CurrentUser(r),
-		"Active":   "mail_queue",
-		"IsGlobal": true,
-		"Output":   out,
-		"Error":    errText,
+		"Title":             "SelfPost — mail queue",
+		"User":              auth.CurrentUser(r),
+		"Active":            "mail_queue",
+		"IsGlobal":          true,
+		"Output":            out,
+		"Error":             errText,
+		"FirstRetry":        policy.FirstRetry(),
+		"BackoffCap":        policy.BackoffCap(),
+		"QueueLifetime":     policy.QueueLifetime(),
+		"RetryFromDefaults": policy.FromDefaults,
 	})
 }
 

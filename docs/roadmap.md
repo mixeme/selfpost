@@ -15,7 +15,9 @@ planned but unlisted.
 
 **Versioning:** SemVer MINOR in the **1.x+** line by default (`1.1.0`…), as long
 as defaults and migrations stay compatible with `1.0.0`. A major `2.x` only for
-an explicit break.
+an explicit break. One such break, when 2.x is cut for any reason, is
+[schema-squash](#schema-squash) — replacing the 1.x SQLite migration chain
+with a baseline. That item does not by itself justify a major.
 
 **Process:** [development.md](development.md). The history of closed phases is
 in `git log` and [CHANGELOG.md](../CHANGELOG.md).
@@ -24,19 +26,27 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Index
 
-| ID | Topic | Status | Plan |
-|---|---|---|---|
-| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | [plans/inbound-relay.md](plans/inbound-relay.md) |
-| contributing | `CONTRIBUTING.md` | candidate | — |
-| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
-| panel-docs | In-panel operator documentation | candidate | — |
+| ID | Topic | Status | Progress | Plan |
+|---|---|---|---|---|
+| inbound-relay | Inbound relay (backup-MX / forwarding) | **agreed** | 0/15 | [plans/inbound-relay.md](plans/inbound-relay.md) |
+| send-log-retention | Send-log retention days in panel Settings | candidate | 0/8 | [plans/send-log-retention.md](plans/send-log-retention.md) |
+| domain-stats-auto-ratelimit | 30-day send stats + auto level-2 rate limit | candidate | 0/11 | [plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md) |
+| contributing | `CONTRIBUTING.md` | candidate | — | — |
+| dmarc-reports | DMARC aggregate report ingestion and panel UI | candidate | 0/8 | [plans/dmarc-reports.md](plans/dmarc-reports.md) |
+| panel-docs | In-panel operator documentation | candidate | 0/6 | [plans/panel-docs.md](plans/panel-docs.md) |
+| schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): **inbound-relay** first among agreed
-items — it is the largest remaining 1.x+ extension. Candidates need explicit
-agreement before they join the queue.
+**Recommended order** (not binding): the next feature is **inbound-relay**.
+**send-log-retention** can land before or beside **domain-stats-auto-ratelimit**
+(panel retention ≥ 30 days helps the stats window). queue-retries shipped in
+[CHANGELOG.md](../CHANGELOG.md) `[1.3.1]`; the 2026-08-13 full-tree review
+follow-ups are in `[1.3.0]`. Candidates need explicit agreement before they
+join the queue.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
-the checklist in its linked plan.
+the **Implementation checklist** in its linked plan. The `Progress` column above
+is `done/total` checklist steps in that plan ([development.md](development.md)
+§ Plan checklists).
 
 ---
 
@@ -58,6 +68,44 @@ engine stays outside the image, only the attachment point is provided.
 a wider attack surface (port 25 accepting mail).
 **Version:** target bump `1.x`; `2.x` possible — to be settled once the
 implementation lands.
+
+---
+
+## send-log-retention
+
+**Goal:** global administrator sets how many days of delivery journal rows
+(`send_log`, `/deliveries`) are kept, from `/settings` — stored in SQLite
+`settings`, with `SEND_LOG_RETENTION_DAYS` as bootstrap default only.
+
+**Boundary:** instance-wide retention; not per-domain. Does not change
+`mail.log` rotation. Today retention is env-only (default 90 days); the panel
+has no control.
+
+**Done when:** see [plans/send-log-retention.md](plans/send-log-retention.md).
+
+**Dependencies / risks:** log-tailer must re-read settings each prune cycle;
+delivery UI must stop hardcoding «ninety days».
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+
+---
+
+## domain-stats-auto-ratelimit
+
+**Goal:** 30-day sending statistics per domain and application (total, peak and
+average msg/h) on the domain page, plus optional **auto** level-2 rate limits
+computed as `ceil(avg_hourly × multiplier)` over the level-1 window.
+
+**Boundary:** extension of v1.0 manual L2 limits; does not change Postfix
+level 1. Stats exclude level-1 refusals (not in send log). Auto with zero
+traffic stays inactive.
+
+**Done when:** see
+[plans/domain-stats-auto-ratelimit.md](plans/domain-stats-auto-ratelimit.md).
+
+**Dependencies / risks:** send log data and preferably
+[send-log-retention](#send-log-retention) ≥ 30 days; aggregate query cost on
+large logs; rate-limit path needs security review.
+**Version:** `1.x` MINOR; `candidate` until explicitly agreed.
 
 ---
 
@@ -94,9 +142,10 @@ reports (`ruf=`) out of scope for v1.
 
 **Dependencies / risks:** inbound SMTP in the image (may share infrastructure
 with [inbound-relay](plans/inbound-relay.md) but must not require backup-MX);
-storage and retention of parsed summaries; the `admin.dmarc_report_email` and
-`domains.dmarc_rua` settings added in the DMARC template work must stay the
-source of truth for `rua=` in DNS guidance.
+storage and retention of parsed summaries; the `dmarc_report_email` setting
+(migration `0005` moved it off the old `admin` table into `settings`) and
+`domains.dmarc_rua` added in the DMARC template work must stay the source of
+truth for `rua=` in DNS guidance.
 
 **Order:** after the DMARC `rua=` settings ship; may follow or overlap with
 inbound-relay depending on how port 25 acceptance is structured.
@@ -126,4 +175,41 @@ read the git tree for day-to-day meaning of a card.
 when checks change; not bloating every page with a second column of prose.
 
 **Version:** `1.x` MINOR; `candidate` until explicitly agreed.
+
+---
+
+## schema-squash
+
+**Goal:** when 2.x is cut, stop shipping the 1.x migration files
+(`0001_init.sql` … `0005_panel_users.sql`) in the binary and replace them with
+one baseline that is the schema as of `user_version = 5`. Fresh 2.x data
+directories no longer create-then-drop the historical `admin` table.
+
+**Boundary:** 1.x keeps the full chain so a 1.0.0 data directory still boots.
+Do not delete, rename, or reorder those files while MINOR compatibility with
+`1.0.0` holds. `migrate()` maps **file order** to `PRAGMA user_version` (`target
+= i + 1`); dropping a file in 1.x would skip or mis-apply steps on existing
+databases. Git history keeps the old files either way; only the embedded set
+in the 2.x image changes.
+
+**Upgrade gate (required with the squash):**
+
+| `user_version` | 2.x behaviour |
+|---|---|
+| `0` (empty file) | Apply the baseline; set `user_version` to the new chain’s head |
+| `>= 5` (fully migrated 1.x) | Skip; schema is already the baseline |
+| `1`…`4` (mid-chain 1.x) | **Refuse to start** — boot the last 1.x once, then 2.x |
+
+Restore remains a separate lock: the backup manifest version must match the
+running binary ([architecture.md](architecture.md) § Persistence). It does not
+replace this gate.
+
+**Done when:** 2.x embeds a single baseline (plus any 2.x-only migrations after
+it); the gate above is tested; the operator guide says a 2.x image will not
+open an unfinished 1.x database.
+
+**Dependencies / risks:** a decided 2.x cut (another breaking change, or an
+explicit major). Squashing five short files is not a reason to cut 2.x on its
+own. A missed gate leaves a `user_version = 3` database silently stuck.
+**Version:** `2.x` major only; not a 1.x item.
 

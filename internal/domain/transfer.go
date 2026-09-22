@@ -23,7 +23,7 @@ type DomainExport struct {
 	Version        string      `json:"version"`
 	Domain         string      `json:"domain"`
 	DKIMSelector   string      `json:"dkim_selector"`
-	DKIMPrivateKey string      `json:"dkim_private_key"` // PKCS#1 PEM
+	DKIMPrivateKey string      `json:"dkim_private_key"`    // PKCS#1 PEM
 	DMARCRua       *string     `json:"dmarc_rua,omitempty"` // nil = inherit profile; set = override ("" = none)
 	Applications   []AppExport `json:"applications"`
 }

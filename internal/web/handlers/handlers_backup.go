@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mixeme/selfpost/internal/backup"
@@ -70,6 +71,11 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
 		return
 	}
+	if err := backup.ValidateDeployRoot(h.cfg.DeployRoot); err != nil {
+		logf("panel: full backup: %v", err)
+		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", deployBackupErr(err))
+		return
+	}
 
 	stamp := time.Now().UTC().Format("20060102-150405")
 	filename := fmt.Sprintf("selfpost-backup-%s.tar.gz", stamp)
@@ -105,9 +111,13 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := backup.Create(sink, backup.Params{
-		DataDir: h.cfg.DataDir,
-		DBPath:  h.cfg.DBPath,
-		Version: h.cfg.Version,
+		DataDir:    h.cfg.DataDir,
+		DBPath:     h.cfg.DBPath,
+		Version:    h.cfg.Version,
+		DeployRoot: h.cfg.DeployRoot,
+		OnWarn: func(msg string) {
+			logf("panel: full backup: %s", msg)
+		},
 	}); err != nil {
 		logf("panel: full backup failed: %v", err)
 		return
@@ -308,6 +318,14 @@ func decryptErrorMessage(err error) string {
 	default:
 		return "Could not decrypt the file."
 	}
+}
+
+// deployBackupErr phrases a pre-flight backup failure for the operator.
+func deployBackupErr(err error) string {
+	if strings.Contains(err.Error(), "DeployRoot") || strings.Contains(err.Error(), "deploy root") {
+		return "Full backup needs the project directory mounted read-only at /selfpost-deploy — add <code>.:/selfpost-deploy:ro</code> to docker-compose.yml and recreate the container."
+	}
+	return "Could not create the backup: " + err.Error()
 }
 
 // importErrorMessage maps a domain-import failure (already logged by the caller)

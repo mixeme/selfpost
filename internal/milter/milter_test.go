@@ -3,6 +3,7 @@ package milter
 import (
 	"errors"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,7 +16,10 @@ import (
 // swallows recorder errors and still accepts the message. By default it reports
 // no configured rate limit, so the level-2 check is inert unless a test sets
 // limits (see fakeRecorder fields).
+// mu guards the recorded slices so several sessions may drive one recorder
+// concurrently, as they do in the real server.
 type fakeRecorder struct {
+	mu       sync.Mutex
 	entries  []store.SendLogEntry
 	rejected []store.SendLogEntry
 	fail     bool
@@ -27,17 +31,25 @@ type fakeRecorder struct {
 	counts    map[string]int64
 	lookupErr error
 	countErr  error
+
+	// onCount, if set, runs inside CountMessages. It lets a test hold every
+	// racing session at the store lookup until they can all proceed together.
+	onCount func()
 }
 
 func (f *fakeRecorder) InsertQueued(e store.SendLogEntry) error {
 	if f.fail {
 		return errors.New("boom")
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.entries = append(f.entries, e)
 	return nil
 }
 
 func (f *fakeRecorder) InsertRejected(e store.SendLogEntry) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.rejected = append(f.rejected, e)
 	return nil
 }
@@ -56,6 +68,9 @@ func (f *fakeRecorder) RateLimit(scope, ref string) (store.RateLimit, bool, erro
 func (f *fakeRecorder) CountMessages(scope, ref string, _ time.Time) (int64, error) {
 	if f.countErr != nil {
 		return 0, f.countErr
+	}
+	if f.onCount != nil {
+		f.onCount()
 	}
 	return f.counts[scope+"|"+ref], nil
 }
@@ -415,6 +430,58 @@ func TestRateLimitCountsInFlightMessages(t *testing.T) {
 	}
 }
 
+// The case above is sequential: the second session reads the stored count after
+// the first has already reserved. Here every session reads it first — the gate
+// holds them all inside the lookup — which is what concurrent SMTP connections
+// actually do. However many then race for the single free slot, exactly one may
+// pass. (TestTryAdmitHandsOutEachSlotOnce is the test that fails when counting
+// and reserving are not one step; this one pins the session-level behaviour.)
+func TestRateLimitAdmitsOnlyOneRacingSession(t *testing.T) {
+	rec := limitedRecorder(4) // one below the ceiling of 5
+	fl := &inflight{}
+	gate := make(chan struct{})
+
+	// Every session is held inside the stored-count lookup until all of them
+	// have read it, which is the state the race needs: none of them can see
+	// another's reservation, because none has been taken yet.
+	const racers = 32
+	var atCount, done sync.WaitGroup
+	atCount.Add(racers)
+	go func() { atCount.Wait(); close(gate) }()
+	rec.onCount = func() { atCount.Done(); <-gate }
+
+	responses := make([]milter.Response, racers)
+	for i := range racers {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			// Connect is skipped so every goroutine starts from the same point;
+			// the client IP is what Connect would have captured.
+			s := &session{rec: rec, flight: fl, clientIP: limitIP}
+			resp, err := s.MailFrom("a@example.com", mods(map[string]string{"auth_authen": "app1"}))
+			if err != nil {
+				resp = nil // reported as a missing Continue below
+			}
+			responses[i] = resp
+		}()
+	}
+	done.Wait()
+
+	admitted := 0
+	for _, resp := range responses {
+		if resp == milter.RespContinue {
+			admitted++
+		}
+	}
+	if admitted != 1 {
+		t.Fatalf("%d of %d racing sessions admitted, want exactly 1 — the last slot was handed out twice",
+			admitted, racers)
+	}
+	if n := fl.count(store.RateLimitScopeDomain+"|example.com", time.Now().Add(-time.Hour)); n != 1 {
+		t.Fatalf("in-flight reservations = %d, want 1", n)
+	}
+}
+
 // Once the message is recorded the stored count sees it, so its reservation
 // must be given back — otherwise it would be counted twice and the ceiling
 // would drift closed.
@@ -477,12 +544,55 @@ func TestRefusalDoesNotLeaveDomainReservation(t *testing.T) {
 	}
 }
 
+// The ceiling is handed out exactly max times however the sessions interleave.
+// Counting and reserving in two critical sections passes the sequential tests
+// above and still overshoots here, because between one session's count and its
+// reservation any number of others can pass the same check.
+func TestTryAdmitHandsOutEachSlotOnce(t *testing.T) {
+	const (
+		max     = 500
+		workers = 8
+	)
+	fl := &inflight{}
+	since := time.Now().Add(-time.Hour)
+	start := make(chan struct{})
+	admitted := make([]int, workers)
+	var wg sync.WaitGroup
+	for i := range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for {
+				_, _, ok := fl.tryAdmit("domain|example.com", since, 0, max)
+				if !ok {
+					return
+				}
+				admitted[i]++
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	total := 0
+	for _, n := range admitted {
+		total += n
+	}
+	if total != max {
+		t.Fatalf("admitted %d messages under a ceiling of %d", total, max)
+	}
+}
+
 // The in-flight count only covers the limit's own window: a reservation older
 // than it (a session stuck mid-DATA for longer than the window) must not be
 // counted against a window it no longer belongs to.
 func TestInflightIgnoresReservationsOutsideWindow(t *testing.T) {
 	fl := &inflight{}
-	r := fl.reserve("domain|example.com")
+	r, _, ok := fl.tryAdmit("domain|example.com", time.Now().Add(-time.Hour), 0, 1)
+	if !ok {
+		t.Fatal("tryAdmit refused the first message under a ceiling of 1")
+	}
 	r.at = time.Now().Add(-time.Minute)
 
 	if n := fl.count("domain|example.com", time.Now().Add(-time.Hour)); n != 1 {

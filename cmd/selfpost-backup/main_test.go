@@ -9,13 +9,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mixeme/selfpost/internal/backup"
 	"github.com/mixeme/selfpost/internal/store"
 )
 
-// seedDataDir builds the minimum /data tree a backup can be taken from.
-func seedDataDir(t *testing.T) string {
+// seedProject builds the minimum operator project tree a backup can be taken from.
+func seedProject(t *testing.T) (deployRoot, dataDir string) {
 	t.Helper()
-	dataDir := t.TempDir()
+	deployRoot = t.TempDir()
+	dataDir = filepath.Join(deployRoot, "data")
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
+		t.Fatalf("mkdir data: %v", err)
+	}
 	st, err := store.Open(filepath.Join(dataDir, "selfpost.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
@@ -26,16 +31,31 @@ func seedDataDir(t *testing.T) string {
 	if err := st.Close(); err != nil {
 		t.Fatalf("close store: %v", err)
 	}
+	writeFile(t, filepath.Join(deployRoot, backup.ComposeFileName), "services:\n  selfpost:\n    image: test\n")
+	writeFile(t, filepath.Join(deployRoot, backup.EnvFileName), "SELFPOST_HOSTNAME=mail.example.com\n")
+	writeFile(t, filepath.Join(deployRoot, backup.CertsDirName, "fullchain.pem"), "CERT")
+	writeFile(t, filepath.Join(deployRoot, backup.CertsDirName, "privkey.pem"), "KEY")
 	t.Setenv("SELFPOST_DATA_DIR", dataDir)
 	t.Setenv("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db"))
-	return dataDir
+	t.Setenv("SELFPOST_DEPLOY_ROOT", deployRoot)
+	return deployRoot, dataDir
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatalf("mkdir %s: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o640); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
 }
 
 // An encrypted backup is only worth having if the container it came from can
 // hand it back as an ordinary archive during a restore, so the two halves of
 // the CLI are tested as the one round trip an operator actually performs.
 func TestEncryptedBackupRoundTrip(t *testing.T) {
-	seedDataDir(t)
+	seedProject(t)
 	dir := t.TempDir()
 	encrypted := filepath.Join(dir, "backup.spbk")
 	plain := filepath.Join(dir, "backup.tar.gz")
@@ -81,7 +101,12 @@ func TestEncryptedBackupRoundTrip(t *testing.T) {
 		}
 		names[hdr.Name] = true
 	}
-	for _, want := range []string{"manifest.json", "selfpost.db"} {
+	for _, want := range []string{
+		backup.DataArchivePrefix + backup.ManifestName,
+		backup.DataArchivePrefix + "selfpost.db",
+		backup.ComposeFileName,
+		backup.EnvFileName,
+	} {
 		if !names[want] {
 			t.Errorf("decrypted archive has no %s (entries: %v)", want, names)
 		}
@@ -91,7 +116,7 @@ func TestEncryptedBackupRoundTrip(t *testing.T) {
 // Without a password the CLI keeps producing the plain archive that existing
 // backup scripts consume.
 func TestUnencryptedBackupStaysPlain(t *testing.T) {
-	seedDataDir(t)
+	seedProject(t)
 	out := filepath.Join(t.TempDir(), "backup.tar.gz")
 	if err := run(out, ""); err != nil {
 		t.Fatalf("create backup: %v", err)

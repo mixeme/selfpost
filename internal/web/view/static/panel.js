@@ -46,145 +46,81 @@
     }
   });
 
-  // --- Address list shown only in list mode -----------------------------
-  // The "Addresses" field applies to list mode only; in wildcard mode the
-  // server ignores it, so hiding it removes a field that does nothing. The
-  // toggle runs on load too, because the edit form of an existing application
-  // may already be set to list mode.
-  function syncAddressField(select) {
-    var form = select.closest("form");
-    var field = form && form.querySelector("[data-addresses]");
-    if (!field) {
+  // --- Conditional field visibility ------------------------------------
+  // Several forms hide a block until a select, checkbox or file input says it
+  // applies. One rule table drives them all so the five near-identical helpers
+  // do not drift.
+  var showWhenRules = [
+    {
+      match: "select[data-list-mode]",
+      target: "[data-addresses]",
+      visible: function (el) { return el.value === el.dataset.listMode; }
+    },
+    {
+      match: "select[data-custom-mode]",
+      target: "[data-custom-address]",
+      visible: function (el) { return el.value === el.dataset.customMode; }
+    },
+    {
+      match: "select[data-global-role]",
+      target: "[data-domain-pick]",
+      visible: function (el) { return el.value !== el.dataset.globalRole; }
+    },
+    {
+      match: "input[data-encrypt-toggle]",
+      target: "[data-encrypt-fields]",
+      visible: function (el) { return el.checked; },
+      clearWhenHidden: true
+    },
+    {
+      match: "input[data-import-file]",
+      target: "[data-import-password-fields]",
+      visible: function (el) {
+        var name = (el.files && el.files[0] && el.files[0].name || "").toLowerCase();
+        return name !== "" && !/\.json$/.test(name);
+      },
+      clearWhenHidden: true
+    }
+  ];
+
+  function syncShowWhen(control) {
+    var form = control.closest("form");
+    if (!form) {
       return;
     }
-    // The mode values come from the server (store.AddressModeList), so the
-    // select carries the one that means "list" rather than this script
-    // hard-coding it.
-    field.hidden = select.value !== select.dataset.listMode;
-  }
-
-  function initAddressFields(root) {
-    root.querySelectorAll("select[data-list-mode]").forEach(function (select) {
-      syncAddressField(select);
-      select.addEventListener("change", function () {
-        syncAddressField(select);
-      });
-    });
-  }
-
-  // --- Custom DMARC rua address shown only for "custom" mode ------------
-  // Same idea as the address list: the email field only applies when the
-  // operator picks Custom address. With JavaScript blocked the field stays
-  // visible and the server still ignores it for inherit/none.
-  function syncCustomAddressField(select) {
-    var form = select.closest("form");
-    var field = form && form.querySelector("[data-custom-address]");
-    if (!field) {
+    for (var i = 0; i < showWhenRules.length; i++) {
+      var rule = showWhenRules[i];
+      if (!control.matches(rule.match)) {
+        continue;
+      }
+      var target = form.querySelector(rule.target);
+      if (!target) {
+        return;
+      }
+      var show = rule.visible(control);
+      target.hidden = !show;
+      if (!show && rule.clearWhenHidden) {
+        target.querySelectorAll("input").forEach(function (input) {
+          input.value = "";
+        });
+      }
       return;
     }
-    field.hidden = select.value !== select.dataset.customMode;
   }
 
-  function initCustomAddressFields(root) {
-    root.querySelectorAll("select[data-custom-mode]").forEach(function (select) {
-      syncCustomAddressField(select);
-      select.addEventListener("change", function () {
-        syncCustomAddressField(select);
-      });
-    });
-  }
-
-  // --- Domain pick shown only for domain administrators ------------------
-  // Global administrators manage every domain, so the assignment checkboxes
-  // are irrelevant for that role. The toggle runs on load too, because the
-  // edit form of an existing global user should not flash the fieldset.
-  function syncDomainPickField(select) {
-    var form = select.closest("form");
-    var field = form && form.querySelector("[data-domain-pick]");
-    if (!field) {
-      return;
-    }
-    field.hidden = select.value === select.dataset.globalRole;
-  }
-
-  function initDomainPickFields(root) {
-    root.querySelectorAll("select[data-global-role]").forEach(function (select) {
-      syncDomainPickField(select);
-      select.addEventListener("change", function () {
-        syncDomainPickField(select);
-      });
-    });
-  }
-
-  // --- Encryption password fields shown only when asked for --------------
-  // The backup, export and import forms carry an optional password block. It
-  // is hidden until the checkbox next to it is ticked, and cleared when it is
-  // unticked, so a password typed and then abandoned is never submitted. With
-  // JavaScript blocked the block stays visible and the forms behave exactly as
-  // the server reads them: the checkbox alone decides whether encryption
-  // happens.
-  function syncEncryptFields(box) {
-    var form = box.closest("form");
-    var fields = form && form.querySelector("[data-encrypt-fields]");
-    if (!fields) {
-      return;
-    }
-    fields.hidden = !box.checked;
-    if (!box.checked) {
-      fields.querySelectorAll("input").forEach(function (input) {
-        input.value = "";
-      });
-    }
-  }
-
-  function initEncryptFields(root) {
-    root.querySelectorAll("input[data-encrypt-toggle]").forEach(function (box) {
-      syncEncryptFields(box);
-      box.addEventListener("change", function () {
-        syncEncryptFields(box);
-      });
-    });
-  }
-
-  // --- Import password field shown based on the chosen file's extension ---
-  // The domain-import file decides for itself whether it is encrypted (the
-  // server checks the envelope magic, not a checkbox), so the panel offers
-  // the password field the same way: reveal it for a .spde file, hide and
-  // clear it for a plain .json one. With no file chosen yet there is nothing
-  // to ask a password for, so the field stays hidden until a file names it.
-  // An unrecognised name leaves the field visible rather than guessing wrong
-  // and hiding a password the file needs.
-  function syncImportPasswordField(input) {
-    var form = input.closest("form");
-    var fields = form && form.querySelector("[data-import-password-fields]");
-    if (!fields) {
-      return;
-    }
-    var name = (input.files && input.files[0] && input.files[0].name || "").toLowerCase();
-    var hide = name === "" || /\.json$/.test(name);
-    fields.hidden = hide;
-    if (hide) {
-      fields.querySelectorAll("input").forEach(function (pw) {
-        pw.value = "";
-      });
-    }
-  }
-
-  function initImportPasswordField(root) {
-    root.querySelectorAll("input[data-import-file]").forEach(function (input) {
-      syncImportPasswordField(input);
-      input.addEventListener("change", function () {
-        syncImportPasswordField(input);
+  function initShowWhen(root) {
+    showWhenRules.forEach(function (rule) {
+      root.querySelectorAll(rule.match).forEach(function (control) {
+        syncShowWhen(control);
+        control.addEventListener("change", function () {
+          syncShowWhen(control);
+        });
       });
     });
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    initAddressFields(document);
-    initCustomAddressFields(document);
-    initDomainPickFields(document);
-    initEncryptFields(document);
-    initImportPasswordField(document);
+    initShowWhen(document);
   });
 
   // --- Adaptive monitoring polling ---------------------------------------

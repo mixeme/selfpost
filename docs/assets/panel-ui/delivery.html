@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoice #4412 — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-delivery" data-page="delivery" data-nav="deliveries" data-title="Message">
+<main class="stack">
+  <div>
+    <h1 class="subject">Invoice #4412</h1>
+    <p class="route">
+      <span class="addr">billing@example.com</span>
+      <span class="arrow">→</span>
+      <span class="addr">ada@example.net</span>
+      <span class="st st-warn">deferred</span>
+    </p>
+    <a class="back" href="deliveries.html">&larr; Back to deliveries</a>
+  </div>
+  <div class="pair">
+    <div class="card">
+      <h2>Message</h2>
+      <div class="facts">
+        <div class="fact"><span class="fact-label">Domain</span><span class="fact-value">example.com</span></div>
+        <div class="fact"><span class="fact-label">Application</span><span class="fact-value">billing</span></div>
+        <div class="fact"><span class="fact-label">Accepted</span><span class="fact-value">2026-08-15 20:14:02 UTC</span></div>
+        <div class="fact"><span class="fact-label">Status reported</span><span class="fact-value">2026-08-15 20:14:08 UTC</span></div>
+        <div class="fact"><span class="fact-label">Queue id</span><span class="fact-value mono">4C3A1E2F1A</span></div>
+        <div class="fact"><span class="fact-label">Journal id</span><span class="fact-value mono">1842</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>History</h2>
+      <ol class="timeline">
+        <li class="event lvl-ok">
+          <p class="event-time">2026-08-15 20:14:02 UTC</p>
+          <p class="event-title"><span class="st st-ok">accepted</span> Received by the relay</p>
+          <p class="event-detail muted">SASL login billing, queued as 4C3A1E2F1A.</p>
+        </li>
+        <li class="event lvl-warn">
+          <p class="event-time">2026-08-15 20:14:08 UTC</p>
+          <p class="event-title"><span class="st st-warn">deferred</span> Receiving MX asked to try later</p>
+          <p class="event-detail muted">Postfix retries: first after 5 minutes, then with increasing gaps up to 1 hour 7 minutes, for up to 5 days. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.</p>
+        </li>
+        <li class="event pending">
+          <p class="event-time">not yet</p>
+          <p class="event-title"><span class="st st-unknown">delivery</span> Waiting on the next retry</p>
+        </li>
+      </ol>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Delivery log</h2>
+      <table class="log desk-only">
+        <thead><tr><th>Time</th><th>Message</th></tr></thead>
+        <tbody>
+          <tr><td class="time muted">20:14:02</td><td class="log-text">postfix/smtpd[221]: 4C3A1E2F1A: client=203.0.113.40, sasl_username=billing</td></tr>
+          <tr><td class="time muted">20:14:02</td><td class="log-text">postfix/cleanup[224]: 4C3A1E2F1A: message-id=&lt;4412@example.com&gt;</td></tr>
+          <tr><td class="time muted">20:14:08</td><td class="log-text">postfix/smtp[230]: 4C3A1E2F1A: to=&lt;ada@example.net&gt;, relay=mx.example.net[198.51.100.20]:25, delay=6, status=deferred (450 4.2.1 mailbox busy)</td></tr>
+        </tbody>
+      </table>
+      <div class="phone-only">
+        <p class="muted" style="margin:0.6rem 0 0.2rem">20:14:08</p>
+        <span class="code">status=deferred (450 4.2.1 mailbox busy)</span>
+        <p class="muted" style="margin:0.6rem 0 0.2rem">20:14:02</p>
+        <span class="code">client=203.0.113.40, sasl_username=billing</span>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-status" data-page="status" data-nav="status" data-title="Status" data-global-only="1">
+<main class="stack">
+  <div class="page-head">
+    <h1>Status</h1>
+    <label class="help-link" for="help-status" title="What these checks mean">?</label>
+  </div>
+
+  <div class="fill">
+    <div class="card" id="overall">
+      <h2>Overall <span class="st st-warn">warn</span></h2>
+      <p class="muted">Running, with warnings below.</p>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="card attn" id="queue">
+      <h2>Mail queue <span class="st st-warn">warn</span></h2>
+      <p>3 Kbytes in 3 Requests.</p>
+      <div class="actions-row"><a class="btn" href="mail-queue.html">View queue</a></div>
+    </div>
+    <div class="card" id="certificate">
+      <h2>TLS certificate <span class="st st-ok">ok</span></h2>
+      <label>Expires</label>
+      <span class="code">2026-11-02 12:00 UTC</span>
+      <p class="muted">Valid for another 78 day(s).</p>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="card" id="sockets">
+      <h2>Milter sockets <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th>Milter</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>OpenDKIM</td><td><span class="st st-ok">ok</span></td><td class="muted">Listening</td></tr>
+          <tr><td>send-log</td><td><span class="st st-ok">ok</span></td><td class="muted">Listening</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" id="hostname">
+      <h2>Hostname and reverse DNS <span class="st st-ok">ok</span></h2>
+      <label>Server hostname</label>
+      <span class="code">mail.example.org</span>
+      <label>Forward and reverse lookup</label>
+      <span class="code">203.0.113.10 → mail.example.org</span>
+      <p class="muted">mail.example.org resolves to 203.0.113.10 and the reverse lookup points back at it.</p>
+      <div class="actions-row"><button type="button">Re-check DNS</button></div>
+    </div>
+  </div>
+
+  <div class="fill in-only" id="inbound-status">
+    <div class="card">
+      <h2>Inbound <span class="st st-warn">warn</span></h2>
+      <p><code>INBOUND_RELAY_ENABLE</code> is on. Port 25 accepts mail for 2 domains and forwards it upstream — not to local mailboxes.</p>
+      <p class="muted">One domain has no MX pointing at this server. Recipients are a list or any address at the domain. Open Inbound for the list, MX checks, upstream, and recipient maps.</p>
+      <p><a href="inbound.html">Inbound domains</a></p>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="card" id="machine">
+      <h2>Machine <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th class="metric">Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="metric">CPU</td>
+            <td class="metric"><meter value="12" min="0" max="100" low="70" high="90" optimum="10">12%</meter> 12%</td>
+            <td class="muted">4 cores · 4 threads</td>
+          </tr>
+          <tr>
+            <td class="metric">Memory</td>
+            <td class="metric"><meter value="41" min="0" max="100" low="70" high="90" optimum="10">41%</meter> 41%</td>
+            <td class="muted">1.6 GiB used of 4.0 GiB.</td>
+          </tr>
+          <tr>
+            <td class="metric">Network</td>
+            <td class="metric">↓ 2.0 KiB/s<br>↑ 1.0 KiB/s</td>
+            <td class="muted"><div>eth0: 1.0 MiB in, 512.0 KiB out</div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" id="processes">
+      <h2>Processes <span class="st st-ok">ok</span></h2>
+      <table>
+        <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td>opendkim</td><td><span class="st st-ok">RUNNING</span></td><td class="muted">pid 21, uptime 3 days, 4:12:01</td></tr>
+          <tr><td>panel</td><td><span class="st st-ok">RUNNING</span></td><td class="muted">pid 18, uptime 3 days, 4:12:03</td></tr>
+          <tr><td>postfix</td><td><span class="st st-ok">RUNNING</span></td><td class="muted">pid 42, uptime 3 days, 4:11:58</td></tr>
+          <tr><td>postfix-reload</td><td><span class="st st-ok">STOPPED</span></td><td class="muted">Not started</td></tr>
+          <tr><td>cert-reload</td><td><span class="st st-ok">STOPPED</span></td><td class="muted">Not started</td></tr>
+          <tr><td>logrotate</td><td><span class="st st-ok">STOPPED</span></td><td class="muted">Not started</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="fill">
+    <div class="card" id="configuration">
+      <h2>Configuration</h2>
+      <p class="muted">Regenerates the OpenDKIM and Postfix configuration from the
+      database and reloads both daemons. Use it if you edited the files by hand,
+      restored a backup, or the running configuration looks out of step with the
+      domain and application lists. It does not touch the mail queue or the TLS
+      certificate, and it is safe to run at any time.</p>
+      <div class="actions-row"><button type="button">Reload configuration</button></div>
+    </div>
+  </div>
+  <p class="version">SelfPost 1.2.3 · © Mixeme · <a href="#">License (AGPL-3.0)</a></p>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

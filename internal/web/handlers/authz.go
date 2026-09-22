@@ -32,17 +32,7 @@ func (h *Handlers) assignedDomains(p auth.Principal) ([]store.Domain, error) {
 	if p.IsGlobal() {
 		return h.store.ListDomains()
 	}
-	all, err := h.store.ListDomains()
-	if err != nil {
-		return nil, err
-	}
-	var out []store.Domain
-	for _, d := range all {
-		if p.CanAccessDomain(d.ID) {
-			out = append(out, d)
-		}
-	}
-	return out, nil
+	return h.store.ListDomainsForUser(p.ID)
 }
 
 func domainNameSet(domains []store.Domain) map[string]bool {

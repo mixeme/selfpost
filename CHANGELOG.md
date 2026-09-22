@@ -5,6 +5,304 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-17
+
+Retry policy in the panel, persistent Postfix queue, and self-contained
+full backups. Mail queue and delivery history show this Postfix's first
+retry, backoff cap, and queue lifetime. Deferred mail survives container
+recreate. Full backups now archive `data/`, compose, `.env`, and `certs/`;
+the archive layout breaks 1.3.0 flat backups (unpack those with
+`tar xzf backup.tar.gz -C ./data` as before). Upgrading from 1.3.0 is a
+tag bump; no schema migration.
+
+### Added
+
+- Mail queue and a delivery's history show this Postfix's retry policy
+  (first delay, backoff cap, queue lifetime), read from `postconf -h` once
+  at panel start. A manual `postconf -e` override is visible after the next
+  panel restart. There is no attempt counter — Postfix retries on time.
+
+- docs: **Plan checklists** in [development.md](docs/development.md) — format,
+  `Progress` column in [roadmap.md](docs/roadmap.md), per-step commit +
+  CHANGELOG, version cuts `1.3.1`…`1.8.0` per roadmap stage.
+- docs: **Implementation checklists** with model routing in
+  [docs/plans/](docs/plans/) (queue-retries, inbound-relay, send-log-retention,
+  domain-stats-auto-ratelimit, dmarc-reports, panel-docs).
+- docs: roadmap candidates **send-log-retention** (panel Settings for delivery
+  journal retention) and **domain-stats-auto-ratelimit** (30-day send stats per
+  domain/application, auto level-2 rate limit from avg × multiplier) — plans in
+  [docs/plans/](docs/plans/).
+
+- Postfix queue under `/data/postfix/queue` — deferred and active mail survive
+  container recreate and are included in full backups.
+- Full backup archives the whole operator project: `data/`, `docker-compose.yml`,
+  `.env`, and `certs/` (requires `.:/selfpost-deploy:ro` in compose). Restore
+  by unpacking into an empty project directory.
+
+### Changed
+
+- **Breaking:** full-backup archive layout — paths are prefixed with `data/`;
+  deploy files sit at the archive root. Old flat archives restore with
+  `tar xzf backup.tar.gz -C ./data` as before.
+- docs: operator guide, architecture, security, and backup UI updated for
+  self-contained backups and persistent queue.
+
+- docs: HTML mockups for a full panel UI refresh
+  ([docs/assets/panel-ui/](docs/assets/panel-ui/index.html)) — current screens,
+  agreed and candidate roadmap surfaces (queue-retries, inbound-relay,
+  dmarc-reports, panel-docs), a hybrid width (ops pages use the window, forms
+  keep a reading measure), and a 390px emergency layout. The stamp and brick
+  palette stay; extra nav icons are proposals only. Design artefact; the
+  running panel is unchanged.
+
+### Changed
+
+- docs: panel UI mockups after review — Status restored to live readings
+  (queue line, PTR, machine/process tables, Configuration); inbound MX DNS
+  check, recipient mode (list or any), and Danger zone beside recipients;
+  Backup and Settings as two-column ops pages; Save and Delete user on one
+  row; help «?» on domain cards; Host/name ‖ Type height matched to the live
+  panel (`b0ebe06`).
+
+- docs: panel UI design system and mockups rebuilt as separate pages
+  (`system.html`, `status.html`, `domain.html`, …), not one hash sheet.
+  Regions are `stack` / `pair` / `measure` / `fill`; Host ‖ Type is
+  `field-row`; Save + Delete is `actions-row`. Shared chrome is `shell.js`.
+
+- docs: panel UI mockups — add-domain sits in the list card (Domains and
+  Inbound); DMARC candidate screens drill into a domain roll-up and a
+  parsed aggregate report (aligned vs third-party fail), not a hub-only
+  summary.
+
+## [1.3.0] - 2026-08-14
+
+Security and quality after 1.2.5: domain-admin send-log authorization,
+fail-closed sign-in and application delete, level-2 rate-limit race fix,
+restore Resync, expanded tests, operator docs, release CI, and OFL for IBM
+Plex. Upgrading from 1.2.x is a tag bump; no migration.
+
+### Added
+
+- licence: the SIL Open Font License 1.1 text now travels with the IBM Plex
+  WOFF2 files (`internal/web/view/static/OFL.txt`). The image copies it next
+  to LICENSE and NOTICE under `/usr/share/doc/selfpost/`; the panel serves it
+  at `/static/OFL.txt`. OFL requires the licence to accompany the font.
+
+- docs: agreed roadmap item **queue-retries** — show this Postfix's retry
+  policy (first delay, backoff cap, queue lifetime) on Mail queue and on a
+  delivery's history, reading `postconf -h` once at panel start so a manual
+  override is visible. Plan: [docs/plans/queue-retries.md](docs/plans/queue-retries.md).
+  Explanation only; no attempt counter and no panel knobs. Not yet
+  implemented.
+
+### Security
+
+- The independent security review of the send-log authorization and
+  fail-closed fixes below (code-review plan § P7; reviewer model ≠ author
+  model) found no further issues: the domain scope holds on every query path,
+  a rate-limit refusal cannot consume window budget, and each failure residue
+  of the reordered application delete fails safe. Nothing was added to
+  [docs/security.md](docs/security.md) § Accepted risks; the review is
+  recorded in that file's header.
+
+### Fixed
+
+- test (e2e): send-log status scrapers follow the badge markup in
+  `deliveries_rows`. The release gate still looked for bare `<td>sent</td>`
+  after the panel started rendering status as `<span class="st st-*">` badges,
+  so `send_verify_dkim_and_status` timed out even when mail was delivered and
+  logged. A handler regression test catches this drift in `go test ./...`
+  without Docker.
+
+- security (panel): the Deliveries list is scoped to a domain administrator's
+  assigned domains for every number of assignments. Previously the send log was
+  narrowed only when exactly one domain was assigned, so an administrator with
+  none or with two or more read every domain's rows (sender, recipient, subject)
+  on the list and its polled fragment. The domain scope is now an `IN`
+  constraint carried by the store query — a filter that states no scope returns
+  nothing — and the `domain` and `app` query parameters are checked against the
+  principal's own domains and applications before the query runs, so a
+  hand-written URL cannot widen the scope. Global administrators are unaffected.
+
+- mail (level-2 rate limit): the ceiling is no longer overshot by messages that
+  arrive at the same instant. The milter counted the stored and in-flight
+  messages and reserved its own slot in two separate steps, so several SMTP
+  sessions could pass the same check before any of them had reserved. Counting
+  and reserving now happen as one operation, and the ceiling is handed out
+  exactly as many times as configured. Postfix's level-1 limit remains the
+  backstop and the level-2 check stays fail-open on store errors.
+
+- panel (sign-in): a session that cannot be written to the database no longer
+  produces a session cookie. The login used to log the failure, set the cookie
+  and redirect to the dashboard, leaving the browser looking signed in while
+  every request bounced back to `/login`; it now fails closed with an error on
+  the sign-in page.
+
+- panel (applications): deleting an application removes its SASL credentials
+  before its registry row. If `saslpasswd2` fails, the application stays listed
+  and the delete can be retried, instead of leaving a hidden account that could
+  still authenticate to Postfix. This matches the order domain deletion already
+  used.
+
+- panel (GUI): a rejected rate-limit change on a domain's page now renders on
+  the danger surface (`.flash.error`) instead of the success one — it was
+  green with red text, reading as good news. Deleting a panel user now goes
+  through a confirmation page, the same pattern as domain deletion, instead of
+  a plain submit button next to Save with no confirmation at all.
+
+- panel (restore): after a backup is extracted and the version guard passes,
+  the panel runs one mail-path Resync on the first boot — OpenDKIM's tables
+  and Postfix's sender map are re-derived from SQLite and the daemons are
+  reloaded, so drift between the archive and the database is healed before
+  mail flows. Later starts skip that step; the Status page Reload button runs
+  the same Resync on demand. The `internal/backup` package comment now matches
+  this behaviour.
+
+- ci (GHCR): per-arch package tags (`X.Y.Z-amd64`, `X.Y.Z-arm64`) are dropped
+  after the manifest merge via the GitHub Packages API. The merge job had called
+  `docker buildx imagetools rm`, which is not a valid subcommand — cleanup failed
+  with a warning and the side-effect tags stayed in the registry.
+
+### Changed
+
+- docs: operator and as-built docs aligned with the code after a full
+  pass — [architecture.md](docs/architecture.md) route table now marks
+  **global** routes (404 for domain administrators) and documents the
+  one-time restore Resync in Persistence; session/password and restore-session
+  wording corrected in [guide.md](docs/guide.md) and architecture (own-password
+  change vs admin reset, no "logout everywhere", immediate session restore on
+  the next request, PTR cache ≈1 min, decrypt has no version check, restore
+  Resync on first boot, domain add/delete/import and `POST /reload` global-only,
+  Settings DMARC global-only); [README.md](README.md) port-587 and quick-start
+  volume wording fixed; [security.md](docs/security.md) CSRF ADR points at
+  `authz.go` for route gating. No behaviour change.
+
+- docs: [guide.md](docs/guide.md) reorganised into **Installation**, **Instance
+  administration**, and **Domain administration** — DNS setup, operations,
+  rate limiting, and backup sections follow the instance/domain boundary
+  instead of mixing them. **Installation** now reads Ports → Local trial →
+  Initial setup → Full deployment (with the fixed image tag nested under it) →
+  Environment variables → Reverse proxy; the step-by-step production deploy and
+  per-proxy TLS commands move here from README's "Reference deploy" (README
+  keeps a short pointer). Internal (non-operator) environment variables move
+  to [architecture.md](docs/architecture.md) § Configuration; the guide keeps
+  a one-line pointer. **Full backup and restore** gains worked commands for
+  in-place restore, move-to-a-new-host, and encrypted-backup decrypt-first,
+  plus the version-mismatch error text. README anchors updated for the new
+  headings. No behaviour change.
+
+- docs: the 2026-08-13 full-tree review plan is complete — every phase (P0–P7)
+  is closed — and `docs/plans/code-review.md` is deleted per its own exit
+  criteria (history in git and in this file). The plan covered architecture,
+  quality, GUI, tests, and licence work; P0 was domain-admin send-log
+  authorization. The [roadmap](docs/roadmap.md)'s recommended order returns to
+  **queue-retries** and then **inbound-relay**; it still records
+  **schema-squash** (replace the 1.x SQLite migration chain with a 2.x baseline;
+  not a reason to cut a major on its own).
+
+- licence: [NOTICE](NOTICE) tells modifiers to update `SourceURL` in
+  `internal/legal/legal.go` (the value the panel footer actually injects), not
+  `layout.html`. Per-file `SPDX-License-Identifier` headers on the two command
+  packages were dropped so the tree is consistent; AGPL-3.0 does not require
+  them ([development.md](docs/development.md) § External libraries). Deleted the
+  completed `docs/plans/logrotate-mode.md` (history in git and
+  [1.2.3](#123---2026-08-12)).
+
+- ci: the release image is published only for a **published** GitHub Release
+  (`vX.Y.Z`) or a manual `workflow_dispatch` with an explicit SemVer version — a
+  bare git tag push no longer starts the build. `release.yml` listens for
+  `release: published`, checks out that tag (not `main` HEAD), e2e-gates each
+  native arch build, merges `X.Y.Z-amd64` and `X.Y.Z-arm64` into one manifest,
+  then removes the per-arch tags from GHCR via the GitHub Packages API so
+  operators see only `ghcr.io/mixeme/selfpost:X.Y.Z` (what
+  `deploy/docker-compose.yml` pins). A dispatch whose version input is missing
+  or not `X.Y.Z` fails in `prepare`. [development.md](docs/development.md)
+  documents draft vs published releases, why deleting a release tag converts
+  it back to draft, and Gitea → GitHub tag-mirror pitfalls (do not prune release
+  tags on GitHub; a mirrored `v1.0.0` still runs that tag's `on: push: tags`
+  workflow).
+
+- test: the authorization and sign-in surfaces that had no tests now have them.
+  The login limiter is covered for its ceiling, its per-address scope, the reset
+  at the end of a window and the sweep that keeps finished buckets out of
+  memory; sign-in for a successful session, for refusals that do not reveal
+  which usernames exist, and for a lockout that a correct password cannot
+  bypass; the one-time setup link for creating the first administrator, closing
+  afterwards, rejecting a wrong or expired token, and refusing credentials the
+  panel would not accept later. Every global-only route (`/users`, `/backup`,
+  domain import, `/status`, `/mail-queue`, `/system-log`, domain add and delete,
+  reload) is checked to answer a domain administrator — and a request with no
+  principal — with 404, the check that would have caught the send-log leak.
+
+- test: restore is covered as the operator performs it, in process. A backup is
+  downloaded from a running panel through `POST /backup` (plain and encrypted),
+  unpacked the way `tar -xzf` unpacks it onto the `/data` bind mount, and a
+  second panel is booted on the result through the startup order the panel
+  itself uses — version guard, database, one Resync when restoring, then
+  services and the HTTP application. The restored panel shows the domain and
+  journal the archive carried, finds the DKIM key, SASL database and Postfix
+  sender map where its configuration says they are, does not reopen the
+  one-time setup link, and still honours a session that predates the backup.
+  Drifted on-disk maps are healed by that Resync step
+  (`TestResyncAfterRestoreHealsDriftedMaps`). A data directory left by another
+  version is refused with both versions named and the manifest kept. `serveHTTP`
+  is split in two so that composition can be started without binding a port; no
+  behaviour change.
+
+- test (e2e): the CoreDNS image is pinned to `1.14.6` instead of `latest`, so
+  the release gate cannot change under a commit between two runs. The level-1
+  rate-limit failure message quoted `RATE_LIMIT_MESSAGES_PER_IP=5` while the
+  stand sets `50`.
+
+- ci: gofmt on eight files that failed the formatting workflow check (panel
+  config, DNS check, domain transfer export, rate-limit tests, auth principal,
+  domain and delivery handlers, web package doc comment).
+
+- panel (templates): the repeated Host/Type/Value DNS record markup on a
+  domain's page and the duplicated credentials form on Settings are now
+  shared partials (`host_type`, `host_type_copy`, `field_value`,
+  `field_values`, `credentials_fields`) instead of copy-pasted blocks. No
+  behaviour or visible change.
+
+- panel (GUI, accessibility): the Deliveries fragment's `hx-get` and pagination
+  links now `urlquery`-encode the `domain`/`app` filters instead of splicing
+  them into the query string raw. The four polled regions (deliveries rows,
+  status, mail queue, system log) carry `aria-live="polite"` so a screen
+  reader announces the refreshed content.
+
+- docs: [security.md](docs/security.md) accepted risks now note that
+  `data-confirm` prompts on destructive forms are JavaScript-only — with
+  JavaScript disabled the form submits immediately, the same as before the
+  prompts existed — and why that is acceptable (the prompt is a mis-click
+  guard, not an authorization boundary).
+
+- docs: security and operator docs updated for the panel that has shipped
+  global administrators and domain-admins since 1.2.0. The CSRF ADR in
+  [security.md](docs/security.md) no longer argues from "single-user"; it now
+  states that cross-user CSRF between panel roles is not the threat the origin
+  check defends against, and gives a new revisit trigger. Dropped the
+  unimplemented "or argon2" alternative for the password hash.
+  [guide.md](docs/guide.md) documents the Users page and the two roles,
+  level-2 rate limiting's fail-open behaviour, and that a domain-admin can
+  export working SASL passwords for domains assigned to them.
+  [architecture.md](docs/architecture.md) gains `/license` and the
+  `/account` → `/settings` redirect in the route table (later expanded for
+  RBAC in the doc-alignment pass above). Corrected stale
+  `admin.dmarc_report_email` references in
+  [roadmap.md](docs/roadmap.md) and
+  [docs/plans/dmarc-reports.md](docs/plans/dmarc-reports.md) to the setting's
+  actual home after migration `0005`. No behaviour change.
+
+- panel: code-review P6 cleanup — the unused `auth.RequireGlobal` middleware is
+  gone (handlers already call `requireGlobal`); the settings route handler is
+  named `HandleSettings` in `handlers_settings.go`; domain lists for a
+  domain-admin now come from `ListDomainsForUser` in SQL instead of loading
+  every domain and filtering in Go; the login and setup rate limiters sweep
+  expired buckets on a timer and cap the map at 4096 keys; the five
+  show/hide field helpers in `panel.js` are one rule table; DMARC copy no
+  longer promises in-panel report reception in a future release — SelfPost
+  does not receive inbound mail.
+
 ## [1.2.5] - 2026-08-13
 
 Rate-limit form polish after 1.2.4. Upgrading is a tag bump; no migration.

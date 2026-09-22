@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mail queue — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-mail-queue" data-page="mail-queue" data-nav="queue" data-title="Mail queue" data-global-only="1">
+<main class="stack">
+  <h1>Mail queue</h1>
+  <div class="fill">
+    <div class="card">
+      <h2>How delivery retries work</h2>
+      <p class="muted">This Postfix’s policy, read once at panel start. There is no maximum attempt count — only time.</p>
+      <div class="facts retry-facts">
+        <div class="fact"><span class="fact-label">First retry</span><span class="fact-value">5 minutes</span></div>
+        <div class="fact"><span class="fact-label">Later retries</span><span class="fact-value">doubling, cap 1 h 7 min</span></div>
+        <div class="fact"><span class="fact-label">Kept in queue</span><span class="fact-value">5 days</span></div>
+        <div class="fact"><span class="fact-label">Then</span><span class="fact-value">bounced</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Pending messages</h2>
+      <table class="desk-only">
+        <thead><tr><th>Queue id</th><th>Age</th><th>From</th><th>To</th><th>Size</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">4C3A1E2F1A</td><td class="time muted">18 min</td><td>billing@example.com</td><td>ada@example.net</td><td>12 KiB</td></tr>
+          <tr><td class="mono">4C3A1E3010</td><td class="time muted">11 min</td><td>news@example.com</td><td>pat@slow.example</td><td>48 KiB</td></tr>
+          <tr><td class="mono">4C3A1E3102</td><td class="time muted">4 min</td><td>billing@example.com</td><td>ada@example.net</td><td>9 KiB</td></tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li><a href="delivery.html"><span>4C3A1E2F1A</span><span class="when">18 min</span><span class="meta">billing@example.com → ada@example.net</span></a></li>
+        <li><a href="delivery.html"><span>4C3A1E3010</span><span class="when">11 min</span><span class="meta">news@example.com → pat@slow.example</span></a></li>
+        <li><a href="delivery.html"><span>4C3A1E3102</span><span class="when">4 min</span><span class="meta">billing@example.com → ada@example.net</span></a></li>
+      </ul>
+      <label>postqueue -p</label>
+      <span class="code">-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------
+4C3A1E2F1A*    12288 Sat Aug 15 20:14:02  billing@example.com
+                                         ada@example.net
+4C3A1E3010     49152 Sat Aug 15 20:21:18  news@example.com
+                                         pat@slow.example
+-- 3 Kbytes in 3 Requests.</span>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

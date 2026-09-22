@@ -15,10 +15,15 @@ import (
 )
 
 // seedDataDir builds a realistic /data tree: a migrated SQLite database plus the
-// DKIM key, SASL and transient files a backup must include or exclude.
-func seedDataDir(t *testing.T) (dataDir, dbPath string) {
+// DKIM key, SASL and transient files a backup must include or exclude. It also
+// seeds a deploy root beside data/ with compose, .env, and certs/.
+func seedDataDir(t *testing.T) (dataDir, dbPath, deployRoot string) {
 	t.Helper()
-	dataDir = t.TempDir()
+	deployRoot = t.TempDir()
+	dataDir = filepath.Join(deployRoot, "data")
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
+		t.Fatalf("mkdir data: %v", err)
+	}
 	dbPath = filepath.Join(dataDir, "selfpost.db")
 
 	st, err := store.Open(dbPath)
@@ -35,6 +40,7 @@ func seedDataDir(t *testing.T) (dataDir, dbPath string) {
 	writeFile(t, filepath.Join(dataDir, "opendkim", "keys", "example.com", "selfpost.private"), "PRIVATE KEY")
 	writeFile(t, filepath.Join(dataDir, "sasl", "sasldb2"), "SASLDB")
 	writeFile(t, filepath.Join(dataDir, "postfix", "sender_login_maps"), "@example.com login")
+	writeFile(t, filepath.Join(dataDir, "postfix", "queue", "deferred", "sample"), "queue-file")
 	// Transient files that must NOT be archived.
 	writeFile(t, filepath.Join(dataDir, "setup-token"), "secret-token")
 	writeFile(t, filepath.Join(dataDir, "selfpost.db-wal"), "wal")
@@ -43,7 +49,11 @@ func seedDataDir(t *testing.T) (dataDir, dbPath string) {
 	// state, and the bulkiest thing under /data.
 	writeFile(t, filepath.Join(dataDir, "log", "mail.log"), "Aug  8 07:26:41 mail postfix/smtp[1]: ABC: to=<a@example.net>, status=sent (ok)")
 	writeFile(t, filepath.Join(dataDir, "log", "mail.log.1"), "older")
-	return dataDir, dbPath
+	writeFile(t, filepath.Join(deployRoot, ComposeFileName), "services:\n  selfpost:\n    image: test\n")
+	writeFile(t, filepath.Join(deployRoot, EnvFileName), "SELFPOST_HOSTNAME=mail.example.com\n")
+	writeFile(t, filepath.Join(deployRoot, CertsDirName, "fullchain.pem"), "CERT")
+	writeFile(t, filepath.Join(deployRoot, CertsDirName, "privkey.pem"), "KEY")
+	return dataDir, dbPath, deployRoot
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -87,21 +97,26 @@ func readArchive(t *testing.T, data []byte) map[string]string {
 }
 
 func TestCreateIncludesStateExcludesTransient(t *testing.T) {
-	dataDir, dbPath := seedDataDir(t)
+	dataDir, dbPath, deployRoot := seedDataDir(t)
 
 	var buf bytes.Buffer
-	if err := Create(&buf, Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3"}); err != nil {
+	if err := Create(&buf, Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	files := readArchive(t, buf.Bytes())
 
 	// Present.
 	for _, name := range []string{
-		ManifestName,
-		"selfpost.db",
-		"opendkim/keys/example.com/selfpost.private",
-		"sasl/sasldb2",
-		"postfix/sender_login_maps",
+		DataArchivePrefix + ManifestName,
+		DataArchivePrefix + "selfpost.db",
+		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
+		DataArchivePrefix + "sasl/sasldb2",
+		DataArchivePrefix + "postfix/sender_login_maps",
+		DataArchivePrefix + "postfix/queue/deferred/sample",
+		ComposeFileName,
+		EnvFileName,
+		CertsDirName + "/fullchain.pem",
+		CertsDirName + "/privkey.pem",
 	} {
 		if _, ok := files[name]; !ok {
 			t.Errorf("archive missing %s", name)
@@ -109,8 +124,11 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 	}
 	// Excluded.
 	for _, name := range []string{
-		"setup-token", "selfpost.db-wal", "selfpost.db-shm",
-		"log/mail.log", "log/mail.log.1",
+		DataArchivePrefix + "setup-token",
+		DataArchivePrefix + "selfpost.db-wal",
+		DataArchivePrefix + "selfpost.db-shm",
+		DataArchivePrefix + "log/mail.log",
+		DataArchivePrefix + "log/mail.log.1",
 	} {
 		if _, ok := files[name]; ok {
 			t.Errorf("archive should not contain %s", name)
@@ -119,7 +137,7 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 
 	// Manifest is well-formed and carries the version.
 	var m Manifest
-	if err := json.Unmarshal([]byte(files[ManifestName]), &m); err != nil {
+	if err := json.Unmarshal([]byte(files[DataArchivePrefix+ManifestName]), &m); err != nil {
 		t.Fatalf("manifest json: %v", err)
 	}
 	if m.Format != FormatFull || m.Version != "1.2.3" {
@@ -128,7 +146,7 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 
 	// The archived selfpost.db is a real, openable SQLite snapshot with our data.
 	snapPath := filepath.Join(t.TempDir(), "restored.db")
-	if err := os.WriteFile(snapPath, []byte(files["selfpost.db"]), 0o640); err != nil {
+	if err := os.WriteFile(snapPath, []byte(files[DataArchivePrefix+"selfpost.db"]), 0o640); err != nil {
 		t.Fatalf("write snapshot: %v", err)
 	}
 	st, err := store.Open(snapPath)
@@ -145,6 +163,14 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 	}
 }
 
+func TestCreateRequiresDeployRoot(t *testing.T) {
+	dataDir, dbPath, _ := seedDataDir(t)
+	var buf bytes.Buffer
+	if err := Create(&buf, Params{DataDir: dataDir, DBPath: dbPath, Version: "1.0.0"}); err == nil {
+		t.Fatal("Create without DeployRoot succeeded")
+	}
+}
+
 func writeManifest(t *testing.T, dir, format, version string) string {
 	t.Helper()
 	path := filepath.Join(dir, ManifestName)
@@ -156,16 +182,24 @@ func writeManifest(t *testing.T, dir, format, version string) string {
 }
 
 func TestCheckRestoreNoManifestIsNormalStart(t *testing.T) {
-	if err := CheckRestore(filepath.Join(t.TempDir(), "manifest.json"), "1.0.0"); err != nil {
+	restored, err := CheckRestore(filepath.Join(t.TempDir(), "manifest.json"), "1.0.0")
+	if err != nil {
 		t.Errorf("CheckRestore with no manifest = %v, want nil", err)
+	}
+	if restored {
+		t.Error("CheckRestore with no manifest reported a restore")
 	}
 }
 
 func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, FormatFull, "1.0.0")
-	if err := CheckRestore(path, "1.0.0"); err != nil {
+	restored, err := CheckRestore(path, "1.0.0")
+	if err != nil {
 		t.Fatalf("CheckRestore matching = %v, want nil", err)
+	}
+	if !restored {
+		t.Fatal("CheckRestore matching did not report a restore")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("manifest should be consumed after a matching restore, stat err = %v", err)
@@ -175,9 +209,12 @@ func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
 func TestCheckRestoreVersionMismatchRefusesAndKeeps(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, FormatFull, "1.0.0")
-	err := CheckRestore(path, "2.0.0")
+	restored, err := CheckRestore(path, "2.0.0")
 	if err == nil {
 		t.Fatal("CheckRestore mismatch = nil, want error")
+	}
+	if restored {
+		t.Error("CheckRestore mismatch reported a restore")
 	}
 	if !strings.Contains(err.Error(), "1.0.0") || !strings.Contains(err.Error(), "2.0.0") {
 		t.Errorf("error should name both versions: %v", err)
@@ -190,7 +227,11 @@ func TestCheckRestoreVersionMismatchRefusesAndKeeps(t *testing.T) {
 func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 	dir := t.TempDir()
 	path := writeManifest(t, dir, "something-else", "1.0.0")
-	if err := CheckRestore(path, "1.0.0"); err == nil {
+	restored, err := CheckRestore(path, "1.0.0")
+	if err == nil {
 		t.Error("CheckRestore accepted a non-backup manifest")
+	}
+	if restored {
+		t.Error("CheckRestore wrong format reported a restore")
 	}
 }

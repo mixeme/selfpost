@@ -66,6 +66,58 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 
 ---
 
+## Plan checklists
+
+Open [roadmap.md](roadmap.md) items with a linked plan file carry an
+**Implementation checklist** in [plans/](plans/). After a context reset, work
+the **active** plan — not the roadmap prose — from the first unchecked line.
+
+**Checklist format**
+
+- `- [ ] Step description — **Model**` (model from the routing table above).
+- Mark `[x]` only in the commit that actually finishes the step.
+- `candidate` items: checklist may exist, but no code until the roadmap status
+  is agreed.
+
+**Progress column** in the roadmap index (`0/N`) counts every checklist line in
+that plan (including docs and `go vet` / `go test` steps). Update `N` when the
+checklist changes; update the numerator when steps are checked off.
+
+### Roadmap track: commit and version
+
+For the current 1.x+ roadmap queue ([roadmap.md](roadmap.md) index), stricter
+than the default «meaningful step» rule in [§ Commits and release build](#commits-and-release-build):
+
+**After each checklist step**
+
+1. Check off the step in the plan file; bump `Progress` in the roadmap index.
+2. Append [CHANGELOG.md](../CHANGELOG.md) under `[Unreleased]` for that step.
+3. Commit on `main` (push / tag / Release only on explicit request).
+
+**After each roadmap stage** (all checklist steps done; «Done when» satisfied)
+
+1. Version cut in one commit: rename `[Unreleased]` to `[X.Y.Z] - date`, open a
+   fresh `[Unreleased]`, bump the image pin in
+   [deploy/docker-compose.yml](../deploy/docker-compose.yml).
+2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
+   [§ Release image](#release-image)).
+
+**Planned version cuts** (from pin `1.3.1`; adjust if semver changes mid-track):
+
+| Stage | ID | Cut |
+|---|---|---|
+| 1 | queue-retries | `1.3.1` (PATCH) |
+| 2 | inbound-relay | `1.4.0` |
+| 3 | send-log-retention | `1.5.0` |
+| 4 | domain-stats-auto-ratelimit | `1.6.0` |
+| 5 | dmarc-reports | `1.7.0` |
+| 6 | panel-docs | `1.8.0` |
+
+Docs-only prep (checklists in plans, no product code) uses the same per-step
+commit rule but **no** version cut until the next product stage ships.
+
+---
+
 ## Technology stack and tools
 
 | Component | Version / notes |
@@ -93,8 +145,9 @@ mechanics → Haiku. Reviewers must not be the author of the code under review.
 ## External libraries
 
 The project is **AGPL-3.0** ([LICENSE](../LICENSE)). Copyright holder and
-third-party notices: [NOTICE](../NOTICE). New Go dependencies must be
-permissive or GPL-family (see
+third-party notices: [NOTICE](../NOTICE). The tree does not use per-file
+`SPDX-License-Identifier` headers; AGPL-3.0 does not require them. New Go
+dependencies must be permissive or GPL-family (see
 [.cursor/rules/agent-rules.mdc](../.cursor/rules/agent-rules.mdc)).
 
 ### Main module (`go.mod`)
@@ -113,6 +166,7 @@ the tree are AGPL-3.0-compatible.
 | Asset | Version | Repository | License |
 |---|---|---|---|
 | `internal/web/view/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
+| `internal/web/view/static/ibm-plex-*.woff2` | latin subset | <https://github.com/IBM/plex> | SIL OFL 1.1 (`OFL.txt` beside the files) |
 
 ### E2e module (`test/e2e/go.mod`)
 
@@ -128,8 +182,10 @@ the image.
 Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
 from Debian bookworm repositories; licenses are in each package's `copyright`
 file on <https://packages.debian.org/bookworm/>.
-The image also ships [LICENSE](../LICENSE) and [NOTICE](../NOTICE) under
-`/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license`.
+The image also ships [LICENSE](../LICENSE), [NOTICE](../NOTICE), and the IBM
+Plex [OFL.txt](../internal/web/view/static/OFL.txt) under
+`/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license` and
+the OFL text at `/static/OFL.txt`.
 
 ---
 
@@ -187,9 +243,12 @@ tag / push only on explicit request (see `release.yml`).
 
 ### Release image
 
-The release image is published **only on tag** `vX.Y.Z` (not on every push to
-`main`). The tag is the single source of version: it drives the image tag and
-`-ldflags` in the binaries so they cannot drift apart.
+The release image is published **only** for a SemVer version `X.Y.Z`: a
+**published** GitHub Release whose tag is `vX.Y.Z`, or a `workflow_dispatch`
+that supplies that version. Pushing a git tag alone does not publish. Ordinary
+commits, and a dispatch from `main` without a version input, do not publish.
+The version is the single source that drives the image tag and `-ldflags` in
+the binaries so they cannot drift apart.
 
 **Steps (on explicit request):**
 
@@ -197,8 +256,42 @@ The release image is published **only on tag** `vX.Y.Z` (not on every push to
    tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
    local-trial image references) in the **same** release commit.
 2. Create and push git tag `vX.Y.Z` on that commit.
-3. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
-   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`.
+3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
+4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
+   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z` (checks out tag `vX.Y.Z`).
+
+**GitHub Release vs GHCR.** The public [Releases](https://github.com/mixeme/selfpost/releases)
+page lists only **published** releases. A draft is visible to maintainers only —
+it looks like “no releases” to everyone else. CI does not create or publish the
+GitHub Release; you do that in the UI. Deleting a release’s git tag on GitHub
+(or re-pushing tags while cleaning the registry) converts a published release
+back into a **draft** — that matches “I published three times and it keeps
+disappearing”. After publish, leave the tag on GitHub; clean up only unwanted
+GHCR package versions, not the git tag.
+
+Push workflow and source changes to **github.com/mixeme/selfpost** before
+publishing — Actions reads that repo, not Gitea.
+
+**Gitea → GitHub tag mirror.** If every tag push from Gitea is mirrored to
+GitHub, two things follow:
+
+1. **GitHub Release tags must not be deleted on GitHub.** Many mirror setups
+   prune remote tags that are absent on Gitea (or re-push with `--force` /
+   `--prune`). Deleting `v1.0.0` / `v1.3.0` on GitHub converts a published
+   Release back to draft. Mirror **branches and new tags forward**; do not
+   delete release tags on the GitHub side. GHCR cleanup is package versions in
+   the UI — not `git push github --delete` and not tag prune on the mirror.
+
+2. **Tag push runs the workflow file at that tag's commit**, not `main`. `v1.0.0`
+   still points at a commit whose `release.yml` has `on: push: tags` and no
+   per-arch GHCR cleanup — every mirror (re)push of that tag can republish
+   `1.0.0-amd64` / `1.0.0-arm64`. Tags from `v1.3.0` onward only run
+   `release.yml` on **Publish release** (`release: published`), so mirroring
+   those tags alone does not start the image build.
+
+   Safe mirror: push tags to GitHub without deleting existing ones; keep release
+   tags on Gitea; publish the GitHub Release on github.com after the mirror has
+   the tag.
 
 Ordinary commits **do not** publish an image. The compose pin and the git tag
 must match (`1.0.0` / `v1.0.0` for the first published release). Intermediate
@@ -265,7 +358,11 @@ operator would actually use.
 **Coverage (summary):** bootstrap → SMTP AUTH → delivery → DKIM verify →
 send-log `queued → sent`; negatives (no AUTH, relay, sender/login mismatch,
 L1/L2 limits, milter fail-open, bad `SELFPOST_HOSTNAME`, session survives
-`docker restart`). Polling with timeouts only — no fixed `sleep`.
+`docker restart`); startup checks that supervisord actually brought up
+OpenDKIM, the panel, and Postfix (`checkSupervisorProcesses`), plus logrotate
+config-mode and forced-rotation checks (`checkLogrotateConfigMode`,
+`checkLogrotateRotation` — [test/e2e/logrotate_check.go](../test/e2e/logrotate_check.go)).
+Polling with timeouts only — no fixed `sleep`.
 
 Requires **Docker + Compose v2** on the machine running the suite.
 
@@ -280,21 +377,33 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 `gofmt -l` → `go vet ./...` → `go test ./...` (main module, no e2e).
 
-### `release.yml` — push of tag `vX.Y.Z` or `workflow_dispatch`
+### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
+
+Publishing a GitHub Release runs `release.yml` directly (`release: published`,
+same pattern as gosentry / imap-scrub). You can also run it manually via
+`workflow_dispatch` with an explicit `X.Y.Z` input. A bare git tag push does not
+run the workflow. The build always checks out `vX.Y.Z`, not `main` HEAD.
+
+`prepare` takes the version from `github.event.release.tag_name` on a release
+event, or from the `workflow_dispatch` `version` input. A dispatch whose input
+is missing or not `X.Y.Z` fails in `prepare`.
 
 ```
-prepare (version from tag)
+release: published
+prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
-      → docker build --load (VERSION from tag)
+      → docker build --load (VERSION from prepare)
       → e2e (test/e2e)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z
+      → GitHub Packages API → drop X.Y.Z-amd64 and X.Y.Z-arm64 from GHCR
 ```
 
 Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under
 emulation for e2e is impractical. E2e first, then push — the registry receives
-the bytes that passed the gate.
+the bytes that passed the gate. Only `ghcr.io/mixeme/selfpost:X.Y.Z` remains
+tagged in GHCR; per-arch names exist briefly during the merge job.
 
 A failed e2e **blocks** image publication.
 

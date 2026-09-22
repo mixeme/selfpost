@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>example.com — DMARC — SelfPost mockups</title>
+<link rel="icon" href="../selfpost-icon-16.svg" type="image/svg+xml">
+<link rel="stylesheet" href="mock.css">
+<link rel="stylesheet" href="system.css">
+</head>
+<body class="page-dmarc-domain" data-page="dmarc-domain" data-nav="dmarc" data-title="example.com DMARC">
+<main class="stack">
+  <div>
+    <h1>example.com <span class="tag future">candidate</span></h1>
+    <a class="back g-only" href="dmarc.html">&larr; All DMARC reports</a>
+    <a class="back" href="domain.html">&larr; Back to example.com</a>
+  </div>
+  <div class="pair">
+    <div class="card">
+      <h2>Last 7 days <span class="st st-ok">pass</span></h2>
+      <p>98% aligned. Tightening <code>p=</code> looks reasonable.</p>
+      <p class="muted"><a href="domain.html">Domain DNS and rua=</a></p>
+    </div>
+    <div class="card">
+      <h2>Third-party senders</h2>
+      <p>google.com / 66.102.0.0/20 failed SPF and DKIM 6 times. Everyone else is this relay.</p>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Reports</h2>
+      <table class="desk-only">
+        <thead><tr><th>Received</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="time muted">2026-08-15 06:12</td>
+            <td class="muted">google.com</td>
+            <td>14 Aug</td>
+            <td>412</td>
+            <td>6</td>
+            <td class="actions"><a href="dmarc-report.html">View</a></td>
+          </tr>
+          <tr>
+            <td class="time muted">2026-08-14 06:08</td>
+            <td class="muted">google.com</td>
+            <td>13 Aug</td>
+            <td>390</td>
+            <td>2</td>
+            <td class="actions"><a href="dmarc-report.html">View</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li>
+          <a href="dmarc-report.html">
+            <span class="st st-ok">412 pass</span><span class="when">14 Aug</span>
+            <span class="meta">google.com · 6 fail</span>
+          </a>
+        </li>
+        <li>
+          <a href="dmarc-report.html">
+            <span class="st st-ok">390 pass</span><span class="when">13 Aug</span>
+            <span class="meta">google.com · 2 fail</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="fill">
+    <div class="card">
+      <h2>Sources · last 7 days</h2>
+      <table class="desk-only">
+        <thead><tr><th>Source</th><th>Pass</th><th>Fail</th><th>Disposition</th></tr></thead>
+        <tbody>
+          <tr><td class="muted">203.0.113.10 (this relay)</td><td>802</td><td>0</td><td><span class="st st-ok">none</span></td></tr>
+          <tr><td class="muted">google.com / 66.102.0.0/20</td><td>0</td><td>8</td><td><span class="st st-warn">none</span></td></tr>
+        </tbody>
+      </table>
+      <ul class="phone-list phone-only">
+        <li><a href="dmarc-report.html"><span>this relay</span><span class="st st-ok">802 pass</span></a></li>
+        <li><a href="dmarc-report.html"><span>google.com / 66.102.0.0/20</span><span class="st st-warn">8 fail</span></a></li>
+      </ul>
+    </div>
+  </div>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

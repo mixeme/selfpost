@@ -69,7 +69,7 @@ chmod 755 /data
 # later phase deliberately hands to another service. /data/log is exempt: it is
 # deliberately owned by postfix (postlogd writes the delivery log there) and is
 # normalised on its own below.
-find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log -exec chown -R panel:panel {} +
+find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log ! -name postfix -exec chown -R panel:panel {} +
 
 # DKIM key tree (spec 6, 9). The panel (user `panel`) generates keys and writes
 # the OpenDKIM tables; OpenDKIM (user `opendkim`) must read them. Normalise the
@@ -99,13 +99,13 @@ chown -R panel:selfpost /data/sasl
 chmod 2750 /data/sasl
 [ -e /data/sasl/sasldb2 ] && chmod 0640 /data/sasl/sasldb2
 
-# Postfix sender_login_maps (spec 5.1). The panel writes it; Postfix reads it.
-# Ensure the file exists (empty is fine) before Postfix starts so a reload that
-# references it never fails on a missing file, and keep it group-readable.
-mkdir -p /data/postfix
+# Postfix state under /data (spec 5.1, architecture.md § Persistence). The panel
+# writes sender_login_maps; Postfix owns the on-disk queue tree under queue/.
+mkdir -p /data/postfix/queue
 [ -e /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
-chown -R panel:selfpost /data/postfix
+chown panel:selfpost /data/postfix
 chmod 2750 /data/postfix
+chown panel:selfpost /data/postfix/sender_login_maps
 chmod 0640 /data/postfix/sender_login_maps
 
 # Delivery log (architecture.md § Log tailer). postlogd writes it as user
@@ -143,5 +143,12 @@ chmod 2750 /run/opendkim /run/selfpost
 # optional 587 service are all driven by env at run time, and re-derived on every
 # start the same way the /data normalisation above is.
 /usr/local/bin/postfix-config.sh
+
+# Initialise the persistent queue tree on first start or after restore. postfix
+# set-permissions reads queue_directory from main.cf (set by postfix-config.sh).
+if [ ! -d /data/postfix/queue/active ]; then
+	postfix set-permissions
+fi
+chown -R postfix:postfix /data/postfix/queue
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

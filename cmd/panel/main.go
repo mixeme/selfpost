@@ -4,7 +4,6 @@
 // the rate-limit checks.
 //
 // Copyright (C) 2026 Mikhail Yenuchenko
-// SPDX-License-Identifier: AGPL-3.0-only
 package main
 
 import (
@@ -53,16 +52,16 @@ type config struct {
 	mailLog       string
 	retentionDays int
 
-	dataDir           string
-	dbPath            string
-	manifestPath      string
-	setupTokenPath    string
-	hostname          string
-	cookieSecure      bool
-	submissionEnabled bool
-	trustedProxies    []*net.IPNet
-	sessionIdleDays   int
-	dnsResolvers      []string
+	dataDir                string
+	dbPath                 string
+	manifestPath           string
+	setupTokenPath         string
+	hostname               string
+	cookieSecure           bool
+	submissionEnabled      bool
+	trustedProxies         []*net.IPNet
+	sessionIdleDays        int
+	dnsResolvers           []string
 	rateLimitMessagesPerIP int
 	rateLimitWindowSeconds int
 
@@ -79,6 +78,7 @@ type config struct {
 	saslDBPath string
 	saslRealm  string
 	postfixDir string
+	deployRoot string
 }
 
 func loadConfig() config {
@@ -139,6 +139,7 @@ func loadConfig() config {
 		saslDBPath: envDefault("SASL_DB_PATH", filepath.Join(dataDir, "sasl", "sasldb2")),
 		saslRealm:  saslRealm(),
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
+		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
 	}
 }
 
@@ -223,7 +224,8 @@ func run() error {
 	// touch the database, so schema/format skew between versions cannot corrupt
 	// the restored state. A match consumes the manifest; its absence is the
 	// normal (non-restore) case.
-	if err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version); err != nil {
+	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	if err != nil {
 		return err
 	}
 
@@ -235,6 +237,13 @@ func run() error {
 		return err
 	}
 	defer st.Close()
+
+	if restored {
+		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
+		if err := resyncAfterRestore(cfg, st, false); err != nil {
+			return err
+		}
+	}
 
 	var wg sync.WaitGroup
 	errc := make(chan error, 3)

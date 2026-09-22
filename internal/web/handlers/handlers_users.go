@@ -102,10 +102,6 @@ func (h *Handlers) HandleUserEdit(w http.ResponseWriter, r *http.Request) {
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Invalid form submission.", FormUsername: u.Username, FormRole: string(u.Role)})
 			return
 		}
-		if r.PostFormValue("action") == "delete" {
-			h.submitUserDelete(w, r, u)
-			return
-		}
 		h.submitUserUpdate(w, r, u)
 	default:
 		w.Header().Set("Allow", "GET, POST")
@@ -289,6 +285,58 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	}
 
 	http.Redirect(w, r, "/users?done=updated", http.StatusSeeOther)
+}
+
+// HandleUserDeleteConfirm shows the cascade warning before a panel user is
+// removed — the same pattern as HandleDeleteConfirm for domains, so a single
+// mis-click on Delete cannot remove a user (P3, code-review.md).
+func (h *Handlers) HandleUserDeleteConfirm(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
+	uid, ok := parseUserID(w, r)
+	if !ok {
+		return
+	}
+	u, err := h.store.GetUser(uid)
+	if err != nil {
+		if errors.Is(err, store.ErrUserNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		logf("panel: get user %d: %v", uid, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	data := h.pageBase(r)
+	data["Title"] = "SelfPost — delete " + u.Username
+	data["Active"] = "users"
+	data["TargetID"] = u.ID
+	data["TargetUsername"] = u.Username
+	h.view.Render(w, http.StatusOK, "user_delete", data)
+}
+
+// HandleUserDelete performs the deletion confirmed on HandleUserDeleteConfirm
+// and returns to the user list.
+func (h *Handlers) HandleUserDelete(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
+	uid, ok := parseUserID(w, r)
+	if !ok {
+		return
+	}
+	u, err := h.store.GetUser(uid)
+	if err != nil {
+		if errors.Is(err, store.ErrUserNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		logf("panel: get user %d: %v", uid, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	h.submitUserDelete(w, r, u)
 }
 
 func (h *Handlers) submitUserDelete(w http.ResponseWriter, r *http.Request, u store.User) {

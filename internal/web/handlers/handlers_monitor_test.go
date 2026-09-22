@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
@@ -129,7 +131,7 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
-	rows, err := h.store.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
@@ -215,6 +217,174 @@ func TestDeliveryPageNotFound(t *testing.T) {
 	}
 }
 
+// A domain administrator reads the journal of the domains assigned to them and
+// nothing else. The list used to be scoped only when exactly one domain was
+// assigned, which meant two assignments read as none at all.
+func TestSendLogScopedToAssignedDomains(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+
+	for name, tc := range map[string]struct {
+		username  string
+		domainIDs []int64
+		want      []string
+		unwanted  []string
+	}{
+		"global sees both": {
+			"", nil, []string{"First message", "Second message"}, nil,
+		},
+		"one assigned domain": {
+			"one-domain", []int64{domains["first.example.ru"].ID},
+			[]string{"First message"}, []string{"Second message", "second-app"},
+		},
+		"two assigned domains": {
+			"two-domains", []int64{domains["first.example.ru"].ID, domains["second.example.ru"].ID},
+			[]string{"First message", "Second message"}, nil,
+		},
+		// Every assigned domain deleted cascades the assignments away. That
+		// leaves a principal entitled to nothing, which is an empty log — the
+		// case that used to hand over the whole journal.
+		"no assigned domains": {
+			"no-domains", nil, []string{"No messages logged yet."},
+			[]string{"First message", "Second message"},
+		},
+	} {
+		var p auth.Principal
+		if tc.username == "" {
+			p = globalPrincipal
+		} else {
+			p = domainAdmin(t, h.store, tc.username, tc.domainIDs...)
+		}
+		for view, handler := range map[string]http.HandlerFunc{
+			"page":     h.HandleDeliveries,
+			"fragment": h.HandleDeliveriesRows,
+		} {
+			out := getBodyAs(t, handler, "/deliveries", p)
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("%s (%s): missing %q:\n%s", name, view, want, out)
+				}
+			}
+			for _, unwanted := range tc.unwanted {
+				if strings.Contains(out, unwanted) {
+					t.Errorf("%s (%s): leaks %q:\n%s", name, view, unwanted, out)
+				}
+			}
+		}
+	}
+}
+
+// The filter dropdowns offer only permitted values, so a leak through them can
+// only come from a hand-written URL — which is exactly why the values are
+// checked against the principal's own domains and applications rather than
+// trusted for having been rendered by us.
+func TestSendLogIgnoresForgedFilters(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+	p := domainAdmin(t, h.store, "forged-filter", domains["first.example.ru"].ID)
+
+	for _, target := range []string{
+		"/deliveries?domain=second.example.ru",
+		"/deliveries?app=second-app",
+		"/deliveries?domain=second.example.ru&app=second-app",
+	} {
+		out := getBodyAs(t, h.HandleDeliveries, target, p)
+		if strings.Contains(out, "Second message") {
+			t.Errorf("GET %s leaks another domain's journal:\n%s", target, out)
+		}
+		if !strings.Contains(out, "First message") {
+			t.Errorf("GET %s hid the principal's own journal:\n%s", target, out)
+		}
+	}
+}
+
+// The detail page has always checked membership; keep it checked, because the
+// list and the page are two ways to the same row.
+func TestDeliveryPageForeignDomainNotFound(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{Domain: "second.example.ru", AllDomains: true}, 1, 0)
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("query: %v (%d rows)", err, len(rows))
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/deliveries/"+itoa(rows[0].ID), nil)
+	req.SetPathValue("id", itoa(rows[0].ID))
+	req = auth.RequestWithPrincipal(req, domainAdmin(t, h.store, "foreign-detail", domains["first.example.ru"].ID))
+	h.HandleDelivery(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("delivery page for a foreign domain = %d, want 404", rec.Code)
+	}
+}
+
+// serverWithTwoDomains builds a panel over a store holding two domains, one
+// application and one delivered message each, so a scoping test can tell "my
+// rows" from "every row" by reading the page.
+func serverWithTwoDomains(t *testing.T) (*Handlers, map[string]store.Domain) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	domains := make(map[string]store.Domain, 2)
+	for _, d := range []struct{ name, app, subject string }{
+		{"first.example.ru", "first-app", "First message"},
+		{"second.example.ru", "second-app", "Second message"},
+	} {
+		dom, err := st.AddDomain(d.name, "mail")
+		if err != nil {
+			t.Fatalf("add domain %s: %v", d.name, err)
+		}
+		if _, err := st.AddApplication(dom.ID, d.app, store.AddressModeWildcard, nil); err != nil {
+			t.Fatalf("add application %s: %v", d.app, err)
+		}
+		if err := st.InsertQueued(store.SendLogEntry{
+			QueueID: "Q" + d.app, Domain: d.name, AppLogin: d.app,
+			From: "noreply@" + d.name, To: "public@example.net", Subject: d.subject,
+		}); err != nil {
+			t.Fatalf("insert %s: %v", d.subject, err)
+		}
+		domains[d.name] = dom
+	}
+
+	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, domains
+}
+
+var globalPrincipal = auth.Principal{ID: 1, Username: "admin", Role: auth.RoleGlobal}
+
+func domainAdmin(t *testing.T, st *store.Store, username string, domainIDs ...int64) auth.Principal {
+	t.Helper()
+	const hash = "test-hash"
+	if len(domainIDs) == 0 {
+		placeholder, err := st.AddDomain(username+".placeholder.invalid", "mail")
+		if err != nil {
+			t.Fatalf("add placeholder domain: %v", err)
+		}
+		id, err := st.CreateUser(username, hash, store.RoleDomainAdmin, []int64{placeholder.ID})
+		if err != nil {
+			t.Fatalf("create domain admin %s: %v", username, err)
+		}
+		if err := st.DeleteDomain(placeholder.ID); err != nil {
+			t.Fatalf("delete placeholder domain: %v", err)
+		}
+		domainIDs = nil
+		u, err := st.GetUser(id)
+		if err != nil {
+			t.Fatalf("get domain admin %s: %v", username, err)
+		}
+		return auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, Domains: u.DomainIDs}
+	}
+	id, err := st.CreateUser(username, hash, store.RoleDomainAdmin, domainIDs)
+	if err != nil {
+		t.Fatalf("create domain admin %s: %v", username, err)
+	}
+	u, err := st.GetUser(id)
+	if err != nil {
+		t.Fatalf("get domain admin %s: %v", username, err)
+	}
+	return auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, Domains: u.DomainIDs}
+}
+
 // serverWithDelivery builds a panel over a store holding one delivery, written
 // the way the journal-milter wrote them before it decoded subjects itself.
 func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
@@ -238,7 +408,7 @@ func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
 	if _, err := st.UpdateStatus("4A1B2C3D", "public@example.ru", store.StatusSent); err != nil {
 		t.Fatalf("update status: %v", err)
 	}
-	rows, err := st.QuerySendLog(store.SendLogFilter{}, 1, 0)
+	rows, err := st.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
@@ -246,18 +416,20 @@ func serverWithDelivery(t *testing.T) (*Handlers, store.SendLogRow) {
 	return &Handlers{store: st, view: mustView(t), cfg: Config{Version: "test"}}, rows[0]
 }
 
-// getBody runs one handler over a GET and returns the page it wrote, failing
-// the test on any non-200. The path's {id} is bound by hand because these calls
-// bypass the router that would otherwise fill it in.
+// getBody runs one handler over a GET as the global administrator.
 func getBody(t *testing.T, h http.HandlerFunc, target string) string {
+	t.Helper()
+	return getBodyAs(t, h, target, globalPrincipal)
+}
+
+// getBodyAs runs one handler over a GET as the given principal and returns the
+// page it wrote, failing the test on any non-200. The path's {id} is bound by
+// hand because these calls bypass the router that would otherwise fill it in.
+func getBodyAs(t *testing.T, h http.HandlerFunc, target string, p auth.Principal) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req = auth.RequestWithPrincipal(req, auth.Principal{
-		ID:       1,
-		Username: "admin",
-		Role:     auth.RoleGlobal,
-	})
+	req = auth.RequestWithPrincipal(req, p)
 	if rest, ok := strings.CutPrefix(req.URL.Path, "/deliveries/"); ok && rest != "rows" {
 		req.SetPathValue("id", rest)
 	}
@@ -279,4 +451,91 @@ func writeMailLog(t *testing.T, lines ...string) string {
 		t.Fatalf("write mail.log: %v", err)
 	}
 	return path
+}
+
+// fixtureRetryPolicy is a distinctive policy so tests can tell the Config
+// snapshot from live postconf and from compiled-in defaults (5 minutes / 5 days).
+func fixtureRetryPolicy() postfix.RetryPolicy {
+	return postfix.RetryPolicy{
+		QueueRunDelay:        10 * time.Minute,
+		MinimalBackoff:       10 * time.Minute,
+		MaximalBackoff:       4000 * time.Second,
+		MaximalQueueLifetime: 2 * 24 * time.Hour,
+		BounceQueueLifetime:  2 * 24 * time.Hour,
+	}
+}
+
+// The retry card sits on the page itself, outside the HTMX poll, and prints
+// whatever policy was cached on Config — never a live postconf.
+func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{Version: "test", RetryPolicy: fixtureRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	for _, want := range []string{
+		"How delivery retries work",
+		"id=\"retry-policy\"",
+		">10 minutes<",
+		"doubling, cap about 1 hour 7 minutes",
+		">2 days<",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("mail queue is missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, ">5 minutes<") || strings.Contains(out, ">5 days<") {
+		t.Errorf("mail queue shows stock defaults instead of the fixture:\n%s", out)
+	}
+	if strings.Contains(out, "compiled-in defaults") {
+		t.Error("a fixture policy must not show the fallback note")
+	}
+}
+
+func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: fixtureRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueueBody, "/mail-queue/body")
+	if strings.Contains(out, "How delivery retries work") || strings.Contains(out, "10 minutes") {
+		t.Errorf("HTMX fragment includes the retry card:\n%s", out)
+	}
+}
+
+func TestMailQueueNotesCompiledInFallback(t *testing.T) {
+	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: postfix.DefaultRetryPolicy()}}
+
+	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	if !strings.Contains(out, "compiled-in defaults") {
+		t.Errorf("fallback note missing:\n%s", out)
+	}
+}
+
+func TestDeliveryPageDeferredUsesRetryPolicy(t *testing.T) {
+	h, row := serverWithDelivery(t)
+	h.cfg.RetryPolicy = fixtureRetryPolicy()
+	if _, err := h.store.UpdateStatus(row.QueueID, row.To, store.StatusDeferred); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
+
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	for _, want := range []string{
+		"first after 10 minutes",
+		"up to about 1 hour 7 minutes",
+		"for up to 2 days",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("deferred history is missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestDeliveryPageBouncedUsesRetryPolicy(t *testing.T) {
+	h, row := serverWithDelivery(t)
+	h.cfg.RetryPolicy = fixtureRetryPolicy()
+	if _, err := h.store.UpdateStatus(row.QueueID, row.To, store.StatusBounced); err != nil {
+		t.Fatalf("update status: %v", err)
+	}
+
+	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	if !strings.Contains(out, "gave up after 2 days in the queue") {
+		t.Errorf("bounced history does not use the fixture lifetime:\n%s", out)
+	}
 }

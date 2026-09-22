@@ -70,12 +70,12 @@ type Domain struct {
 // compares DNS against the key this server actually signs with. Hostname and
 // ServerIPs identify this server and come from a preceding Server check.
 type Query struct {
-	Name              string
-	Selector          string
-	ExpectedDKIM      string
-	Hostname          string
-	ServerIPs         []string
-	DMARCReportEmail  string // resolved rua= destination; empty = policy-only template
+	Name             string
+	Selector         string
+	ExpectedDKIM     string
+	Hostname         string
+	ServerIPs        []string
+	DMARCReportEmail string // resolved rua= destination; empty = policy-only template
 }
 
 // resolver is the slice of *net.Resolver this package uses, as an interface so

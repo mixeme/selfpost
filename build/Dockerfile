@@ -87,12 +87,16 @@ COPY --from=build /out/panel /usr/local/bin/panel
 COPY --from=build /out/selfpost-backup /usr/local/bin/selfpost-backup
 
 # Licence text shipped with the image (AGPL-3.0 conveyance). The panel also
-# serves the same text at /license from an embedded copy.
+# serves the same text at /license from an embedded copy. OFL.txt is the SIL
+# Open Font License 1.1 that must travel with the IBM Plex WOFF2 files
+# embedded in the panel binary (NOTICE).
 COPY --chmod=0644 LICENSE NOTICE /usr/share/doc/selfpost/
+COPY --chmod=0644 internal/web/view/static/OFL.txt /usr/share/doc/selfpost/OFL.txt
 
 # File modes are pinned here so a build context copied from a checkout without
 # POSIX permissions (e.g. Windows tar sync) cannot land group-writable config
-# that logrotate would silently ignore — see docs/plans/logrotate-mode.md.
+# that logrotate would silently ignore — see docs/development.md § Building
+# binaries and the image.
 COPY --chmod=0644 build/opendkim.conf /etc/opendkim.conf
 COPY --chmod=0644 build/logrotate-mail.conf /etc/logrotate.d/mail
 COPY --chmod=0755 build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh

@@ -17,6 +17,7 @@ services:
       - "587:587"
     volumes: !override
       - ./data:/data
+      - .:/selfpost-deploy:ro
       # Populated by extract-cert.sh from traefik's acme.json — see below.
       - ./traefik/extracted-certs:/etc/postfix/tls:ro
     labels:

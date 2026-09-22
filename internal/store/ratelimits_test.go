@@ -152,9 +152,9 @@ func TestDeleteRateLimitsForDomain(t *testing.T) {
 func TestRateLimitActiveAndAllowsIP(t *testing.T) {
 	inactive := []RateLimit{
 		{},
-		{Scope: RateLimitScopeDomain, AllowedIPs: []string{"203.0.113.1"}}, // no ceiling
-		{Scope: RateLimitScopeDomain, MaxMessages: 5},                      // no window
-		{Scope: RateLimitScopeApp, MaxMessages: 5, WindowSeconds: 60},      // app needs IPs
+		{Scope: RateLimitScopeDomain, AllowedIPs: []string{"203.0.113.1"}},              // no ceiling
+		{Scope: RateLimitScopeDomain, MaxMessages: 5},                                   // no window
+		{Scope: RateLimitScopeApp, MaxMessages: 5, WindowSeconds: 60},                   // app needs IPs
 		{Scope: RateLimitScopeApp, AllowedIPs: []string{"203.0.113.1"}, MaxMessages: 5}, // no window
 	}
 	for i, rl := range inactive {

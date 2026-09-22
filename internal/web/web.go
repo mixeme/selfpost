@@ -1,4 +1,4 @@
-﻿// Package web implements the SelfPost control panel's HTTP surface: the
+// Package web implements the SelfPost control panel's HTTP surface: the
 // one-time administrator setup flow (security.md), login/session handling
 // (security.md) and the authenticated shell the later phases build on.
 package web
@@ -13,6 +13,7 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/legal"
+	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/handlers"
@@ -40,11 +41,13 @@ type Config struct {
 	// the log-tailer role follows in cmd/panel.
 	MailLogPath string
 	// DataDir and DBPath locate the persistent state a full backup archives
-	// (architecture.md § Persistence); Version is stamped into the backup
-	// manifest. They mirror the panel's own configuration.
-	DataDir string
-	DBPath  string
-	Version string
+	// (architecture.md § Persistence); DeployRoot is the operator project
+	// directory (docker-compose.yml, .env, certs/); Version is stamped into
+	// the backup manifest. They mirror the panel's own configuration.
+	DataDir    string
+	DBPath     string
+	DeployRoot string
+	Version    string
 	// TrustedProxyCIDRs are the reverse-proxy addresses allowed to supply
 	// X-Forwarded-For (env TRUSTED_PROXY_CIDR). A request whose
 	// direct peer (RemoteAddr) is not in this list never has its XFF header
@@ -75,6 +78,10 @@ type Config struct {
 	// display and to cap domain/app level-2 ceilings (guide § Rate limiting).
 	RateLimitMessagesPerIP int
 	RateLimitWindowSeconds int
+	// RetryPolicy is this Postfix's deferred-mail timings, snapshotted once
+	// when the HTTP role starts. Handlers read the cache; they never call
+	// postconf (architecture.md).
+	RetryPolicy postfix.RetryPolicy
 }
 
 // Server is the panel HTTP application.
@@ -106,12 +113,14 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, cfg Config
 		MailLogPath:            cfg.MailLogPath,
 		DataDir:                cfg.DataDir,
 		DBPath:                 cfg.DBPath,
+		DeployRoot:             cfg.DeployRoot,
 		Version:                cfg.Version,
 		TLSCertFile:            cfg.TLSCertFile,
 		OpenDKIMSocket:         cfg.OpenDKIMSocket,
 		JournalSocket:          cfg.JournalSocket,
 		RateLimitMessagesPerIP: cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds: cfg.RateLimitWindowSeconds,
+		RetryPolicy:            cfg.RetryPolicy,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }
@@ -158,7 +167,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
 	authed.HandleFunc("POST /reload", h.HandleReload)
 
-	authed.HandleFunc("/settings", h.HandleAccount)
+	authed.HandleFunc("/settings", h.HandleSettings)
 	authed.HandleFunc("/account", redirectSettings)
 
 	authed.HandleFunc("GET /users", h.HandleUsers)
@@ -166,6 +175,8 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /users/new", h.HandleUserNew)
 	authed.HandleFunc("GET /users/{uid}", h.HandleUserEdit)
 	authed.HandleFunc("POST /users/{uid}", h.HandleUserEdit)
+	authed.HandleFunc("GET /users/{uid}/delete", h.HandleUserDeleteConfirm)
+	authed.HandleFunc("POST /users/{uid}/delete", h.HandleUserDelete)
 
 	authed.HandleFunc("GET /backup", h.HandleBackupPage)
 	authed.HandleFunc("POST /backup", h.HandleBackup)

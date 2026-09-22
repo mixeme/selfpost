@@ -59,7 +59,9 @@ domain administrators with assigned domains). The optional **inbound relay** is
 the main agreed **1.x+** extension still on the
 [roadmap](roadmap.md) — it targets a 1.x MINOR bump by default; a 2.x major
 remains possible pending implementation. Items marked *candidate* in the
-roadmap require explicit approval before coding.
+roadmap require explicit approval before coding (including **send-log retention
+in Settings**, **30-day send statistics**, and **auto level-2 rate limits** —
+see linked plans there).
 
 ---
 

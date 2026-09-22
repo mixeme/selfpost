@@ -75,6 +75,14 @@ func (p *Postfix) Reload() error {
 	return p.reload()
 }
 
+// SetReloadHook replaces how configuration is applied after a rebuild. Tests
+// that cannot reach supervisord use this to verify file regeneration alone.
+func (p *Postfix) SetReloadHook(fn func() error) {
+	if fn != nil {
+		p.reload = fn
+	}
+}
+
 // renderSenderLoginMaps builds the sender_login_maps file contents. Keys are
 // sorted for deterministic output and the logins under each key are sorted and
 // de-duplicated. Every address and login is re-checked for injection safety

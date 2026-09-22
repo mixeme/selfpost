@@ -219,5 +219,5 @@ func testLevel1RateLimit(t *testing.T, sc *scenario) {
 			return
 		}
 	}
-	t.Fatalf("level-1 rate limit (RATE_LIMIT_MESSAGES_PER_IP=5) never tripped after %d sends", maxAttempts)
+	t.Fatalf("level-1 rate limit (RATE_LIMIT_MESSAGES_PER_IP=50) never tripped after %d sends", maxAttempts)
 }

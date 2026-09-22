@@ -2,6 +2,25 @@
      in panel.css, as on a delivery's page). */}}
 {{define "wide"}}wide{{end}}
 
+{{/* The username/password fields are identical for a global administrator
+     (split card, DMARC alongside) and a domain administrator (narrow card,
+     no DMARC card) — only the surrounding form and card differ. */}}
+{{define "credentials_fields"}}
+<label for="username">Username</label>
+<input id="username" name="username" autocomplete="username"
+       autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
+
+<label for="current_password">Current password</label>
+<input id="current_password" name="current_password" type="password"
+       autocomplete="current-password" required>
+
+<label for="new_password">New password</label>
+<input id="new_password" name="new_password" type="password" autocomplete="new-password">
+
+<label for="new_password_confirm">Confirm new password</label>
+<input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
+{{end}}
+
 {{define "content"}}
 <h1>Settings</h1>
 
@@ -16,27 +35,15 @@
     <p class="muted">These are the credentials for this control panel only.
     Applications keep their own logins and passwords, which are not affected.</p>
 
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username"
-           autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
-
-    <label for="current_password">Current password</label>
-    <input id="current_password" name="current_password" type="password"
-           autocomplete="current-password" required>
-
-    <label for="new_password">New password</label>
-    <input id="new_password" name="new_password" type="password" autocomplete="new-password">
-
-    <label for="new_password_confirm">Confirm new password</label>
-    <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
+    {{template "credentials_fields" .}}
   </div>
 
   <div class="card">
     <h2>DMARC aggregate reports</h2>
     <p class="muted">Optional default <code>rua=</code> address for every sending
     domain (can be overridden per domain). Use a mailbox on a domain that
-    receives inbound mail. SelfPost is send-only today; a future release will
-    be able to receive reports in the panel itself.</p>
+    receives inbound mail. SelfPost does not receive inbound mail — point
+    <code>rua=</code> at a mailbox elsewhere.</p>
 
     <label for="dmarc_report_email">Default report address</label>
     <input id="dmarc_report_email" name="dmarc_report_email" type="email"
@@ -81,19 +88,7 @@ this one stays signed in.</p>
   <p class="muted">These are the credentials for this control panel only.
   Applications keep their own logins and passwords, which are not affected.</p>
   <form method="post" action="/settings">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username"
-           autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
-
-    <label for="current_password">Current password</label>
-    <input id="current_password" name="current_password" type="password"
-           autocomplete="current-password" required>
-
-    <label for="new_password">New password</label>
-    <input id="new_password" name="new_password" type="password" autocomplete="new-password">
-
-    <label for="new_password_confirm">Confirm new password</label>
-    <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password">
+    {{template "credentials_fields" .}}
 
     <button type="submit">Save changes</button>
   </form>
