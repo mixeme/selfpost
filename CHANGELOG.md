@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-09-22
+
+Panel-redesign prep, docs only: stage 1-2 mockups on all 33 screens, the
+accepted header/type-scale/contrast corrections, the account e-mail and
+inbound-delegation decisions, and the routes/quarantine/preflight roadmap
+screens. Nothing in `internal/web` changes; the design stays `candidate`
+(3/21) until the redesign itself ships as `2.0.0`.
+
 ### Added
 
 - Panel redesign, account e-mail and notifications: a user's e-mail is its own
