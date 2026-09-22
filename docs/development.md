@@ -64,6 +64,11 @@ obligation — not because the convention around AI authorship shifts.
 Default rule: risk-critical → Opus; UI / docs / boilerplate → Sonnet; trivial
 mechanics → Haiku. Reviewers must not be the author of the code under review.
 
+**Composer → Opus → Fable** (when a plan specifies it): **Composer** writes all
+implementation for that item (code, tests, docs); **Opus** does the technical
+review of the result; **Fable** does the security review. A plan's checklist
+overrides the default routing table for that item only.
+
 ---
 
 ## Plan checklists
@@ -424,6 +429,7 @@ There is no `docs/archive/` directory.
 | As-built design | [architecture.md](architecture.md) |
 | Development process (this file) | [development.md](development.md) |
 | Security requirements and accepted risks | [security.md](security.md) |
+| SQLite schema and migrations | [schema-migrations.md](schema-migrations.md) |
 | Roadmap (1.x+) | [roadmap.md](roadmap.md) |
 | Active design plans | [plans/](plans/) |
 | Release history | [CHANGELOG.md](../CHANGELOG.md) |
@@ -453,6 +459,8 @@ Out of scope for v1.x: `CONTRIBUTING.md`, man pages, a separate docs site
    fails on an undocumented `loadConfig` or build-script key.
 3. **New gaps** go into [roadmap.md](roadmap.md) (or the active plan file), not
    silent drive-by edits.
+4. **Schema changes:** update [schema-migrations.md](schema-migrations.md) in the
+   same change as a new `internal/store/migrations/*.sql` file.
 
 ### Verifying docs against code
 

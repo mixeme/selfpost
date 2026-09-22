@@ -13,6 +13,37 @@
 # a fixed literal or a container environment variable (spec 7.6.3).
 set -eu
 
+# postconf -P refuses master.cf -o values that contain whitespace; inbound port
+# 25 needs restriction lists and milter specs that include spaces. Patch the
+# smtp/inet service stanza directly instead.
+master_cf_set_smtp_inet_o() {
+	param="$1"
+	value="$2"
+	awk -v p="$param" -v v="$value" '
+		/^smtp[ \t]+inet[ \t]/ && !done {
+			print
+			print "    -o " p "=" v
+			done = 1
+			in_smtp_inet = 1
+			next
+		}
+		in_smtp_inet && /^[ \t]+-o / {
+			line = $0
+			sub(/^[ \t]+-o /, "", line)
+			eq = index(line, "=")
+			on = substr(line, 1, eq - 1)
+			if (on == p) {
+				next
+			}
+		}
+		in_smtp_inet && /^[^ \t#-]/ {
+			in_smtp_inet = 0
+		}
+		{ print }
+	' /etc/postfix/master.cf > /etc/postfix/master.cf.new
+	mv /etc/postfix/master.cf.new /etc/postfix/master.cf
+}
+
 # --- environment knobs (spec 8) ----------------------------------------------
 # Server hostname: used as HELO name AND, crucially, as the Cyrus SASL realm the
 # sasldb2 accounts are looked up under. The panel creates accounts under realm
@@ -235,17 +266,18 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		done
 		RELAY_DOMAINS_SETTING="texthash:${RELAY_DOMAINS_MAP}"
 		TRANSPORT_SETTING="texthash:${TRANSPORT_MAP}"
-		RECIPIENT_RESTRICTIONS="reject_unauth_destination, reject_unlisted_recipient"
+		RECIPIENT_RESTRICTIONS="reject_unauth_destination,reject_unlisted_recipient"
 	fi
 	if [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
 		for f in "$DMARC_RECIPIENTS_MAP" "$DMARC_TRANSPORT_MAP" "$DMARC_RELAY_DOMAINS_MAP"; do
 			[ -e "$f" ] || : > "$f"
 		done
+		ln -sf /usr/local/bin/panel /usr/local/bin/dmarc-ingest
 		postconf -M "dmarc-ingest/unix-pipe=dmarc-ingest unix - n n - - pipe"
 		postconf -P \
 			"dmarc-ingest/unix-pipe/flags=Rq" \
 			"dmarc-ingest/unix-pipe/user=panel" \
-			"dmarc-ingest/unix-pipe/argv=/usr/local/bin/panel -dmarc-ingest"
+			"dmarc-ingest/unix-pipe/argv=/usr/local/bin/dmarc-ingest"
 		if [ -n "$RELAY_DOMAINS_SETTING" ]; then
 			RELAY_DOMAINS_SETTING="${RELAY_DOMAINS_SETTING} texthash:${DMARC_RELAY_DOMAINS_MAP}"
 			TRANSPORT_SETTING="${TRANSPORT_SETTING} texthash:${DMARC_TRANSPORT_MAP}"
@@ -253,7 +285,7 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 			RELAY_DOMAINS_SETTING="texthash:${DMARC_RELAY_DOMAINS_MAP}"
 			TRANSPORT_SETTING="texthash:${DMARC_TRANSPORT_MAP}"
 		fi
-		RECIPIENT_RESTRICTIONS="check_recipient_access texthash:${DMARC_RECIPIENTS_MAP}, ${RECIPIENT_RESTRICTIONS}"
+		RECIPIENT_RESTRICTIONS="check_recipient_access texthash:${DMARC_RECIPIENTS_MAP},${RECIPIENT_RESTRICTIONS}"
 	fi
 	postconf -e \
 		"relay_domains=${RELAY_DOMAINS_SETTING}" \
@@ -285,7 +317,7 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 				exit 1
 				;;
 		esac
-		INBOUND_MILTERS="{ ${INBOUND_ANTISPAM_MILTER}, default_action=${INBOUND_ANTISPAM_MILTER_ACTION} }"
+		INBOUND_MILTERS="{${INBOUND_ANTISPAM_MILTER},default_action=${INBOUND_ANTISPAM_MILTER_ACTION}}"
 	fi
 
 	PORT25_RATE="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}"
@@ -311,10 +343,12 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		"smtp/inet/smtpd_sender_restrictions=" \
 		"smtp/inet/smtpd_client_restrictions=" \
 		"smtp/inet/smtpd_relay_restrictions=reject_unauth_destination" \
-		"smtp/inet/smtpd_recipient_restrictions=${RECIPIENT_RESTRICTIONS}" \
-		"smtp/inet/smtpd_milters=${INBOUND_MILTERS}" \
 		"smtp/inet/smtpd_client_message_rate_limit=${PORT25_RATE}" \
 		"smtp/inet/message_size_limit=${PORT25_SIZE}"
+	master_cf_set_smtp_inet_o smtpd_recipient_restrictions "${RECIPIENT_RESTRICTIONS}"
+	if [ -n "${INBOUND_MILTERS}" ]; then
+		master_cf_set_smtp_inet_o smtpd_milters "${INBOUND_MILTERS}"
+	fi
 else
 	postconf -MX "smtp/inet" 2>/dev/null || true
 	postconf -MX "dmarc-ingest/unix-pipe" 2>/dev/null || true
