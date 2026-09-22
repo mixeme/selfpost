@@ -188,10 +188,10 @@ holds the cookie works after process restart, redeploy, or full backup restore.
 - **Idle timeout** — sliding window, `PANEL_SESSION_IDLE_DAYS` (default 7); no
   absolute cap (regular use keeps the session alive indefinitely).
 - **Renewal** — DB `last_seen` and cookie `Max-Age` update at most once per hour
-  (`renewThreshold` in [internal/web/session.go](../internal/web/session.go)).
+  (`renewThreshold` in [internal/web/auth/session.go](../internal/web/auth/session.go)).
 - **Password change** — all other sessions are deleted; the current session stays
   active ([internal/store/sessions.go](../internal/store/sessions.go),
-  [handlers_account.go](../internal/web/handlers_account.go)).
+  [handlers_account.go](../internal/web/handlers/handlers_account.go)).
 
 Restoring an **older** backup also restores session rows: a session invalidated
 after that backup was taken can become valid again if the browser still has the
@@ -218,7 +218,15 @@ flowchart TB
     backupcli["selfpost-backup CLI"]
   end
   subgraph web ["internal/web — HTTP surface"]
-    handlers["handlers_*.go, templates, session/security"]
+    webRoot["web.go — router, security"]
+    viewPkg["web/view — templates, static"]
+    authPkg["web/auth — session, login, setup"]
+    handlersPkg["web/handlers — authenticated pages"]
+    webRoot --> viewPkg
+    webRoot --> authPkg
+    webRoot --> handlersPkg
+    handlersPkg --> authPkg
+    handlersPkg --> viewPkg
   end
   subgraph services ["Services — multi-store operations + rollback"]
     domainSvc["internal/domain"]

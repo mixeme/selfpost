@@ -148,8 +148,13 @@ Two different scopes — don't confuse them:
   behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).
 - **DKIM** — a TXT record with the exact value the panel shows on that
   domain's page (`domain page → DKIM TXT record`), one selector per domain.
-- **DMARC** — a `_dmarc` TXT record (even a conservative `p=none` starts
-  building reporting/reputation history).
+- **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring
+  only, safe to publish immediately). On a send-only relay the sending domain
+  often has no inbox, so `rua=` is optional — configure a default report address
+  in *Settings* or per domain when you have a mailbox that receives inbound mail
+  elsewhere. If `rua=` points at another domain, publish `_report._dmarc` on that
+  hub domain too; the panel checks it. Public mail hosts (Gmail, Outlook, …)
+  cannot be used as external report destinations.
 
 Skipping any of the three per-domain records is the single most common reason
 mail lands in spam even though SelfPost delivered it correctly — DKIM passing
@@ -160,7 +165,8 @@ The panel checks both scopes for you and tells you what is actually published:
 the *Status* page verifies the server's hostname and its reverse record
 (forward-confirmed reverse DNS), and each domain's page shows a *DNS status*
 card comparing the published DKIM record against the key this server signs with,
-plus the domain's SPF and DMARC records. Results are cached for a few minutes;
+plus the domain's SPF, DMARC, and (when configured) DMARC report-authorisation
+records. Results are cached for a few minutes;
 use *Re-check* right after publishing a record. The SPF check is deliberately
 shallow — it looks for a mechanism that literally covers this server's address
 and does not follow `include:` or `redirect=`, so a record that authorizes the
@@ -375,7 +381,7 @@ but it can look like an open port in external scans.
 ## Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `1.0.1`. Intermediate
+deliberately never `:latest`. The current pin is `1.1.0`. Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check above:
 the panel binary's embedded version and the image tag that produced it are the

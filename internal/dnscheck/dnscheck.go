@@ -56,12 +56,13 @@ type Server struct {
 
 // Domain is the published-DNS state of one sending domain.
 type Domain struct {
-	Name      string
-	DKIM      Result
-	SPF       Result
-	DMARC     Result
-	Overall   health.Status
-	CheckedAt time.Time
+	Name            string
+	DKIM            Result
+	SPF             Result
+	DMARC           Result
+	DMARCReportAuth Result // zero when external rua= is not used
+	Overall         health.Status
+	CheckedAt       time.Time
 }
 
 // Query describes the domain to check. ExpectedDKIM is the TXT value the panel
@@ -69,11 +70,12 @@ type Domain struct {
 // compares DNS against the key this server actually signs with. Hostname and
 // ServerIPs identify this server and come from a preceding Server check.
 type Query struct {
-	Name         string
-	Selector     string
-	ExpectedDKIM string
-	Hostname     string
-	ServerIPs    []string
+	Name              string
+	Selector          string
+	ExpectedDKIM      string
+	Hostname          string
+	ServerIPs         []string
+	DMARCReportEmail  string // resolved rua= destination; empty = policy-only template
 }
 
 // resolver is the slice of *net.Resolver this package uses, as an interface so
@@ -178,12 +180,19 @@ func (c *Checker) Forget(domainName string) {
 func (c *Checker) checkDomain(ctx context.Context, q Query) Domain {
 	d := Domain{Name: q.Name, CheckedAt: time.Now()}
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() { defer wg.Done(); d.DKIM = c.checkDKIM(ctx, q) }()
 	go func() { defer wg.Done(); d.SPF = c.checkSPF(ctx, q) }()
-	go func() { defer wg.Done(); d.DMARC = c.checkDMARC(ctx, q.Name) }()
+	go func() { defer wg.Done(); d.DMARC = c.checkDMARC(ctx, q) }()
+	go func() {
+		defer wg.Done()
+		hub := EmailDomain(q.DMARCReportEmail)
+		if hub != "" && !strings.EqualFold(hub, q.Name) {
+			d.DMARCReportAuth = c.checkReportAuth(ctx, hub)
+		}
+	}()
 	wg.Wait()
-	d.Overall = health.Worst(d.DKIM.Status, d.SPF.Status, d.DMARC.Status)
+	d.Overall = health.Worst(d.DKIM.Status, d.SPF.Status, d.DMARC.Status, d.DMARCReportAuth.Status)
 	return d
 }
 

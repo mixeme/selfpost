@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-10
+
+The first MINOR after 1.0.0: send-only DMARC guidance in the panel, AGPL
+packaging on every page, and an internal split of `internal/web` ahead of
+domain-admin work. Upgrading runs one SQLite migration (empty defaults;
+existing DNS guidance is unchanged until you set a report address).
+
+### Changed
+
+- `internal/web` split into subpackages (`web/view`, `web/auth`, `web/validate`,
+  `web/handlers`); the composition root (`web.New`, `web.Config`, `Server.Handler`)
+  is unchanged for `cmd/panel`. Templates and static assets moved under
+  `internal/web/view/`.
+
+### Added
+
+- panel: DMARC guidance for send-only relays — the suggested `_dmarc` record
+  is now `p=none` without `rua=` by default; *Settings* and each domain page
+  let you configure an optional aggregate-report address (profile default plus
+  per-domain inherit / none / custom). When `rua=` targets another domain, the
+  panel shows and DNS-checks the hub's `_report._dmarc` authorisation record.
+  Domain export/import carries per-domain overrides.
+- AGPL packaging hygiene: [NOTICE](NOTICE) names the copyright holder and the
+  bundled third-party works (htmx 0BSD, IBM Plex OFL in outlined logos); the
+  panel footer on every page — including login and setup — shows copyright, a
+  link to `/license` (embedded AGPL text), a Source link to the public
+  repository, and "No warranty"; the runtime image ships `LICENSE` and
+  `NOTICE` under `/usr/share/doc/selfpost/`. `docs/development.md` now lists
+  the vendored htmx asset beside the Go module licences.
+- [docs/roadmap.md](docs/roadmap.md) — candidate item **visual-style** (panel
+  visual refresh: typography, colour tokens, spacing, and component styling
+  without behaviour changes). Starting reference:
+  [docs/assets/selfpost-proof.html](docs/assets/selfpost-proof.html). No semver
+  impact; explicit agreement required before coding, like other candidates.
+
 ## [1.0.1] - 2026-08-09
 
 A documentation and packaging release: no change to the mail path, the

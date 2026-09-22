@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -72,6 +73,9 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if _, err := src.store.AddApplication(d.ID, "alerts", store.AddressModeList, []string{"a@example.com"}); err != nil {
 		t.Fatalf("add alerts: %v", err)
 	}
+	if err := src.store.UpdateDomainDMARCRua(d.ID, sql.NullString{Valid: true, String: "reports@hub.example"}); err != nil {
+		t.Fatalf("set dmarc rua: %v", err)
+	}
 
 	exp, err := src.Export(d.ID)
 	if err != nil {
@@ -106,6 +110,12 @@ func TestExportImportRoundTrip(t *testing.T) {
 	}
 	if got.Name != "example.com" || got.DKIMSelector != "selfpost" {
 		t.Errorf("imported domain = %+v", got)
+	}
+	if !got.DMARCRua.Valid || got.DMARCRua.String != "reports@hub.example" {
+		t.Errorf("imported dmarc rua = %+v", got.DMARCRua)
+	}
+	if exp.DMARCRua == nil || *exp.DMARCRua != "reports@hub.example" {
+		t.Errorf("exported dmarc rua = %v", exp.DMARCRua)
 	}
 	// The DKIM key was imported byte-for-byte, so the DNS record is unchanged.
 	dstKey, err := dstOdk.ExportKey("example.com", "selfpost")

@@ -11,7 +11,7 @@ func TestUpdateAdmin(t *testing.T) {
 	if err := st.CreateAdmin("admin", "hash-one"); err != nil {
 		t.Fatalf("CreateAdmin: %v", err)
 	}
-	if err := st.UpdateAdmin("operator", "hash-two"); err != nil {
+	if err := st.UpdateAdmin("operator", "hash-two", "reports@hub.example"); err != nil {
 		t.Fatalf("UpdateAdmin: %v", err)
 	}
 
@@ -19,7 +19,18 @@ func TestUpdateAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAdmin: %v", err)
 	}
-	if a.Username != "operator" || a.PasswordHash != "hash-two" {
+	if a.DMARCReportEmail != "reports@hub.example" {
+		t.Fatalf("dmarc email = %q", a.DMARCReportEmail)
+	}
+
+	if err := st.UpdateAdmin("operator", "hash-three", ""); err != nil {
+		t.Fatalf("clear dmarc email: %v", err)
+	}
+	a, err = st.GetAdmin()
+	if err != nil {
+		t.Fatalf("GetAdmin: %v", err)
+	}
+	if a.Username != "operator" || a.PasswordHash != "hash-three" {
 		t.Fatalf("unexpected admin after update: %+v", a)
 	}
 	if a.CreatedAt.IsZero() {
@@ -32,7 +43,7 @@ func TestUpdateAdmin(t *testing.T) {
 func TestUpdateAdminWithoutAdmin(t *testing.T) {
 	st := openTestStore(t)
 
-	if err := st.UpdateAdmin("operator", "hash"); !errors.Is(err, ErrNoAdmin) {
+	if err := st.UpdateAdmin("operator", "hash", ""); !errors.Is(err, ErrNoAdmin) {
 		t.Fatalf("UpdateAdmin without admin = %v, want ErrNoAdmin", err)
 	}
 	exists, err := st.AdminExists()

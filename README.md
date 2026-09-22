@@ -95,7 +95,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:1.0.1
+  ghcr.io/mixeme/selfpost:1.1.0
 ```
 
 **Get the setup URL** (pick one):
@@ -262,6 +262,9 @@ Optional variables (`TRUSTED_PROXY_CIDR`, rate limits, retention): see
 
 ## License
 
+Copyright © 2026 Mikhail Yenuchenko.
+
 [AGPL-3.0](LICENSE). The AGPL closes the "SaaS loophole": if you run a modified
 version as a network-accessible service, you must make the modified source
 available to its users — not only when you distribute copies of the code.
+Third-party notices: [NOTICE](NOTICE).

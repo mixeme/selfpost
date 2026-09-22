@@ -60,12 +60,14 @@ func (c *Checker) checkDKIM(ctx context.Context, q Query) Result {
 
 // checkDMARC reports whether the domain publishes a DMARC policy. DMARC is not
 // required for delivery, so its absence is advice (warn), not a fault.
-func (c *Checker) checkDMARC(ctx context.Context, domainName string) Result {
-	name := DMARCRecordName(domainName)
+func (c *Checker) checkDMARC(ctx context.Context, q Query) Result {
+	name := DMARCRecordName(q.Name)
 	txt, found, err := c.lookupTXT(ctx, name)
 	if err != nil {
 		return lookupFailed("the DMARC record", err)
 	}
+
+	example := DMARCExample(q.DMARCReportEmail)
 
 	var records []string
 	for _, rec := range txt {
@@ -74,10 +76,11 @@ func (c *Checker) checkDMARC(ctx context.Context, domainName string) Result {
 		}
 	}
 	if !found || len(records) == 0 {
-		return Result{
-			Status: health.StatusWarn,
-			Detail: fmt.Sprintf("No DMARC record at %s. Delivery works without one, but publishing at least %q tells receivers what to do with mail that fails DKIM and gets you reports.", name, DMARCExample(domainName)),
+		detail := fmt.Sprintf("No DMARC record at %s. Delivery works without one, but publishing %q tells receivers what to do with mail that fails authentication.", name, example)
+		if q.DMARCReportEmail == "" {
+			detail += " Aggregate reports (rua=) are optional on a send-only relay — omit rua= unless a mailbox that receives inbound mail is configured."
 		}
+		return Result{Status: health.StatusWarn, Detail: detail}
 	}
 	if len(records) > 1 {
 		return Result{
@@ -100,6 +103,52 @@ func (c *Checker) checkDMARC(ctx context.Context, domainName string) Result {
 		detail += " That is monitoring only — tighten it to quarantine or reject once the reports look clean."
 	}
 	return Result{Status: health.StatusOK, Detail: detail, Records: records}
+}
+
+// checkReportAuth verifies the hub domain publishes _report._dmarc for external
+// aggregate-report destinations. Missing authorisation does not affect outbound
+// delivery, only whether reports reach the rua= mailbox.
+func (c *Checker) checkReportAuth(ctx context.Context, hubDomain string) Result {
+	name := ReportAuthRecordName(hubDomain)
+	expected := ReportAuthExample()
+	txt, found, err := c.lookupTXT(ctx, name)
+	if err != nil {
+		return lookupFailed("the DMARC report-authorisation record", err)
+	}
+
+	var records []string
+	for _, rec := range txt {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rec)), "v=dmarc1") {
+			records = append(records, rec)
+		}
+	}
+	if !found || len(records) == 0 {
+		return Result{
+			Status: health.StatusWarn,
+			Detail: fmt.Sprintf("No report-authorisation record at %s. Aggregate DMARC reports sent to a mailbox on %s will not be delivered until %q is published there.", name, hubDomain, expected),
+		}
+	}
+	if len(records) > 1 {
+		return Result{
+			Status:  health.StatusError,
+			Detail:  fmt.Sprintf("More than one DMARC report-authorisation record is published at %s. Keep exactly one.", name),
+			Records: records,
+		}
+	}
+	return Result{
+		Status:  health.StatusOK,
+		Detail:  fmt.Sprintf("Published at %s — aggregate reports addressed to %s are authorised.", name, hubDomain),
+		Records: records,
+	}
+}
+
+// ReportAuth checks whether hubDomain authorises external DMARC aggregate
+// reports. It is used on the settings page for the administrator profile.
+func (c *Checker) ReportAuth(ctx context.Context, hubDomain string) Result {
+	if hubDomain == "" {
+		return Result{}
+	}
+	return c.checkReportAuth(ctx, hubDomain)
 }
 
 // publicKeyTag extracts the p= (public key) tag of a DKIM record, with all

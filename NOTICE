@@ -1,0 +1,32 @@
+SelfPost
+Copyright (C) 2026 Mikhail Yenuchenko
+
+This product is licensed under the GNU Affero General Public License,
+version 3. The full licence text is in the LICENSE file in this
+distribution (and at /license in the control panel).
+
+Corresponding Source for the published releases is at:
+  https://github.com/mixeme/selfpost
+
+If you modify SelfPost and let users interact with it over a network,
+AGPL-3.0 §13 requires you to offer them the Corresponding Source of
+your modified version. Update the Source link in the panel footer
+(internal/web/templates/layout.html) so it points at your sources.
+
+Third-party software included in this distribution
+----------------------------------------------------
+
+htmx 2.0.4 (internal/web/static/htmx.min.js)
+  Copyright (c) Big Sky Software
+  Licence: Zero-Clause BSD (0BSD)
+  https://github.com/bigskysoftware/htmx
+
+IBM Plex Sans / IBM Plex Mono (wordmarks in SVG logos only)
+  Copyright © 2017 IBM Corp., with Reserved Font Name "Plex"
+  Licence: SIL Open Font License 1.1
+  The shipped SVGs use outlined paths derived from these fonts; the
+  font files themselves are not distributed.
+
+Go module dependencies are listed with their licences in
+docs/development.md § External libraries. Debian packages in the
+runtime image carry their own copyright files as shipped by Debian.
