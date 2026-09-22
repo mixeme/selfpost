@@ -31,6 +31,8 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
   - [Server-level DNS (PTR/rDNS)](#server-level-dns-ptrrdns)
   - [Rate limiting — level 1 (IP backstop)](#rate-limiting--level-1-ip-backstop)
   - [Full backup and restore](#full-backup-and-restore)
+    - [Taking a full backup](#taking-a-full-backup)
+    - [Restore](#restore)
     - [Encrypting a backup or export](#encrypting-a-backup-or-export)
   - [Inbound relay](#inbound-relay)
   - [DMARC reports](#dmarc-reports)
@@ -459,26 +461,106 @@ logs under `data/log/` are excluded. The base compose file mounts the project
 directory read-only at `/selfpost-deploy` so the panel and CLI can read those
 deploy files — without that mount, *Full backup* refuses with an error.
 
-Take a backup from the panel (*Backup* → *Full backup*) or from the host:
+#### Taking a full backup
+
+There are four ways to capture a full backup. They differ in whether the
+instance keeps running, what goes into the archive, and what happens on restore.
+
+**1. Panel — while the container is running (no downtime).** *Backup* → *Full
+backup* (optionally tick *Encrypt with a password*). Same archive as the CLI
+below.
+
+**2. `selfpost-backup` CLI — while the container is running (no downtime).**
+The panel button and this command call the same code path: a consistent SQLite
+snapshot via `VACUUM INTO`, then a gzip tar of `data/` (minus diagnostics) plus
+deploy files.
 
 ```sh
 docker exec <container> selfpost-backup > selfpost-backup.tar.gz
 ```
 
-**Restore** means unpacking that archive into an **empty project directory**
-(not into `./data` alone) and starting a container of the **exact same image
-version** that created it — SelfPost refuses to start otherwise and tells you
-which tag to use. On the first successful start after restore, `data/manifest.json`
-from the archive is **deleted** — it guards only that one boot, so a later
-in-place upgrade is not blocked. On that same first boot the panel also runs
-one **Resync** — OpenDKIM's tables and Postfix's sender map are re-derived from
-SQLite (and inbound relay maps when `INBOUND_RELAY_ENABLE=true`) and both
-daemons are reloaded, healing any drift between the extracted files and the
-database (the Status page's *Reload configuration* button runs the same step on
-demand). This is why the compose file pins a fixed tag rather
-than `:latest`: without a known version, there'd be no way to tell which image
-restoring a given backup actually requires (see [Fixed image
-tag](#fixed-image-tag)).
+Use `-o /path/inside/container` to write inside the container instead of
+stdout. Optional encryption: set `SELFPOST_BACKUP_PASSWORD` or pass
+`-password-file` — see [Encrypting a backup or
+export](#encrypting-a-backup-or-export).
+
+**3. `tar` of the whole project directory — with the service stopped.** Stop
+the instance so nothing is writing to SQLite, then archive the operator
+directory (the folder that contains `docker-compose.yml`, `.env`, `data/`, and
+usually `certs/`):
+
+```sh
+docker compose down
+tar czf ../selfpost-backup.tar.gz .
+docker compose up -d
+```
+
+Postfix delivery logs under `data/log/` are included and are often the bulk of
+the archive; add `--exclude='./data/log'` if you only want state. Unlike the
+panel/CLI backup, this archive has no `data/manifest.json`, so restore does not
+run the version guard or the one-time post-restore *Resync* (see
+[Restore](#restore) below) — a normal `docker compose up` is enough when the
+files were captured cleanly while stopped.
+
+**4. `tar` of `./data` only — with the service stopped.** Same as (3), but only
+the data volume:
+
+```sh
+docker compose down
+tar czf ../selfpost-data.tar.gz ./data
+docker compose up -d
+```
+
+This is **not** self-contained: you must keep `docker-compose.yml`, `.env`,
+and `certs/` separately (another backup, or unchanged on the same host).
+Restore is `tar xzf selfpost-data.tar.gz` into an existing project directory,
+not into an empty one. Also includes `data/log/` unless you exclude it.
+
+**Do not `tar` while the container is running.** SQLite uses WAL mode; copying
+or archiving `./data` (or the whole project directory) while the panel and
+Postfix are writing can produce an inconsistent database. The panel and CLI
+backup avoid this by snapshotting the database on a live instance; the `tar`
+methods avoid it by stopping first.
+
+| | Panel / `selfpost-backup` | `tar` project dir (stopped) | `tar` `./data` only (stopped) |
+|--|---------------------------|------------------------------|-------------------------------|
+| Downtime | None | Yes (`docker compose down`) | Yes |
+| Self-contained archive | Yes | Yes | No — deploy files separate |
+| SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
+| `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
+| `data/manifest.json` | Written (version stamp) | Absent | Absent |
+| Restore version check | Yes — must match image tag | No | No |
+| Post-restore *Resync* | Yes, on first boot | No | No |
+| Password encryption (`.spbk`) | Yes | No — encrypt the `.tar.gz` yourself if needed | No |
+
+Prefer the panel or CLI when you cannot afford downtime. Prefer a stopped `tar`
+of the whole project directory when you already plan maintenance and want a
+plain archive without going through the container. Use `tar` of `./data` only
+when deploy files are managed elsewhere and never change.
+
+#### Restore
+
+**Panel and CLI archives** (with `data/manifest.json`) restore by unpacking into
+an **empty project directory** (not into `./data` alone) and starting a
+container of the **exact same image version** that created the backup — SelfPost
+refuses to start otherwise and tells you which tag to use. On the first
+successful start after restore, `data/manifest.json` from the archive is
+**deleted** — it guards only that one boot, so a later in-place upgrade is not
+blocked. On that same first boot the panel also runs one **Resync** — OpenDKIM's
+tables and Postfix's sender map are re-derived from SQLite (and inbound relay
+maps when `INBOUND_RELAY_ENABLE=true`) and both daemons are reloaded, healing
+any drift between the extracted files and the database (the Status page's
+*Reload configuration* button runs the same step on demand). This is why the
+compose file pins a fixed tag rather than `:latest`: without a known version,
+there'd be no way to tell which image restoring a given backup actually requires
+(see [Fixed image tag](#fixed-image-tag)).
+
+**Stopped-`tar` archives** (methods 3 and 4 above) have no `manifest.json`, so
+there is no version guard and no automatic post-restore *Resync*. Unpack a
+self-contained project archive into an empty directory (or replace `./data` in
+place for a data-only archive) and `docker compose up -d`. Use an image tag
+compatible with the data on disk; when in doubt, match the tag that was running
+when the archive was taken.
 
 **Restoring in place** (same host — recovering from data loss, or rolling
 back after a bad change):
@@ -547,17 +629,6 @@ current session; there is no "logout everywhere". Changing your own password
 on `/settings` deletes your other sessions, but a global administrator
 resetting another user's password on `/users` does not invalidate that user's
 existing sessions.
-
-**Alternative: archive `./data` while stopped.** If the service can be taken
-offline, `docker compose down` then `tar czf selfpost-data.tar.gz ./data` on
-the host is safe — nothing is writing to SQLite. Unlike the panel/CLI backup
-this sweeps in `./data/log/` too, which is Postfix's raw log and usually the
-bulk of the archive; add `--exclude=./data/log` if you only want the state.
-Do **not** tar `./data` while the container is running: the database uses
-WAL mode and a naive copy can capture an inconsistent snapshot. The
-panel/CLI backup remains preferable when you cannot afford downtime because
-it takes a consistent SQLite snapshot via the Backup API on a live
-container.
 
 See also [Exporting and importing a single
 domain](#exporting-and-importing-a-single-domain) — a different, domain-scoped
@@ -701,8 +772,8 @@ Parsed report data lives in SQLite and is included in a
 `/domains` lists sending domains and hosts the add-domain form (**global
 administrator only**). Domain administrators see only domains assigned to
 them. Each row shows its DKIM TXT value, SPF/DMARC checks, and SASL
-applications. Per-domain rate limits (level 2) and trusted-IP application
-overrides are configured here — see [Rate limiting —
+applications. Per-domain rate limits (level 2), per-application limits, and
+optional client IP allow-lists are configured here — see [Rate limiting —
 level 2](#rate-limiting--level-2-domain-and-application). *Export domain*
 writes a single-domain archive; *Import a domain* on the Backup page reads
 one back in (**global administrator only**) — see [Exporting and importing a single
@@ -766,12 +837,15 @@ returns a 4xx and the refusal is recorded in [Deliveries](#deliveries) as
 sending as that domain. When unset, only level 1 applies for non-privileged
 senders.
 
-**Level 2 — application (trusted IPs)** — optional override on an
-application: list one or more client IPs and a ceiling **strictly above**
-the domain limit (still ≤ level 1). Connections from those IPs use the
-application ceiling and skip the domain check. Other IPs stay under the
-domain limit (or level 1 alone). An application override without trusted
-IPs is inactive.
+**Client IP allow-list (application)** — optional restriction on an
+application: when enabled, list one or more client IPs that may authenticate
+and submit mail as that application. When disabled, any client IP is allowed.
+This is independent of rate limits.
+
+**Level 2 — application** — optional override of the domain limit for one
+application (≤ level 1). The ceiling may be **higher or lower** than the domain
+limit. When active, it replaces the domain limit for that login; when unset,
+the domain limit (or level 1 alone) applies.
 
 **Manual and auto mode** — each domain and application limit can be
 **Manual** (you set the ceiling and window) or **Auto**. Auto derives
@@ -782,8 +856,7 @@ domain page; level-1 refusals are not in the send log, so totals
 under-count strict IP limits. When retention is below 30 days, statistics
 use `min(30, retention)` days. With no traffic in the window, auto stays
 inactive until messages are sent. Auto limits are recalculated every six
-hours and on demand via **Recalculate now**. Application auto ceilings stay
-strictly above an active domain limit when possible.
+hours and on demand via **Recalculate now**.
 
 **Level 2 is best-effort, not a guarantee.** It runs inside the
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
@@ -818,7 +891,7 @@ default until it is changed there.
 Domain page → *Export domain* to write the file, *Backup* → *Import a
 domain* to read it back in. This moves one domain — its DKIM key, its
 applications' **working** SASL passwords, and configured **rate limits**
-(mode, ceilings, multipliers, trusted IPs) — to a different SelfPost
+(mode, ceilings, multipliers) and client IP allow-lists — to a different SelfPost
 instance without regenerating anything, so DNS (the DKIM TXT record)
 doesn't need to change. Unlike a full restore (see [Full backup and
 restore](#full-backup-and-restore)), this works across different

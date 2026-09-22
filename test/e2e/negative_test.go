@@ -26,7 +26,7 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sc.panel.setRateLimit(fmt.Sprintf("/applications/%s/ratelimit", appID), ip, 1, 3600); err != nil {
+	if err := sc.panel.setRateLimit(fmt.Sprintf("/applications/%s/ratelimit", appID), 1, 3600); err != nil {
 		t.Fatalf("save application rate limit: %v", err)
 	}
 

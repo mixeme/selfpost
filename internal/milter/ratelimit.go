@@ -10,9 +10,10 @@ import (
 // overLimit reports whether the message currently being received should be
 // refused under a level-2 differentiated limit (guide § Rate limiting).
 //
-// Trusted application IPs (app limit active and client IP listed) use only the
-// app ceiling and skip the domain check. Everyone else is under the domain
-// ceiling when one is configured; otherwise only level 1 applies.
+// When an application has an active limit, it overrides the domain limit for
+// that login (the ceiling may be higher or lower than the domain). Otherwise
+// the domain ceiling applies when configured; if neither is set, only level 1
+// applies.
 //
 // It is deliberately fail-open: any store error, or the absence of a usable
 // limit, is treated as "not over limit" so a malfunction of the level-2
@@ -33,7 +34,7 @@ func (s *session) overLimit() bool {
 		rl, ok, err := s.rec.RateLimit(store.RateLimitScopeApp, s.login)
 		if err != nil {
 			log.Printf("journal-milter: rate-limit lookup application %q: %v (fail-open)", s.login, err)
-		} else if ok && rl.Active() && rl.AllowsIP(s.clientIP) {
+		} else if ok && rl.Active() {
 			return s.enforceLimit(store.RateLimitScopeApp, s.login, rl)
 		}
 	}

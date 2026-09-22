@@ -50,52 +50,52 @@ func TestParseAppRateLimitForm(t *testing.T) {
 
 	in, err := parseAppRateLimitForm(form(url.Values{
 		"mode":           {"manual"},
-		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"80"},
 		"window_seconds": {"3600"},
-	}), 100, 40, true)
-	if err != nil || in.maxMessages != 80 || len(in.ips) != 1 {
-		t.Fatalf("valid app override = %+v err=%v", in, err)
+	}), 100)
+	if err != nil || in.maxMessages != 80 {
+		t.Fatalf("valid app limit = %+v err=%v", in, err)
+	}
+
+	in, err = parseAppRateLimitForm(form(url.Values{"max_messages": {""}}), 100)
+	if err != nil || !in.clear {
+		t.Fatalf("empty max should clear: %+v err=%v", in, err)
 	}
 
 	_, err = parseAppRateLimitForm(form(url.Values{
 		"mode":           {"manual"},
-		"max_messages":   {"80"},
-		"window_seconds": {"3600"},
-	}), 100, 40, true)
-	if err == nil || !strings.Contains(err.Error(), "trusted client IP") {
-		t.Fatalf("missing IPs want error, got %v", err)
-	}
-
-	_, err = parseAppRateLimitForm(form(url.Values{
-		"mode":           {"manual"},
-		"allowed_ips":    {"203.0.113.10"},
-		"max_messages":   {"40"},
-		"window_seconds": {"3600"},
-	}), 100, 40, true)
-	if err == nil || !strings.Contains(err.Error(), "greater than the domain") {
-		t.Fatalf("app <= domain want error, got %v", err)
-	}
-
-	_, err = parseAppRateLimitForm(form(url.Values{
-		"mode":           {"manual"},
-		"allowed_ips":    {"203.0.113.10"},
 		"max_messages":   {"150"},
 		"window_seconds": {"3600"},
-	}), 100, 0, false)
+	}), 100)
 	if err == nil || !strings.Contains(err.Error(), "level-1") {
 		t.Fatalf("over L1 want error, got %v", err)
 	}
+}
 
-	// No domain limit: any app ceiling ≤ L1 is fine.
-	in, err = parseAppRateLimitForm(form(url.Values{
-		"mode":           {"manual"},
-		"allowed_ips":    {"203.0.113.10"},
-		"max_messages":   {"50"},
-		"window_seconds": {"3600"},
-	}), 100, 0, false)
-	if err != nil || in.maxMessages != 50 {
-		t.Fatalf("app without domain = %+v err=%v", in, err)
+func TestParseAppAuthIPsForm(t *testing.T) {
+	t.Parallel()
+	form := func(vals url.Values) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(vals.Encode()))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return r
+	}
+
+	restrict, ips, err := parseAppAuthIPsForm(form(url.Values{
+		"auth_ip_restrict": {"1"},
+		"auth_allowed_ips":   {"203.0.113.10"},
+	}))
+	if err != nil || !restrict || len(ips) != 1 {
+		t.Fatalf("enabled with IP = restrict=%v ips=%v err=%v", restrict, ips, err)
+	}
+
+	restrict, ips, err = parseAppAuthIPsForm(form(url.Values{}))
+	if err != nil || restrict || ips != nil {
+		t.Fatalf("disabled = restrict=%v ips=%v err=%v", restrict, ips, err)
+	}
+
+	_, _, err = parseAppAuthIPsForm(form(url.Values{"auth_ip_restrict": {"1"}}))
+	if err == nil || !strings.Contains(err.Error(), "at least one client IP") {
+		t.Fatalf("enabled without IPs want error, got %v", err)
 	}
 }
 

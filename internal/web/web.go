@@ -178,6 +178,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("POST /domains/{id}/dmarc", h.HandleDomainDMARC)
 	authed.HandleFunc("POST /domains/{id}/export", h.HandleExportDomain)
 	authed.HandleFunc("POST /applications/{aid}/mode", h.HandleUpdateAppMode)
+	authed.HandleFunc("POST /applications/{aid}/authips", h.HandleAppAuthIPs)
 	authed.HandleFunc("POST /applications/{aid}/password", h.HandleRegenPassword)
 	authed.HandleFunc("POST /applications/{aid}/ratelimit", h.HandleAppRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc)

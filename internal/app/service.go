@@ -199,12 +199,13 @@ func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
 	return s.store.GetRateLimit(store.RateLimitScopeApp, appID)
 }
 
-// SaveRateLimit stores the application-level trusted-IP override (guide § Rate
-// limiting). The caller has validated the IPs and numbers (security.md); the
-// milter reads the row live, so no reload is needed.
+// SaveRateLimit stores the application-level rate limit (guide § Rate
+// limiting). The caller has validated the numbers (security.md); the milter
+// reads the row live, so no reload is needed.
 func (s *Service) SaveRateLimit(appID int64, rl store.RateLimit) error {
 	rl.Scope = store.RateLimitScopeApp
 	rl.RefID = appID
+	rl.AllowedIPs = nil
 	return s.store.SetRateLimit(rl)
 }
 
@@ -212,6 +213,12 @@ func (s *Service) SaveRateLimit(appID int64, rl store.RateLimit) error {
 // limiting).
 func (s *Service) ClearRateLimit(appID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeApp, appID)
+}
+
+// UpdateAuthIPs sets client IP restriction for an application (guide § Rate
+// limiting — authorization). The caller has validated the IPs (security.md).
+func (s *Service) UpdateAuthIPs(appID int64, restrict bool, ips []string) error {
+	return s.store.UpdateApplicationAuthIPs(appID, restrict, ips)
 }
 
 // PurgeDomainSASL removes the SASL accounts of every application bound to a

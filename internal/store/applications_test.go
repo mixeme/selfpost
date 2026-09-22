@@ -187,3 +187,43 @@ func TestListLoginsByDomain(t *testing.T) {
 		t.Fatalf("logins = %v, want [a b]", logins)
 	}
 }
+
+func TestApplicationAuthIPs(t *testing.T) {
+	st := openTestStore(t)
+	d := addTestDomain(t, st, "example.com")
+	a, err := st.AddApplication(d.ID, "app1", AddressModeWildcard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.AuthIPRestrict || len(a.AuthAllowedIPs) != 0 {
+		t.Fatalf("new app should have no IP restriction: %+v", a)
+	}
+
+	if err := st.UpdateApplicationAuthIPs(a.ID, true, []string{"203.0.113.1", "2001:db8::1"}); err != nil {
+		t.Fatalf("UpdateApplicationAuthIPs: %v", err)
+	}
+	got, err := st.GetApplication(a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.AuthIPRestrict || len(got.AuthAllowedIPs) != 2 {
+		t.Fatalf("after update: %+v", got)
+	}
+	if !got.AllowsAuthFromIP("203.0.113.1") || !got.AllowsAuthFromIP("2001:0db8:0000:0000:0000:0000:0000:0001") {
+		t.Fatal("listed IPs should match")
+	}
+	if got.AllowsAuthFromIP("198.51.100.7") {
+		t.Fatal("unlisted IP must not match")
+	}
+
+	if err := st.UpdateApplicationAuthIPs(a.ID, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = st.GetApplication(a.ID)
+	if got.AuthIPRestrict || len(got.AuthAllowedIPs) != 0 {
+		t.Fatalf("cleared restriction: %+v", got)
+	}
+	if !got.AllowsAuthFromIP("198.51.100.7") {
+		t.Fatal("restriction off should allow any IP")
+	}
+}
