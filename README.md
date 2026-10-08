@@ -112,7 +112,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:1.9.3
+  ghcr.io/mixeme/selfpost:1.9.4
 ```
 
 **Get the setup URL** (pick one):

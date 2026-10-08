@@ -2,7 +2,7 @@
 
 **Status:** agreed  
 **Date:** 2026-08-19  
-**Version:** `1.10.0` MINOR (opt-in; no change to outbound-only or inbound-without-filter paths).
+**Version:** `2.1.0` MINOR (opt-in; no change to outbound-only or inbound-without-filter paths). Was `1.10.0`; on 2026-10-09 the owner put the panel redesign first, so this ships on the 2.0 baseline and its screens are built from the redesign's component kit ([panel-redesign.md](panel-redesign.md) § Component kit).
 
 ---
 
@@ -128,7 +128,7 @@ table has filters (decision, domain, date range). Mockups are drawn first, in
 `docs/assets/panel-redesign/panel/src/` under that plan's design contract —
 not in the superseded `docs/assets/panel-ui/`.
 
-## Schema (migration `0011_inbound_spam_log.sql`)
+## Schema (migration `0002_inbound_spam_log.sql`, the first after the 2.0 baseline)
 
 **`inbound_spam_log`**
 
@@ -239,15 +239,15 @@ Fable runs after Opus sign-off.
 
 ## Implementation checklist
 
-Target version cut: **`1.10.0`** (MINOR). One commit per step;
+Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
-- [ ] Migration `0011_inbound_spam_log.sql` — **Composer**
+- [ ] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
 - [ ] Inbound journal-milter + Postfix wiring — **Composer**
 - [ ] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**
-- [ ] Panel: journal + lists UI (+ mockup) — **Composer**
+- [ ] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
 - [ ] Backup includes `/data/antispam/` — **Composer**
 - [ ] Unit + handler tests — **Composer**
 - [ ] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer**

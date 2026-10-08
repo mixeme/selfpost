@@ -211,7 +211,7 @@ target; none of this is smuggled in with the restyle):
 
 - Queue as a table — parse `postqueue -j` instead of printing `postqueue -p`.
 - Inbound queue — the same queue filtered by recipient domain.
-- Inbound log — rides on `inbound-antispam-panel` (`1.10.0`).
+- Inbound log — rides on `inbound-antispam-panel` (`2.1.0`).
 - Server › Health — a route for the tables removed from Overview, and the
   home of *Reload configuration* (today a card on `/status`).
 
@@ -229,11 +229,12 @@ the first step of that feature's plan — not invented during implementation.
 
 | Roadmap item | Where it lands | Built from | Drawn |
 |---|---|---|---|
-| inbound-antispam-panel (agreed, `1.10.0`) | journal = **Inbound › Log** (add client IP and engine to the mockup's columns; `quarantine` joins the decisions); lists = new **Inbound › Filter lists**, global-only because the lists are instance-wide | list layout: add form + two tables, `status_tag`, filter form in `box_head`; the log links *Allow / Deny sender* to the lists | `in-log`, `in-filter-lists` |
+| inbound-antispam-panel (agreed, `2.1.0`) | journal = **Inbound › Log** (add client IP and engine to the mockup's columns; `quarantine` joins the decisions); lists = new **Inbound › Filter lists**, global-only because the lists are instance-wide | list layout: add form + two tables, `status_tag`, filter form in `box_head`; the log links *Allow / Deny sender* to the lists | `in-log`, `in-filter-lists` |
 | inbound-quarantine (candidate) | new **Inbound › Quarantine**, list + detail with *Release* / *Discard* | list layout; detail like `out-message` with `facts`, `log_pane` for headers only, Release beside a `sp-danger-zone` Discard | `in-quarantine`, `in-quarantine-message` — the open questions of its plan (where mail lives, what release means, retention, RBAC) stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
 | preflight (candidate) | new **Server › Preflight**, next to Health: Health is what runs now, Preflight is the deeper on-demand installation check with a test e-mail form | `postmark` verdict, a table of checks with `status_tag` and a *What to do* column, one form box for the test e-mail | `preflight` |
 | panel-notifications (candidate) | per-user event choice on **Account**; one switch under **Server › Settings** | checkboxes in a box, `help` | `account`, `settings` |
 | password-reset (candidate) | a link on sign-in, two signed-out screens (request, set new password) | the signed-out layout | **no** |
+| delivery-log-storage (candidate) | the *Delivery log* box of **Outbound › Log › message**, filled from a table instead of a grep of today's `mail.log` | `log_pane`, unchanged | `out-message` |
 | csrf-tokens | no screen; every form gains a hidden field — forms are rendered through one helper so the token cannot be forgotten | — | n/a |
 | template-data-typing | no screen; the component partials are the natural first users of typed data | — | n/a |
 | structured-logging, contributing, review follow-ups | none | — | n/a |
@@ -242,8 +243,14 @@ The sibling strip under the navbar holds five or six entries per group without
 wrapping; Inbound would reach five (Domains · Log · Queue · Quarantine ·
 Filter lists), Server six. Past that a group is split rather than squeezed.
 
-Ordering with 2.0: inbound-antispam-panel ships first in `1.10.0` and adds its
-migration to the 1.x chain as planned; the 2.0 baseline then folds it in.
+Ordering with 2.0 (owner, 2026-10-09: feature order is not fixed, take
+whatever suits development): **the redesign ships first as `2.0.0`**, and
+inbound-antispam-panel follows as `2.1.0`, built from the component kit on
+the 2.0 baseline. The other way round would have styled two screens twice and
+written a 1.x migration only to dissolve it into the baseline. The antispam
+back end (journal milter, log tailer, list CRUD, rspamd map sync) touches
+nothing under `internal/web/view` and may be built alongside stages 0–1 below
+if time allows; its two screens wait for the kit.
 
 ## Three layers
 
@@ -275,6 +282,45 @@ into the bar; it stays on sign-in, setup and the favicon); under it the
 stamp's paper margin with the perforation along its outer edge — round holes,
 flat teeth, the mark's ink hairline, one tile `perf-edge.svg`; then the
 sibling-page strip; and the footer.
+
+## Component kit
+
+The three layers above are implemented as one unit **before any page is
+restyled** — stage 0 of the checklist. The question the kit answers is the
+owner's: a screen must not be able to invent a shared component on the spot.
+The mockup fragments in `panel/src/` cannot answer it, because they copy the
+component markup by hand into every screen; in the code that markup exists in
+exactly one place.
+
+The kit is, in `internal/web/view`:
+
+| Part | What it is |
+|---|---|
+| `templates/components.html` | one `{{define}}` per partial of § Three layers; the only file that contains `sp-box-head`, `sp-postmark`, `sp-record`, `sp-facts`, … literally |
+| `components.go` | the typed input of every partial — `Head{Kicker, Title, Lead, Postmark, Actions}`, `Box{No, Title, End, Help, Variant}`, `Record{Name, Status, Host, Type, Value, InDNS}`, `Fact{Label, Value, Big}`, `SideMenu{Groups}`, `Tag{Status, Label}`, … — so a page passes a struct, not a `dict` it composes itself. A partial's input is part of its definition: components.html documents the look, `components.go` the data |
+| template functions | `status_tag` (status → `tag is-… is-light`), `copy_field`, `wbr_at` (`<wbr>` after `@` in table cells) |
+| `static/panel.css` | `panel/theme.css` + `shared/brand.css`, no rule the mockups do not have; the old stylesheet is deleted at the end, not merged |
+| `static/bulma.min.css`, icons | vendored, pinned by checksum; the icon font subset to the icons the mockups use (58 today), not the whole Tabler set |
+| `layout.html` | the shell: navbar with the wordmark, perforated edge, sibling strip, user menu, footer; the signed-out variant |
+| `GET /server/components` | the kit page, global role only: every partial in every state rendered from fixtures — the mockup `components.html` rebuilt by the real templates |
+
+**Kit acceptance** (stage 0 is not done without it):
+
+- `TestPanelClassVocabulary` and `TestPanelCSSContract` are green on the kit
+  alone (the old pages are still on the ratchet list at this point, see
+  § Against resurrected pages);
+- every partial named in § Three layers exists, renders on the kit page, and
+  has a typed input in `components.go` with a doc comment saying where it is
+  used;
+- a screenshot of `/server/components` from the running container sits beside
+  the mockup under `docs/assets/panel-redesign/evidence/components.png`, and
+  the reviewer finds no difference they cannot name;
+- `panel/audit.js` on the kit page reports an empty `problems` list.
+
+After stage 0 a page template is thin: it calls partials with structs and
+contains no `sp-` markup of its own. If a page needs a component the kit lacks,
+that is contract rule 2 — stop and ask; the owner decides whether it is a
+`design:` change to the components page first.
 
 ## Type and tables
 
@@ -359,6 +405,37 @@ CI adds one step, `design-first`: a commit that touches
 `internal/web/view/**` must not touch `docs/assets/panel-redesign/panel/**`
 or the guard tests.
 
+### Against resurrected pages
+
+It has happened once: an implementer took the old page templates out of git
+history and reported them as the redesigned pages. Four guards make that
+impossible to pass, and none of them depends on anyone looking:
+
+1. **The ratchet.** The guard tests carry one list, `legacyPages`, of page
+   names that are still old and therefore exempt from
+   `TestPanelOutlinesMatchMockups`, `TestPanelClassVocabulary` and
+   `TestTemplatesUseComponents`. It starts as every page and **can only
+   shrink**: a CI step fails a commit whose `legacyPages` is not a subset of
+   its parent's. Restyling a page means removing it from the list in the same
+   commit; from then on that page is held to its outline forever. Putting the
+   old template back fails three tests at once, and putting the name back on
+   the list fails CI.
+2. **The outline is the design.** An old page has a different component
+   skeleton from `outlines.json` — different boxes, no `page_head`, no
+   `side_menu` — so it cannot match, however its classes are renamed.
+3. **Old paths are forbidden.** `TestRoutesFollowNavigation` fails on any
+   template that contains a pre-2.0 path; every old page does.
+4. **No blob from the past.** The `design-first` CI step also compares every
+   file under `internal/web/view/templates/` with the same path's blobs in
+   history up to the last 1.x tag, whitespace-normalised, and fails on a
+   match. This catches a byte-for-byte revert that happens to be on the
+   ratchet list still; the three tests above catch everything else.
+
+The evidence rules below close the remaining gap, a screenshot that is not
+what it claims to be: screenshots come from the running container with the
+e2e fixtures, so they show fixture data a mockup does not contain, and the
+reviewer is a model that did not write the step.
+
 ### Evidence for "done"
 
 Every checklist step that restyles pages ends with, in the commit:
@@ -384,26 +461,58 @@ reviewed.
 - Weakening CSP; a JS bundler; a front-end framework.
 
 ## Implementation checklist
-No code until the roadmap status is **agreed**.
+No code until the roadmap status is **agreed**. Stages are ordered for
+development, not by feature priority (owner, 2026-10-09). Stage 1 touches no
+file under `internal/web/view` and may run alongside stage 0; stage 2 starts
+only when both are done. Every stage-2 step ends with the evidence of
+§ Evidence for "done".
+
+**Decided**
 
 - [x] Owner decision recorded here: keep today's paths or rename with redirects — **owner** (2026-09-21: rename, § Routes)
 - [x] Owner decision: no compatibility, migrations to zero, `2.0.0` — **owner** (2026-09-21, § No compatibility)
 - [x] Owner decision: inbound is delegated per user, separately from outbound — **owner** (2026-09-21, § Who sees what)
-- [ ] Vendor Bulma 1.0.4 and the used Tabler icons (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
-- [ ] Guard tests from the table above and `TestRoutesFollowNavigation`, red against today's panel where expected; `design-first` CI step — **Opus**
-- [ ] Schema from zero: single `0001_init.sql` baseline with `user_inbound_domains`, store tests, `schema-migrations.md` rewritten — **Opus**
-- [ ] Inbound delegation: `requireInboundDomain`, filtered lists and log, two-list user form, per-route 404 tests for both roles — **Opus**
-- [ ] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/` — **Opus**
-- [ ] `panel.css` from `panel/theme.css`; `components.html` partials; `status_tag`; a `/components` page behind the global role rendering every partial — **Sonnet**
-- [ ] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer; visibility flags — **Sonnet**
+- [x] Owner decision: the redesign ships before inbound-antispam-panel; feature order follows development convenience — **owner** (2026-10-09, § Room for roadmap items)
+- [x] Decision inside 2.0: **Server › Health** is built with the restyle (the tables that leave Overview need a home, § Routes); **queue as a table** and the **inbound queue** stay roadmap decisions — both queue pages ship old content in the new shell, the Inbound › Queue entry hidden — (2026-10-09)
+
+**Stage 0 — foundation and component kit** (§ Component kit)
+
+- [ ] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
+- [ ] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
+- [ ] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
+- [ ] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**
+- [ ] `GET /server/components` behind the global role rendering every partial from fixtures; kit acceptance (§ Component kit) with evidence — **Sonnet**, reviewed by **Opus**
+
+**Stage 1 — data and routes** (no template work; parallel with stage 0)
+
+- [ ] Schema from zero: single `0001_init.sql` baseline with `users.email`, the DMARC default fields, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
+- [ ] Inbound delegation: `requireInboundDomain`, lists and log filtered in the query, two-list user form data, per-route 404 tests for both roles including another tenant's id — **Opus**
+- [ ] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/`; links in the old templates retargeted so the panel works on every commit — **Opus**
+- [ ] The application form as one POST; `out-app-created` as the response with `Cache-Control: no-store` — **Opus**
+- [ ] Server › Health route and handler (tables and *Reload configuration* from `/status`); Overview handler reduced to verdicts — **Opus**
+
+**Stage 2 — pages, in groups** (each step: partial calls only, page off the ratchet list, evidence pairs)
+
 - [ ] Signed-out pages: login, setup — **Sonnet**
-- [ ] Overview (verdicts) and Account / Settings split — **Sonnet**
-- [ ] Outbound: domains, domain, domain settings, application form as one POST, shown-once password, delete — **Sonnet**
+- [ ] Overview, Health, and the Account / Settings split — **Sonnet**
+- [ ] Outbound: domains, domain, domain settings, application form, shown-once password, delete — **Sonnet**
 - [ ] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
-- [ ] Inbound: domains, domain, delete — **Sonnet**
-- [ ] Server: system log, backup, users, user form, delete; Help — **Sonnet**
-- [ ] Remove the old `panel.css` rules and classes nothing references; vocabulary test green with no allow-list — **Sonnet**
+- [ ] Inbound: domains, domain with the *Spam filter* box, delete — **Sonnet**
+- [ ] Server: system log, backup, users, user form, delete; Help as `help_topic` partials, the drawer removed — **Sonnet**
+- [ ] Queues: old content inside the new shell (outbound), Inbound › Queue hidden — **Sonnet**
+- [ ] Remove the old `panel.css`, the drawer code in `panel.js` and every class nothing references; `legacyPages` empty, vocabulary test green with no allow-list — **Sonnet**
+
+**Stage 3 — reviews, docs, 2.0.0**
+
 - [ ] Technical review of the whole against the mockups, evidence pairs complete — **Opus**
 - [ ] Security review of the route rename, subtree authorization and inbound delegation — **Fable**
-- [ ] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory — **Sonnet**
-- [ ] `go vet`, `go test ./...`, e2e suite — **Haiku**
+- [ ] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory; strike the three UI rows of review-2026-08-followups that the redesign retires — **Sonnet**
+- [ ] `go vet`, `go test ./...`, e2e suite; version cut `2.0.0` — **Haiku**
+
+**After 2.0** — features land in the kit, each from its own plan, mockup first
+(§ Room for roadmap items): inbound-antispam-panel `2.1.0`; then, in whatever
+order suits development, preflight, delivery-log-storage, panel-notifications,
+password-reset (two screens to draw first), queue as a table with the inbound
+queue, csrf-tokens
+(one hidden field in the form partial once security.md is settled),
+inbound-quarantine after its open questions.

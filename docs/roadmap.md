@@ -37,12 +37,15 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
+| delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | candidate | 3/21 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | candidate | 5/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
-**Recommended order** (not binding): the next feature is
-**inbound-antispam-panel** (`1.10.0`). panel-docs shipped in
+**Recommended order** (not binding; owner, 2026-10-09: feature order follows
+development convenience): the next stage is **panel-redesign** (`2.0.0`),
+then **inbound-antispam-panel** (`2.1.0`) built in the new component kit —
+styling its two screens once instead of twice. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (security review of the ingest path pending); domain-stats-auto-ratelimit in
 `[1.6.0]`; send-log-retention in `[1.5.0]`; inbound-relay in `[1.4.0]`;
@@ -130,7 +133,7 @@ hook is set.
 **Dependencies / risks:** inbound relay `[1.4.0]`; rspamd map/header coupling;
 journal PII; global-admin-only RBAC.
 
-**Version:** `1.10.0` MINOR; **agreed**.
+**Version:** `2.1.0` MINOR (was `1.10.0`; reordered after the redesign on 2026-10-09); **agreed**.
 
 ---
 
@@ -294,6 +297,59 @@ degrades gracefully when `/proc` is missing (`TestMachineSamplerWithoutProc`),
 and tagging it would only delete cross-platform test coverage.
 
 **Version:** no bearing on semver; `candidate`.
+
+---
+
+## delivery-log-storage
+
+**Problem (owner, 2026-10-09):** the *Delivery log* box on a message's page
+(`/deliveries/{id}`, mockup `out-message`) is usually empty. The lines are not
+stored anywhere: `logtail.QueueLines`
+([internal/logtail/logtail.go](../internal/logtail/logtail.go)) greps the
+**current** `mail.log` on every page view, within its last 4 MB, and never
+opens the rotated files. Rotation is daily
+([build/logrotate-mail.conf](../build/logrotate-mail.conf)), so a message
+older than the last rotation — in practice anything not sent today — shows
+"Nothing for this queue id in the current mail log" while its send-log row
+lives on for ninety days. The fourteen rotated files on disk hold the lines
+and are never read.
+
+**Goal:** a message's page shows what Postfix wrote about it for as long as
+the message is in the send log.
+
+**Options:**
+
+1. **Store the lines** (recommended). The log tailer already reads every
+   `mail.log` line once to update delivery status; a line whose queue id
+   belongs to a send-log row is also appended to a new table
+   (`send_log_lines`: row id, written at, text), five to ten short lines per
+   message. Retention follows the row — the existing send-log sweep deletes
+   them together — and the page reads the table instead of the file. Lines
+   written while the panel was down are caught up the way status updates
+   are, from the persisted read offset. The grep stays only as a fallback
+   for rows older than the table.
+2. **Grep the rotated files too.** `QueueLines` walks `mail.log.1`,
+   `mail.log.2.gz`, … until it finds the id. No schema, but each view
+   decompresses up to fourteen files, and past fourteen days the answer is
+   still empty against a ninety-day row.
+
+**Boundary:** outbound send-log rows only; the inbound journal
+([inbound-antispam-panel](#inbound-antispam-panel)) decides for itself
+whether it wants the same. No change to what the box looks like — the
+`out-message` mockup already draws it as a `log_pane`.
+
+**Done when:** a message sent before the last rotation shows its lines on its
+page; the lines disappear with the row; the page wording no longer blames
+rotation for an ordinary case.
+
+**Dependencies / risks:** a queue id is reused by Postfix after a message
+leaves the queue, so matching must be bounded to the row's lifetime (accepted
+time to final status plus the queue lifetime), not to the id alone; the table
+grows with the send log (small — a few hundred bytes per message) and is
+covered by the same retention.
+
+**Version:** `2.x` MINOR; `candidate`. Fits after the redesign, built against
+the kit's `log_pane`.
 
 ---
 

@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-10-09
+
+Plan-only cut, owner-requested: the redesign goes first as `2.0.0` with a
+component-kit stage and guards against resurrected pages; antispam moves to
+`2.1.0`; a new candidate explains the empty delivery log. No product code
+changes.
+
+### Changed
+
+- Roadmap order (owner, 2026-10-09): the panel redesign ships first as
+  `2.0.0`; inbound-antispam-panel follows as `2.1.0` on the 2.0 baseline
+  (its migration becomes `0002_inbound_spam_log.sql`), built from the
+  redesign's component kit so its two screens are styled once. The redesign
+  plan gains a **Component kit** section and stage (partials with typed
+  inputs, one `panel.css`, a `/server/components` kit page, acceptance before
+  any page is restyled), a staged checklist (5/27), Health decided inside 2.0
+  and the queue pages left as old content in the new shell, and an **Against
+  resurrected pages** section: a shrink-only `legacyPages` ratchet in the
+  guard tests, the outline golden, the old-path test and a history-blob
+  check in CI, so an old template from git history cannot pass as a
+  redesigned page.
+- New roadmap candidate `delivery-log-storage`: the *Delivery log* box on a
+  message's page is empty for anything older than the last daily rotation,
+  because the lines are grepped from the current `mail.log` on each view and
+  never stored; the item proposes keeping them with the send-log row.
+
 ## [1.9.3] - 2026-09-22
 
 Panel-redesign prep, docs only: stage 1-2 mockups on all 33 screens, the
