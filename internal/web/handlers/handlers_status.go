@@ -3,44 +3,116 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
-	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // The old Status page is two pages in 2.0 (plan § Information architecture):
 //
 //   - Overview answers "is mail flowing?" with one verdict per check, each a
-//     card that leads to its detail;
+//     card that leads to its detail, and lists the two kinds of domain;
 //   - Server › Health is everything behind those cards — the tables — and the
 //     home of the two actions, Re-check DNS and Reload configuration.
 //
 // Both read the same checks (healthChecks), so a card and its table can never
-// disagree. Until stage 2 gives each page its own template they share the old
-// one, switched by .Overview.
+// disagree.
 
-// HandleOverview shows the verdicts.
+// HandleOverview shows the verdicts and the domains.
 func (h *Handlers) HandleOverview(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	data := h.overviewBody()
-	data["Title"] = "SelfPost — overview"
-	data["User"] = auth.CurrentUser(r)
-	data["Active"] = "status"
-	data["IsGlobal"] = true
-	h.view.Render(w, http.StatusOK, "status", data)
+	domains, err := h.store.ListDomains()
+	if err != nil {
+		logf("panel: overview: list domains: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	retention := h.sendLogRetentionDays()
+	_, _, days := store.StatsWindow(retention, time.Now())
+
+	inboundOn := h.cfg.InboundEnabled && h.inbound != nil
+	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, inboundOn)
+	page.OutboundRows = h.overviewDomains(domains, retention)
+	if inboundOn {
+		list, err := h.inbound.List()
+		if err != nil {
+			logf("panel: overview: list inbound domains: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		for _, row := range h.inboundRows(list) {
+			page.InboundRows = append(page.InboundRows, view.OverviewInbound{
+				Name: row.Name, Href: fmt.Sprintf("/inbound/domains/%d", row.ID),
+				MX: view.Tag{Status: string(row.DNS), Label: "MX"}, Upstream: row.Upstream,
+			})
+		}
+	}
+	h.view.Render(w, http.StatusOK, "overview", page)
 }
 
-// HandleOverviewFragment is the polled part of Overview.
+// HandleOverviewFragment is the polled part of Overview: the Server health box
+// read again, and the page head — stamp, sentence, time — which follows the
+// cards. The domain tables are not part of it; they are not a live reading.
 func (h *Handlers) HandleOverviewFragment(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	h.view.RenderFragment(w, http.StatusOK, "status_body", h.overviewBody())
+	_, _, days := store.StatsWindow(h.sendLogRetentionDays(), time.Now())
+	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, false)
+	h.view.RenderFragment(w, http.StatusOK, "overview_poll", page)
+}
+
+// overviewDomains is one row per sending domain: the verdict of each DNS check
+// (cached for a few minutes, as on the domain list), the applications, and the
+// mail it sent in the stats window.
+func (h *Handlers) overviewDomains(domains []store.Domain, retention int) []view.OverviewDomain {
+	rows := make([]view.OverviewDomain, len(domains))
+	var wg sync.WaitGroup
+	for i, d := range domains {
+		rows[i] = view.OverviewDomain{
+			Name: d.Name, Href: fmt.Sprintf("/outbound/domains/%d", d.ID), Apps: d.AppCount,
+			DNS: dnsTags(health.StatusUnknown, health.StatusUnknown, health.StatusUnknown), Messages: "—",
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if stats, err := h.store.DomainSendStats(d.Name, retention, d.CreatedAt); err != nil {
+				logf("panel: overview: domain %d: send stats: %v", d.ID, err)
+			} else {
+				rows[i].Messages = view.FormatMessages(stats.Total)
+			}
+			record, err := h.domains.DKIMRecord(d)
+			if err != nil {
+				logf("panel: overview: domain %d: dkim record: %v", d.ID, err)
+				return
+			}
+			reportEmail, err := h.domainReportAddress(d)
+			if err != nil {
+				logf("panel: overview: domain %d: dmarc report address: %v", d.ID, err)
+				return
+			}
+			dns, _ := h.domainDNS(d, record, reportEmail, false)
+			rows[i].DNS = dnsTags(dns.DKIM.Status, dns.SPF.Status, dns.DMARC.Status)
+		}()
+	}
+	wg.Wait()
+	return rows
+}
+
+func dnsTags(dkim, spf, dmarc health.Status) []view.Tag {
+	return []view.Tag{
+		{Status: string(dkim), Label: "DKIM"},
+		{Status: string(spf), Label: "SPF"},
+		{Status: string(dmarc), Label: "DMARC"},
+	}
 }
 
 // HandleHealth shows every check in full, with the two server actions.
@@ -48,21 +120,18 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	data := h.healthChecks()
-	data["Title"] = "SelfPost — health"
-	data["User"] = auth.CurrentUser(r)
-	data["Active"] = "health"
-	data["IsGlobal"] = true
-	data["Flash"] = statusFlash(r)
-	h.view.Render(w, http.StatusOK, "status", data)
+	h.view.Render(w, http.StatusOK, "health", healthPage(h.shellMeta(r), h.healthChecks(), statusFlash(r)))
 }
 
-// HandleHealthFragment is the polled part of Health.
+// HandleHealthFragment is the polled part of Health: the same two rows of
+// boxes the page holds, read again.
 func (h *Handlers) HandleHealthFragment(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	h.view.RenderFragment(w, http.StatusOK, "status_body", h.healthChecks())
+	page := healthPage(h.shellMeta(r), h.healthChecks(), "")
+	page.Refresh = true
+	h.view.RenderFragment(w, http.StatusOK, "health_body", page)
 }
 
 // HandleHealthRecheck re-runs the DNS checks of the server ignoring the cache.
@@ -74,18 +143,91 @@ func (h *Handlers) HandleHealthRecheck(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/server/health?rechecked=1", http.StatusSeeOther)
 }
 
-// overviewBody reduces the checks to what Overview shows: the overall verdict
-// and one card per check. The cards are the typed input of the health_card
-// partial of the component kit, so the stage-2 page renders them as they are.
-func (h *Handlers) overviewBody() map[string]any {
-	c := h.healthChecks()
-	return map[string]any{
-		"Overview":       true,
-		"Hostname":       c["Hostname"],
-		"OverallStatus":  c["OverallStatus"],
-		"OverallHeading": c["OverallHeading"],
-		"Cards":          healthCards(c),
+// healthPage turns one reading of the checks (healthChecks) into the Health
+// page: a table row per resource, process and socket, and the verdict of each
+// box in its head.
+func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
+	page := view.NewHealth(m, flash)
+
+	machine := c["Machine"].(health.Machine)
+	page.Machine.End = view.Verdict(string(machine.Status))
+	page.MachineRows = machineRows(machine)
+
+	page.Processes.End = view.Verdict(string(c["ProcessStatus"].(health.Status)))
+	page.ProcessError = c["ProcessError"].(bool)
+	for _, p := range c["Processes"].([]health.Process) {
+		page.ProcessRows = append(page.ProcessRows, view.ProcessRow{
+			Name: p.Name, State: view.Tag{Status: string(p.Status), Label: strings.ToLower(p.State)}, Detail: p.Detail,
+		})
 	}
+
+	cert := c["Cert"].(health.Certificate)
+	page.Certificate.End = view.Verdict(string(cert.Status))
+	if !cert.NotAfter.IsZero() {
+		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Expires", Value: view.Plain(cert.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
+	}
+	if cert.Subject != "" {
+		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Names", Value: view.Plain(cert.Subject), Mono: true})
+	}
+	page.CertDetail, page.CertProblem = cert.Detail, cert.Status != health.StatusOK
+
+	page.Sockets.End = view.Verdict(string(c["SocketStatus"].(health.Status)))
+	for _, s := range c["Sockets"].([]health.Socket) {
+		row := view.SocketRow{Name: s.Name, Path: s.Path, State: view.Tag{Status: string(s.Status)}}
+		if s.Status != health.StatusOK {
+			row.Detail = s.Detail
+		}
+		page.SocketRows = append(page.SocketRows, row)
+	}
+
+	ptr := c["PTR"].(dnscheck.Result)
+	page.Hostname.End = view.Verdict(string(ptr.Status))
+	host := c["Hostname"].(string)
+	if host == "" {
+		host = "(SELFPOST_HOSTNAME is not set)"
+	}
+	page.HostFacts = []view.Fact{{Label: "Hostname", Value: view.Plain(host), Mono: true}}
+	if len(ptr.Records) > 0 {
+		var lookup view.Text
+		for i, rec := range ptr.Records {
+			if i > 0 {
+				lookup = append(lookup, view.Br())
+			}
+			lookup = append(lookup, view.Inline{Text: rec})
+		}
+		page.HostFacts = append(page.HostFacts, view.Fact{Label: "Lookup", Value: lookup, Mono: true})
+	}
+	return page
+}
+
+// machineRows is the Machine table: processor and memory as bars with their
+// figure, the network as rates, and for each the sentence the sampler gave. A
+// reading that could not be taken keeps its row, without a figure.
+func machineRows(m health.Machine) []view.MachineRow {
+	cpu := view.MachineRow{Resource: "CPU", Detail: lines(m.CPU.Detail)}
+	if m.CPU.Measured {
+		cpu.Gauge = &view.Gauge{Percent: m.CPU.Percent(), Text: m.CPU.BusyText(), Level: cardLevel(m.CPU.Status)}
+	}
+	mem := view.MachineRow{Resource: "Memory", Detail: lines(m.Memory.Detail)}
+	if m.Memory.Measured {
+		mem.Gauge = &view.Gauge{Percent: m.Memory.Percent(), Text: m.Memory.PctText(), Level: cardLevel(m.Memory.Status)}
+	}
+	net := view.MachineRow{Resource: "Network"}
+	if m.Network.Measured {
+		net.Usage = "↓ " + m.Network.InRateText() + " · ↑ " + m.Network.OutRateText()
+	}
+	for _, i := range m.Network.Interfaces {
+		net.Detail = append(net.Detail, fmt.Sprintf("%s: %s in, %s out", i.Name, i.InText(), i.OutText()))
+	}
+	net.Detail = append(net.Detail, lines(m.Network.Detail)...)
+	return []view.MachineRow{cpu, mem, net}
+}
+
+func lines(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return []string{s}
 }
 
 // healthCards turns the checks into the six cards of Overview, in the order of
@@ -109,15 +251,20 @@ func healthCards(c map[string]any) []view.HealthCard {
 		ram = "RAM " + machine.Memory.PctText()
 	}
 
-	running := 0
+	running, notRunning := 0, []string{}
 	for _, p := range procs {
 		if p.Status == health.StatusOK {
 			running++
+		} else {
+			notRunning = append(notRunning, p.Name)
 		}
 	}
-	procValue := fmt.Sprintf("%d of %d running", running, len(procs))
+	procValue, procSub := fmt.Sprintf("%d of %d running", running, len(procs)), "all programs"
+	if len(notRunning) > 0 {
+		procSub = strings.Join(notRunning, ", ")
+	}
 	if c["ProcessError"].(bool) {
-		procValue = "Could not be read"
+		procValue, procSub = "Could not be read", "supervisord"
 	}
 
 	certValue := cert.Detail
@@ -125,16 +272,17 @@ func healthCards(c map[string]any) []view.HealthCard {
 		certValue = fmt.Sprintf("Expires in %d days", cert.DaysLeft)
 	}
 
-	queueValue := c["QueueSummary"].(string)
+	queueValue := queueCardValue(c["QueueSummary"].(string))
 	if e := c["QueueError"].(string); e != "" {
 		queueValue = "Could not be read"
 	}
 
-	answering := 0
+	answering, socketNames := 0, make([]string, 0, len(sockets))
 	for _, s := range sockets {
 		if s.Present {
 			answering++
 		}
+		socketNames = append(socketNames, s.Name)
 	}
 
 	ptrValue := "Forward = reverse"
@@ -147,13 +295,29 @@ func healthCards(c map[string]any) []view.HealthCard {
 
 	return []view.HealthCard{
 		card("Machine", "ti-cpu", "/server/health#machine", machine.Status, cpu, ram),
-		card("Processes", "ti-server-cog", "/server/health#processes", c["ProcessStatus"].(health.Status), procValue, ""),
+		card("Processes", "ti-server-cog", "/server/health#processes", c["ProcessStatus"].(health.Status), procValue, procSub),
 		card("TLS certificate", "ti-certificate", "/server/health#certificate", cert.Status, certValue, cert.Subject),
 		card("Queue", "ti-stack-2", "/outbound/queue", c["QueueStatus"].(health.Status), queueValue, "outbound"),
 		card("Milter sockets", "ti-plug-connected", "/server/health#sockets", c["SocketStatus"].(health.Status),
-			fmt.Sprintf("%d of %d answering", answering, len(sockets)), ""),
+			fmt.Sprintf("%d of %d answering", answering, len(sockets)), strings.Join(socketNames, ", ")),
 		card("Reverse DNS", "ti-arrows-exchange", "/server/health#hostname", ptr.Status, ptrValue, c["Hostname"].(string)),
 	}
+}
+
+// queuedRequests reads the count out of postqueue's last line, "-- 3 Kbytes in 2
+// Requests.".
+var queuedRequests = regexp.MustCompile(`(\d+) Requests?`)
+
+// queueCardValue is what the Queue card says in words short enough for a card:
+// "Empty", "2 queued", or — for a line it does not recognise — the line itself.
+func queueCardValue(summary string) string {
+	switch m := queuedRequests.FindStringSubmatch(summary); {
+	case summary == "" || strings.Contains(summary, "queue is empty"):
+		return "Empty"
+	case m != nil:
+		return m[1] + " queued"
+	}
+	return summary
 }
 
 // cardLevel maps the status of a check onto the three states of a card. A
@@ -201,22 +365,19 @@ func (h *Handlers) healthChecks() map[string]any {
 	machine := h.machine.Sample()
 	srv := h.dns.Server(h.cfg.Hostname, false)
 
-	overall := health.Worst(procStatus, queueStatus, cert.Status, socketStatus, machine.Status)
 	return map[string]any{
-		"Processes":      procs,
-		"ProcessError":   procErr != nil,
-		"ProcessStatus":  procStatus,
-		"QueueSummary":   queueSummary(queueText),
-		"QueueError":     queueErr,
-		"QueueStatus":    queueStatus,
-		"Machine":        machine,
-		"Cert":           cert,
-		"Sockets":        sockets,
-		"SocketStatus":   socketStatus,
-		"Hostname":       h.cfg.Hostname,
-		"PTR":            srv.PTR,
-		"OverallStatus":  overall,
-		"OverallHeading": overallHeading(overall),
+		"Processes":     procs,
+		"ProcessError":  procErr != nil,
+		"ProcessStatus": procStatus,
+		"QueueSummary":  queueSummary(queueText),
+		"QueueError":    queueErr,
+		"QueueStatus":   queueStatus,
+		"Machine":       machine,
+		"Cert":          cert,
+		"Sockets":       sockets,
+		"SocketStatus":  socketStatus,
+		"Hostname":      h.cfg.Hostname,
+		"PTR":           srv.PTR,
 	}
 }
 
@@ -228,19 +389,6 @@ func queueSummary(out string) string {
 		}
 	}
 	return ""
-}
-
-func overallHeading(worst health.Status) string {
-	switch worst {
-	case health.StatusError:
-		return "A component needs attention — see the details below."
-	case health.StatusWarn:
-		return "Running, with warnings below."
-	case health.StatusOK:
-		return "All components are running normally."
-	default:
-		return "Some checks could not be performed."
-	}
 }
 
 func statusFlash(r *http.Request) string {

@@ -24,8 +24,6 @@ inbound
 inbound_delete
 inbound_domain
 mail_queue
-settings
-status
 system_log
 user_delete
 user_form

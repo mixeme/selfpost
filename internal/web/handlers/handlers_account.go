@@ -10,6 +10,7 @@ import (
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -61,19 +62,12 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, u store.User, f accountForm) {
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — account"
-	data["Active"] = "account"
-	data["AccountPage"] = true
-	data["Role"] = u.Role
-	data["FormUsername"] = f.Username
-	data["FormEmail"] = f.Email
-	data["FormDMARCMode"] = f.DMARCMode
-	data["FormDMARCAddress"] = f.DMARCAddress
-	data["AccountEmail"] = u.Email
-	data["Error"] = f.Err
-	data["Flash"] = accountFlash(r)
-	data["DMARCIngestEnabled"] = h.dmarc != nil && h.cfg.DMARCEnabled
+	hosted := h.dmarc != nil && h.cfg.DMARCEnabled
+	page := view.NewAccount(h.shellMeta(r), string(u.Role), hosted, u.Email)
+	page.Username, page.Email = f.Username, f.Email
+	page.DMARCSelected, page.DMARCAddress = f.DMARCMode, f.DMARCAddress
+	page.WithResult(accountFlash(r), f.Err)
+	page.WithDomainUse(h.domainsFollowing(r, u))
 
 	// The stored default, not the one being typed: the authorization record
 	// belongs to the address domains are actually told to publish.
@@ -81,14 +75,33 @@ func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status 
 	if addr := def.Resolve(""); addr != "" && def.Mode != store.DMARCDefaultHosted {
 		if hub := dnscheck.EmailDomain(addr); hub != "" {
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			data["ReportAuthDNS"] = h.dns.ReportAuth(ctx, hub)
+			ra := h.dns.ReportAuth(ctx, hub)
 			cancel()
-			data["ReportAuthName"] = dnscheck.ReportAuthRecordName(hub)
-			data["ReportAuthExample"] = dnscheck.ReportAuthExample()
-			data["ReportAuthHub"] = hub
+			page.WithAuthorization(dnscheck.ReportAuthRecordName(hub), dnscheck.ReportAuthExample(),
+				string(ra.Status), ra.Detail, ra.Records)
 		}
 	}
-	h.view.Render(w, status, "settings", data)
+	h.view.Render(w, status, "account", page)
+}
+
+// domainsFollowing counts the outbound domains the user reaches and how many of
+// them take their report address from this user's default.
+func (h *Handlers) domainsFollowing(r *http.Request, u store.User) (following, total int) {
+	p, ok := h.principal(r)
+	if !ok {
+		return 0, 0
+	}
+	domains, err := h.assignedDomains(p)
+	if err != nil {
+		logf("panel: account: list domains: %v", err)
+		return 0, 0
+	}
+	for _, d := range domains {
+		if d.DMARCRuaUserID.Valid && d.DMARCRuaUserID.Int64 == u.ID {
+			following++
+		}
+	}
+	return following, len(domains)
 }
 
 func accountFlash(r *http.Request) string {

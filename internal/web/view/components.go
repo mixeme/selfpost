@@ -168,6 +168,12 @@ type Head struct {
 	Route   Route
 	Note    []string // right-hand note, one line each
 	Actions []Action
+	// ID and OOB make the head replaceable by a polled fragment: ID is the
+	// element's id, and OOB (set on the fragment's copy only, never on the page)
+	// marks it to be swapped into the page by that id. Used by Overview, whose
+	// stamp and sentence follow its cards. Both are attributes, not markup.
+	ID  string
+	OOB bool
 }
 
 // Crumb is one step of a Head's trail; a step without Href is plain text (the
@@ -220,6 +226,10 @@ type Flash struct {
 // the slot at the right of the head (a note, a tag, a link) and Filter takes it
 // instead as a filter form. Help links the section's topic on the Help page.
 // ID is the anchor a side menu points at. Variant is BoxDanger or BoxCredential.
+// Poll, when set, makes the box the element that polls: it is the address of the
+// fragment that answers with the box again (panel.js schedules the next request
+// by the box's ID, which Poll therefore requires). Used by Overview's Server
+// health box. It adds attributes only, no markup.
 type Box struct {
 	No      string
 	Icon    string
@@ -229,6 +239,7 @@ type Box struct {
 	Filter  *Filter
 	Help    *HelpLink
 	Variant string
+	Poll    string
 }
 
 // HelpLink is a Box's link to its Help topic.

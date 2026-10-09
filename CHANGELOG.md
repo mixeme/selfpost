@@ -76,6 +76,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the pointer to the one-time setup link, in the same column as the form. The
   signed-out column is sized through `.sp-form`, not through `form` (owner,
   2026-10-09).
+- panel-redesign (design): the Notifications boxes are out of the Account
+  and Server › Settings mockups. Event notifications are not built
+  (panel-notifications is a candidate), and 2.0 carries no box for a feature
+  that does not exist; they are drawn again as the first step of that
+  feature (owner, 2026-10-10).
+- panel-redesign (stage 2): **Overview**, **Server › Health**, **Account**
+  and **Server › Settings** are in the new design. Overview shows the verdict
+  as a stamp with one sentence, the six checks as cards and both domain
+  lists; Health holds the tables behind the cards. Both refresh themselves.
+  The Queue card reads "Empty" or "N queued". `status` and `settings` are
+  off the ratchet.
 
 ### Changed
 

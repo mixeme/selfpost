@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path"
 
 	"github.com/mixeme/selfpost/internal/legal"
 )
@@ -38,6 +39,9 @@ var pageFiles = map[string][]string{
 	"setup":          {"templates/setup.html"},
 	"login":          {"templates/login.html"},
 	"dashboard":      {"templates/dashboard.html"},
+	"overview":       {"templates/overview.html", "templates/overview_cards.html"},
+	"health":         {"templates/health.html", "templates/health_body.html"},
+	"account":        {"templates/account.html"},
 	"settings":       {"templates/settings.html"},
 	"users":          {"templates/users.html"},
 	"user_form":      {"templates/user_form.html"},
@@ -55,7 +59,6 @@ var pageFiles = map[string][]string{
 	"delivery":       {"templates/delivery.html"},
 	"mail_queue":     {"templates/mail_queue.html", "templates/mail_queue_body.html"},
 	"system_log":     {"templates/system_log.html", "templates/system_log_body.html"},
-	"status":         {"templates/status.html", "templates/status_body.html"},
 	"help":           {"templates/help.html"},
 	"components":     {"templates/kit.html"},
 }
@@ -70,6 +73,10 @@ var kitPages = map[string]bool{
 	"components": true,
 	"login":      true,
 	"setup":      true,
+	"overview":   true,
+	"health":     true,
+	"account":    true,
+	"settings":   true,
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -78,8 +85,12 @@ var fragmentFiles = map[string]string{
 	"deliveries_rows": "templates/deliveries_rows.html",
 	"mail_queue_body": "templates/mail_queue_body.html",
 	"system_log_body": "templates/system_log_body.html",
-	"status_body":     "templates/status_body.html",
+	"health_body":     "templates/health_body.html",
+	"overview_poll":   "templates/overview_cards.html",
 }
+
+// kitFragments are the fragments rendered with the component kit's partials.
+var kitFragments = map[string]bool{"health_body": true, "overview_poll": true}
 
 // New parses embedded templates. version is stamped into every page footer.
 func New(version string) (*Engine, error) {
@@ -103,7 +114,13 @@ func New(version string) (*Engine, error) {
 		e.pages[name] = tmpl
 	}
 	for name, file := range fragmentFiles {
-		tmpl, err := template.ParseFS(assetsFS, file)
+		// A fragment of a kit page calls the kit's partials, so it parses with
+		// them; the old fragments define everything they use themselves.
+		patterns := []string{file}
+		if kitFragments[name] {
+			patterns = []string{"templates/components.html", file}
+		}
+		tmpl, err := template.New(path.Base(file)).Funcs(templateFuncs()).ParseFS(assetsFS, patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("parse fragment %s: %w", name, err)
 		}

@@ -1,0 +1,55 @@
+{{/* Account (mockup account.html): the signed-in user's own — name and e-mail,
+     password, and where DMARC reports about their domains go. Each form is its
+     own POST and none of them asks for the others' fields. Every role has this
+     page; the instance's settings are on Server > Settings (settings.html). */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+<div class="columns">
+  <div class="column is-5">
+    {{template "box_open" .Profile}}
+    {{template "body_open"}}
+    <form class="sp-form" method="post" action="/account/profile">
+      <div class="field"><label class="label" for="username">Username</label><div class="control has-icons-left"><input class="input" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required><span class="icon is-left"><i class="ti ti-user"></i></span></div></div>
+      <div class="field"><label class="label" for="email">E-mail</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="email" autocapitalize="none" spellcheck="false"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
+        <p class="help">Where the panel writes to you. It can also receive DMARC reports — your choice, under <a href="#dmarc">DMARC reports</a>.</p></div>
+      <button type="submit" class="button is-primary">Save profile</button>
+    </form>
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .Password}}
+    {{template "body_open"}}
+    <form class="sp-form" method="post" action="/account/password">
+      <div class="field"><label class="label" for="current_password">Current password</label><div class="control"><input class="input" id="current_password" name="current_password" type="password" autocomplete="current-password" required></div></div>
+      <div class="sp-pair">
+        <div class="field"><label class="label" for="new_password">New password</label><div class="control"><input class="input" id="new_password" name="new_password" type="password" autocomplete="new-password" required></div></div>
+        <div class="field"><label class="label" for="new_password_confirm">Repeat</label><div class="control"><input class="input" id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password" required></div></div>
+      </div>
+      <p class="help mb-3">Changing it signs out every other session of this account; this one stays signed in.</p>
+      <button type="submit" class="button">Change password</button>
+    </form>
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+
+  <div class="column is-7">
+    {{template "box_open" .DMARC}}
+    {{template "record_open"}}
+    <form class="sp-form" method="post" action="/account/dmarc">
+      <div class="field"><label class="label" for="dmarc_default">My default report address</label>
+        <div class="control"><div class="select is-fullwidth"><select id="dmarc_default" name="dmarc_default" data-custom-mode="custom">{{$sel := .DMARCSelected}}{{range .DMARCOptions}}
+          <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select></div></div>
+        <p class="help">{{template "inline" .DMARCHelp}}</p></div>
+      <div class="field" data-custom-address><label class="label" for="dmarc_default_address">Report address</label>
+        <div class="control"><input class="input" id="dmarc_default_address" name="dmarc_default_address" type="email" value="{{.DMARCAddress}}" placeholder="reports@your-mail-domain.com" autocomplete="off" autocapitalize="none" spellcheck="false"></div></div>
+      <button type="submit" class="button is-primary">Save report address</button>
+    </form>
+    {{template "record_close"}}
+    {{if .Authorization}}{{template "dns_record" .Authorization}}
+    {{end}}{{template "box_close"}}
+  </div>
+</div>
+{{end}}

@@ -21,10 +21,10 @@ func TestSettingsPageShowsSendLogRetention(t *testing.T) {
 
 	out := getBody(t, h.HandleServerSettings, "/server/settings")
 	for _, want := range []string{
-		`id="deliveries-retention"`,
 		`name="send_log_retention_days"`,
 		`value="45"`,
-		"Send log retention",
+		"Keep outbound log rows, days",
+		"Save settings",
 		`action="/server/settings"`,
 		`id="rate-limits"`,
 	} {

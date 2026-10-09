@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 16/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 17/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows

@@ -6,6 +6,7 @@ import (
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 func (h *Handlers) principal(r *http.Request) (auth.Principal, bool) {
@@ -30,6 +31,18 @@ func (h *Handlers) pageBase(r *http.Request) map[string]any {
 		"HasOutbound": p.HasOutbound(),
 		"HasInbound":  p.HasInbound(),
 	}
+}
+
+// shellMeta is what the shell of a page of the component kit needs to know
+// about the person looking at it: their name and which groups of the menu they
+// reach. The page's constructor adds its title and where it sits in the menu.
+func (h *Handlers) shellMeta(r *http.Request) view.Meta {
+	p, _ := h.principal(r)
+	user := auth.CurrentUser(r)
+	if user == "" {
+		user = p.Username
+	}
+	return view.Meta{User: user, IsGlobal: p.IsGlobal(), HasOutbound: p.HasOutbound(), HasInbound: p.HasInbound()}
 }
 
 func (h *Handlers) assignedDomains(p auth.Principal) ([]store.Domain, error) {

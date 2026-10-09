@@ -1,152 +1,30 @@
-{{/* One legacy template for two pages until stage 2 gives each its own:
-     Account (GET /account, every role) — the user's name and e-mail, their
-     password and their default DMARC report address, each its own form — and
-     Server › Settings (GET /server/settings, global role) — what holds for the
-     whole instance. .AccountPage says which one this is. */}}
-{{define "wide"}}wide{{end}}
-
+{{/* Server > Settings (mockup settings.html): what holds for the whole instance.
+     One form, one Save button; the rate limits are read-only facts. A user's own
+     name, e-mail, password and DMARC address are on Account (account.html). */}}
 {{define "content"}}
-{{if .AccountPage}}
-<h1>Account</h1>
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
 
-{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-
-<div class="split">
-  <div class="card" id="profile">
-    <h2>Profile</h2>
-    <p class="muted">Signed in as {{.User}} · {{.Role}}. These are the
-    credentials for this control panel only. Applications keep their own logins
-    and passwords, which are not affected.</p>
-    <form method="post" action="/account/profile">
-      <label for="username">Username</label>
-      <input id="username" name="username" autocomplete="username"
-             autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
-
-      <label for="email">E-mail</label>
-      <input id="email" name="email" type="email" autocomplete="email"
-             autocapitalize="none" spellcheck="false" value="{{.FormEmail}}">
-      <p class="muted">Where the panel writes to you. It can also receive DMARC
-      reports — your choice, under DMARC reports.</p>
-
-      <button type="submit">Save profile</button>
-    </form>
-  </div>
-
-  <div class="card" id="password">
-    <h2>Password</h2>
-    <form method="post" action="/account/password">
-      <label for="current_password">Current password</label>
-      <input id="current_password" name="current_password" type="password"
-             autocomplete="current-password" required>
-
-      <label for="new_password">New password</label>
-      <input id="new_password" name="new_password" type="password" autocomplete="new-password" required>
-
-      <label for="new_password_confirm">Repeat</label>
-      <input id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password" required>
-
-      <button type="submit">Change password</button>
-    </form>
-    <p class="muted">Changing it signs out every other session of this account;
-    this one stays signed in.</p>
-  </div>
-</div>
-
-<div class="card" id="dmarc">
-  <h2>DMARC reports</h2>
-  <p class="muted">Your default report address. It is used by every outbound
-  domain whose report address is set to follow your default; changing it
-  changes the DMARC record those domains must publish.</p>
-  <form method="post" action="/account/dmarc">
-    <label for="dmarc_default">My default report address</label>
-    <select id="dmarc_default" name="dmarc_default" data-custom-mode="custom">
-      {{if .DMARCIngestEnabled}}<option value="hosted"{{if eq .FormDMARCMode "hosted"}} selected{{end}}>SelfPost hosted — read them under DMARC</option>{{end}}
-      <option value="account"{{if eq .FormDMARCMode "account"}} selected{{end}}>My account e-mail{{if .AccountEmail}} — {{.AccountEmail}}{{end}}</option>
-      <option value="custom"{{if eq .FormDMARCMode "custom"}} selected{{end}}>Another address…</option>
-      <option value="none"{{if eq .FormDMARCMode "none"}} selected{{end}}>No reports</option>
-    </select>
-    <div data-custom-address>
-      <label for="dmarc_default_address">Report address</label>
-      <input id="dmarc_default_address" name="dmarc_default_address" type="email"
-             autocomplete="off" autocapitalize="none" spellcheck="false"
-             value="{{.FormDMARCAddress}}" placeholder="reports@your-mail-domain.com">
+<form class="sp-form" method="post" action="/server/settings">
+  <div class="columns">
+    <div class="column is-6">
+      {{template "box_open" .Retention}}
+      {{template "body_open"}}
+      <div class="field"><label class="label" for="send_log_retention_days">Keep outbound log rows, days</label>
+        <div class="control"><input class="input" id="send_log_retention_days" name="send_log_retention_days" type="number" min="7" max="365" step="1" value="{{.RetentionDays}}" required></div>
+        <p class="help">The main driver of <code>/data</code> growth. Does not affect <code>mail.log</code> rotation (fourteen daily files).</p></div>
+      {{template "body_close"}}
+      {{template "box_close"}}
     </div>
-    <button type="submit">Save report address</button>
-  </form>
 
-  {{if .ReportAuthName}}
-  <p class="muted">When <code>rua=</code> points at another domain, that hub
-  domain must publish a report-authorisation record so receivers will deliver
-  the XML aggregates.</p>
-
-  <label>Report authorization — host / name</label>
-  <div class="code-row">
-    <span class="code">{{.ReportAuthName}}</span>
-    <button type="button" class="copy">Copy</button>
+    <div class="column is-6">
+      {{template "box_open" .RateLimits}}
+      {{template "body_open"}}
+      {{template "facts" .RateFacts}}
+      {{template "body_close"}}
+      {{template "box_close"}}
+    </div>
   </div>
-
-  <label>Report authorization — value</label>
-  <div class="code-row">
-    <span class="code">{{.ReportAuthExample}}</span>
-    <button type="button" class="copy">Copy</button>
-  </div>
-
-  {{if .ReportAuthDNS.Status}}
-  <label>Report authorization DNS <span class="st st-{{.ReportAuthDNS.Status}}">{{.ReportAuthDNS.Status}}</span></label>
-  <p class="{{if eq .ReportAuthDNS.Status "ok"}}muted{{else}}error{{end}}">{{.ReportAuthDNS.Detail}}</p>
-  {{if .ReportAuthDNS.Records}}<span class="code">{{range .ReportAuthDNS.Records}}{{.}}
-{{end}}</span>{{end}}
-  {{end}}
-  {{end}}
-</div>
-{{else}}
-<h1>Settings</h1>
-
-<p class="muted">What holds for the whole instance, whoever is signed in. Your
-own name, e-mail, password and DMARC report address are under
-<a href="/account">Account</a>.</p>
-
-{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
-{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-
-<form method="post" action="/server/settings">
-<div class="card" id="deliveries-retention">
-  <h2>Deliveries</h2>
-  <p class="muted">How long rows on <a href="/outbound/log">Deliveries</a> are
-  kept before the background sweep deletes them — the main driver of
-  <code>/data</code> growth over time. Does not affect <code>mail.log</code>
-  rotation (fourteen daily files).</p>
-
-  <label for="send_log_retention_days">Send log retention (days)</label>
-  <input id="send_log_retention_days" name="send_log_retention_days" type="number"
-         min="7" max="365" step="1" required
-         value="{{.FormSendLogRetentionDays}}">
-  <button type="submit">Save settings</button>
-</div>
+  <div class="buttons"><button type="submit" class="button is-primary">Save settings</button></div>
 </form>
-
-<div class="card" id="rate-limits">
-  <h2>Sending rate limits</h2>
-  <p class="muted">Configured in <code>.env</code> / Compose; restart the
-  container to change level&nbsp;1. Domain and application ceilings are set on
-  each domain's page.</p>
-
-  <label>Level 1 — per client IP (Postfix)</label>
-  <p class="code-row"><span class="code">{{.L1Messages}} messages / {{.L1Window}} seconds</span></p>
-  <p class="muted"><code>RATE_LIMIT_MESSAGES_PER_IP</code> /
-  <code>RATE_LIMIT_WINDOW_SECONDS</code>. Hard ceiling for every connecting IP;
-  the panel cannot raise a domain or application limit above this.</p>
-
-  <label>Level 2 — domain</label>
-  <p class="muted">Optional ceiling for <em>all</em> senders on a domain. When
-  unset, only level&nbsp;1 applies. Must be ≤ level&nbsp;1.</p>
-
-  <label>Level 2 — application</label>
-  <p class="muted">Overrides the domain limit for one application. The ceiling
-  may be <em>above or below</em> the domain setting (≤ level&nbsp;1). When unset,
-  the domain limit or level&nbsp;1 applies. Independent of the client IP
-  allow-list.</p>
-</div>
-{{end}}
 {{end}}

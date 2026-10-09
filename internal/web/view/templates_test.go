@@ -9,9 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/mixeme/selfpost/internal/health"
 )
 
 // The navigation is rendered from the layout, not copied into each page, so
@@ -169,7 +166,7 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("status").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":     "admin",
 		"Active":   "status",
 		"IsGlobal": true,
@@ -198,7 +195,7 @@ func TestNavShowsInboundWhenEnabled(t *testing.T) {
 	}
 	engine.SetInboundEnabled(true)
 	var buf bytes.Buffer
-	if err := engine.Page("status").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":           "admin",
 		"Active":         "status",
 		"IsGlobal":       true,
@@ -228,8 +225,8 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	wide := map[string]bool{
-		"settings": true, "deliveries": true, "delivery": true, "mail_queue": true,
-		"status": true, "system_log": true, "domain_detail": true,
+		"deliveries": true, "delivery": true, "mail_queue": true,
+		"system_log": true, "domain_detail": true,
 		"inbound": true, "inbound_domain": true, "dmarc": true,
 	}
 	for name, page := range engine.Pages() {
@@ -303,26 +300,23 @@ func TestDomainDetailPageHasPairedCards(t *testing.T) {
 }
 
 func TestSettingsPageDocumentsRateLimits(t *testing.T) {
-	body, err := fs.ReadFile(assetsFS, "templates/settings.html")
-	if err != nil {
-		t.Fatalf("read settings: %v", err)
-	}
-	src := string(body)
-	if !strings.Contains(src, `id="rate-limits"`) {
-		t.Error("settings should include a sending rate limits card")
-	}
-	if !strings.Contains(src, `id="deliveries-retention"`) {
-		t.Error("settings should include a send log retention card for global administrators")
-	}
+	out := renderSignedIn(t, "settings", settingsFixture())
 	for _, want := range []string{
-		"RATE_LIMIT_MESSAGES_PER_IP",
-		"Level 2 — domain",
-		"Level 2 — application",
-		"{{.L1Messages}} messages / {{.L1Window}} seconds",
-		`name="send_log_retention_days"`,
+		`id="rate-limits"`,
+		"Sending rate limits",
+		"Level 1 · per client IP", "600 / h", "<code>.env</code>",
+		"Level 2 · domain, application", `href="/outbound/domains"`,
+		`name="send_log_retention_days"`, `value="30"`, "Keep outbound log rows, days",
+		`action="/server/settings"`,
 	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("settings rate limits card missing %q", want)
+		if !strings.Contains(out, want) {
+			t.Errorf("settings page missing %q", want)
+		}
+	}
+	// What belongs to a user is on Account.
+	for _, gone := range []string{`name="current_password"`, `name="username"`, `name="dmarc_default"`, `name="email"`} {
+		if strings.Contains(out, gone) {
+			t.Errorf("the instance settings page carries the user's %s", gone)
 		}
 	}
 }
@@ -365,14 +359,23 @@ func TestNoTemplateLinksToTheBareRoot(t *testing.T) {
 	})
 }
 
-// The reload action is a server-health control and lives only on the status
-// page.
-func TestReloadFormLivesOnlyOnTheStatusPage(t *testing.T) {
+// The reload action is a server-health control and lives only on the Health
+// page (as a partial call: its path is in the page's data, so no template but
+// the view code names it).
+func TestReloadFormLivesOnlyOnTheHealthPage(t *testing.T) {
 	forEachTemplate(t, func(name, body string) {
-		if strings.Contains(body, `action="/server/health/reload"`) && name != "status.html" {
-			t.Errorf("%s still posts to /server/health/reload; the reload control belongs on the status page", name)
+		if strings.Contains(body, "/server/health/reload") {
+			t.Errorf("%s names /server/health/reload; the reload control belongs to NewHealth", name)
 		}
 	})
+	if got := renderSignedIn(t, "health", healthFixture(false)); !strings.Contains(got, `action="/server/health/reload"`) {
+		t.Error("Health has no Reload configuration form")
+	}
+	for _, page := range []string{"overview", "account", "settings"} {
+		if strings.Contains(renderSignedIn(t, page, pageFixtures[page]()), "/server/health/reload") {
+			t.Errorf("%s offers the reload control", page)
+		}
+	}
 }
 
 // The panel's Content-Security-Policy is a plain default-src 'self' with no
@@ -422,148 +425,6 @@ func TestLayoutReferencesOnlyEmbeddedAssets(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestStatusPageRendersEveryCheck(t *testing.T) {
-	out := renderStatusPage(t, statusPageData())
-	for _, want := range []string{
-		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
-		"203.0.113.10 → no PTR record", `action="/server/health/reload"`,
-		`hx-get="/server/health/fragment"`, `class="st st-error"`,
-		// Three .split rows inside the polled fragment: machine|processes,
-		// queue|certificate, and sockets|hostname. Ids stay on the cards.
-		`id="processes"`, `id="machine"`, `id="queue"`, `id="certificate"`, `id="sockets"`, `id="hostname"`,
-		`action="/server/health/recheck"`,
-		// The machine card: the bars carry their reading in an attribute
-		// (the CSP rules out sizing them with a style), and the figures are
-		// printed beside them for anything that does not render a meter.
-		`<meter value="12"`, `<meter value="50"`,
-		"4 cores · 4 threads", "2.0 GiB used of 4.0 GiB",
-		"eth0: 1.0 MiB in, 512.0 KiB out",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("status page is missing %q", want)
-		}
-	}
-	if got := strings.Count(out, `class="split"`); got != 3 {
-		t.Errorf("status page has %d .split rows, want 3", got)
-	}
-	// Hostname must live inside the fragment so a poll refresh keeps it beside
-	// sockets; Configuration stays outside (static reload control).
-	body := strings.Index(out, `id="status-body"`)
-	conf := strings.Index(out, `id="configuration"`)
-	if body < 0 || conf < 0 || conf < body {
-		t.Fatal("status-body or configuration card missing or out of order")
-	}
-	frag := out[body:conf]
-	if !strings.Contains(frag, `id="hostname"`) {
-		t.Error("hostname card is outside the polled status-body fragment")
-	}
-	if strings.Contains(frag, `id="configuration"`) || strings.Contains(frag, `action="/server/health/reload"`) {
-		t.Error("configuration reload must stay outside the polled fragment")
-	}
-}
-
-// A machine whose counters could not be read — no /proc, or a first reading
-// with nothing to compare against — must leave the card in place with its rows
-// blank, the same way an unreachable supervisord costs one line and not the
-// page.
-func TestStatusPageWithoutMachineMetrics(t *testing.T) {
-	data := statusPageData()
-	data["Machine"] = health.Machine{
-		CPU:     health.CPU{Status: health.StatusUnknown, Detail: "The kernel's processor counters (/proc/stat) could not be read here."},
-		Memory:  health.Memory{Status: health.StatusUnknown, Detail: "The kernel's memory counters (/proc/meminfo) could not be read here."},
-		Network: health.Network{Status: health.StatusUnknown, Detail: "The kernel's network counters (/proc/net/dev) could not be read here."},
-		Status:  health.StatusUnknown,
-	}
-
-	out := renderStatusPage(t, data)
-	if strings.Contains(out, "<meter") {
-		t.Error("a bar was drawn for a reading that does not exist")
-	}
-	for _, want := range []string{
-		`<h2>Machine <span class="st st-unknown">`,
-		"/proc/stat", "/proc/meminfo", "/proc/net/dev",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("degraded machine card is missing %q", want)
-		}
-	}
-}
-
-func renderStatusPage(t *testing.T, data map[string]any) string {
-	t.Helper()
-	engine, err := New("test")
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	var buf bytes.Buffer
-	if err := engine.Page("status").ExecuteTemplate(&buf, "layout_legacy.html", data); err != nil {
-		t.Fatalf("execute status page: %v", err)
-	}
-	return buf.String()
-}
-
-// statusPageData is one plausible reading of every check the status page shows,
-// so a test can render the page and vary the one part it is about.
-func statusPageData() map[string]any {
-	return map[string]any{
-		"Title":  "SelfPost — status",
-		"User":   "admin",
-		"Active": "status",
-		"Processes": []health.Process{
-			{Name: "opendkim", State: "RUNNING", Detail: "pid 21", Status: health.StatusOK},
-			{Name: "postfix", State: "FATAL", Detail: "exited too quickly", Status: health.StatusError},
-		},
-		"ProcessStatus": health.StatusError,
-		"QueueSummary":  "Mail queue is empty",
-		"QueueStatus":   health.StatusOK,
-		"Cert": health.Certificate{
-			Path: "/etc/postfix/tls/fullchain.pem", Subject: "mail.example.com",
-			NotAfter: time.Now().Add(30 * 24 * time.Hour), DaysLeft: 30,
-			Status: health.StatusOK, Detail: "Valid for another 30 day(s).",
-		},
-		"Machine": health.Machine{
-			CPU: health.CPU{
-				Measured: true, BusyPct: 12.4, Cores: 4, Threads: 4,
-				Load: [3]float64{0.31, 0.24, 0.19}, HasLoad: true,
-				Status: health.StatusOK, Detail: "4 cores · 4 threads",
-			},
-			Memory: health.Memory{
-				Measured: true, TotalBytes: 4 << 30, UsedBytes: 2 << 30, UsedPct: 50,
-				Status: health.StatusOK, Detail: "2.0 GiB used of 4.0 GiB.",
-			},
-			Network: health.Network{
-				Measured: true, RxRate: 2048, TxRate: 1024,
-				Interfaces: []health.Interface{
-					{Name: "eth0", RxBytes: 1 << 20, TxBytes: 1 << 19, RxRate: 2048, TxRate: 1024, Measured: true},
-				},
-				Status: health.StatusOK,
-			},
-			Window: 5 * time.Second,
-			Status: health.StatusOK,
-		},
-		"Sockets": []health.Socket{
-			{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening"},
-		},
-		"SocketStatus":   health.StatusOK,
-		"OverallStatus":  health.StatusError,
-		"OverallHeading": "A component needs attention — see the details below.",
-		"Hostname":       "mail.example.com",
-		"PTR": dnscheckResult{
-			Status:  health.StatusError,
-			Detail:  "No address has a reverse record.",
-			Records: []string{"203.0.113.10 → no PTR record"},
-		},
-	}
-}
-
-// dnscheckResult mirrors dnscheck.Result's shape for the template test, so the
-// view package's template tests do not depend on the checker's constructor.
-type dnscheckResult struct {
-	Status  health.Status
-	Detail  string
-	Records []string
 }
 
 // forEachTemplate runs fn over every embedded template's source.
@@ -657,10 +518,15 @@ func TestLoginPageOmitsHelpDrawer(t *testing.T) {
 	}
 }
 
-func TestStatusPageHasHelpEntry(t *testing.T) {
-	out := renderStatusPage(t, statusPageData())
-	if !strings.Contains(out, `for="help-status"`) {
-		t.Error("status page is missing the help entry point")
+// The help drawer is gone from the pages of the kit: Overview points at the
+// section of the Help page that explains its checks, from the head of its box.
+func TestOverviewLinksToItsHelpTopic(t *testing.T) {
+	out := renderSignedIn(t, "overview", overviewFixture())
+	if !strings.Contains(out, `class="sp-help" href="/help#checks"`) {
+		t.Error("the Server health box has no link to its Help topic")
+	}
+	if strings.Contains(out, "help-drawer") {
+		t.Error("a page of the kit carries the old help drawer")
 	}
 }
 

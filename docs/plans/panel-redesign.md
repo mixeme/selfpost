@@ -176,8 +176,8 @@ list, an action under the thing it changes.
 | system-log | `GET /server/log` | `/system-log` |
 | backup | `GET, POST /server/backup` · `POST /server/backup/import` | `/backup` · `POST /domains/import` |
 | users · user · user-delete | `/server/users` · `…/new` · `…/{uid}` · `…/{uid}/delete` | `/users/…` |
-| settings | `GET, POST /server/settings` | the instance half of `/settings`: log retention, rate limits; plus the notifications switch |
-| account | `GET /account` · `POST /account/profile`, `/password`, `/notifications`, `/dmarc` | `/settings`: credentials and the DMARC default (today `/account` redirects there) |
+| settings | `GET, POST /server/settings` | the instance half of `/settings`: log retention, rate limits |
+| account | `GET /account` · `POST /account/profile`, `/password`, `/dmarc` | `/settings`: credentials and the DMARC default (today `/account` redirects there) |
 | help · components | `GET /help` · `GET /server/components` | `/help` · — |
 
 Unchanged: `/healthz`, `/license`, `/static/`, `/setup/{token}`, `/login`,
@@ -232,7 +232,7 @@ the first step of that feature's plan — not invented during implementation.
 | inbound-antispam-panel (agreed, `2.1.0`) | journal = **Inbound › Log** (add client IP and engine to the mockup's columns; `quarantine` joins the decisions); lists = new **Inbound › Filter lists**, global-only because the lists are instance-wide | list layout: add form + two tables, `status_tag`, filter form in `box_head`; the log links *Allow / Deny sender* to the lists | `in-log`, `in-filter-lists` |
 | inbound-quarantine (candidate) | new **Inbound › Quarantine**, list + detail with *Release* / *Discard* | list layout; detail like `out-message` with `facts`, `log_pane` for headers only, Release beside a `sp-danger-zone` Discard | `in-quarantine`, `in-quarantine-message` — the open questions of its plan (where mail lives, what release means, retention, RBAC) stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
 | preflight (candidate) | new **Server › Preflight**, next to Health: Health is what runs now, Preflight is the deeper on-demand installation check with a test e-mail form | `postmark` verdict, a table of checks with `status_tag` and a *What to do* column, one form box for the test e-mail | `preflight` |
-| panel-notifications (candidate) | per-user event choice on **Account**; one switch under **Server › Settings** | checkboxes in a box, `help` | `account`, `settings` |
+| panel-notifications (candidate) | per-user event choice on **Account**; one switch under **Server › Settings** | checkboxes in a box, `help` | **no** — drawn once, taken out of `account` and `settings` on 2026-10-10 (owner): 2.0 ships no box for a feature that is not built; redrawn as the first step of its plan |
 | password-reset (candidate) | a link on sign-in, two signed-out screens (request, set new password) | the signed-out layout | **no** |
 | delivery-log-storage (candidate) | the *Delivery log* box of **Outbound › Log › message**, filled from a table instead of a grep of today's `mail.log` | `log_pane`, unchanged | `out-message` |
 | csrf-tokens | no screen; every form gains a hidden field — forms are rendered through one helper so the token cannot be forgotten | — | n/a |
@@ -514,7 +514,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 **Stage 2 — pages, in groups** (each step: partial calls only, page off the ratchet list, evidence pairs)
 
 - [x] Signed-out pages: login, setup — **Sonnet**
-- [ ] Overview, Health, and the Account / Settings split — **Sonnet**
+- [x] Overview, Health, and the Account / Settings split — **Sonnet**
 - [ ] Outbound: domains, domain, domain settings, application form, shown-once password, delete — **Sonnet**
 - [ ] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
 - [ ] Inbound: domains, domain with the *Spam filter* box, delete — **Sonnet**

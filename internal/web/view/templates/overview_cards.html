@@ -1,0 +1,12 @@
+{{/* The polled part of Overview, in the page and in its fragment (GET
+     /overview/fragment) alike, so the two cannot drift apart: the Server health
+     box, which polls (Box.Poll: panel.js reads its id and data-poll), and — in the
+     fragment only — the page head marked to be swapped in by its id, so the stamp,
+     the sentence and the time follow the cards. The fragment's primary element is
+     the box, which replaces the one that asked; the head rides along out of band. */}}
+{{define "overview_cards"}}{{template "box_open" .Health}}
+{{template "health_cards" .Cards}}
+{{template "box_close"}}{{end}}
+
+{{define "overview_poll"}}{{template "page_head" .HeadOOB}}
+{{template "overview_cards" .}}{{end}}

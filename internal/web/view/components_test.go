@@ -583,3 +583,28 @@ func TestLegacyPagesStayOnTheOldLayout(t *testing.T) {
 	mustContain(t, out, `href="/static/legacy.css"`, `class="shell"`)
 	mustNotContain(t, out, "bulma.min.css", "tabler-icons.css", "/static/panel.css", "navbar")
 }
+
+// Poll, ID and OOB are optional attributes: empty, box_open and page_head write
+// exactly the markup they wrote before they existed.
+func TestPollAndOOBAttributesAreAbsentWhenEmpty(t *testing.T) {
+	if got := partial(t, "box_open", Box{No: "01", Title: "x", ID: "apps"}); !strings.HasPrefix(got, `<div class="box" id="apps">`+"\n") {
+		t.Errorf("box_open without Poll starts %q", got[:40])
+	}
+	if got := partial(t, "box_open", Box{No: "01", Title: "x"}); !strings.HasPrefix(got, `<div class="box">`+"\n") {
+		t.Errorf("box_open without ID or Poll starts %q", got[:40])
+	}
+	if got := partial(t, "page_head", Head{Title: "T"}); !strings.HasPrefix(got, `<div class="sp-head">`+"\n") {
+		t.Errorf("page_head without ID starts %q", got[:40])
+	}
+	mustNotContain(t, partial(t, "box_open", Box{No: "01", Title: "x", ID: "a"}), "data-poll", "hx-")
+	mustNotContain(t, partial(t, "page_head", Head{Title: "T", ID: "h"}), "hx-swap-oob")
+}
+
+// With them, the box is the element that polls and the head is the element a
+// fragment swaps into place — attributes on the element, nothing else changed.
+func TestPollAndOOBAttributes(t *testing.T) {
+	got := partial(t, "box_open", Box{No: "01", Title: "x", ID: "health", Poll: "/overview/fragment"})
+	mustContain(t, got, `<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`)
+	got = partial(t, "page_head", Head{Title: "T", ID: "h", OOB: true})
+	mustContain(t, got, `<div class="sp-head" id="h" hx-swap-oob="true">`)
+}

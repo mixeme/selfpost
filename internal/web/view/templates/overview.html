@@ -1,0 +1,52 @@
+{{/* Overview (mockup overview.html): the verdict in the head, the six checks as
+     cards, and the two kinds of domain at a glance. Everything behind a card is
+     on Health. The inbound box exists only while the inbound relay is on; without
+     it the outbound box takes the whole width. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+{{template "overview_cards" .}}
+
+{{if .InboundOn}}
+<div class="columns">
+  <div class="column is-7">
+{{template "overview_outbound" .}}
+  </div>
+  <div class="column is-5">
+{{template "overview_inbound" .}}
+  </div>
+</div>
+{{else}}
+{{template "overview_outbound" .}}
+{{end}}
+{{end}}
+
+{{define "overview_outbound"}}
+{{template "box_open" .Outbound}}
+{{if .OutboundRows}}
+<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Domain</th><th>DNS</th><th>Apps</th><th>{{.Days}} days</th></tr></thead>
+  <tbody>{{range .OutboundRows}}
+    <tr><td><a href="{{.Href}}"><strong>{{.Name}}</strong></a></td><td>{{range $i, $t := .DNS}}{{if $i}} {{end}}{{template "tag" $t}}{{end}}</td><td>{{.Apps}}</td><td class="sp-muted">{{.Messages}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{else}}
+{{template "empty_state" .OutboundEmpty}}
+{{end}}
+{{template "box_close"}}
+{{end}}
+
+{{define "overview_inbound"}}
+{{template "box_open" .Inbound}}
+{{if .InboundRows}}
+<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Domain</th><th>MX</th><th>Upstream</th></tr></thead>
+  <tbody>{{range .InboundRows}}
+    <tr><td><a href="{{.Href}}"><strong>{{.Name}}</strong></a></td><td>{{template "tag" .MX}}</td><td class="sp-muted sp-mono sp-small">{{.Upstream}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{else}}
+{{template "empty_state" .InboundEmpty}}
+{{end}}
+{{template "box_close"}}
+{{end}}

@@ -170,3 +170,102 @@ func TestAccountIsOpenToADomainAdministrator(t *testing.T) {
 		t.Errorf("another user's e-mail was changed to %q", admin.Email)
 	}
 }
+
+// Account is drawn by the shell of the kit, for the signed-in person, with
+// their role in the kicker.
+func TestAccountPageIsDrawnInTheShell(t *testing.T) {
+	h, _ := settingsServer(t)
+	out := getBody(t, h.HandleAccount, "/account")
+	for _, want := range []string{
+		`class="navbar is-primary"`, `Signed in as admin · global`, `<h1 class="title is-3">Account</h1>`,
+		`id="dmarc"`, `href="/static/panel.css"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("account page missing %q", want)
+		}
+	}
+	if strings.Contains(out, "/static/legacy.css") {
+		t.Error("account page loads the old stylesheet")
+	}
+}
+
+// A refused form is shown again with the error above the boxes and what the
+// person typed in the fields — escaped.
+func TestAccountRefusalKeepsWhatWasTyped(t *testing.T) {
+	h, _ := settingsServer(t)
+	rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,
+		url.Values{"username": {`o"><b>x</b>`}, "email": {"not-an-address"}})
+	out := rec.Body.String()
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /account/profile = %d, want 400:\n%s", rec.Code, out)
+	}
+	if !strings.Contains(out, `notification is-danger is-light`) {
+		t.Error("the refusal is not shown as the error flash")
+	}
+	if !strings.Contains(out, `value="not-an-address"`) {
+		t.Error("the e-mail that was typed is not shown again")
+	}
+	if strings.Contains(out, `<b>x</b>`) {
+		t.Errorf("the username was written back unescaped:\n%s", out)
+	}
+
+	rec = postFormAs(h.HandleAccountPassword, globalPrincipal, "/account/password", nil,
+		url.Values{"current_password": {"nope"}, "new_password": {"another-long-password-2"}, "new_password_confirm": {"another-long-password-2"}})
+	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "Current password is incorrect.") {
+		t.Errorf("wrong current password = %d:\n%s", rec.Code, rec.Body.String())
+	}
+	// A password is never written back.
+	if strings.Contains(rec.Body.String(), "another-long-password-2") {
+		t.Error("a submitted password is in the page that refused it")
+	}
+}
+
+func TestAccountResultsAreTheFlash(t *testing.T) {
+	h, _ := settingsServer(t)
+	for done, want := range map[string]string{
+		"profile":  "Profile saved.",
+		"password": "Password changed.",
+		"dmarc":    "Default report address saved.",
+	} {
+		out := getBody(t, h.HandleAccount, "/account?done="+done)
+		if !strings.Contains(out, `notification is-success is-light`) || !strings.Contains(out, want) {
+			t.Errorf("?done=%s: the result is not shown (%q)", done, want)
+		}
+	}
+}
+
+// A domain administrator has the same Account page in the same shell; it has
+// no Server group in the menu and says its role.
+func TestAccountPageForADomainAdministrator(t *testing.T) {
+	h, _ := settingsServer(t)
+	d, _ := h.store.AddDomain("example.com", "mail")
+	p := domainAdmin(t, h.store, "ops", d.ID)
+	out := getBodyAs(t, h.HandleAccount, "/account", p)
+	if !strings.Contains(out, `· domain`) || !strings.Contains(out, `action="/account/profile"`) {
+		t.Errorf("account page for a domain administrator:\n%s", out)
+	}
+	for _, gone := range []string{`href="/server/health"`, `href="/overview"`, `href="/server/users"`} {
+		if strings.Contains(out, gone) {
+			t.Errorf("a domain administrator's menu carries %s", gone)
+		}
+	}
+}
+
+// The default address needs an authorization record when it is on another
+// domain; with "no reports" nothing is asked of DNS and no record is drawn. The
+// count of following domains is the user's own.
+func TestAccountReportAuthorizationFollowsTheStoredDefault(t *testing.T) {
+	h, _ := settingsServer(t)
+	d, _ := h.store.AddDomain("example.com", "mail")
+	h.followCreator(d.ID, globalPrincipal.ID)
+	if _, err := h.store.AddDomain("other.example", "mail"); err != nil {
+		t.Fatal(err)
+	}
+	out := getBody(t, h.HandleAccount, "/account")
+	if strings.Contains(out, "Report authorization") {
+		t.Error("an authorization record for a default of no reports")
+	}
+	if !strings.Contains(out, "1 of 2 now") {
+		t.Errorf("the domains following the default are not counted:\n%s", out)
+	}
+}

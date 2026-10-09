@@ -41,7 +41,7 @@
 {{/* page_head opens every page (input: Head): the path or section as the
      kicker, the h1, a lead or a route line, the postmark when the page has a
      verdict, a note on the right, and the buttons. */}}
-{{define "page_head"}}<div class="sp-head">
+{{define "page_head"}}<div class="sp-head"{{if .ID}} id="{{.ID}}"{{end}}{{if .OOB}} hx-swap-oob="true"{{end}}>
 {{if .Postmark}}{{template "postmark" .Postmark}}
 {{end}}<div class="sp-grow">
 {{if .Crumbs}}<p class="sp-kicker">{{range $i, $c := .Crumbs}}{{if $i}} {{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Label}}</a>{{else}}{{$c.Label}}{{end}} /{{end}}</p>
@@ -72,7 +72,7 @@
      sp-credential (a secret shown once). A box foot, a table in its
      table-container, a run of records, a log or an empty state sit directly
      inside; anything else goes in body_open … body_close. */}}
-{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}>
+{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}>
 {{template "box_head" .}}
 {{end}}
 {{define "box_close"}}</div>{{end}}

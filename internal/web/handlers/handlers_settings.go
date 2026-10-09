@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // Server › Settings holds what is true of the whole instance, whoever is
@@ -30,18 +31,13 @@ func (h *Handlers) HandleServerSettings(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handlers) renderServerSettings(w http.ResponseWriter, r *http.Request, status int, formErr string, formRetention int) {
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — settings"
-	data["Active"] = "settings"
-	data["AccountPage"] = false
-	data["FormSendLogRetentionDays"] = formRetention
-	data["Error"] = formErr
+	page := view.NewSettings(h.shellMeta(r), strconv.Itoa(formRetention), view.FormatRate(h.l1Messages(), h.l1Window()))
+	flash := ""
 	if r.URL.Query().Has("saved") {
-		data["Flash"] = "Settings saved."
+		flash = "Settings saved."
 	}
-	data["L1Messages"] = h.l1Messages()
-	data["L1Window"] = h.l1Window()
-	h.view.Render(w, status, "settings", data)
+	page.WithResult(flash, formErr)
+	h.view.Render(w, status, "settings", page)
 }
 
 func (h *Handlers) submitServerSettings(w http.ResponseWriter, r *http.Request) {

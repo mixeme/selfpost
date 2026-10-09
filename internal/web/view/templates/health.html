@@ -1,0 +1,17 @@
+{{/* Server > Health (mockup health.html): every check behind the cards of
+     Overview, and the one action that is not about DNS, Reload configuration. The
+     two rows of tables are the polled part (health_body.html); the head and the
+     Configuration box are static. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+{{template "health_body" .}}
+
+{{template "box_open" .Configuration}}
+{{template "body_open"}}
+<p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+{{template "action" .Reload}}
+{{template "body_close"}}
+{{template "box_close"}}
+{{end}}
