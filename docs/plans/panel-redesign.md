@@ -513,7 +513,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 **Stage 2 — pages, in groups** (each step: partial calls only, page off the ratchet list, evidence pairs)
 
-- [ ] Signed-out pages: login, setup — **Sonnet**
+- [x] Signed-out pages: login, setup — **Sonnet**
 - [ ] Overview, Health, and the Account / Settings split — **Sonnet**
 - [ ] Outbound: domains, domain, domain settings, application form, shown-once password, delete — **Sonnet**
 - [ ] Outbound: log, message, DMARC hub / domain / report — **Sonnet**

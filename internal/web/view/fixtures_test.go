@@ -16,4 +16,6 @@ package view
 // restyles a page adds its fixture here in the same commit.
 var pageFixtures = map[string]func() any{
 	"components": func() any { return KitPage() },
+	"login":      func() any { return NewLogin("mail.example.org", "") },
+	"setup":      func() any { return NewSetup("0123456789abcdef", "") },
 }

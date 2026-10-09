@@ -1,21 +1,23 @@
+{{/* First-run setup (mockup setup.html): the form column of the signed-out
+     screen, reached by the one-time link /setup/<token>. */}}
 {{define "content"}}
-<img class="mark" src="/static/logo.svg" width="330" height="150" alt="SelfPost">
-<h1>Create administrator</h1>
-<div class="card narrow">
-  <p class="muted">This one-time link creates the single panel administrator.
-  After you submit, the link stops working for good.</p>
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <form method="post" action="/setup/{{.Token}}">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username" autofocus required>
-
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="new-password" required>
-
-    <label for="password_confirm">Confirm password</label>
-    <input id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required>
-
-    <button type="submit">Create administrator</button>
-  </form>
-</div>
+<form class="sp-form" method="post" action="/setup/{{.Token}}">
+  <p>{{template "kicker" "First run · one-time link"}}</p>
+  <h1 class="title is-3">Create administrator</h1>
+  <p class="sp-muted mb-4">This link creates the single global administrator. After you submit, it stops working for good.</p>
+  {{if .Error}}{{template "flash" .Notice}}{{end}}
+  <div class="field">
+    <label class="label" for="username">Username</label>
+    <div class="control has-icons-left"><input class="input" id="username" name="username" autocomplete="username" autofocus required><span class="icon is-left"><i class="ti ti-user"></i></span></div>
+  </div>
+  <div class="field">
+    <label class="label" for="password">Password</label>
+    <div class="control has-icons-left"><input class="input" id="password" name="password" type="password" autocomplete="new-password" required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
+  </div>
+  <div class="field">
+    <label class="label" for="password_confirm">Confirm password</label>
+    <div class="control has-icons-left"><input class="input" id="password_confirm" name="password_confirm" type="password" autocomplete="new-password" required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
+  </div>
+  <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Create administrator</button></div>
+</form>
 {{end}}

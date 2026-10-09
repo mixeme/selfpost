@@ -7,6 +7,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -74,11 +75,7 @@ func (m *Module) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !exists {
-		m.view.Render(w, http.StatusOK, "login", map[string]any{
-			"Title":     "SelfPost — Sign in",
-			"Active":    "login",
-			"SetupHint": true,
-		})
+		m.view.Render(w, http.StatusOK, "login", view.NewLoginSetupHint(m.cfg.Hostname))
 		return
 	}
 
@@ -94,11 +91,7 @@ func (m *Module) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) renderLogin(w http.ResponseWriter, status int, formErr string) {
-	m.view.Render(w, status, "login", map[string]any{
-		"Title":  "SelfPost — Sign in",
-		"Active": "login",
-		"Error":  formErr,
-	})
+	m.view.Render(w, status, "login", view.NewLogin(m.cfg.Hostname, formErr))
 }
 
 func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
@@ -196,12 +189,7 @@ func (m *Module) HandleSetup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) renderSetupForm(w http.ResponseWriter, status int, token, formErr string) {
-	m.view.Render(w, status, "setup", map[string]any{
-		"Title":  "SelfPost — Create administrator",
-		"Active": "setup",
-		"Token":  token,
-		"Error":  formErr,
-	})
+	m.view.Render(w, status, "setup", view.NewSetup(token, formErr))
 }
 
 func (m *Module) submitSetup(w http.ResponseWriter, r *http.Request, token string) {

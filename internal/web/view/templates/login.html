@@ -1,24 +1,32 @@
+{{/* Sign-in (mockup login.html): the form column of the signed-out screen. The
+     layout draws the brand half and the legal notice; this is only what stands
+     between them. Before the first administrator exists there is nothing to sign
+     in as, so the form gives way to a pointer at the setup link. */}}
 {{define "content"}}
-{{/* The full mark, on the two pages that carry no navigation: with no bar above
-     it, this is the only thing telling an administrator which service just asked
-     them for a password. */}}
-<img class="mark" src="/static/logo.svg" width="330" height="150" alt="SelfPost">
-<h1>Sign in</h1>
-<div class="card narrow">
-  {{if .SetupHint}}
-    <p class="muted">No administrator has been created yet. Open the one-time
-    setup link printed in the container log to get started.</p>
-  {{else}}
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-    <form method="post" action="/login">
-      <label for="username">Username</label>
-      <input id="username" name="username" autocomplete="username" autofocus required>
-
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
-
-      <button type="submit">Sign in</button>
-    </form>
-  {{end}}
-</div>
+{{if .SetupHint}}
+{{/* The signed-out layout sizes and centres its column through "form" alone, so
+     this state, which has no fields, keeps the element; it has no action and no
+     control and cannot be submitted. */}}
+<form class="sp-form">
+  {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}
+  <h1 class="title is-3">Sign in</h1>
+  <p class="sp-muted">No administrator has been created yet. Open the one-time
+  setup link printed in the container log to get started.</p>
+</form>
+{{else}}
+<form class="sp-form" method="post" action="/login">
+  {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}
+  <h1 class="title is-3">Sign in</h1>
+  {{if .Error}}{{template "flash" .Notice}}{{end}}
+  <div class="field">
+    <label class="label" for="username">Username</label>
+    <div class="control has-icons-left"><input class="input" id="username" name="username" autocomplete="username" autofocus required><span class="icon is-left"><i class="ti ti-user"></i></span></div>
+  </div>
+  <div class="field">
+    <label class="label" for="password">Password</label>
+    <div class="control has-icons-left"><input class="input" id="password" name="password" type="password" autocomplete="current-password" required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
+  </div>
+  <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Sign in</button></div>
+</form>
+{{end}}
 {{end}}

@@ -66,6 +66,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   verdict per check — machine, processes, TLS certificate, queue, milter
   sockets, reverse DNS — each leading to its table on Health; a check that
   could not run shows as a warning, never as fine. Both read the same checks.
+- panel-redesign (stage 2): **Sign in** and **Create administrator** are the
+  first pages in the new design - the split brand / form screen, built from
+  the component kit. Sign in names the mail host above its title; a refused
+  attempt is shown as a notice above the fields. `login` and `setup` are off
+  the ratchet.
 
 ### Changed
 

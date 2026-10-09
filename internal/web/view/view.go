@@ -68,6 +68,8 @@ var pageFiles = map[string][]string{
 // pageFiles stays a plain map of file lists because the guard tests read it.
 var kitPages = map[string]bool{
 	"components": true,
+	"login":      true,
+	"setup":      true,
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its

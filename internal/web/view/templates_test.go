@@ -81,21 +81,26 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 
 	// Signed out (login, setup) the version must not be advertised, but the
 	// Appropriate Legal Notices must still be present.
-	var buf bytes.Buffer
-	if err := engine.Page("login").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
-		"Title": "t", "Active": "", "Version": "9.9.9-test",
-		"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
-		"SourceURL": "https://github.com/mixeme/selfpost",
-	}); err != nil {
-		t.Fatalf("execute login: %v", err)
+	// Both signed-out pages go through Engine.Render, which supplies the
+	// engine's version and the legal lines itself.
+	signedOut := map[string]any{
+		"login": NewLogin("mail.example.org", ""),
+		"setup": NewSetup("token", ""),
 	}
-	out := buf.String()
-	if strings.Contains(out, "9.9.9-test") {
-		t.Errorf("the login page shows the version to unauthenticated visitors:\n%s", out)
-	}
-	for _, want := range legalBits {
-		if !strings.Contains(out, want) {
-			t.Errorf("login page is missing legal notice %q", want)
+	for name, data := range signedOut {
+		rec := httptest.NewRecorder()
+		engine.Render(rec, http.StatusOK, name, data)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("render %s: status %d: %s", name, rec.Code, rec.Body.String())
+		}
+		out := rec.Body.String()
+		if strings.Contains(out, "9.9.9-test") {
+			t.Errorf("the %s page shows the version to unauthenticated visitors:\n%s", name, out)
+		}
+		for _, want := range legalBits {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s page is missing legal notice %q", name, want)
+			}
 		}
 	}
 }
@@ -637,14 +642,18 @@ func TestLoginPageOmitsHelpDrawer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	var buf bytes.Buffer
-	if err := engine.Page("login").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
-		"Title": "t", "Active": "",
-	}); err != nil {
-		t.Fatalf("execute login: %v", err)
-	}
-	if strings.Contains(buf.String(), "help-drawer") {
-		t.Error("login page should not include the help drawer")
+	for name, data := range map[string]any{
+		"login": NewLogin("", ""),
+		"setup": NewSetup("token", ""),
+	} {
+		rec := httptest.NewRecorder()
+		engine.Render(rec, http.StatusOK, name, data)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("render %s: status %d: %s", name, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "help-drawer") {
+			t.Errorf("%s page should not include the help drawer", name)
+		}
 	}
 }
 

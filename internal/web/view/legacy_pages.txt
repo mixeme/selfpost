@@ -23,10 +23,8 @@ help
 inbound
 inbound_delete
 inbound_domain
-login
 mail_queue
 settings
-setup
 status
 system_log
 user_delete
