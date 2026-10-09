@@ -1,0 +1,36 @@
+# The redesign ratchet (docs/plans/panel-redesign.md § Against resurrected pages).
+#
+# One entry per line: what is still pre-2.0 and therefore not yet held to the
+# design contract by the guard tests. This list ONLY SHRINKS — CI fails a
+# commit whose list is not a subset of its parent's (.github/scripts/design-first.sh).
+# Finishing a piece of work means deleting its line in the same commit; from
+# then on the guards hold that piece for good.
+#
+#   @kit     the component kit is not complete (stage 0): panel.css,
+#            components.html, components.go, layout.html, GET /server/components
+#   @routes  the pre-2.0 route table is still in place (stage 1)
+#   <name>   a page of the view engine that is still the old template
+@kit
+@routes
+backup
+dashboard
+deliveries
+delivery
+dmarc
+dmarc_domain
+dmarc_report
+domain_delete
+domain_detail
+help
+inbound
+inbound_delete
+inbound_domain
+login
+mail_queue
+settings
+setup
+status
+system_log
+user_delete
+user_form
+users

@@ -147,6 +147,17 @@ func (s *Server) Start() error {
 
 // Handler returns the panel's HTTP handler (router).
 func (s *Server) Handler() http.Handler {
+	mux, authed := s.muxes()
+	mux.Handle("/", s.auth.RequireAuth(authed))
+	return s.secure(mux)
+}
+
+// muxes registers every route: the public ones, and the ones behind a session.
+// Both muxes are flat — one pattern per route, nothing mounted as a sub-router —
+// and building them only takes method values, it never calls into s.auth or
+// s.handlers: the route guard test (guard_routes_test.go) runs this on a bare
+// Server and asks each mux which pattern answers a path.
+func (s *Server) muxes() (public, authed *http.ServeMux) {
 	mux := http.NewServeMux()
 	h := s.handlers
 
@@ -157,7 +168,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/login", s.auth.HandleLogin)
 	mux.HandleFunc("/logout", s.auth.HandleLogout)
 
-	authed := http.NewServeMux()
+	authed = http.NewServeMux()
 	authed.HandleFunc("GET /{$}", redirectHome)
 	authed.HandleFunc("GET /help", h.HandleHelp)
 
@@ -224,8 +235,7 @@ func (s *Server) Handler() http.Handler {
 	authed.HandleFunc("GET /system-log", h.HandleSystemLog)
 	authed.HandleFunc("GET /system-log/body", h.HandleSystemLogBody)
 
-	mux.Handle("/", s.auth.RequireAuth(authed))
-	return s.secure(mux)
+	return mux, authed
 }
 
 // redirectSettings sends legacy /account bookmarks to /settings (308 preserves POST).
