@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Delete {{.Domain.Name}}</h1>
 
-{{template "back_link" (back (printf "/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
+{{template "back_link" (back (printf "/outbound/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
 
 <div class="card">
   <h2>Confirm deletion</h2>
@@ -17,7 +17,7 @@
   <p class="muted">This cannot be undone. The published DKIM DNS record becomes
   invalid; remove it from DNS if you do not plan to re-add the domain.</p>
 
-  <form method="post" action="/domains/{{.Domain.ID}}/delete">
+  <form method="post" action="/outbound/domains/{{.Domain.ID}}/delete">
     <button type="submit" class="danger">Delete {{.Domain.Name}}</button>
   </form>
 </div>

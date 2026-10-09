@@ -114,7 +114,7 @@ func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.followCreator(d.ID, p.ID)
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d", d.ID), http.StatusSeeOther)
 }
 
 // followCreator makes a new domain take its DMARC report address from the
@@ -172,7 +172,7 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/domains?deleted=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/outbound/domains?deleted=1", http.StatusSeeOther)
 }
 
 // HandleReload re-applies both the OpenDKIM configuration and the Postfix
@@ -198,7 +198,7 @@ func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.Redirect(w, r, "/status?reloaded=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/overview?reloaded=1", http.StatusSeeOther)
 }
 
 func (h *Handlers) lookupDomain(w http.ResponseWriter, r *http.Request) (store.Domain, bool) {

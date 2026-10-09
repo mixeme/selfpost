@@ -120,7 +120,7 @@ func newInboundStand(t *testing.T) inboundStand {
 }
 
 func (s inboundStand) call(rt inboundRoute, p *auth.Principal, id int64) *httptest.ResponseRecorder {
-	return send(rt.handler(s.h), p, rt.method, "/inbound/"+idStr(id)+rt.suffix, map[string]string{"id": idStr(id)}, rt.form)
+	return send(rt.handler(s.h), p, rt.method, "/inbound/domains/"+idStr(id)+rt.suffix, map[string]string{"id": idStr(id)}, rt.form)
 }
 
 // Every route of one inbound domain, for every kind of user: 404 for another
@@ -131,7 +131,7 @@ func TestInboundDomainRoutesAreDelegatedPerDomain(t *testing.T) {
 	s := newInboundStand(t)
 	const missing = 9999
 	for _, rt := range inboundDomainRoutes {
-		name := rt.method + " /inbound/{id}" + rt.suffix
+		name := rt.method + " /inbound/domains/{id}" + rt.suffix
 		denied := []struct {
 			who string
 			p   *auth.Principal
@@ -186,12 +186,12 @@ func TestAddingAndDeletingInboundDomainsStaysGlobal(t *testing.T) {
 	for _, p := range []*auth.Principal{&s.ownsA, &s.allIn, &s.outboundOnly, nil} {
 		for _, rt := range inboundGlobalRoutes {
 			if rec := s.call(rt, p, s.a.ID); rec.Code != http.StatusNotFound {
-				t.Errorf("%s /inbound/{id}%s as %+v = %d, want 404", rt.method, rt.suffix, p, rec.Code)
+				t.Errorf("%s /inbound/domains/{id}%s as %+v = %d, want 404", rt.method, rt.suffix, p, rec.Code)
 			}
 		}
-		rec := send(s.h.HandleAddInbound, p, "POST", "/inbound", nil, url.Values{"name": {"new.example.com"}})
+		rec := send(s.h.HandleAddInbound, p, "POST", "/inbound/domains", nil, url.Values{"name": {"new.example.com"}})
 		if rec.Code != http.StatusNotFound {
-			t.Errorf("POST /inbound as %+v = %d, want 404", p, rec.Code)
+			t.Errorf("POST /inbound/domains as %+v = %d, want 404", p, rec.Code)
 		}
 	}
 	list, err := s.h.store.ListInboundDomains()
@@ -200,11 +200,11 @@ func TestAddingAndDeletingInboundDomainsStaysGlobal(t *testing.T) {
 	}
 
 	// The global role still can.
-	if rec := send(s.h.HandleAddInbound, &s.global, "POST", "/inbound", nil, url.Values{"name": {"new.example.com"}}); rec.Code != http.StatusSeeOther {
-		t.Errorf("POST /inbound as the global role = %d:\n%s", rec.Code, rec.Body.String())
+	if rec := send(s.h.HandleAddInbound, &s.global, "POST", "/inbound/domains", nil, url.Values{"name": {"new.example.com"}}); rec.Code != http.StatusSeeOther {
+		t.Errorf("POST /inbound/domains as the global role = %d:\n%s", rec.Code, rec.Body.String())
 	}
 	if rec := s.call(inboundGlobalRoutes[1], &s.global, s.a.ID); rec.Code != http.StatusSeeOther {
-		t.Errorf("POST /inbound/{id}/delete as the global role = %d:\n%s", rec.Code, rec.Body.String())
+		t.Errorf("POST /inbound/domains/{id}/delete as the global role = %d:\n%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -213,7 +213,7 @@ func TestAddingAndDeletingInboundDomainsStaysGlobal(t *testing.T) {
 func TestInboundListShowsOnlyTheAssignedDomains(t *testing.T) {
 	s := newInboundStand(t)
 	list := func(p *auth.Principal) *httptest.ResponseRecorder {
-		return send(s.h.HandleInboundList, p, "GET", "/inbound", nil, nil)
+		return send(s.h.HandleInboundList, p, "GET", "/inbound/domains", nil, nil)
 	}
 
 	rec := list(&s.ownsA)
@@ -266,7 +266,7 @@ func TestInboundListWithNothingLeftIs404(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, InboundDomains: u.InboundDomainIDs}
-	if rec := send(s.h.HandleInboundList, &p, "GET", "/inbound", nil, nil); rec.Code != http.StatusNotFound {
+	if rec := send(s.h.HandleInboundList, &p, "GET", "/inbound/domains", nil, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("list after the only assigned inbound domain was deleted = %d, want 404", rec.Code)
 	}
 }
@@ -297,13 +297,13 @@ func TestOutboundRoutesAnswerAnotherTenant404(t *testing.T) {
 		handler        http.HandlerFunc
 		pathValues     map[string]string
 	}{
-		{"GET", "/domains/{id}", h.HandleDomainDetail, did},
-		{"POST", "/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck, did},
-		{"POST", "/domains/{id}/applications", h.HandleAddApplication, did},
-		{"POST", "/domains/{id}/ratelimit", h.HandleDomainRateLimit, did},
-		{"POST", "/domains/{id}/ratelimit/recalc", h.HandleDomainRateLimitRecalc, did},
-		{"POST", "/domains/{id}/dmarc", h.HandleDomainDMARC, did},
-		{"POST", "/domains/{id}/export", h.HandleExportDomain, did},
+		{"GET", "/outbound/domains/{id}", h.HandleDomainDetail, did},
+		{"POST", "/outbound/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck, did},
+		{"POST", "/outbound/domains/{id}/applications", h.HandleAddApplication, did},
+		{"POST", "/outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit, did},
+		{"POST", "/outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc, did},
+		{"POST", "/outbound/domains/{id}/settings/reports", h.HandleDomainDMARC, did},
+		{"POST", "/outbound/domains/{id}/settings/export", h.HandleExportDomain, did},
 		{"POST", "/applications/{aid}/mode", h.HandleUpdateAppMode, aid},
 		{"POST", "/applications/{aid}/authips", h.HandleAppAuthIPs, aid},
 		{"POST", "/applications/{aid}/password", h.HandleRegenPassword, aid},
@@ -350,7 +350,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 		for k, v := range extra {
 			form[k] = v
 		}
-		rec := send(h.HandleUserNew, &root, "POST", "/users/new", nil, form)
+		rec := send(h.HandleUserNew, &root, "POST", "/server/users/new", nil, form)
 		u, _ := st.GetUserByUsername(username)
 		return rec, u
 	}
@@ -374,7 +374,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 	update := func(u store.User, form url.Values) store.User {
 		t.Helper()
 		form.Set("username", u.Username)
-		rec := send(h.HandleUserEdit, &root, "POST", "/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)}, form)
+		rec := send(h.HandleUserEdit, &root, "POST", "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)}, form)
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("update %s = %d:\n%s", u.Username, rec.Code, rec.Body.String())
 		}
@@ -401,7 +401,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 	h.cfg.InboundEnabled = true
 
 	// Emptying both lists is refused and changes nothing.
-	rec = send(h.HandleUserEdit, &root, "POST", "/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)},
+	rec = send(h.HandleUserEdit, &root, "POST", "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)},
 		url.Values{"username": {u.Username}, "role": {"domain"}})
 	if after, _ := st.GetUser(u.ID); rec.Code != http.StatusBadRequest || after.Reach().Empty() {
 		t.Errorf("emptying both lists = %d, reach now %+v", rec.Code, after.Reach())
@@ -415,7 +415,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 
 	// The form shows both lists with what is ticked.
 	other, _ := st.GetUserByUsername("inbound-only")
-	body := send(h.HandleUserEdit, &root, "GET", "/users/"+idStr(other.ID), map[string]string{"uid": idStr(other.ID)}, nil).Body.String()
+	body := send(h.HandleUserEdit, &root, "GET", "/server/users/"+idStr(other.ID), map[string]string{"uid": idStr(other.ID)}, nil).Body.String()
 	for _, want := range []string{
 		`name="all_domains"`, `name="all_inbound_domains"`, "out.example.com",
 		`name="inbound_domain_ids" value="` + idStr(in.ID) + `" checked`,

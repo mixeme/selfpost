@@ -187,10 +187,10 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 	}
 	resp, err := sc.panel.status()
 	if err != nil {
-		t.Fatalf("GET /status after restart: %v", err)
+		t.Fatalf("GET /overview after restart: %v", err)
 	}
-	if resp.Request.URL.Path != "/status" {
-		t.Fatalf("session did not survive restart: landed on %s instead of /status", resp.Request.URL.Path)
+	if resp.Request.URL.Path != "/overview" {
+		t.Fatalf("session did not survive restart: landed on %s instead of /overview", resp.Request.URL.Path)
 	}
 }
 

@@ -295,9 +295,9 @@ func deliveriesBackURL(r *http.Request) string {
 		}
 	}
 	if len(back) == 0 {
-		return "/deliveries"
+		return "/outbound/log"
 	}
-	return "/deliveries?" + back.Encode()
+	return "/outbound/log?" + back.Encode()
 }
 
 // sendLogData reads the domain/app filters and page number off the query

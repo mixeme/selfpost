@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dmarc"
@@ -169,83 +170,112 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	mux.HandleFunc("/logout", s.auth.HandleLogout)
 
 	authed = http.NewServeMux()
+	// A URL reads like the menu: /<group>/<page>, an entity under its list, an
+	// action under the thing it changes (docs/plans/panel-redesign.md §
+	// Routes). The pre-2.0 paths are gone, not redirected.
 	authed.HandleFunc("GET /{$}", redirectHome)
 	authed.HandleFunc("GET /help", h.HandleHelp)
-	authed.HandleFunc("GET /server/components", h.HandleComponents)
 
-	authed.HandleFunc("GET /status", h.HandleStatus)
-	authed.HandleFunc("GET /status/fragment", h.HandleStatusFragment)
-	authed.HandleFunc("POST /status/recheck", h.HandleStatusRecheck)
+	// Account: every signed-in user's own.
+	authed.HandleFunc("GET /account", h.HandleAccount)
+	authed.HandleFunc("POST /account/profile", h.HandleAccountProfile)
+	authed.HandleFunc("POST /account/password", h.HandleAccountPassword)
+	authed.HandleFunc("POST /account/dmarc", h.HandleAccountDMARC)
 
-	authed.HandleFunc("GET /domains", h.HandleDashboard)
-	authed.HandleFunc("POST /domains", h.HandleAddDomain)
-	authed.HandleFunc("POST /domains/import", h.HandleImportDomain)
-	authed.HandleFunc("GET /domains/{id}", h.HandleDomainDetail)
-	authed.HandleFunc("POST /domains/{id}/dns-recheck", h.HandleDomainDNSRecheck)
-	authed.HandleFunc("GET /domains/{id}/delete", h.HandleDeleteConfirm)
-	authed.HandleFunc("POST /domains/{id}/delete", h.HandleDeleteDomain)
-	authed.HandleFunc("POST /domains/{id}/applications", h.HandleAddApplication)
-	authed.HandleFunc("POST /domains/{id}/ratelimit", h.HandleDomainRateLimit)
-	authed.HandleFunc("POST /domains/{id}/ratelimit/recalc", h.HandleDomainRateLimitRecalc)
-	authed.HandleFunc("POST /domains/{id}/dmarc", h.HandleDomainDMARC)
-	authed.HandleFunc("POST /domains/{id}/export", h.HandleExportDomain)
+	// Overview. Its handler checks the role itself: the page is global-only
+	// but does not live under /server/.
+	authed.HandleFunc("GET /overview", h.HandleStatus)
+	authed.HandleFunc("GET /overview/fragment", h.HandleStatusFragment)
+
+	// Outbound: checked per domain in the handlers (lookupDomain,
+	// lookupApplication), adding and deleting by role.
+	authed.HandleFunc("GET /outbound/domains", h.HandleDashboard)
+	authed.HandleFunc("POST /outbound/domains", h.HandleAddDomain)
+	authed.HandleFunc("GET /outbound/domains/{id}", h.HandleDomainDetail)
+	authed.HandleFunc("POST /outbound/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck)
+	authed.HandleFunc("GET /outbound/domains/{id}/delete", h.HandleDeleteConfirm)
+	authed.HandleFunc("POST /outbound/domains/{id}/delete", h.HandleDeleteDomain)
+	// Until the domain page is split in two (stage 2), its settings half is
+	// still the lower part of the one old page.
+	authed.HandleFunc("GET /outbound/domains/{id}/settings", h.HandleDomainDetail)
+	authed.HandleFunc("POST /outbound/domains/{id}/settings/reports", h.HandleDomainDMARC)
+	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit)
+	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc)
+	authed.HandleFunc("POST /outbound/domains/{id}/settings/export", h.HandleExportDomain)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications", h.HandleAddApplication)
 	authed.HandleFunc("POST /applications/{aid}/mode", h.HandleUpdateAppMode)
 	authed.HandleFunc("POST /applications/{aid}/authips", h.HandleAppAuthIPs)
 	authed.HandleFunc("POST /applications/{aid}/password", h.HandleRegenPassword)
 	authed.HandleFunc("POST /applications/{aid}/ratelimit", h.HandleAppRateLimit)
 	authed.HandleFunc("POST /applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc)
 	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
-	authed.HandleFunc("POST /reload", h.HandleReload)
 
-	if s.cfg.InboundEnabled {
-		authed.HandleFunc("GET /inbound", h.HandleInboundList)
-		authed.HandleFunc("POST /inbound", h.HandleAddInbound)
-		authed.HandleFunc("GET /inbound/{id}", h.HandleInboundDetail)
-		authed.HandleFunc("POST /inbound/{id}/dns-recheck", h.HandleInboundDNSRecheck)
-		authed.HandleFunc("POST /inbound/{id}/upstream", h.HandleInboundTransport)
-		authed.HandleFunc("POST /inbound/{id}/recipients", h.HandleInboundRecipients)
-		authed.HandleFunc("GET /inbound/{id}/delete", h.HandleInboundDeleteConfirm)
-		authed.HandleFunc("POST /inbound/{id}/delete", h.HandleInboundDelete)
-	}
+	authed.HandleFunc("GET /outbound/log", h.HandleDeliveries)
+	authed.HandleFunc("GET /outbound/log/fragment", h.HandleDeliveriesRows)
+	authed.HandleFunc("GET /outbound/log/{id}", h.HandleDelivery)
+	authed.HandleFunc("GET /outbound/queue", h.HandleMailQueue)
+	authed.HandleFunc("GET /outbound/queue/fragment", h.HandleMailQueueBody)
 
 	if s.cfg.DMARCEnabled {
-		authed.HandleFunc("GET /dmarc", h.HandleDMARCList)
-		authed.HandleFunc("GET /dmarc/reports/{id}", h.HandleDMARCReport)
-		authed.HandleFunc("GET /dmarc/domains/{id}", h.HandleDMARCDomain)
+		authed.HandleFunc("GET /outbound/dmarc", h.HandleDMARCList)
+		authed.HandleFunc("GET /outbound/dmarc/reports/{id}", h.HandleDMARCReport)
+		authed.HandleFunc("GET /outbound/dmarc/domains/{id}", h.HandleDMARCDomain)
 	}
 
-	authed.HandleFunc("/settings", h.HandleSettings)
-	authed.HandleFunc("/account", redirectSettings)
+	// Inbound: checked per inbound domain (requireInboundDomain).
+	if s.cfg.InboundEnabled {
+		authed.HandleFunc("GET /inbound/domains", h.HandleInboundList)
+		authed.HandleFunc("POST /inbound/domains", h.HandleAddInbound)
+		authed.HandleFunc("GET /inbound/domains/{id}", h.HandleInboundDetail)
+		authed.HandleFunc("POST /inbound/domains/{id}/dns-recheck", h.HandleInboundDNSRecheck)
+		authed.HandleFunc("POST /inbound/domains/{id}/upstream", h.HandleInboundTransport)
+		authed.HandleFunc("POST /inbound/domains/{id}/recipients", h.HandleInboundRecipients)
+		authed.HandleFunc("GET /inbound/domains/{id}/delete", h.HandleInboundDeleteConfirm)
+		authed.HandleFunc("POST /inbound/domains/{id}/delete", h.HandleInboundDelete)
+	}
 
-	authed.HandleFunc("GET /users", h.HandleUsers)
-	authed.HandleFunc("GET /users/new", h.HandleUserNew)
-	authed.HandleFunc("POST /users/new", h.HandleUserNew)
-	authed.HandleFunc("GET /users/{uid}", h.HandleUserEdit)
-	authed.HandleFunc("POST /users/{uid}", h.HandleUserEdit)
-	authed.HandleFunc("GET /users/{uid}/delete", h.HandleUserDeleteConfirm)
-	authed.HandleFunc("POST /users/{uid}/delete", h.HandleUserDelete)
-
-	authed.HandleFunc("GET /backup", h.HandleBackupPage)
-	authed.HandleFunc("POST /backup", h.HandleBackup)
-
-	authed.HandleFunc("GET /deliveries", h.HandleDeliveries)
-	authed.HandleFunc("GET /deliveries/rows", h.HandleDeliveriesRows)
-	authed.HandleFunc("GET /deliveries/{id}", h.HandleDelivery)
-	authed.HandleFunc("GET /mail-queue", h.HandleMailQueue)
-	authed.HandleFunc("GET /mail-queue/body", h.HandleMailQueueBody)
-	authed.HandleFunc("GET /system-log", h.HandleSystemLog)
-	authed.HandleFunc("GET /system-log/body", h.HandleSystemLogBody)
+	// Server: everything under /server/ is for the global role, so the subtree
+	// is guarded once, here, by server() — a route added to this group cannot
+	// forget the check. The handlers keep their own requireGlobal as well.
+	server := func(pattern string, handler http.HandlerFunc) {
+		if _, path, _ := strings.Cut(pattern, " "); !strings.HasPrefix(path, "/server/") {
+			panic("web: server() registers routes under /server/ only: " + pattern)
+		}
+		authed.HandleFunc(pattern, globalOnly(handler))
+	}
+	server("POST /server/health/recheck", h.HandleStatusRecheck)
+	server("POST /server/health/reload", h.HandleReload)
+	server("GET /server/log", h.HandleSystemLog)
+	server("GET /server/log/fragment", h.HandleSystemLogBody)
+	server("GET /server/backup", h.HandleBackupPage)
+	server("POST /server/backup", h.HandleBackup)
+	server("POST /server/backup/import", h.HandleImportDomain)
+	server("GET /server/users", h.HandleUsers)
+	server("GET /server/users/new", h.HandleUserNew)
+	server("POST /server/users/new", h.HandleUserNew)
+	server("GET /server/users/{uid}", h.HandleUserEdit)
+	server("POST /server/users/{uid}", h.HandleUserEdit)
+	server("GET /server/users/{uid}/delete", h.HandleUserDeleteConfirm)
+	server("POST /server/users/{uid}/delete", h.HandleUserDelete)
+	server("GET /server/settings", h.HandleServerSettings)
+	server("POST /server/settings", h.HandleServerSettings)
+	server("GET /server/components", h.HandleComponents)
 
 	return mux, authed
 }
 
-// redirectSettings sends legacy /account bookmarks to /settings (308 preserves POST).
-func redirectSettings(w http.ResponseWriter, r *http.Request) {
-	target := "/settings"
-	if r.URL.RawQuery != "" {
-		target += "?" + r.URL.RawQuery
+// globalOnly answers 404 to anyone but the global role before the wrapped
+// handler runs — the same answer a missing page gets, so the panel does not
+// confirm to a domain administrator that the Server pages exist.
+func globalOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := auth.PrincipalFromRequest(r)
+		if !ok || !p.IsGlobal() {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
 	}
-	http.Redirect(w, r, target, http.StatusPermanentRedirect)
 }
 
 func redirectHome(w http.ResponseWriter, r *http.Request) {
@@ -254,13 +284,13 @@ func redirectHome(w http.ResponseWriter, r *http.Request) {
 		// A domain administrator lands on what they reach: their sending
 		// domains, or the inbound ones when that is all they are assigned.
 		if !p.HasOutbound() && p.HasInbound() {
-			http.Redirect(w, r, "/inbound", http.StatusSeeOther)
+			http.Redirect(w, r, "/inbound/domains", http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/domains", http.StatusSeeOther)
+		http.Redirect(w, r, "/outbound/domains", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/status", http.StatusSeeOther)
+	http.Redirect(w, r, "/overview", http.StatusSeeOther)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

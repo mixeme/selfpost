@@ -141,22 +141,22 @@ func TestE2E(t *testing.T) {
 	})
 
 	run("inbound_ui_absent_when_disabled", func(t *testing.T) {
-		resp, body, err := sc.panel.get("/status")
+		resp, body, err := sc.panel.get("/overview")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if resp.StatusCode != 200 {
 			t.Fatalf("status = %d", resp.StatusCode)
 		}
-		if strings.Contains(body, `href="/inbound"`) {
+		if strings.Contains(body, `href="/inbound/domains"`) {
 			t.Fatal("status page shows Inbound nav while INBOUND_RELAY_ENABLE is off")
 		}
-		resp, _, err = sc.panel.get("/inbound")
+		resp, _, err = sc.panel.get("/inbound/domains")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if resp.StatusCode != 404 {
-			t.Fatalf("GET /inbound = %d, want 404 with inbound relay off", resp.StatusCode)
+			t.Fatalf("GET /inbound/domains = %d, want 404 with inbound relay off", resp.StatusCode)
 		}
 	})
 

@@ -10,7 +10,7 @@ import (
 // checks whether the e2e gate's HTML scrapers still match it.
 func TestE2ESendLogStatusMarkupDrift(t *testing.T) {
 	h, _ := serverWithDelivery(t)
-	rendered := getBody(t, h.HandleDeliveriesRows, "/deliveries/rows")
+	rendered := getBody(t, h.HandleDeliveriesRows, "/outbound/log/fragment")
 
 	// These mirror test/e2e/main_test.go — keep in sync when fixing the e2e gate.
 	statusCellPattern := regexp.MustCompile(`class="st st-[^"]+">(queued|sent|deferred|bounced|rejected)</span>`)

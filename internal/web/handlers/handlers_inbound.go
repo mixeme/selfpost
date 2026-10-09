@@ -222,7 +222,7 @@ func (h *Handlers) HandleAddInbound(w http.ResponseWriter, r *http.Request) {
 			"Could not add the domain. Please check the logs and try again.", raw)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/inbound/%d", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleInboundDetail(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +282,7 @@ func (h *Handlers) HandleInboundDNSRecheck(w http.ResponseWriter, r *http.Reques
 	if h.dns != nil && h.cfg.Hostname != "" {
 		h.dns.InboundMX(d.Name, h.cfg.Hostname, true)
 	}
-	http.Redirect(w, r, fmt.Sprintf("/inbound/%d?rechecked=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +301,7 @@ func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request
 		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{TransportErr: err.Error()})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/inbound/%d?saved=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?saved=1", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleInboundRecipients(w http.ResponseWriter, r *http.Request) {
@@ -319,7 +319,7 @@ func (h *Handlers) HandleInboundRecipients(w http.ResponseWriter, r *http.Reques
 		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{RecipientErr: err.Error()})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/inbound/%d?recipients=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?recipients=1", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleInboundDeleteConfirm(w http.ResponseWriter, r *http.Request) {
@@ -358,5 +358,5 @@ func (h *Handlers) HandleInboundDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/inbound?deleted=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/inbound/domains?deleted=1", http.StatusSeeOther)
 }

@@ -74,7 +74,7 @@ func restoreFromOwnBackup(t *testing.T, password string) restored {
 func TestPanelBootsOnADataDirectoryRestoredFromItsOwnBackup(t *testing.T) {
 	r := restoreFromOwnBackup(t, "")
 
-	body := getPage(t, r.panel, "/deliveries", signIn(t, r.panel))
+	body := getPage(t, r.panel, "/outbound/log", signIn(t, r.panel))
 	for _, want := range []string{restoreDomain, restoreSubject} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the restored panel's send log does not show %q:\n%s", want, body)
@@ -128,7 +128,7 @@ func TestARestoreDoesNotReopenTheSetupLink(t *testing.T) {
 func TestARestoredPanelHonoursSessionsFromTheArchive(t *testing.T) {
 	r := restoreFromOwnBackup(t, "")
 
-	rec := request(t, r.panel, http.MethodGet, "/deliveries", nil, r.session)
+	rec := request(t, r.panel, http.MethodGet, "/outbound/log", nil, r.session)
 	if rec.Code != http.StatusOK {
 		t.Errorf("a session from before the backup = %d on the restored panel, want 200", rec.Code)
 	}
@@ -141,7 +141,7 @@ func TestARestoredPanelHonoursSessionsFromTheArchive(t *testing.T) {
 func TestAnEncryptedBackupRestoresTheSameWay(t *testing.T) {
 	r := restoreFromOwnBackup(t, "a-long-enough-password")
 
-	body := getPage(t, r.panel, "/deliveries", signIn(t, r.panel))
+	body := getPage(t, r.panel, "/outbound/log", signIn(t, r.panel))
 	if !strings.Contains(body, restoreSubject) {
 		t.Errorf("the panel restored from an encrypted backup lost the send log:\n%s", body)
 	}
@@ -384,7 +384,7 @@ func downloadBackup(t *testing.T, h http.Handler, session *http.Cookie, password
 		form.Set("password", password)
 		form.Set("password_confirm", password)
 	}
-	rec := request(t, h, http.MethodPost, "/backup", strings.NewReader(form.Encode()), session)
+	rec := request(t, h, http.MethodPost, "/server/backup", strings.NewReader(form.Encode()), session)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("download a backup = %d, want 200:\n%s", rec.Code, rec.Body.String())
 	}

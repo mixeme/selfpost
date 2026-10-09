@@ -60,7 +60,7 @@
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
 
-{{template "back_link" (back "/domains" "All domains")}}
+{{template "back_link" (back "/outbound/domains" "All domains")}}
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 {{if .RateLimitErr}}<div class="flash error">{{.RateLimitErr}}</div>{{end}}
@@ -140,7 +140,7 @@
     </div>
   </div>
 
-  <form class="inline" method="post" action="/domains/{{.Domain.ID}}/dns-recheck">
+  <form class="inline" method="post" action="/outbound/domains/{{.Domain.ID}}/dns-recheck">
     <button type="submit">Re-check</button>
   </form>
 </div>
@@ -186,7 +186,7 @@
     SelfPost does not receive inbound mail — use a mailbox on another domain.{{end}}</p>
     {{end}}
     {{if and .DMARCIngestEnabled .ResolvedDMARCEmail}}
-    <p class="muted"><a href="/dmarc/domains/{{.Domain.ID}}">View DMARC reports</a> for this domain.</p>
+    <p class="muted"><a href="/outbound/dmarc/domains/{{.Domain.ID}}">View DMARC reports</a> for this domain.</p>
     {{end}}
 
     {{if .NeedsReportAuth}}
@@ -228,7 +228,7 @@
        above the domains list. */}}
   <div class="card" id="add-application">
     <h2>Add an application</h2>
-    <form method="post" action="/domains/{{.Domain.ID}}/applications">
+    <form method="post" action="/outbound/domains/{{.Domain.ID}}/applications">
       <label for="login">Login</label>
       <input id="login" name="login" type="text" placeholder="prod-server"
              autocomplete="off" autocapitalize="none" spellcheck="false"
@@ -418,10 +418,10 @@
   <div class="check-cols check-cols-rows">
     <div class="check-col">
       <p class="check-col-title">DMARC reports</p>
-      <p class="muted">Default comes from <a href="/settings">Settings</a>;
+      <p class="muted">Default comes from <a href="/account#dmarc">Account</a>;
       override per domain here.</p>
       <div class="check-col-fields">
-        <form id="dmarc-domain" method="post" action="/domains/{{.Domain.ID}}/dmarc">
+        <form id="dmarc-domain" method="post" action="/outbound/domains/{{.Domain.ID}}/settings/reports">
           <label for="dmarc_rua_mode">Aggregate reports (rua=)</label>
           <select id="dmarc_rua_mode" name="dmarc_rua_mode" data-custom-mode="custom">
             <option value="inherit"{{if eq .DMARCRuaMode "inherit"}} selected{{end}}>Same as Settings{{if .ProfileDMARCEmail}} ({{.ProfileDMARCEmail}}){{end}}</option>
@@ -446,9 +446,9 @@
     <div class="check-col">
       <p class="check-col-title">Level-2 rate limit
         {{if .DomainHasRL}}<span class="st st-ok">active</span>{{else}}<span class="st st-unknown">inactive</span>{{end}}</p>
-      <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s — <a href="/settings#rate-limits">Settings</a>.</p>
+      <p class="muted">Level&nbsp;1 backstop: {{.L1Messages}} messages / {{.L1Window}}s {{if .IsGlobal}} — <a href="/server/settings#rate-limits">Settings</a>{{end}}.</p>
       <div class="check-col-fields">
-        <form id="rl-domain" method="post" action="/domains/{{.Domain.ID}}/ratelimit">
+        <form id="rl-domain" method="post" action="/outbound/domains/{{.Domain.ID}}/settings/ratelimit">
           <label for="d_mode">Limit mode</label>
           <select id="d_mode" name="mode" data-ratelimit-mode>
             <option value="manual" {{if not .DomainRLAuto}}selected{{end}}>Manual</option>
@@ -483,12 +483,12 @@
       <div class="check-col-actions">
         <button type="submit" form="rl-domain">Save limit</button>
         {{if .DomainRLAuto}}
-        <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit/recalc">
+        <form class="inline" method="post" action="/outbound/domains/{{.Domain.ID}}/settings/ratelimit/recalc">
           <button type="submit">Recalculate now</button>
         </form>
         {{end}}
         {{if .DomainHasRL}}
-        <form class="inline" method="post" action="/domains/{{.Domain.ID}}/ratelimit"
+        <form class="inline" method="post" action="/outbound/domains/{{.Domain.ID}}/settings/ratelimit"
               data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply.">
           <input type="hidden" name="clear" value="1">
           <button type="submit" class="danger">Remove limit</button>
@@ -508,7 +508,7 @@
     <p class="muted"><strong>Secret file</strong> — transfer securely, or encrypt
     below as <code>.spde</code>.</p>
     {{if .ExportErr}}<p class="error">{{.ExportErr}}</p>{{end}}
-    <form method="post" action="/domains/{{.Domain.ID}}/export">
+    <form method="post" action="/outbound/domains/{{.Domain.ID}}/settings/export">
       {{template "encryptfields" .}}
       <button type="submit">Export domain</button>
     </form>
@@ -517,7 +517,7 @@
   <div class="card" id="danger">
     <h2>Danger zone</h2>
     <p class="muted">Deletes the DKIM key and every application on this domain.</p>
-    <a class="danger" href="/domains/{{.Domain.ID}}/delete">Delete domain</a>
+    <a class="danger" href="/outbound/domains/{{.Domain.ID}}/delete">Delete domain</a>
   </div>
 </div>
 {{end}}

@@ -48,19 +48,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   tenant's domain, a missing one and a user with no inbound reach all get the
   same 404. A menu group with nothing assigned is absent, and `/` leads an
   inbound-only administrator to Inbound.
+- panel-redesign (stage 1): **Account** (`/account`, every role) and
+  **Server › Settings** (`/server/settings`, global role) replace the one
+  Settings page. Account has three forms, each its own POST: profile
+  (username, e-mail), password, and the default DMARC report address
+  (SelfPost hosted, my account e-mail, another address, none). Saving the
+  profile no longer asks for the password; changing the password still does.
 
 ### Changed
 
+- **Breaking — every panel URL changed.** A path now reads like the menu
+  (`/overview`, `/outbound/…`, `/inbound/…`, `/server/…`, `/account`); the
+  old paths are removed, not redirected — see *Removed*. Polled fragments all
+  answer `<page>/fragment`. Everything under `/server/` is guarded for the
+  global role where the routes are registered, in addition to each handler's
+  own check. The application routes and Server › Health follow in the next
+  two steps.
 - **Breaking — the database starts from zero.** The 1.x migration chain
   (`0001`–`0010`) is replaced by one baseline, `0001_init.sql`. A 1.x
   `/data/selfpost.db` is refused at start-up with an explicit error and left
   untouched; nothing is migrated. A domain can be carried over with its
   export file.
 - The panel role `domain_admin` is stored as `domain`.
-- Until the Account page replaces it, the old Settings form's "default report
-  address" field sets the account e-mail and switches the user's DMARC
-  default between that e-mail and none; a domain's "Same as Settings" makes
-  it follow the user who chose it.
+- On the old domain page, "Same as Settings" makes the domain follow the
+  default report address of the user who chose it.
 - The old panel is untouched on screen but steps aside in the tree: its
   stylesheet is `legacy.css` and its layout `layout_legacy.html` until the
   last old page is restyled. The 2.0 menu paths in the new shell do not
@@ -70,6 +81,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Removed
 
+- Old panel paths, GET and POST alike, without redirects: `/status`,
+  `/status/fragment`, `/status/recheck`, `/reload`, `/domains` and everything
+  under it (`/domains/import`, `/domains/{id}`, `…/dns-recheck`, `…/delete`,
+  `…/ratelimit`, `…/ratelimit/recalc`, `…/dmarc`, `…/export`), `/inbound` and
+  `/inbound/{id}/…`, `/dmarc`, `/dmarc/reports/{id}`, `/dmarc/domains/{id}`,
+  `/deliveries`, `/deliveries/rows`, `/deliveries/{id}`, `/mail-queue`,
+  `/mail-queue/body`, `/system-log`, `/system-log/body`, `/backup`, `/users`
+  and everything under it, `/settings`, and the `/account` → `/settings`
+  redirect.
 - The instance setting `dmarc_report_email` (a mirror of the global user's
   profile field) and the unused `rate_limits.allowed_ips` column.
 

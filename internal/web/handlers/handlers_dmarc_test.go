@@ -47,7 +47,7 @@ func TestDomainDMARCFollowsTheUserWhoChoseInherit(t *testing.T) {
 	}
 	save := func(values url.Values) store.Domain {
 		t.Helper()
-		rec := postFormAs(h.HandleDomainDMARC, p, "/domains/1/dmarc", map[string]string{"id": "1"}, values)
+		rec := postFormAs(h.HandleDomainDMARC, p, "/outbound/domains/1/settings/reports", map[string]string{"id": "1"}, values)
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("POST %v = %d, want 303:\n%s", values, rec.Code, rec.Body.String())
 		}
@@ -76,40 +76,6 @@ func TestDomainDMARCFollowsTheUserWhoChoseInherit(t *testing.T) {
 		t.Fatalf("none: %q / follows %v", got.DMARCRua, got.DMARCRuaUserID)
 	}
 
-}
-
-// Until the Account page replaces the old Settings form, its single address
-// field is the account e-mail and switches the user's DMARC default between
-// "my account e-mail" and "none". Nothing is written to the instance settings.
-func TestSettingsFormMapsToAccountEmailAndDefault(t *testing.T) {
-	h, password := settingsServer(t)
-	submit := func(email string) store.User {
-		t.Helper()
-		rec := postFormAs(h.HandleSettings, globalPrincipal, "/settings", nil, url.Values{
-			"username": {"admin"}, "current_password": {password}, "dmarc_report_email": {email},
-		})
-		if rec.Code != http.StatusSeeOther {
-			t.Fatalf("POST /settings (%q) = %d, want 303:\n%s", email, rec.Code, rec.Body.String())
-		}
-		u, err := h.store.GetUser(globalPrincipal.ID)
-		if err != nil {
-			t.Fatalf("GetUser: %v", err)
-		}
-		return u
-	}
-
-	u := submit("mix@example.org")
-	if u.Email != "mix@example.org" || u.DMARCDefaultMode != store.DMARCDefaultAccount {
-		t.Fatalf("after setting the address: e-mail %q, default %q", u.Email, u.DMARCDefaultMode)
-	}
-	if v, err := h.store.GetSetting("dmarc_report_email"); err == nil && v != "" {
-		t.Fatalf("the address was mirrored into the instance settings: %q", v)
-	}
-
-	u = submit("")
-	if u.Email != "" || u.DMARCDefaultMode != store.DMARCDefaultNone {
-		t.Fatalf("after clearing the address: e-mail %q, default %q", u.Email, u.DMARCDefaultMode)
-	}
 }
 
 // A new domain takes its report address from whoever created it.

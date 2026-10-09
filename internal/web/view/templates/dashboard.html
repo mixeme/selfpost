@@ -6,7 +6,7 @@
 {{if .IsGlobal}}
 <div class="card">
   <h2>Add a sending domain</h2>
-  <form method="post" action="/domains">
+  <form method="post" action="/outbound/domains">
     <label for="name">Domain</label>
     <div class="input-row">
       <input id="name" name="name" type="text" placeholder="example.com"
@@ -29,11 +29,11 @@
     <tbody>
       {{range .Domains}}
       <tr>
-        <td><a href="/domains/{{.ID}}">{{.Name}}</a></td>
-        <td><a class="st st-{{.DNS}}" href="/domains/{{.ID}}#dns-status">{{.DNS}}</a></td>
+        <td><a href="/outbound/domains/{{.ID}}">{{.Name}}</a></td>
+        <td><a class="st st-{{.DNS}}" href="/outbound/domains/{{.ID}}#dns-status">{{.DNS}}</a></td>
         <td class="muted">{{.DKIMSelector}}</td>
         <td>{{.AppCount}}</td>
-        {{if $.IsGlobal}}<td class="actions"><a class="danger" href="/domains/{{.ID}}/delete">Delete</a></td>{{else}}<td></td>{{end}}
+        {{if $.IsGlobal}}<td class="actions"><a class="danger" href="/outbound/domains/{{.ID}}/delete">Delete</a></td>{{else}}<td></td>{{end}}
       </tr>
       {{end}}
     </tbody>

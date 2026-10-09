@@ -284,7 +284,7 @@ func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 			h.followCreator(d.ID, p.ID)
 		}
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?imported=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?imported=1", d.ID), http.StatusSeeOther)
 }
 
 // secretFilePassword reads the "encrypt this download with a password" controls

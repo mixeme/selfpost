@@ -33,7 +33,7 @@ func (h *Handlers) HandleStatusRecheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.dns.Server(h.cfg.Hostname, true)
-	http.Redirect(w, r, "/status?rechecked=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/overview?rechecked=1", http.StatusSeeOther)
 }
 
 func (h *Handlers) statusBody() map[string]any {

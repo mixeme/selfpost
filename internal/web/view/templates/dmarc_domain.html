@@ -1,13 +1,13 @@
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
-{{template "back_link" (back "/dmarc" "All DMARC reports")}}
-{{template "back_link" (back (printf "/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
+{{template "back_link" (back "/outbound/dmarc" "All DMARC reports")}}
+{{template "back_link" (back (printf "/outbound/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
 
 <div class="pair">
   <div class="card">
     <h2>Last {{.WindowDays}} days {{if and (gt .Pass7d 0) (eq .Fail7d 0)}}<span class="st st-ok">pass</span>{{else if gt .Fail7d 0}}<span class="st st-warn">review</span>{{end}}</h2>
     <p>{{.PolicyHint}}</p>
-    <p class="muted"><a href="/domains/{{.Domain.ID}}#dmarc">Domain DNS and rua=</a></p>
+    <p class="muted"><a href="/outbound/domains/{{.Domain.ID}}#dmarc">Domain DNS and rua=</a></p>
   </div>
   <div class="card">
     <h2>Totals</h2>
@@ -28,7 +28,7 @@
         <td>{{.PeriodLabel}}</td>
         <td>{{.PassCount}}</td>
         <td>{{.FailCount}}</td>
-        <td class="actions"><a href="/dmarc/reports/{{.ID}}">View</a></td>
+        <td class="actions"><a href="/outbound/dmarc/reports/{{.ID}}">View</a></td>
       </tr>
     {{end}}
     </tbody>

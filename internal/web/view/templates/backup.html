@@ -16,7 +16,7 @@
   the download is then a <code>.spbk</code> file (SelfPost backup) that only
   the password opens.</p>
   {{if .BackupErr}}<p class="error">{{.BackupErr}}</p>{{end}}
-  <form method="post" action="/backup">
+  <form method="post" action="/server/backup">
     {{template "encryptfields" .}}
     <button type="submit">Download full backup</button>
   </form>
@@ -30,7 +30,7 @@
   application passwords come across, so the published DNS record needs no
   change. The export file is a secret, like a full backup.</p>
   {{if .ImportErr}}<p class="error">{{.ImportErr}}</p>{{end}}
-  <form method="post" action="/domains/import" enctype="multipart/form-data">
+  <form method="post" action="/server/backup/import" enctype="multipart/form-data">
     <label for="importfile">Domain export file</label>
     <input id="importfile" name="file" type="file" accept=".json,.spde,application/json" required data-import-file>
     <div class="encrypt-fields" data-import-password-fields>

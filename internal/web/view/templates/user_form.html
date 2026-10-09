@@ -1,11 +1,11 @@
 {{define "content"}}
 <h1>{{if .IsEdit}}Edit user{{else}}Create user{{end}}</h1>
 
-{{template "back_link" (back "/users" "Back to users")}}
+{{template "back_link" (back "/server/users" "Back to users")}}
 
 <div class="card narrow">
   {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <form method="post" action="{{if .IsEdit}}/users/{{.UserID}}{{else}}/users/new{{end}}">
+  <form method="post" action="{{if .IsEdit}}/server/users/{{.UserID}}{{else}}/server/users/new{{end}}">
     <label for="username">Username</label>
     <input id="username" name="username" autocomplete="username"
            autocapitalize="none" spellcheck="false" value="{{.FormUsername}}" required>
@@ -62,7 +62,7 @@
   {{if .LastGlobalLocked}}
   <p class="muted">The only global administrator cannot be deleted.</p>
   {{else}}
-  <a class="danger" href="/users/{{.UserID}}/delete">Delete user</a>
+  <a class="danger" href="/server/users/{{.UserID}}/delete">Delete user</a>
   {{end}}
   {{end}}
 </div>

@@ -150,10 +150,10 @@ func TestNavMarksActivePage(t *testing.T) {
 	if !strings.Contains(out, `<span aria-current="page">`) || !strings.Contains(out, `Mail queue</span>`) {
 		t.Errorf("active page is not marked:\n%s", out)
 	}
-	if strings.Contains(out, `href="/mail-queue"`) {
+	if strings.Contains(out, `href="/outbound/queue"`) {
 		t.Errorf("active page still links to itself:\n%s", out)
 	}
-	if !strings.Contains(out, `href="/deliveries"`) {
+	if !strings.Contains(out, `href="/outbound/log"`) {
 		t.Errorf("inactive pages are not linked:\n%s", out)
 	}
 }
@@ -175,13 +175,13 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 	if !strings.Contains(out, `<span aria-current="page">`) || !strings.Contains(out, `Status</span>`) {
 		t.Errorf("the status page is not marked active:\n%s", out)
 	}
-	if !strings.Contains(out, `href="/domains"`) {
-		t.Errorf("Domains does not link to /domains:\n%s", out)
+	if !strings.Contains(out, `href="/outbound/domains"`) {
+		t.Errorf("Domains does not link to /outbound/domains:\n%s", out)
 	}
 	if strings.Index(out, "Status") > strings.Index(out, "Domains") {
 		t.Errorf("Status is not the first navigation entry:\n%s", out)
 	}
-	if strings.Contains(out, `href="/inbound"`) || strings.Contains(out, "Inbound") {
+	if strings.Contains(out, `href="/inbound/domains"`) || strings.Contains(out, "Inbound") {
 		t.Errorf("Inbound nav is shown while InboundEnabled is unset:\n%s", out)
 	}
 }
@@ -202,11 +202,11 @@ func TestNavShowsInboundWhenEnabled(t *testing.T) {
 		t.Fatalf("execute nav: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, `href="/inbound"`) || !strings.Contains(out, "Inbound") {
+	if !strings.Contains(out, `href="/inbound/domains"`) || !strings.Contains(out, "Inbound") {
 		t.Errorf("Inbound nav is missing while InboundEnabled is true:\n%s", out)
 	}
-	dom := strings.Index(out, `href="/domains"`)
-	inb := strings.Index(out, `href="/inbound"`)
+	dom := strings.Index(out, `href="/outbound/domains"`)
+	inb := strings.Index(out, `href="/inbound/domains"`)
 	if dom < 0 || inb < 0 || inb < dom {
 		t.Errorf("Inbound should follow Domains:\n%s", out)
 	}
@@ -355,7 +355,7 @@ func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 func TestNoTemplateLinksToTheBareRoot(t *testing.T) {
 	forEachTemplate(t, func(name, body string) {
 		if strings.Contains(body, `href="/"`) {
-			t.Errorf(`%s links to "/", which is now the status redirect; link to /domains (or the intended page) instead`, name)
+			t.Errorf(`%s links to "/", which is now the status redirect; link to /outbound/domains (or the intended page) instead`, name)
 		}
 	})
 }
@@ -364,8 +364,8 @@ func TestNoTemplateLinksToTheBareRoot(t *testing.T) {
 // page.
 func TestReloadFormLivesOnlyOnTheStatusPage(t *testing.T) {
 	forEachTemplate(t, func(name, body string) {
-		if strings.Contains(body, `action="/reload"`) && name != "status.html" {
-			t.Errorf("%s still posts to /reload; the reload control belongs on the status page", name)
+		if strings.Contains(body, `action="/server/health/reload"`) && name != "status.html" {
+			t.Errorf("%s still posts to /server/health/reload; the reload control belongs on the status page", name)
 		}
 	})
 }
@@ -423,12 +423,12 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 	out := renderStatusPage(t, statusPageData())
 	for _, want := range []string{
 		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
-		"203.0.113.10 → no PTR record", `action="/reload"`,
-		`hx-get="/status/fragment"`, `class="st st-error"`,
+		"203.0.113.10 → no PTR record", `action="/server/health/reload"`,
+		`hx-get="/overview/fragment"`, `class="st st-error"`,
 		// Three .split rows inside the polled fragment: machine|processes,
 		// queue|certificate, and sockets|hostname. Ids stay on the cards.
 		`id="processes"`, `id="machine"`, `id="queue"`, `id="certificate"`, `id="sockets"`, `id="hostname"`,
-		`action="/status/recheck"`,
+		`action="/server/health/recheck"`,
 		// The machine card: the bars carry their reading in an attribute
 		// (the CSP rules out sizing them with a style), and the figures are
 		// printed beside them for anything that does not render a meter.
@@ -454,7 +454,7 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 	if !strings.Contains(frag, `id="hostname"`) {
 		t.Error("hostname card is outside the polled status-body fragment")
 	}
-	if strings.Contains(frag, `id="configuration"`) || strings.Contains(frag, `action="/reload"`) {
+	if strings.Contains(frag, `id="configuration"`) || strings.Contains(frag, `action="/server/health/reload"`) {
 		t.Error("configuration reload must stay outside the polled fragment")
 	}
 }
@@ -599,7 +599,7 @@ func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
 		"about 1 hour 7 minutes",
 		"2 days",
 		`id="retry-policy"`,
-		`hx-get="/mail-queue/body"`,
+		`hx-get="/outbound/queue/fragment"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("mail_queue is missing %q:\n%s", want, out)
@@ -709,22 +709,22 @@ func TestLegacyNavFollowsTheUsersReach(t *testing.T) {
 	has := func(out, href string) bool { return strings.Contains(out, `href="`+href+`"`) }
 
 	out := nav(map[string]any{"HasInbound": true})
-	if !has(out, "/inbound") {
+	if !has(out, "/inbound/domains") {
 		t.Errorf("an inbound-only administrator has no Inbound entry:\n%s", out)
 	}
-	for _, gone := range []string{"/domains", "/deliveries", "/dmarc", "/status", "/users", "/mail-queue"} {
+	for _, gone := range []string{"/outbound/domains", "/outbound/log", "/outbound/dmarc", "/overview", "/server/users", "/outbound/queue"} {
 		if has(out, gone) {
 			t.Errorf("an inbound-only administrator is offered %s", gone)
 		}
 	}
 
 	out = nav(map[string]any{"HasOutbound": true})
-	if has(out, "/inbound") || !has(out, "/domains") || !has(out, "/deliveries") || !has(out, "/dmarc") {
+	if has(out, "/inbound/domains") || !has(out, "/outbound/domains") || !has(out, "/outbound/log") || !has(out, "/outbound/dmarc") {
 		t.Errorf("an outbound-only administrator's menu is wrong:\n%s", out)
 	}
 
 	out = nav(map[string]any{"IsGlobal": true})
-	for _, want := range []string{"/status", "/domains", "/inbound", "/dmarc", "/deliveries", "/users"} {
+	for _, want := range []string{"/overview", "/outbound/domains", "/inbound/domains", "/outbound/dmarc", "/outbound/log", "/server/users"} {
 		if !has(out, want) {
 			t.Errorf("the global role lost %s", want)
 		}

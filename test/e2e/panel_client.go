@@ -130,20 +130,20 @@ func (c *panelClient) login(username, password string) error {
 	if err != nil {
 		return err
 	}
-	if resp.Request.URL.Path != "/status" {
-		return fmt.Errorf("login did not land on /status (landed on %s): %s", resp.Request.URL.Path, body)
+	if resp.Request.URL.Path != "/overview" {
+		return fmt.Errorf("login did not land on /overview (landed on %s): %s", resp.Request.URL.Path, body)
 	}
 	return nil
 }
 
 // addDomain submits the add-domain form and returns its assigned id, read
-// back from the redirect target /domains/{id}.
+// back from the redirect target /outbound/domains/{id}.
 func (c *panelClient) addDomain(name string) (string, error) {
-	resp, body, err := c.postForm("/domains", url.Values{"name": {name}})
+	resp, body, err := c.postForm("/outbound/domains", url.Values{"name": {name}})
 	if err != nil {
 		return "", err
 	}
-	m := regexp.MustCompile(`^/domains/(\d+)$`).FindStringSubmatch(resp.Request.URL.Path)
+	m := regexp.MustCompile(`^/outbound/domains/(\d+)$`).FindStringSubmatch(resp.Request.URL.Path)
 	if m == nil {
 		return "", fmt.Errorf("add domain %q: unexpected landing page %s: %s", name, resp.Request.URL.Path, body)
 	}
@@ -153,7 +153,7 @@ func (c *panelClient) addDomain(name string) (string, error) {
 // dkimRecord fetches a domain's page and scrapes the DKIM DNS record it tells
 // the administrator to publish.
 func (c *panelClient) dkimRecord(domainID string) (name, value string, err error) {
-	_, body, err := c.get("/domains/" + domainID)
+	_, body, err := c.get("/outbound/domains/" + domainID)
 	if err != nil {
 		return "", "", err
 	}
@@ -172,7 +172,7 @@ func (c *panelClient) dkimRecord(domainID string) (name, value string, err error
 // login/password the panel renders inline (security.md — never recoverable
 // later, so this is the only place to read it).
 func (c *panelClient) addApplication(domainID, login, mode, addresses string) (appLogin, password string, err error) {
-	resp, body, err := c.postForm("/domains/"+domainID+"/applications", url.Values{
+	resp, body, err := c.postForm("/outbound/domains/"+domainID+"/applications", url.Values{
 		"login":     {login},
 		"mode":      {mode},
 		"addresses": {addresses},
@@ -195,7 +195,7 @@ func (c *panelClient) addApplication(domainID, login, mode, addresses string) (a
 }
 
 // setRateLimit saves a level-2 limit (guide § Rate limiting) on an application
-// or domain (/applications/{id}/ratelimit or /domains/{id}/ratelimit).
+// or domain (/applications/{id}/ratelimit or /outbound/domains/{id}/settings/ratelimit).
 func (c *panelClient) setRateLimit(path string, maxMessages, windowSeconds int) error {
 	vals := url.Values{
 		"max_messages":   {fmt.Sprintf("%d", maxMessages)},
@@ -211,25 +211,25 @@ func (c *panelClient) setRateLimit(path string, maxMessages, windowSeconds int) 
 	return nil
 }
 
-// sendLogRows returns the raw /deliveries/rows HTML fragment, filtered to one
+// sendLogRows returns the raw /outbound/log/fragment HTML fragment, filtered to one
 // domain and optionally to one application login, for polling a row's status
 // without parsing full HTML into structs. The application is a filter rather
 // than something to search the returned rows for: the log's columns identify a
 // message (time, from, to, subject, status) and the sending application is only
-// named on a row's own /deliveries/{id} page.
+// named on a row's own /outbound/log/{id} page.
 func (c *panelClient) sendLogRows(domain, app string) (string, error) {
 	q := url.Values{"domain": {domain}}
 	if app != "" {
 		q.Set("app", app)
 	}
-	_, body, err := c.get("/deliveries/rows?" + q.Encode())
+	_, body, err := c.get("/outbound/log/fragment?" + q.Encode())
 	return body, err
 }
 
 // status fetches the authenticated landing page — used after a container
 // restart to confirm the session cookie is still accepted (plan C.4 check 8).
 func (c *panelClient) status() (*http.Response, error) {
-	resp, _, err := c.get("/status")
+	resp, _, err := c.get("/overview")
 	return resp, err
 }
 
@@ -240,7 +240,7 @@ func (c *panelClient) status() (*http.Response, error) {
 // reordering the block's controls does not break the scrape; only the login
 // heading itself is anchored on.
 func (c *panelClient) applicationID(domainID, login string) (string, error) {
-	_, body, err := c.get("/domains/" + domainID)
+	_, body, err := c.get("/outbound/domains/" + domainID)
 	if err != nil {
 		return "", err
 	}

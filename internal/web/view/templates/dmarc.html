@@ -34,12 +34,12 @@ XML — not a dashboard.</p>
     {{range .Reports}}
       <tr>
         <td class="time muted">{{.ReceivedLabel}}</td>
-        <td>{{if .DomainID}}<a href="/dmarc/domains/{{.DomainID}}">{{.Domain}}</a>{{else}}{{.Domain}}{{end}}</td>
+        <td>{{if .DomainID}}<a href="/outbound/dmarc/domains/{{.DomainID}}">{{.Domain}}</a>{{else}}{{.Domain}}{{end}}</td>
         <td class="muted">{{.Reporter}}</td>
         <td>{{.PeriodLabel}}</td>
         <td>{{.PassCount}}</td>
         <td>{{.FailCount}}</td>
-        <td class="actions"><a href="/dmarc/reports/{{.ID}}">View</a></td>
+        <td class="actions"><a href="/outbound/dmarc/reports/{{.ID}}">View</a></td>
       </tr>
     {{end}}
     </tbody>
@@ -47,7 +47,7 @@ XML — not a dashboard.</p>
   <ul class="phone-list phone-only">
     {{range .Reports}}
     <li>
-      <a href="/dmarc/reports/{{.ID}}">
+      <a href="/outbound/dmarc/reports/{{.ID}}">
         <span class="st {{if gt .FailCount 0}}st-warn{{else}}st-ok{{end}}">{{.PassCount}} pass</span>
         <span class="when">{{.ReceivedLabel}}</span>
         <span class="meta">{{.Domain}} · {{.Reporter}}</span>

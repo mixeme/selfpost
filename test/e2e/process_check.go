@@ -12,7 +12,7 @@ import (
 var wantRunning = []string{"opendkim", "panel", "postfix", "cert-reload", "logrotate"}
 
 // checkSupervisorProcesses shells into the container directly (not through the
-// panel's /status page) so it works before an administrator account even
+// panel's /overview page) so it works before an administrator account even
 // exists — this is the first thing the harness checks after `docker compose
 // up` (plan C.4). Programs take a moment to leave STARTING right after the
 // container starts, so this polls rather than checking once.

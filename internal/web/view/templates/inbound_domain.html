@@ -3,7 +3,7 @@
 {{define "content"}}
 <h1>{{.Domain.Name}}</h1>
 
-{{template "back_link" (back "/inbound" "All inbound domains")}}
+{{template "back_link" (back "/inbound/domains" "All inbound domains")}}
 
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
@@ -34,7 +34,7 @@
   {{else}}
   <p class="error">{{.MX.Detail}}</p>
   {{end}}
-  <form method="post" action="/inbound/{{.Domain.ID}}/dns-recheck">
+  <form method="post" action="/inbound/domains/{{.Domain.ID}}/dns-recheck">
     <button type="submit">Re-check</button>
   </form>
 </div>
@@ -43,7 +43,7 @@
   <div class="card">
     <h2>Upstream</h2>
     <p class="muted">Where accepted mail is handed off. Not a mailbox.</p>
-    <form method="post" action="/inbound/{{.Domain.ID}}/upstream">
+    <form method="post" action="/inbound/domains/{{.Domain.ID}}/upstream">
       <label for="host">Host</label>
       <input id="host" name="host" type="text" value="{{.Domain.Host}}"
              autocomplete="off" autocapitalize="none" spellcheck="false" required>
@@ -89,7 +89,7 @@
     <h2>Valid recipients</h2>
     <p class="muted">Who this domain accepts on port 25. Same idea as an
     application's address mode: a list, or any address at the domain.</p>
-    <form method="post" action="/inbound/{{.Domain.ID}}/recipients">
+    <form method="post" action="/inbound/domains/{{.Domain.ID}}/recipients">
       <label for="recipient_mode">Who to accept</label>
       <select id="recipient_mode" name="recipient_mode" data-list-mode="list">
         <option value="list" {{if eq .Domain.RecipientMode "list"}}selected{{end}}>Listed addresses only</option>
@@ -112,7 +112,7 @@
     <h2>Danger zone</h2>
     <p class="muted">Stops accepting mail for this domain. Does not touch
     outbound sending domains.</p>
-    {{if .IsGlobal}}<p><a class="danger" href="/inbound/{{.Domain.ID}}/delete">Delete inbound domain</a></p>{{end}}
+    {{if .IsGlobal}}<p><a class="danger" href="/inbound/domains/{{.Domain.ID}}/delete">Delete inbound domain</a></p>{{end}}
   </div>
 </div>
 {{end}}

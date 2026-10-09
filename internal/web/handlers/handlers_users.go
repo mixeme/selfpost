@@ -196,7 +196,7 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Could not create user. Please check the logs."})
 		return
 	}
-	http.Redirect(w, r, "/users?done=created", http.StatusSeeOther)
+	http.Redirect(w, r, "/server/users?done=created", http.StatusSeeOther)
 }
 
 func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u store.User) {
@@ -289,7 +289,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 
-	http.Redirect(w, r, "/users?done=updated", http.StatusSeeOther)
+	http.Redirect(w, r, "/server/users?done=updated", http.StatusSeeOther)
 }
 
 // HandleUserDeleteConfirm shows the cascade warning before a panel user is
@@ -363,7 +363,7 @@ func (h *Handlers) submitUserDelete(w http.ResponseWriter, r *http.Request, u st
 		h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not delete user.", FormUsername: u.Username, FormRole: string(u.Role)})
 		return
 	}
-	http.Redirect(w, r, "/users?done=deleted", http.StatusSeeOther)
+	http.Redirect(w, r, "/server/users?done=deleted", http.StatusSeeOther)
 }
 
 func parseUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {

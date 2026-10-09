@@ -5,7 +5,7 @@
   <span class="st st-ok">{{.Report.PassCount}} pass</span>
   {{if gt .Report.FailCount 0}}<span class="st st-warn">{{.Report.FailCount}} fail</span>{{end}}
 </p>
-{{template "back_link" (back (printf "/dmarc/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
+{{template "back_link" (back (printf "/outbound/dmarc/domains/%d" .Domain.ID) (printf "Back to %s" .Domain.Name))}}
 
 <div class="pair">
   <div class="card">

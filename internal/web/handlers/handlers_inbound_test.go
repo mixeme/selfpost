@@ -51,16 +51,16 @@ func inboundCall(h *Handlers, method, target string, form url.Values, p auth.Pri
 		req = httptest.NewRequest(method, target, nil)
 	}
 	req = auth.RequestWithPrincipal(req, p)
-	if rest, ok := strings.CutPrefix(req.URL.Path, "/inbound/"); ok {
+	if rest, ok := strings.CutPrefix(req.URL.Path, "/inbound/domains/"); ok {
 		id, _, _ := strings.Cut(rest, "/")
 		if id != "" && id != "delete" {
 			req.SetPathValue("id", id)
 		}
 	}
 	switch {
-	case method == http.MethodGet && target == "/inbound":
+	case method == http.MethodGet && target == "/inbound/domains":
 		h.HandleInboundList(rec, req)
-	case method == http.MethodPost && target == "/inbound":
+	case method == http.MethodPost && target == "/inbound/domains":
 		h.HandleAddInbound(rec, req)
 	case strings.HasSuffix(target, "/delete") && method == http.MethodGet:
 		h.HandleInboundDeleteConfirm(rec, req)
@@ -78,7 +78,7 @@ func inboundCall(h *Handlers, method, target string, form url.Values, p auth.Pri
 
 func TestInboundListAndAdd(t *testing.T) {
 	h, _ := inboundHandlers(t)
-	rec := inboundCall(h, http.MethodGet, "/inbound", nil, globalPrincipal)
+	rec := inboundCall(h, http.MethodGet, "/inbound/domains", nil, globalPrincipal)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("list = %d\n%s", rec.Code, rec.Body.String())
 	}
@@ -86,12 +86,12 @@ func TestInboundListAndAdd(t *testing.T) {
 		t.Fatal("list missing add form")
 	}
 
-	rec = inboundCall(h, http.MethodPost, "/inbound", url.Values{"name": {"lists.example.com"}}, globalPrincipal)
+	rec = inboundCall(h, http.MethodPost, "/inbound/domains", url.Values{"name": {"lists.example.com"}}, globalPrincipal)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("add = %d %s", rec.Code, rec.Body.String())
 	}
 
-	rec = inboundCall(h, http.MethodGet, "/inbound", nil, globalPrincipal)
+	rec = inboundCall(h, http.MethodGet, "/inbound/domains", nil, globalPrincipal)
 	if !strings.Contains(rec.Body.String(), "lists.example.com") {
 		t.Fatalf("list missing domain:\n%s", rec.Body.String())
 	}
@@ -100,7 +100,7 @@ func TestInboundListAndAdd(t *testing.T) {
 func TestInboundDisabledIs404(t *testing.T) {
 	h, _ := inboundHandlers(t)
 	h.cfg.InboundEnabled = false
-	rec := inboundCall(h, http.MethodGet, "/inbound", nil, globalPrincipal)
+	rec := inboundCall(h, http.MethodGet, "/inbound/domains", nil, globalPrincipal)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("disabled inbound = %d, want 404", rec.Code)
 	}
@@ -114,14 +114,14 @@ func TestInboundTransportAndRecipients(t *testing.T) {
 	}
 	id := itoa(d.ID)
 
-	rec := inboundCall(h, http.MethodPost, "/inbound/"+id+"/upstream", url.Values{
+	rec := inboundCall(h, http.MethodPost, "/inbound/domains/"+id+"/upstream", url.Values{
 		"host": {"10.0.0.8"}, "port": {"25"}, "tls_mode": {"encrypt"},
 	}, globalPrincipal)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("upstream = %d %s", rec.Code, rec.Body.String())
 	}
 
-	rec = inboundCall(h, http.MethodPost, "/inbound/"+id+"/recipients", url.Values{
+	rec = inboundCall(h, http.MethodPost, "/inbound/domains/"+id+"/recipients", url.Values{
 		"recipient_mode": {"list"},
 		"addresses":      {"staff@lists.example.com\nabuse@other.com"},
 	}, globalPrincipal)
@@ -129,7 +129,7 @@ func TestInboundTransportAndRecipients(t *testing.T) {
 		t.Fatalf("foreign recipient = %d, want 400", rec.Code)
 	}
 
-	rec = inboundCall(h, http.MethodPost, "/inbound/"+id+"/recipients", url.Values{
+	rec = inboundCall(h, http.MethodPost, "/inbound/domains/"+id+"/recipients", url.Values{
 		"recipient_mode": {"list"},
 		"addresses":      {"staff@lists.example.com"},
 	}, globalPrincipal)
@@ -137,7 +137,7 @@ func TestInboundTransportAndRecipients(t *testing.T) {
 		t.Fatalf("recipients = %d %s", rec.Code, rec.Body.String())
 	}
 
-	rec = inboundCall(h, http.MethodGet, "/inbound/"+id, nil, globalPrincipal)
+	rec = inboundCall(h, http.MethodGet, "/inbound/domains/"+id, nil, globalPrincipal)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "10.0.0.8") {
 		t.Fatalf("detail =\n%s", rec.Body.String())
 	}
@@ -150,7 +150,7 @@ func TestInboundDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := itoa(d.ID)
-	rec := inboundCall(h, http.MethodPost, "/inbound/"+id+"/delete", nil, globalPrincipal)
+	rec := inboundCall(h, http.MethodPost, "/inbound/domains/"+id+"/delete", nil, globalPrincipal)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("delete = %d %s", rec.Code, rec.Body.String())
 	}

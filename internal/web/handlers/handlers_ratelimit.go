@@ -162,7 +162,7 @@ func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?ratelimit=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?ratelimit=1", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +188,7 @@ func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?ratelimit=1", a.DomainID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?ratelimit=1", a.DomainID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleAppAuthIPs(w http.ResponseWriter, r *http.Request) {
@@ -214,7 +214,7 @@ func (h *Handlers) HandleAppAuthIPs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?authips=1", a.DomainID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?authips=1", a.DomainID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +230,7 @@ func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Re
 		})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?recalculated=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", d.ID), http.StatusSeeOther)
 }
 
 func (h *Handlers) HandleAppRateLimitRecalc(w http.ResponseWriter, r *http.Request) {
@@ -246,7 +246,7 @@ func (h *Handlers) HandleAppRateLimitRecalc(w http.ResponseWriter, r *http.Reque
 		})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?recalculated=1", a.DomainID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", a.DomainID), http.StatusSeeOther)
 }
 
 func (h *Handlers) recalcRateLimit(scope string, refID int64) error {

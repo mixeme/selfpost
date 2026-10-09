@@ -72,5 +72,5 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.dns.Forget(d.Name)
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?dmarc=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?dmarc=1", d.ID), http.StatusSeeOther)
 }

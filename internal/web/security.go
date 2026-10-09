@@ -89,7 +89,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 // judged per *origin*, so they tell that neighbour apart from the panel.
 //
 // Read-only methods are exempt: every GET route in the panel is a read (the
-// delete confirmation at GET /domains/{id}/delete only renders a form), so
+// delete confirmation at GET /outbound/domains/{id}/delete only renders a form), so
 // there is nothing for a cross-origin GET to change.
 func originAllowed(r *http.Request) bool {
 	switch r.Method {

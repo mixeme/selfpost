@@ -15,7 +15,7 @@ import (
 
 // postForm builds the kind of request the backup and export forms submit.
 func postForm(values url.Values) *http.Request {
-	r := httptest.NewRequest(http.MethodPost, "/backup", strings.NewReader(values.Encode()))
+	r := httptest.NewRequest(http.MethodPost, "/server/backup", strings.NewReader(values.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return r
 }
@@ -107,7 +107,7 @@ func TestDecryptErrorMessage(t *testing.T) {
 func TestBackupPageOffersEncryption(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{Version: "test"}}
 	rec := httptest.NewRecorder()
-	h.renderBackupPageWith(rec, httptest.NewRequest(http.MethodGet, "/backup", nil),
+	h.renderBackupPageWith(rec, httptest.NewRequest(http.MethodGet, "/server/backup", nil),
 		http.StatusOK, "", "The two passwords do not match.")
 
 	body := rec.Body.String()

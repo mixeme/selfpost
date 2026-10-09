@@ -37,11 +37,11 @@ func TestReadLogTailMissingFileIsNotAnError(t *testing.T) {
 func TestDeliveryLogShowsOnlyTheIdentifyingColumns(t *testing.T) {
 	h, row := serverWithDelivery(t)
 
-	out := getBody(t, h.HandleDeliveries, "/deliveries")
+	out := getBody(t, h.HandleDeliveries, "/outbound/log")
 	for _, want := range []string{
 		row.CreatedAt.Format("2006-01-02 15:04:05"),
 		"noreply@bs.example.ru", "public@example.ru",
-		"Проверка", ">sent<", `href="/deliveries/` + itoa(row.ID),
+		"Проверка", ">sent<", `href="/outbound/log/` + itoa(row.ID),
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery log is missing %q:\n%s", want, out)
@@ -63,8 +63,8 @@ func TestDeliveryLogDecodesStoredEncodedSubjects(t *testing.T) {
 	h, _ := serverWithDelivery(t)
 
 	for name, out := range map[string]string{
-		"log":  getBody(t, h.HandleDeliveries, "/deliveries"),
-		"rows": getBody(t, h.HandleDeliveriesRows, "/deliveries/rows"),
+		"log":  getBody(t, h.HandleDeliveries, "/outbound/log"),
+		"rows": getBody(t, h.HandleDeliveriesRows, "/outbound/log/fragment"),
 	} {
 		if strings.Contains(out, "=?utf-8?Q?") {
 			t.Errorf("%s shows the subject's MIME encoding instead of its text:\n%s", name, out)
@@ -80,11 +80,11 @@ func TestDeliveryLogDecodesStoredEncodedSubjects(t *testing.T) {
 func TestDeliveryPageShowsWhatTheLogOmits(t *testing.T) {
 	h, row := serverWithDelivery(t)
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID)+"?domain=bs.example.ru&p=2")
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID)+"?domain=bs.example.ru&p=2")
 	for _, want := range []string{
 		"bs.example.ru", "Queuer3C", "4A1B2C3D", "Проверка",
 		"noreply@bs.example.ru", "public@example.ru", "sent",
-		`href="/deliveries?domain=bs.example.ru&amp;p=2"`,
+		`href="/outbound/log?domain=bs.example.ru&amp;p=2"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery page is missing %q:\n%s", want, out)
@@ -101,7 +101,7 @@ func TestDeliveryPageShowsWhatTheLogOmits(t *testing.T) {
 func TestDeliveryPageTellsTheMessagesHistory(t *testing.T) {
 	h, row := serverWithDelivery(t)
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	for _, want := range []string{
 		"Accepted and queued", "Delivered",
 		row.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -137,7 +137,7 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(rows[0].ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(rows[0].ID))
 	for _, want := range []string{"Waiting for a delivery report", "pending", "not yet"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery page does not mark the message as still waiting (%q):\n%s", want, out)
@@ -157,7 +157,7 @@ func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 		"2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)",
 	)
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	for _, want := range []string{
 		"<th>Time</th>", "<th>Message</th>",
 		// The stamp is split off into its own cell, without the microseconds
@@ -181,7 +181,7 @@ func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
 	h, row := serverWithDelivery(t)
 	h.cfg.MailLogPath = writeMailLog(t, "host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status=sent (250 OK)")
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	if !strings.Contains(out, "host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;, status=sent (250 OK)") {
 		t.Errorf("an unstamped log line did not survive the split into columns:\n%s", out)
 	}
@@ -197,7 +197,7 @@ func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
 	}
 	h.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	if !strings.Contains(out, "rotated away") {
 		t.Errorf("delivery page does not explain the empty delivery log:\n%s", out)
 	}
@@ -214,10 +214,10 @@ func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
 func TestDeliveryPageNotFound(t *testing.T) {
 	h, _ := serverWithDelivery(t)
 
-	for _, path := range []string{"/deliveries/999999", "/deliveries/abc", "/deliveries/0"} {
+	for _, path := range []string{"/outbound/log/999999", "/outbound/log/abc", "/outbound/log/0"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.SetPathValue("id", strings.TrimPrefix(path, "/deliveries/"))
+		req.SetPathValue("id", strings.TrimPrefix(path, "/outbound/log/"))
 		h.HandleDelivery(rec, req)
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("GET %s = %d, want 404", path, rec.Code)
@@ -266,7 +266,7 @@ func TestSendLogScopedToAssignedDomains(t *testing.T) {
 			"page":     h.HandleDeliveries,
 			"fragment": h.HandleDeliveriesRows,
 		} {
-			out := getBodyAs(t, handler, "/deliveries", p)
+			out := getBodyAs(t, handler, "/outbound/log", p)
 			for _, want := range tc.want {
 				if !strings.Contains(out, want) {
 					t.Errorf("%s (%s): missing %q:\n%s", name, view, want, out)
@@ -290,9 +290,9 @@ func TestSendLogIgnoresForgedFilters(t *testing.T) {
 	p := domainAdmin(t, h.store, "forged-filter", domains["first.example.ru"].ID)
 
 	for _, target := range []string{
-		"/deliveries?domain=second.example.ru",
-		"/deliveries?app=second-app",
-		"/deliveries?domain=second.example.ru&app=second-app",
+		"/outbound/log?domain=second.example.ru",
+		"/outbound/log?app=second-app",
+		"/outbound/log?domain=second.example.ru&app=second-app",
 	} {
 		out := getBodyAs(t, h.HandleDeliveries, target, p)
 		if strings.Contains(out, "Second message") {
@@ -314,7 +314,7 @@ func TestDeliveryPageForeignDomainNotFound(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/deliveries/"+itoa(rows[0].ID), nil)
+	req := httptest.NewRequest(http.MethodGet, "/outbound/log/"+itoa(rows[0].ID), nil)
 	req.SetPathValue("id", itoa(rows[0].ID))
 	req = auth.RequestWithPrincipal(req, domainAdmin(t, h.store, "foreign-detail", domains["first.example.ru"].ID))
 	h.HandleDelivery(rec, req)
@@ -443,7 +443,7 @@ func getBodyAs(t *testing.T, h http.HandlerFunc, target string, p auth.Principal
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req = auth.RequestWithPrincipal(req, p)
-	if rest, ok := strings.CutPrefix(req.URL.Path, "/deliveries/"); ok && rest != "rows" {
+	if rest, ok := strings.CutPrefix(req.URL.Path, "/outbound/log/"); ok && rest != "rows" {
 		req.SetPathValue("id", rest)
 	}
 	h(rec, req)
@@ -483,7 +483,7 @@ func fixtureRetryPolicy() postfix.RetryPolicy {
 func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{Version: "test", RetryPolicy: fixtureRetryPolicy()}}
 
-	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	out := getBody(t, h.HandleMailQueue, "/outbound/queue")
 	for _, want := range []string{
 		"How delivery retries work",
 		"id=\"retry-policy\"",
@@ -506,7 +506,7 @@ func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
 func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: fixtureRetryPolicy()}}
 
-	out := getBody(t, h.HandleMailQueueBody, "/mail-queue/body")
+	out := getBody(t, h.HandleMailQueueBody, "/outbound/queue/fragment")
 	if strings.Contains(out, "How delivery retries work") || strings.Contains(out, "10 minutes") {
 		t.Errorf("HTMX fragment includes the retry card:\n%s", out)
 	}
@@ -515,7 +515,7 @@ func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
 func TestMailQueueNotesCompiledInFallback(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: postfix.DefaultRetryPolicy()}}
 
-	out := getBody(t, h.HandleMailQueue, "/mail-queue")
+	out := getBody(t, h.HandleMailQueue, "/outbound/queue")
 	if !strings.Contains(out, "compiled-in defaults") {
 		t.Errorf("fallback note missing:\n%s", out)
 	}
@@ -528,7 +528,7 @@ func TestDeliveryPageDeferredUsesRetryPolicy(t *testing.T) {
 		t.Fatalf("update status: %v", err)
 	}
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	for _, want := range []string{
 		"first after 10 minutes",
 		"up to about 1 hour 7 minutes",
@@ -547,7 +547,7 @@ func TestDeliveryPageBouncedUsesRetryPolicy(t *testing.T) {
 		t.Fatalf("update status: %v", err)
 	}
 
-	out := getBody(t, h.HandleDelivery, "/deliveries/"+itoa(row.ID))
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	if !strings.Contains(out, "gave up after 2 days in the queue") {
 		t.Errorf("bounced history does not use the fixture lifetime:\n%s", out)
 	}

@@ -290,7 +290,7 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 		return
 	}
 	h.domainDNS(d, record, reportEmail, true)
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
 // intOrBlank renders a non-positive number as an empty string so an unset field
@@ -420,7 +420,7 @@ func (h *Handlers) HandleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?modeupdated=1", a.DomainID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?modeupdated=1", a.DomainID), http.StatusSeeOther)
 }
 
 // HandleRegenPassword issues a new password for an application and shows it once
@@ -459,7 +459,7 @@ func (h *Handlers) HandleDeleteApplication(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/domains/%d?appdeleted=1", a.DomainID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?appdeleted=1", a.DomainID), http.StatusSeeOther)
 }
 
 // lookupApplication resolves the {aid} path value to an application, writing a

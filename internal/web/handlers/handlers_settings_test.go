@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -20,37 +19,35 @@ func TestSettingsPageShowsSendLogRetention(t *testing.T) {
 		t.Fatalf("SetSendLogRetentionDays: %v", err)
 	}
 
-	out := getBody(t, h.HandleSettings, "/settings")
+	out := getBody(t, h.HandleServerSettings, "/server/settings")
 	for _, want := range []string{
 		`id="deliveries-retention"`,
 		`name="send_log_retention_days"`,
 		`value="45"`,
 		"Send log retention",
+		`action="/server/settings"`,
+		`id="rate-limits"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("settings page missing %q:\n%s", want, out)
 		}
 	}
+	// What belongs to a user is not on the instance's page.
+	for _, gone := range []string{`name="current_password"`, `name="username"`, `name="dmarc_default"`} {
+		if strings.Contains(out, gone) {
+			t.Errorf("the instance settings page still carries the user's %s", gone)
+		}
+	}
 }
 
+// The instance settings ask for no password: they are the server's, and the
+// page is behind the global role.
 func TestSubmitSettingsSavesSendLogRetention(t *testing.T) {
-	h, password := settingsServer(t)
-
-	values := url.Values{
-		"username":                {"admin"},
-		"current_password":        {password},
-		"send_log_retention_days": {"120"},
+	h, _ := settingsServer(t)
+	rec := postFormAs(h.HandleServerSettings, globalPrincipal, "/server/settings", nil, url.Values{"send_log_retention_days": {"120"}})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/server/settings?saved=1" {
+		t.Fatalf("POST /server/settings = %d to %q, want 303:\n%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
-	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(values.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = auth.RequestWithPrincipal(req, globalPrincipal)
-
-	rec := httptest.NewRecorder()
-	h.HandleSettings(rec, req)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("POST /settings = %d, want 303:\n%s", rec.Code, rec.Body.String())
-	}
-
 	got, err := h.store.GetSendLogRetentionDays(90)
 	if err != nil {
 		t.Fatalf("GetSendLogRetentionDays: %v", err)
@@ -61,24 +58,34 @@ func TestSubmitSettingsSavesSendLogRetention(t *testing.T) {
 }
 
 func TestSubmitSettingsRejectsOutOfRangeRetention(t *testing.T) {
-	h, password := settingsServer(t)
-
-	values := url.Values{
-		"username":                {"admin"},
-		"current_password":        {password},
-		"send_log_retention_days": {"3"},
+	h, _ := settingsServer(t)
+	for _, bad := range []string{"3", "nine", ""} {
+		rec := postFormAs(h.HandleServerSettings, globalPrincipal, "/server/settings", nil, url.Values{"send_log_retention_days": {bad}})
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("POST /server/settings (%q) = %d, want 400:\n%s", bad, rec.Code, rec.Body.String())
+		}
 	}
-	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(values.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req = auth.RequestWithPrincipal(req, globalPrincipal)
-
-	rec := httptest.NewRecorder()
-	h.HandleSettings(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("POST /settings = %d, want 400:\n%s", rec.Code, rec.Body.String())
-	}
+	rec := postFormAs(h.HandleServerSettings, globalPrincipal, "/server/settings", nil, url.Values{"send_log_retention_days": {"3"}})
 	if !strings.Contains(rec.Body.String(), "between 7 and 365") {
 		t.Errorf("expected range error in body:\n%s", rec.Body.String())
+	}
+	if got, _ := h.store.GetSendLogRetentionDays(90); got != 90 {
+		t.Errorf("a refused value changed the retention to %d", got)
+	}
+}
+
+func TestServerSettingsIsGlobalOnly(t *testing.T) {
+	h, _ := settingsServer(t)
+	d, err := h.store.AddDomain("example.com", "mail")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := domainAdmin(t, h.store, "ops", d.ID)
+	if rec := postFormAs(h.HandleServerSettings, p, "/server/settings", nil, url.Values{"send_log_retention_days": {"120"}}); rec.Code != http.StatusNotFound {
+		t.Errorf("POST /server/settings as a domain administrator = %d, want 404", rec.Code)
+	}
+	if got, _ := h.store.GetSendLogRetentionDays(90); got != 90 {
+		t.Errorf("a domain administrator changed the retention to %d", got)
 	}
 }
 

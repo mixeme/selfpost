@@ -26,38 +26,38 @@ type route struct {
 var globalOnlyRoutes = []route{
 	{"GET", "/server/components", func(h *Handlers) http.HandlerFunc { return h.HandleComponents }, nil},
 
-	{"GET", "/users", func(h *Handlers) http.HandlerFunc { return h.HandleUsers }, nil},
-	{"GET", "/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},
-	{"POST", "/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},
-	{"GET", "/users/1", func(h *Handlers) http.HandlerFunc { return h.HandleUserEdit }, map[string]string{"uid": "1"}},
-	{"POST", "/users/1", func(h *Handlers) http.HandlerFunc { return h.HandleUserEdit }, map[string]string{"uid": "1"}},
-	{"GET", "/users/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleUserDeleteConfirm }, map[string]string{"uid": "1"}},
-	{"POST", "/users/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleUserDelete }, map[string]string{"uid": "1"}},
+	{"GET", "/server/users", func(h *Handlers) http.HandlerFunc { return h.HandleUsers }, nil},
+	{"GET", "/server/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},
+	{"POST", "/server/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},
+	{"GET", "/server/users/1", func(h *Handlers) http.HandlerFunc { return h.HandleUserEdit }, map[string]string{"uid": "1"}},
+	{"POST", "/server/users/1", func(h *Handlers) http.HandlerFunc { return h.HandleUserEdit }, map[string]string{"uid": "1"}},
+	{"GET", "/server/users/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleUserDeleteConfirm }, map[string]string{"uid": "1"}},
+	{"POST", "/server/users/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleUserDelete }, map[string]string{"uid": "1"}},
 
-	{"GET", "/backup", func(h *Handlers) http.HandlerFunc { return h.HandleBackupPage }, nil},
-	{"POST", "/backup", func(h *Handlers) http.HandlerFunc { return h.HandleBackup }, nil},
-	{"POST", "/domains/import", func(h *Handlers) http.HandlerFunc { return h.HandleImportDomain }, nil},
+	{"GET", "/server/backup", func(h *Handlers) http.HandlerFunc { return h.HandleBackupPage }, nil},
+	{"POST", "/server/backup", func(h *Handlers) http.HandlerFunc { return h.HandleBackup }, nil},
+	{"POST", "/server/backup/import", func(h *Handlers) http.HandlerFunc { return h.HandleImportDomain }, nil},
 
-	{"GET", "/status", func(h *Handlers) http.HandlerFunc { return h.HandleStatus }, nil},
-	{"GET", "/status/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleStatusFragment }, nil},
-	{"POST", "/status/recheck", func(h *Handlers) http.HandlerFunc { return h.HandleStatusRecheck }, nil},
+	{"GET", "/overview", func(h *Handlers) http.HandlerFunc { return h.HandleStatus }, nil},
+	{"GET", "/overview/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleStatusFragment }, nil},
+	{"POST", "/server/health/recheck", func(h *Handlers) http.HandlerFunc { return h.HandleStatusRecheck }, nil},
 
-	{"GET", "/mail-queue", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueue }, nil},
-	{"GET", "/mail-queue/body", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueueBody }, nil},
-	{"GET", "/system-log", func(h *Handlers) http.HandlerFunc { return h.HandleSystemLog }, nil},
-	{"GET", "/system-log/body", func(h *Handlers) http.HandlerFunc { return h.HandleSystemLogBody }, nil},
+	{"GET", "/outbound/queue", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueue }, nil},
+	{"GET", "/outbound/queue/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueueBody }, nil},
+	{"GET", "/server/log", func(h *Handlers) http.HandlerFunc { return h.HandleSystemLog }, nil},
+	{"GET", "/server/log/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleSystemLogBody }, nil},
 
-	{"POST", "/domains", func(h *Handlers) http.HandlerFunc { return h.HandleAddDomain }, nil},
-	{"GET", "/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteConfirm }, map[string]string{"id": "1"}},
-	{"POST", "/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteDomain }, map[string]string{"id": "1"}},
-	{"POST", "/reload", func(h *Handlers) http.HandlerFunc { return h.HandleReload }, nil},
+	{"POST", "/outbound/domains", func(h *Handlers) http.HandlerFunc { return h.HandleAddDomain }, nil},
+	{"GET", "/outbound/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteConfirm }, map[string]string{"id": "1"}},
+	{"POST", "/outbound/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteDomain }, map[string]string{"id": "1"}},
+	{"POST", "/server/health/reload", func(h *Handlers) http.HandlerFunc { return h.HandleReload }, nil},
 
 	// Inbound: only adding and deleting a domain are global. The list and the
 	// pages of one inbound domain are delegated per domain and have their own
 	// table in handlers_delegation_test.go.
-	{"POST", "/inbound", func(h *Handlers) http.HandlerFunc { return h.HandleAddInbound }, nil},
-	{"GET", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDeleteConfirm }, map[string]string{"id": "1"}},
-	{"POST", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDelete }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/domains", func(h *Handlers) http.HandlerFunc { return h.HandleAddInbound }, nil},
+	{"GET", "/inbound/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDeleteConfirm }, map[string]string{"id": "1"}},
+	{"POST", "/inbound/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDelete }, map[string]string{"id": "1"}},
 }
 
 // A domain administrator has an account on the panel, so authentication is not
@@ -102,7 +102,7 @@ func TestGlobalOnlyRoutesAnswerAnUnknownPrincipal404(t *testing.T) {
 func TestGlobalOnlyRoutesOpenForAGlobalAdministrator(t *testing.T) {
 	h, _ := serverWithTwoDomains(t)
 
-	for _, target := range []string{"/users", "/backup"} {
+	for _, target := range []string{"/server/users", "/server/backup"} {
 		rt := getRoute(t, target)
 		if rec := call(h, rt, globalPrincipal); rec.Code != http.StatusOK {
 			t.Errorf("GET %s as a global administrator = %d, want 200:\n%s",

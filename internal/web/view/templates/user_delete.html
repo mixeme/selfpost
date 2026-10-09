@@ -1,7 +1,7 @@
 {{define "content"}}
 <h1>Delete {{.TargetUsername}}</h1>
 
-{{template "back_link" (back (printf "/users/%d" .TargetID) (printf "Back to %s" .TargetUsername))}}
+{{template "back_link" (back (printf "/server/users/%d" .TargetID) (printf "Back to %s" .TargetUsername))}}
 
 <div class="card narrow">
   <h2>Confirm deletion</h2>
@@ -9,7 +9,7 @@
   This cannot be undone; a signed-in session for this user stops working
   immediately.</p>
 
-  <form method="post" action="/users/{{.TargetID}}/delete">
+  <form method="post" action="/server/users/{{.TargetID}}/delete">
     <button type="submit" class="danger">Delete {{.TargetUsername}}</button>
   </form>
 </div>

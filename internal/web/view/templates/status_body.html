@@ -1,5 +1,5 @@
 {{define "status_body"}}
-<div id="status-body" data-poll aria-live="polite" hx-get="/status/fragment" hx-trigger="load" hx-swap="outerHTML">
+<div id="status-body" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">
   <div class="card" id="overall">
     <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
     <p class="muted">{{.OverallHeading}}</p>
@@ -77,7 +77,7 @@
       <p class="error">{{.QueueError}}</p>
       {{else}}
       <p>{{if .QueueSummary}}{{.QueueSummary}}{{else}}Mail queue is empty.{{end}}</p>
-      <a class="btn" href="/mail-queue">View queue</a>
+      <a class="btn" href="/outbound/queue">View queue</a>
       {{end}}
     </div>
 
@@ -120,7 +120,7 @@
 {{end}}</span>
       {{end}}
 
-      <form class="inline" method="post" action="/status/recheck">
+      <form class="inline" method="post" action="/server/health/recheck">
         <button type="submit">Re-check DNS</button>
       </form>
     </div>
