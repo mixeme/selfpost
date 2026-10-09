@@ -27,7 +27,12 @@ type Principal struct {
 	ID       int64
 	Username string
 	Role     Role
-	Domains  []int64 // assigned domain IDs; empty for global (all domains)
+	// What a domain user reaches (store.Reach). All four are unused for the
+	// global role, which reaches everything.
+	Domains        []int64 // assigned outbound domain ids
+	AllDomains     bool    // every outbound domain, including those added later
+	InboundDomains []int64 // assigned inbound domain ids
+	AllInbound     bool    // every inbound domain, including those added later
 }
 
 // IsGlobal reports whether the principal has full panel access.
@@ -35,9 +40,35 @@ func (p Principal) IsGlobal() bool {
 	return p.Role == RoleGlobal
 }
 
-// CanAccessDomain reports whether the principal may access a domain id.
+// HasOutbound reports whether the principal reaches any sending domain. A
+// group with nothing in it is absent from that user's menu.
+func (p Principal) HasOutbound() bool {
+	return p.IsGlobal() || p.AllDomains || len(p.Domains) > 0
+}
+
+// HasInbound reports whether the principal reaches any inbound domain.
+func (p Principal) HasInbound() bool {
+	return p.IsGlobal() || p.AllInbound || len(p.InboundDomains) > 0
+}
+
+// CanAccessInboundDomain reports whether the principal may access an inbound
+// domain id. Inbound is granted separately from outbound: a sending domain of
+// the same name gives no access here, and the other way round.
+func (p Principal) CanAccessInboundDomain(inboundDomainID int64) bool {
+	if p.IsGlobal() || p.AllInbound {
+		return true
+	}
+	for _, id := range p.InboundDomains {
+		if id == inboundDomainID {
+			return true
+		}
+	}
+	return false
+}
+
+// CanAccessDomain reports whether the principal may access a sending domain id.
 func (p Principal) CanAccessDomain(domainID int64) bool {
-	if p.IsGlobal() {
+	if p.IsGlobal() || p.AllDomains {
 		return true
 	}
 	for _, id := range p.Domains {
@@ -59,6 +90,10 @@ func principalFromUser(u store.User) Principal {
 		Username: u.Username,
 		Role:     u.Role,
 		Domains:  u.DomainIDs,
+
+		AllDomains:     u.AllDomains,
+		InboundDomains: u.InboundDomainIDs,
+		AllInbound:     u.AllInboundDomains,
 	}
 }
 

@@ -687,3 +687,46 @@ func TestNavIncludesHelp(t *testing.T) {
 		t.Error("nav is missing Help link")
 	}
 }
+
+// A group with nothing assigned is absent from that user's menu: a domain
+// administrator who was given inbound domains only sees Inbound and none of the
+// sending pages, and the mark takes them to what they have.
+func TestLegacyNavFollowsTheUsersReach(t *testing.T) {
+	engine, err := New("test")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	nav := func(data map[string]any) string {
+		t.Helper()
+		data["User"], data["Active"] = "ops", ""
+		data["InboundEnabled"], data["DMARCEnabled"] = true, true
+		var buf bytes.Buffer
+		if err := engine.Page("help").ExecuteTemplate(&buf, "nav", data); err != nil {
+			t.Fatalf("execute nav: %v", err)
+		}
+		return buf.String()
+	}
+	has := func(out, href string) bool { return strings.Contains(out, `href="`+href+`"`) }
+
+	out := nav(map[string]any{"HasInbound": true})
+	if !has(out, "/inbound") {
+		t.Errorf("an inbound-only administrator has no Inbound entry:\n%s", out)
+	}
+	for _, gone := range []string{"/domains", "/deliveries", "/dmarc", "/status", "/users", "/mail-queue"} {
+		if has(out, gone) {
+			t.Errorf("an inbound-only administrator is offered %s", gone)
+		}
+	}
+
+	out = nav(map[string]any{"HasOutbound": true})
+	if has(out, "/inbound") || !has(out, "/domains") || !has(out, "/deliveries") || !has(out, "/dmarc") {
+		t.Errorf("an outbound-only administrator's menu is wrong:\n%s", out)
+	}
+
+	out = nav(map[string]any{"IsGlobal": true})
+	for _, want := range []string{"/status", "/domains", "/inbound", "/dmarc", "/deliveries", "/users"} {
+		if !has(out, want) {
+			t.Errorf("the global role lost %s", want)
+		}
+	}
+}

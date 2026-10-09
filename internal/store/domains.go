@@ -80,16 +80,18 @@ func (s *Store) ListDomains() ([]Domain, error) {
 	return out, rows.Err()
 }
 
-// ListDomainsForUser returns domains assigned to userID with application counts,
-// ordered by name.
+// ListDomainsForUser returns the sending domains a domain user reaches, with
+// application counts, ordered by name: the assigned ones, or every domain when
+// the user's All flag is set — which is how a domain added later is included.
+// The filter is in the query, so a caller cannot forget it.
 func (s *Store) ListDomainsForUser(userID int64) ([]Domain, error) {
 	rows, err := s.db.Query(`
 		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.dmarc_rua_user_id, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
-		INNER JOIN user_domains ud ON ud.domain_id = d.id
-		WHERE ud.user_id = ?
-		ORDER BY d.name`, userID)
+		WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND u.all_domains = 1)
+		   OR EXISTS (SELECT 1 FROM user_domains ud WHERE ud.user_id = ? AND ud.domain_id = d.id)
+		ORDER BY d.name`, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list domains for user: %w", err)
 	}

@@ -52,12 +52,10 @@ var globalOnlyRoutes = []route{
 	{"POST", "/domains/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleDeleteDomain }, map[string]string{"id": "1"}},
 	{"POST", "/reload", func(h *Handlers) http.HandlerFunc { return h.HandleReload }, nil},
 
-	{"GET", "/inbound", func(h *Handlers) http.HandlerFunc { return h.HandleInboundList }, nil},
+	// Inbound: only adding and deleting a domain are global. The list and the
+	// pages of one inbound domain are delegated per domain and have their own
+	// table in handlers_delegation_test.go.
 	{"POST", "/inbound", func(h *Handlers) http.HandlerFunc { return h.HandleAddInbound }, nil},
-	{"GET", "/inbound/1", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDetail }, map[string]string{"id": "1"}},
-	{"POST", "/inbound/1/dns-recheck", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDNSRecheck }, map[string]string{"id": "1"}},
-	{"POST", "/inbound/1/upstream", func(h *Handlers) http.HandlerFunc { return h.HandleInboundTransport }, map[string]string{"id": "1"}},
-	{"POST", "/inbound/1/recipients", func(h *Handlers) http.HandlerFunc { return h.HandleInboundRecipients }, map[string]string{"id": "1"}},
 	{"GET", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDeleteConfirm }, map[string]string{"id": "1"}},
 	{"POST", "/inbound/1/delete", func(h *Handlers) http.HandlerFunc { return h.HandleInboundDelete }, map[string]string{"id": "1"}},
 }

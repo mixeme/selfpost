@@ -113,6 +113,35 @@ func (s *Store) ListInboundDomains() ([]InboundDomain, error) {
 	return out, rows.Err()
 }
 
+// ListInboundDomainsForUser returns the inbound domains a domain user reaches,
+// ordered by name: the assigned ones, or every inbound domain when the user's
+// All flag is set. Like ListDomainsForUser, the filter is in the query.
+func (s *Store) ListInboundDomainsForUser(userID int64) ([]InboundDomain, error) {
+	rows, err := s.db.Query(`
+		SELECT d.id, d.name, d.recipient_mode, d.created_at,
+		       t.host, t.port, t.tls_mode,
+		       (SELECT COUNT(*) FROM inbound_recipients r WHERE r.inbound_domain_id = d.id)
+		FROM inbound_domains d
+		INNER JOIN inbound_transports t ON t.inbound_domain_id = d.id
+		WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND u.all_inbound_domains = 1)
+		   OR EXISTS (SELECT 1 FROM user_inbound_domains ud WHERE ud.user_id = ? AND ud.inbound_domain_id = d.id)
+		ORDER BY d.name`, userID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list inbound domains for user: %w", err)
+	}
+	defer rows.Close()
+
+	var out []InboundDomain
+	for rows.Next() {
+		d, err := scanInboundDomain(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // GetInboundDomain returns one inbound domain with its recipient list, or
 // ErrInboundDomainNotFound.
 func (s *Store) GetInboundDomain(id int64) (InboundDomain, error) {

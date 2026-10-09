@@ -112,7 +112,7 @@
     <h2>Danger zone</h2>
     <p class="muted">Stops accepting mail for this domain. Does not touch
     outbound sending domains.</p>
-    <p><a class="danger" href="/inbound/{{.Domain.ID}}/delete">Delete inbound domain</a></p>
+    {{if .IsGlobal}}<p><a class="danger" href="/inbound/{{.Domain.ID}}/delete">Delete inbound domain</a></p>{{end}}
   </div>
 </div>
 {{end}}

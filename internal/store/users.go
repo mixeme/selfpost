@@ -196,10 +196,39 @@ func (s *Store) ListUsers() ([]User, error) {
 	return users, rows.Err()
 }
 
-// UserRow is a user plus assigned domain names for the management list.
+// Reach is what a domain user is assigned: outbound and inbound domains are
+// granted separately, and the same name on both lists is two assignments. All
+// means every domain of that direction, including the ones added later; the
+// id list beside it is then ignored. Reach widens a list, never the role:
+// adding and deleting domains, the queues and Server stay with the global role.
+type Reach struct {
+	AllDomains       bool
+	DomainIDs        []int64
+	AllInbound       bool
+	InboundDomainIDs []int64
+}
+
+// Empty reports whether the reach assigns nothing at all. A domain user must
+// have something on at least one of the two lists.
+func (r Reach) Empty() bool {
+	return !r.AllDomains && len(r.DomainIDs) == 0 && !r.AllInbound && len(r.InboundDomainIDs) == 0
+}
+
+// Reach returns what the user is assigned.
+func (u User) Reach() Reach {
+	return Reach{AllDomains: u.AllDomains, DomainIDs: u.DomainIDs, AllInbound: u.AllInboundDomains, InboundDomainIDs: u.InboundDomainIDs}
+}
+
+// ErrEmptyReach is returned when a domain user would be left with nothing
+// assigned on either list.
+var ErrEmptyReach = errors.New("a domain user needs at least one outbound or inbound domain")
+
+// UserRow is a user plus the names of the assigned domains for the management
+// list. The names are empty where the user's All flag covers the direction.
 type UserRow struct {
-	User        User
-	DomainNames []string
+	User               User
+	DomainNames        []string
+	InboundDomainNames []string
 }
 
 // ListUserRows returns users with assigned domain names for the management UI.
@@ -214,11 +243,16 @@ func (s *Store) ListUserRows() ([]UserRow, error) {
 		if u.Role == RoleGlobal {
 			continue
 		}
-		names, err := s.listUserDomainNames(u.ID)
-		if err != nil {
-			return nil, err
+		if !u.AllDomains {
+			if rows[i].DomainNames, err = s.listUserDomainNames(u.ID); err != nil {
+				return nil, err
+			}
 		}
-		rows[i].DomainNames = names
+		if !u.AllInboundDomains {
+			if rows[i].InboundDomainNames, err = s.listUserInboundDomainNames(u.ID); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return rows, nil
 }
@@ -232,10 +266,12 @@ func (s *Store) CountGlobalUsers() (int, error) {
 	return n, nil
 }
 
-// CreateUser inserts a panel user and optional domain assignments.
-func (s *Store) CreateUser(username, passwordHash string, role Role, domainIDs []int64) (int64, error) {
-	if role == RoleDomain && len(domainIDs) == 0 {
-		return 0, fmt.Errorf("create user: the domain role requires domains")
+// CreateUser inserts a panel user. A domain user is created with its reach in
+// the same call and must be given one (ErrEmptyReach); for a global user the
+// reach is ignored.
+func (s *Store) CreateUser(username, passwordHash string, role Role, reach Reach) (int64, error) {
+	if role == RoleDomain && reach.Empty() {
+		return 0, ErrEmptyReach
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
@@ -253,7 +289,7 @@ func (s *Store) CreateUser(username, passwordHash string, role Role, domainIDs [
 		return 0, fmt.Errorf("create user id: %w", err)
 	}
 	if role == RoleDomain {
-		if err := s.setUserDomains(id, domainIDs); err != nil {
+		if err := s.setUserReach(id, reach); err != nil {
 			return 0, err
 		}
 	}
@@ -339,28 +375,27 @@ func (s *Store) SetUserRole(userID int64, role Role) error {
 	return nil
 }
 
-// ClearUserDomains removes all domain assignments for a user.
-func (s *Store) ClearUserDomains(userID int64) error {
-	_, err := s.db.Exec("DELETE FROM user_domains WHERE user_id = ?", userID)
-	if err != nil {
-		return fmt.Errorf("clear user domains: %w", err)
-	}
-	return nil
+// ClearUserReach removes everything a user is assigned — both lists and both
+// All flags. A user promoted to the global role keeps none of it, so a later
+// demotion does not quietly bring an old assignment back.
+func (s *Store) ClearUserReach(userID int64) error {
+	return s.setUserReach(userID, Reach{})
 }
 
-// SetUserDomains replaces the outbound domain assignments of a domain user.
-func (s *Store) SetUserDomains(userID int64, domainIDs []int64) error {
+// SetUserReach replaces what a domain user is assigned, both directions at
+// once. ErrEmptyReach if nothing would be left.
+func (s *Store) SetUserReach(userID int64, reach Reach) error {
 	u, err := s.GetUser(userID)
 	if err != nil {
 		return err
 	}
 	if u.Role != RoleDomain {
-		return fmt.Errorf("set user domains: user does not have the domain role")
+		return fmt.Errorf("set user reach: user does not have the domain role")
 	}
-	if len(domainIDs) == 0 {
-		return fmt.Errorf("set user domains: at least one domain required")
+	if reach.Empty() {
+		return ErrEmptyReach
 	}
-	return s.setUserDomains(userID, domainIDs)
+	return s.setUserReach(userID, reach)
 }
 
 // DeleteUser removes a panel user. ErrLastGlobal when deleting the only global user.
@@ -427,6 +462,26 @@ func (s *Store) listUserDomainIDs(userID int64) ([]int64, error) {
 	return ids, rows.Err()
 }
 
+func (s *Store) listUserInboundDomainNames(userID int64) ([]string, error) {
+	rows, err := s.db.Query(
+		"SELECT d.name FROM user_inbound_domains ud JOIN inbound_domains d ON d.id = ud.inbound_domain_id WHERE ud.user_id = ? ORDER BY d.name",
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list user inbound domain names: %w", err)
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("list user inbound domain names scan: %w", err)
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
 func (s *Store) listUserDomainNames(userID int64) ([]string, error) {
 	rows, err := s.db.Query(
 		"SELECT d.name FROM user_domains ud JOIN domains d ON d.id = ud.domain_id WHERE ud.user_id = ? ORDER BY d.name",
@@ -447,20 +502,40 @@ func (s *Store) listUserDomainNames(userID int64) ([]string, error) {
 	return names, rows.Err()
 }
 
-func (s *Store) setUserDomains(userID int64, domainIDs []int64) error {
+// setUserReach writes the flags and both assignment tables in one transaction.
+// With an All flag set the rows of that direction are dropped rather than
+// stored: the flag already covers them, and stale rows would come back to life
+// the day the flag is cleared.
+func (s *Store) setUserReach(userID int64, reach Reach) error {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("set user domains begin: %w", err)
+		return fmt.Errorf("set user reach begin: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("UPDATE users SET all_domains = ?, all_inbound_domains = ? WHERE id = ?",
+		reach.AllDomains, reach.AllInbound, userID); err != nil {
+		return fmt.Errorf("set user reach flags: %w", err)
 	}
 	if _, err := tx.Exec("DELETE FROM user_domains WHERE user_id = ?", userID); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("set user domains clear: %w", err)
+		return fmt.Errorf("set user reach clear: %w", err)
 	}
-	for _, did := range domainIDs {
-		if _, err := tx.Exec("INSERT INTO user_domains (user_id, domain_id) VALUES (?, ?)", userID, did); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("set user domains insert: %w", err)
+	if _, err := tx.Exec("DELETE FROM user_inbound_domains WHERE user_id = ?", userID); err != nil {
+		return fmt.Errorf("set user reach clear inbound: %w", err)
+	}
+	if !reach.AllDomains {
+		for _, id := range reach.DomainIDs {
+			if _, err := tx.Exec("INSERT INTO user_domains (user_id, domain_id) VALUES (?, ?)", userID, id); err != nil {
+				return fmt.Errorf("set user reach insert: %w", err)
+			}
+		}
+	}
+	if !reach.AllInbound {
+		for _, id := range reach.InboundDomainIDs {
+			if _, err := tx.Exec("INSERT INTO user_inbound_domains (user_id, inbound_domain_id) VALUES (?, ?)", userID, id); err != nil {
+				return fmt.Errorf("set user reach insert inbound: %w", err)
+			}
 		}
 	}
 	return tx.Commit()
+
 }

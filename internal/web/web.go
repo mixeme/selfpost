@@ -251,6 +251,12 @@ func redirectSettings(w http.ResponseWriter, r *http.Request) {
 func redirectHome(w http.ResponseWriter, r *http.Request) {
 	p, ok := auth.PrincipalFromRequest(r)
 	if ok && !p.IsGlobal() {
+		// A domain administrator lands on what they reach: their sending
+		// domains, or the inbound ones when that is all they are assigned.
+		if !p.HasOutbound() && p.HasInbound() {
+			http.Redirect(w, r, "/inbound", http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, "/domains", http.StatusSeeOther)
 		return
 	}

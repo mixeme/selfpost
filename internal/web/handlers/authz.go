@@ -26,6 +26,9 @@ func (h *Handlers) pageBase(r *http.Request) map[string]any {
 	return map[string]any{
 		"User":     auth.CurrentUser(r),
 		"IsGlobal": p.IsGlobal(),
+		// Which groups the menu shows this user (plan § Who sees what).
+		"HasOutbound": p.HasOutbound(),
+		"HasInbound":  p.HasInbound(),
 	}
 }
 
@@ -60,8 +63,10 @@ func domainNameSet(domains []store.Domain) map[string]bool {
 	return m
 }
 
+// domainIDSet is the set of sending domains a principal is limited to; nil
+// means no limit (the global role, or a domain user with All).
 func domainIDSet(p auth.Principal) map[int64]bool {
-	if p.IsGlobal() {
+	if p.IsGlobal() || p.AllDomains {
 		return nil
 	}
 	m := make(map[int64]bool, len(p.Domains))

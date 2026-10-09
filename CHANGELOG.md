@@ -38,6 +38,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `user_inbound_domains` and the per-user `all_domains` /
   `all_inbound_domains` flags are in the schema for the inbound delegation
   that follows. Details: `docs/schema-migrations.md`.
+- panel-redesign (stage 1): inbound domains are delegated to domain
+  administrators, separately from outbound. The user form has two lists, each
+  with *All* (which includes domains added later; with it ticked the rows
+  under it are ignored); a domain administrator needs at least one assignment
+  on either. Such a user sees the inbound domains assigned to them — the list
+  is filtered in the query — and can change their upstream and recipients;
+  adding and deleting an inbound domain stays with the global role. Another
+  tenant's domain, a missing one and a user with no inbound reach all get the
+  same 404. A menu group with nothing assigned is absent, and `/` leads an
+  inbound-only administrator to Inbound.
 
 ### Changed
 

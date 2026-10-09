@@ -95,7 +95,7 @@ func settingsServer(t *testing.T) (*Handlers, string) {
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
-	if _, err := st.CreateUser("admin", string(hash), store.RoleGlobal, nil); err != nil {
+	if _, err := st.CreateUser("admin", string(hash), store.RoleGlobal, store.Reach{}); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 

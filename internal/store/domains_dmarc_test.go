@@ -115,7 +115,7 @@ func TestDeletingTheFollowedUserLeavesNoReports(t *testing.T) {
 		t.Fatalf("CreateGlobalUser: %v", err)
 	}
 	d, _ := st.AddDomain("example.com", "sel")
-	id, err := st.CreateUser("second", "hash", RoleGlobal, nil)
+	id, err := st.CreateUser("second", "hash", RoleGlobal, Reach{})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

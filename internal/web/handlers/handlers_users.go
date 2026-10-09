@@ -15,7 +15,7 @@ type userFormView struct {
 	FormErr      string
 	FormUsername string
 	FormRole     string
-	FormDomains  map[int64]bool
+	Reach        store.Reach
 	FormPassword string
 }
 
@@ -88,14 +88,10 @@ func (h *Handlers) HandleUserEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		selected := make(map[int64]bool, len(u.DomainIDs))
-		for _, id := range u.DomainIDs {
-			selected[id] = true
-		}
 		h.renderUserForm(w, r, http.StatusOK, u.ID, userFormView{
 			FormUsername: u.Username,
 			FormRole:     string(u.Role),
-			FormDomains:  selected,
+			Reach:        u.Reach(),
 		})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
@@ -129,7 +125,21 @@ func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status
 	data["FormUsername"] = view.FormUsername
 	data["FormRole"] = view.FormRole
 	data["GlobalRole"] = store.RoleGlobal
-	data["FormDomains"] = view.FormDomains
+	// The two lists of the form, each with its All tick. Inbound is offered
+	// only where the feature is on.
+	data["FormDomains"] = idSet(view.Reach.DomainIDs)
+	data["FormAllDomains"] = view.Reach.AllDomains
+	data["FormInbound"] = idSet(view.Reach.InboundDomainIDs)
+	data["FormAllInbound"] = view.Reach.AllInbound
+	if h.cfg.InboundEnabled {
+		inboundDomains, err := h.store.ListInboundDomains()
+		if err != nil {
+			logf("panel: user form: list inbound domains: %v", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		data["InboundDomains"] = inboundDomains
+	}
 	data["FormPassword"] = view.FormPassword
 	data["IsEdit"] = userID != 0
 	data["LastGlobalLocked"] = lastGlobalLocked(h, userID, view.FormRole)
@@ -152,22 +162,22 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PostFormValue("username"))
 	password := r.PostFormValue("password")
 	role := store.Role(r.PostFormValue("role"))
-	domainIDs := parseDomainIDs(r)
+	reach := h.reachFromForm(r, store.Reach{})
 
 	if err := validate.Username(username); err != nil {
-		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
+		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 	if err := validate.AdminPassword(password); err != nil {
-		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
+		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 	if role != store.RoleGlobal && role != store.RoleDomain {
-		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
+		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
-	if role == store.RoleDomain && len(domainIDs) == 0 {
-		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Select at least one domain for a domain administrator.", FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
+	if role == store.RoleDomain && reach.Empty() {
+		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Assign at least one outbound or inbound domain to a domain administrator.", FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 
@@ -177,9 +187,9 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Internal error. Please try again."})
 		return
 	}
-	if _, err := h.store.CreateUser(username, string(hash), role, domainIDs); err != nil {
+	if _, err := h.store.CreateUser(username, string(hash), role, reach); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
-			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
+			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 		logf("panel: create user: %v", err)
@@ -203,22 +213,21 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	username := strings.TrimSpace(r.PostFormValue("username"))
 	password := r.PostFormValue("password")
 	role := store.Role(r.PostFormValue("role"))
-	domainIDs := parseDomainIDs(r)
-	selected := domainIDSetFromForm(r)
+	reach := h.reachFromForm(r, u.Reach())
 
 	if username == "" {
 		username = u.Username
 	}
 	if err := validate.Username(username); err != nil {
-		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: selected})
+		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 	if role != store.RoleGlobal && role != store.RoleDomain {
-		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
-	if role == store.RoleDomain && len(domainIDs) == 0 {
-		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Select at least one domain for a domain administrator.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+	if role == store.RoleDomain && reach.Empty() {
+		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Assign at least one outbound or inbound domain to a domain administrator.", FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 
@@ -229,7 +238,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 			if u.ID == p.ID {
 				msg = "You cannot demote yourself without another global administrator."
 			}
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormRole: string(u.Role), FormDomains: selected})
+			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormRole: string(u.Role), Reach: reach})
 			return
 		}
 	}
@@ -237,13 +246,13 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	hash := u.PasswordHash
 	if password != "" {
 		if err := validate.AdminPassword(password); err != nil {
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: selected})
+			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
 			logf("panel: update user hash: %v", err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Internal error. Please try again.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Internal error. Please try again.", FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 		hash = string(newHash)
@@ -251,31 +260,31 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 
 	if err := h.store.UpdateUser(u.ID, username, hash, u.Email); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
-			h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+			h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 		logf("panel: update user: %v", err)
-		h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save user. Please check the logs.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+		h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save user. Please check the logs.", FormUsername: username, FormRole: string(role), Reach: reach})
 		return
 	}
 
 	if role != u.Role {
 		if err := h.store.SetUserRole(u.ID, role); err != nil {
 			logf("panel: set user role: %v", err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not update role.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not update role.", FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 		if role == store.RoleGlobal {
-			if err := h.store.ClearUserDomains(u.ID); err != nil {
-				logf("panel: clear user domains: %v", err)
+			if err := h.store.ClearUserReach(u.ID); err != nil {
+				logf("panel: clear user reach: %v", err)
 			}
 		}
 	}
 
 	if role == store.RoleDomain {
-		if err := h.store.SetUserDomains(u.ID, domainIDs); err != nil {
-			logf("panel: set user domains: %v", err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save domain assignments.", FormUsername: username, FormRole: string(role), FormDomains: selected})
+		if err := h.store.SetUserReach(u.ID, reach); err != nil {
+			logf("panel: set user reach: %v", err)
+			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save domain assignments.", FormUsername: username, FormRole: string(role), Reach: reach})
 			return
 		}
 	}
@@ -366,20 +375,45 @@ func parseUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return id, true
 }
 
-func parseDomainIDs(r *http.Request) []int64 {
+// reachFromForm reads the two assignment lists of the user form. With an All
+// box ticked the rows under it are ignored — the form works without scripts,
+// so both may arrive — and All then also covers domains added later. Where
+// inbound is switched off the form has no inbound list, and what the user
+// already had there (current) is kept rather than wiped by an unrelated save.
+func (h *Handlers) reachFromForm(r *http.Request, current store.Reach) store.Reach {
+	reach := store.Reach{
+		AllDomains: r.PostFormValue("all_domains") != "",
+		AllInbound: current.AllInbound, InboundDomainIDs: current.InboundDomainIDs,
+	}
+	if !reach.AllDomains {
+		reach.DomainIDs = parseIDs(r, "domain_ids")
+	}
+	if h.cfg.InboundEnabled {
+		reach.AllInbound = r.PostFormValue("all_inbound_domains") != ""
+		reach.InboundDomainIDs = nil
+		if !reach.AllInbound {
+			reach.InboundDomainIDs = parseIDs(r, "inbound_domain_ids")
+		}
+	}
+	return reach
+}
+
+func parseIDs(r *http.Request, field string) []int64 {
 	var ids []int64
-	for _, v := range r.PostForm["domain_ids"] {
+	seen := make(map[int64]bool)
+	for _, v := range r.PostForm[field] {
 		id, err := strconv.ParseInt(v, 10, 64)
-		if err == nil && id > 0 {
+		if err == nil && id > 0 && !seen[id] {
+			seen[id] = true
 			ids = append(ids, id)
 		}
 	}
 	return ids
 }
 
-func domainIDSetFromForm(r *http.Request) map[int64]bool {
-	m := make(map[int64]bool)
-	for _, id := range parseDomainIDs(r) {
+func idSet(ids []int64) map[int64]bool {
+	m := make(map[int64]bool, len(ids))
+	for _, id := range ids {
 		m[id] = true
 	}
 	return m

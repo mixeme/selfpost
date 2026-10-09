@@ -23,12 +23,65 @@ type inboundRow struct {
 	RcptLabel string
 }
 
+// Inbound is delegated to domain administrators separately from outbound (plan
+// § Who sees what), so its handlers come in three strengths:
+//
+//   - requireInbound        the list: anyone who reaches at least one inbound
+//                           domain — and the list itself is filtered;
+//   - requireInboundDomain  one domain (its page, DNS re-check, upstream,
+//                           recipients): the global role, or a domain user
+//                           this very inbound domain is assigned to;
+//   - requireInboundGlobal  adding and deleting a domain: the global role only.
+//
+// All three answer 404 — for a missing domain, for another tenant's, and for a
+// user with no inbound reach alike — so the panel never confirms what exists.
+
 func (h *Handlers) requireInbound(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {
 	if !h.cfg.InboundEnabled || h.inbound == nil {
 		http.NotFound(w, r)
 		return auth.Principal{}, false
 	}
+	p, ok := h.principal(r)
+	if !ok || !p.HasInbound() {
+		http.NotFound(w, r)
+		return auth.Principal{}, false
+	}
+	return p, true
+}
+
+func (h *Handlers) requireInboundGlobal(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {
+	if !h.cfg.InboundEnabled || h.inbound == nil {
+		http.NotFound(w, r)
+		return auth.Principal{}, false
+	}
 	return h.requireGlobal(w, r)
+}
+
+// requireInboundDomain resolves the {id} of the request to an inbound domain
+// the principal may work with.
+func (h *Handlers) requireInboundDomain(w http.ResponseWriter, r *http.Request) (store.InboundDomain, bool) {
+	p, ok := h.requireInbound(w, r)
+	if !ok {
+		return store.InboundDomain{}, false
+	}
+	d, ok := h.lookupInbound(w, r)
+	if !ok {
+		return store.InboundDomain{}, false
+	}
+	if !p.CanAccessInboundDomain(d.ID) {
+		http.NotFound(w, r)
+		return store.InboundDomain{}, false
+	}
+	return d, true
+}
+
+// assignedInboundDomains lists the inbound domains a principal reaches. The
+// filter is in the query (ListInboundDomainsForUser), not in the template.
+func (h *Handlers) assignedInboundDomains(p auth.Principal) ([]store.InboundDomain, error) {
+	if p.IsGlobal() {
+		return h.inbound.List()
+	}
+	return h.store.ListInboundDomainsForUser(p.ID)
 }
 
 func (h *Handlers) lookupInbound(w http.ResponseWriter, r *http.Request) (store.InboundDomain, bool) {
@@ -54,7 +107,8 @@ func (h *Handlers) lookupInbound(w http.ResponseWriter, r *http.Request) (store.
 	return d, true
 }
 
-// HandleInboundList is the inbound-relay domain list (global administrators only).
+// HandleInboundList is the inbound-relay domain list: every inbound domain for
+// the global role, the assigned ones for a domain administrator.
 func (h *Handlers) HandleInboundList(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireInbound(w, r); !ok {
 		return
@@ -63,7 +117,8 @@ func (h *Handlers) HandleInboundList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) renderInboundList(w http.ResponseWriter, r *http.Request, status int, formErr, formName string) {
-	list, err := h.inbound.List()
+	p, _ := h.principal(r)
+	list, err := h.assignedInboundDomains(p)
 	if err != nil {
 		logf("panel: inbound list: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -143,7 +198,7 @@ func rcptLabel(d store.InboundDomain) string {
 // HandleAddInbound validates the name, creates the inbound domain, and
 // redirects to its page.
 func (h *Handlers) HandleAddInbound(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
+	if _, ok := h.requireInboundGlobal(w, r); !ok {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -171,10 +226,7 @@ func (h *Handlers) HandleAddInbound(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) HandleInboundDetail(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
-		return
-	}
-	d, ok := h.lookupInbound(w, r)
+	d, ok := h.requireInboundDomain(w, r)
 	if !ok {
 		return
 	}
@@ -223,10 +275,7 @@ func inboundFlash(r *http.Request) string {
 }
 
 func (h *Handlers) HandleInboundDNSRecheck(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
-		return
-	}
-	d, ok := h.lookupInbound(w, r)
+	d, ok := h.requireInboundDomain(w, r)
 	if !ok {
 		return
 	}
@@ -237,10 +286,7 @@ func (h *Handlers) HandleInboundDNSRecheck(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
-		return
-	}
-	d, ok := h.lookupInbound(w, r)
+	d, ok := h.requireInboundDomain(w, r)
 	if !ok {
 		return
 	}
@@ -259,10 +305,7 @@ func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handlers) HandleInboundRecipients(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
-		return
-	}
-	d, ok := h.lookupInbound(w, r)
+	d, ok := h.requireInboundDomain(w, r)
 	if !ok {
 		return
 	}
@@ -280,7 +323,7 @@ func (h *Handlers) HandleInboundRecipients(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *Handlers) HandleInboundDeleteConfirm(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
+	if _, ok := h.requireInboundGlobal(w, r); !ok {
 		return
 	}
 	d, ok := h.lookupInbound(w, r)
@@ -296,7 +339,7 @@ func (h *Handlers) HandleInboundDeleteConfirm(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handlers) HandleInboundDelete(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireInbound(w, r); !ok {
+	if _, ok := h.requireInboundGlobal(w, r); !ok {
 		return
 	}
 	d, ok := h.lookupInbound(w, r)

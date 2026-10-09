@@ -373,7 +373,7 @@ func domainAdmin(t *testing.T, st *store.Store, username string, domainIDs ...in
 		if err != nil {
 			t.Fatalf("add placeholder domain: %v", err)
 		}
-		id, err := st.CreateUser(username, hash, store.RoleDomain, []int64{placeholder.ID})
+		id, err := st.CreateUser(username, hash, store.RoleDomain, store.Reach{DomainIDs: []int64{placeholder.ID}})
 		if err != nil {
 			t.Fatalf("create domain admin %s: %v", username, err)
 		}
@@ -387,7 +387,7 @@ func domainAdmin(t *testing.T, st *store.Store, username string, domainIDs ...in
 		}
 		return auth.Principal{ID: u.ID, Username: u.Username, Role: u.Role, Domains: u.DomainIDs}
 	}
-	id, err := st.CreateUser(username, hash, store.RoleDomain, domainIDs)
+	id, err := st.CreateUser(username, hash, store.RoleDomain, store.Reach{DomainIDs: domainIDs})
 	if err != nil {
 		t.Fatalf("create domain admin %s: %v", username, err)
 	}

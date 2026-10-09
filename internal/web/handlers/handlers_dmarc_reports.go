@@ -33,15 +33,7 @@ func (h *Handlers) requireDMARC(w http.ResponseWriter, r *http.Request) (auth.Pr
 }
 
 func (h *Handlers) canViewDMARCDomain(p auth.Principal, d store.Domain) bool {
-	if p.IsGlobal() {
-		return true
-	}
-	for _, id := range p.Domains {
-		if id == d.ID {
-			return true
-		}
-	}
-	return false
+	return p.CanAccessDomain(d.ID)
 }
 
 // HandleDMARCList is the global DMARC reports index.

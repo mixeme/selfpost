@@ -8,14 +8,15 @@
   {{if .Users}}
   <table>
     <thead>
-      <tr><th>Username</th><th>Role</th><th>Domains</th><th></th></tr>
+      <tr><th>Username</th><th>Role</th><th>Outbound domains</th>{{if .InboundEnabled}}<th>Inbound domains</th>{{end}}<th></th></tr>
     </thead>
     <tbody>
       {{range .Users}}
       <tr>
         <td>{{.User.Username}}</td>
-        <td>{{if eq .User.Role "global"}}Global{{else}}Domain admin{{end}}</td>
-        <td class="muted">{{if eq .User.Role "global"}}All{{else}}{{range $i, $n := .DomainNames}}{{if $i}}, {{end}}{{$n}}{{end}}{{end}}</td>
+        <td>{{.User.Role}}</td>
+        <td class="muted">{{if or (eq .User.Role "global") .User.AllDomains}}All{{else}}{{range $i, $n := .DomainNames}}{{if $i}}, {{end}}{{$n}}{{end}}{{end}}</td>
+        {{if $.InboundEnabled}}<td class="muted">{{if or (eq .User.Role "global") .User.AllInboundDomains}}All{{else}}{{range $i, $n := .InboundDomainNames}}{{if $i}}, {{end}}{{$n}}{{end}}{{end}}</td>{{end}}
         <td class="actions"><a href="/users/{{.User.ID}}">Edit</a></td>
       </tr>
       {{end}}

@@ -21,9 +21,17 @@
     </select>
     {{if .LastGlobalLocked}}<p class="muted">The only global administrator cannot be demoted.</p>{{end}}
 
-    <fieldset id="domain-pick" data-domain-pick>
-      <legend>Assigned domains</legend>
-      <p class="muted">Required for domain administrators.</p>
+    {{/* Outbound and inbound domains are assigned separately; a domain
+         administrator needs at least one on either list. "All" also covers
+         domains added later — with it ticked the rows below are ignored. */}}
+    <div id="domain-pick" data-domain-pick>
+    <fieldset>
+      <legend>Outbound domains</legend>
+      <p class="muted">A domain administrator needs at least one outbound or inbound domain.</p>
+      <label class="check">
+        <input type="checkbox" name="all_domains" value="1" {{if .FormAllDomains}}checked{{end}}>
+        All, including domains added later
+      </label>
       {{range .Domains}}
       <label class="check">
         <input type="checkbox" name="domain_ids" value="{{.ID}}" {{if index $.FormDomains .ID}}checked{{end}}>
@@ -31,6 +39,22 @@
       </label>
       {{end}}
     </fieldset>
+    {{if .InboundEnabled}}
+    <fieldset>
+      <legend>Inbound domains</legend>
+      <label class="check">
+        <input type="checkbox" name="all_inbound_domains" value="1" {{if .FormAllInbound}}checked{{end}}>
+        All, including domains added later
+      </label>
+      {{range .InboundDomains}}
+      <label class="check">
+        <input type="checkbox" name="inbound_domain_ids" value="{{.ID}}" {{if index $.FormInbound .ID}}checked{{end}}>
+        {{.Name}}
+      </label>
+      {{end}}
+    </fieldset>
+    {{end}}
+    </div>
 
     <button type="submit">{{if .IsEdit}}Save{{else}}Create{{end}}</button>
   </form>
