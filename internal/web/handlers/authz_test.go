@@ -38,9 +38,11 @@ var globalOnlyRoutes = []route{
 	{"POST", "/server/backup", func(h *Handlers) http.HandlerFunc { return h.HandleBackup }, nil},
 	{"POST", "/server/backup/import", func(h *Handlers) http.HandlerFunc { return h.HandleImportDomain }, nil},
 
-	{"GET", "/overview", func(h *Handlers) http.HandlerFunc { return h.HandleStatus }, nil},
-	{"GET", "/overview/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleStatusFragment }, nil},
-	{"POST", "/server/health/recheck", func(h *Handlers) http.HandlerFunc { return h.HandleStatusRecheck }, nil},
+	{"GET", "/overview", func(h *Handlers) http.HandlerFunc { return h.HandleOverview }, nil},
+	{"GET", "/server/health", func(h *Handlers) http.HandlerFunc { return h.HandleHealth }, nil},
+	{"GET", "/server/health/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleHealthFragment }, nil},
+	{"GET", "/overview/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleOverviewFragment }, nil},
+	{"POST", "/server/health/recheck", func(h *Handlers) http.HandlerFunc { return h.HandleHealthRecheck }, nil},
 
 	{"GET", "/outbound/queue", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueue }, nil},
 	{"GET", "/outbound/queue/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueueBody }, nil},

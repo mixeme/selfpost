@@ -184,8 +184,8 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 
 	// Overview. Its handler checks the role itself: the page is global-only
 	// but does not live under /server/.
-	authed.HandleFunc("GET /overview", h.HandleStatus)
-	authed.HandleFunc("GET /overview/fragment", h.HandleStatusFragment)
+	authed.HandleFunc("GET /overview", h.HandleOverview)
+	authed.HandleFunc("GET /overview/fragment", h.HandleOverviewFragment)
 
 	// Outbound: checked per domain in the handlers (lookupDomain,
 	// lookupApplication), adding and deleting by role.
@@ -246,7 +246,9 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 		}
 		authed.HandleFunc(pattern, globalOnly(handler))
 	}
-	server("POST /server/health/recheck", h.HandleStatusRecheck)
+	server("GET /server/health", h.HandleHealth)
+	server("GET /server/health/fragment", h.HandleHealthFragment)
+	server("POST /server/health/recheck", h.HandleHealthRecheck)
 	server("POST /server/health/reload", h.HandleReload)
 	server("GET /server/log", h.HandleSystemLog)
 	server("GET /server/log/fragment", h.HandleSystemLogBody)

@@ -198,7 +198,7 @@ func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.Redirect(w, r, "/overview?reloaded=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/server/health?reloaded=1", http.StatusSeeOther)
 }
 
 func (h *Handlers) lookupDomain(w http.ResponseWriter, r *http.Request) (store.Domain, bool) {

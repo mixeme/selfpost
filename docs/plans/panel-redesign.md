@@ -509,7 +509,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 - [x] Inbound delegation: `requireInboundDomain`, lists and log filtered in the query, two-list user form data, per-route 404 tests for both roles including another tenant's id — **Opus**
 - [x] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/`; links in the old templates retargeted so the panel works on every commit — **Opus**
 - [x] The application form as one POST; `out-app-created` as the response with `Cache-Control: no-store` — **Opus**
-- [ ] Server › Health route and handler (tables and *Reload configuration* from `/status`); Overview handler reduced to verdicts — **Opus**
+- [x] Server › Health route and handler (tables and *Reload configuration* from `/status`); Overview handler reduced to verdicts — **Opus**
 
 **Stage 2 — pages, in groups** (each step: partial calls only, page off the ratchet list, evidence pairs)
 

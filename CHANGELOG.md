@@ -60,6 +60,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   together or not at all — also at creation, so an application can be added
   with its limit already in place. The page that shows a generated password
   is the response to its POST only and is sent with `Cache-Control: no-store`.
+- panel-redesign (stage 1): **Server › Health** (`/server/health`) holds the
+  tables of the old Status page and its two actions, *Re-check DNS* and
+  *Reload configuration*. **Overview** (`/overview`) is reduced to one
+  verdict per check — machine, processes, TLS certificate, queue, milter
+  sockets, reverse DNS — each leading to its table on Health; a check that
+  could not run shows as a warning, never as fine. Both read the same checks.
 
 ### Changed
 

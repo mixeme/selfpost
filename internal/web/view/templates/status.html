@@ -3,8 +3,11 @@
 {{define "wide"}}wide{{end}}
 
 {{define "content"}}
+{{/* One legacy template for two pages until stage 2 gives each its own:
+     Overview (the verdicts) and Server › Health (the tables and the two
+     server actions). .Overview says which one this is. */}}
 <div class="page-head">
-  <h1>Status</h1>
+  <h1>{{if .Overview}}Overview{{else}}Health{{end}}</h1>
   <label class="help-link" for="help-status" title="What these checks mean">?</label>
 </div>
 
@@ -12,6 +15,7 @@
 
 {{template "status_body" .}}
 
+{{if not .Overview}}
 <div class="card" id="configuration">
   <h2>Configuration</h2>
   <p class="muted">Regenerates the OpenDKIM and Postfix configuration from the
@@ -23,4 +27,5 @@
     <button type="submit">Reload configuration</button>
   </form>
 </div>
+{{end}}
 {{end}}

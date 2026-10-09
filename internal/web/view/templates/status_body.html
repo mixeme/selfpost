@@ -1,5 +1,29 @@
 {{define "status_body"}}
+{{if .Overview}}
+{{/* Overview: one verdict per check, each leading to its table on Health. */}}
 <div id="status-body" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card" id="overall">
+    <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
+    <p class="muted">{{.OverallHeading}} <a href="/server/health">All details</a></p>
+  </div>
+  <div class="card" id="verdicts">
+    <h2>Server health</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Verdict</th><th>Detail</th></tr></thead>
+      <tbody>
+        {{range .Cards}}
+        <tr>
+          <td><a href="{{.Href}}">{{.Name}}</a></td>
+          <td><span class="st st-{{if eq .Level "fail"}}error{{else if eq .Level "warn"}}warn{{else}}ok{{end}}">{{.Value}}</span></td>
+          <td class="muted">{{.Sub}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{else}}
+<div id="status-body" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
   <div class="card" id="overall">
     <h2>Overall <span class="st st-{{.OverallStatus}}">{{.OverallStatus}}</span></h2>
     <p class="muted">{{.OverallHeading}}</p>
@@ -126,4 +150,5 @@
     </div>
   </div>
 </div>
+{{end}}
 {{end}}

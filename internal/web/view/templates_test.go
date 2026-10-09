@@ -424,7 +424,7 @@ func TestStatusPageRendersEveryCheck(t *testing.T) {
 	for _, want := range []string{
 		"opendkim", "FATAL", "Mail queue is empty", "mail.example.com",
 		"203.0.113.10 → no PTR record", `action="/server/health/reload"`,
-		`hx-get="/overview/fragment"`, `class="st st-error"`,
+		`hx-get="/server/health/fragment"`, `class="st st-error"`,
 		// Three .split rows inside the polled fragment: machine|processes,
 		// queue|certificate, and sockets|hostname. Ids stay on the cards.
 		`id="processes"`, `id="machine"`, `id="queue"`, `id="certificate"`, `id="sockets"`, `id="hostname"`,
