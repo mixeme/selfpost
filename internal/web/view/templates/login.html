@@ -4,15 +4,12 @@
      in as, so the form gives way to a pointer at the setup link. */}}
 {{define "content"}}
 {{if .SetupHint}}
-{{/* The signed-out layout sizes and centres its column through "form" alone, so
-     this state, which has no fields, keeps the element; it has no action and no
-     control and cannot be submitted. */}}
-<form class="sp-form">
+{{/* Mockup login-no-admin.html: the same column, not a form. */}}
+<div class="sp-form">
   {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}
-  <h1 class="title is-3">Sign in</h1>
-  <p class="sp-muted">No administrator has been created yet. Open the one-time
-  setup link printed in the container log to get started.</p>
-</form>
+  <h1 class="title is-3">No administrator yet</h1>
+  <p class="sp-muted">Open the one-time setup link printed in the container log to create one.</p>
+</div>
 {{else}}
 <form class="sp-form" method="post" action="/login">
   {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}

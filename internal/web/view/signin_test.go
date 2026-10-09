@@ -53,12 +53,11 @@ func TestLoginShowsAnErrorEscaped(t *testing.T) {
 
 func TestLoginWithoutAnAdministratorHasNoForm(t *testing.T) {
 	out := renderSignedOut(t, "login", NewLoginSetupHint("mail.example.org"))
-	if !strings.Contains(out, "No administrator has been created yet") {
+	if !strings.Contains(out, "No administrator yet") || !strings.Contains(out, "one-time setup link") {
 		t.Error("the setup hint is missing")
 	}
-	// The element stays (the signed-out layout centres the column through it) but
-	// nothing in it can be filled in or sent.
-	for _, bad := range []string{`action=`, `<input`, `<button`, `name="password"`, `name="username"`} {
+	// Nothing on it can be filled in or sent.
+	for _, bad := range []string{`<form`, `action=`, `<input`, `<button`, `name="password"`, `name="username"`} {
 		if strings.Contains(out, bad) {
 			t.Errorf("the hint page carries %q", bad)
 		}

@@ -71,6 +71,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the component kit. Sign in names the mail host above its title; a refused
   attempt is shown as a notice above the fields. `login` and `setup` are off
   the ratchet.
+- panel-redesign (design): the sign-in page before any administrator exists
+  is a drawn screen (`login-no-admin`): the heading *No administrator yet* and
+  the pointer to the one-time setup link, in the same column as the form. The
+  signed-out column is sized through `.sp-form`, not through `form` (owner,
+  2026-10-09).
 
 ### Changed
 

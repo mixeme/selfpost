@@ -133,7 +133,7 @@ func TestLoginPointsAtSetupBeforeTheFirstAdministrator(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "No administrator has been created yet") {
+	if !strings.Contains(body, "No administrator yet") || !strings.Contains(body, "one-time setup link") {
 		t.Errorf("the login page does not point at the setup link:\n%s", body)
 	}
 	if strings.Contains(body, `name="password"`) {
