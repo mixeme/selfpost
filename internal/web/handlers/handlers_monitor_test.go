@@ -443,7 +443,7 @@ func getBodyAs(t *testing.T, h http.HandlerFunc, target string, p auth.Principal
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req = auth.RequestWithPrincipal(req, p)
-	if rest, ok := strings.CutPrefix(req.URL.Path, "/outbound/log/"); ok && rest != "rows" {
+	if rest, ok := strings.CutPrefix(req.URL.Path, "/outbound/log/"); ok && rest != "fragment" {
 		req.SetPathValue("id", rest)
 	}
 	h(rec, req)

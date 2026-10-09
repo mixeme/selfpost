@@ -275,3 +275,117 @@ func (s *Service) validateForDomain(domainID int64, login, mode string, rawAddre
 	}
 	return parseAddresses(rawAddresses, d.Name)
 }
+
+// Limit is an application's level-2 rate-limit choice on the application form.
+// An empty Mode means "use the domain limit": the application has no limit of
+// its own.
+type Limit struct {
+	Mode           string // "", store.RateLimitModeManual or store.RateLimitModeAuto
+	MaxMessages    int
+	WindowSeconds  int
+	AutoMultiplier float64
+}
+
+// Settings is everything the application form holds besides the login: who the
+// application may send as, which client IPs may use it, and its rate limit.
+// The form is one POST, so the three are validated and saved together.
+type Settings struct {
+	Mode           string
+	Addresses      []string // raw; list mode only
+	AuthIPRestrict bool
+	AuthAllowedIPs []string
+	Limit          Limit
+}
+
+// Recalc derives an auto limit's ceiling from send statistics. The numbers it
+// needs (retention, the level-1 backstop) are the panel's configuration, so
+// the caller supplies it.
+type Recalc func(appID int64) error
+
+// CreateWithSettings adds an application with all of its settings in one step
+// and returns the password to show once. If anything after the creation fails
+// the application is removed again: the form either produces a complete
+// application or none.
+func (s *Service) CreateWithSettings(domainID int64, login string, set Settings, recalc Recalc) (store.Application, string, error) {
+	a, password, err := s.Create(domainID, login, set.Mode, set.Addresses)
+	if err != nil {
+		return store.Application{}, "", err
+	}
+	if err := s.applyAccess(a.ID, set, recalc); err != nil {
+		_ = s.ClearRateLimit(a.ID)
+		s.rollbackCreate(a.ID, login)
+		_ = s.Resync()
+		return store.Application{}, "", err
+	}
+	a, err = s.store.GetApplication(a.ID)
+	if err != nil {
+		return store.Application{}, "", err
+	}
+	return a, password, nil
+}
+
+// SaveSettings replaces an application's settings in one step. The sender
+// rules are validated before anything is written; if a later write fails, what
+// was already changed is put back, so the application is left as it was rather
+// than half-saved. The login and the password are untouched.
+func (s *Service) SaveSettings(id int64, set Settings, recalc Recalc) error {
+	before, err := s.store.GetApplication(id)
+	if err != nil {
+		return err
+	}
+	addresses, err := s.validateForDomain(before.DomainID, before.Login, set.Mode, set.Addresses)
+	if err != nil {
+		return err
+	}
+	limitBefore, hadLimit, err := s.RateLimit(id)
+	if err != nil {
+		return err
+	}
+	restore := func() {
+		_ = s.store.UpdateApplicationMode(id, before.AddressMode, before.Addresses)
+		_ = s.store.UpdateApplicationAuthIPs(id, before.AuthIPRestrict, before.AuthAllowedIPs)
+		if hadLimit {
+			_ = s.SaveRateLimit(id, limitBefore)
+		} else {
+			_ = s.ClearRateLimit(id)
+		}
+		_ = s.Resync()
+	}
+	if err := s.store.UpdateApplicationMode(id, set.Mode, addresses); err != nil {
+		restore()
+		return err
+	}
+	if err := s.applyAccess(id, set, recalc); err != nil {
+		restore()
+		return err
+	}
+	if err := s.Resync(); err != nil {
+		restore()
+		return err
+	}
+	return nil
+}
+
+// applyAccess writes the client-IP restriction and the rate limit.
+func (s *Service) applyAccess(id int64, set Settings, recalc Recalc) error {
+	if err := s.UpdateAuthIPs(id, set.AuthIPRestrict, set.AuthAllowedIPs); err != nil {
+		return err
+	}
+	switch set.Limit.Mode {
+	case "":
+		return s.ClearRateLimit(id)
+	case store.RateLimitModeAuto:
+		rl := store.RateLimit{Mode: store.RateLimitModeAuto, AutoMultiplier: set.Limit.AutoMultiplier, WindowSeconds: set.Limit.WindowSeconds}
+		if err := s.SaveRateLimit(id, rl); err != nil {
+			return err
+		}
+		if recalc == nil {
+			return nil
+		}
+		return recalc(id)
+	default:
+		return s.SaveRateLimit(id, store.RateLimit{
+			Mode: store.RateLimitModeManual, MaxMessages: set.Limit.MaxMessages, WindowSeconds: set.Limit.WindowSeconds,
+		})
+	}
+}

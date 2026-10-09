@@ -183,3 +183,11 @@ func dumpSASLDB(path string) ([]byte, error) {
 	}
 	return out, nil
 }
+
+// WithRunner replaces the command that runs saslpasswd2 and returns the same
+// manager. It exists for tests outside this package that need an application
+// service without the real binary; the panel never calls it.
+func (s *SASLDB) WithRunner(run func(args []string, stdin []byte) error) *SASLDB {
+	s.run = run
+	return s
+}

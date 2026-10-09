@@ -228,7 +228,7 @@
        above the domains list. */}}
   <div class="card" id="add-application">
     <h2>Add an application</h2>
-    <form method="post" action="/outbound/domains/{{.Domain.ID}}/applications">
+    <form method="post" action="/outbound/domains/{{.Domain.ID}}/applications/new">
       <label for="login">Login</label>
       <input id="login" name="login" type="text" placeholder="prod-server"
              autocomplete="off" autocapitalize="none" spellcheck="false"
@@ -301,20 +301,22 @@
         <div class="actions">
           <input class="panel-toggle t-edit" id="edit-{{.ID}}" type="checkbox">
           <label class="toggle for-edit" for="edit-{{.ID}}">Edit{{if .HasLimit}} <span class="st st-ok">limit</span>{{end}}</label>
-          <form class="inline" method="post" action="/applications/{{.ID}}/password"
+          <form class="inline" method="post" action="/outbound/domains/{{$.Domain.ID}}/applications/{{.ID}}/password"
                 data-confirm="Regenerate the password for {{.Login}}? The current password stops working immediately.">
             <button type="submit">New password</button>
           </form>
-          <form class="inline" method="post" action="/applications/{{.ID}}/delete"
+          <form class="inline" method="post" action="/outbound/domains/{{$.Domain.ID}}/applications/{{.ID}}/delete"
                 data-confirm="Delete application {{.Login}}? Its credentials stop working immediately.">
             <button type="submit" class="danger">Delete</button>
           </form>
           <div class="panel panel-edit">
+            {{/* The application form is one POST: sender, client IPs and rate
+                 limit are saved together by the one button under the columns. */}}
+            <form id="app-{{.ID}}" method="post" action="/outbound/domains/{{$.Domain.ID}}/applications/{{.ID}}">
             <div class="check-cols">
               <div class="check-col">
                 <p class="check-col-title">Address mode</p>
                 <p class="muted">Which From addresses this application may use.</p>
-                <form method="post" action="/applications/{{.ID}}/mode">
                   <select name="mode" data-list-mode="{{$.List}}" aria-label="Address mode">
                     <option value="{{$.Wildcard}}" {{if eq .AddressMode $.Wildcard}}selected{{end}}>Any address of the domain</option>
                     <option value="{{$.List}}" {{if eq .AddressMode $.List}}selected{{end}}>Specific addresses (list)</option>
@@ -324,8 +326,6 @@
                     <textarea name="addresses" rows="3" placeholder="alerts@{{$.Domain.Name}}">{{range $i, $a := .Addresses}}{{if $i}}
 {{end}}{{$a}}{{end}}</textarea>
                   </div>
-                  <button type="submit">Save mode</button>
-                </form>
               </div>
               <div class="check-col">
                 <p class="check-col-title">Client IP allow-list
@@ -335,7 +335,6 @@
                 <code>MAIL FROM</code>. When off, any client IP is allowed. Like the
                 level-2 rate limit this runs in the journal-milter and is fail-open —
                 it is a sending control, not an authentication boundary.</p>
-                <form method="post" action="/applications/{{.ID}}/authips">
                   <label class="check-row">
                     <input type="checkbox" name="auth_ip_restrict" value="1"
                            {{if .AuthIPRestrict}}checked{{end}}>
@@ -343,8 +342,6 @@
                   </label>
                   <textarea name="auth_allowed_ips" rows="2" placeholder="203.0.113.10"
                             aria-label="Allowed client IPs">{{.AuthIPsText}}</textarea>
-                  <button type="submit">Save IP restriction</button>
-                </form>
               </div>
               <div class="check-col">
                 <p class="check-col-title">Level-2 rate limit
@@ -353,11 +350,11 @@
                 ceiling may be <em>higher or lower</em> than the domain setting
                 (≤ level&nbsp;1). When unset, the domain limit{{if $.DomainHasRL}}
                 ({{$.DomainRLMaxNum}}){{end}} or level&nbsp;1 applies.</p>
-                <form id="rl-{{.ID}}" method="post" action="/applications/{{.ID}}/ratelimit">
                   <label for="mode-{{.ID}}">Limit mode</label>
-                  <select id="mode-{{.ID}}" name="mode" data-ratelimit-mode>
-                    <option value="manual" {{if not .IsAuto}}selected{{end}}>Manual</option>
-                    <option value="auto" {{if .IsAuto}}selected{{end}}>Auto (from statistics)</option>
+                  <select id="mode-{{.ID}}" name="rl_mode" data-ratelimit-mode>
+                    <option value="domain" {{if eq .RLMode "domain"}}selected{{end}}>Use the domain limit</option>
+                    <option value="manual" {{if eq .RLMode "manual"}}selected{{end}}>Manual</option>
+                    <option value="auto" {{if eq .RLMode "auto"}}selected{{end}}>Auto (from statistics)</option>
                   </select>
                   <div data-manual-fields>
                     <div class="field-pair">
@@ -381,23 +378,16 @@
                     messages are sent.{{if .AutoUpdated}} Last recalculated {{.AutoUpdated}}.{{end}}
                     Peak {{.Stats.PeakPerHour}} msg/h shown for comparison.</p>
                   </div>
-                </form>
-                <div class="panel-buttons">
-                  <button type="submit" form="rl-{{.ID}}">Save limit</button>
-                  {{if .IsAuto}}
-                  <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit/recalc">
-                    <button type="submit">Recalculate now</button>
-                  </form>
-                  {{end}}
-                  {{if .HasLimit}}
-                  <form class="inline" method="post" action="/applications/{{.ID}}/ratelimit"
-                        data-confirm="Remove the rate limit for {{.Login}}? The domain limit (or level 1) will apply.">
-                    <input type="hidden" name="clear" value="1">
-                    <button type="submit" class="danger">Remove limit</button>
-                  </form>
-                  {{end}}
-                </div>
               </div>
+            </div>
+            </form>
+            <div class="panel-buttons">
+              <button type="submit" form="app-{{.ID}}">Save application</button>
+              {{if .IsAuto}}
+              <form class="inline" method="post" action="/outbound/domains/{{$.Domain.ID}}/applications/{{.ID}}/ratelimit/recalc">
+                <button type="submit">Recalculate now</button>
+              </form>
+              {{end}}
             </div>
           </div>
         </div>

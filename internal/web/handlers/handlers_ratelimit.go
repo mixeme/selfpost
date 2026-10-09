@@ -165,58 +165,6 @@ func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?ratelimit=1", d.ID), http.StatusSeeOther)
 }
 
-func (h *Handlers) HandleAppRateLimit(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
-	if !ok {
-		return
-	}
-	d, err := h.domains.Get(a.DomainID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	in, err := parseRateLimitForm(r, h.l1Messages())
-	if err != nil {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),
-		})
-		return
-	}
-	if err := h.applyRateLimit(in, store.RateLimitScopeApp, a.ID, h.apps); err != nil {
-		logf("panel: application %d: save rate limit: %v", a.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?ratelimit=1", a.DomainID), http.StatusSeeOther)
-}
-
-func (h *Handlers) HandleAppAuthIPs(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
-	if !ok {
-		return
-	}
-	d, err := h.domains.Get(a.DomainID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	restrict, ips, err := parseAppAuthIPsForm(r)
-	if err != nil {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),
-		})
-		return
-	}
-	if err := h.apps.UpdateAuthIPs(a.ID, restrict, ips); err != nil {
-		logf("panel: application %d: save auth IPs: %v", a.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?authips=1", a.DomainID), http.StatusSeeOther)
-}
-
 func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
@@ -234,12 +182,11 @@ func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handlers) HandleAppRateLimitRecalc(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
+	a, d, ok := h.lookupDomainApplication(w, r)
 	if !ok {
 		return
 	}
 	if err := h.recalcRateLimit(store.RateLimitScopeApp, a.ID); err != nil {
-		d, _ := h.domains.Get(a.DomainID)
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
 			FormMode:     store.AddressModeWildcard,
 			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),

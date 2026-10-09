@@ -272,7 +272,8 @@ func TestInboundListWithNothingLeftIs404(t *testing.T) {
 }
 
 // The outbound side of the same rule, route by route: a domain administrator
-// asking for another tenant's sending domain or application by id gets 404,
+// asking for another tenant's sending domain or application by id gets 404 —
+// also when the application is addressed through the caller's own domain —
 // and so does a user whose reach is inbound only.
 func TestOutboundRoutesAnswerAnotherTenant404(t *testing.T) {
 	h, domains := serverWithTwoDomains(t)
@@ -291,25 +292,35 @@ func TestOutboundRoutesAnswerAnotherTenant404(t *testing.T) {
 	inboundOnly := userWith(t, h.store, "inbound-only", store.RoleDomain, store.Reach{InboundDomainIDs: []int64{in.ID}})
 
 	did := map[string]string{"id": idStr(second.ID)}
-	aid := map[string]string{"aid": idStr(foreignApp.ID)}
-	routes := []struct {
+	// Another tenant's application, addressed through its own domain — and
+	// through the caller's own domain, which it is not in: the URL names a
+	// domain the caller may open, but the application still is not theirs.
+	aid := map[string]string{"id": idStr(second.ID), "aid": idStr(foreignApp.ID)}
+	smuggled := map[string]string{"id": idStr(first.ID), "aid": idStr(foreignApp.ID)}
+	type outRoute struct {
 		method, target string
 		handler        http.HandlerFunc
 		pathValues     map[string]string
-	}{
+	}
+	routes := []outRoute{
 		{"GET", "/outbound/domains/{id}", h.HandleDomainDetail, did},
+		{"GET", "/outbound/domains/{id}/settings", h.HandleDomainDetail, did},
 		{"POST", "/outbound/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck, did},
-		{"POST", "/outbound/domains/{id}/applications", h.HandleAddApplication, did},
 		{"POST", "/outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit, did},
 		{"POST", "/outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc, did},
 		{"POST", "/outbound/domains/{id}/settings/reports", h.HandleDomainDMARC, did},
 		{"POST", "/outbound/domains/{id}/settings/export", h.HandleExportDomain, did},
-		{"POST", "/applications/{aid}/mode", h.HandleUpdateAppMode, aid},
-		{"POST", "/applications/{aid}/authips", h.HandleAppAuthIPs, aid},
-		{"POST", "/applications/{aid}/password", h.HandleRegenPassword, aid},
-		{"POST", "/applications/{aid}/ratelimit", h.HandleAppRateLimit, aid},
-		{"POST", "/applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc, aid},
-		{"POST", "/applications/{aid}/delete", h.HandleDeleteApplication, aid},
+		{"GET", "/outbound/domains/{id}/applications/new", h.HandleApplicationNew, did},
+		{"POST", "/outbound/domains/{id}/applications/new", h.HandleApplicationCreate, did},
+	}
+	for _, pv := range []map[string]string{aid, smuggled} {
+		routes = append(routes,
+			outRoute{"GET", "/outbound/domains/{id}/applications/{aid}", h.HandleApplicationEdit, pv},
+			outRoute{"POST", "/outbound/domains/{id}/applications/{aid}", h.HandleApplicationSave, pv},
+			outRoute{"POST", "/outbound/domains/{id}/applications/{aid}/password", h.HandleRegenPassword, pv},
+			outRoute{"POST", "/outbound/domains/{id}/applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc, pv},
+			outRoute{"POST", "/outbound/domains/{id}/applications/{aid}/delete", h.HandleDeleteApplication, pv},
+		)
 	}
 	for _, rt := range routes {
 		for who, p := range map[string]*auth.Principal{

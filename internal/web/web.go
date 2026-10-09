@@ -202,13 +202,16 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit)
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc)
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/export", h.HandleExportDomain)
-	authed.HandleFunc("POST /outbound/domains/{id}/applications", h.HandleAddApplication)
-	authed.HandleFunc("POST /applications/{aid}/mode", h.HandleUpdateAppMode)
-	authed.HandleFunc("POST /applications/{aid}/authips", h.HandleAppAuthIPs)
-	authed.HandleFunc("POST /applications/{aid}/password", h.HandleRegenPassword)
-	authed.HandleFunc("POST /applications/{aid}/ratelimit", h.HandleAppRateLimit)
-	authed.HandleFunc("POST /applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc)
-	authed.HandleFunc("POST /applications/{aid}/delete", h.HandleDeleteApplication)
+	// An application lives under its domain, and its form is one POST: sender,
+	// client IPs and rate limit are saved together. The page that shows a new
+	// password is the response to its POST and has no GET path.
+	authed.HandleFunc("GET /outbound/domains/{id}/applications/new", h.HandleApplicationNew)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications/new", h.HandleApplicationCreate)
+	authed.HandleFunc("GET /outbound/domains/{id}/applications/{aid}", h.HandleApplicationEdit)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications/{aid}", h.HandleApplicationSave)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications/{aid}/password", h.HandleRegenPassword)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications/{aid}/ratelimit/recalc", h.HandleAppRateLimitRecalc)
+	authed.HandleFunc("POST /outbound/domains/{id}/applications/{aid}/delete", h.HandleDeleteApplication)
 
 	authed.HandleFunc("GET /outbound/log", h.HandleDeliveries)
 	authed.HandleFunc("GET /outbound/log/fragment", h.HandleDeliveriesRows)

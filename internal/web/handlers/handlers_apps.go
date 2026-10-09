@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/domain"
@@ -53,7 +54,10 @@ type appRateLimitView struct {
 	AutoMultiplier string
 	AutoUpdated    string
 	IsAuto         bool
-	Stats          sendStatsView
+	// RLMode is the form's limit choice: "domain" (no limit of its own),
+	// "manual" or "auto".
+	RLMode string
+	Stats  sendStatsView
 }
 
 // sendStatsView is the template-facing send statistics block.
@@ -122,6 +126,7 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 			Mode:           mode,
 			AutoMultiplier: formatMultiplier(mult),
 			IsAuto:         ok && rl.IsAuto(),
+			RLMode:         limitChoice(rl, ok),
 			AutoUpdated:    formatAutoUpdated(rl.AutoUpdatedAt),
 			Stats:          formatSendStats(appStats),
 		})
@@ -293,6 +298,19 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 
+// limitChoice names which of the form's three limit choices an application has:
+// the domain limit (none of its own), manual, or auto.
+func limitChoice(rl store.RateLimit, configured bool) string {
+	switch {
+	case !configured:
+		return "domain"
+	case rl.IsAuto():
+		return store.RateLimitModeAuto
+	default:
+		return store.RateLimitModeManual
+	}
+}
+
 // intOrBlank renders a non-positive number as an empty string so an unset field
 // shows blank rather than "0".
 func intOrBlank(n int) string {
@@ -336,12 +354,10 @@ func detailFlash(r *http.Request) string {
 	switch {
 	case r.URL.Query().Get("appdeleted") != "":
 		return "Application deleted."
-	case r.URL.Query().Get("modeupdated") != "":
-		return "Application address mode updated."
+	case r.URL.Query().Get("appsaved") != "":
+		return "Application saved."
 	case r.URL.Query().Get("ratelimit") != "":
 		return "Rate limit updated."
-	case r.URL.Query().Get("authips") != "":
-		return "Client IP restriction updated."
 	case r.URL.Query().Get("recalculated") != "":
 		return "Auto rate limit recalculated."
 	case r.URL.Query().Get("dmarc") != "":
@@ -355,11 +371,79 @@ func detailFlash(r *http.Request) string {
 	}
 }
 
-// HandleAddApplication creates an application on a domain and renders the page
-// back with the generated password shown once (product.md, security.md). Because the
-// password cannot be recovered later, this deliberately renders inline rather
-// than redirecting.
-func (h *Handlers) HandleAddApplication(w http.ResponseWriter, r *http.Request) {
+// The application form is ONE post (plan § Routes): who the application may
+// send as, which client IPs may use it and its rate limit are parsed and
+// validated together and saved together, or not at all (app.Service
+// CreateWithSettings / SaveSettings). The same form, empty, adds an
+// application; filled, it edits one. The login is given once, at creation.
+
+// parseApplicationForm reads the form's three parts. Every field is checked
+// here or by the service before anything is written.
+func (h *Handlers) parseApplicationForm(r *http.Request) (app.Settings, error) {
+	set := app.Settings{
+		Mode:      r.PostFormValue("mode"),
+		Addresses: splitAddresses(r.PostFormValue("addresses")),
+	}
+	restrict, ips, err := parseAppAuthIPsForm(r)
+	if err != nil {
+		return app.Settings{}, err
+	}
+	set.AuthIPRestrict, set.AuthAllowedIPs = restrict, ips
+
+	switch mode := strings.TrimSpace(r.PostFormValue("rl_mode")); mode {
+	case "", "domain":
+		// Use the domain limit: the application has none of its own.
+	case store.RateLimitModeAuto:
+		mult, err := parseAutoMultiplier(r.PostFormValue("auto_multiplier"))
+		if err != nil {
+			return app.Settings{}, err
+		}
+		set.Limit = app.Limit{Mode: mode, AutoMultiplier: mult, WindowSeconds: h.l1Window()}
+	case store.RateLimitModeManual:
+		maxMessages, err := parsePositiveInt(r.PostFormValue("max_messages"), 0)
+		if err != nil || maxMessages <= 0 {
+			return app.Settings{}, fmt.Errorf("enter a message limit greater than zero, or use the domain limit")
+		}
+		if l1 := h.l1Messages(); maxMessages > l1 {
+			return app.Settings{}, fmt.Errorf("message limit cannot exceed the level-1 backstop (%d)", l1)
+		}
+		window, err := parsePositiveInt(r.PostFormValue("window_seconds"), defaultRateLimitWindowSeconds)
+		if err != nil || window <= 0 {
+			return app.Settings{}, fmt.Errorf("enter a time window greater than zero seconds")
+		}
+		set.Limit = app.Limit{Mode: mode, MaxMessages: maxMessages, WindowSeconds: window}
+	default:
+		return app.Settings{}, fmt.Errorf("choose the domain limit, manual or auto")
+	}
+	return set, nil
+}
+
+func (h *Handlers) recalcApp(appID int64) error {
+	return h.recalcRateLimit(store.RateLimitScopeApp, appID)
+}
+
+// noStore keeps a page that shows a secret out of every cache and out of the
+// browser's history copy: the password on it is shown once.
+func noStore(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+}
+
+// HandleApplicationNew shows the form that adds an application. Until the
+// domain page is split (stage 2) the form is a card of that page.
+func (h *Handlers) HandleApplicationNew(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
+	if !ok {
+		return
+	}
+	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+}
+
+// HandleApplicationCreate creates an application with all of its settings and
+// answers with the generated password, shown once (product.md, security.md).
+// The password cannot be recovered later, so the page is the response to this
+// POST — it has no GET path — and is never stored by the browser.
+func (h *Handlers) HandleApplicationCreate(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
@@ -370,16 +454,18 @@ func (h *Handlers) HandleAddApplication(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	login := strings.TrimSpace(r.PostFormValue("login"))
-	mode := r.PostFormValue("mode")
-	addrs := splitAddresses(r.PostFormValue("addresses"))
-
 	repopulate := detailView{
 		FormLogin: login,
-		FormMode:  mode,
+		FormMode:  r.PostFormValue("mode"),
 		FormAddrs: r.PostFormValue("addresses"),
 	}
-
-	a, password, err := h.apps.Create(d.ID, login, mode, addrs)
+	set, err := h.parseApplicationForm(r)
+	if err != nil {
+		repopulate.FormErr = err.Error()
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, repopulate)
+		return
+	}
+	a, password, err := h.apps.CreateWithSettings(d.ID, login, set, h.recalcApp)
 	if err != nil {
 		repopulate.FormErr = applicationErrorMessage(err)
 		status := http.StatusBadRequest
@@ -389,50 +475,62 @@ func (h *Handlers) HandleAddApplication(w http.ResponseWriter, r *http.Request) 
 		h.renderDomainDetail(w, r, status, d, repopulate)
 		return
 	}
+	noStore(w)
 	h.renderDomainDetail(w, r, http.StatusCreated, d, detailView{
 		FormMode: store.AddressModeWildcard,
 		NewCred:  &newCred{Login: a.Login, Password: password},
 	})
 }
 
-// HandleUpdateAppMode switches an application's address mode / list (product.md).
-func (h *Handlers) HandleUpdateAppMode(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
+// HandleApplicationEdit shows an application's form. Until the domain page is
+// split (stage 2) that is the application's Edit panel on the domain page.
+func (h *Handlers) HandleApplicationEdit(w http.ResponseWriter, r *http.Request) {
+	_, d, ok := h.lookupDomainApplication(w, r)
 	if !ok {
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid form", http.StatusBadRequest)
-		return
-	}
-	mode := r.PostFormValue("mode")
-	addrs := splitAddresses(r.PostFormValue("addresses"))
+	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+}
 
-	if err := h.apps.UpdateMode(a.ID, mode, addrs); err != nil {
-		d, derr := h.domains.Get(a.DomainID)
-		if derr != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormErr:  fmt.Sprintf("Could not update %s: %s", a.Login, applicationErrorMessage(err)),
-			FormMode: store.AddressModeWildcard,
-		})
+// HandleApplicationSave saves an application's form: sender, client IPs and
+// rate limit in one step.
+func (h *Handlers) HandleApplicationSave(w http.ResponseWriter, r *http.Request) {
+	a, d, ok := h.lookupDomainApplication(w, r)
+	if !ok {
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?modeupdated=1", a.DomainID), http.StatusSeeOther)
+	fail := func(msg string) {
+		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
+			FormMode:     store.AddressModeWildcard,
+			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, msg),
+		})
+	}
+	if err := r.ParseForm(); err != nil {
+		fail("invalid form submission")
+		return
+	}
+	// The login is the SASL account's name and is not renamed by this form.
+	if login := strings.TrimSpace(r.PostFormValue("login")); login != "" && login != a.Login {
+		fail("the login of an application cannot be changed; add a new application instead")
+		return
+	}
+	set, err := h.parseApplicationForm(r)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	if err := h.apps.SaveSettings(a.ID, set, h.recalcApp); err != nil {
+		fail(applicationErrorMessage(err))
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?appsaved=1", d.ID), http.StatusSeeOther)
 }
 
 // HandleRegenPassword issues a new password for an application and shows it once
-// (product.md, security.md). Rendered inline, like creation, so the password is visible.
+// (product.md, security.md): the response to the POST, never cached.
 func (h *Handlers) HandleRegenPassword(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
+	a, d, ok := h.lookupDomainApplication(w, r)
 	if !ok {
-		return
-	}
-	d, err := h.domains.Get(a.DomainID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	password, err := h.apps.RegeneratePassword(a.ID)
@@ -441,6 +539,7 @@ func (h *Handlers) HandleRegenPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	noStore(w)
 	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{
 		FormMode: store.AddressModeWildcard,
 		NewCred:  &newCred{Login: a.Login, Password: password},
@@ -450,7 +549,7 @@ func (h *Handlers) HandleRegenPassword(w http.ResponseWriter, r *http.Request) {
 // HandleDeleteApplication removes an application and returns to its domain page
 // (product.md).
 func (h *Handlers) HandleDeleteApplication(w http.ResponseWriter, r *http.Request) {
-	a, ok := h.lookupApplication(w, r)
+	a, _, ok := h.lookupDomainApplication(w, r)
 	if !ok {
 		return
 	}
@@ -460,6 +559,27 @@ func (h *Handlers) HandleDeleteApplication(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?appdeleted=1", a.DomainID), http.StatusSeeOther)
+}
+
+// lookupDomainApplication resolves /outbound/domains/{id}/applications/{aid}
+// to the application and its domain. The application must belong to the domain
+// named in the path: an id from another domain is answered 404 like a missing
+// one, whoever asks, so a URL can never address an application through a
+// domain it is not in.
+func (h *Handlers) lookupDomainApplication(w http.ResponseWriter, r *http.Request) (store.Application, store.Domain, bool) {
+	d, ok := h.lookupDomain(w, r)
+	if !ok {
+		return store.Application{}, store.Domain{}, false
+	}
+	a, ok := h.lookupApplication(w, r)
+	if !ok {
+		return store.Application{}, store.Domain{}, false
+	}
+	if a.DomainID != d.ID {
+		http.NotFound(w, r)
+		return store.Application{}, store.Domain{}, false
+	}
+	return a, d, true
 }
 
 // lookupApplication resolves the {aid} path value to an application, writing a

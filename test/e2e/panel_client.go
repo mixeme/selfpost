@@ -172,7 +172,7 @@ func (c *panelClient) dkimRecord(domainID string) (name, value string, err error
 // login/password the panel renders inline (security.md — never recoverable
 // later, so this is the only place to read it).
 func (c *panelClient) addApplication(domainID, login, mode, addresses string) (appLogin, password string, err error) {
-	resp, body, err := c.postForm("/outbound/domains/"+domainID+"/applications", url.Values{
+	resp, body, err := c.postForm("/outbound/domains/"+domainID+"/applications/new", url.Values{
 		"login":     {login},
 		"mode":      {mode},
 		"addresses": {addresses},
@@ -194,14 +194,17 @@ func (c *panelClient) addApplication(domainID, login, mode, addresses string) (a
 	return appLogin, password, nil
 }
 
-// setRateLimit saves a level-2 limit (guide § Rate limiting) on an application
-// or domain (/applications/{id}/ratelimit or /outbound/domains/{id}/settings/ratelimit).
-func (c *panelClient) setRateLimit(path string, maxMessages, windowSeconds int) error {
+// setApplicationLimit saves a manual level-2 limit (guide § Rate limiting) on
+// an application. The application form is one POST, so the sender rule goes
+// with it: the application stays on the domain wildcard it was created with.
+func (c *panelClient) setApplicationLimit(domainID, appID string, maxMessages, windowSeconds int) error {
 	vals := url.Values{
+		"mode":           {"wildcard"},
+		"rl_mode":        {"manual"},
 		"max_messages":   {fmt.Sprintf("%d", maxMessages)},
 		"window_seconds": {fmt.Sprintf("%d", windowSeconds)},
 	}
-	resp, body, err := c.postForm(path, vals)
+	resp, body, err := c.postForm("/outbound/domains/"+domainID+"/applications/"+appID, vals)
 	if err != nil {
 		return err
 	}

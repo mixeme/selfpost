@@ -54,6 +54,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   (username, e-mail), password, and the default DMARC report address
   (SelfPost hosted, my account e-mail, another address, none). Saving the
   profile no longer asks for the password; changing the password still does.
+- panel-redesign (stage 1): the application form is one POST. Who the
+  application may send as, its client-IP allow-list and its rate limit
+  ("use the domain limit", manual or auto) are validated together and saved
+  together or not at all — also at creation, so an application can be added
+  with its limit already in place. The page that shows a generated password
+  is the response to its POST only and is sent with `Cache-Control: no-store`.
 
 ### Changed
 
@@ -62,8 +68,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   old paths are removed, not redirected — see *Removed*. Polled fragments all
   answer `<page>/fragment`. Everything under `/server/` is guarded for the
   global role where the routes are registered, in addition to each handler's
-  own check. The application routes and Server › Health follow in the next
-  two steps.
+  own check. An application is addressed under its domain
+  (`/outbound/domains/{id}/applications/{aid}`), and an application id that
+  does not belong to the domain in the path is a 404.
 - **Breaking — the database starts from zero.** The 1.x migration chain
   (`0001`–`0010`) is replaced by one baseline, `0001_init.sql`. A 1.x
   `/data/selfpost.db` is refused at start-up with an explicit error and left
@@ -89,7 +96,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `/deliveries`, `/deliveries/rows`, `/deliveries/{id}`, `/mail-queue`,
   `/mail-queue/body`, `/system-log`, `/system-log/body`, `/backup`, `/users`
   and everything under it, `/settings`, and the `/account` → `/settings`
-  redirect.
+  redirect; `POST /domains/{id}/applications` and `/applications/{aid}/mode`,
+  `/authips`, `/ratelimit`, `/ratelimit/recalc`, `/password`, `/delete` — the
+  three separate saves of an application are one form now.
 - The instance setting `dmarc_report_email` (a mirror of the global user's
   profile field) and the unused `rate_limits.allowed_ips` column.
 
