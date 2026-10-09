@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [1.9.5] - 2026-10-09
+
+CI-only cut: the release workflow no longer breaks the multi-arch image it
+just published. No product code changes.
+
+### Fixed
+
+- ci (GHCR): the release no longer deletes the `X.Y.Z-amd64` / `X.Y.Z-arm64`
+  package versions after the manifest merge. Those versions are the images the
+  `X.Y.Z` manifest points at, so `docker pull ghcr.io/mixeme/selfpost:1.3.0`
+  failed with a missing manifest. The per-arch tags now stay; the merge job
+  instead removes untagged versions that no tagged manifest references.
+
 ## [1.9.4] - 2026-10-09
 
 Plan-only cut, owner-requested: the redesign goes first as `2.0.0` with a

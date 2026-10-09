@@ -11,9 +11,9 @@ name: release
 # own native runner; a merge job then combines them into the one manifest tag
 # documented in deploy/docker-compose.yml. "test, then push" (not push-by-digest
 # then test) is deliberate: it means the bytes that get tagged are exactly the
-# bytes that passed e2e. Per-arch tags are pushed only so imagetools can
-# assemble the multi-arch manifest; merge removes them from GHCR so operators
-# see a single version tag.
+# bytes that passed e2e. The per-arch tags stay in GHCR next to the version
+# tag: they are the images the multi-arch manifest points at, and GHCR cannot
+# drop a tag without deleting the image behind it.
 on:
   release:
     types: [published]
@@ -177,28 +177,35 @@ jobs:
             backoff=$((backoff * 2))
           done
 
-      - name: Remove per-arch tags from GHCR
-        # Side-effect tags for imagetools assembly only — not part of the public
-        # version surface (deploy/docker-compose.yml pins X.Y.Z, not X.Y.Z-amd64).
-        # imagetools has no "rm" subcommand; delete via the GitHub Packages API.
+      - name: Remove orphaned untagged versions from GHCR
+        # Re-publishing a version moves its tags to new manifests and leaves the
+        # old ones behind as untagged "sha256:..." package versions. Delete only
+        # those that no tagged manifest references: the images behind a
+        # multi-arch tag are package versions too, and deleting one breaks pulls
+        # of that tag. Any failed lookup aborts the step before anything is
+        # deleted.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          version="${{ needs.prepare.outputs.version }}"
+          image="ghcr.io/${{ github.repository }}"
           owner="${{ github.repository_owner }}"
           pkg="${{ github.event.repository.name }}"
           api="/users/${owner}/packages/container/${pkg}/versions"
-          for suffix in amd64 arm64; do
-            tag="${version}-${suffix}"
-            mapfile -t ids < <(gh api "$api" --paginate \
-              --jq ".[] | select([.metadata.container.tags[]] | index(\"${tag}\")) | .id")
-            if [ "${#ids[@]}" -eq 0 ]; then
-              echo "no GHCR package version for tag ${tag}"
+          versions=$(gh api "${api}?per_page=100" --paginate \
+            --jq '.[] | [.id, .name, (.metadata.container.tags | length)] | @tsv')
+          keep=$(mktemp)
+          while IFS=$'\t' read -r id digest ntags; do
+            [ "$ntags" -gt 0 ] || continue
+            echo "$digest" >> "$keep"
+            raw=$(docker buildx imagetools inspect --raw "${image}@${digest}")
+            jq -r '.manifests[]?.digest' <<<"$raw" >> "$keep"
+          done <<<"$versions"
+          while IFS=$'\t' read -r id digest ntags; do
+            [ "$ntags" -eq 0 ] || continue
+            if grep -qxF "$digest" "$keep"; then
               continue
             fi
-            for id in "${ids[@]}"; do
-              echo "deleting GHCR package version ${id} (tag ${tag})"
-              gh api -X DELETE "${api}/${id}"
-            done
-          done
+            echo "deleting orphaned GHCR package version ${id} (${digest})"
+            gh api -X DELETE "${api}/${id}"
+          done <<<"$versions"

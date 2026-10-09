@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `1.9.4`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `1.9.5`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -122,8 +122,9 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 9 | 2026-08-19 code review pass | `1.9.2` (PATCH) |
 | 10 | panel-redesign prep (docs only, owner-requested cut) | `1.9.3` (PATCH) |
 | 11 | panel-redesign plan: component kit, stages, reorder (docs only, owner-requested cut) | `1.9.4` (PATCH) |
-| 12 | panel-redesign | `2.0.0` (planned; MAJOR, no compatibility) |
-| 13 | inbound-antispam-panel | `2.1.0` (planned; was `1.10.0`, reordered 2026-10-09) |
+| 12 | GHCR release fix: keep per-arch images, sweep orphaned versions (CI only) | `1.9.5` (PATCH) |
+| 13 | panel-redesign | `2.0.0` (planned; MAJOR, no compatibility) |
+| 14 | inbound-antispam-panel | `2.1.0` (planned; was `1.10.0`, reordered 2026-10-09) |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.
@@ -409,13 +410,17 @@ prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z
-      → GitHub Packages API → drop X.Y.Z-amd64 and X.Y.Z-arm64 from GHCR
+      → GitHub Packages API → drop untagged versions no tagged manifest references
 ```
 
 Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under
 emulation for e2e is impractical. E2e first, then push — the registry receives
-the bytes that passed the gate. Only `ghcr.io/mixeme/selfpost:X.Y.Z` remains
-tagged in GHCR; per-arch names exist briefly during the merge job.
+the bytes that passed the gate. Each release leaves three tags in GHCR:
+`X.Y.Z` (the multi-arch manifest operators pin) and `X.Y.Z-amd64` /
+`X.Y.Z-arm64` (the images it points at). The per-arch tags must stay — GHCR
+cannot drop a tag without deleting the image, and deleting it breaks pulls of
+`X.Y.Z`. The last merge step removes only orphans: untagged versions left
+behind when a version is published again.
 
 A failed e2e **blocks** image publication.
 
