@@ -1,0 +1,247 @@
+/* Tabler Icons 3.49.0 — MIT, https://github.com/tabler/tabler-icons — subset to the 57 icons the panel uses; regenerate, do not hand-edit */
+@font-face {
+  font-family: "tabler-icons";
+  font-style: normal;
+  font-weight: 400;
+  src: url("tabler-icons.woff2") format("woff2");
+}
+.ti {
+  font-family: "tabler-icons" !important;
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  /* Better Font Rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ti-activity-heartbeat:before {
+  content: "\f0db";
+}
+
+.ti-address-book:before {
+  content: "\f021";
+}
+
+.ti-alert-circle:before {
+  content: "\ea05";
+}
+
+.ti-alert-triangle:before {
+  content: "\ea06";
+}
+
+.ti-apps:before {
+  content: "\ebb6";
+}
+
+.ti-archive:before {
+  content: "\ea0b";
+}
+
+.ti-arrow-forward-up:before {
+  content: "\eb78";
+}
+
+.ti-arrow-left:before {
+  content: "\ea19";
+}
+
+.ti-arrow-right:before {
+  content: "\ea1f";
+}
+
+.ti-arrows-exchange:before {
+  content: "\f1f4";
+}
+
+.ti-certificate:before {
+  content: "\ed76";
+}
+
+.ti-checklist:before {
+  content: "\f074";
+}
+
+.ti-circle-check:before {
+  content: "\ea67";
+}
+
+.ti-copy:before {
+  content: "\ea7a";
+}
+
+.ti-cpu:before {
+  content: "\ef8e";
+}
+
+.ti-download:before {
+  content: "\ea96";
+}
+
+.ti-eye:before {
+  content: "\ea9a";
+}
+
+.ti-file-export:before {
+  content: "\ede9";
+}
+
+.ti-file-import:before {
+  content: "\edea";
+}
+
+.ti-file-text:before {
+  content: "\eaa2";
+}
+
+.ti-filter:before {
+  content: "\eaa5";
+}
+
+.ti-gauge:before {
+  content: "\eab1";
+}
+
+.ti-heartbeat:before {
+  content: "\ef92";
+}
+
+.ti-help:before {
+  content: "\eabf";
+}
+
+.ti-help-circle:before {
+  content: "\f91d";
+}
+
+.ti-inbox:before {
+  content: "\eac4";
+}
+
+.ti-key:before {
+  content: "\eac7";
+}
+
+.ti-list-details:before {
+  content: "\ef40";
+}
+
+.ti-lock:before {
+  content: "\eae2";
+}
+
+.ti-logout:before {
+  content: "\eba8";
+}
+
+.ti-mail:before {
+  content: "\eae5";
+}
+
+.ti-mail-forward:before {
+  content: "\eeac";
+}
+
+.ti-mail-pause:before {
+  content: "\f941";
+}
+
+.ti-plug:before {
+  content: "\ebd9";
+}
+
+.ti-plug-connected:before {
+  content: "\f00a";
+}
+
+.ti-plug-connected-x:before {
+  content: "\f0a0";
+}
+
+.ti-plus:before {
+  content: "\eb0b";
+}
+
+.ti-refresh:before {
+  content: "\eb13";
+}
+
+.ti-reload:before {
+  content: "\f3ae";
+}
+
+.ti-report-analytics:before {
+  content: "\eecb";
+}
+
+.ti-send:before {
+  content: "\eb1e";
+}
+
+.ti-server-2:before {
+  content: "\f07c";
+}
+
+.ti-server-cog:before {
+  content: "\f321";
+}
+
+.ti-settings:before {
+  content: "\eb20";
+}
+
+.ti-shield-check:before {
+  content: "\eb22";
+}
+
+.ti-stack-2:before {
+  content: "\eef7";
+}
+
+.ti-trash:before {
+  content: "\eb41";
+}
+
+.ti-upload:before {
+  content: "\eb47";
+}
+
+.ti-user:before {
+  content: "\eb4d";
+}
+
+.ti-user-circle:before {
+  content: "\ef68";
+}
+
+.ti-user-plus:before {
+  content: "\eb4b";
+}
+
+.ti-users:before {
+  content: "\ebf2";
+}
+
+.ti-world:before {
+  content: "\eb54";
+}
+
+.ti-world-check:before {
+  content: "\f9db";
+}
+
+.ti-world-download:before {
+  content: "\ef8a";
+}
+
+.ti-world-upload:before {
+  content: "\ef8b";
+}
+
+.ti-x:before {
+  content: "\eb55";
+}

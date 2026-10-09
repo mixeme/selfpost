@@ -21,6 +21,22 @@ htmx 2.0.4 (internal/web/view/static/htmx.min.js)
   Licence: Zero-Clause BSD (0BSD)
   https://github.com/bigskysoftware/htmx
 
+Bulma 1.0.4 (internal/web/view/static/bulma.min.css)
+  Copyright (c) 2023 Jeremy Thomas
+  Licence: MIT
+  https://github.com/jgthms/bulma
+  Distributed unmodified.
+
+Tabler Icons 3.49.0
+  Copyright (c) 2020-2026 Paweł Kuna
+  Licence: MIT
+  https://github.com/tabler/tabler-icons
+  Distributed as two files:
+    internal/web/view/static/tabler-icons.css
+    internal/web/view/static/tabler-icons.woff2
+  Webfont subset to the 57 icons the panel uses, made with fontTools
+  pyftsubset.
+
 IBM Plex Sans / IBM Plex Mono
   Copyright © 2017 IBM Corp., with Reserved Font Name "Plex"
   Licence: SIL Open Font License 1.1

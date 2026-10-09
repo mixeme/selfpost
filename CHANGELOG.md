@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- panel-redesign (stage 0): Bulma 1.0.4 and a 57-icon subset of Tabler Icons
+  3.49.0 are vendored under `/static` (MIT, listed in NOTICE). Nothing links
+  them yet; the old panel is unchanged.
+
+### Changed
+
+- panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
+  the component kit.
+
 ## [1.9.5] - 2026-10-09
 
 CI-only cut: the release workflow no longer breaks the multi-arch image it

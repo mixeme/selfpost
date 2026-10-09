@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | candidate | 5/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 6/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
@@ -408,7 +408,7 @@ Not drawn yet.
 **Goal:** a panel an operator opens a few times a year and still finds their
 way in — the important things in view, details one or two clicks away, one
 visual language, no page tuning its own width. The design is drawn and
-accepted: 29 screens and a components page under
+accepted: 33 screens and a components page under
 [docs/assets/panel-redesign/](assets/panel-redesign/index.html) (Bulma base,
 postmark / numbered heads / perforated edge, icons). Contract and checklist:
 [plans/panel-redesign.md](plans/panel-redesign.md).
@@ -419,10 +419,12 @@ Server) and paths are renamed to match. **No compatibility is kept** (owner,
 2026-09-21): no redirects, the migration chain is replaced by one baseline
 and 2.0 starts from an empty data directory — the only live installation is
 the owner's. Inbound domains become delegable to a
-domain administrator, separately from outbound. Four things the mockups show need their own decision and are not
-smuggled in with the restyle: queue as a table (`postqueue -j`), inbound
-queue, inbound log (rides on inbound-antispam-panel), Server › Health. No CSP
-change, no JavaScript widgets, no second framework.
+domain administrator, separately from outbound. Server › Health is built
+with the restyle (decided 2026-10-09). Three things the mockups show keep
+their own decision and are not smuggled in: queue as a table
+(`postqueue -j`), inbound queue, inbound log (rides on
+inbound-antispam-panel) — until then both queues ship the old content in the
+new shell. No CSP change, no JavaScript widgets, no second framework.
 
 **Done when:** every page renders with the component skeleton recorded in
 `panel/outlines.json`, the guard tests in the plan are green with no
@@ -434,7 +436,7 @@ of their own — answered by guard tests that land before the templates, a
 `design-first` CI step and evidence-based acceptance (plan § Enforcement).
 Competes with feature work; Bulma is ~680 kB minified, embedded once.
 
-**Version:** `2.0.0` MAJOR; `candidate` until agreed.
+**Version:** `2.0.0` MAJOR; `agreed` (owner, 2026-10-09).
 
 ---
 

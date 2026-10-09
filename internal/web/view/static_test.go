@@ -29,6 +29,7 @@ func TestStaticAssetsCarryETag(t *testing.T) {
 		// thing the panel serves and the ones a browser is most willing to keep.
 		"ibm-plex-sans.woff2", "ibm-plex-mono-400.woff2", "ibm-plex-mono-600.woff2",
 		"OFL.txt",
+		"bulma.min.css", "tabler-icons.css", "tabler-icons.woff2",
 	} {
 		rec := serveStatic("/static/"+name, nil)
 		if rec.Code != http.StatusOK {

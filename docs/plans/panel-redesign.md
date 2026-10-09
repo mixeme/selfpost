@@ -1,6 +1,6 @@
 # Plan: panel-redesign
 
-**Status:** candidate  
+**Status:** agreed (owner, 2026-10-09)  
 **Date:** 2026-09-21 (replaces the 2026-09-08 givens)  
 **Version:** `2.0.0` MAJOR — a breaking release by the owner's decision (§ No compatibility).
 
@@ -300,7 +300,7 @@ The kit is, in `internal/web/view`:
 | `components.go` | the typed input of every partial — `Head{Kicker, Title, Lead, Postmark, Actions}`, `Box{No, Title, End, Help, Variant}`, `Record{Name, Status, Host, Type, Value, InDNS}`, `Fact{Label, Value, Big}`, `SideMenu{Groups}`, `Tag{Status, Label}`, … — so a page passes a struct, not a `dict` it composes itself. A partial's input is part of its definition: components.html documents the look, `components.go` the data |
 | template functions | `status_tag` (status → `tag is-… is-light`), `copy_field`, `wbr_at` (`<wbr>` after `@` in table cells) |
 | `static/panel.css` | `panel/theme.css` + `shared/brand.css`, no rule the mockups do not have; the old stylesheet is deleted at the end, not merged |
-| `static/bulma.min.css`, icons | vendored, pinned by checksum; the icon font subset to the icons the mockups use (58 today), not the whole Tabler set |
+| `static/bulma.min.css`, icons | vendored, pinned by checksum; the icon font subset to the icons the mockups use (57 today), not the whole Tabler set |
 | `layout.html` | the shell: navbar with the wordmark, perforated edge, sibling strip, user menu, footer; the signed-out variant |
 | `GET /server/components` | the kit page, global role only: every partial in every state rendered from fixtures — the mockup `components.html` rebuilt by the real templates |
 
@@ -461,7 +461,7 @@ reviewed.
 - Weakening CSP; a JS bundler; a front-end framework.
 
 ## Implementation checklist
-No code until the roadmap status is **agreed**. Stages are ordered for
+Roadmap status: **agreed** (owner, 2026-10-09). Stages are ordered for
 development, not by feature priority (owner, 2026-10-09). Stage 1 touches no
 file under `internal/web/view` and may run alongside stage 0; stage 2 starts
 only when both are done. Every stage-2 step ends with the evidence of
@@ -477,7 +477,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 **Stage 0 — foundation and component kit** (§ Component kit)
 
-- [ ] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
+- [x] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
 - [ ] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
 - [ ] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
 - [ ] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**

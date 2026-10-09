@@ -180,6 +180,9 @@ the tree are AGPL-3.0-compatible.
 |---|---|---|---|
 | `internal/web/view/static/htmx.min.js` | 2.0.4 | <https://github.com/bigskysoftware/htmx> | 0BSD |
 | `internal/web/view/static/ibm-plex-*.woff2` | latin subset | <https://github.com/IBM/plex> | SIL OFL 1.1 (`OFL.txt` beside the files) |
+| `internal/web/view/static/bulma.min.css` | 1.0.4 | <https://github.com/jgthms/bulma> | MIT |
+| `internal/web/view/static/tabler-icons.css` | 3.49.0 (57-icon subset) | <https://github.com/tabler/tabler-icons> | MIT |
+| `internal/web/view/static/tabler-icons.woff2` | 3.49.0 (57-icon subset) | <https://github.com/tabler/tabler-icons> | MIT |
 
 ### E2e module (`test/e2e/go.mod`)
 
