@@ -1,0 +1,35 @@
+{{/* Outbound domains (mockup out-domains.html): the domains this relay signs and
+     sends for, and — for the global role, who alone adds and deletes domains —
+     the form that adds one. A domain administrator sees the list alone. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+{{if .CanManage}}
+{{template "box_open" .Add}}
+{{template "body_open"}}
+<form class="sp-form" method="post" action="/outbound/domains">
+  <div class="field has-addons">
+    <div class="control is-expanded has-icons-left"><input class="input" name="name" type="text" value="{{.AddName}}" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required><span class="icon is-left"><i class="ti ti-world"></i></span></div>
+    <div class="control"><button type="submit" class="button is-primary"><i class="ti ti-plus"></i>Add domain</button></div>
+  </div>
+  <p class="help">{{template "inline" .AddHelp}}</p>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+{{end}}
+
+{{template "box_open" .List}}
+{{if .Rows}}
+<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Domain</th><th>DNS</th><th>Selector</th><th>Apps</th><th>{{.Days}} days</th><th></th></tr></thead>
+  <tbody>{{range .Rows}}
+    <tr><td><a href="{{.Href}}"><strong>{{.Name}}</strong></a></td><td>{{range $i, $t := .DNS}}{{if $i}} {{end}}{{template "tag" $t}}{{end}}</td><td class="sp-muted sp-mono">{{.Selector}}</td><td>{{.Apps}}</td><td class="sp-muted">{{.Activity}}</td><td class="sp-actions"><a href="{{.Href}}">Open</a>{{if .DeleteHref}}<a class="has-text-danger" href="{{.DeleteHref}}">Delete</a>{{end}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{template "box_foot" .Legend}}
+{{else}}
+{{template "empty_state" .Empty}}
+{{end}}
+{{template "box_close"}}
+{{end}}

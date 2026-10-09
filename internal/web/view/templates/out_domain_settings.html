@@ -1,0 +1,84 @@
+{{/* Domain settings (mockup out-domain-settings.html): the things set once and
+     rarely touched. Each box is its own form with its own POST and none of them
+     asks for the others' fields; a refusal comes back as the flash above them.
+     The delete entry is the global role's. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+<div class="columns">
+  <div class="column is-6">
+{{template "box_open" .Reports}}
+{{template "body_open"}}
+<form class="sp-form" method="post" action="{{.ReportsAction}}">
+  <div class="field"><label class="label" for="rua">Aggregate reports (rua=)</label>
+    <div class="control"><div class="select is-fullwidth"><select id="rua" name="dmarc_rua_mode" data-custom-mode="custom">{{$sel := .RuaSelected}}{{range .RuaOptions}}
+      <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select></div></div>
+    <p class="help">{{template "inline" .RuaHelp}}</p></div>
+  <div class="field" data-custom-address><label class="label" for="rua_email">Custom report address</label>
+    <div class="control"><input class="input" id="rua_email" name="dmarc_rua_email" type="email" value="{{.RuaCustom}}" placeholder="reports@your-mail-domain.com" autocomplete="off" autocapitalize="none" spellcheck="false"></div></div>
+  <button type="submit" class="button is-primary">Save report address</button>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+
+{{template "box_open" .Export}}
+{{template "body_open"}}
+<p class="mb-3">One file with the DKIM key and every application's password hash — import it on another SelfPost and the published DNS needs no change. <strong>The file is a secret.</strong></p>
+<form class="sp-form" method="post" action="{{.ExportAction}}">
+  <div class="field"><label class="checkbox"><input type="checkbox" name="encrypt" value="1"{{if .Encrypt}} checked{{end}} data-encrypt-toggle> Encrypt with a password (<code>.spde</code>)</label></div>
+  <div data-encrypt-fields>
+    <div class="sp-pair">
+      <div class="field"><label class="label" for="encpw">Password</label><div class="control"><input class="input" id="encpw" name="password" type="password" autocomplete="new-password" minlength="{{.PasswordMin}}" placeholder="at least {{.PasswordMin}} characters"></div></div>
+      <div class="field"><label class="label" for="encpw2">Repeat password</label><div class="control"><input class="input" id="encpw2" name="password_confirm" type="password" autocomplete="new-password"></div></div>
+    </div>
+    <p class="help mb-3">Keep this password: SelfPost does not store it, and the file cannot be opened without it.</p>
+  </div>
+  <button type="submit" class="button"><i class="ti ti-download"></i>Export domain</button>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+
+  <div class="column is-6">
+{{template "box_open" .Limit}}
+{{template "body_open"}}
+<form class="sp-form mb-3" id="rate-limit" method="post" action="{{.LimitAction}}">
+  <div class="field"><label class="label" for="mode">Limit mode</label>
+    <div class="control"><div class="select is-fullwidth"><select id="mode" name="mode" data-ratelimit-mode>
+      <option value="manual"{{if not .Rate.Auto}} selected{{end}}>Manual</option>
+      <option value="auto"{{if .Rate.Auto}} selected{{end}}>Auto (from statistics)</option>
+    </select></div></div></div>
+  <div data-manual-fields>
+    <div class="sp-pair">
+      <div class="field"><label class="label" for="max">Messages (max {{.Rate.L1Messages}})</label><div class="control"><input class="input" id="max" name="max_messages" type="number" min="1" max="{{.Rate.L1Messages}}" value="{{.Rate.MaxMessages}}" placeholder="{{.Rate.L1Messages}}"></div></div>
+      <div class="field"><label class="label" for="win">Window, s</label><div class="control"><input class="input" id="win" name="window_seconds" type="number" min="1" value="{{.Rate.Window}}"></div></div>
+    </div>
+    <p class="help mb-3">Leave the message limit empty to use level 1 only.</p>
+  </div>
+  <div data-auto-fields>
+    <div class="field"><label class="label" for="mult">Multiplier ({{.Rate.MinMultiplier}}–{{.Rate.MaxMultiplier}}, default {{.Rate.DefaultMultiplier}})</label>
+      <div class="control"><input class="input" id="mult" name="auto_multiplier" type="number" min="{{.Rate.MinMultiplier}}" max="{{.Rate.MaxMultiplier}}" step="0.1" value="{{.Rate.Multiplier}}"></div>
+      <p class="help">{{template "inline" .Rate.AutoHelp}}</p></div>
+  </div>
+</form>
+<div class="buttons">
+  <button type="submit" class="button is-primary" form="rate-limit">Save limit</button>
+  {{if .Rate.Auto}}<form method="post" action="{{.RecalcAction}}"><button type="submit" class="button">Recalculate now</button></form>{{end}}
+  {{if .Rate.Active}}<form method="post" action="{{.LimitAction}}" data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply."><input type="hidden" name="clear" value="1"><button type="submit" class="button is-danger is-light">Remove limit</button></form>{{end}}
+</div>
+<p class="sp-muted mt-4">{{template "inline" .LimitNote}}</p>
+{{template "body_close"}}
+{{template "box_close"}}
+{{if .CanDelete}}
+{{template "box_open" .Delete}}
+{{template "body_open"}}
+<p class="mb-3">{{template "inline" .DeleteText}}</p>
+{{template "action" .DeleteLink}}
+{{template "body_close"}}
+{{template "box_close"}}
+{{end}}
+  </div>
+</div>
+{{end}}

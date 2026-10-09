@@ -6,24 +6,17 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/store"
-	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
-// domainRow is one line of the domain list: the stored domain plus the rolled-up
-// verdict of its published DNS records, so the operator sees which domains still
-// need a record published without opening each one.
-type domainRow struct {
-	store.Domain
-	DNS health.Status
-}
-
-// HandleDashboard is the authenticated landing page: the list of sending
-// domains with their DKIM/selector and application counts, plus the add-domain
-// form (product.md).
+// HandleDashboard is the list of sending domains with the verdict of each DNS
+// check, their application counts and the mail of the statistics window, plus —
+// for the global role — the add-domain form (product.md).
 func (h *Handlers) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 	h.renderDashboard(w, r, http.StatusOK, "", "")
 }
@@ -36,40 +29,52 @@ func (h *Handlers) renderDashboard(w http.ResponseWriter, r *http.Request, statu
 	}
 	domains, err := h.assignedDomains(p)
 	if err != nil {
-		logf("panel: dashboard: list domains: %v", err)
+		logf("panel: domains: list domains: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — domains"
-	data["Active"] = "domains"
-	data["Domains"] = h.domainRows(domains)
-	data["Error"] = formErr
-	data["FormName"] = formName
-	data["Flash"] = dashboardFlash(r)
-	h.view.Render(w, status, "dashboard", data)
+	retention := h.sendLogRetentionDays()
+	_, _, days := store.StatsWindow(retention, time.Now())
+	page := view.NewOutDomains(h.shellMeta(r), p.IsGlobal(), days).
+		WithRows(h.outDomainRows(domains, retention, p.IsGlobal())).
+		WithResult(dashboardFlash(r), formErr, formName)
+	h.view.Render(w, status, "out-domains", page)
 }
 
-func (h *Handlers) domainRows(domains []store.Domain) []domainRow {
-	rows := make([]domainRow, len(domains))
+// outDomainRows is one row per domain: the verdict of each DNS check (cached for
+// a few minutes, as on the domain page), the selector, the applications and the
+// mail of the statistics window. The checks run side by side.
+func (h *Handlers) outDomainRows(domains []store.Domain, retention int, canDelete bool) []view.OutDomainRow {
+	rows := make([]view.OutDomainRow, len(domains))
 	var wg sync.WaitGroup
 	for i, d := range domains {
-		rows[i] = domainRow{Domain: d, DNS: health.StatusUnknown}
+		rows[i] = view.OutDomainRow{
+			Name: d.Name, Href: view.DomainHref(d.ID), Selector: d.DKIMSelector, Apps: d.AppCount,
+			DNS: dnsTags(health.StatusUnknown, health.StatusUnknown, health.StatusUnknown), Activity: "—",
+		}
+		if canDelete {
+			rows[i].DeleteHref = view.DomainHref(d.ID) + "/delete"
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if stats, err := h.store.DomainSendStats(d.Name, retention, d.CreatedAt); err != nil {
+				logf("panel: domains: domain %d: send stats: %v", d.ID, err)
+			} else {
+				rows[i].Activity = view.FormatActivity(stats.Total, stats.PeakPerHour)
+			}
 			record, err := h.domains.DKIMRecord(d)
 			if err != nil {
-				logf("panel: dashboard: domain %d: dkim record: %v", d.ID, err)
+				logf("panel: domains: domain %d: dkim record: %v", d.ID, err)
 				return
 			}
 			reportEmail, err := h.domainReportAddress(d)
 			if err != nil {
-				logf("panel: dashboard: domain %d: dmarc report address: %v", d.ID, err)
+				logf("panel: domains: domain %d: dmarc report address: %v", d.ID, err)
 				return
 			}
 			dns, _ := h.domainDNS(d, record, reportEmail, false)
-			rows[i].DNS = dns.Overall
+			rows[i].DNS = dnsTags(dns.DKIM.Status, dns.SPF.Status, dns.DMARC.Status)
 		}()
 	}
 	wg.Wait()
@@ -142,13 +147,17 @@ func (h *Handlers) HandleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	h.view.Render(w, http.StatusOK, "domain_delete", map[string]any{
-		"Title":    "SelfPost — delete " + d.Name,
-		"User":     auth.CurrentUser(r),
-		"Active":   "domains",
-		"Domain":   d,
-		"IsGlobal": true,
-	})
+	apps, err := h.store.ListApplicationsByDomain(d.ID)
+	if err != nil {
+		logf("panel: delete domain %d: list applications: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	logins := make([]string, len(apps))
+	for i, a := range apps {
+		logins[i] = a.Login
+	}
+	h.view.Render(w, http.StatusOK, "out-domain-delete", view.NewOutDomainDelete(h.shellMeta(r), d.ID, d.Name, logins))
 }
 
 // HandleDeleteDomain performs the deletion and returns to the domain list.

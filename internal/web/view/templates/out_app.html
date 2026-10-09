@@ -1,0 +1,71 @@
+{{/* The application form (mockup out-app.html): who the login may send as, which
+     client IPs may use it and its own rate limit, in one form with one button.
+     The same form, empty, adds an application; the three parts are checked and
+     saved together or not at all. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+<form class="sp-form" method="post" action="{{.Action}}">
+  <div class="columns">
+    <div class="column is-4">
+{{template "box_open" .Sender}}
+{{template "body_open"}}
+      <div class="field"><label class="label" for="login">Login</label>
+        <div class="control"><input class="input sp-mono" id="login" name="login" value="{{.Login}}"{{if .LoginFixed}} readonly{{end}} autocomplete="off" autocapitalize="none" spellcheck="false" required></div>
+        <p class="help">{{template "inline" .LoginHelp}}</p></div>
+      <div class="field"><label class="label" for="amode">May send as</label>
+        <div class="control"><div class="select is-fullwidth"><select id="amode" name="mode" data-list-mode="list">{{$mode := .Mode}}{{range .Modes}}
+          <option value="{{.Value}}"{{if eq .Value $mode}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select></div></div></div>
+      <div data-addresses>
+        <div class="field"><label class="label" for="addresses">Addresses</label>
+          <div class="control"><textarea class="textarea" id="addresses" name="addresses" rows="3" placeholder="{{.Placeholder}}">{{.Addresses}}</textarea></div>
+          <p class="help">One per line. Used only with a list.</p></div>
+      </div>
+{{template "body_close"}}
+{{template "box_close"}}
+    </div>
+
+    <div class="column is-4">
+{{template "box_open" .IPs}}
+{{template "body_open"}}
+      <div class="field"><label class="checkbox"><input type="checkbox" name="auth_ip_restrict" value="1"{{if .IPRestrict}} checked{{end}}> Restrict to listed IPs</label></div>
+      <div class="field"><label class="label" for="ips">Allowed client IPs</label>
+        <div class="control"><textarea class="textarea sp-mono" id="ips" name="auth_allowed_ips" rows="3" placeholder="203.0.113.10">{{.AllowedIPs}}</textarea></div>
+        <p class="help">A login from anywhere else is refused with a 4xx at <code>MAIL FROM</code>. A sending control, fail-open — not an authentication boundary.</p></div>
+{{template "body_close"}}
+{{template "box_close"}}
+    </div>
+
+    <div class="column is-4">
+{{template "box_open" .Limit}}
+{{template "body_open"}}
+      <div class="field"><label class="label" for="rmode">Limit mode</label>
+        <div class="control"><div class="select is-fullwidth"><select id="rmode" name="rl_mode" data-ratelimit-mode>{{$limit := .LimitMode}}{{range .LimitModes}}
+          <option value="{{.Value}}"{{if eq .Value $limit}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select></div></div></div>
+      <div data-manual-fields>
+        <div class="sp-pair">
+          <div class="field"><label class="label" for="max">Messages (max {{.Rate.L1Messages}})</label><div class="control"><input class="input" id="max" name="max_messages" type="number" min="1" max="{{.Rate.L1Messages}}" value="{{.MaxMessages}}" placeholder="{{.Rate.L1Messages}}"></div></div>
+          <div class="field"><label class="label" for="win">Window, s</label><div class="control"><input class="input" id="win" name="window_seconds" type="number" min="1" value="{{.Window}}"></div></div>
+        </div>
+      </div>
+      <div data-auto-fields>
+        <div class="field"><label class="label" for="mult">Multiplier ({{.Rate.MinMultiplier}}–{{.Rate.MaxMultiplier}}, default {{.Rate.DefaultMultiplier}})</label>
+          <div class="control"><input class="input" id="mult" name="auto_multiplier" type="number" min="{{.Rate.MinMultiplier}}" max="{{.Rate.MaxMultiplier}}" step="0.1" value="{{.Multiplier}}"></div>
+          <p class="help">{{template "inline" .Rate.AutoHelp}}</p></div>
+      </div>
+      <p class="help">{{template "inline" .LimitHelp}}</p>
+{{template "body_close"}}
+{{template "box_close"}}
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button type="submit" class="button is-primary">{{.Submit}}</button>
+    {{if .Recalc}}<button type="submit" class="button" formaction="{{.Recalc}}">Recalculate rate limit</button>{{end}}
+    <a class="button is-text" href="{{.Cancel}}">Cancel</a>
+  </div>
+</form>
+{{end}}

@@ -87,6 +87,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   lists; Health holds the tables behind the cards. Both refresh themselves.
   The Queue card reads "Empty" or "N queued". `status` and `settings` are
   off the ratchet.
+- panel-redesign (stage 2): the **Outbound** domain pages are in the new
+  design: the domain list, the domain page (DNS records with what to
+  publish and what is in DNS now, applications, connection), **Domain
+  settings** as a page of its own (report address, rate limit, export,
+  delete), the application form, the password shown once and the delete
+  confirmation. `dashboard`, `domain_detail` and `domain_delete` are off
+  the ratchet.
 
 ### Changed
 
@@ -112,6 +119,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   exist before stage 1; only the kit page uses that shell so far.
 - panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
   the component kit.
+
+### Fixed
+
+- Saving a domain's report-address form untouched no longer moves a domain
+  that follows another user's default to whoever saved it: that user's
+  default is its own choice, and "My default instead" is the change.
+- The auto rate-limit fields follow the limit mode on the domain and
+  application forms (the script applied only the first matching rule).
 
 ### Removed
 

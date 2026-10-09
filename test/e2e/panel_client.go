@@ -161,7 +161,7 @@ func (c *panelClient) dkimRecord(domainID string) (name, value string, err error
 	if !ok {
 		return "", "", fmt.Errorf("could not find DKIM record name on domain page")
 	}
-	value, ok = extractCodeRow(body, "Value")
+	value, ok = extractCodeRow(body, "Value to publish")
 	if !ok {
 		return "", "", fmt.Errorf("could not find DKIM record value on domain page")
 	}
@@ -236,18 +236,17 @@ func (c *panelClient) status() (*http.Response, error) {
 	return resp, err
 }
 
-// applicationID scrapes an application's numeric id off its block on the domain
-// page, keyed by login — needed to build /applications/{id}/ratelimit, which the
-// add-application response (just the login/password) does not carry. The id is
-// taken from the first action posted under that login, whichever it is, so
-// reordering the block's controls does not break the scrape; only the login
-// heading itself is anchored on.
+// applicationID scrapes an application's numeric id off its row of the domain
+// page, keyed by login — needed to build the application's own address
+// (/outbound/domains/{id}/applications/{aid}), which the add-application
+// response (just the login/password) does not carry. The id is taken from the
+// row's Edit link, so only the login cell itself is anchored on.
 func (c *panelClient) applicationID(domainID, login string) (string, error) {
 	_, body, err := c.get("/outbound/domains/" + domainID)
 	if err != nil {
 		return "", err
 	}
-	pattern := `(?s)<p class="app-login">` + regexp.QuoteMeta(login) + `</p>.*?/applications/(\d+)/`
+	pattern := `(?s)<strong>` + regexp.QuoteMeta(login) + `</strong></td>.*?/applications/(\d+)"`
 	m := regexp.MustCompile(pattern).FindStringSubmatch(body)
 	if m == nil {
 		return "", fmt.Errorf("could not find application id for login %q", login)
@@ -255,18 +254,24 @@ func (c *panelClient) applicationID(domainID, login string) (string, error) {
 	return m[1], nil
 }
 
-// extractCodeRow scrapes the value of a "<label>LABEL</label> ... <span
-// class=\"code\">VALUE</span>" pair from a rendered panel page (see
-// internal/web/templates/domain_detail.html). It is deliberately anchored to
-// the label text rather than position, so it survives unrelated template
-// reordering. html/template's escaper is conservative about which characters
-// it entity-encodes in text nodes — a DKIM value's base64 "+" comes back as
-// "&#43;" — so the match is HTML-unescaped before returning.
+// extractCodeRow scrapes the value of a copy field — a "<label class=\"label\">
+// LABEL</label>" followed by its read-only input or textarea (the panel's
+// copy_field partial, internal/web/view/templates/components.html) — from a
+// rendered panel page. It is deliberately anchored to the label text rather
+// than position, so it survives unrelated template reordering. html/template's
+// escaper is conservative about which characters it entity-encodes — a DKIM
+// value's base64 "+" comes back as "&#43;" — so the match is HTML-unescaped
+// before returning.
 func extractCodeRow(body, label string) (string, bool) {
-	pattern := `<label>` + regexp.QuoteMeta(label) + `</label>\s*<div class="code-row">\s*<span class="code">([^<]*)</span>`
+	pattern := `<label class="label">` + regexp.QuoteMeta(label) + `</label>\s*<div class="field has-addons"><div class="control is-expanded">` +
+		`(?:<input class="input" readonly value="([^"]*)">|<textarea class="textarea" rows="\d+" readonly>([^<]*)</textarea>)`
 	m := regexp.MustCompile(pattern).FindStringSubmatch(body)
 	if m == nil {
 		return "", false
 	}
-	return html.UnescapeString(strings.TrimSpace(m[1])), true
+	value := m[1]
+	if value == "" {
+		value = m[2]
+	}
+	return html.UnescapeString(strings.TrimSpace(value)), true
 }

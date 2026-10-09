@@ -34,7 +34,7 @@
 {{/* action is a button in a page head or a box foot (input: Action): a link, or
      a POST form with one submit button when Post is set — a state change is
      never a link. */}}
-{{define "action"}}{{if .Post}}<form method="post" action="{{.Post}}"><button type="submit" class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</button></form>{{else}}<a class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}" href="{{.Href}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</a>{{end}}{{end}}
+{{define "action"}}{{if .Post}}<form method="post" action="{{.Post}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}}><button type="submit" class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</button></form>{{else}}<a class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}" href="{{.Href}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</a>{{end}}{{end}}
 
 {{/* ---- page head and postmark */}}
 

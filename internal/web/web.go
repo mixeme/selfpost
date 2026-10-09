@@ -195,9 +195,7 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	authed.HandleFunc("POST /outbound/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck)
 	authed.HandleFunc("GET /outbound/domains/{id}/delete", h.HandleDeleteConfirm)
 	authed.HandleFunc("POST /outbound/domains/{id}/delete", h.HandleDeleteDomain)
-	// Until the domain page is split in two (stage 2), its settings half is
-	// still the lower part of the one old page.
-	authed.HandleFunc("GET /outbound/domains/{id}/settings", h.HandleDomainDetail)
+	authed.HandleFunc("GET /outbound/domains/{id}/settings", h.HandleDomainSettings)
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/reports", h.HandleDomainDMARC)
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit)
 	authed.HandleFunc("POST /outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc)

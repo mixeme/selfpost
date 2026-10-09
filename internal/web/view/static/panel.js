@@ -136,6 +136,8 @@
     if (!form) {
       return;
     }
+    // A control can drive more than one block (the rate-limit select shows the
+    // manual fields or the auto ones), so every rule that matches is applied.
     for (var i = 0; i < showWhenRules.length; i++) {
       var rule = showWhenRules[i];
       if (!control.matches(rule.match)) {
@@ -143,7 +145,7 @@
       }
       var target = form.querySelector(rule.target);
       if (!target) {
-        return;
+        continue;
       }
       var show = rule.visible(control);
       target.hidden = !show;
@@ -152,7 +154,6 @@
           input.value = "";
         });
       }
-      return;
     }
   }
 

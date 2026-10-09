@@ -1,0 +1,32 @@
+{{/* Delete an outbound domain (mockup out-domain-delete.html): what goes with it,
+     the one button that does it, and the way back. Moving the domain is the
+     alternative, beside it. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+<div class="columns">
+  <div class="column is-7">
+{{template "box_open" .Danger}}
+{{template "body_open"}}
+<p class="mb-3">{{template "inline" .Intro}}</p>
+{{template "confirm_list" .Consequences}}
+<p class="sp-muted mb-4">{{template "inline" .Note}}</p>
+<form method="post" action="{{.Action}}">
+  <div class="buttons">
+    <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>{{.Confirm}}</button>
+    <a class="button is-text" href="{{.KeepHref}}">Keep it</a>
+  </div>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+
+  <div class="column is-5">
+{{template "box_open" .Moving}}
+{{template "body_open"}}
+<p>{{template "inline" .MovingText}}</p>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+</div>
+{{end}}

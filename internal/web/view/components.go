@@ -184,12 +184,16 @@ type Crumb struct {
 }
 
 // Action is a button in a Head or a Foot: a link to Href, or a POST form
-// submitting to Post. Icon is a Tabler class ("ti-refresh").
+// submitting to Post. Icon is a Tabler class ("ti-refresh"). Confirm, set on a
+// POST that deletes something or ends a working password, is the question
+// panel.js asks before the form is sent (data-confirm); it adds an attribute and
+// no markup.
 type Action struct {
 	Label   string
 	Icon    string
 	Href    string
 	Post    string
+	Confirm string
 	Primary bool
 	Danger  bool
 }

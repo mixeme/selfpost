@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -14,74 +15,24 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
-// newCred carries a freshly generated login/password to the template so it can
-// be shown exactly once (security.md). It is never read back from storage.
-type newCred struct {
-	Login    string
-	Password string
-}
-
-// detailView holds the one-shot, request-specific extras layered on top of a
-// domain's persistent state when rendering its page: an application-form error,
-// the values to repopulate that form, and any just-issued credential to show
-// once.
-type detailView struct {
-	FormErr   string
-	FormLogin string
-	FormMode  string
-	FormAddrs string
-	NewCred   *newCred
-	// RateLimitErr surfaces a validation error from a domain- or
-	// application-level rate-limit form (guide § Rate limiting) as a page
-	// banner.
-	RateLimitErr string
-	// ExportErr surfaces a rejected encryption password from the export card.
-	ExportErr string
-}
-
-// appRateLimitView pairs an application with its differentiated rate-limit
-// settings for the domain page. store.Application is embedded so the existing
-// template fields (Login, AddressMode, Addresses, ID) resolve unchanged.
-type appRateLimitView struct {
-	store.Application
-	HasLimit       bool
-	AuthIPsText    string
-	MaxText        string
-	WindowVal      string
-	Mode           string
-	AutoMultiplier string
-	AutoUpdated    string
-	IsAuto         bool
-	// RLMode is the form's limit choice: "domain" (no limit of its own),
-	// "manual" or "auto".
-	RLMode string
-	Stats  sendStatsView
-}
-
-// sendStatsView is the template-facing send statistics block.
-type sendStatsView struct {
-	Total       int64
-	PeakPerHour int64
-	AvgPerHour  string
-}
-
-// HandleDomainDetail shows a single domain: its DKIM DNS record (product.md)
-// and its applications with the controls to add, edit, delete and re-issue
-// credentials (product.md).
+// HandleDomainDetail shows a single domain: the DNS records it must publish and
+// what DNS says about them, its applications and how to connect (product.md).
 func (h *Handlers) HandleDomainDetail(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
-	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+	h.renderDomain(w, r, http.StatusOK, d)
 }
 
-// renderDomainDetail renders the domain page. view supplies request-specific
-// extras (form error/values, a one-time credential); everything else is loaded
-// fresh from the stores so the page always reflects committed state.
-func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, status int, d store.Domain, view detailView) {
+// renderDomain renders the domain page. Everything is loaded fresh from the
+// stores, so the page always reflects committed state; the DNS state is cached
+// by the checker, so re-rendering after a redirect costs nothing.
+func (h *Handlers) renderDomain(w http.ResponseWriter, r *http.Request, status int, d store.Domain) {
+	p, _ := h.principal(r)
 	record, err := h.domains.DKIMRecord(d)
 	if err != nil {
 		logf("panel: domain %d: dkim record: %v", d.ID, err)
@@ -94,49 +45,16 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	appViews := make([]appRateLimitView, 0, len(apps))
 	retention := h.sendLogRetentionDays()
+	rows := make([]view.OutAppRow, 0, len(apps))
 	for _, a := range apps {
-		rl, ok, err := h.apps.RateLimit(a.ID)
+		row, err := h.outAppRow(d, a, retention)
 		if err != nil {
-			logf("panel: application %d: rate limit: %v", a.ID, err)
+			logf("panel: application %d: %v", a.ID, err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		appStats, err := h.store.AppSendStats(a.Login, retention, a.CreatedAt)
-		if err != nil {
-			logf("panel: application %d: send stats: %v", a.ID, err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		mode := store.RateLimitModeManual
-		if ok && rl.Mode != "" {
-			mode = rl.Mode
-		}
-		mult := rl.AutoMultiplier
-		if mult <= 0 {
-			mult = store.DefaultAutoMultiplier
-		}
-		appViews = append(appViews, appRateLimitView{
-			Application:    a,
-			HasLimit:       ok && rl.Active(),
-			AuthIPsText:    strings.Join(a.AuthAllowedIPs, "\n"),
-			MaxText:        intOrBlank(rl.MaxMessages),
-			WindowVal:      windowOrDefault(rl.WindowSeconds),
-			Mode:           mode,
-			AutoMultiplier: formatMultiplier(mult),
-			IsAuto:         ok && rl.IsAuto(),
-			RLMode:         limitChoice(rl, ok),
-			AutoUpdated:    formatAutoUpdated(rl.AutoUpdatedAt),
-			Stats:          formatSendStats(appStats),
-		})
-	}
-
-	domainRL, domainRLok, err := h.domains.RateLimit(d.ID)
-	if err != nil {
-		logf("panel: domain %d: rate limit: %v", d.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		rows = append(rows, row)
 	}
 	domainStats, err := h.store.DomainSendStats(d.Name, retention, d.CreatedAt)
 	if err != nil {
@@ -144,20 +62,15 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	domainMode := store.RateLimitModeManual
-	domainMult := store.DefaultAutoMultiplier
-	if domainRLok {
-		if domainRL.Mode != "" {
-			domainMode = domainRL.Mode
-		}
-		if domainRL.AutoMultiplier > 0 {
-			domainMult = domainRL.AutoMultiplier
-		}
+	domainRL, domainRLok, err := h.domains.RateLimit(d.ID)
+	if err != nil {
+		logf("panel: domain %d: rate limit: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
 
 	// What DNS actually publishes for the domain today, checked against the key
-	// this server signs with. Cached by the checker, so re-rendering the page
-	// after a form post costs nothing.
+	// this server signs with.
 	reportEmail, err := h.domainReportAddress(d)
 	if err != nil {
 		logf("panel: domain %d: dmarc report address: %v", d.ID, err)
@@ -165,97 +78,216 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		return
 	}
 	dns, srv := h.domainDNS(d, record, reportEmail, false)
-	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
-	hostedAddr := h.hostedDMARCAddress(d.Name)
-	// The form's "inherit" is a domain that follows a user's default. What it
-	// offers next to that choice is the address following would give: the
-	// followed user's when the domain already follows one, otherwise the
-	// signed-in user's own — choosing it makes the domain follow them.
-	dmarcMode := "inherit"
-	dmarcCustom := ""
-	profileEmail := reportEmail
-	if !d.DMARCRuaUserID.Valid {
-		profileEmail = ""
-		if p, ok := h.principal(r); ok {
-			if def, err := h.store.GetDMARCDefault(p.ID); err == nil {
-				profileEmail = def.Resolve(hostedAddr)
-			}
-		}
-		switch {
-		case d.DMARCRua == "":
-			dmarcMode = "none"
-		case hostedAddr != "" && strings.EqualFold(d.DMARCRua, hostedAddr):
-			dmarcMode = "hosted"
-		default:
-			dmarcMode = "custom"
-			dmarcCustom = d.DMARCRua
-		}
+	records := []view.Record{
+		view.DKIMRecord(d.DKIMSelector, record.Name, record.Value, dnsCheck(dns.DKIM)),
+		view.SPFRecord(d.Name, dnscheck.SPFExample(h.cfg.Hostname, srv.IPs), dnsCheck(dns.SPF)),
 	}
-	dmarcSource := "policy"
-	switch {
-	case dmarcMode == "hosted":
-		dmarcSource = "hosted"
-	case dmarcMode == "custom":
-		dmarcSource = "custom"
-	case dmarcMode == "none":
-		dmarcSource = "none"
-	case reportEmail != "":
-		dmarcSource = "settings"
+	reports := ""
+	if h.cfg.DMARCEnabled && reportEmail != "" {
+		reports = "/outbound/dmarc/domains/" + strconv.FormatInt(d.ID, 10)
+	}
+	records = append(records, view.DMARCRecord(view.DMARCRecordInput{
+		Host: dnscheck.DMARCRecordName(d.Name), Value: dnscheck.DMARCExample(reportEmail), Check: dnsCheck(dns.DMARC),
+		Source: h.reportSource(d, reportEmail), SettingsHref: view.DomainHref(d.ID) + "/settings", ReportsHref: reports,
+		SameDomain: reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name) &&
+			!(h.cfg.DMARCEnabled && dmarc.IsHostedOnHostname(reportEmail, h.cfg.Hostname)),
+	}))
+	if name, value, needs := dnscheck.ExternalReportAuth(d.Name, reportEmail); needs {
+		records = append(records, view.ReportAuthRecord(name, value, dnsCheck(dns.DMARCReportAuth)))
 	}
 
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — " + d.Name
-	data["Active"] = "domains"
-	data["Domain"] = d
-	data["Record"] = record
-	data["DNS"] = dns
-	data["SPFExample"] = dnscheck.SPFExample(h.cfg.Hostname, srv.IPs)
-	data["DMARCName"] = dnscheck.DMARCRecordName(d.Name)
-	data["DMARCExample"] = dnscheck.DMARCExample(reportEmail)
-	data["DMARCSource"] = dmarcSource
-	data["ProfileDMARCEmail"] = profileEmail
-	data["ResolvedDMARCEmail"] = reportEmail
-	data["DMARCRuaMode"] = dmarcMode
-	data["DMARCRuaCustom"] = dmarcCustom
-	data["HostedDMARCEmail"] = hostedAddr
-	data["DMARCIngestEnabled"] = h.cfg.DMARCEnabled
-	data["ReportAuthName"] = reportAuthName
-	data["ReportAuthValue"] = reportAuthValue
-	data["NeedsReportAuth"] = needsReportAuth
-	data["SameDomainRUA"] = reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name) &&
-		!(h.cfg.DMARCEnabled && dmarc.IsHostedOnHostname(reportEmail, h.cfg.Hostname))
-	data["Hostname"] = h.cfg.Hostname
-	data["SubmissionEnabled"] = h.cfg.SubmissionEnabled
-	data["Apps"] = appViews
-	data["Error"] = view.FormErr
-	data["FormLogin"] = view.FormLogin
-	data["FormMode"] = view.FormMode
-	data["FormAddrs"] = view.FormAddrs
-	data["NewCred"] = view.NewCred
-	data["Flash"] = detailFlash(r)
-	data["Wildcard"] = store.AddressModeWildcard
-	data["List"] = store.AddressModeList
-	data["RateLimitErr"] = view.RateLimitErr
-	data["ExportErr"] = view.ExportErr
-	data["MinPwLen"] = validate.MinSecretFilePasswordLen
-	data["DomainHasRL"] = domainRLok && domainRL.Active()
-	data["DomainRLMax"] = intOrBlank(domainRL.MaxMessages)
-	data["DomainRLWin"] = windowOrDefault(domainRL.WindowSeconds)
-	data["DomainRLMaxNum"] = domainRL.MaxMessages
-	data["DomainRLMode"] = domainMode
-	data["DomainRLAuto"] = domainRLok && domainRL.IsAuto()
-	data["DomainRLMultiplier"] = formatMultiplier(domainMult)
-	data["DomainRLAutoUpdated"] = formatAutoUpdated(domainRL.AutoUpdatedAt)
-	data["DomainStats"] = formatSendStats(domainStats)
-	data["StatsWindowDays"] = domainStats.WindowDays
-	data["StatsRetentionWarning"] = retention < store.StatsWindowDays
-	data["L1Messages"] = h.l1Messages()
-	data["L1Window"] = h.l1Window()
-	data["DefaultAutoMultiplier"] = store.DefaultAutoMultiplier
-	data["MinAutoMultiplier"] = store.MinAutoMultiplier
-	data["MaxAutoMultiplier"] = store.MaxAutoMultiplier
-	h.view.Render(w, status, "domain_detail", data)
+	page := view.NewOutDomain(h.shellMeta(r), d.ID, d.Name, p.IsGlobal()).
+		WithStats(domainStats.Total, domainStats.PeakPerHour, fmt.Sprintf("%.1f", domainStats.AvgPerHour), domainStats.WindowDays).
+		WithRecords(records, view.FormatAge(dns.CheckedAt, time.Now())).
+		WithApplications(rows).
+		WithConnection(h.cfg.Hostname, h.cfg.SubmissionEnabled).
+		WithSeeAlso("/outbound/log?domain="+url.QueryEscape(d.Name), reports).
+		WithRateLimit(domainRLok && domainRL.IsAuto(), domainRLok && domainRL.Active() && !domainRL.IsAuto()).
+		WithResult(detailFlash(r))
+	h.view.Render(w, status, "out-domain", page)
 }
+
+// dnsCheck is a DNS result as the view reads it.
+func dnsCheck(r dnscheck.Result) view.DNSCheck {
+	return view.DNSCheck{Status: string(r.Status), Detail: r.Detail, Found: r.Records}
+}
+
+// reportSource says in words where a domain's DMARC reports go: the default of
+// the user it follows, the hosted address, an address of its own, or nowhere.
+func (h *Handlers) reportSource(d store.Domain, reportEmail string) string {
+	switch {
+	case d.DMARCRuaUserID.Valid:
+		if def, err := h.store.GetDMARCDefault(d.DMARCRuaUserID.Int64); err == nil && def.Username != "" {
+			return def.Username + "'s default"
+		}
+		return "a user's default"
+	case reportEmail == "":
+		return "none"
+	case strings.EqualFold(reportEmail, h.hostedDMARCAddress(d.Name)):
+		return "SelfPost hosted"
+	}
+	return "a custom address"
+}
+
+// outAppRow is one line of the Applications table of a domain.
+func (h *Handlers) outAppRow(d store.Domain, a store.Application, retention int) (view.OutAppRow, error) {
+	rl, ok, err := h.apps.RateLimit(a.ID)
+	if err != nil {
+		return view.OutAppRow{}, fmt.Errorf("rate limit: %w", err)
+	}
+	stats, err := h.store.AppSendStats(a.Login, retention, a.CreatedAt)
+	if err != nil {
+		return view.OutAppRow{}, fmt.Errorf("send stats: %w", err)
+	}
+	senders := a.Addresses
+	if a.AddressMode == store.AddressModeWildcard {
+		senders = []string{"*@" + d.Name}
+	}
+	limits := []view.Tag{{Label: "domain"}}
+	if ok && rl.Active() {
+		label := view.FormatRate(rl.MaxMessages, rl.WindowSeconds)
+		if rl.IsAuto() {
+			label = "auto · " + label
+		}
+		limits = []view.Tag{{Status: "ok", Label: label}}
+	}
+	if a.AuthIPRestrict {
+		label := strconv.Itoa(len(a.AuthAllowedIPs)) + " IPs"
+		if len(a.AuthAllowedIPs) == 1 {
+			label = "1 IP"
+		}
+		limits = append(limits, view.Tag{Status: "ok", Label: label})
+	}
+	return view.OutAppRow{
+		Login: a.Login, Senders: senders, Activity: view.FormatActivity(stats.Total, stats.PeakPerHour), Limits: limits,
+		Edit: fmt.Sprintf("%s/applications/%d", view.DomainHref(d.ID), a.ID),
+	}, nil
+}
+
+// settingsView is what a re-shown settings page carries besides the stored
+// state: the refusal, and the report-address choice and custom address that
+// were submitted (empty: show what is stored).
+type settingsView struct {
+	Err       string
+	RuaMode   string
+	RuaCustom string
+}
+
+// HandleDomainSettings shows the settings that are set once and rarely
+// touched: where DMARC reports go, the domain's rate limit, the export and the
+// delete entry.
+func (h *Handlers) HandleDomainSettings(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.lookupDomain(w, r)
+	if !ok {
+		return
+	}
+	h.renderDomainSettings(w, r, http.StatusOK, d, settingsView{})
+}
+
+func (h *Handlers) renderDomainSettings(w http.ResponseWriter, r *http.Request, status int, d store.Domain, sv settingsView) {
+	p, _ := h.principal(r)
+	rl, ok, err := h.domains.RateLimit(d.ID)
+	if err != nil {
+		logf("panel: domain %d: rate limit: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	stats, err := h.store.DomainSendStats(d.Name, h.sendLogRetentionDays(), d.CreatedAt)
+	if err != nil {
+		logf("panel: domain %d: send stats: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	mult := rl.AutoMultiplier
+	if !ok || mult <= 0 {
+		mult = store.DefaultAutoMultiplier
+	}
+	rate := view.DomainRateLimit{
+		Active: ok && rl.Active(), Auto: ok && rl.IsAuto(),
+		MaxMessages: intOrBlank(rl.MaxMessages), Window: windowOrDefault(rl.WindowSeconds), Multiplier: formatMultiplier(mult),
+		Peak: stats.PeakPerHour, Updated: formatAutoUpdated(rl.AutoUpdatedAt),
+		L1Messages: h.l1Messages(), L1Window: h.l1Window(),
+		MinMultiplier: formatBound(store.MinAutoMultiplier), MaxMultiplier: formatBound(store.MaxAutoMultiplier),
+		DefaultMultiplier: formatBound(store.DefaultAutoMultiplier),
+	}
+	if rate.Auto {
+		rate.Computed = intOrBlank(rl.MaxMessages)
+	}
+
+	options, selected, custom, help := h.reportAddressForm(r, d)
+	if sv.RuaMode != "" {
+		selected, custom = sv.RuaMode, sv.RuaCustom
+	}
+	page := view.NewOutDomainSettings(h.shellMeta(r), d.ID, d.Name, d.AppCount, p.IsGlobal()).
+		WithReportAddress(options, selected, custom, help).
+		WithExport(validate.MinSecretFilePasswordLen).
+		WithRateLimit(rate).
+		WithResult("", sv.Err)
+	h.view.Render(w, status, "out-domain-settings", page)
+}
+
+// reportAddressForm is the choices of the report-address select for a domain
+// and the signed-in user. "inherit" makes the domain follow the default of the
+// user who saves the form (HandleDomainDMARC), so what the option says depends
+// on whom the domain follows now: the user themselves, someone else, or nobody.
+// A domain that follows someone else also offers "keep" — that user's default,
+// selected — so saving the form untouched does not take the domain over.
+func (h *Handlers) reportAddressForm(r *http.Request, d store.Domain) (options []view.Option, selected, custom string, help view.Text) {
+	hosted := h.hostedDMARCAddress(d.Name)
+	me, _ := h.principal(r)
+	mine, _ := h.store.GetDMARCDefault(me.ID)
+	address := func(a string) string {
+		if a == "" {
+			return "no report address yet"
+		}
+		return a
+	}
+	myAddr := address(mine.Resolve(hosted))
+
+	help = view.Rich("A default belongs to a user and is set under their ", view.Link("/account#dmarc", "Account"),
+		"; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish.")
+	inherit := view.Option{Value: "inherit", Label: "My default — " + myAddr}
+	followsOther := d.DMARCRuaUserID.Valid && d.DMARCRuaUserID.Int64 != me.ID
+	switch {
+	case followsOther:
+		inherit.Label = "My default instead — " + myAddr + " (you are " + me.Username + ")"
+		keep := view.Option{Value: "keep", Label: "Another user's default"}
+		if other, err := h.store.GetDMARCDefault(d.DMARCRuaUserID.Int64); err == nil {
+			keep.Label = other.Username + "'s default — " + address(other.Resolve(hosted))
+		}
+		options = append(options, keep)
+	case d.DMARCRuaUserID.Valid:
+		inherit.Label = me.Username + "'s default — " + myAddr
+		options = append(options, inherit)
+	default:
+		options = append(options, inherit)
+	}
+	if hosted != "" {
+		options = append(options, view.Option{Value: "hosted", Label: "SelfPost hosted (" + hosted + ")"})
+	}
+	// The mockup's order: whose default is followed now, hosted, "mine instead".
+	if followsOther {
+		options = append(options, inherit)
+	}
+	options = append(options, view.Option{Value: "none", Label: "No aggregate reports"}, view.Option{Value: "custom", Label: "Custom address"})
+
+	switch {
+	case followsOther:
+		selected = "keep"
+	case d.DMARCRuaUserID.Valid:
+		selected = "inherit"
+	case d.DMARCRua == "":
+		selected = "none"
+	case hosted != "" && strings.EqualFold(d.DMARCRua, hosted):
+		selected = "hosted"
+	default:
+		selected, custom = "custom", d.DMARCRua
+	}
+	return options, selected, custom, help
+}
+
+// formatBound writes a multiplier bound the short way: "1.5", "5".
+func formatBound(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
 // records. The server's own address comes from the (separately
@@ -327,14 +359,6 @@ func windowOrDefault(n int) string {
 		return strconv.Itoa(defaultRateLimitWindowSeconds)
 	}
 	return strconv.Itoa(n)
-}
-
-func formatSendStats(s store.SendStats) sendStatsView {
-	return sendStatsView{
-		Total:       s.Total,
-		PeakPerHour: s.PeakPerHour,
-		AvgPerHour:  fmt.Sprintf("%.1f", s.AvgPerHour),
-	}
 }
 
 func formatMultiplier(v float64) string {
@@ -429,14 +453,129 @@ func noStore(w http.ResponseWriter) {
 	w.Header().Set("Pragma", "no-cache")
 }
 
-// HandleApplicationNew shows the form that adds an application. Until the
-// domain page is split (stage 2) the form is a card of that page.
+// blankAppForm is the application form as it opens: any address of the domain,
+// no client IPs, the domain's limit.
+func blankAppForm() view.OutAppForm {
+	return view.OutAppForm{
+		Mode: store.AddressModeWildcard, LimitMode: view.LimitDomain,
+		Window: strconv.Itoa(defaultRateLimitWindowSeconds), Multiplier: formatMultiplier(store.DefaultAutoMultiplier),
+	}
+}
+
+// submittedAppForm reads the application form as it was posted, to show it
+// again with its refusal and what was typed.
+func submittedAppForm(r *http.Request) view.OutAppForm {
+	f := blankAppForm()
+	f.Login = strings.TrimSpace(r.PostFormValue("login"))
+	if mode := r.PostFormValue("mode"); mode != "" {
+		f.Mode = mode
+	}
+	f.Addresses = r.PostFormValue("addresses")
+	f.IPRestrict = r.PostFormValue("auth_ip_restrict") != ""
+	f.AllowedIPs = r.PostFormValue("auth_allowed_ips")
+	if mode := strings.TrimSpace(r.PostFormValue("rl_mode")); mode != "" {
+		f.LimitMode = mode
+	}
+	f.MaxMessages = r.PostFormValue("max_messages")
+	if window := r.PostFormValue("window_seconds"); window != "" {
+		f.Window = window
+	}
+	if mult := r.PostFormValue("auto_multiplier"); mult != "" {
+		f.Multiplier = mult
+	}
+	return f
+}
+
+// renderApplicationForm renders the application form: empty for a new
+// application (a == nil), or the stored one. submitted, when set, replaces the
+// fields with what was posted; formErr is the refusal shown above the form.
+func (h *Handlers) renderApplicationForm(w http.ResponseWriter, r *http.Request, status int, d store.Domain,
+	a *store.Application, submitted *view.OutAppForm, formErr string) {
+	fail := func(what string, err error) {
+		logf("panel: domain %d: application form: %s: %v", d.ID, what, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+	retention := h.sendLogRetentionDays()
+	domainRL, domainRLok, err := h.domains.RateLimit(d.ID)
+	if err != nil {
+		fail("domain rate limit", err)
+		return
+	}
+	rate := view.AppRateLimit{
+		L1Messages: h.l1Messages(), L1Window: h.l1Window(),
+		MinMultiplier: formatBound(store.MinAutoMultiplier), MaxMultiplier: formatBound(store.MaxAutoMultiplier),
+		DefaultMultiplier: formatBound(store.DefaultAutoMultiplier),
+	}
+	if domainRLok && domainRL.Active() {
+		rate.DomainLimit = view.FormatRate(domainRL.MaxMessages, domainRL.WindowSeconds)
+	}
+
+	var (
+		page  *view.OutApp
+		form  = blankAppForm()
+		state view.OutAppState
+	)
+	if a == nil {
+		page = view.NewOutApp(h.shellMeta(r), d.ID, d.Name, "")
+	} else {
+		rl, ok, err := h.apps.RateLimit(a.ID)
+		if err != nil {
+			fail("rate limit", err)
+			return
+		}
+		stats, err := h.store.AppSendStats(a.Login, retention, a.CreatedAt)
+		if err != nil {
+			fail("send stats", err)
+			return
+		}
+		mult := rl.AutoMultiplier
+		if mult <= 0 {
+			mult = store.DefaultAutoMultiplier
+		}
+		form = view.OutAppForm{
+			Login: a.Login, Mode: a.AddressMode, Addresses: strings.Join(a.Addresses, "\n"),
+			IPRestrict: a.AuthIPRestrict, AllowedIPs: strings.Join(a.AuthAllowedIPs, "\n"),
+			LimitMode: limitChoice(rl, ok), MaxMessages: intOrBlank(rl.MaxMessages), Window: windowOrDefault(rl.WindowSeconds),
+			Multiplier: formatMultiplier(mult),
+		}
+		state = view.OutAppState{IPs: a.AuthIPRestrict, Limit: ok && rl.Active(), Auto: ok && rl.IsAuto()}
+		rate.Peak = stats.PeakPerHour
+		if state.Auto {
+			rate.Computed, rate.Updated = intOrBlank(rl.MaxMessages), formatAutoUpdated(rl.AutoUpdatedAt)
+		}
+		page = view.NewOutApp(h.shellMeta(r), d.ID, d.Name, a.Login).
+			WithApplication(d.ID, a.ID, stats.Total, stats.PeakPerHour, fmt.Sprintf("%.1f", stats.AvgPerHour), stats.WindowDays)
+	}
+	if submitted != nil {
+		form = *submitted
+		if a != nil {
+			form.Login = a.Login // the login is not renamed by this form
+		}
+	}
+	h.view.Render(w, status, "out-app", page.WithForm(form, state, rate).WithResult("", formErr))
+}
+
+// renderPasswordOnce answers with the page that shows a password a single time:
+// the login and the password, which are not stored, and how to connect. The
+// response is the one place the password exists, so it is never cached.
+func (h *Handlers) renderPasswordOnce(w http.ResponseWriter, r *http.Request, status int, d store.Domain,
+	a store.Application, password string, fresh bool) {
+	senders := a.Addresses
+	if a.AddressMode == store.AddressModeWildcard {
+		senders = []string{"*@" + d.Name}
+	}
+	noStore(w)
+	h.view.Render(w, status, "out-app-created", view.NewOutAppCreated(h.shellMeta(r), d.ID, d.Name, a.Login, password, fresh,
+		h.cfg.Hostname, h.cfg.SubmissionEnabled, senders))
+}
+
+// HandleApplicationNew shows the form that adds an application.
 func (h *Handlers) HandleApplicationNew(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return
 	}
-	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+	h.renderApplicationForm(w, r, http.StatusOK, d, nil, nil, "")
 }
 
 // HandleApplicationCreate creates an application with all of its settings and
@@ -449,47 +588,34 @@ func (h *Handlers) HandleApplicationCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d,
-			detailView{FormErr: "Invalid form submission.", FormMode: store.AddressModeWildcard})
+		h.renderApplicationForm(w, r, http.StatusBadRequest, d, nil, nil, "Invalid form submission.")
 		return
 	}
-	login := strings.TrimSpace(r.PostFormValue("login"))
-	repopulate := detailView{
-		FormLogin: login,
-		FormMode:  r.PostFormValue("mode"),
-		FormAddrs: r.PostFormValue("addresses"),
-	}
+	submitted := submittedAppForm(r)
 	set, err := h.parseApplicationForm(r)
 	if err != nil {
-		repopulate.FormErr = err.Error()
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, repopulate)
+		h.renderApplicationForm(w, r, http.StatusBadRequest, d, nil, &submitted, err.Error())
 		return
 	}
-	a, password, err := h.apps.CreateWithSettings(d.ID, login, set, h.recalcApp)
+	a, password, err := h.apps.CreateWithSettings(d.ID, submitted.Login, set, h.recalcApp)
 	if err != nil {
-		repopulate.FormErr = applicationErrorMessage(err)
 		status := http.StatusBadRequest
 		if errors.Is(err, store.ErrLoginExists) {
 			status = http.StatusConflict
 		}
-		h.renderDomainDetail(w, r, status, d, repopulate)
+		h.renderApplicationForm(w, r, status, d, nil, &submitted, applicationErrorMessage(err))
 		return
 	}
-	noStore(w)
-	h.renderDomainDetail(w, r, http.StatusCreated, d, detailView{
-		FormMode: store.AddressModeWildcard,
-		NewCred:  &newCred{Login: a.Login, Password: password},
-	})
+	h.renderPasswordOnce(w, r, http.StatusCreated, d, a, password, true)
 }
 
-// HandleApplicationEdit shows an application's form. Until the domain page is
-// split (stage 2) that is the application's Edit panel on the domain page.
+// HandleApplicationEdit shows an application's form.
 func (h *Handlers) HandleApplicationEdit(w http.ResponseWriter, r *http.Request) {
-	_, d, ok := h.lookupDomainApplication(w, r)
+	a, d, ok := h.lookupDomainApplication(w, r)
 	if !ok {
 		return
 	}
-	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{FormMode: store.AddressModeWildcard})
+	h.renderApplicationForm(w, r, http.StatusOK, d, &a, nil, "")
 }
 
 // HandleApplicationSave saves an application's form: sender, client IPs and
@@ -500,10 +626,8 @@ func (h *Handlers) HandleApplicationSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fail := func(msg string) {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, msg),
-		})
+		submitted := submittedAppForm(r)
+		h.renderApplicationForm(w, r, http.StatusBadRequest, d, &a, &submitted, fmt.Sprintf("%s: %s", a.Login, msg))
 	}
 	if err := r.ParseForm(); err != nil {
 		fail("invalid form submission")
@@ -539,11 +663,7 @@ func (h *Handlers) HandleRegenPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	noStore(w)
-	h.renderDomainDetail(w, r, http.StatusOK, d, detailView{
-		FormMode: store.AddressModeWildcard,
-		NewCred:  &newCred{Login: a.Login, Password: password},
-	})
+	h.renderPasswordOnce(w, r, http.StatusOK, d, a, password, false)
 }
 
 // HandleDeleteApplication removes an application and returns to its domain page

@@ -1,0 +1,26 @@
+{{/* The password of an application, shown once (mockup out-app-created.html): the
+     response to the POST that created the application or issued a new password,
+     never stored and never cached. It has no address of its own. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+<div class="columns">
+  <div class="column is-7">
+{{template "box_open" .Credential}}
+{{template "record_open"}}
+{{template "copy_field" .Login}}
+{{template "copy_field" .Password}}
+{{template "record_close"}}
+{{template "box_foot" .Done}}
+{{template "box_close"}}
+  </div>
+
+  <div class="column is-5">
+{{template "box_open" .Connect}}
+{{template "body_open"}}
+{{template "facts" .Facts}}
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+</div>
+{{end}}

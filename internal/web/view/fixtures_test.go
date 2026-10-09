@@ -27,6 +27,13 @@ var pageFixtures = map[string]func() any{
 	"health":     func() any { return healthFixture(false) },
 	"account":    func() any { return accountFixture() },
 	"settings":   func() any { return settingsFixture() },
+
+	"out-domains":         func() any { return outDomainsFixture() },
+	"out-domain":          func() any { return outDomainFixture() },
+	"out-domain-settings": func() any { return outDomainSettingsFixture() },
+	"out-app":             func() any { return outAppFixture() },
+	"out-app-created":     func() any { return outAppCreatedFixture() },
+	"out-domain-delete":   func() any { return outDomainDeleteFixture() },
 }
 
 // admin is the signed-in global administrator every fixture is rendered for.
@@ -110,4 +117,92 @@ func accountFixture() *Account {
 // messages an hour.
 func settingsFixture() *Settings {
 	return NewSettings(admin(), "30", FormatRate(600, 3600))
+}
+
+// outDomainsFixture is the mockup's Outbound domains: three domains, the first
+// with a wrong SPF record and the last with a weak DMARC one.
+func outDomainsFixture() *OutDomains {
+	dns := func(dkim, spf, dmarc string) []Tag {
+		return []Tag{{Status: dkim, Label: "DKIM"}, {Status: spf, Label: "SPF"}, {Status: dmarc, Label: "DMARC"}}
+	}
+	row := func(id, name string, tags []Tag, selector string, apps int, total, peak int64) OutDomainRow {
+		return OutDomainRow{Name: name, Href: "/outbound/domains/" + id, DeleteHref: "/outbound/domains/" + id + "/delete",
+			DNS: tags, Selector: selector, Apps: apps, Activity: FormatActivity(total, peak)}
+	}
+	return NewOutDomains(admin(), true, 30).WithRows([]OutDomainRow{
+		row("1", "example.org", dns("ok", "error", "ok"), "sp2026", 2, 1284, 96),
+		row("2", "shop.example.org", dns("ok", "ok", "ok"), "sp2026", 1, 18920, 410),
+		row("3", "notify.acme.io", dns("ok", "ok", "warn"), "sp2025", 3, 402, 22),
+	})
+}
+
+// outDomainFixture is the mockup's domain page: the DKIM and DMARC records
+// published, the SPF one pointing at the wrong server, two applications.
+func outDomainFixture() *OutDomain {
+	p := NewOutDomain(admin(), 1, "example.org", true)
+	p.WithStats(1284, 96, "1.8", 30)
+	p.WithRecords([]Record{
+		DKIMRecord("sp2026", "sp2026._domainkey.example.org",
+			"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3kqV0mJd8e2f1Yb7Qw5uT9sLr4nHc6pZaXo1vKe0yWm2gBt8RjN5dCq3hUf7lPs9aEi4oMz6xTb1kGv0nYw…IDAQAB",
+			DNSCheck{Status: "ok"}),
+		SPFRecord("example.org", "v=spf1 ip4:203.0.113.25 ~all", DNSCheck{Status: "error",
+			Detail: "The published record does not authorize 203.0.113.25. Add ip4:203.0.113.25 before ~all.",
+			Found:  []string{"v=spf1 include:_spf.google.com ~all"}}),
+		DMARCRecord(DMARCRecordInput{Host: "_dmarc.example.org", Value: "v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org",
+			Check: DNSCheck{Status: "ok"}, Source: "admin's default", SettingsHref: "/outbound/domains/1/settings",
+			ReportsHref: "/outbound/dmarc/domains/1"}),
+	}, "3 min ago")
+	p.WithApplications([]OutAppRow{
+		{Login: "prod-server", Senders: []string{"*@example.org"}, Activity: FormatActivity(1102, 96),
+			Limits: []Tag{{Status: "ok", Label: "200 / h"}}, Edit: "/outbound/domains/1/applications/1"},
+		{Login: "alerts", Senders: []string{"alerts@example.org", "noc@example.org"}, Activity: FormatActivity(182, 14),
+			Limits: []Tag{{Label: "domain"}, {Status: "ok", Label: "2 IPs"}}, Edit: "/outbound/domains/1/applications/2"},
+	})
+	p.WithConnection("mail.example.org", true)
+	p.WithSeeAlso("/outbound/log?domain=example.org", "/outbound/dmarc/domains/1")
+	p.WithRateLimit(true, false)
+	return p
+}
+
+// outDomainSettingsFixture is the mockup's Domain settings: reports go to the
+// default of the signed-in administrator, the rate limit is automatic.
+func outDomainSettingsFixture() *OutDomainSettings {
+	p := NewOutDomainSettings(admin(), 1, "example.org", 2, true)
+	p.WithReportAddress([]Option{
+		{Value: "inherit", Label: "admin's default — mix@example.org"},
+		{Value: "hosted", Label: "SelfPost hosted (example.org@dmarc.mail.example.org)"},
+		{Value: "none", Label: "No aggregate reports"},
+		{Value: "custom", Label: "Custom address"},
+	}, "inherit", "", Rich("A default belongs to a user and is set under their ", Link("/account#dmarc", "Account"),
+		"; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish."))
+	p.WithExport(12)
+	return p.WithRateLimit(DomainRateLimit{
+		Active: true, Auto: true, MaxMessages: "288", Window: "3600", Multiplier: "2.5",
+		Computed: "288", Peak: 96, Updated: "2026-10-09 03:00 UTC",
+		L1Messages: 600, L1Window: 3600, MinMultiplier: "1.5", MaxMultiplier: "5", DefaultMultiplier: "2.5",
+	})
+}
+
+// outAppFixture is the mockup's application form, filled with prod-server: any
+// address of the domain, no client IPs, a manual limit of 200 an hour.
+func outAppFixture() *OutApp {
+	p := NewOutApp(admin(), 1, "example.org", "prod-server")
+	p.WithApplication(1, 1, 1102, 96, "1.5", 30)
+	return p.WithForm(OutAppForm{
+		Login: "prod-server", Mode: AddressWildcard, LimitMode: LimitManual, MaxMessages: "200", Window: "3600", Multiplier: "2.5",
+	}, OutAppState{Limit: true}, AppRateLimit{L1Messages: 600, L1Window: 3600, MinMultiplier: "1.5", MaxMultiplier: "5",
+		DefaultMultiplier: "2.5", DomainLimit: "288 / h", Peak: 96})
+}
+
+// outAppCreatedFixture is the mockup's password page: a new password for
+// prod-server, which may send as the whole domain.
+func outAppCreatedFixture() *OutAppCreated {
+	return NewOutAppCreated(admin(), 1, "example.org", "prod-server", "kT7v-Qm2x-Lp9d-Ue4s-Hn6b-Rz3w", false,
+		"mail.example.org", true, []string{"*@example.org"})
+}
+
+// outDomainDeleteFixture is the mockup's confirmation: the domain has the two
+// applications that go with it.
+func outDomainDeleteFixture() *OutDomainDelete {
+	return NewOutDomainDelete(admin(), 1, "example.org", []string{"prod-server", "alerts"})
 }

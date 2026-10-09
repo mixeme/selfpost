@@ -304,7 +304,7 @@ func TestOutboundRoutesAnswerAnotherTenant404(t *testing.T) {
 	}
 	routes := []outRoute{
 		{"GET", "/outbound/domains/{id}", h.HandleDomainDetail, did},
-		{"GET", "/outbound/domains/{id}/settings", h.HandleDomainDetail, did},
+		{"GET", "/outbound/domains/{id}/settings", h.HandleDomainSettings, did},
 		{"POST", "/outbound/domains/{id}/dns-recheck", h.HandleDomainDNSRecheck, did},
 		{"POST", "/outbound/domains/{id}/settings/ratelimit", h.HandleDomainRateLimit, did},
 		{"POST", "/outbound/domains/{id}/settings/ratelimit/recalc", h.HandleDomainRateLimitRecalc, did},

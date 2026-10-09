@@ -138,7 +138,7 @@ func TestNavMarksActivePage(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	err = engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
+	err = engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":     "admin",
 		"Active":   "mail_queue",
 		"IsGlobal": true,
@@ -166,7 +166,7 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":     "admin",
 		"Active":   "status",
 		"IsGlobal": true,
@@ -195,7 +195,7 @@ func TestNavShowsInboundWhenEnabled(t *testing.T) {
 	}
 	engine.SetInboundEnabled(true)
 	var buf bytes.Buffer
-	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":           "admin",
 		"Active":         "status",
 		"IsGlobal":       true,
@@ -226,8 +226,8 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	}
 	wide := map[string]bool{
 		"deliveries": true, "delivery": true, "mail_queue": true,
-		"system_log": true, "domain_detail": true,
-		"inbound": true, "inbound_domain": true, "dmarc": true,
+		"system_log": true,
+		"inbound":    true, "inbound_domain": true, "dmarc": true,
 	}
 	for name, page := range engine.Pages() {
 		if kitPages[name] {
@@ -244,58 +244,6 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		case !wide[name] && got != "":
 			t.Errorf("page %q declares itself %q; only the pages that are tables of data, raw log lines or side-by-side cards take the whole column", name, got)
 		}
-	}
-}
-
-// The domain page pairs cards the same way Status does: three .split rows
-// (DKIM+SPF|DMARC, connection|add-app, export|danger). DNS status, Applications
-// and Domain settings are full-width; DNS status and Domain settings (and the
-// application Edit panel) use .check-cols. Losing a row silently stacks again.
-func TestDomainDetailPageHasPairedCards(t *testing.T) {
-	body, err := fs.ReadFile(assetsFS, "templates/domain_detail.html")
-	if err != nil {
-		t.Fatalf("read domain_detail: %v", err)
-	}
-	src := string(body)
-	if got := strings.Count(src, `class="split"`); got != 3 {
-		t.Errorf("domain detail has %d .split rows, want 3", got)
-	}
-	if !strings.Contains(src, `class="check-cols"`) {
-		t.Error("domain detail is missing the check-cols grid")
-	}
-	if !strings.Contains(src, `class="panel-toggle t-edit"`) {
-		t.Error("application Edit should be a single panel-toggle")
-	}
-	if strings.Contains(src, `panel-toggle t-mode`) || strings.Contains(src, `panel-toggle t-limit`) ||
-		strings.Contains(src, `panel-mode`) || strings.Contains(src, `panel-limit`) {
-		t.Error("application Edit mode and Rate limit should be one Edit button")
-	}
-	for _, id := range []string{
-		`id="dkim-spf"`, `id="dns-status"`, `id="dmarc"`,
-		`id="connection"`, `id="add-application"`, `id="applications"`,
-		`id="domain-settings"`, `id="export"`, `id="danger"`,
-	} {
-		if !strings.Contains(src, id) {
-			t.Errorf("domain detail is missing %s", id)
-		}
-	}
-	if strings.Contains(src, `id="rate-limit"`) {
-		t.Error("domain rate limit should live inside domain-settings, not its own card")
-	}
-	if strings.Contains(src, `id="d_ips"`) {
-		t.Error("domain rate limit must not ask for client IPs")
-	}
-	if !strings.Contains(src, "{{.L1Messages}}") && !strings.Contains(src, "{{$.L1Messages}}") {
-		t.Error("domain rate limit should show the L1 message count")
-	}
-	if !strings.Contains(src, "Level&nbsp;1 backstop") {
-		t.Error("domain rate limit should show a Level 1 backstop line")
-	}
-	if !strings.Contains(src, "Restrict to listed IPs") {
-		t.Error("application should offer client IP allow-list")
-	}
-	if strings.Contains(src, `id="spf-dmarc"`) {
-		t.Error("SPF should sit with DKIM, not with DMARC")
 	}
 }
 
@@ -325,8 +273,6 @@ func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 	drillDown := map[string]bool{
 		"user_form.html":      true,
 		"user_delete.html":    true,
-		"domain_detail.html":  true,
-		"domain_delete.html":  true,
 		"inbound_domain.html": true,
 		"inbound_delete.html": true,
 		"dmarc_domain.html":   true,
@@ -530,30 +476,13 @@ func TestOverviewLinksToItsHelpTopic(t *testing.T) {
 	}
 }
 
-func TestDomainDetailHasHelpOnCards(t *testing.T) {
-	body, err := fs.ReadFile(assetsFS, "templates/domain_detail.html")
-	if err != nil {
-		t.Fatalf("read domain_detail: %v", err)
-	}
-	src := string(body)
-	for _, want := range []string{
-		`"ID" "dns"`, `"ID" "records"`, `"ID" "dmarc"`, `"ID" "connection"`,
-		`"ID" "apps"`, `"ID" "domain-settings"`, `"ID" "export"`,
-		`card-head`,
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("domain_detail missing %q", want)
-		}
-	}
-}
-
 func TestNavIncludesHelp(t *testing.T) {
 	engine, err := New("test")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("dashboard").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User": "admin", "Active": "domains", "IsGlobal": true,
 	}); err != nil {
 		t.Fatalf("execute nav: %v", err)

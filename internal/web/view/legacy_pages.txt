@@ -11,14 +11,11 @@
 #   @routes  the pre-2.0 route table is still in place (stage 1)
 #   <name>   a page of the view engine that is still the old template
 backup
-dashboard
 deliveries
 delivery
 dmarc
 dmarc_domain
 dmarc_report
-domain_delete
-domain_detail
 help
 inbound
 inbound_delete

@@ -142,10 +142,7 @@ func (h *Handlers) HandleExportDomain(w http.ResponseWriter, r *http.Request) {
 	}
 	password, pwErr := secretFilePassword(r)
 	if pwErr != "" {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:  store.AddressModeWildcard,
-			ExportErr: pwErr,
-		})
+		h.renderDomainSettings(w, r, http.StatusBadRequest, d, settingsView{Err: pwErr})
 		return
 	}
 	exp, err := h.domains.Export(d.ID)

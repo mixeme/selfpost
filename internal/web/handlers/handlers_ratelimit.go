@@ -151,10 +151,7 @@ func (h *Handlers) HandleDomainRateLimit(w http.ResponseWriter, r *http.Request)
 	}
 	in, err := parseRateLimitForm(r, h.l1Messages())
 	if err != nil {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: err.Error(),
-		})
+		h.renderDomainSettings(w, r, http.StatusBadRequest, d, settingsView{Err: err.Error()})
 		return
 	}
 	if err := h.applyRateLimit(in, store.RateLimitScopeDomain, d.ID, h.domains); err != nil {
@@ -172,10 +169,7 @@ func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Re
 	}
 	if err := h.recalcRateLimit(store.RateLimitScopeDomain, d.ID); err != nil {
 		logf("panel: domain %d: recalc rate limit: %v", d.ID, err)
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: err.Error(),
-		})
+		h.renderDomainSettings(w, r, http.StatusBadRequest, d, settingsView{Err: err.Error()})
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", d.ID), http.StatusSeeOther)
@@ -187,10 +181,7 @@ func (h *Handlers) HandleAppRateLimitRecalc(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := h.recalcRateLimit(store.RateLimitScopeApp, a.ID); err != nil {
-		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{
-			FormMode:     store.AddressModeWildcard,
-			RateLimitErr: fmt.Sprintf("%s: %s", a.Login, err.Error()),
-		})
+		h.renderApplicationForm(w, r, http.StatusBadRequest, d, &a, nil, fmt.Sprintf("%s: %s", a.Login, err.Error()))
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", a.DomainID), http.StatusSeeOther)
