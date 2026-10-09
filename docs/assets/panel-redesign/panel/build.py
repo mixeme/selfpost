@@ -81,7 +81,9 @@ def navbar(section, page):
             '            <a class="navbar-item" href="account.html"><i class="ti ti-key"></i>Account</a>',
             '            <a class="navbar-item" href="help.html"><i class="ti ti-help"></i>Help</a>',
             '            <hr class="navbar-divider">',
-            '            <a class="navbar-item" href="login.html"><i class="ti ti-logout"></i>Sign out</a>',
+            # Signing out changes state, so it is a POST: a form with a button, not a link.
+            '            <form method="post" action="login.html"><button type="submit" class="navbar-item">'
+            '<i class="ti ti-logout"></i>Sign out</button></form>',
             '          </div>', '        </div>', '      </div>', '    </div>', '  </div>', '</nav>',
             '<div class="sp-perf" aria-hidden="true"></div>']
     return "\n".join(out)
