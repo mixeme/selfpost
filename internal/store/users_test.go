@@ -23,19 +23,20 @@ func TestUpdateUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUser: %v", err)
 	}
-	if got.DMARCReportEmail != "reports@hub.example" {
-		t.Fatalf("dmarc email = %q", got.DMARCReportEmail)
+	if got.Email != "reports@hub.example" {
+		t.Fatalf("email = %q", got.Email)
 	}
-	email, err := st.GlobalDMARCReportEmail()
-	if err != nil {
-		t.Fatalf("GlobalDMARCReportEmail: %v", err)
+	// The account e-mail is the user's own: saving it does not make it anyone's
+	// report address, and nothing is mirrored into the instance settings.
+	if got.DMARCDefaultMode != DMARCDefaultNone {
+		t.Fatalf("dmarc default mode = %q after setting the e-mail, want %q", got.DMARCDefaultMode, DMARCDefaultNone)
 	}
-	if email != "reports@hub.example" {
-		t.Fatalf("settings dmarc = %q", email)
+	if v, err := st.GetSetting("dmarc_report_email"); err == nil && v != "" {
+		t.Fatalf("the e-mail leaked into the instance settings: %q", v)
 	}
 
 	if err := st.UpdateUser(u.ID, "operator", "hash-three", ""); err != nil {
-		t.Fatalf("clear dmarc email: %v", err)
+		t.Fatalf("clear e-mail: %v", err)
 	}
 	got, err = st.GetUser(u.ID)
 	if err != nil {
@@ -73,7 +74,7 @@ func TestCreateDomainAdminUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddDomain: %v", err)
 	}
-	id, err := st.CreateUser("domainop", "hash2", RoleDomainAdmin, []int64{d.ID})
+	id, err := st.CreateUser("domainop", "hash2", RoleDomain, []int64{d.ID})
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}

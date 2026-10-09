@@ -205,7 +205,6 @@ func (s *Service) RateLimit(appID int64) (store.RateLimit, bool, error) {
 func (s *Service) SaveRateLimit(appID int64, rl store.RateLimit) error {
 	rl.Scope = store.RateLimitScopeApp
 	rl.RefID = appID
-	rl.AllowedIPs = nil
 	return s.store.SetRateLimit(rl)
 }
 

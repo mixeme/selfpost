@@ -20,7 +20,6 @@ func TestRateLimitSetGetDelete(t *testing.T) {
 	want := RateLimit{
 		Scope:         RateLimitScopeDomain,
 		RefID:         d.ID,
-		AllowedIPs:    []string{"203.0.113.1", "203.0.113.2"},
 		MaxMessages:   100,
 		WindowSeconds: 3600,
 	}
@@ -32,19 +31,17 @@ func TestRateLimitSetGetDelete(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("GetRateLimit after set: ok=%v err=%v", ok, err)
 	}
-	if got.MaxMessages != 100 || got.WindowSeconds != 3600 || len(got.AllowedIPs) != 2 ||
-		got.AllowedIPs[0] != "203.0.113.1" || got.AllowedIPs[1] != "203.0.113.2" {
+	if got.MaxMessages != 100 || got.WindowSeconds != 3600 {
 		t.Fatalf("roundtrip mismatch: %+v", got)
 	}
 
 	// Upsert replaces in place (UNIQUE(scope, ref_id)).
 	want.MaxMessages = 5
-	want.AllowedIPs = []string{"198.51.100.9"}
 	if err := st.SetRateLimit(want); err != nil {
 		t.Fatalf("SetRateLimit upsert: %v", err)
 	}
 	got, _, _ = st.GetRateLimit(RateLimitScopeDomain, d.ID)
-	if got.MaxMessages != 5 || len(got.AllowedIPs) != 1 || got.AllowedIPs[0] != "198.51.100.9" {
+	if got.MaxMessages != 5 || got.WindowSeconds != 3600 {
 		t.Fatalf("upsert did not replace: %+v", got)
 	}
 
@@ -64,10 +61,10 @@ func TestRateLimitByNameAndLogin(t *testing.T) {
 		t.Fatalf("AddApplication: %v", err)
 	}
 
-	if err := st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: d.ID, AllowedIPs: []string{"203.0.113.1"}, MaxMessages: 10, WindowSeconds: 60}); err != nil {
+	if err := st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: d.ID, MaxMessages: 10, WindowSeconds: 60}); err != nil {
 		t.Fatalf("set domain limit: %v", err)
 	}
-	if err := st.SetRateLimit(RateLimit{Scope: RateLimitScopeApp, RefID: a.ID, AllowedIPs: []string{"203.0.113.2"}, MaxMessages: 3, WindowSeconds: 60}); err != nil {
+	if err := st.SetRateLimit(RateLimit{Scope: RateLimitScopeApp, RefID: a.ID, MaxMessages: 3, WindowSeconds: 60}); err != nil {
 		t.Fatalf("set app limit: %v", err)
 	}
 
@@ -131,9 +128,9 @@ func TestDeleteRateLimitsForDomain(t *testing.T) {
 	a, _ := st.AddApplication(d.ID, "app1", AddressModeWildcard, nil)
 	other, _ := st.AddDomain("other.example", "selfpost")
 
-	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: d.ID, AllowedIPs: []string{"203.0.113.1"}, MaxMessages: 10, WindowSeconds: 60})
-	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeApp, RefID: a.ID, AllowedIPs: []string{"203.0.113.2"}, MaxMessages: 3, WindowSeconds: 60})
-	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: other.ID, AllowedIPs: []string{"203.0.113.9"}, MaxMessages: 1, WindowSeconds: 60})
+	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: d.ID, MaxMessages: 10, WindowSeconds: 60})
+	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeApp, RefID: a.ID, MaxMessages: 3, WindowSeconds: 60})
+	_ = st.SetRateLimit(RateLimit{Scope: RateLimitScopeDomain, RefID: other.ID, MaxMessages: 1, WindowSeconds: 60})
 
 	if err := st.DeleteRateLimitsForDomain(d.ID); err != nil {
 		t.Fatalf("DeleteRateLimitsForDomain: %v", err)
@@ -153,9 +150,9 @@ func TestDeleteRateLimitsForDomain(t *testing.T) {
 func TestRateLimitActive(t *testing.T) {
 	inactive := []RateLimit{
 		{},
-		{Scope: RateLimitScopeDomain, AllowedIPs: []string{"203.0.113.1"}}, // no ceiling
-		{Scope: RateLimitScopeDomain, MaxMessages: 5},                      // no window
-		{Scope: RateLimitScopeApp, MaxMessages: 5},                         // no window
+		{Scope: RateLimitScopeDomain}, // no ceiling
+		{Scope: RateLimitScopeDomain, MaxMessages: 5}, // no window
+		{Scope: RateLimitScopeApp, MaxMessages: 5},    // no window
 	}
 	for i, rl := range inactive {
 		if rl.Active() {

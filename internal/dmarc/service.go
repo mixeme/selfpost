@@ -54,10 +54,6 @@ func (s *Service) AllowedRecipients() ([]string, error) {
 	if !s.enabled || s.hostname == "" {
 		return nil, nil
 	}
-	profile, err := s.store.GlobalDMARCReportEmail()
-	if err != nil {
-		return nil, err
-	}
 	seen := make(map[string]bool)
 	var out []string
 	add := func(addr string) {
@@ -68,8 +64,24 @@ func (s *Service) AllowedRecipients() ([]string, error) {
 		seen[addr] = true
 		out = append(out, addr)
 	}
-	add(profile)
-	if profile == "" {
+	// A user's own default that points at this host is accepted even before a
+	// domain follows it, so the address can be published first. With no such
+	// default anywhere, the instance's generic mailbox stays open — the address
+	// the guide tells a fresh install to publish.
+	users, err := s.store.ListUsers()
+	if err != nil {
+		return nil, err
+	}
+	anyDefault := false
+	for _, u := range users {
+		if def := u.DMARCDefault(); def.Mode == store.DMARCDefaultAccount || def.Mode == store.DMARCDefaultCustom {
+			if addr := def.Resolve(""); addr != "" {
+				anyDefault = true
+				add(addr)
+			}
+		}
+	}
+	if !anyDefault {
 		add(DefaultHostedReportAddress(s.hostname))
 	}
 	domains, err := s.store.ListDomains()
@@ -77,21 +89,13 @@ func (s *Service) AllowedRecipients() ([]string, error) {
 		return nil, err
 	}
 	for _, d := range domains {
-		rua := dnscheck.ResolveDMARCRua(d.DMARCRua, profile)
-		if rua == "" {
-			continue
+		// add keeps only addresses on this host, so a domain reporting elsewhere
+		// (or nowhere) opens nothing here.
+		rua, err := s.store.DomainDMARCRua(d, HostedReportAddress(s.hostname, d.Name))
+		if err != nil {
+			return nil, err
 		}
-		if IsHostedOnHostname(rua, s.hostname) {
-			add(rua)
-			continue
-		}
-		if d.DMARCRua.Valid && d.DMARCRua.String == "" {
-			continue
-		}
-		hosted := HostedReportAddress(s.hostname, d.Name)
-		if strings.EqualFold(rua, hosted) {
-			add(rua)
-		}
+		add(rua)
 	}
 	sort.Strings(out)
 	return out, nil

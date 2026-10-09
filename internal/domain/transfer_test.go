@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
@@ -73,7 +72,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if _, err := src.store.AddApplication(d.ID, "alerts", store.AddressModeList, []string{"a@example.com"}); err != nil {
 		t.Fatalf("add alerts: %v", err)
 	}
-	if err := src.store.UpdateDomainDMARCRua(d.ID, sql.NullString{Valid: true, String: "reports@hub.example"}); err != nil {
+	if err := src.store.SetDomainDMARCAddress(d.ID, "reports@hub.example"); err != nil {
 		t.Fatalf("set dmarc rua: %v", err)
 	}
 
@@ -111,8 +110,8 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if got.Name != "example.com" || got.DKIMSelector != "selfpost" {
 		t.Errorf("imported domain = %+v", got)
 	}
-	if !got.DMARCRua.Valid || got.DMARCRua.String != "reports@hub.example" {
-		t.Errorf("imported dmarc rua = %+v", got.DMARCRua)
+	if got.DMARCRuaUserID.Valid || got.DMARCRua != "reports@hub.example" {
+		t.Errorf("imported dmarc rua = %q (follows user: %v)", got.DMARCRua, got.DMARCRuaUserID.Valid)
 	}
 	if exp.DMARCRua == nil || *exp.DMARCRua != "reports@hub.example" {
 		t.Errorf("exported dmarc rua = %v", exp.DMARCRua)

@@ -41,7 +41,6 @@ const (
 type RateLimit struct {
 	Scope          string
 	RefID          int64
-	AllowedIPs     []string // legacy column; unused for new rows
 	MaxMessages    int
 	WindowSeconds  int
 	Mode           string  // manual | auto
@@ -63,7 +62,7 @@ func (r RateLimit) Active() bool {
 // its id, for the panel's edit form. ok is false when none is configured.
 func (s *Store) GetRateLimit(scope string, refID int64) (RateLimit, bool, error) {
 	row := s.db.QueryRow(
-		`SELECT allowed_ips, max_messages, window_seconds, mode, auto_multiplier, auto_updated_at
+		`SELECT max_messages, window_seconds, mode, auto_multiplier, auto_updated_at
 		 FROM rate_limits WHERE scope = ? AND ref_id = ?`, scope, refID)
 	rl, err := scanRateLimit(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -93,16 +92,15 @@ func (s *Store) SetRateLimit(rl RateLimit) error {
 		autoUpdated = rl.AutoUpdatedAt.UTC().Format(time.RFC3339)
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO rate_limits (scope, ref_id, allowed_ips, max_messages, window_seconds, mode, auto_multiplier, auto_updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO rate_limits (scope, ref_id, max_messages, window_seconds, mode, auto_multiplier, auto_updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(scope, ref_id) DO UPDATE SET
-		   allowed_ips       = excluded.allowed_ips,
 		   max_messages      = excluded.max_messages,
 		   window_seconds    = excluded.window_seconds,
 		   mode              = excluded.mode,
 		   auto_multiplier   = excluded.auto_multiplier,
 		   auto_updated_at   = excluded.auto_updated_at`,
-		rl.Scope, rl.RefID, strings.Join(rl.AllowedIPs, ","), rl.MaxMessages, rl.WindowSeconds,
+		rl.Scope, rl.RefID, rl.MaxMessages, rl.WindowSeconds,
 		mode, autoMult, autoUpdated,
 	)
 	if err != nil {
@@ -144,11 +142,11 @@ func (s *Store) RateLimit(scope, ref string) (RateLimit, bool, error) {
 	var query string
 	switch scope {
 	case RateLimitScopeDomain:
-		query = `SELECT rl.allowed_ips, rl.max_messages, rl.window_seconds, rl.mode, rl.auto_multiplier, rl.auto_updated_at
+		query = `SELECT rl.max_messages, rl.window_seconds, rl.mode, rl.auto_multiplier, rl.auto_updated_at
 		         FROM rate_limits rl JOIN domains d ON d.id = rl.ref_id
 		         WHERE rl.scope = 'domain' AND d.name = ?`
 	case RateLimitScopeApp:
-		query = `SELECT rl.allowed_ips, rl.max_messages, rl.window_seconds, rl.mode, rl.auto_multiplier, rl.auto_updated_at
+		query = `SELECT rl.max_messages, rl.window_seconds, rl.mode, rl.auto_multiplier, rl.auto_updated_at
 		         FROM rate_limits rl JOIN applications a ON a.id = rl.ref_id
 		         WHERE rl.scope = 'application' AND a.login = ?`
 	default:
@@ -196,23 +194,21 @@ func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error)
 	return n, nil
 }
 
-// scanRateLimit reads the three stored columns, tolerating NULL numeric columns
+// scanRateLimit reads the stored columns, tolerating NULL numeric columns
 // by leaving the corresponding field zero, which makes the limit inert via
 // Active() until max and window are both set.
 func scanRateLimit(r scanRow) (RateLimit, error) {
 	var (
-		ips         sql.NullString
 		maxMsgs     sql.NullInt64
 		windowSecs  sql.NullInt64
 		mode        sql.NullString
 		autoMult    sql.NullFloat64
 		autoUpdated sql.NullString
 	)
-	if err := r.Scan(&ips, &maxMsgs, &windowSecs, &mode, &autoMult, &autoUpdated); err != nil {
+	if err := r.Scan(&maxMsgs, &windowSecs, &mode, &autoMult, &autoUpdated); err != nil {
 		return RateLimit{}, err
 	}
 	rl := RateLimit{
-		AllowedIPs:    splitIPs(ips.String),
 		MaxMessages:   int(maxMsgs.Int64),
 		WindowSeconds: int(windowSecs.Int64),
 		Mode:          mode.String,

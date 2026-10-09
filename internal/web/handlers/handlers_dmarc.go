@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,12 +25,14 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rua sql.NullString
+	// "inherit" makes the domain follow the default of the user who chose it;
+	// every other mode gives the domain an address of its own ("" = none).
+	follow := false
+	rua := ""
 	switch strings.TrimSpace(r.PostFormValue("dmarc_rua_mode")) {
 	case "inherit":
-		rua = sql.NullString{}
+		follow = true
 	case "none":
-		rua = sql.NullString{Valid: true, String: ""}
 	case "custom":
 		email := strings.TrimSpace(r.PostFormValue("dmarc_rua_email"))
 		if err := validate.Email(email); err != nil {
@@ -42,20 +43,25 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 			h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{FormErr: "Enter a custom report address or choose another mode."})
 			return
 		}
-		rua = sql.NullString{Valid: true, String: email}
+		rua = email
 	case "hosted":
 		if h.dmarc == nil || !h.dmarc.Enabled() {
 			h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{FormErr: "SelfPost-hosted reports are not enabled on this server."})
 			return
 		}
-		addr := dmarc.HostedReportAddress(h.cfg.Hostname, d.Name)
-		rua = sql.NullString{Valid: true, String: addr}
+		rua = dmarc.HostedReportAddress(h.cfg.Hostname, d.Name)
 	default:
 		h.renderDomainDetail(w, r, http.StatusBadRequest, d, detailView{FormErr: "Choose how aggregate reports are addressed for this domain."})
 		return
 	}
 
-	if err := h.store.UpdateDomainDMARCRua(d.ID, rua); err != nil {
+	var err error
+	if p, ok := h.principal(r); follow && ok {
+		err = h.store.SetDomainDMARCUser(d.ID, p.ID)
+	} else {
+		err = h.store.SetDomainDMARCAddress(d.ID, rua)
+	}
+	if err != nil {
 		logf("panel: domain %d: save dmarc rua: %v", d.ID, err)
 		h.renderDomainDetail(w, r, http.StatusInternalServerError, d, detailView{FormErr: "Could not save DMARC settings. Please check the logs and try again."})
 		return

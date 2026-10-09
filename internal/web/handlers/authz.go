@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
@@ -33,6 +34,22 @@ func (h *Handlers) assignedDomains(p auth.Principal) ([]store.Domain, error) {
 		return h.store.ListDomains()
 	}
 	return h.store.ListDomainsForUser(p.ID)
+}
+
+// hostedDMARCAddress is the SelfPost-hosted report mailbox for a sending
+// domain, "" when report ingest is off on this server.
+func (h *Handlers) hostedDMARCAddress(domainName string) string {
+	if h.dmarc == nil || !h.cfg.DMARCEnabled {
+		return ""
+	}
+	return dmarc.HostedReportAddress(h.cfg.Hostname, domainName)
+}
+
+// domainReportAddress resolves where a domain's DMARC aggregate reports go:
+// its own address, or the default of the user it follows. "" is a policy-only
+// record.
+func (h *Handlers) domainReportAddress(d store.Domain) (string, error) {
+	return h.store.DomainDMARCRua(d, h.hostedDMARCAddress(d.Name))
 }
 
 func domainNameSet(domains []store.Domain) map[string]bool {

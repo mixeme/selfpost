@@ -39,8 +39,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 10/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| schema-squash | Squash SQLite migrations into a 2.x baseline | **2.x** | — | — |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 11/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): the next stage is **panel-redesign** (`2.0.0`),
@@ -468,6 +468,12 @@ zero and 2.0 starts from an empty data directory. The
 **Boundary** and **Done when** above are superseded on that point by
 [plans/panel-redesign.md](plans/panel-redesign.md) § No compatibility; this
 item ships as a step of that plan, not on its own.
+
+**Built 2026-10-09** (panel-redesign stage 1): `internal/store/migrations/`
+holds one baseline, `0001_init.sql`. The gate that survives is a refusal, not
+an upgrade: `store.Open` rejects a database that was not created by 2.x
+(`ErrForeignSchema`, tested), so a 1.x file is never half-read — the "missed
+gate" risk below. See [schema-migrations.md](schema-migrations.md).
 
 **Dependencies / risks:** a decided 2.x cut (another breaking change, or an
 explicit major). Squashing the current short chain is not a reason to cut 2.x on

@@ -292,8 +292,7 @@ func TestRateLimitDomainAppliesToAnyIP(t *testing.T) {
 		},
 		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
 	}
-	// Domain ceilings apply to every client IP; leftover AllowedIPs on the row
-	// are ignored.
+	// Domain ceilings apply to every client IP.
 	if resp := mailFrom(t, rec, limitIP, "a@example.com", "app1"); resp != milter.RespTempFail {
 		t.Fatalf("domain over limit from any IP = %v, want TempFail", resp)
 	}
@@ -362,7 +361,7 @@ func TestAuthIPRestrictOffAllowsAnyIP(t *testing.T) {
 func TestRateLimitInactiveWithoutCeiling(t *testing.T) {
 	rec := &fakeRecorder{
 		limits: map[string]store.RateLimit{
-			store.RateLimitScopeDomain + "|example.com": {AllowedIPs: []string{limitIP}}, // no max/window
+			store.RateLimitScopeDomain + "|example.com": {}, // no max/window
 		},
 		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
 	}

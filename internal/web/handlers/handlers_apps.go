@@ -153,29 +153,37 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with. Cached by the checker, so re-rendering the page
 	// after a form post costs nothing.
-	profileEmail, err := h.store.GlobalDMARCReportEmail()
+	reportEmail, err := h.domainReportAddress(d)
 	if err != nil {
-		logf("panel: domain %d: global dmarc email: %v", d.ID, err)
+		logf("panel: domain %d: dmarc report address: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	reportEmail := dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail)
-	dns, srv := h.domainDNS(d, record, profileEmail, false)
+	dns, srv := h.domainDNS(d, record, reportEmail, false)
 	reportAuthName, reportAuthValue, needsReportAuth := dnscheck.ExternalReportAuth(d.Name, reportEmail)
+	hostedAddr := h.hostedDMARCAddress(d.Name)
+	// The form's "inherit" is a domain that follows a user's default. What it
+	// offers next to that choice is the address following would give: the
+	// followed user's when the domain already follows one, otherwise the
+	// signed-in user's own — choosing it makes the domain follow them.
 	dmarcMode := "inherit"
 	dmarcCustom := ""
-	hostedAddr := ""
-	if h.dmarc != nil && h.cfg.DMARCEnabled {
-		hostedAddr = dmarc.HostedReportAddress(h.cfg.Hostname, d.Name)
-	}
-	if d.DMARCRua.Valid {
-		if d.DMARCRua.String == "" {
+	profileEmail := reportEmail
+	if !d.DMARCRuaUserID.Valid {
+		profileEmail = ""
+		if p, ok := h.principal(r); ok {
+			if def, err := h.store.GetDMARCDefault(p.ID); err == nil {
+				profileEmail = def.Resolve(hostedAddr)
+			}
+		}
+		switch {
+		case d.DMARCRua == "":
 			dmarcMode = "none"
-		} else if hostedAddr != "" && strings.EqualFold(d.DMARCRua.String, hostedAddr) {
+		case hostedAddr != "" && strings.EqualFold(d.DMARCRua, hostedAddr):
 			dmarcMode = "hosted"
-		} else {
+		default:
 			dmarcMode = "custom"
-			dmarcCustom = d.DMARCRua.String
+			dmarcCustom = d.DMARCRua
 		}
 	}
 	dmarcSource := "policy"
@@ -186,7 +194,7 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 		dmarcSource = "custom"
 	case dmarcMode == "none":
 		dmarcSource = "none"
-	case profileEmail != "":
+	case reportEmail != "":
 		dmarcSource = "settings"
 	}
 
@@ -250,7 +258,7 @@ func (h *Handlers) renderDomainDetail(w http.ResponseWriter, r *http.Request, st
 // and no extra environment variable is needed. That server result is returned
 // alongside, because the page's suggested SPF record is built from the same
 // addresses. force bypasses the cache, for the Re-check button.
-func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, profileEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
+func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, reportEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
 	srv := h.dns.Server(h.cfg.Hostname, false)
 	return h.dns.Domain(dnscheck.Query{
 		Name:             d.Name,
@@ -258,7 +266,7 @@ func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, profileEm
 		ExpectedDKIM:     record.Value,
 		Hostname:         srv.Hostname,
 		ServerIPs:        srv.IPs,
-		DMARCReportEmail: dnscheck.ResolveDMARCRua(d.DMARCRua, profileEmail),
+		DMARCReportEmail: reportEmail,
 	}, force), srv
 }
 
@@ -275,13 +283,13 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	profileEmail, err := h.store.GlobalDMARCReportEmail()
+	reportEmail, err := h.domainReportAddress(d)
 	if err != nil {
-		logf("panel: domain %d: global dmarc email: %v", d.ID, err)
+		logf("panel: domain %d: dmarc report address: %v", d.ID, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	h.domainDNS(d, record, profileEmail, true)
+	h.domainDNS(d, record, reportEmail, true)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 

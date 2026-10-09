@@ -43,7 +43,7 @@ func (s *Store) RecalcAutoRateLimit(scope string, refID int64, retentionDays, l1
 
 func (s *Store) listAutoRateLimits() ([]RateLimit, error) {
 	rows, err := s.db.Query(
-		`SELECT scope, ref_id, allowed_ips, max_messages, window_seconds, mode, auto_multiplier, auto_updated_at
+		`SELECT scope, ref_id, max_messages, window_seconds, mode, auto_multiplier, auto_updated_at
 		 FROM rate_limits WHERE mode = ?`, RateLimitModeAuto,
 	)
 	if err != nil {
@@ -55,18 +55,16 @@ func (s *Store) listAutoRateLimits() ([]RateLimit, error) {
 	for rows.Next() {
 		var scope string
 		var refID int64
-		var ips sql.NullString
 		var maxMsgs, windowSecs sql.NullInt64
 		var mode sql.NullString
 		var autoMult sql.NullFloat64
 		var autoUpdated sql.NullString
-		if err := rows.Scan(&scope, &refID, &ips, &maxMsgs, &windowSecs, &mode, &autoMult, &autoUpdated); err != nil {
+		if err := rows.Scan(&scope, &refID, &maxMsgs, &windowSecs, &mode, &autoMult, &autoUpdated); err != nil {
 			return nil, fmt.Errorf("scan auto rate limit: %w", err)
 		}
 		rl := RateLimit{
 			Scope:         scope,
 			RefID:         refID,
-			AllowedIPs:    splitIPs(ips.String),
 			MaxMessages:   int(maxMsgs.Int64),
 			WindowSeconds: int(windowSecs.Int64),
 			Mode:          mode.String,

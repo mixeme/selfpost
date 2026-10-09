@@ -18,8 +18,8 @@ const (
 type Role = store.Role
 
 const (
-	RoleGlobal      = store.RoleGlobal
-	RoleDomainAdmin = store.RoleDomainAdmin
+	RoleGlobal = store.RoleGlobal
+	RoleDomain = store.RoleDomain
 )
 
 // Principal is the authenticated panel user attached to a request.

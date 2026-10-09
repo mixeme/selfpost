@@ -505,7 +505,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 **Stage 1 — data and routes** (no template work; parallel with stage 0)
 
-- [ ] Schema from zero: single `0001_init.sql` baseline with `users.email`, the DMARC default fields, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
+- [x] Schema from zero: single `0001_init.sql` baseline with `users.email`, the DMARC default fields, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
 - [ ] Inbound delegation: `requireInboundDomain`, lists and log filtered in the query, two-list user form data, per-route 404 tests for both roles including another tenant's id — **Opus**
 - [ ] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/`; links in the old templates retargeted so the panel works on every commit — **Opus**
 - [ ] The application form as one POST; `out-app-created` as the response with `Cache-Control: no-store` — **Opus**

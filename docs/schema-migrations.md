@@ -1,16 +1,15 @@
 # SQLite schema and migrations
 
-**What this file is.** A living reference for the embedded SQLite migration chain,
-historical legacy that still runs on fresh 1.x installs, and the planned 2.x
-schema squash. When you add or review a migration, update this file in the same
-change.
+**What this file is.** A living reference for the embedded SQLite schema: the
+2.0 baseline, the migrations added after it, and how a database is opened.
+When you add or review a migration, update this file in the same change.
 
 **Source of truth in code:** `internal/store/migrations/*.sql`, applied by
 `internal/store/store.go` (`migrate()`).
 
 **Related:** [architecture.md](architecture.md) § Persistence;
-[roadmap.md](roadmap.md) § schema-squash; [development.md](development.md) §
-Documentation.
+[plans/panel-redesign.md](plans/panel-redesign.md) § No compatibility;
+[development.md](development.md) § Documentation.
 
 ---
 
@@ -18,14 +17,35 @@ Documentation.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 10` |
-| Files | `0001_init.sql` … `0010_send_log_app_login_index.sql` (10 files) |
+| Chain head | `user_version = 1` |
+| Files | `0001_init.sql` (the 2.0 baseline) |
+| File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
-| Compatibility | 1.x MINOR releases must boot a `1.0.0` data directory |
+| Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
 
-Last updated in **[1.9.2]** (`0010_send_log_app_login_index`); **1.9.1**
-had no schema change. The release column below records the cut a migration
-shipped in.
+---
+
+## 2.0 starts from an empty data directory
+
+Decided by the owner on 2026-09-21: the redesign is a breaking release, the
+1.x migration chain (`0001` … `0010`, with its `admin` table created in the
+first file and dropped in the fifth) is deleted from the binary, and there is
+no upgrade path. The only live 1.x installation is the owner's and is set up
+again on 2.0. The 1.x chain stays in git history (last present at `1.9.5`).
+
+What that means in practice:
+
+- A fresh `/data` gets the baseline and nothing else.
+- **A 1.x database is refused, not migrated.** `store.Open` returns
+  `ErrForeignSchema` for a file that has a schema version but not the 2.x
+  `application_id`. Without that check a 1.x file at `user_version = 10`
+  would read as "already migrated" and the panel would start on tables it
+  does not know. The file is not modified. The same applies to restoring a
+  1.x full backup into a 2.0 container.
+- A database whose version is higher than the build knows is refused too.
+- Domains can still be carried by hand: a 1.x **domain export** (JSON, with
+  the DKIM key and applications) imports into 2.0 — the transfer format is
+  not the database.
 
 ---
 
@@ -38,17 +58,12 @@ shipped in.
 4. Each pending migration runs in its own transaction, then bumps `user_version`.
 5. There is no down-migration; fixes ship as a new `00NN_*.sql` file.
 
-```text
-0001_init.sql              → user_version 1
-0002_sessions.sql          → user_version 2
-…
-0009_application_auth_ips.sql → user_version 9
-0010_send_log_app_login_index.sql → user_version 10
-```
-
-**Implication:** never delete, rename, or reorder migration files while 1.x must
-stay compatible with `1.0.0`. Git history keeps old files; only a 2.x cut may
-replace the embedded set (see [Planned 2.x squash](#planned-2x-squash)).
+**Implication:** once `2.0.0` is released, `0001_init.sql` is never edited
+again and no file is deleted, renamed or reordered — every 2.x database has
+already run it. Until that release the baseline is still being written:
+later steps of the redesign and the features queued behind it (the next one
+is `0002_inbound_spam_log.sql` of inbound-antispam-panel, `2.1.0`) add files
+after it.
 
 ---
 
@@ -56,152 +71,72 @@ replace the embedded set (see [Planned 2.x squash](#planned-2x-squash)).
 
 | Ver | File | Shipped | Kind | Summary |
 |-----|------|---------|------|---------|
-| 1 | `0001_init.sql` | ≤ 1.0.0 | DDL | Core schema: `admin`, `settings`, `domains`, `applications`, `application_addresses`, `send_log`, `rate_limits` |
-| 2 | `0002_sessions.sql` | ≤ 1.0.0 | DDL | `sessions` (token hash, sliding idle expiry) |
-| 3 | `0003_logtail_state.sql` | 0.5.0 | DDL | `logtail_state` (log-tailer read offset + fingerprint) |
-| 4 | `0004_dmarc_report_email.sql` | 1.1.0 | DDL | `admin.dmarc_report_email`, `domains.dmarc_rua` |
-| 5 | `0005_panel_users.sql` | 1.2.0 | DDL + data | `users`, `user_domains`; migrate single `admin` row; copy profile `dmarc_report_email` to `settings`; **DROP `admin`** |
-| 6 | `0006_inbound_relay.sql` | 1.4.0 | DDL | `inbound_domains`, `inbound_transports`, `inbound_recipients` |
-| 7 | `0007_rate_limit_auto.sql` | 1.6.0 | DDL | `rate_limits.mode`, `auto_multiplier`, `auto_updated_at` |
-| 8 | `0008_dmarc_reports.sql` | 1.7.0 | DDL | `dmarc_reports`, `dmarc_report_records` |
-| 9 | `0009_application_auth_ips.sql` | 1.9.0 | DDL + data | `applications.auth_ip_restrict`, `auth_allowed_ips`; move legacy app `rate_limits.allowed_ips` into auth columns; clear those IPs on rate limits |
-| 10 | `0010_send_log_app_login_index.sql` | 1.9.2 | DDL | `idx_send_log_app_login_created_at` — app-scoped rate-limit counts and per-application send statistics were scanning the `created_at` range |
+| 1 | `0001_init.sql` | 2.0.0 | DDL | The whole 2.0 schema, below |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
-for operators upgrading from older 1.x images.
-
-The feature plans that introduced schema work (`inbound-relay`,
-`domain-stats-auto-ratelimit`, `dmarc-reports`) were deleted once they
-shipped; what each migration was for is the table above, and the release it
-came with is in [CHANGELOG.md](../CHANGELOG.md).
+for operators upgrading from older 2.x images.
 
 ---
 
-## Schema after head (v10)
+## Schema at head (v1)
 
-Tables present in a fully migrated database:
+| Table | Role |
+|-------|------|
+| `settings` | Key/value settings of the instance — what is true whoever is signed in (send-log retention). Nothing that belongs to a user |
+| `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `dmarc_default_mode` / `dmarc_default_address` are their default DMARC report address; `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
+| `sessions` | Panel login sessions (token hash, sliding idle expiry) |
+| `domains` | Sending (outbound) domains. `dmarc_rua` / `dmarc_rua_user_id` say where aggregate reports go |
+| `user_domains` | Outbound domains assigned to a `domain` user |
+| `applications` | SASL applications per domain, with the client-IP restriction (`auth_ip_restrict`, `auth_allowed_ips`) |
+| `application_addresses` | Explicit From addresses (`list` mode) |
+| `rate_limits` | Level-2 limits per domain / application, manual or auto |
+| `send_log` | Delivery journal |
+| `logtail_state` | Log-tailer read position |
+| `inbound_domains` | Inbound relay domains |
+| `inbound_transports` | Upstream host / port / TLS per inbound domain |
+| `inbound_recipients` | Allow-list when `recipient_mode = list` |
+| `user_inbound_domains` | Inbound domains assigned to a `domain` user — granted separately from the outbound ones |
+| `dmarc_reports` | Parsed aggregate report summaries |
+| `dmarc_report_records` | Per-source rows inside a report |
 
-| Table | Introduced | Role |
-|-------|------------|------|
-| `settings` | 0001 | Key/value panel settings (retention, profile flags) |
-| `domains` | 0001 (+ `dmarc_rua` in 0004) | Sending domains |
-| `applications` | 0001 (+ auth IP cols in 0009) | SASL applications per domain |
-| `application_addresses` | 0001 | Explicit From addresses (`list` mode) |
-| `send_log` | 0001 | Delivery journal |
-| `rate_limits` | 0001 (+ auto cols in 0007) | Level-2 limits per domain/application |
-| `sessions` | 0002 | Panel login sessions |
-| `logtail_state` | 0003 | Log-tailer persistence |
-| `users` | 0005 | Panel users (`global`, `domain_admin`) |
-| `user_domains` | 0005 | Domain-admin assignments |
-| `inbound_domains` | 0006 | Inbound relay domains |
-| `inbound_transports` | 0006 | Upstream host/port/TLS per inbound domain |
-| `inbound_recipients` | 0006 | Allow-list when `recipient_mode = list` |
-| `dmarc_reports` | 0008 | Parsed aggregate report summaries |
-| `dmarc_report_records` | 0008 | Per-source rows inside a report |
+`TestBaselineSchema` (`internal/store/schema_test.go`) pins every table, column
+and index of this list.
 
-**Not present after v10:** `admin` (dropped in 0005).
+### What changed against the last 1.x schema
 
----
+| 1.x | 2.0 | Why |
+|---|---|---|
+| `admin` created in 0001, dropped in 0005 | never exists | the reason for the squash |
+| `users.role` = `global` / `domain_admin` | `global` / `domain` | the role is a reach, not a rank — everyone in the panel is an administrator |
+| `users.dmarc_report_email` | `users.email` | a user's e-mail is theirs; it is what the panel writes to, and DMARC only *may* use it |
+| instance setting `dmarc_report_email` (mirror of the global user's field) | `users.dmarc_default_mode`, `users.dmarc_default_address` | the default report address is a user's setting, not the server's |
+| `domains.dmarc_rua` NULL = inherit the instance default, `''` = none | `domains.dmarc_rua_user_id` set = follows that user's default; otherwise `dmarc_rua` is the address, `''` = none | a domain can have several users, so "the default" has to be someone's |
+| — | `user_inbound_domains` | inbound is delegated per user, separately from outbound |
+| — | `users.all_domains`, `users.all_inbound_domains` | "All" includes domains added later |
+| `rate_limits.allowed_ips` (unused since 1.9.0) | gone | client IPs belong to the application (`auth_allowed_ips`) |
 
-## Legacy and fresh-install artefacts
+### Where a domain's DMARC reports go
 
-These are intentional in 1.x; they are the main motivation for
-[schema-squash](roadmap.md#schema-squash) at 2.x.
+Resolved in one place, `Store.DomainDMARCRua`:
 
-### `admin` table (0001 → 0005)
+1. `domains.dmarc_rua_user_id` is set → the domain follows that user's default
+   (`DMARCDefault.Resolve`): `hosted` → SelfPost's own mailbox for the domain
+   (no reports while ingest is off), `account` → `users.email`, `custom` →
+   `users.dmarc_default_address`, `none` → no reports.
+2. Otherwise `domains.dmarc_rua` is the address itself; `''` means a
+   policy-only record.
 
-On a **new** 1.x data directory the chain still:
-
-1. Creates `admin` (0001),
-2. Adds `admin.dmarc_report_email` (0004),
-3. Copies the row into `users` and drops `admin` (0005).
-
-Functionally harmless; confusing when reading migrations or inferring schema from
-code. A 2.x baseline should define `users` directly and omit `admin`.
-
-### Application trusted IPs (0009)
-
-Before 1.9.0, client IPs for an application lived in `rate_limits.allowed_ips`
-(`scope = application`). Migration 0009 copies non-empty values into
-`applications.auth_allowed_ips`, sets `auth_ip_restrict = 1`, and clears
-`rate_limits.allowed_ips` for application scope. Level-2 limits no longer carry
-IP bindings; auth and rate limiting are separate concerns.
-
-Note that the two columns do not mean the same thing: the old list was
-*permissive* (those IPs got the application ceiling, every other IP fell back
-to the domain limit), the new one is *restrictive* (every IP not on the list is
-refused for that application). The conversion branch only fires for a database
-that carried application-scope `allowed_ips` from before 1.9.0.
-
-### Profile DMARC email (0004 → 0005)
-
-`0004` adds `admin.dmarc_report_email`. `0005` copies it into the migrated global
-`users` row and into `settings` key `dmarc_report_email`. Per-domain overrides
-remain on `domains.dmarc_rua`.
-
-### Documentation references to migration numbers
-
-Other docs cite migrations by number (e.g. architecture § sessions → `0002`).
-After a 2.x squash, those references remain valid for **upgrade history** and
-git; fresh 2.x installs only run the baseline plus post-2.x files.
+A new domain follows whoever created it. Deleting the followed user sets
+`dmarc_rua_user_id` to NULL (`ON DELETE SET NULL`), which leaves the domain at
+"no reports" — never at another user's default.
 
 ---
 
-## Rules for 1.x changes
+## Adding a migration
 
-1. **Add** the next `00NN_descriptive_name.sql`; do not edit shipped migrations.
-2. **Bump this file:** snapshot table, chain row, schema table if needed.
-3. **CHANGELOG** under the release that ships the migration.
-4. **Operator impact:** if upgrade behaviour matters, note it in [guide.md](guide.md).
-5. **Backup manifest** is separate: restore requires matching binary version
-   ([architecture.md](architecture.md) § Persistence); it does not replace
-   running pending SQLite migrations.
-
-### Checklist for a new migration
-
-- [ ] File name is next integer, zero-padded four digits.
-- [ ] SQL is idempotent in spirit (runs once per DB; guard with schema state, not
-      “IF NOT EXISTS” everywhere unless needed).
-- [ ] Data migrations handle empty/partial state (e.g. no `admin` row on re-run is
-      impossible; mid-upgrade failure is recovered by re-running the same file
-      only if the transaction failed before `user_version` bump).
-- [ ] Row added to [Migration chain](#migration-chain) and [Current snapshot](#current-snapshot).
-- [ ] `go test ./...` (store and dependents).
-
----
-
-## Planned 2.x squash
-
-Tracked as [schema-squash](roadmap.md#schema-squash). **Not** a reason to cut 2.x
-on its own — only bundled with another breaking change or an explicit major.
-
-**Goal:** embed one baseline SQL file equal to the schema at whatever the 1.x
-chain head is when the squash ships (`v10` today), instead of the full 1.x
-chain. Fresh 2.x `/data` directories skip create-then-drop `admin`.
-
-**Upgrade gate (required when squash ships):**
-
-| `user_version` | 2.x behaviour |
-|---|---|
-| `0` (empty DB) | Apply baseline; set `user_version` to new chain head |
-| `>= N` (fully migrated 1.x) | Skip; schema already matches baseline |
-| `1`…`N-1` (mid-chain 1.x) | **Refuse to start** — run the last 1.x image once, then 2.x |
-
-`N` is the chain head at cut time (`10` today).
-
-**Done when:** baseline embedded; gate tested; [guide.md](guide.md) states that
-2.x will not open an unfinished 1.x database.
-
----
-
-## Restore vs migrate
-
-| Mechanism | What it checks |
-|-----------|----------------|
-| SQLite `user_version` | Which embedded migrations have run on this `selfpost.db` |
-| Backup `manifest.json` | Binary/image version after full restore |
-
-An operator can have a matching manifest after restore but still need migrations
-if they restored an older DB snapshot with a newer binary — normal `migrate()`
-applies pending files. The 2.x gate adds a **refusal** for half-upgraded 1.x DBs
-when the old chain is no longer embedded.
+1. Add `internal/store/migrations/00NN_short_name.sql` (next number).
+2. Update the table in [Migration chain](#migration-chain), the snapshot at the
+   top, and the affected rows of [Schema at head](#schema-at-head-v1).
+3. Update `TestBaselineSchema` if tables, columns or indexes change, and add a
+   test that opens a database at the previous version and migrates it.
+4. A *data* migration states in a comment which 2.x versions it is written for.

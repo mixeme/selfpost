@@ -51,10 +51,6 @@ func (h *Handlers) renderDashboard(w http.ResponseWriter, r *http.Request, statu
 }
 
 func (h *Handlers) domainRows(domains []store.Domain) []domainRow {
-	profileEmail := ""
-	if email, err := h.store.GlobalDMARCReportEmail(); err == nil {
-		profileEmail = email
-	}
 	rows := make([]domainRow, len(domains))
 	var wg sync.WaitGroup
 	for i, d := range domains {
@@ -67,7 +63,12 @@ func (h *Handlers) domainRows(domains []store.Domain) []domainRow {
 				logf("panel: dashboard: domain %d: dkim record: %v", d.ID, err)
 				return
 			}
-			dns, _ := h.domainDNS(d, record, profileEmail, false)
+			reportEmail, err := h.domainReportAddress(d)
+			if err != nil {
+				logf("panel: dashboard: domain %d: dmarc report address: %v", d.ID, err)
+				return
+			}
+			dns, _ := h.domainDNS(d, record, reportEmail, false)
 			rows[i].DNS = dns.Overall
 		}()
 	}
@@ -86,7 +87,8 @@ func dashboardFlash(r *http.Request) string {
 // OpenDKIM reload), and redirects to the domain's page so the DNS record to
 // publish is shown (product.md).
 func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.requireGlobal(w, r); !ok {
+	p, ok := h.requireGlobal(w, r)
+	if !ok {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -111,7 +113,24 @@ func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
 			"Could not add the domain. Please check the logs and try again.", raw)
 		return
 	}
+	h.followCreator(d.ID, p.ID)
 	http.Redirect(w, r, fmt.Sprintf("/domains/%d", d.ID), http.StatusSeeOther)
+}
+
+// followCreator makes a new domain take its DMARC report address from the
+// default of whoever created it (plan § Account e-mail). The domain exists
+// either way: a failure here leaves it with no report address, which its page
+// shows and its DMARC form can change.
+func (h *Handlers) followCreator(domainID, userID int64) {
+	if err := h.store.SetDomainDMARCUser(domainID, userID); err != nil {
+		logf("panel: domain %d: follow user %d's dmarc default: %v", domainID, userID, err)
+		return
+	}
+	if h.dmarc != nil && h.dmarc.Enabled() {
+		if err := h.dmarc.Resync(); err != nil {
+			logf("panel: domain %d: dmarc resync: %v", domainID, err)
+		}
+	}
 }
 
 // HandleDeleteConfirm shows the cascade warning before a domain is removed.

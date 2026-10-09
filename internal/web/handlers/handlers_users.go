@@ -58,7 +58,7 @@ func (h *Handlers) HandleUserNew(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		h.renderUserForm(w, r, http.StatusOK, 0, userFormView{FormRole: string(store.RoleDomainAdmin)})
+		h.renderUserForm(w, r, http.StatusOK, 0, userFormView{FormRole: string(store.RoleDomain)})
 	case http.MethodPost:
 		h.submitUserCreate(w, r)
 	default:
@@ -162,11 +162,11 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
 		return
 	}
-	if role != store.RoleGlobal && role != store.RoleDomainAdmin {
+	if role != store.RoleGlobal && role != store.RoleDomain {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
 		return
 	}
-	if role == store.RoleDomainAdmin && len(domainIDs) == 0 {
+	if role == store.RoleDomain && len(domainIDs) == 0 {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Select at least one domain for a domain administrator.", FormUsername: username, FormRole: string(role), FormDomains: domainIDSetFromForm(r)})
 		return
 	}
@@ -213,16 +213,16 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormRole: string(role), FormDomains: selected})
 		return
 	}
-	if role != store.RoleGlobal && role != store.RoleDomainAdmin {
+	if role != store.RoleGlobal && role != store.RoleDomain {
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Choose a valid role.", FormUsername: username, FormRole: string(role), FormDomains: selected})
 		return
 	}
-	if role == store.RoleDomainAdmin && len(domainIDs) == 0 {
+	if role == store.RoleDomain && len(domainIDs) == 0 {
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Select at least one domain for a domain administrator.", FormUsername: username, FormRole: string(role), FormDomains: selected})
 		return
 	}
 
-	if u.Role == store.RoleGlobal && role == store.RoleDomainAdmin {
+	if u.Role == store.RoleGlobal && role == store.RoleDomain {
 		n, err := h.store.CountGlobalUsers()
 		if err != nil || n <= 1 {
 			msg := "Cannot demote the last global administrator."
@@ -249,7 +249,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		hash = string(newHash)
 	}
 
-	if err := h.store.UpdateUser(u.ID, username, hash, u.DMARCReportEmail); err != nil {
+	if err := h.store.UpdateUser(u.ID, username, hash, u.Email); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormRole: string(role), FormDomains: selected})
 			return
@@ -272,7 +272,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 
-	if role == store.RoleDomainAdmin {
+	if role == store.RoleDomain {
 		if err := h.store.SetUserDomains(u.ID, domainIDs); err != nil {
 			logf("panel: set user domains: %v", err)
 			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save domain assignments.", FormUsername: username, FormRole: string(role), FormDomains: selected})

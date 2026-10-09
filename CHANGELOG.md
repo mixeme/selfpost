@@ -29,14 +29,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   mockups too, and its button takes the same hover, focus and press tint as
   Account and Help (owner, 2026-10-09).
 
+- panel-redesign (stage 1): the 2.0 schema. `users.email` is the user's own
+  address; the default DMARC report address is a user's setting
+  (`dmarc_default_mode` / `dmarc_default_address`) and a domain either has an
+  address of its own or follows a named user's default
+  (`domains.dmarc_rua_user_id`) — a new domain follows whoever created it,
+  and deleting that user leaves it with no report address.
+  `user_inbound_domains` and the per-user `all_domains` /
+  `all_inbound_domains` flags are in the schema for the inbound delegation
+  that follows. Details: `docs/schema-migrations.md`.
+
 ### Changed
 
+- **Breaking — the database starts from zero.** The 1.x migration chain
+  (`0001`–`0010`) is replaced by one baseline, `0001_init.sql`. A 1.x
+  `/data/selfpost.db` is refused at start-up with an explicit error and left
+  untouched; nothing is migrated. A domain can be carried over with its
+  export file.
+- The panel role `domain_admin` is stored as `domain`.
+- Until the Account page replaces it, the old Settings form's "default report
+  address" field sets the account e-mail and switches the user's DMARC
+  default between that e-mail and none; a domain's "Same as Settings" makes
+  it follow the user who chose it.
 - The old panel is untouched on screen but steps aside in the tree: its
   stylesheet is `legacy.css` and its layout `layout_legacy.html` until the
   last old page is restyled. The 2.0 menu paths in the new shell do not
   exist before stage 1; only the kit page uses that shell so far.
 - panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
   the component kit.
+
+### Removed
+
+- The instance setting `dmarc_report_email` (a mirror of the global user's
+  profile field) and the unused `rate_limits.allowed_ips` column.
 
 ## [1.9.5] - 2026-10-09
 

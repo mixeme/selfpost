@@ -8,6 +8,7 @@ package store
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"sort"
@@ -50,6 +51,14 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// applicationID marks a database file as a 2.x SelfPost one ("SP20"). The
+// baseline migration sets it.
+const applicationID = 0x53503230
+
+// ErrForeignSchema is returned by Open for a database that has a schema but
+// was not created by SelfPost 2.x — in practice a 1.x data directory.
+var ErrForeignSchema = errors.New("database was not created by SelfPost 2.x; 2.0 starts from an empty data directory (docs/schema-migrations.md)")
+
 // migrate applies embedded migrations in filename order, tracking progress via
 // SQLite's PRAGMA user_version so each migration runs at most once.
 func (s *Store) migrate() error {
@@ -68,6 +77,23 @@ func (s *Store) migrate() error {
 	var version int
 	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
+	}
+
+	// A 1.x file carries a user_version from the deleted 1.x chain. Counting it
+	// against today's files would skip the baseline and leave the panel running
+	// on a schema it does not know, so such a file is refused outright; nothing
+	// is migrated from 1.x (docs/schema-migrations.md).
+	if version > 0 {
+		var appID int64
+		if err := s.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil {
+			return fmt.Errorf("read application id: %w", err)
+		}
+		if appID != applicationID {
+			return fmt.Errorf("schema version %d: %w", version, ErrForeignSchema)
+		}
+	}
+	if version > len(names) {
+		return fmt.Errorf("database schema version %d is newer than this build knows (%d)", version, len(names))
 	}
 
 	for i, name := range names {

@@ -30,7 +30,7 @@ func (h *Handlers) HandleSettings(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		h.renderSettings(w, r, http.StatusOK, "", u.Username, u.DMARCReportEmail, h.sendLogRetentionDays(), p.IsGlobal())
+		h.renderSettings(w, r, http.StatusOK, "", u.Username, u.Email, h.sendLogRetentionDays(), p.IsGlobal())
 	case http.MethodPost:
 		h.submitSettings(w, r)
 	default:
@@ -128,7 +128,7 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 	dmarcEmail := strings.TrimSpace(r.PostFormValue("dmarc_report_email"))
 	formRetention := currentRetention
 	if !p.IsGlobal() {
-		dmarcEmail = user.DMARCReportEmail
+		dmarcEmail = user.Email
 	} else if raw := strings.TrimSpace(r.PostFormValue("send_log_retention_days")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
@@ -161,7 +161,7 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	emailChanging := p.IsGlobal() && dmarcEmail != user.DMARCReportEmail
+	emailChanging := p.IsGlobal() && dmarcEmail != user.Email
 
 	retentionChanging := false
 	if p.IsGlobal() && formRetention != currentRetention {
@@ -214,6 +214,23 @@ func (h *Handlers) submitSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			h.renderSettings(w, r, http.StatusInternalServerError, msg, username, dmarcEmail, formRetention, p.IsGlobal())
+			return
+		}
+	}
+
+	// Until the Account page replaces this form (stage 2), its one "default
+	// report address" field stands for both halves of the 2.0 model: it is the
+	// account e-mail, and the user's DMARC default is "my account e-mail" while
+	// it is filled and "none" once it is cleared.
+	if emailChanging {
+		mode := store.DMARCDefaultNone
+		if dmarcEmail != "" {
+			mode = store.DMARCDefaultAccount
+		}
+		if err := h.store.SetDMARCDefault(user.ID, mode, ""); err != nil {
+			logf("panel: settings: set dmarc default failed: %v", err)
+			h.renderSettings(w, r, http.StatusInternalServerError,
+				"Could not save the changes. Please check the logs and try again.", username, dmarcEmail, formRetention, p.IsGlobal())
 			return
 		}
 	}

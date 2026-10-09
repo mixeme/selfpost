@@ -2,7 +2,6 @@ package dnscheck
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"testing"
 
@@ -38,21 +37,6 @@ func TestDMARCExample(t *testing.T) {
 	want := "v=DMARC1; p=none; rua=mailto:reports@hub.example"
 	if got := DMARCExample("reports@hub.example"); got != want {
 		t.Errorf("with rua = %q, want %q", got, want)
-	}
-}
-
-func TestResolveDMARCRua(t *testing.T) {
-	inherit := sql.NullString{}
-	if got := ResolveDMARCRua(inherit, "a@b.com"); got != "a@b.com" {
-		t.Errorf("inherit profile = %q", got)
-	}
-	none := sql.NullString{Valid: true}
-	if got := ResolveDMARCRua(none, "a@b.com"); got != "" {
-		t.Errorf("explicit none = %q", got)
-	}
-	custom := sql.NullString{Valid: true, String: "x@y.com"}
-	if got := ResolveDMARCRua(custom, "a@b.com"); got != "x@y.com" {
-		t.Errorf("custom = %q", got)
 	}
 }
 

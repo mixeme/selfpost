@@ -1,7 +1,6 @@
 package dnscheck
 
 import (
-	"database/sql"
 	"net"
 	"strings"
 )
@@ -46,15 +45,6 @@ func SPFExample(hostname string, serverIPs []string) string {
 		mechanisms = []string{"a:" + hostname}
 	}
 	return "v=spf1 " + strings.Join(mechanisms, " ") + " -all"
-}
-
-// ResolveDMARCRua picks the rua= mailbox for a sending domain: per-domain
-// override wins, then the administrator profile, then policy-only (empty).
-func ResolveDMARCRua(domainRua sql.NullString, profileEmail string) string {
-	if domainRua.Valid {
-		return domainRua.String
-	}
-	return profileEmail
 }
 
 // EmailDomain returns the lower-case domain part of addr, or "" when invalid.
