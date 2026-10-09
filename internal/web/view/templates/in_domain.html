@@ -1,0 +1,63 @@
+{{/* One inbound domain (mockup in-domain.html): the MX record to publish and what
+     DNS says about it, where accepted mail is handed on, who is accepted, and
+     what the spam filter does for the domain. The upstream and the recipients
+     are each a form with their own POST. The side menu leads to the boxes and,
+     for the global role, to deleting the domain. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+<div class="columns">
+  <div class="column is-3">
+{{template "side_menu" .Menu}}
+  </div>
+
+  <div class="column is-9">
+{{template "box_open" .DNS}}
+{{template "dns_record" .Record}}
+{{template "box_close"}}
+
+<div class="columns">
+  <div class="column is-6">
+{{template "box_open" .Upstream}}
+{{template "body_open"}}
+<form class="sp-form" method="post" action="{{.UpstreamAction}}">
+  <div class="sp-row">
+    <div class="field"><label class="label" for="host">Host</label><div class="control"><input class="input sp-mono" id="host" name="host" value="{{.Host}}" autocomplete="off" autocapitalize="none" spellcheck="false" required></div></div>
+    <div class="field"><label class="label" for="port">Port</label><div class="control"><input class="input sp-mono" id="port" name="port" inputmode="numeric" value="{{.Port}}" required></div></div>
+  </div>
+  <div class="field"><label class="label" for="tls">TLS to upstream</label>
+    <div class="control"><div class="select is-fullwidth"><select id="tls" name="tls_mode">{{$sel := .TLSSelected}}{{range .TLSOptions}}
+      <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select></div></div></div>
+  <button type="submit" class="button is-primary">Save upstream</button>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+  <div class="column is-6">
+{{template "box_open" .Recipients}}
+{{template "body_open"}}
+<form class="sp-form" method="post" action="{{.RecipientsAction}}">
+  <div class="field"><label class="label" for="rmode">Who to accept</label>
+    <div class="control"><div class="select is-fullwidth"><select id="rmode" name="recipient_mode" data-list-mode="list">{{$mode := .ModeSelected}}{{range .ModeOptions}}
+      <option value="{{.Value}}"{{if eq .Value $mode}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select></div></div></div>
+  <div class="field" data-addresses><label class="label" for="addresses">Addresses</label>
+    <div class="control"><textarea class="textarea sp-mono" id="addresses" name="addresses" rows="4">{{.Addresses}}</textarea></div>
+    <p class="help">{{template "inline" .RecipientsHelp}}</p></div>
+  <button type="submit" class="button is-primary">Save recipients</button>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+</div>
+
+{{template "box_open" .Filter}}
+{{template "body_open"}}
+{{if .FilterFacts}}{{template "facts" .FilterFacts}}{{else}}<p>{{template "inline" .FilterText}}</p>{{end}}
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
+</div>
+{{end}}

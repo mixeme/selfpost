@@ -12,9 +12,6 @@
 #   <name>   a page of the view engine that is still the old template
 backup
 help
-inbound
-inbound_delete
-inbound_domain
 mail_queue
 system_log
 user_delete

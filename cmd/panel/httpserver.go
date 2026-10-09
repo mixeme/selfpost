@@ -110,6 +110,8 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		RateLimitWindowSeconds:     cfg.rateLimitWindowSeconds,
 		RetryPolicy:                retryPolicy,
 		InboundEnabled:             cfg.inboundEnabled,
+		InboundAntispamMilter:      cfg.inboundAntispamMilter,
+		InboundAntispamAction:      cfg.inboundAntispamAction,
 		DMARCEnabled:               cfg.dmarcEnabled,
 		SendLogRetentionEnvDefault: cfg.retentionDays,
 	}, cfg.setupTokenPath)

@@ -91,7 +91,12 @@ type config struct {
 	deployRoot string
 
 	inboundEnabled bool
-	dmarcEnabled   bool
+	// The optional milter on the inbound listener (INBOUND_ANTISPAM_MILTER) and
+	// what Postfix does when it is down. Read-only: build/postfix-config.sh is
+	// what attaches it; the panel only says so. See antispamAction.
+	inboundAntispamMilter string
+	inboundAntispamAction string
+	dmarcEnabled          bool
 }
 
 func loadConfig() config {
@@ -154,10 +159,26 @@ func loadConfig() config {
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
 		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
 		// Optional inbound relay (backup-MX / forwarder). Off unless exactly "true".
-		inboundEnabled: os.Getenv("INBOUND_RELAY_ENABLE") == "true",
+		inboundEnabled:        os.Getenv("INBOUND_RELAY_ENABLE") == "true",
+		inboundAntispamMilter: os.Getenv("INBOUND_ANTISPAM_MILTER"),
+		inboundAntispamAction: antispamAction(os.Getenv("INBOUND_ANTISPAM_MILTER_ACTION")),
 		// Optional DMARC aggregate ingest on port 25. Off unless exactly "true".
 		dmarcEnabled: os.Getenv("DMARC_REPORTS_ENABLE") == "true",
 	}
+}
+
+// antispamAction reads INBOUND_ANTISPAM_MILTER_ACTION the way
+// build/postfix-config.sh does: empty means accept, and accept and tempfail are
+// the only other values it lets the container start with. Anything else is
+// returned as "" — the panel says nothing about the action rather than guess.
+func antispamAction(raw string) string {
+	switch raw {
+	case "", "accept":
+		return "accept"
+	case "tempfail":
+		return "tempfail"
+	}
+	return ""
 }
 
 // saslRealm chooses the realm new SASL accounts live under. It mirrors the

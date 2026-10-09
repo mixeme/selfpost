@@ -224,7 +224,7 @@ func TestInboundListShowsOnlyTheAssignedDomains(t *testing.T) {
 	if !strings.Contains(body, "a.example.com") || strings.Contains(body, "b.example.com") {
 		t.Errorf("the administrator of A must see A and not B:\n%s", body)
 	}
-	for _, globalOnly := range []string{"Add inbound domain", "/delete"} {
+	for _, globalOnly := range []string{"Add a domain", "/delete"} {
 		if strings.Contains(body, globalOnly) {
 			t.Errorf("the list offers a domain administrator %q", globalOnly)
 		}
@@ -249,7 +249,7 @@ func TestInboundListShowsOnlyTheAssignedDomains(t *testing.T) {
 			t.Errorf("list with %s = %d, want 404", who, rec.Code)
 		}
 	}
-	if body := list(&s.global).Body.String(); !strings.Contains(body, "Add inbound domain") || !strings.Contains(body, "b.example.com") {
+	if body := list(&s.global).Body.String(); !strings.Contains(body, "Add a domain") || !strings.Contains(body, "b.example.com") {
 		t.Errorf("the global role lost the full list or the add form:\n%s", body)
 	}
 }

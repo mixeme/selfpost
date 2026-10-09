@@ -52,9 +52,9 @@ var pageFiles = map[string][]string{
 	"out-app":             {"templates/out_app.html"},
 	"out-app-created":     {"templates/out_app_created.html"},
 	"out-domain-delete":   {"templates/out_domain_delete.html"},
-	"inbound":             {"templates/inbound.html"},
-	"inbound_domain":      {"templates/inbound_domain.html"},
-	"inbound_delete":      {"templates/inbound_delete.html"},
+	"in-domains":          {"templates/in_domains.html"},
+	"in-domain":           {"templates/in_domain.html"},
+	"in-domain-delete":    {"templates/in_domain_delete.html"},
 	"out-log":             {"templates/out_log.html", "templates/out_log_rows.html"},
 	"out-message":         {"templates/out_message.html"},
 	"dmarc":               {"templates/dmarc.html"},
@@ -87,6 +87,10 @@ var kitPages = map[string]bool{
 	"out-app":             true,
 	"out-app-created":     true,
 	"out-domain-delete":   true,
+
+	"in-domains":       true,
+	"in-domain":        true,
+	"in-domain-delete": true,
 
 	"out-log":      true,
 	"out-message":  true,

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
@@ -13,15 +12,8 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
-
-type inboundRow struct {
-	store.InboundDomain
-	DNS       health.Status
-	Upstream  string
-	TLSLabel  string
-	RcptLabel string
-}
 
 // Inbound is delegated to domain administrators separately from outbound (plan
 // § Who sees what), so its handlers come in three strengths:
@@ -124,75 +116,42 @@ func (h *Handlers) renderInboundList(w http.ResponseWriter, r *http.Request, sta
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — inbound"
-	data["Active"] = "inbound"
-	data["Domains"] = h.inboundRows(list)
-	data["Error"] = formErr
-	data["FormName"] = formName
+	flash := ""
 	if r.URL.Query().Get("deleted") != "" {
-		data["Flash"] = "Inbound domain deleted."
+		flash = "Inbound domain deleted."
 	}
-	h.view.Render(w, status, "inbound", data)
+	on, _, _ := h.inboundFilter()
+	page := view.NewInDomains(h.shellMeta(r), p.IsGlobal()).
+		WithFilter(on).
+		WithRows(h.inboundRows(list, p.IsGlobal())).
+		WithResult(flash, formErr, formName)
+	h.view.Render(w, status, "in-domains", page)
 }
 
-func (h *Handlers) inboundRows(domains []store.InboundDomain) []inboundRow {
-	rows := make([]inboundRow, len(domains))
+// inboundRows is one row per inbound domain: the verdict of the MX check
+// (cached for a few minutes, as on the domain page), the upstream, who is
+// accepted and the TLS to the upstream. The checks run side by side.
+func (h *Handlers) inboundRows(domains []store.InboundDomain, canDelete bool) []view.InDomainRow {
+	rows := make([]view.InDomainRow, len(domains))
 	var wg sync.WaitGroup
 	for i, d := range domains {
-		rows[i] = inboundRow{
-			InboundDomain: d,
-			DNS:           health.StatusUnknown,
-			Upstream:      inboundUpstream(d),
-			TLSLabel:      tlsLabel(d.TLSMode),
-			RcptLabel:     rcptLabel(d),
+		in := view.InDomainInput{
+			ID: d.ID, Name: d.Name, DNSStatus: string(health.StatusUnknown),
+			Host: d.Host, Port: d.Port, TLSMode: d.TLSMode,
+			RecipientMode: d.RecipientMode, RecipientCount: d.RecipientCount,
 		}
+		rows[i] = view.NewInDomainRow(in, canDelete)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			if h.dns != nil && h.cfg.Hostname != "" {
-				rows[i].DNS = h.dns.InboundMX(d.Name, h.cfg.Hostname, false).Status
+				in.DNSStatus = string(h.dns.InboundMX(d.Name, h.cfg.Hostname, false).Status)
+				rows[i] = view.NewInDomainRow(in, canDelete)
 			}
 		}()
 	}
 	wg.Wait()
 	return rows
-}
-
-func inboundUpstream(d store.InboundDomain) string {
-	if d.Host == "" {
-		return "—"
-	}
-	return fmt.Sprintf("%s:%d", d.Host, d.Port)
-}
-
-func tlsLabel(mode string) string {
-	switch mode {
-	case store.TLSModeEncrypt:
-		return "required"
-	case store.TLSModeNone:
-		return "off"
-	default:
-		return "opportunistic"
-	}
-}
-
-func tlsStatusClass(mode string) string {
-	if mode == store.TLSModeEncrypt {
-		return "ok"
-	}
-	return "unknown"
-}
-
-func rcptLabel(d store.InboundDomain) string {
-	if d.RecipientMode == store.RecipientModeAny {
-		return "any"
-	}
-	n := d.RecipientCount
-	if n == 1 {
-		return "1 listed"
-	}
-	return fmt.Sprintf("%d listed", n)
 }
 
 // HandleAddInbound validates the name, creates the inbound domain, and
@@ -244,21 +203,35 @@ func (h *Handlers) renderInboundDetail(w http.ResponseWriter, r *http.Request, s
 	if h.dns != nil && h.cfg.Hostname != "" {
 		mx = h.dns.InboundMX(d.Name, h.cfg.Hostname, false)
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — " + d.Name
-	data["Active"] = "inbound"
-	data["Domain"] = d
-	data["MX"] = mx
-	data["MXValue"] = "10 " + strings.TrimSuffix(h.cfg.Hostname, ".") + "."
-	data["Hostname"] = h.cfg.Hostname
-	data["TLSLabel"] = tlsLabel(d.TLSMode)
-	data["TLSClass"] = tlsStatusClass(d.TLSMode)
-	data["RecipientText"] = strings.Join(d.Recipients, "\n")
-	data["Flash"] = inboundFlash(r)
-	data["FormErr"] = extra.FormErr
-	data["TransportErr"] = extra.TransportErr
-	data["RecipientErr"] = extra.RecipientErr
-	h.view.Render(w, status, "inbound_domain", data)
+	on, milter, action := h.inboundFilter()
+	page := view.NewInDomain(h.shellMeta(r), view.InDomainInput{
+		ID: d.ID, Name: d.Name, DNSStatus: string(mx.Status), Host: d.Host, Port: d.Port, TLSMode: d.TLSMode,
+		RecipientMode: d.RecipientMode, RecipientCount: d.RecipientCount, Addresses: d.Recipients,
+	}).
+		WithMX(h.cfg.Hostname, view.DNSCheck{Status: string(mx.Status), Detail: mx.Detail, Found: mx.Records}).
+		WithFilter(on, milter, action).
+		WithResult(inboundFlash(r), firstNonEmpty(extra.FormErr, extra.TransportErr, extra.RecipientErr))
+	h.view.Render(w, status, "in-domain", page)
+}
+
+// inboundFilter says whether the instance filters inbound mail, and with what:
+// the milter address and what Postfix does when it is down. It mirrors
+// build/postfix-config.sh, which attaches the filter only when the inbound
+// relay is on and a milter is set.
+func (h *Handlers) inboundFilter() (on bool, milter, action string) {
+	if !h.cfg.InboundEnabled || h.cfg.InboundAntispamMilter == "" {
+		return false, "", ""
+	}
+	return true, h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func inboundFlash(r *http.Request) string {
@@ -330,12 +303,12 @@ func (h *Handlers) HandleInboundDeleteConfirm(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — delete " + d.Name
-	data["Active"] = "inbound"
-	data["Domain"] = d
-	data["Upstream"] = inboundUpstream(d)
-	h.view.Render(w, http.StatusOK, "inbound_delete", data)
+	listed := 0
+	if d.RecipientMode != store.RecipientModeAny {
+		listed = d.RecipientCount
+	}
+	h.view.Render(w, http.StatusOK, "in-domain-delete",
+		view.NewInDomainDelete(h.shellMeta(r), d.ID, d.Name, d.Host != "", listed))
 }
 
 func (h *Handlers) HandleInboundDelete(w http.ResponseWriter, r *http.Request) {

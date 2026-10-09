@@ -99,6 +99,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   in the new design. The log refreshes its rows without touching the filter
   being chosen. `deliveries`, `delivery`, `dmarc`, `dmarc_domain` and
   `dmarc_report` are off the ratchet.
+- panel-redesign (stage 2): the **Inbound** pages are in the new design: the
+  domain list, the domain page (MX record, upstream, valid recipients) and
+  the delete confirmation. Every inbound domain page has a **Spam filter**
+  box and the list names the filter's state: the panel reads
+  `INBOUND_ANTISPAM_MILTER` and `INBOUND_ANTISPAM_MILTER_ACTION` and says
+  whether inbound mail is filtered and what happens while the filter is
+  down. The filter's address is shown to the global role only. `inbound`,
+  `inbound_domain` and `inbound_delete` are off the ratchet.
 
 ### Changed
 

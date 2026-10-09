@@ -35,6 +35,10 @@ var pageFixtures = map[string]func() any{
 	"out-app-created":     func() any { return outAppCreatedFixture() },
 	"out-domain-delete":   func() any { return outDomainDeleteFixture() },
 
+	"in-domains":       func() any { return inDomainsFixture() },
+	"in-domain":        func() any { return inDomainFixture() },
+	"in-domain-delete": func() any { return inDomainDeleteFixture() },
+
 	"out-log":      func() any { return outLogFixture() },
 	"out-message":  func() any { return outMessageFixture() },
 	"dmarc":        func() any { return dmarcHubFixture() },
@@ -306,4 +310,35 @@ func dmarcReportFixture() *DMARCReport {
 		{Source: "203.0.113.25", ThisRelay: true, Count: 1903, Disposition: "none", SPF: "pass", DKIM: "pass", HeaderFrom: "shop.example.org"},
 		{Source: "198.51.100.44", Count: 7, Disposition: "none", SPF: "fail", DKIM: "fail", HeaderFrom: "shop.example.org"},
 	})
+}
+
+// inDomainsFixture is the mockup's Inbound domains: two domains, one that lists
+// its four recipients and needs TLS to its upstream, one that accepts any
+// address and takes whatever its upstream offers.
+func inDomainsFixture() *InDomains {
+	row := func(in InDomainInput) InDomainRow { return NewInDomainRow(in, true) }
+	return NewInDomains(admin(), true).WithFilter(true).WithRows([]InDomainRow{
+		row(InDomainInput{ID: 1, Name: "lists.example.org", DNSStatus: "ok", Host: "mx.internal", Port: 25,
+			TLSMode: "encrypt", RecipientMode: "list", RecipientCount: 4}),
+		row(InDomainInput{ID: 2, Name: "acme.io", DNSStatus: "ok", Host: "10.0.4.12", Port: 2525,
+			TLSMode: "may", RecipientMode: "any"}),
+	})
+}
+
+// inDomainDeleteFixture is the mockup's confirmation: a domain with an upstream
+// and four listed recipients.
+func inDomainDeleteFixture() *InDomainDelete {
+	return NewInDomainDelete(admin(), 1, "lists.example.org", true, 4)
+}
+
+// inDomainFixture is the mockup's domain page: the MX published and pointing
+// here, an upstream that needs TLS, four listed recipients and a spam filter
+// that is on.
+func inDomainFixture() *InDomain {
+	p := NewInDomain(admin(), InDomainInput{ID: 1, Name: "lists.example.org", DNSStatus: "ok", Host: "mx.internal", Port: 25,
+		TLSMode: "encrypt", RecipientMode: "list", RecipientCount: 4,
+		Addresses: []string{"announce@lists.example.org", "dev@lists.example.org", "owner@lists.example.org", "security@lists.example.org"}})
+	p.WithMX("mail.example.org", DNSCheck{Status: "ok", Found: []string{"10 mail.example.org."}})
+	p.WithFilter(true, "inet:antispam:11332", "accept")
+	return p
 }

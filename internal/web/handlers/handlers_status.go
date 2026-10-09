@@ -48,10 +48,9 @@ func (h *Handlers) HandleOverview(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		for _, row := range h.inboundRows(list) {
+		for _, row := range h.inboundRows(list, false) {
 			page.InboundRows = append(page.InboundRows, view.OverviewInbound{
-				Name: row.Name, Href: fmt.Sprintf("/inbound/domains/%d", row.ID),
-				MX: view.Tag{Status: string(row.DNS), Label: "MX"}, Upstream: row.Upstream,
+				Name: row.Name, Href: row.Href, MX: row.DNS, Upstream: row.Upstream,
 			})
 		}
 	}

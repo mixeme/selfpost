@@ -87,6 +87,12 @@ type Config struct {
 	RetryPolicy postfix.RetryPolicy
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE.
 	InboundEnabled bool
+	// InboundAntispamMilter mirrors INBOUND_ANTISPAM_MILTER (inet:host:port or
+	// unix:/path) and InboundAntispamAction INBOUND_ANTISPAM_MILTER_ACTION
+	// ("accept" or "tempfail", "" when the variable holds anything else): the
+	// panel only reports them.
+	InboundAntispamMilter string
+	InboundAntispamAction string
 	// DMARCEnabled mirrors DMARC_REPORTS_ENABLE.
 	DMARCEnabled bool
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start.
@@ -133,6 +139,8 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		RateLimitWindowSeconds:     cfg.RateLimitWindowSeconds,
 		RetryPolicy:                cfg.RetryPolicy,
 		InboundEnabled:             cfg.InboundEnabled,
+		InboundAntispamMilter:      cfg.InboundAntispamMilter,
+		InboundAntispamAction:      cfg.InboundAntispamAction,
 		DMARCEnabled:               cfg.DMARCEnabled,
 		SendLogRetentionEnvDefault: cfg.SendLogRetentionEnvDefault,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)

@@ -39,6 +39,12 @@ type Config struct {
 	// InboundEnabled mirrors INBOUND_RELAY_ENABLE: the inbound panel and
 	// routes exist only when this is true.
 	InboundEnabled bool
+	// InboundAntispamMilter mirrors INBOUND_ANTISPAM_MILTER and
+	// InboundAntispamAction INBOUND_ANTISPAM_MILTER_ACTION ("accept",
+	// "tempfail", or "" for a value build/postfix-config.sh would refuse). The
+	// filter is on only when the inbound relay is on and the milter is set.
+	InboundAntispamMilter string
+	InboundAntispamAction string
 	// DMARCEnabled mirrors DMARC_REPORTS_ENABLE.
 	DMARCEnabled bool
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start; used
