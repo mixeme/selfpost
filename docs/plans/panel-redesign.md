@@ -394,16 +394,30 @@ reviewed by models other than the one that implements the templates.
 
 | Test | Fails when |
 |---|---|
-| `TestPanelClassVocabulary` | a template uses a class outside the Bulma subset + the `sp-` classes of `panel.css`; an `sp-` class is defined but unused, or used but absent from `components.html` |
-| `TestPanelCSSContract` | `panel.css` has `!important`, an id or page-name selector, or a width outside `WIDTH_OK` |
-| `TestTemplatesUseComponents` | a page template contains `sp-box-head`, `sp-postmark`, `sp-record`, `sp-facts`, … literally instead of `{{template "…"}}` |
-| `TestPanelOutlinesMatchMockups` | a page rendered with fixtures has a different component skeleton than `outlines.json` — a different design cannot pass as this one |
-| `TestVendoredBulmaChecksum` | `bulma.min.css` differs from the pinned SHA-256 |
+| `TestPanelClassVocabulary` | a template, or the page it renders, uses a class outside the Bulma subset + the `sp-` classes of `panel.css`, or an icon outside the vendored subset; an `sp-` class is defined but unused, or used but not shown on the components page |
+| `TestPanelCSSIsTheMockupStylesheet` | `panel.css` is not `brand.css` + `theme.css` rule for rule — a rule the mockups do not have is a design change |
+| `TestPanelCSSContract` | `panel.css` has `!important`, an id or page selector, a size under the type floor, or a width outside `WIDTH_OK` |
+| `TestTemplatesUseComponents` | a page template writes a component's `sp-` class itself instead of `{{template "…"}}`, or builds a partial's input with `dict`; a partial or its typed input is missing |
+| `TestPanelOutlinesMatchMockups` | a page rendered with its fixture has a different component skeleton than `outlines.json` — a different design cannot pass as this one |
+| `TestPanelPageStructure` | a rendered page breaks a structure rule of `check.py`: one `<h1>`, opens with `page_head`, a box starts with `box_head`, a table sits in a `table-container`, the shell is the layout's |
+| `TestRedesignedPagesLoadOnlyTheKit` | a redesigned page loads the old stylesheet, or any stylesheet or script outside the kit |
+| `TestOutlinePortMatchesCheckPy` | the Go port of `outline()` reads a mockup differently from `check.py` |
+| `TestLegacyRatchetMatchesTheEngine` | the ratchet names something that is not a page, or a page off the ratchet is not a drawn screen |
+| `TestVendoredAssetsArePinned` | `bulma.min.css` or the icon subset differs from its pinned SHA-256 |
+| `TestStaticHoldsOnlyTheKnownAssets` | `/static` holds a file outside the allow-list — a second framework, icon set or script |
+| `TestRoutesFollowNavigation` | § Routes: a path is missing, an old path still answers, a template links to a path the router does not serve |
 | `TestNoTemplateUsesInlineScriptOrStyle` | (exists) inline `style` / script |
 
-CI adds one step, `design-first`: a commit that touches
-`internal/web/view/**` must not touch `docs/assets/panel-redesign/panel/**`
-or the guard tests.
+The guards are the files `guard_*_test.go` under `internal/web`. They read
+their lists from the mockup directory itself — the Bulma subset and
+`WIDTH_OK` from `check.py`, the shell's classes from `build.py`, the
+stylesheet, the outlines — so there is no second copy to drift.
+
+CI adds one step, `design-first`
+([.github/scripts/design-first.sh](../../.github/scripts/design-first.sh),
+run on every commit of a push or pull request): a commit that touches
+`docs/assets/panel-redesign/panel/**`, a guard test or the script itself must
+not touch anything else under `internal/web/`.
 
 ### Against resurrected pages
 
@@ -411,24 +425,30 @@ It has happened once: an implementer took the old page templates out of git
 history and reported them as the redesigned pages. Four guards make that
 impossible to pass, and none of them depends on anyone looking:
 
-1. **The ratchet.** The guard tests carry one list, `legacyPages`, of page
-   names that are still old and therefore exempt from
+1. **The ratchet.** One list,
+   [internal/web/view/legacy_pages.txt](../../internal/web/view/legacy_pages.txt),
+   names the pages that are still old and therefore exempt from
    `TestPanelOutlinesMatchMockups`, `TestPanelClassVocabulary` and
-   `TestTemplatesUseComponents`. It starts as every page and **can only
-   shrink**: a CI step fails a commit whose `legacyPages` is not a subset of
-   its parent's. Restyling a page means removing it from the list in the same
+   `TestTemplatesUseComponents`. It is a file of its own, beside the guards
+   and not inside them, because the step that restyles a page must edit it
+   and must not edit a guard. It starts as every page and **can only
+   shrink**: `design-first` fails a commit whose list is not a subset of its
+   parent's. Restyling a page means removing it from the list in the same
    commit; from then on that page is held to its outline forever. Putting the
    old template back fails three tests at once, and putting the name back on
-   the list fails CI.
+   the list fails CI. Two entries are not pages: `@kit` keeps the kit's own
+   tests quiet until stage 0 is accepted, `@routes` does the same for
+   `TestRoutesFollowNavigation` until stage 1 renames the paths — "red where
+   expected" without a red main branch, and equally unable to come back.
 2. **The outline is the design.** An old page has a different component
    skeleton from `outlines.json` — different boxes, no `page_head`, no
    `side_menu` — so it cannot match, however its classes are renamed.
 3. **Old paths are forbidden.** `TestRoutesFollowNavigation` fails on any
    template that contains a pre-2.0 path; every old page does.
 4. **No blob from the past.** The `design-first` CI step also compares every
-   file under `internal/web/view/templates/` with the same path's blobs in
-   history up to the last 1.x tag, whitespace-normalised, and fails on a
-   match. This catches a byte-for-byte revert that happens to be on the
+   template a commit adds or changes under `internal/web/view/templates/`
+   with every template blob in the history before it — under any path, so a
+   rename does not hide it — whitespace-normalised, and fails on a match. This catches a byte-for-byte revert that happens to be on the
    ratchet list still; the three tests above catch everything else.
 
 The evidence rules below close the remaining gap, a screenshot that is not
@@ -478,7 +498,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 **Stage 0 — foundation and component kit** (§ Component kit)
 
 - [x] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
-- [ ] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
+- [x] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
 - [ ] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
 - [ ] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**
 - [ ] `GET /server/components` behind the global role rendering every partial from fixtures; kit acceptance (§ Component kit) with evidence — **Sonnet**, reviewed by **Opus**

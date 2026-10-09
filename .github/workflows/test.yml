@@ -10,6 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # design-first.sh reads each commit's parent and the template history.
+          fetch-depth: 0
+
+      - name: Design first
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash .github/scripts/design-first.sh "$BASE" "$HEAD"
 
       - uses: actions/setup-go@v5
         with:

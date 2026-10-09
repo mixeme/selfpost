@@ -10,6 +10,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - panel-redesign (stage 0): Bulma 1.0.4 and a 57-icon subset of Tabler Icons
   3.49.0 are vendored under `/static` (MIT, listed in NOTICE). Nothing links
   them yet; the old panel is unchanged.
+- panel-redesign (stage 0): the design contract as guard tests
+  (`guard_*_test.go` under `internal/web`) and a `design-first` CI step. The
+  tests read their rules from the accepted mockups — class vocabulary,
+  stylesheet, page structure, component outlines, the 2.0 route table — and
+  pin the vendored assets. `internal/web/view/legacy_pages.txt` lists what is
+  still pre-2.0 and may only shrink; CI also rejects a commit that changes a
+  guard together with the implementation, or brings back a template from
+  history. The kit and route tests stay skipped until their stages land.
 
 ### Changed
 
