@@ -249,7 +249,7 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .sp-signin-brand img { width: 20rem; max-width: 100%; height: auto; }
 .sp-signin-brand p { font-family: var(--sp-mono); letter-spacing: .18em; font-size: var(--sp-fs-xs); color: var(--sp-on-brick); margin-top: 1.6rem; }
 .sp-signin-form { display: flex; flex-direction: column; justify-content: center; padding: 3rem; }
-.sp-signin-form form { width: 22rem; max-width: 100%; margin-inline: auto; }
+.sp-signin-form .sp-form { width: 22rem; max-width: 100%; margin-inline: auto; }
 .sp-foot { color: var(--sp-muted); font-size: var(--sp-fs-s); padding-block: 1.5rem 0; }
 .sp-foot a { color: inherit; text-decoration: underline; }
 .sp-signin-form .sp-foot { text-align: center; margin-top: 2.5rem; }
