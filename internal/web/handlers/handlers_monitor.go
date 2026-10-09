@@ -15,6 +15,7 @@ import (
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // sendLogPageSize bounds each send-log page (product.md's monitoring screens
@@ -27,37 +28,32 @@ const (
 	deliveryLogLines = 200
 )
 
-// HandleDeliveries renders the Deliveries page over the send log: server-side
-// filters by domain/application and pagination (architecture.md §
-// Persistence). The row table itself is the "deliveries_rows" fragment, shared
-// verbatim with HandleDeliveriesRows so the initial page and its HTMX-polled
-// refreshes never diverge.
+// HandleDeliveries renders the Outbound log over the send log: server-side
+// filters by domain/application and pagination (architecture.md § Persistence).
+// The table and the count under it are the polled region, rendered by the same
+// template for the page and for HandleDeliveriesRows, so the initial page and
+// its HTMX-polled refreshes never diverge.
 func (h *Handlers) HandleDeliveries(w http.ResponseWriter, r *http.Request) {
-	data, err := h.sendLogData(r)
+	page, err := h.outLogPage(r)
 	if err != nil {
 		logf("panel: send log: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	data["Title"] = "SelfPost — deliveries"
-	for k, v := range h.pageBase(r) {
-		data[k] = v
-	}
-	data["Active"] = "deliveries"
-	h.view.Render(w, http.StatusOK, "deliveries", data)
+	h.view.Render(w, http.StatusOK, "out-log", page)
 }
 
-// HandleDeliveriesRows serves the HTMX polling fragment for the delivery table
+// HandleDeliveriesRows serves the HTMX polling fragment for the log
 // (architecture.md § Panel HTTP surface: fragment endpoints return HTML, not
-// JSON).
+// JSON): the table, and the foot under it for the page to swap in.
 func (h *Handlers) HandleDeliveriesRows(w http.ResponseWriter, r *http.Request) {
-	data, err := h.sendLogData(r)
+	page, err := h.outLogPage(r)
 	if err != nil {
 		logf("panel: send log rows: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	h.view.RenderFragment(w, http.StatusOK, "deliveries_rows", data)
+	h.view.RenderFragment(w, http.StatusOK, "out_log_rows", page.Fragment())
 }
 
 // HandleDelivery renders one send-log row in full. The log itself carries only
@@ -94,79 +90,44 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if !p.IsGlobal() {
-		allowed, err := h.assignedDomains(p)
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		if !domainNameSet(allowed)[row.Domain] {
-			http.NotFound(w, r)
-			return
-		}
+	allowed, err := h.assignedDomains(p)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !p.IsGlobal() && !domainNameSet(allowed)[row.Domain] {
+		http.NotFound(w, r)
+		return
 	}
 	row.Subject = mailhdr.DecodeSubject(row.Subject)
-	logRows, logNote := h.deliveryLog(row)
-	h.view.Render(w, http.StatusOK, "delivery", map[string]any{
-		"Title":                "SelfPost — delivery",
-		"User":                 auth.CurrentUser(r),
-		"Active":               "deliveries",
-		"IsGlobal":             p.IsGlobal(),
-		"SendLogRetentionDays": h.sendLogRetentionDays(),
-		"Row":                  row,
-		// The status in the panel's own badge vocabulary, so the headline reads
-		// the same way as every other health signal in the panel.
-		"Level":  deliveryLevel(row.Status),
-		"Events": deliveryEvents(row, h.cfg.RetryPolicy),
+	logLines, logNote := h.deliveryLog(row)
+
+	in := view.MessageInput{
+		ID: row.ID, QueueID: row.QueueID, Domain: row.Domain, App: row.AppLogin,
+		From: row.From, To: row.To, Subject: row.Subject, Status: row.Status,
+		Accepted: row.CreatedAt, Reported: row.UpdatedAt,
+		// Where the row came from, so the way back returns to the page and filters
+		// the operator was looking at rather than the top of an unfiltered log.
+		BackHref: deliveriesBackURL(r),
+	}
+	// The names link to their pages when there is a page to go to: a domain
+	// that was deleted since, or an application of another domain, is text.
+	for _, d := range allowed {
+		if d.Name != row.Domain {
+			continue
+		}
+		in.DomainHref = view.DomainHref(d.ID)
+		if a, err := h.store.GetApplicationByLogin(row.AppLogin); err == nil && a.DomainID == d.ID {
+			in.AppHref = view.DomainHref(d.ID) + "/applications/" + strconv.FormatInt(a.ID, 10)
+		}
+		break
+	}
+	page := view.NewOutMessage(h.shellMeta(r), in).
+		WithHistory(deliveryEvents(row, h.cfg.RetryPolicy)).
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
-		"LogRows": logRows,
-		"LogNote": logNote,
-		// Where the row came from, so "Back" returns to the page and filters
-		// the operator was looking at rather than the top of an unfiltered log.
-		"BackURL": deliveriesBackURL(r),
-	})
-}
-
-// deliveryLevel maps a send-log status onto the ok/warn/error/unknown badge
-// vocabulary the status page and the DNS checks already use (see .st in
-// legacy.css), so a colour means the same thing on every page: delivered is the
-// good outcome, deferred is not settled yet, and the two refusals are failures.
-// A queued row is "unknown" rather than "warn" — nothing has gone wrong, it is
-// simply that nothing has been reported.
-func deliveryLevel(status string) string {
-	switch status {
-	case store.StatusSent:
-		return "ok"
-	case store.StatusDeferred:
-		return "warn"
-	case store.StatusBounced, store.StatusRejected:
-		return "error"
-	default:
-		return "unknown"
-	}
-}
-
-// sendLogRow is a row of the send log as the table draws it: the stored row
-// plus the badge level its status maps onto. The level is carried rather than
-// derived in the template because deliveryLevel is the one place that decides
-// what a status means — the delivery page already reads it, and a second
-// mapping written in the template or the stylesheet would be free to drift
-// from it.
-type sendLogRow struct {
-	store.SendLogRow
-	Level string // ok / warn / error / unknown, as deliveryLevel returns
-}
-
-// deliveryEvent is one step of a message's history, as the timeline on the
-// delivery page draws it. At is zero for the step that has not happened yet —
-// the delivery report a queued message is still waiting for.
-type deliveryEvent struct {
-	At     time.Time
-	Level  string // ok / warn / error / unknown, as deliveryLevel returns
-	Status string // the send-log status value this step reached
-	Title  string
-	Detail string
+		WithDeliveryLog(logLines, logNote)
+	h.view.Render(w, http.StatusOK, "out-message", page)
 }
 
 // deliveryEvents turns a row's two timestamps into the history the page shows.
@@ -177,91 +138,60 @@ type deliveryEvent struct {
 // six hours, then delivered" rather than as two dates in a list of fields.
 // policy supplies the human intervals for deferred and bounced copy, the same
 // strings the Mail queue card prints, so the two cannot drift.
-func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []deliveryEvent {
+func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []view.Step {
+	// step states what happened and when; outcome is ok, warn, error or "" for a
+	// step that reports nothing either way, and a zero time is a step that has
+	// not happened yet.
+	step := func(at time.Time, outcome, title, detail string) view.Step {
+		return view.Step{
+			Time:   view.StepTime(at),
+			Strong: title,
+			Text:   view.Plain(" — " + detail),
+			Level:  view.StepLevel(outcome, !at.IsZero()),
+		}
+	}
+
 	// A rejected message has no second step, and its first one is not an
 	// acceptance: the journal-milter refused it, so Postfix never queued it.
 	if row.Status == store.StatusRejected {
-		return []deliveryEvent{{
-			At:     row.CreatedAt,
-			Level:  "error",
-			Status: store.StatusRejected,
-			Title:  "Refused before queueing",
-			Detail: "The journal-milter refused the message under a rate limit. It was never queued, so there is no queue id and Postfix never attempted delivery.",
-		}}
+		return []view.Step{step(row.CreatedAt, "error", "Refused before queueing",
+			"The journal-milter refused the message under a rate limit. It was never queued, so there is no queue id and Postfix never attempted delivery.")}
 	}
 
-	events := []deliveryEvent{{
-		At:     row.CreatedAt,
-		Level:  "unknown",
-		Status: store.StatusQueued,
-		Title:  "Accepted and queued",
-		Detail: "Postfix accepted the message over an authenticated submission and the journal-milter recorded it. Delivery to the recipient had not been attempted yet.",
-	}}
+	events := []view.Step{step(row.CreatedAt, "", "Accepted and queued",
+		"Postfix accepted the message over an authenticated submission and the journal-milter recorded it. Delivery to the recipient had not been attempted yet.")}
 
 	switch row.Status {
 	case store.StatusQueued:
 		// The step that has not happened. Drawn as an open dot with no time.
-		return append(events, deliveryEvent{
-			Level:  "unknown",
-			Status: store.StatusQueued,
-			Title:  "Waiting for a delivery report",
-			Detail: "Postfix has not reported an attempt for this recipient yet. The Mail queue page shows what it is still holding.",
-		})
+		return append(events, step(time.Time{}, "", "Waiting for a delivery report",
+			"Postfix has not reported an attempt for this recipient yet. The Mail queue page shows what it is still holding."))
 	case store.StatusSent:
-		return append(events, deliveryEvent{
-			At:     row.UpdatedAt,
-			Level:  "ok",
-			Status: store.StatusSent,
-			Title:  "Delivered",
-			Detail: "The receiving server accepted the message. That is as far as this server can see — what the recipient's mailbox then did with it is not reported back.",
-		})
+		return append(events, step(row.UpdatedAt, "ok", "Delivered",
+			"The receiving server accepted the message. That is as far as this server can see — what the recipient's mailbox then did with it is not reported back."))
 	case store.StatusDeferred:
-		return append(events, deliveryEvent{
-			At:     row.UpdatedAt,
-			Level:  "warn",
-			Status: store.StatusDeferred,
-			Title:  "Deferred, will be retried",
-			Detail: fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
-				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime()),
-		})
+		return append(events, step(row.UpdatedAt, "warn", "Deferred, will be retried",
+			fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
+				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime())))
 	case store.StatusBounced:
-		return append(events, deliveryEvent{
-			At:     row.UpdatedAt,
-			Level:  "error",
-			Status: store.StatusBounced,
-			Title:  "Bounced",
-			Detail: fmt.Sprintf("Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after %s in the queue. The reason is in the delivery log below.",
-				policy.QueueLifetime()),
-		})
+		return append(events, step(row.UpdatedAt, "error", "Bounced",
+			fmt.Sprintf("Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after %s in the queue. The reason is in the delivery log below.",
+				policy.QueueLifetime())))
 	default:
 		// A status the log-tailer learns to write before this switch does.
-		return append(events, deliveryEvent{
-			At:     row.UpdatedAt,
-			Level:  deliveryLevel(row.Status),
-			Status: row.Status,
-			Title:  "Status reported",
-			Detail: "The last state Postfix reported for this recipient.",
-		})
+		return append(events, step(row.UpdatedAt, "", "Status reported",
+			"The last state Postfix reported for this recipient."))
 	}
 }
 
-// deliveryLogRow is one mail.log line split for the table on the delivery
-// page: when it was written, and what it says. Time is empty for a line whose
-// head is not a timestamp the log format recognises — the line still shows, in
-// full, under Message.
-type deliveryLogRow struct {
-	Time string
-	Text string
-}
-
 // deliveryLog reads the mail.log lines Postfix wrote about one message and
-// splits each into the two columns the page shows it in. The second return
-// value is what to say when there are none: every reason for an empty result
-// here is an ordinary one — the message never reached the queue, or its lines
-// have aged out of the log — so none of them is an error on the page. Only a
-// log that cannot be read at all is reported as a fault, and that one is
+// splits each into the time and the text the page shows it in. The second
+// return value is what to say when there are none: every reason for an empty
+// result here is an ordinary one — the message never reached the queue, or its
+// lines have aged out of the log — so none of them is an error on the page. Only
+// a log that cannot be read at all is reported as a fault, and that one is
 // logged for the operator as well.
-func (h *Handlers) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) {
+func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 	if row.QueueID == "" {
 		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
 	}
@@ -274,10 +204,12 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]deliveryLogRow, string) 
 		days := h.sendLogRetentionDays()
 		return nil, fmt.Sprintf("Nothing for this queue id in the current mail log. Its lines have most likely been rotated away (send-log rows are kept for %d days).", days)
 	}
-	out := make([]deliveryLogRow, len(lines))
+	out := make([]view.LogLine, len(lines))
 	for i, line := range lines {
+		// A line whose head is not a timestamp the log format recognises keeps its
+		// whole text and no time: nothing is dropped from what the log says.
 		stamp, rest := logtail.SplitTimestamp(line)
-		out[i] = deliveryLogRow{Time: stamp, Text: rest}
+		out[i] = view.LogLine{Time: stamp, Text: rest, Level: view.LogLineLevel(rest)}
 	}
 	return out, ""
 }
@@ -300,9 +232,9 @@ func deliveriesBackURL(r *http.Request) string {
 	return "/outbound/log?" + back.Encode()
 }
 
-// sendLogData reads the domain/app filters and page number off the query
-// string, queries the store, and assembles everything the template needs
-// (filter dropdown options plus the current selection, rows, and pagination).
+// outLogPage reads the domain/app filters and page number off the query
+// string, queries the store, and fills the log page (filter choices plus the
+// current selection, rows, and pagination).
 //
 // The invariant this function owes the journal: a principal who is not global
 // only ever reads rows for the domains assigned to them. That scope is stated
@@ -313,7 +245,7 @@ func deliveriesBackURL(r *http.Request) string {
 // the assigned domains and their applications before the query runs, because a
 // dropdown that offers only permitted values is a courtesy to the browser, not
 // a check on the request.
-func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
+func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	p, ok := h.principal(r)
 	if !ok {
 		return nil, errors.New("no principal")
@@ -374,30 +306,21 @@ func (h *Handlers) sendLogData(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	view := make([]sendLogRow, len(rows))
-	for i := range rows {
-		rows[i].Subject = mailhdr.DecodeSubject(rows[i].Subject)
-		view[i] = sendLogRow{SendLogRow: rows[i], Level: deliveryLevel(rows[i].Status)}
-	}
 
 	lastPage := 1
 	if total > 0 {
 		lastPage = int((total + sendLogPageSize - 1) / sendLogPageSize)
 	}
-	return map[string]any{
-		"Rows":                 view,
-		"FilterDomains":        domainNames,
-		"FilterApps":           logins,
-		"FilterDomain":         filter.Domain,
-		"FilterApp":            filter.AppLogin,
-		"Page":                 page,
-		"PrevPage":             page - 1,
-		"NextPage":             page + 1,
-		"LastPage":             lastPage,
-		"HasPrev":              page > 1,
-		"HasNext":              page < lastPage,
-		"SendLogRetentionDays": h.sendLogRetentionDays(),
-	}, nil
+	out := view.NewOutLog(h.shellMeta(r), h.sendLogRetentionDays(), p.IsGlobal(), domainNames, logins, filter.Domain, filter.AppLogin)
+	table := make([]view.OutLogRow, len(rows))
+	for i, row := range rows {
+		table[i] = view.OutLogRow{
+			Time: view.FormatLogTime(row.CreatedAt), From: row.From, To: row.To,
+			Subject: mailhdr.DecodeSubject(row.Subject), Status: view.Tag{Status: row.Status},
+			Href: out.DetailHref(row.ID, page),
+		}
+	}
+	return out.WithRows(table, page, lastPage), nil
 }
 
 // parsePage clamps the "p" query parameter to a valid page number, defaulting

@@ -13,16 +13,16 @@ func TestE2ESendLogStatusMarkupDrift(t *testing.T) {
 	rendered := getBody(t, h.HandleDeliveriesRows, "/outbound/log/fragment")
 
 	// These mirror test/e2e/main_test.go — keep in sync when fixing the e2e gate.
-	statusCellPattern := regexp.MustCompile(`class="st st-[^"]+">(queued|sent|deferred|bounced|rejected)</span>`)
+	statusCellPattern := regexp.MustCompile(`<span class="tag[^"]*">(queued|sent|deferred|bounced|rejected)</span>`)
 	containsCell := func(html, needle string) bool {
-		return strings.Contains(html, `<span class="st st-`) && strings.Contains(html, `">`+needle+`</span>`)
+		return strings.Contains(html, `<span class="tag`) && strings.Contains(html, `">`+needle+`</span>`)
 	}
 
 	if statusCellPattern.FindStringSubmatch(rendered) == nil {
-		t.Fatalf("e2e statusCellPattern does not match rendered send-log rows:\n%s", snippet(rendered, `class="status"`))
+		t.Fatalf("e2e statusCellPattern does not match rendered send-log rows:\n%s", snippet(rendered, `<td>`))
 	}
 	if !containsCell(rendered, "sent") {
-		t.Fatalf("e2e containsCell does not match rendered send-log rows:\n%s", snippet(rendered, `class="status"`))
+		t.Fatalf("e2e containsCell does not match rendered send-log rows:\n%s", snippet(rendered, `<td>`))
 	}
 }
 

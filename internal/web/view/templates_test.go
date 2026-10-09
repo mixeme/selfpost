@@ -225,9 +225,9 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	wide := map[string]bool{
-		"deliveries": true, "delivery": true, "mail_queue": true,
+		"mail_queue": true,
 		"system_log": true,
-		"inbound":    true, "inbound_domain": true, "dmarc": true,
+		"inbound":    true, "inbound_domain": true,
 	}
 	for name, page := range engine.Pages() {
 		if kitPages[name] {
@@ -275,9 +275,6 @@ func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 		"user_delete.html":    true,
 		"inbound_domain.html": true,
 		"inbound_delete.html": true,
-		"dmarc_domain.html":   true,
-		"dmarc_report.html":   true,
-		"delivery.html":       true,
 	}
 	forEachTemplate(t, func(name, body string) {
 		if !drillDown[name] {

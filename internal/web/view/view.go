@@ -55,11 +55,11 @@ var pageFiles = map[string][]string{
 	"inbound":             {"templates/inbound.html"},
 	"inbound_domain":      {"templates/inbound_domain.html"},
 	"inbound_delete":      {"templates/inbound_delete.html"},
+	"out-log":             {"templates/out_log.html", "templates/out_log_rows.html"},
+	"out-message":         {"templates/out_message.html"},
 	"dmarc":               {"templates/dmarc.html"},
-	"dmarc_domain":        {"templates/dmarc_domain.html"},
-	"dmarc_report":        {"templates/dmarc_report.html"},
-	"deliveries":          {"templates/deliveries.html", "templates/deliveries_rows.html"},
-	"delivery":            {"templates/delivery.html"},
+	"dmarc-domain":        {"templates/dmarc_domain.html"},
+	"dmarc-report":        {"templates/dmarc_report.html"},
 	"mail_queue":          {"templates/mail_queue.html", "templates/mail_queue_body.html"},
 	"system_log":          {"templates/system_log.html", "templates/system_log_body.html"},
 	"help":                {"templates/help.html"},
@@ -87,12 +87,18 @@ var kitPages = map[string]bool{
 	"out-app":             true,
 	"out-app-created":     true,
 	"out-domain-delete":   true,
+
+	"out-log":      true,
+	"out-message":  true,
+	"dmarc":        true,
+	"dmarc-domain": true,
+	"dmarc-report": true,
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
 // template file, for standalone rendering by the HTMX polling endpoints.
 var fragmentFiles = map[string]string{
-	"deliveries_rows": "templates/deliveries_rows.html",
+	"out_log_rows":    "templates/out_log_rows.html",
 	"mail_queue_body": "templates/mail_queue_body.html",
 	"system_log_body": "templates/system_log_body.html",
 	"health_body":     "templates/health_body.html",
@@ -100,7 +106,7 @@ var fragmentFiles = map[string]string{
 }
 
 // kitFragments are the fragments rendered with the component kit's partials.
-var kitFragments = map[string]bool{"health_body": true, "overview_poll": true}
+var kitFragments = map[string]bool{"health_body": true, "overview_poll": true, "out_log_rows": true}
 
 // New parses embedded templates. version is stamped into every page footer.
 func New(version string) (*Engine, error) {

@@ -1,63 +1,24 @@
-{{define "wide"}}wide{{end}}
-
+{{/* DMARC reports (mockup dmarc.html): whether aggregate reports are arriving,
+     and the latest of them across the domains the viewer reaches. */}}
 {{define "content"}}
-<h1>DMARC reports</h1>
+{{template "page_head" .Head}}
 
-<p class="muted">Aggregate reports SelfPost accepted for <code>rua=</code>.
-Forensic (<code>ruf=</code>) is out of scope. Open a report for the parsed
-XML — not a dashboard.</p>
+{{template "box_open" .Ingest}}
+{{template "body_open"}}
+{{template "facts" .IngestFacts}}
+{{template "body_close"}}
+{{template "box_close"}}
 
-<div class="pair">
-  <div class="card">
-    <h2>Ingest {{if .IngestStats.IngestOK}}<span class="st st-ok">ok</span>{{else}}<span class="st st-warn">quiet</span>{{end}}</h2>
-    {{if .LastReceivedLabel}}
-    <p>Last report {{.LastReceivedLabel}} UTC. Port 25 accepts only configured report addresses.</p>
-    {{else}}
-    <p>No reports received yet. Point <code>rua=</code> at
-    <code>{{.HostedAddress}}</code> (or a per-domain hosted address) and publish
-    MX for {{.HostedAddress}} on this server.</p>
-    {{end}}
-  </div>
-  <div class="card">
-    <h2>This week</h2>
-    <p>{{.IngestStats.KeptThisWeek}} kept{{if .IngestStats.ParseFailures}}, {{.IngestStats.ParseFailures}} parse failures{{end}}.
-    Older summaries are pruned ({{.RetentionMax}} max, {{.RetentionDays}} days).</p>
-  </div>
-</div>
-
-<div class="card">
-  <h2>Recent reports</h2>
-  {{if .Reports}}
-  <table class="desk-only">
-    <thead><tr><th>Received</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
-    <tbody>
-    {{range .Reports}}
-      <tr>
-        <td class="time muted">{{.ReceivedLabel}}</td>
-        <td>{{if .DomainID}}<a href="/outbound/dmarc/domains/{{.DomainID}}">{{.Domain}}</a>{{else}}{{.Domain}}{{end}}</td>
-        <td class="muted">{{.Reporter}}</td>
-        <td>{{.PeriodLabel}}</td>
-        <td>{{.PassCount}}</td>
-        <td>{{.FailCount}}</td>
-        <td class="actions"><a href="/outbound/dmarc/reports/{{.ID}}">View</a></td>
-      </tr>
-    {{end}}
-    </tbody>
-  </table>
-  <ul class="phone-list phone-only">
-    {{range .Reports}}
-    <li>
-      <a href="/outbound/dmarc/reports/{{.ID}}">
-        <span class="st {{if gt .FailCount 0}}st-warn{{else}}st-ok{{end}}">{{.PassCount}} pass</span>
-        <span class="when">{{.ReceivedLabel}}</span>
-        <span class="meta">{{.Domain}} · {{.Reporter}}</span>
-        <span class="subj">{{.FailCount}} fail</span>
-      </a>
-    </li>
-    {{end}}
-  </ul>
-  {{else}}
-  <p class="muted">No reports yet.</p>
-  {{end}}
-</div>
+{{template "box_open" .Recent}}
+{{if .Rows}}
+<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Received, UTC</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
+  <tbody>{{range .Rows}}
+    <tr><td class="sp-mono sp-muted sp-nowrap sp-small">{{.Received}}</td><td>{{if .DomainHref}}<a href="{{.DomainHref}}">{{.Domain}}</a>{{else}}{{.Domain}}{{end}}</td><td class="sp-muted">{{.Reporter}}</td><td>{{.Window}}</td><td>{{.PassText}}</td><td>{{if .Fail}}{{template "tag" .FailTag}}{{else}}0{{end}}</td><td class="sp-actions"><a href="{{.Href}}">View</a></td></tr>{{end}}
+  </tbody>
+</table></div>
+{{else}}
+{{template "empty_state" .Empty}}
+{{end}}
+{{template "box_close"}}
 {{end}}

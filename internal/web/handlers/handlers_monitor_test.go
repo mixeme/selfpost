@@ -14,6 +14,7 @@ import (
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // After log rotation renames mail.log away, Postfix takes about a second to
@@ -39,8 +40,8 @@ func TestDeliveryLogShowsOnlyTheIdentifyingColumns(t *testing.T) {
 
 	out := getBody(t, h.HandleDeliveries, "/outbound/log")
 	for _, want := range []string{
-		row.CreatedAt.Format("2006-01-02 15:04:05"),
-		"noreply@bs.example.ru", "public@example.ru",
+		view.FormatLogTime(row.CreatedAt),
+		"noreply@<wbr>bs.example.ru", "public@<wbr>example.ru",
 		"Проверка", ">sent<", `href="/outbound/log/` + itoa(row.ID),
 	} {
 		if !strings.Contains(out, want) {
@@ -106,9 +107,9 @@ func TestDeliveryPageTellsTheMessagesHistory(t *testing.T) {
 		"Accepted and queued", "Delivered",
 		row.CreatedAt.Format("2006-01-02 15:04:05"),
 		row.UpdatedAt.Format("2006-01-02 15:04:05"),
-		// A delivered message is "ok" in the panel's own badge vocabulary, the
+		// A delivered message is green in the panel's own tag vocabulary, the
 		// same one the status page and the DNS checks use.
-		`class="st st-ok"`,
+		`<span class="tag is-success is-light">sent</span>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery page is missing %q:\n%s", want, out)
@@ -147,8 +148,8 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 
 // The queue id used to be printed as something to go and search the system log
 // for by hand; the page does that search now, and shows only this message's
-// lines — as a table of when and what, so the seconds between the connection
-// and the reply line up down one edge.
+// lines — in a log pane, the time of each dimmed in front of it, so the seconds
+// between the connection and the reply read down one edge.
 func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 	h, row := serverWithDelivery(t)
 	h.cfg.MailLogPath = writeMailLog(t,
@@ -159,15 +160,15 @@ func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 
 	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	for _, want := range []string{
-		"<th>Time</th>", "<th>Message</th>",
-		// The stamp is split off into its own cell, without the microseconds
-		// and the offset that make it the widest thing on the line.
-		`<td class="time muted">2026-08-03 05:15:52</td>`,
-		`<td class="time muted">2026-08-03 05:16:03</td>`,
-		"client=mail.example.com", "status=sent (250 OK)",
+		`<pre class="sp-log">`,
+		// The stamp is split off from the line, without the microseconds and the
+		// offset that make it the widest thing on it.
+		`<span class="sp-d">2026-08-03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
+		`<span class="sp-d">2026-08-03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
+		"status=sent (250 OK)",
 	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("delivery log table is missing %q:\n%s", want, out)
+			t.Errorf("delivery log is missing %q:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "99999999") {

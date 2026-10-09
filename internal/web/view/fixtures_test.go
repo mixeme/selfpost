@@ -34,6 +34,12 @@ var pageFixtures = map[string]func() any{
 	"out-app":             func() any { return outAppFixture() },
 	"out-app-created":     func() any { return outAppCreatedFixture() },
 	"out-domain-delete":   func() any { return outDomainDeleteFixture() },
+
+	"out-log":      func() any { return outLogFixture() },
+	"out-message":  func() any { return outMessageFixture() },
+	"dmarc":        func() any { return dmarcHubFixture() },
+	"dmarc-domain": func() any { return dmarcDomainFixture() },
+	"dmarc-report": func() any { return dmarcReportFixture() },
 }
 
 // admin is the signed-in global administrator every fixture is rendered for.
@@ -205,4 +211,99 @@ func outAppCreatedFixture() *OutAppCreated {
 // applications that go with it.
 func outDomainDeleteFixture() *OutDomainDelete {
 	return NewOutDomainDelete(admin(), 1, "example.org", []string{"prod-server", "alerts"})
+}
+
+// outLogFixture is the mockup's Outbound log: six messages of three domains on
+// the first of 412 pages, one deferred, one bounced, one refused by a rate limit.
+func outLogFixture() *OutLog {
+	p := NewOutLog(admin(), 30, true,
+		[]string{"example.org", "shop.example.org", "notify.acme.io"}, []string{"prod-server", "alerts"}, "", "")
+	row := func(id int64, at, from, to, subject, status string) OutLogRow {
+		return OutLogRow{Time: at, From: from, To: to, Subject: subject, Status: Tag{Status: status},
+			Href: p.DetailHref(id, 1)}
+	}
+	return p.WithRows([]OutLogRow{
+		row(184223, "09-21 14:01:52", "shop@shop.example.org", "m.keller@gmx.de", "Your order #48213 has shipped", "sent"),
+		row(184222, "09-21 14:01:50", "shop@shop.example.org", "anna.lind@outlook.com", "Your order #48212 has shipped", "sent"),
+		row(184220, "09-21 13:58:07", "alerts@example.org", "noc@example.org", "[FIRING] disk usage above 90 % on db-2", "deferred"),
+		row(184211, "09-21 13:41:19", "no-reply@notify.acme.io", "j.doe@nonexistent.example", "Reset your password", "bounced"),
+		row(184209, "09-21 13:40:02", "prod@example.org", "billing@partner.example", "Invoice 2026-0917", "rejected"),
+		row(184198, "09-21 13:12:44", "shop@shop.example.org", "p.novak@seznam.cz", "We received your return request", "sent"),
+	}, 1, 412)
+}
+
+// outMessageFixture is the mockup's message page: a deferred alert, with the
+// four lines Postfix and OpenDKIM wrote about it.
+func outMessageFixture() *OutMessage {
+	at := time.Date(2026, 9, 21, 13, 58, 7, 0, time.UTC)
+	p := NewOutMessage(admin(), MessageInput{
+		ID: 184220, QueueID: "4XcB7k2Jm9z1", Domain: "example.org", DomainHref: "/outbound/domains/1",
+		App: "alerts", AppHref: "/outbound/domains/1/applications/2",
+		From: "alerts@example.org", To: "noc@example.org", Subject: "[FIRING] disk usage above 90 % on db-2", Status: "deferred",
+		Accepted: at, Reported: at.Add(2 * time.Second), BackHref: "/outbound/log",
+	})
+	p.WithHistory([]Step{
+		{Time: StepTime(at), Strong: "Accepted and queued", Text: Plain(" — Postfix accepted the message over an authenticated submission and the journal-milter recorded it.")},
+		{Time: StepTime(at.Add(2 * time.Second)), Strong: "Deferred, will be retried", Level: LevelWarn,
+			Text: Plain(" — the receiving server could not take the message yet. Postfix retries: first after 5 minutes, then with increasing gaps up to 1 hour 7 minutes, for up to 5 days.")},
+		{Time: StepTime(time.Time{}), Strong: "Waiting for a delivery report", Level: LevelPending,
+			Text: Plain(" — the next attempt is made by Postfix on its own; the queue shows what it is still holding.")},
+	})
+	return p.WithDeliveryLog([]LogLine{
+		{Time: "13:58:07", Text: "postfix/smtpd[2114]: 4XcB7k2Jm9z1: client=unknown[198.51.100.7], sasl_username=alerts"},
+		{Time: "13:58:07", Text: "postfix/cleanup[2120]: 4XcB7k2Jm9z1: message-id=<a81f0c@alertmanager>"},
+		{Time: "13:58:07", Text: "opendkim[39]: 4XcB7k2Jm9z1: DKIM-Signature field added (s=sp2026, d=example.org)"},
+		{Time: "13:58:09", Level: "warn", Text: "postfix/smtp[2123]: 4XcB7k2Jm9z1: to=<noc@example.org>, relay=mx1.example.org[192.0.2.10]:25, delay=1.9, status=deferred (host mx1.example.org said: 451 4.7.1 Greylisted, try again in 5 minutes)"},
+	}, "")
+}
+
+// dmarcHubFixture is the mockup's DMARC hub: ingest healthy, four recent
+// reports, one with failures.
+func dmarcHubFixture() *DMARCHub {
+	p := NewDMARCHub(admin(), IngestInput{
+		OK: true, Last: time.Date(2026, 9, 21, 6, 12, 0, 0, time.UTC), KeptThisWeek: 14, ParseFailures: 0,
+		Hosted: "dmarc@mail.example.org", Host: "mail.example.org", RetentionMax: 500, RetentionDays: 90,
+	})
+	row := func(id int64, at, domain, reporter, window string, pass, fail int) DMARCReportRow {
+		return DMARCReportRow{Received: at, Domain: domain, DomainHref: "/outbound/dmarc/domains/1", Reporter: reporter,
+			Window: window, Pass: pass, Fail: fail, Href: DMARCReportHref(id)}
+	}
+	return p.WithReports([]DMARCReportRow{
+		row(41, "09-21 06:12", "example.org", "google.com", "20 Sep", 412, 0),
+		row(40, "09-21 04:40", "shop.example.org", "Outlook.com", "20 Sep", 1903, 7),
+		row(39, "09-20 23:58", "example.org", "Yahoo", "19 Sep", 38, 0),
+		row(38, "09-20 06:09", "notify.acme.io", "google.com", "19 Sep", 61, 0),
+	})
+}
+
+// dmarcDomainFixture is the mockup's domain page: seven days of shop.example.org
+// with one source that is not this relay failing, and three reports.
+func dmarcDomainFixture() *DMARCDomain {
+	p := NewDMARCDomain(admin(), 2, "shop.example.org", true, 11204, 41, 7,
+		"A third-party source is not aligned. Do not tighten p= until that sender is fixed or removed.")
+	row := func(id int64, at, reporter, window string, pass, fail int) DMARCReportRow {
+		return DMARCReportRow{Received: at, Reporter: reporter, Window: window, Pass: pass, Fail: fail, Href: DMARCReportHref(id)}
+	}
+	return p.WithSources([]DMARCSourceRow{
+		{Source: "203.0.113.25", ThisRelay: true, Pass: 11204, Fail: 0, Disposition: "none"},
+		{Source: "198.51.100.44", Pass: 0, Fail: 41, Disposition: "none"},
+	}).WithReports([]DMARCReportRow{
+		row(40, "09-21 04:40", "Outlook.com", "20 Sep", 1903, 7),
+		row(37, "09-21 02:15", "google.com", "20 Sep", 6410, 0),
+		row(35, "09-20 04:38", "Outlook.com", "19 Sep", 1877, 34),
+	})
+}
+
+// dmarcReportFixture is the mockup's report: Outlook.com's day for
+// shop.example.org, two sources, one of them failing both checks.
+func dmarcReportFixture() *DMARCReport {
+	return NewDMARCReport(admin(), ReportInput{
+		ID: 40, Reporter: "Outlook.com", ReportID: "5f1c9a0e7b2d4e61a3", Domain: "shop.example.org", DomainID: 2,
+		Pass: 1903, Fail: 7, Window: "20 Sep", Period: "20 Sep 00:00 – 21 Sep 00:00 UTC", Received: "2026-09-21 04:40 UTC",
+		PolicyP: "none", PolicySP: "none", PolicyPct: 100, PolicyADKIM: "r", PolicyASPF: "r",
+		Recipient: "dmarc@mail.example.org", Hub: true,
+	}).WithRecords([]DMARCRecordRow{
+		{Source: "203.0.113.25", ThisRelay: true, Count: 1903, Disposition: "none", SPF: "pass", DKIM: "pass", HeaderFrom: "shop.example.org"},
+		{Source: "198.51.100.44", Count: 7, Disposition: "none", SPF: "fail", DKIM: "fail", HeaderFrom: "shop.example.org"},
+	})
 }

@@ -94,6 +94,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   delete), the application form, the password shown once and the delete
   confirmation. `dashboard`, `domain_detail` and `domain_delete` are off
   the ratchet.
+- panel-redesign (stage 2): the **Outbound log**, the message page (facts,
+  history, the lines of `mail.log`) and the three **DMARC report** pages are
+  in the new design. The log refreshes its rows without touching the filter
+  being chosen. `deliveries`, `delivery`, `dmarc`, `dmarc_domain` and
+  `dmarc_report` are off the ratchet.
 
 ### Changed
 
@@ -127,6 +132,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   default is its own choice, and "My default instead" is the change.
 - The auto rate-limit fields follow the limit mode on the domain and
   application forms (the script applied only the first matching rule).
+- The DMARC page of a domain no longer answers 500 once the domain has a
+  reported source.
 
 ### Removed
 

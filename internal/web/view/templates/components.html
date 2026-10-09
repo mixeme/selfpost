@@ -97,7 +97,7 @@
 
 {{/* box_foot is the line under a box's content (input: Foot): a legend, paging
      with an end slot, or the one button that finishes the page. */}}
-{{define "box_foot"}}<div class="sp-box-foot">{{if .Button}}{{template "action" .Button}}{{else}}{{if .Bare}}{{template "inline" .Text}}{{else}}<span>{{template "inline" .Text}}</span>{{end}}{{if .Link}}<a href="{{.Link.Href}}">{{.Link.Label}}</a>{{end}}{{if .End}}<span class="sp-end">{{template "inline" .End}}</span>{{end}}{{end}}</div>{{end}}
+{{define "box_foot"}}<div class="sp-box-foot"{{if .ID}} id="{{.ID}}"{{end}}{{if .OOB}} hx-swap-oob="true"{{end}}>{{if .Button}}{{template "action" .Button}}{{else}}{{if .Bare}}{{template "inline" .Text}}{{else}}<span>{{template "inline" .Text}}</span>{{end}}{{if .Link}}<a href="{{.Link.Href}}">{{.Link.Label}}</a>{{end}}{{if .End}}<span class="sp-end">{{template "inline" .End}}</span>{{end}}{{end}}</div>{{end}}
 
 {{/* ---- health, records, copy */}}
 
@@ -142,7 +142,7 @@
 {{/* facts is a label / value grid (input: []Fact); Big is for a headline
      number, with its supporting line under it. */}}
 {{define "facts"}}<dl class="sp-facts">{{range .}}
-<div><dt>{{.Label}}</dt><dd{{if .Mono}} class="sp-mono"{{else if .Big}} class="sp-big"{{end}}>{{template "inline" .Value}}</dd>{{if .Note}}<dd class="sp-muted">{{template "inline" .Note}}</dd>{{end}}</div>{{end}}
+<div><dt>{{.Label}}</dt><dd{{if and .Mono .Small}} class="sp-mono sp-small"{{else if .Mono}} class="sp-mono"{{else if .Big}} class="sp-big"{{end}}>{{template "inline" .Value}}</dd>{{if .Note}}<dd class="sp-muted">{{template "inline" .Note}}</dd>{{end}}</div>{{end}}
 </dl>{{end}}
 
 {{/* side_menu is the Bulma menu of a detail page (input: SideMenu): icons,

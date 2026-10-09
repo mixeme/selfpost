@@ -1,0 +1,11 @@
+{{/* Outbound log (mockup out-log.html): every message the relay accepted from an
+     application, newest first, filtered by domain and application. The table and
+     the count under it are the polled part (out_log_rows.html); the box head with
+     its filter is static, so a choice being made there is never swapped away. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+{{template "box_open" .Messages}}
+{{template "out_log_rows" .}}
+{{template "box_close"}}
+{{end}}

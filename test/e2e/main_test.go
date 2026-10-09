@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-var statusCellPattern = regexp.MustCompile(`class="st st-[^"]+">(queued|sent|deferred|bounced|rejected)</span>`)
+var statusCellPattern = regexp.MustCompile(`<span class="tag[^"]*">(queued|sent|deferred|bounced|rejected)</span>`)
 
 // h is the single shared stand for the whole ordered scenario in TestE2E.
 // TestHostnameGate does not use it — it spins its own disposable container.
@@ -273,7 +273,7 @@ func uniqueToken(label string) string {
 }
 
 func containsCell(html, needle string) bool {
-	return strings.Contains(html, `<span class="st st-`) && strings.Contains(html, `">`+needle+`</span>`)
+	return strings.Contains(html, `<span class="tag`) && strings.Contains(html, `">`+needle+`</span>`)
 }
 
 func firstStatusCell(html string) string {

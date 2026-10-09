@@ -1,0 +1,15 @@
+{{/* The polled part of the Outbound log, in the page and in its fragment (GET
+     /outbound/log/fragment) alike, so the two cannot drift apart: the table, which
+     polls (panel.js reads its id and data-poll; the response replaces it), and the
+     foot under it, which the fragment marks to be swapped in by its id (.Foot.OOB)
+     so the page count follows the rows. */}}
+{{define "out_log_rows"}}<div class="table-container" id="out-log-rows" data-poll aria-live="polite" hx-get="{{.PollURL}}" hx-trigger="load" hx-swap="outerHTML">
+{{if .Rows}}<table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr></thead>
+  <tbody>{{range .Rows}}
+    <tr><td class="sp-mono sp-muted sp-nowrap sp-small">{{.Time}}</td><td>{{wbr_at .From}}</td><td>{{wbr_at .To}}</td><td class="sp-clip" title="{{.Subject}}">{{.Subject}}</td><td>{{template "tag" .Status}}</td><td class="sp-actions"><a href="{{.Href}}">Details</a></td></tr>{{end}}
+  </tbody>
+</table>
+{{else}}{{template "empty_state" .Empty}}
+{{end}}</div>
+{{template "box_foot" .Foot}}{{end}}

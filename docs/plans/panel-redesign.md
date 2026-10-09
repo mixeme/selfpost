@@ -516,7 +516,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 - [x] Signed-out pages: login, setup — **Sonnet**
 - [x] Overview, Health, and the Account / Settings split — **Sonnet**
 - [x] Outbound: domains, domain, domain settings, application form, shown-once password, delete — **Sonnet**
-- [ ] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
+- [x] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
 - [ ] Inbound: domains, domain with the *Spam filter* box, delete — **Sonnet**
 - [ ] Server: system log, backup, users, user form, delete; Help as `help_topic` partials, the drawer removed — **Sonnet**
 - [ ] Queues: old content inside the new shell (outbound), Inbound › Queue hidden — **Sonnet**

@@ -1,0 +1,27 @@
+{{/* One message of the Outbound log (mockup out-message.html): what the journal
+     recorded and the steps it went through side by side, and under both what
+     Postfix itself wrote about the message. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+<div class="columns">
+  <div class="column is-7">
+    {{template "box_open" .Message}}
+    {{template "body_open"}}
+    {{template "facts" .Facts}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+  <div class="column is-5">
+    {{template "box_open" .History}}
+    {{template "body_open"}}
+    {{template "timeline" .Steps}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+</div>
+
+{{template "box_open" .Delivery}}
+{{if .LogLines}}{{template "log_pane" .LogLines}}{{else}}{{template "empty_state" .LogEmpty}}{{end}}
+{{template "box_close"}}
+{{end}}

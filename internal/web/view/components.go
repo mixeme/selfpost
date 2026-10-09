@@ -286,12 +286,18 @@ type DateInput struct {
 // or "Page 1 of 9"), a Link beside it ("Older →"), an End slot at the right, or
 // instead of all of it one Button that finishes the page. Bare puts Text
 // directly in the foot instead of in a span, as the legends under tables do.
+// ID and OOB make the foot replaceable by a polled fragment, as they do on Head:
+// ID is the element's id, and OOB (set on the fragment's copy only, never on the
+// page) marks it to be swapped into the page by that id. Used by the Outbound
+// log, whose page count follows its rows. Both are attributes, not markup.
 type Foot struct {
 	Text   Text
 	Bare   bool
 	Link   *Anchor
 	End    Text
 	Button *Action
+	ID     string
+	OOB    bool
 }
 
 // Anchor is a plain link: where it goes and what it says.
@@ -353,6 +359,10 @@ type Fact struct {
 	Label string
 	Value Text
 	Mono  bool
+	// Small sets a mono value in the supporting size, for long identifiers and
+	// addresses that would otherwise wrap in a narrow column (the report id and
+	// rua of a DMARC report).
+	Small bool
 	Big   bool
 	Note  Text
 }

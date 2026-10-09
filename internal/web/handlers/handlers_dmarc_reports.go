@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,13 +9,16 @@ import (
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
-type dmarcListRow struct {
-	store.DMARCReportSummary
-	DomainID      int64
-	ReceivedLabel string
-	PeriodLabel   string
+// dmarcRow is a report in a table of the pages.
+func dmarcRow(rep store.DMARCReportSummary) view.DMARCReportRow {
+	return view.DMARCReportRow{
+		Received: view.FormatReceived(rep.ReceivedAt), Domain: rep.Domain, Reporter: rep.Reporter,
+		Window: formatDMARCWindow(rep.PeriodBegin, rep.PeriodEnd), Pass: rep.PassCount, Fail: rep.FailCount,
+		Href: view.DMARCReportHref(rep.ID),
+	}
 }
 
 func (h *Handlers) requireDMARC(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {
@@ -69,27 +71,22 @@ func (h *Handlers) HandleDMARCList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	rows := make([]dmarcListRow, len(reports))
+	rows := make([]view.DMARCReportRow, len(reports))
 	for i, rep := range reports {
-		rows[i] = dmarcListRow{
-			DMARCReportSummary: rep,
-			DomainID:           domainIDs[rep.Domain],
-			ReceivedLabel:      rep.ReceivedAt.UTC().Format("2006-01-02 15:04"),
-			PeriodLabel:        formatDMARCWindow(rep.PeriodBegin, rep.PeriodEnd),
+		rows[i] = dmarcRow(rep)
+		if id := domainIDs[rep.Domain]; id != 0 {
+			rows[i].DomainHref = view.DMARCDomainHref(id)
 		}
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — DMARC reports"
-	data["Active"] = "dmarc"
-	data["Reports"] = rows
-	data["IngestStats"] = stats
-	data["HostedAddress"] = h.dmarc.DefaultHostedSuggestion()
-	data["RetentionMax"] = store.DMARCReportsMaxKeep
-	data["RetentionDays"] = store.DMARCReportsMaxAgeDays
-	if stats.LastReceivedAt != nil {
-		data["LastReceivedLabel"] = stats.LastReceivedAt.UTC().Format("2006-01-02 15:04")
+	in := view.IngestInput{
+		OK: stats.IngestOK, KeptThisWeek: stats.KeptThisWeek, ParseFailures: stats.ParseFailures,
+		Hosted: h.dmarc.DefaultHostedSuggestion(), Host: h.cfg.Hostname,
+		RetentionMax: store.DMARCReportsMaxKeep, RetentionDays: store.DMARCReportsMaxAgeDays,
 	}
-	h.view.Render(w, http.StatusOK, "dmarc", data)
+	if stats.LastReceivedAt != nil {
+		in.Last = *stats.LastReceivedAt
+	}
+	h.view.Render(w, http.StatusOK, "dmarc", view.NewDMARCHub(h.shellMeta(r), in).WithReports(rows))
 }
 
 // HandleDMARCDomain shows roll-ups for one sending domain.
@@ -125,34 +122,23 @@ func (h *Handlers) HandleDMARCDomain(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	reportRows := make([]dmarcListRow, len(reports))
+	reportRows := make([]view.DMARCReportRow, len(reports))
 	for i, rep := range reports {
-		reportRows[i] = dmarcListRow{
-			DMARCReportSummary: rep,
-			ReceivedLabel:      rep.ReceivedAt.UTC().Format("2006-01-02 15:04"),
-			PeriodLabel:        formatDMARCWindow(rep.PeriodBegin, rep.PeriodEnd),
-		}
+		reportRows[i] = dmarcRow(rep)
 	}
+	relay := h.relayIPs()
 	hints := make([]dmarc.SourceHint, len(sources))
+	sourceRows := make([]view.DMARCSourceRow, len(sources))
 	for i, s := range sources {
-		hints[i] = dmarc.SourceHint{
-			SourceIP:  s.SourceIP,
-			PassCount: s.PassCount,
-			FailCount: s.FailCount,
-			ThisRelay: h.sourceIsThisRelay(s.SourceIP),
+		hints[i] = dmarc.SourceHint{SourceIP: s.SourceIP, PassCount: s.PassCount, FailCount: s.FailCount, ThisRelay: relay[s.SourceIP]}
+		sourceRows[i] = view.DMARCSourceRow{
+			Source: s.SourceIP, ThisRelay: relay[s.SourceIP], Pass: s.PassCount, Fail: s.FailCount, Disposition: s.Disposition,
 		}
 	}
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — " + d.Name + " DMARC"
-	data["Active"] = "dmarc"
-	data["Domain"] = d
-	data["Reports"] = reportRows
-	data["Pass7d"] = pass
-	data["Fail7d"] = fail
-	data["Sources"] = hints
-	data["PolicyHint"] = dmarc.TightenPolicyHint(pass, fail, hints)
-	data["WindowDays"] = windowDays
-	h.view.Render(w, http.StatusOK, "dmarc_domain", data)
+	page := view.NewDMARCDomain(h.shellMeta(r), d.ID, d.Name, p.IsGlobal(), pass, fail, windowDays,
+		dmarc.TightenPolicyHint(pass, fail, hints)).
+		WithSources(sourceRows).WithReports(reportRows)
+	h.view.Render(w, http.StatusOK, "dmarc-domain", page)
 }
 
 // HandleDMARCReport shows one parsed aggregate report.
@@ -195,30 +181,40 @@ func (h *Handlers) HandleDMARCReport(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data := h.pageBase(r)
-	data["Title"] = fmt.Sprintf("SelfPost — %s report", rep.Reporter)
-	data["Active"] = "dmarc"
-	data["Report"] = rep
-	data["Domain"] = d
-	data["Hostname"] = h.cfg.Hostname
-	data["WindowLabel"] = formatDMARCWindow(rep.PeriodBegin, rep.PeriodEnd)
-	data["ReceivedLabel"] = rep.ReceivedAt.UTC().Format("2006-01-02 15:04")
-	data["PeriodBeginLabel"] = rep.PeriodBegin.UTC().Format("2006-01-02 15:04")
-	data["PeriodEndLabel"] = rep.PeriodEnd.UTC().Format("2006-01-02 15:04")
-	h.view.Render(w, http.StatusOK, "dmarc_report", data)
-}
-
-func (h *Handlers) sourceIsThisRelay(ip string) bool {
-	if ip == "" || h.dns == nil || h.cfg.Hostname == "" {
-		return false
-	}
-	srv := h.dns.Server(h.cfg.Hostname, false)
-	for _, s := range srv.IPs {
-		if ip == s {
-			return true
+	relay := h.relayIPs()
+	records := make([]view.DMARCRecordRow, len(rep.Records))
+	for i, rec := range rep.Records {
+		records[i] = view.DMARCRecordRow{
+			Source: rec.SourceIP, ThisRelay: relay[rec.SourceIP], Count: rec.Count, Disposition: rec.Disposition,
+			SPF: rec.SPFResult, DKIM: rec.DKIMResult, HeaderFrom: rec.HeaderFrom,
 		}
 	}
-	return false
+	const stamp = "2 Jan 15:04"
+	page := view.NewDMARCReport(h.shellMeta(r), view.ReportInput{
+		ID: rep.ID, Reporter: rep.Reporter, ReportID: rep.ReportID, Domain: rep.Domain, DomainID: d.ID,
+		Contact: rep.ContactEmail, Pass: rep.PassCount, Fail: rep.FailCount,
+		Window:   formatDMARCWindow(rep.PeriodBegin, rep.PeriodEnd),
+		Period:   rep.PeriodBegin.UTC().Format(stamp) + " – " + rep.PeriodEnd.UTC().Format(stamp) + " UTC",
+		Received: rep.ReceivedAt.UTC().Format("2006-01-02 15:04") + " UTC",
+		PolicyP:  rep.PolicyP, PolicySP: rep.PolicySP, PolicyPct: rep.PolicyPct,
+		PolicyADKIM: rep.PolicyADKIM, PolicyASPF: rep.PolicyASPF, Recipient: rep.Recipient,
+		Hub: p.IsGlobal(),
+	}).WithRecords(records)
+	h.view.Render(w, http.StatusOK, "dmarc-report", page)
+}
+
+// relayIPs is the set of addresses this server sends from, so that a source in
+// a report can be told to be this relay. Empty while the server's name or its
+// addresses are unknown.
+func (h *Handlers) relayIPs() map[string]bool {
+	if h.dns == nil || h.cfg.Hostname == "" {
+		return nil
+	}
+	ips := map[string]bool{}
+	for _, ip := range h.dns.Server(h.cfg.Hostname, false).IPs {
+		ips[ip] = true
+	}
+	return ips
 }
 
 func formatDMARCWindow(begin, end time.Time) string {
