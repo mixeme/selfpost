@@ -109,7 +109,7 @@ func TestRenderSuppliesTheVersion(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	data := map[string]any{"Title": "t", "User": "admin"}
-	engine.Render(rec, http.StatusOK, "backup", data)
+	engine.Render(rec, http.StatusOK, "mail_queue", data)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -138,7 +138,7 @@ func TestNavMarksActivePage(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	err = engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
+	err = engine.Page("mail_queue").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":     "admin",
 		"Active":   "mail_queue",
 		"IsGlobal": true,
@@ -166,7 +166,7 @@ func TestNavLeadsWithStatusAndPointsDomainsAtItsOwnPath(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":     "admin",
 		"Active":   "status",
 		"IsGlobal": true,
@@ -195,7 +195,7 @@ func TestNavShowsInboundWhenEnabled(t *testing.T) {
 	}
 	engine.SetInboundEnabled(true)
 	var buf bytes.Buffer
-	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User":           "admin",
 		"Active":         "status",
 		"IsGlobal":       true,
@@ -226,7 +226,6 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 	}
 	wide := map[string]bool{
 		"mail_queue": true,
-		"system_log": true,
 		"inbound":    true, "inbound_domain": true,
 	}
 	for name, page := range engine.Pages() {
@@ -271,8 +270,6 @@ func TestSettingsPageDocumentsRateLimits(t *testing.T) {
 
 func TestDrillDownPagesPlaceBackLinkAboveContent(t *testing.T) {
 	drillDown := map[string]bool{
-		"user_form.html":      true,
-		"user_delete.html":    true,
 		"inbound_domain.html": true,
 		"inbound_delete.html": true,
 	}
@@ -419,24 +416,27 @@ func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
 	}
 }
 
-func TestAuthenticatedLayoutIncludesHelpDrawer(t *testing.T) {
+// The help drawer is gone from the old layout as well: a topic is a section of
+// the Help page, linked from the head of the box it explains, and the Help
+// entry of the navigation leads there.
+func TestAuthenticatedLayoutHasNoHelpDrawer(t *testing.T) {
 	engine, err := New("test")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("help").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
-		"Title": "t", "User": "admin", "Active": "help", "IsGlobal": true,
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
+		"Title": "t", "User": "admin", "Active": "mail_queue", "IsGlobal": true,
 	}); err != nil {
-		t.Fatalf("execute help layout: %v", err)
+		t.Fatalf("execute legacy layout: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{
-		`id="help-off"`, `class="help-drawer"`, `help-pane-status`,
-		`for="help-dns"`, `href="/help"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("authenticated layout missing %q", want)
+	if !strings.Contains(out, `href="/help"`) {
+		t.Error("the authenticated layout has no link to the Help page")
+	}
+	for _, gone := range []string{`id="help-off"`, `help-drawer`, `help-pane`, `for="help-`, `help-scrim`} {
+		if strings.Contains(out, gone) {
+			t.Errorf("the authenticated layout still carries the help drawer (%q)", gone)
 		}
 	}
 }
@@ -479,7 +479,7 @@ func TestNavIncludesHelp(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("help").ExecuteTemplate(&buf, "nav", map[string]any{
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "nav", map[string]any{
 		"User": "admin", "Active": "domains", "IsGlobal": true,
 	}); err != nil {
 		t.Fatalf("execute nav: %v", err)
@@ -502,7 +502,7 @@ func TestLegacyNavFollowsTheUsersReach(t *testing.T) {
 		data["User"], data["Active"] = "ops", ""
 		data["InboundEnabled"], data["DMARCEnabled"] = true, true
 		var buf bytes.Buffer
-		if err := engine.Page("help").ExecuteTemplate(&buf, "nav", data); err != nil {
+		if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "nav", data); err != nil {
 			t.Fatalf("execute nav: %v", err)
 		}
 		return buf.String()

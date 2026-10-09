@@ -1,0 +1,53 @@
+{{/* The user form (mockup user.html): one form that creates a panel user and
+     edits one. The account is the left column; on the right the domains the user
+     reaches, outbound and inbound as two lists, each with its All. The lists stay
+     in view whatever the role — the server ignores them for the global role. A
+     blank password keeps the current one. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+<form class="sp-form" method="post" action="{{.Action}}">
+  <div class="columns">
+    <div class="column is-6">
+{{template "box_open" .Account}}
+{{template "body_open"}}
+<div class="field"><label class="label" for="username">Username</label><div class="control"><input class="input" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required></div></div>
+<div class="field"><label class="label" for="email">E-mail</label><div class="control"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="off"></div>
+  <p class="help">The user's own address. They can change it under Account, and can choose it there as the address that receives DMARC reports.</p></div>
+<div class="field"><label class="label" for="password">Password</label><div class="control"><input class="input" id="password" name="password" type="password" autocomplete="new-password"{{if .NewUser}} required{{end}}></div>
+  <p class="help">{{if .NewUser}}At least {{.PasswordMin}} characters.{{else}}Leave empty to keep the current one.{{end}}</p></div>
+<div class="field"><label class="label" for="role">Role</label>
+  {{if .RoleLocked}}<input type="hidden" name="role" value="{{.Role}}">{{end}}
+  <div class="control"><div class="select is-fullwidth"><select id="role" name="role"{{if .RoleLocked}} disabled{{end}}>{{$sel := .Role}}{{range .Roles}}
+    <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
+  </select></div></div>
+  <p class="help">Everyone here is an administrator; the role is the reach. <em>Global</em> also sees Server and is the only one who adds or deletes domains. The only global user cannot be changed to <em>domain</em> or deleted.</p></div>
+{{template "body_close"}}
+{{template "box_close"}}
+    </div>
+    <div class="column is-6">
+{{template "box_open" .Outbound}}
+{{template "body_open"}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="all_domains" value="1"{{if .AllOut}} checked{{end}}> <strong>All outbound domains</strong>, including ones added later</label></div>{{range .OutDomains}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="domain_ids" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
+<p class="help">With <em>All</em> ticked the single domains are ignored.</p>
+{{template "body_close"}}
+{{template "box_close"}}
+{{if .ShowInbound}}
+{{template "box_open" .Inbound}}
+{{template "body_open"}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="all_inbound_domains" value="1"{{if .AllIn}} checked{{end}}> <strong>All inbound domains</strong>, including ones added later</label></div>{{range .InDomains}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="inbound_domain_ids" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
+<p class="help">Granted separately from outbound: the same name on both lists is two assignments. The <em>domain</em> role needs at least one domain, or <em>All</em>, on either list.</p>
+{{template "body_close"}}
+{{template "box_close"}}
+{{end}}
+    </div>
+  </div>
+  <div class="buttons">
+    <button type="submit" class="button is-primary">{{.Submit}}</button>
+    <a class="button is-text" href="{{.CancelHref}}">Cancel</a>
+  </div>
+</form>
+{{end}}

@@ -578,7 +578,7 @@ func TestKitPagesAreTheOnesOffTheRatchet(t *testing.T) {
 func TestLegacyPagesStayOnTheOldLayout(t *testing.T) {
 	e := kitEngine(t)
 	rec := httptest.NewRecorder()
-	e.Render(rec, http.StatusOK, "backup", map[string]any{"Title": "t", "User": "admin", "IsGlobal": true})
+	e.Render(rec, http.StatusOK, "mail_queue", map[string]any{"Title": "t", "User": "admin", "IsGlobal": true})
 	out := rec.Body.String()
 	mustContain(t, out, `href="/static/legacy.css"`, `class="shell"`)
 	mustNotContain(t, out, "bulma.min.css", "tabler-icons.css", "/static/panel.css", "navbar")

@@ -1,16 +1,23 @@
+{{/* Delete a panel user (mockup user-delete.html): what goes with the user, the
+     one button that does it, and the way back to the user's form. */}}
 {{define "content"}}
-<h1>Delete {{.TargetUsername}}</h1>
+{{template "page_head" .Head}}
 
-{{template "back_link" (back (printf "/server/users/%d" .TargetID) (printf "Back to %s" .TargetUsername))}}
-
-<div class="card narrow">
-  <h2>Confirm deletion</h2>
-  <p>You are about to delete the panel user <strong>{{.TargetUsername}}</strong>.
-  This cannot be undone; a signed-in session for this user stops working
-  immediately.</p>
-
-  <form method="post" action="/server/users/{{.TargetID}}/delete">
-    <button type="submit" class="danger">Delete {{.TargetUsername}}</button>
-  </form>
+<div class="columns">
+  <div class="column is-7">
+{{template "box_open" .Danger}}
+{{template "body_open"}}
+<p class="mb-3">{{template "inline" .Intro}}</p>
+{{template "confirm_list" .Consequences}}
+<p class="sp-muted mb-4">{{template "inline" .Note}}</p>
+<form method="post" action="{{.Action}}">
+  <div class="buttons">
+    <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>{{.Confirm}}</button>
+    <a class="button is-text" href="{{.KeepHref}}">Keep it</a>
+  </div>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+  </div>
 </div>
 {{end}}

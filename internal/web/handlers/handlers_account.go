@@ -162,9 +162,7 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 	}
 	// The e-mail is the report address of every domain that follows this
 	// user's "my account e-mail" default.
-	if f.Email != u.Email && u.DMARCDefaultMode == store.DMARCDefaultAccount {
-		h.resyncDMARC("account e-mail")
-	}
+	h.resyncAfterEmailChange(u, f.Email)
 	logf("panel: user %d profile updated (username: %t, e-mail: %t)", u.ID, f.Username != u.Username, f.Email != u.Email)
 	http.Redirect(w, r, "/account?done=profile", http.StatusSeeOther)
 }
@@ -274,6 +272,16 @@ func (h *Handlers) HandleAccountDMARC(w http.ResponseWriter, r *http.Request) {
 	h.resyncDMARC("default report address")
 	logf("panel: user %d set their default report address to %q", u.ID, f.DMARCMode)
 	http.Redirect(w, r, "/account?done=dmarc", http.StatusSeeOther)
+}
+
+// resyncAfterEmailChange is what changing a user's account e-mail does for
+// DMARC: the address is the report address of every domain that follows a user
+// whose default is "my account e-mail", so the ingest allow-list is rebuilt. It
+// is the one path both the Account page and the user form take.
+func (h *Handlers) resyncAfterEmailChange(u store.User, newEmail string) {
+	if newEmail != u.Email && u.DMARCDefaultMode == store.DMARCDefaultAccount {
+		h.resyncDMARC("account e-mail")
+	}
 }
 
 // resyncDMARC rebuilds the ingest allow-list after something that changes

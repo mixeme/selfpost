@@ -1,12 +1,8 @@
-{{/* Raw mail.log lines, long by nature: the whole column rather than the
-     reading measure (see the "wide" block in layout.html). */}}
-{{define "wide"}}wide{{end}}
-
+{{/* System log (mockup system-log.html): the tail of mail.log in one box. The box
+     is the polled part (system_log_body.html), so the page and its fragment
+     draw it from the same block. */}}
 {{define "content"}}
-<h1>System log</h1>
+{{template "page_head" .Head}}
 
-<div class="card">
-  <h2>Recent log entries</h2>
-  {{template "system_log_body" .}}
-</div>
+{{template "system_log_body" .}}
 {{end}}

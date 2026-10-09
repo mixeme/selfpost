@@ -44,6 +44,13 @@ var pageFixtures = map[string]func() any{
 	"dmarc":        func() any { return dmarcHubFixture() },
 	"dmarc-domain": func() any { return dmarcDomainFixture() },
 	"dmarc-report": func() any { return dmarcReportFixture() },
+
+	"system-log":  func() any { return systemLogFixture() },
+	"backup":      func() any { return backupFixture() },
+	"users":       func() any { return usersFixture() },
+	"user":        func() any { return userFixture() },
+	"user-delete": func() any { return userDeleteFixture() },
+	"help":        func() any { return NewHelp(admin(), true) },
 }
 
 // admin is the signed-in global administrator every fixture is rendered for.
@@ -341,4 +348,56 @@ func inDomainFixture() *InDomain {
 	p.WithMX("mail.example.org", DNSCheck{Status: "ok", Found: []string{"10 mail.example.org."}})
 	p.WithFilter(true, "inet:antispam:11332", "accept")
 	return p
+}
+
+// systemLogFixture is the mockup's System log: ten lines of mail.log, as the
+// handler reads them (oldest first), with the deferrals in amber and the
+// refusals and the bounce in red.
+func systemLogFixture() *SystemLog {
+	return NewSystemLog(admin(), []LogLine{
+		{Time: "Sep 21 13:00:00", Text: "opendkim[39]: key table reloaded (3 domains)"},
+		{Time: "Sep 21 13:40:02", Text: "journal-milter[40]: rate limit: app=prod-server 201/200 in 3600s — tempfail at MAIL FROM", Level: "warn"},
+		{Time: "Sep 21 13:41:19", Text: "postfix/smtp[2098]: 4XcB1c3Rk8z1: to=<j.doe@nonexistent.example>, status=bounced (Host or domain name not found)", Level: "error"},
+		{Time: "Sep 21 13:44:02", Text: "postfix/smtp[2101]: 4XcB2m7Hd4z1: to=<jobs@acme.io>, relay=none, status=deferred (connect to 10.0.4.12[10.0.4.12]:2525: Connection timed out)", Level: "warn"},
+		{Time: "Sep 21 13:57:41", Text: "postfix/smtpd[2119]: NOQUEUE: reject: RCPT from bulk.example[198.51.100.90]: 550 5.1.1 <sales@lists.example.org>: Recipient address rejected: unknown recipient", Level: "error"},
+		{Time: "Sep 21 13:58:09", Text: "postfix/smtp[2123]: 4XcB7k2Jm9z1: to=<noc@example.org>, relay=mx1.example.org[192.0.2.10]:25, status=deferred (451 4.7.1 Greylisted, try again in 5 minutes)", Level: "warn"},
+		{Time: "Sep 21 14:00:18", Text: "postfix/smtp[2130]: 4XcB8z5Tn1z1: to=<dev@lists.example.org>, relay=mx.internal[10.0.4.2]:25, status=sent (250 2.0.0 Ok: queued)"},
+		{Time: "Sep 21 14:00:18", Text: "postfix/smtpd[2129]: connect from mail.uni.example[192.0.2.77]"},
+		{Time: "Sep 21 14:01:52", Text: "postfix/qmgr[58]: 4XcB9q0Lw2z1: removed"},
+		{Time: "Sep 21 14:01:52", Text: "postfix/smtp[2131]: 4XcB9q0Lw2z1: to=<m.keller@gmx.de>, relay=mx00.gmx.net[212.227.15.9]:25, delay=0.8, status=sent (250 Requested mail action okay)"},
+	}, "")
+}
+
+// backupFixture is the mockup's Backup: nothing refused, the password minimum
+// of the encryption fields at twelve.
+func backupFixture() *Backup {
+	return NewBackup(admin(), 12, "")
+}
+
+// usersFixture is the mockup's Users: the signed-in global administrator and
+// two domain administrators, one of them just created.
+func usersFixture() *Users {
+	return NewUsers(admin(), true, "User created.").WithRows([]UserRow{
+		NewUserRow(UserRowInput{ID: 1, Username: "admin", Email: "mix@example.org", Global: true, You: true}),
+		NewUserRow(UserRowInput{ID: 2, Username: "shop-team", Email: "team@shop.example.org", Outbound: []string{"shop.example.org"}}),
+		NewUserRow(UserRowInput{ID: 3, Username: "acme-ops", Email: "ops@acme.io", AllOutbound: true, Inbound: []string{"acme.io"}}),
+	})
+}
+
+// userFixture is the mockup's user form, filled with acme-ops: a domain
+// administrator on all outbound domains and on acme.io inbound.
+func userFixture() *UserForm {
+	return NewUserForm(admin(), UserFormInput{
+		ID: 3, Name: "acme-ops", Username: "acme-ops", Email: "ops@acme.io", Role: "domain", CanDelete: true,
+		PasswordMin: 12, ShowInbound: true,
+		AllOut:     true,
+		OutDomains: []DomainChoice{{ID: 1, Name: "example.org"}, {ID: 2, Name: "shop.example.org"}, {ID: 3, Name: "notify.acme.io"}},
+		InDomains:  []DomainChoice{{ID: 1, Name: "lists.example.org"}, {ID: 2, Name: "acme.io", Checked: true}},
+	})
+}
+
+// userDeleteFixture is the mockup's confirmation: acme-ops, who has all
+// outbound domains and acme.io inbound.
+func userDeleteFixture() *UserDelete {
+	return NewUserDelete(admin(), UserDeleteInput{ID: 3, Username: "acme-ops", AllOutbound: true, Inbound: []string{"acme.io"}})
 }

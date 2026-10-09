@@ -15,6 +15,7 @@ import (
 	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // maxImportBytes caps a domain-import upload. A domain export is a small JSON
@@ -45,13 +46,11 @@ func (h *Handlers) renderBackupPage(w http.ResponseWriter, r *http.Request, stat
 // password), importErr to the import card, so neither message appears under the
 // wrong form.
 func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, status int, importErr, backupErr string) {
-	data := h.pageBase(r)
-	data["Title"] = "SelfPost — backup & migration"
-	data["Active"] = "backup"
-	data["ImportErr"] = importErr
-	data["BackupErr"] = backupErr
-	data["MinPwLen"] = validate.MinSecretFilePasswordLen
-	h.view.Render(w, status, "backup", data)
+	refusal := importErr
+	if refusal == "" {
+		refusal = backupErr
+	}
+	h.view.Render(w, status, "backup", view.NewBackup(h.shellMeta(r), validate.MinSecretFilePasswordLen, refusal))
 }
 
 // HandleBackup streams a full-server backup as a download (architecture.md §
@@ -327,7 +326,7 @@ func decryptErrorMessage(err error) string {
 // deployBackupErr phrases a pre-flight backup failure for the operator.
 func deployBackupErr(err error) string {
 	if strings.Contains(err.Error(), "DeployRoot") || strings.Contains(err.Error(), "deploy root") {
-		return "Full backup needs the project directory mounted read-only at /selfpost-deploy — add <code>.:/selfpost-deploy:ro</code> to docker-compose.yml and recreate the container."
+		return "Full backup needs the project directory mounted read-only at /selfpost-deploy — add .:/selfpost-deploy:ro to the volumes in docker-compose.yml and recreate the container."
 	}
 	return "Could not create the backup: " + err.Error()
 }

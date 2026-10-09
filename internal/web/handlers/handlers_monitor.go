@@ -385,15 +385,7 @@ func (h *Handlers) HandleSystemLog(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	lines, errText := h.readLogTail()
-	h.view.Render(w, http.StatusOK, "system_log", map[string]any{
-		"Title":    "SelfPost — system log",
-		"User":     auth.CurrentUser(r),
-		"Active":   "system_log",
-		"IsGlobal": true,
-		"Lines":    lines,
-		"Error":    errText,
-	})
+	h.view.Render(w, http.StatusOK, "system-log", h.systemLogPage(r))
 }
 
 // HandleSystemLogBody serves the HTMX polling fragment for the log-tail view.
@@ -401,11 +393,21 @@ func (h *Handlers) HandleSystemLogBody(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	lines, errText := h.readLogTail()
-	h.view.RenderFragment(w, http.StatusOK, "system_log_body", map[string]any{
-		"Lines": lines,
-		"Error": errText,
-	})
+	h.view.RenderFragment(w, http.StatusOK, "system_log_body", h.systemLogPage(r))
+}
+
+// systemLogPage reads the tail of mail.log and splits each line into the time
+// and the text the page shows it in, as the delivery log of one message does. A
+// line whose head is not a timestamp the log format recognises keeps its whole
+// text and no time: nothing is dropped from what the log says.
+func (h *Handlers) systemLogPage(r *http.Request) *view.SystemLog {
+	raw, errText := h.readLogTail()
+	lines := make([]view.LogLine, len(raw))
+	for i, line := range raw {
+		stamp, rest := logtail.SplitTimestamp(line)
+		lines[i] = view.LogLine{Time: stamp, Text: rest, Level: view.LogLineLevel(rest)}
+	}
+	return view.NewSystemLog(h.shellMeta(r), lines, errText)
 }
 
 func (h *Handlers) readLogTail() ([]string, string) {

@@ -32,9 +32,7 @@ type Engine struct {
 // from the component kit (kitPages); pages that embed a polling fragment
 // (architecture.md § Panel HTTP surface) list that fragment's file too, so the
 // same {{define}} block renders both the initial page and the fragment's own
-// refresh responses identically. Pages sharing a block of markup (the
-// encryption fields on the two secret downloads) list that partial the same
-// way.
+// refresh responses identically.
 var pageFiles = map[string][]string{
 	"setup":               {"templates/setup.html"},
 	"login":               {"templates/login.html"},
@@ -42,10 +40,12 @@ var pageFiles = map[string][]string{
 	"health":              {"templates/health.html", "templates/health_body.html"},
 	"account":             {"templates/account.html"},
 	"settings":            {"templates/settings.html"},
+	"system-log":          {"templates/system_log.html", "templates/system_log_body.html"},
+	"backup":              {"templates/backup.html"},
 	"users":               {"templates/users.html"},
-	"user_form":           {"templates/user_form.html"},
-	"user_delete":         {"templates/user_delete.html"},
-	"backup":              {"templates/backup.html", "templates/encrypt_fields.html"},
+	"user":                {"templates/user.html"},
+	"user-delete":         {"templates/user_delete.html"},
+	"help":                {"templates/help.html"},
 	"out-domains":         {"templates/out_domains.html"},
 	"out-domain":          {"templates/out_domain.html"},
 	"out-domain-settings": {"templates/out_domain_settings.html"},
@@ -61,8 +61,6 @@ var pageFiles = map[string][]string{
 	"dmarc-domain":        {"templates/dmarc_domain.html"},
 	"dmarc-report":        {"templates/dmarc_report.html"},
 	"mail_queue":          {"templates/mail_queue.html", "templates/mail_queue_body.html"},
-	"system_log":          {"templates/system_log.html", "templates/system_log_body.html"},
-	"help":                {"templates/help.html"},
 	"components":          {"templates/kit.html"},
 }
 
@@ -97,6 +95,13 @@ var kitPages = map[string]bool{
 	"dmarc":        true,
 	"dmarc-domain": true,
 	"dmarc-report": true,
+
+	"system-log":  true,
+	"backup":      true,
+	"users":       true,
+	"user":        true,
+	"user-delete": true,
+	"help":        true,
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -110,7 +115,7 @@ var fragmentFiles = map[string]string{
 }
 
 // kitFragments are the fragments rendered with the component kit's partials.
-var kitFragments = map[string]bool{"health_body": true, "overview_poll": true, "out_log_rows": true}
+var kitFragments = map[string]bool{"health_body": true, "overview_poll": true, "out_log_rows": true, "system_log_body": true}
 
 // New parses embedded templates. version is stamped into every page footer.
 func New(version string) (*Engine, error) {
@@ -122,7 +127,7 @@ func New(version string) (*Engine, error) {
 	for name, files := range pageFiles {
 		// A page parses with the layout of its design. The template is named
 		// after the layout file so that its content is the layout's.
-		layout, shared := "layout_legacy.html", []string{"templates/help_drawer.html"}
+		layout, shared := "layout_legacy.html", []string(nil)
 		if kitPages[name] {
 			layout, shared = "layout.html", []string{"templates/components.html"}
 		}

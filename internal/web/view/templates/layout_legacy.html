@@ -26,7 +26,6 @@
 <script src="/static/panel.js" defer></script>
 </head>
 <body>
-{{if .User}}{{template "help_inputs" .}}{{end}}
 {{/* Two columns: the navigation on the left and the page beside it, centred
      together (see .shell in legacy.css). The signed-out pages have no navigation
      and the shell holds their card alone. */}}
@@ -55,7 +54,6 @@
 </footer>
 </main>
 </div>
-{{if .User}}{{template "help_drawer" .}}{{end}}
 </body>
 </html>{{end}}
 

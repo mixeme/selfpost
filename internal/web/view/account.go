@@ -62,7 +62,7 @@ func NewAccount(m Meta, role string, hosted bool, accountEmail string) *Account 
 		Profile:  Box{No: "01", Title: "Profile"},
 		Password: Box{No: "02", Title: "Password"},
 		DMARC: Box{No: "03", Title: "DMARC reports", ID: "dmarc",
-			Help: &HelpLink{Href: "/help#dmarc", Title: "What the reports are and where they go"}},
+			Help: &HelpLink{Href: "/help#" + HelpDNS, Title: "DMARC and where its reports go"}},
 		hosted: hosted,
 	}
 	a.WithDomainUse(0, 0)

@@ -107,6 +107,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   whether inbound mail is filtered and what happens while the filter is
   down. The filter's address is shown to the global role only. `inbound`,
   `inbound_domain` and `inbound_delete` are off the ratchet.
+- panel-redesign (stage 2): the **Server** pages - System log, Backup,
+  Users, the user form and its delete confirmation - and **Help** are in the
+  new design. Help is a page of topics that the `?` in a box's head opens;
+  the help drawer is gone. The user form sets the user's e-mail. The backup
+  download is encrypted unless the box is unticked. Only the queue page is
+  left on the ratchet.
 
 ### Changed
 
@@ -142,6 +148,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   application forms (the script applied only the first matching rule).
 - The DMARC page of a domain no longer answers 500 once the domain has a
   reported source.
+- The confirmation before deleting a user names the domains that follow
+  that user's default report address and will be left without one; it used
+  to say the domains were not affected.
 
 ### Removed
 

@@ -295,8 +295,7 @@ func NewInDomain(m Meta, in InDomainInput) *InDomain {
 		},
 		id: in.ID, name: in.Name, dnsStatus: in.DNSStatus, recipientCount: in.RecipientCount, recipientMode: in.RecipientMode,
 
-		DNS: Box{No: "01", Title: "MX record", ID: "dns",
-			Help: &HelpLink{Href: "/help#inbound", Title: "Backup-MX and forwarding"}},
+		DNS: Box{No: "01", Title: "MX record", ID: "dns"},
 
 		Upstream:       Box{No: "02", Title: "Upstream", ID: "upstream", End: Plain("Not a mailbox")},
 		UpstreamAction: href + "/upstream",
