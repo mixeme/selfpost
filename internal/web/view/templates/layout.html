@@ -127,9 +127,9 @@
             {{/* Signing out is a POST (the handler answers nothing else), so it
                  stays a form that works without scripts. The submit button
                  carries navbar-item: Bulma resets a button to plain text, so
-                 it takes the dropdown's entry styling like the links around it
-                 (only Bulma's hover tint, which it gives to a.navbar-item
-                 alone, is missing). */}}
+                 it takes the dropdown's entry styling like the links around
+                 it, and panel.css hands it the hover tint Bulma gives to
+                 a.navbar-item alone. */}}
             <form method="post" action="/logout"><button type="submit" class="navbar-item"><i class="ti ti-logout"></i>Sign out</button></form>
           </div>
         </div>

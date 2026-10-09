@@ -25,6 +25,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   footer) and the signed-out screen; `GET /server/components` (global role)
   renders every partial in every state. `@kit` is off the ratchet: the kit
   is held to the design contract from here on.
+- panel-redesign (design): Sign out in the user menu is a POST form in the
+  mockups too, and its button takes the same hover, focus and press tint as
+  Account and Help (owner, 2026-10-09).
 
 ### Changed
 

@@ -121,6 +121,14 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .navbar.is-primary .navbar-dropdown .navbar-item .ti { margin-right: .6rem; color: var(--sp-muted); }
 .navbar.is-primary .navbar-dropdown .navbar-item.is-active { color: var(--sp-brick); font-weight: 600; background: var(--sp-brick-tint); }
 .navbar.is-primary .navbar-dropdown .navbar-item.is-active .ti { color: var(--sp-brick); }
+/* Sign out is a POST, so it is a form with a button rather than a link. Bulma
+   tints only a.navbar-item; the button is handed the same variables, and the
+   form stretches it across the menu, so it answers the pointer, the keyboard
+   and a press exactly like the entries above it. */
+.navbar-dropdown form { display: flex; }
+.navbar-dropdown button.navbar-item { flex: 1; cursor: pointer; }
+.navbar-dropdown button.navbar-item:hover, .navbar-dropdown button.navbar-item:focus { --bulma-navbar-item-background-l-delta: var(--bulma-navbar-item-hover-background-l-delta); }
+.navbar-dropdown button.navbar-item:active { --bulma-navbar-item-background-l-delta: var(--bulma-navbar-item-active-background-l-delta); }
 .navbar.is-primary .sp-current > .navbar-link, .navbar.is-primary a.navbar-item.sp-current { background: rgb(0 0 0 / .18); }
 /* The header is built like the mark: a brick field, then the stamp's paper
    margin, and the perforation runs along the outer edge of that margin — round
