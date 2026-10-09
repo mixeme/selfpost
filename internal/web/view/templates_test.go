@@ -49,8 +49,11 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 	}
 	rendered := 0
 	for name := range engine.Pages() {
+		if kitPages[name] {
+			continue // the kit layout has its own tests (components_test.go)
+		}
 		var buf bytes.Buffer
-		err := engine.Page(name).ExecuteTemplate(&buf, "layout.html", map[string]any{
+		err := engine.Page(name).ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
 			"Title": "t", "User": "admin", "Active": "", "Version": "9.9.9-test",
 			"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
 			"SourceURL": "https://github.com/mixeme/selfpost",
@@ -79,7 +82,7 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 	// Signed out (login, setup) the version must not be advertised, but the
 	// Appropriate Legal Notices must still be present.
 	var buf bytes.Buffer
-	if err := engine.Page("login").ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := engine.Page("login").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
 		"Title": "t", "Active": "", "Version": "9.9.9-test",
 		"Copyright": "Copyright © 2026 Mikhail Yenuchenko",
 		"SourceURL": "https://github.com/mixeme/selfpost",
@@ -210,7 +213,7 @@ func TestNavShowsInboundWhenEnabled(t *testing.T) {
 }
 
 // Whether a page takes the whole column or the reading measure is declared by
-// the page's own "wide" block (see layout.html), which the layout stamps into
+// the page's own "wide" block (see layout_legacy.html), which the layout stamps into
 // <main>'s class list. A page that loses the block does not fail to render — it
 // silently comes back at the measure, with its table squeezed into two thirds
 // of the column — so the set is asserted here, in both directions.
@@ -225,6 +228,9 @@ func TestOnlyThePagesMadeOfDataDeclareThemselvesWide(t *testing.T) {
 		"inbound": true, "inbound_domain": true, "dmarc": true,
 	}
 	for name, page := range engine.Pages() {
+		if kitPages[name] {
+			continue // "wide" belongs to the legacy layout; the kit's width comes from its columns
+		}
 		var buf bytes.Buffer
 		if err := page.ExecuteTemplate(&buf, "wide", nil); err != nil {
 			t.Fatalf("execute the wide block of %s: %v", name, err)
@@ -396,17 +402,19 @@ func TestNoTemplateUsesInlineScriptOrStyle(t *testing.T) {
 // server actually serves, so a typo in a /static path is a blocked request,
 // not a 404 in the page's own colours.
 func TestLayoutReferencesOnlyEmbeddedAssets(t *testing.T) {
-	body, err := fs.ReadFile(assetsFS, "templates/layout.html")
-	if err != nil {
-		t.Fatalf("read layout: %v", err)
-	}
-	refs := regexp.MustCompile(`(?:src|href)="/static/([^"]+)"`).FindAllStringSubmatch(string(body), -1)
-	if len(refs) == 0 {
-		t.Fatal("the layout references no static assets at all")
-	}
-	for _, m := range refs {
-		if _, err := fs.Stat(assetsFS, "static/"+m[1]); err != nil {
-			t.Errorf("layout references /static/%s, which is not embedded: %v", m[1], err)
+	for _, file := range []string{"templates/layout_legacy.html", "templates/layout.html"} {
+		body, err := fs.ReadFile(assetsFS, file)
+		if err != nil {
+			t.Fatalf("read layout: %v", err)
+		}
+		refs := regexp.MustCompile(`(?:src|href)="/static/([^"]+)"`).FindAllStringSubmatch(string(body), -1)
+		if len(refs) == 0 {
+			t.Fatalf("%s references no static assets at all", file)
+		}
+		for _, m := range refs {
+			if _, err := fs.Stat(assetsFS, "static/"+m[1]); err != nil {
+				t.Errorf("%s references /static/%s, which is not embedded: %v", file, m[1], err)
+			}
 		}
 	}
 }
@@ -485,7 +493,7 @@ func renderStatusPage(t *testing.T, data map[string]any) string {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("status").ExecuteTemplate(&buf, "layout.html", data); err != nil {
+	if err := engine.Page("status").ExecuteTemplate(&buf, "layout_legacy.html", data); err != nil {
 		t.Fatalf("execute status page: %v", err)
 	}
 	return buf.String()
@@ -575,7 +583,7 @@ func TestMailQueuePageRendersRetryPolicy(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := engine.Page("mail_queue").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
 		"Title": "t", "User": "admin", "Active": "mail_queue", "Version": "test",
 		"Copyright":  "Copyright © 2026 Mikhail Yenuchenko",
 		"SourceURL":  "https://github.com/mixeme/selfpost",
@@ -608,7 +616,7 @@ func TestAuthenticatedLayoutIncludesHelpDrawer(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("help").ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := engine.Page("help").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
 		"Title": "t", "User": "admin", "Active": "help", "IsGlobal": true,
 	}); err != nil {
 		t.Fatalf("execute help layout: %v", err)
@@ -630,7 +638,7 @@ func TestLoginPageOmitsHelpDrawer(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	var buf bytes.Buffer
-	if err := engine.Page("login").ExecuteTemplate(&buf, "layout.html", map[string]any{
+	if err := engine.Page("login").ExecuteTemplate(&buf, "layout_legacy.html", map[string]any{
 		"Title": "t", "Active": "",
 	}); err != nil {
 		t.Fatalf("execute login: %v", err)

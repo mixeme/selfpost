@@ -499,9 +499,9 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 - [x] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
 - [x] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
-- [ ] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
-- [ ] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**
-- [ ] `GET /server/components` behind the global role rendering every partial from fixtures; kit acceptance (§ Component kit) with evidence — **Sonnet**, reviewed by **Opus**
+- [x] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
+- [x] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**
+- [x] `GET /server/components` behind the global role rendering every partial from fixtures; kit acceptance (§ Component kit) with evidence — **Sonnet**, reviewed by **Opus**
 
 **Stage 1 — data and routes** (no template work; parallel with stage 0)
 

@@ -32,6 +32,44 @@
     });
   });
 
+  // --- Copy buttons of the component kit ------------------------------
+  // copy_field joins a read-only input or textarea to a Copy button marked
+  // data-copy; the two sit together in one .has-addons field, and the value is
+  // read from the field itself, so it can never drift from what is shown. Where
+  // the clipboard API is absent (plain HTTP outside localhost) the value is
+  // selected instead, ready for the operator's own Ctrl+C. The button's icon
+  // stays; only its word changes for a moment.
+  document.addEventListener("click", function (ev) {
+    var button = ev.target.closest("button[data-copy]");
+    if (!button) {
+      return;
+    }
+    var group = button.closest(".has-addons");
+    var field = group && group.querySelector("input, textarea");
+    if (!field) {
+      return;
+    }
+    if (!navigator.clipboard) {
+      field.focus();
+      field.select();
+      return;
+    }
+    navigator.clipboard.writeText(field.value).then(function () {
+      var label = button.lastChild;
+      if (!label || label.nodeType !== Node.TEXT_NODE) {
+        return;
+      }
+      var original = label.nodeValue;
+      label.nodeValue = "Copied";
+      setTimeout(function () {
+        label.nodeValue = original;
+      }, 1500);
+    }, function () {
+      field.focus();
+      field.select();
+    });
+  });
+
   // --- Confirmation on destructive forms --------------------------------
   // Forms that delete something or invalidate a working credential carry a
   // data-confirm message. The prompt lives here rather than in an inline

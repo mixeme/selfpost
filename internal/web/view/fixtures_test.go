@@ -14,4 +14,6 @@ package view
 //
 // This file belongs to the implementation, not to the guards: the step that
 // restyles a page adds its fixture here in the same commit.
-var pageFixtures = map[string]func() any{}
+var pageFixtures = map[string]func() any{
+	"components": func() any { return KitPage() },
+}

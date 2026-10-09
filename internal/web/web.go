@@ -171,6 +171,7 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	authed = http.NewServeMux()
 	authed.HandleFunc("GET /{$}", redirectHome)
 	authed.HandleFunc("GET /help", h.HandleHelp)
+	authed.HandleFunc("GET /server/components", h.HandleComponents)
 
 	authed.HandleFunc("GET /status", h.HandleStatus)
 	authed.HandleFunc("GET /status/fragment", h.HandleStatusFragment)

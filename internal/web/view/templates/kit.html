@@ -1,0 +1,153 @@
+{{/* The kit page (GET /server/components): every partial of components.html in
+     every state, filled from kit.go — the mockup components page rebuilt with
+     the real templates. Like any page it is thin: partial calls with structs,
+     Bulma layout classes, and the page utilities; the markup of a component is
+     written in components.html and nowhere else. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+
+{{template "flash" .Flash}}
+{{template "flash" .FlashError}}
+
+{{template "box_open" .Layouts}}
+{{template "body_open"}}
+{{template "facts" .LayoutFacts}}
+{{template "body_close"}}
+{{template "box_close"}}
+
+<div class="columns">
+  <div class="column is-6">
+    {{template "box_open" .Postmark}}
+    {{template "body_open"}}
+    <div class="buttons">{{range .Postmarks}}
+      {{template "postmark" .}}{{end}}
+    </div>
+    <p class="sp-muted">Only inside page_head, at most one per page, and only where the page has a verdict to give.</p>
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .StatusTag}}
+    <div class="table-container"><table class="table is-fullwidth">
+      <thead><tr><th>Status</th><th>Tag</th><th>Bulma classes</th></tr></thead>
+      <tbody>{{range .StatusRows}}
+        <tr><td>{{.Words}}</td><td>{{template "tag" .Tag}}</td><td class="sp-mono sp-small">{{status_tag .Tag.Status}}</td></tr>{{end}}
+      </tbody>
+    </table></div>
+    {{template "box_close"}}
+  </div>
+
+  <div class="column is-6">
+    {{template "box_open" .BoxHead}}
+    {{template "body_open"}}
+    <p class="mb-2">The <i class="ti ti-help-circle"></i> after the end slot is <code>sp-help</code>: an optional link to the section's topic on the Help page. It replaces today's help drawer.</p>
+    <p>box_body — padded content. A <code>table</code> or a run of <code>sp-record</code> blocks sits directly in the box, without box_body.</p>
+    {{template "body_close"}}
+    {{template "box_foot" .BoxFoot}}
+    {{template "box_close"}}
+
+    {{template "box_open" .DangerZone}}
+    {{template "body_open"}}
+    <p>For destructive confirmations and the "delete" entry of a settings page. The number may be an icon when the box is not part of a sequence.</p>
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .Credential}}
+    {{template "body_open"}}
+    <p>Only for a secret the panel will never show again.</p>
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+</div>
+
+{{template "box_open" .HealthCard}}
+{{template "health_cards" .HealthCards}}
+{{template "box_close"}}
+
+<div class="columns">
+  <div class="column is-7">
+    {{template "box_open" .DNSRecord}}
+    {{range .Records}}{{template "dns_record" .}}
+    {{end}}{{template "box_close"}}
+
+    {{template "box_open" .Tables}}
+    <div class="table-container"><table class="table is-fullwidth is-hoverable">
+      <thead><tr><th>Time, UTC</th><th>Name</th><th>sp-clip</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td><a href="#"><strong>the row's link</strong></a></td><td class="sp-clip">A long subject is clipped with an ellipsis instead of wrapping the row</td><td><span class="{{status_tag "sent"}}">sent</span></td><td class="sp-actions"><a href="#">Details</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+      </tbody>
+    </table></div>
+    {{template "box_foot" .TablesFoot}}
+    {{template "box_close"}}
+
+    {{template "box_open" .LogPane}}
+    {{template "log_pane" .LogLines}}
+    {{template "box_close"}}
+  </div>
+
+  <div class="column is-5">
+    {{template "box_open" .Facts}}
+    {{template "body_open"}}
+    {{template "facts" .FactList}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .Timeline}}
+    {{template "body_open"}}
+    {{template "timeline" .Steps}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .EmptyState}}
+    {{template "empty_state" .Empty}}
+    {{template "box_close"}}
+
+    {{template "box_open" .ConfirmList}}
+    {{template "body_open"}}
+    {{template "confirm_list" .Confirm}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+</div>
+
+<div class="columns">
+  <div class="column is-3">
+    {{template "side_menu" .SideMenu}}
+  </div>
+  <div class="column is-9">
+    {{template "box_open" .FormRows}}
+    {{template "body_open"}}
+    <div class="sp-form">
+      <div class="sp-row">
+        <div class="field"><label class="label">sp-row — a wide field</label><div class="control"><input class="input" value="host"></div></div>
+        <div class="field"><label class="label">and a short one</label><div class="control"><input class="input" value="25"></div></div>
+      </div>
+      <div class="sp-pair">
+        <div class="field"><label class="label">sp-pair — two equal fields</label><div class="control"><input class="input" type="password"></div></div>
+        <div class="field"><label class="label">Repeat</label><div class="control"><input class="input" type="password"></div><p class="help">Help text lives in Bulma's <code>help</code>.</p></div>
+      </div>
+    </div>
+    {{template "route" .Route}}
+    {{template "body_close"}}
+    {{template "help_topic" .HelpTopic}}
+    {{template "box_close"}}
+  </div>
+</div>
+
+{{template "box_open" .Shell}}
+{{template "body_open"}}
+{{template "facts" .ShellFacts}}
+{{template "body_close"}}
+{{template "box_close"}}
+
+{{template "box_open" .TypeScale}}
+<div class="table-container"><table class="table is-fullwidth">
+  <thead><tr><th>Size</th><th>Looks like</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td class="sp-mono sp-small">body · 16px</td><td>The quick brown fox, 203.0.113.25</td><td class="sp-muted">Text, table cells, inputs, selects, buttons, menus and their dropdowns</td></tr>
+    <tr><td class="sp-mono sp-small">--sp-fs-s · 14px</td><td class="sp-small">The quick brown fox, <span class="sp-mono">203.0.113.25</span></td><td class="sp-muted">Supporting text: labels, <code>help</code>, notes in a box head or foot, mono values (<code>sp-small</code>), logs, the footer</td></tr>
+    <tr><td class="sp-mono sp-small">--sp-fs-xs · 13px</td><td>{{template "kicker" .KickerSample}} <span class="tag is-light">tag</span></td><td class="sp-muted">Upper-case mono micro-labels (kicker, table head, <code>dt</code>, box title) and tags — nothing else</td></tr>
+  </tbody>
+</table></div>
+{{template "box_foot" .TypeScaleFoot}}
+{{template "box_close"}}
+{{end}}

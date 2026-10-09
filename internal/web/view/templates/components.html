@@ -1,0 +1,180 @@
+{{/* The component kit: one {{define}} per partial of docs/plans/panel-redesign.md
+     § Three layers. This is the only file besides layout.html in which an sp-
+     component class is written; a page calls a partial and passes the struct
+     that components.go declares for it (a page never builds the input with
+     dict), and it never rebuilds the markup. The reference for every partial in
+     every state is the mockup components page,
+     docs/assets/panel-redesign/panel/src/components.html — the markup here is
+     that markup, element for element and class for class, and the kit page
+     (GET /server/components, kit.html) renders it all from fixtures.
+
+     Go templates have no slots, so a component that wraps the page's own
+     content is an open/close pair: box_open … box_close, body_open …
+     body_close, record_open … record_close. Between the two the page writes
+     Bulma markup (a table in its table-container, a form) or calls another
+     partial. */}}
+
+{{/* ---- inline content: the text a struct field carries */}}
+
+{{/* inline renders a Text (components.go): plain text, links, code, mono
+     values, strong, emphasis, tags and line breaks, all escaped. It is how a
+     lead, a box's end slot or a fact's value can hold a link or a code span
+     without any field being trusted HTML. */}}
+{{define "inline"}}{{range .}}{{if .Break}}<br>{{else if .Tag}}{{template "tag" .Tag}}{{else if .Href}}<a href="{{.Href}}">{{template "inline_leaf" .}}</a>{{else}}{{template "inline_leaf" .}}{{end}}{{end}}{{end}}
+{{define "inline_leaf"}}{{if .Code}}<code>{{.Text}}</code>{{else if .Mono}}<span class="sp-mono">{{.Text}}</span>{{else if .Strong}}<strong>{{.Text}}</strong>{{else if .Em}}<em>{{.Text}}</em>{{else}}{{.Text}}{{end}}{{end}}
+
+{{/* tag is a status tag (input: Tag). The colour comes from status_tag, the one
+     mapping of status to Bulma classes; the label defaults to the status. */}}
+{{define "tag"}}<span class="{{status_tag .Status}}">{{if .Label}}{{.Label}}{{else}}{{.Status}}{{end}}</span>{{end}}
+
+{{/* kicker is the upper-case mono micro-label on its own (input: string).
+     page_head writes its own kicker as the line above the title. */}}
+{{define "kicker"}}<span class="sp-kicker">{{.}}</span>{{end}}
+
+{{/* action is a button in a page head or a box foot (input: Action): a link, or
+     a POST form with one submit button when Post is set — a state change is
+     never a link. */}}
+{{define "action"}}{{if .Post}}<form method="post" action="{{.Post}}"><button type="submit" class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</button></form>{{else}}<a class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}" href="{{.Href}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</a>{{end}}{{end}}
+
+{{/* ---- page head and postmark */}}
+
+{{/* page_head opens every page (input: Head): the path or section as the
+     kicker, the h1, a lead or a route line, the postmark when the page has a
+     verdict, a note on the right, and the buttons. */}}
+{{define "page_head"}}<div class="sp-head">
+{{if .Postmark}}{{template "postmark" .Postmark}}
+{{end}}<div class="sp-grow">
+{{if .Crumbs}}<p class="sp-kicker">{{range $i, $c := .Crumbs}}{{if $i}} {{end}}{{if $c.Href}}<a href="{{$c.Href}}">{{$c.Label}}</a>{{else}}{{$c.Label}}{{end}} /{{end}}</p>
+{{else if .Kicker}}<p class="sp-kicker">{{.Kicker}}</p>
+{{end}}<h1 class="title {{if .Compact}}is-4{{else}}is-3{{end}}{{if .Mono}} sp-mono{{end}}">{{.Title}}{{if .Code}} <span class="sp-mono">{{.Code}}</span>{{end}}</h1>
+{{if .Route}}{{template "route" .Route}}
+{{else if .Lead}}<p class="sp-lead">{{template "inline" .Lead}}</p>
+{{end}}</div>
+{{if .Note}}<div class="sp-muted sp-small">{{range $i, $l := .Note}}{{if $i}}<br>{{end}}{{$l}}{{end}}</div>
+{{end}}{{if .Actions}}<div class="buttons">{{range .Actions}}{{template "action" .}}{{end}}</div>
+{{end}}</div>{{end}}
+
+{{/* postmark is the round verdict stamp (input: Postmark). Inside page_head
+     only, at most one per page. */}}
+{{define "postmark"}}<div class="sp-postmark{{if eq .Level "warn"}} sp-warn{{else if eq .Level "fail"}} sp-fail{{end}}"><span>{{.Top}}</span><b>{{.Word}}</b><span>{{.Bottom}}</span></div>{{end}}
+
+{{/* route is the from → to line of a message (input: Route). */}}
+{{define "route"}}<p class="sp-route">{{range .}}{{if .Arrow}}<i class="ti ti-arrow-right sp-muted"></i>{{else if .Tag}}{{template "tag" .Tag}}{{else}}<span>{{.Text}}</span>{{end}}{{end}}</p>{{end}}
+
+{{/* flash is the result of the last action, between page_head and the first
+     box (input: Flash). A field's own error stays in help is-danger. */}}
+{{define "flash"}}<div class="notification {{if .Error}}is-danger{{else}}is-success{{end}} is-light"><i class="ti {{if .Error}}ti-alert-circle{{else}}ti-circle-check{{end}}"></i>{{template "inline" .Text}}</div>{{end}}
+
+{{/* ---- box */}}
+
+{{/* box_open starts a box and writes its head (input: Box); box_close ends it.
+     The variants are sp-danger-zone (a destructive confirmation) and
+     sp-credential (a secret shown once). A box foot, a table in its
+     table-container, a run of records, a log or an empty state sit directly
+     inside; anything else goes in body_open … body_close. */}}
+{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}>
+{{template "box_head" .}}
+{{end}}
+{{define "box_close"}}</div>{{end}}
+
+{{/* body_open pads the content of a box (box_body); body_close ends it. */}}
+{{define "body_open"}}<div class="sp-box-body">{{end}}
+{{define "body_close"}}</div>{{end}}
+
+{{/* box_head is the numbered mono head of a box (input: Box): the number — or an
+     icon when the box is not part of a sequence — the title, an end slot (a
+     note, a tag, a link, or a filter form) and an optional link to the
+     section's Help topic. */}}
+{{define "box_head"}}<div class="sp-box-head"><span class="sp-no">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{else}}{{.No}}{{end}}</span><h2>{{.Title}}</h2>{{if .Filter}}{{template "filter_form" .Filter}}{{else if .End}}<div class="sp-end">{{template "inline" .End}}</div>{{end}}{{if .Help}}<a class="sp-help" href="{{.Help.Href}}" title="{{.Help.Title}}"><i class="ti ti-help-circle"></i></a>{{end}}</div>{{end}}
+
+{{/* filter_form is the filter of a list in the end slot of its box head
+     (input: Filter): selects, date inputs and one button, sent with GET. */}}
+{{define "filter_form"}}<form class="sp-end" method="get" action="{{.Action}}">{{range .Selects}}
+<div class="select"><select name="{{.Name}}" aria-label="{{.Label}}">{{$sel := .Selected}}{{range .Options}}<option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}</select></div>{{end}}{{range .Dates}}
+<input class="input" type="date" name="{{.Name}}" value="{{.Value}}" aria-label="{{.Label}}">{{end}}
+<button type="submit" class="button"><i class="ti ti-filter"></i>{{if .Button}}{{.Button}}{{else}}Filter{{end}}</button>
+</form>{{end}}
+
+{{/* box_foot is the line under a box's content (input: Foot): a legend, paging
+     with an end slot, or the one button that finishes the page. */}}
+{{define "box_foot"}}<div class="sp-box-foot">{{if .Button}}{{template "action" .Button}}{{else}}{{if .Bare}}{{template "inline" .Text}}{{else}}<span>{{template "inline" .Text}}</span>{{end}}{{if .Link}}<a href="{{.Link.Href}}">{{.Link.Label}}</a>{{end}}{{if .End}}<span class="sp-end">{{template "inline" .End}}</span>{{end}}{{end}}</div>{{end}}
+
+{{/* ---- health, records, copy */}}
+
+{{/* health_cards is the Overview grid (input: []HealthCard); each card is
+     health_card (input: HealthCard) and links to its detail. */}}
+{{define "health_cards"}}<div class="sp-health">{{range .}}
+{{template "health_card" .}}{{end}}
+</div>{{end}}
+{{define "health_card"}}<a href="{{.Href}}"{{if eq .Level "warn"}} class="sp-warn"{{else if eq .Level "fail"}} class="sp-fail"{{end}}><span class="sp-h-icon"><i class="ti {{.Icon}}"></i></span><span><span class="sp-h-name">{{.Name}}</span><span class="sp-h-value">{{.Value}}</span><span class="sp-h-sub">{{.Sub}}</span></span></a>{{end}}
+
+{{/* dns_record is one DNS record (input: Record): its status, what to publish
+     with a Copy button, and "In DNS now" only when it differs. */}}
+{{define "dns_record"}}<div class="sp-record">
+<div class="sp-record-head"><h3>{{.Name}}</h3>{{if .Status.Status}}{{template "tag" .Status}}{{end}}{{if .Note}}<small>{{template "inline" .Note}}</small>{{end}}</div>
+{{if .Host}}<div class="sp-row">
+{{template "copy_field" .HostField}}
+<div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="{{.Type}}"></div></div>
+</div>
+{{end}}{{if .Value}}{{template "copy_field" .ValueField}}
+{{end}}{{if .InDNS}}<div class="field"><label class="label">In DNS now</label>
+<div class="control"><input class="input is-danger" readonly value="{{.InDNS}}"></div>
+{{if .Problem}}<p class="help is-danger">{{template "inline" .Problem}}</p>
+{{end}}</div>
+{{end}}</div>{{end}}
+
+{{/* record_open starts the padded block a record sits in and record_close ends
+     it, for what is not a DNS record but is laid out like one: the fields of a
+     secret shown once, a form inside a box. */}}
+{{define "record_open"}}<div class="sp-record">{{end}}
+{{define "record_close"}}</div>{{end}}
+
+{{/* copy_field is a read-only value joined to its Copy button (input:
+     CopyField): one line, or a textarea when Rows is set — a DKIM key. The
+     button is wired by panel.js through data-copy. */}}
+{{define "copy_field"}}<div class="field"><label class="label">{{.Label}}</label>
+<div class="field has-addons"><div class="control is-expanded">{{if .Rows}}<textarea class="textarea" rows="{{.Rows}}" readonly>{{.Value}}</textarea>{{else}}<input class="input" readonly value="{{.Value}}">{{end}}</div><div class="control"><button type="button" class="button" data-copy><i class="ti ti-copy"></i>Copy</button></div></div>
+{{if .Help}}<p class="help">{{template "inline" .Help}}</p>
+{{end}}</div>{{end}}
+
+{{/* ---- facts, menu, timeline, log, states */}}
+
+{{/* facts is a label / value grid (input: []Fact); Big is for a headline
+     number, with its supporting line under it. */}}
+{{define "facts"}}<dl class="sp-facts">{{range .}}
+<div><dt>{{.Label}}</dt><dd{{if .Mono}} class="sp-mono"{{else if .Big}} class="sp-big"{{end}}>{{template "inline" .Value}}</dd>{{if .Note}}<dd class="sp-muted">{{template "inline" .Note}}</dd>{{end}}</div>{{end}}
+</dl>{{end}}
+
+{{/* side_menu is the Bulma menu of a detail page (input: SideMenu): icons,
+     count tags, and the rarely used entries in a group of their own. It
+     stays in view while the page scrolls. */}}
+{{define "side_menu"}}<aside class="menu sp-side">{{range .Groups}}
+<p class="menu-label">{{.Label}}</p>
+<ul class="menu-list">{{range .Items}}
+<li><a{{if .Active}} class="is-active"{{else if .Danger}} class="has-text-danger"{{end}} href="{{.Href}}"><i class="ti {{.Icon}}{{if .Danger}} has-text-danger{{end}}"></i>{{.Label}}{{if .Tag}} {{template "tag" .Tag}}{{end}}</a></li>{{end}}
+</ul>{{end}}
+</aside>{{end}}
+
+{{/* timeline is what happened to a message, in order (input: []Step). */}}
+{{define "timeline"}}<ol class="sp-timeline">{{range .}}
+<li{{if eq .Level "warn"}} class="sp-warn"{{else if eq .Level "fail"}} class="sp-fail"{{else if eq .Level "pending"}} class="sp-pending"{{end}}><time>{{.Time}}</time>{{if .Strong}}<strong>{{.Strong}}</strong>{{end}}{{template "inline" .Text}}</li>{{end}}
+</ol>{{end}}
+
+{{/* log_pane is a dark block of log lines (input: []LogLine). The time is
+     dimmed, a warning amber, an error red. The newline between lines is part of
+     the text: the pane is a pre. */}}
+{{define "log_pane"}}<pre class="sp-log">{{range $i, $l := .}}{{if $i}}
+{{end}}{{if $l.Time}}<span class="sp-d">{{$l.Time}}</span> {{end}}{{if eq $l.Level "warn"}}<span class="sp-w">{{$l.Text}}</span>{{else if eq $l.Level "error"}}<span class="sp-e">{{$l.Text}}</span>{{else}}{{$l.Text}}{{end}}{{end}}</pre>{{end}}
+
+{{/* empty_state says what is absent and why that is fine (input: EmptyState). */}}
+{{define "empty_state"}}<div class="sp-empty"><i class="ti {{.Icon}}"></i>{{template "inline" .Text}}</div>{{end}}
+
+{{/* confirm_list lists what a destructive action will take with it (input:
+     []Text), inside an sp-danger-zone box above the danger button. */}}
+{{define "confirm_list"}}<ul class="sp-list-check">{{range .}}
+<li><i class="ti ti-x"></i>{{template "inline" .}}</li>{{end}}
+</ul>{{end}}
+
+{{/* help_topic is one topic of the Help page (input: HelpTopic): a heading and
+     paragraphs; topics stack inside one box. */}}
+{{define "help_topic"}}<div class="sp-help-topic"{{if .ID}} id="{{.ID}}"{{end}}><h3>{{.Title}}</h3>{{range .Body}}<p>{{template "inline" .}}</p>{{end}}</div>{{end}}

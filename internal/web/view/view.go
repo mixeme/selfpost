@@ -26,7 +26,9 @@ type Engine struct {
 }
 
 // pageFiles maps a logical page name to its template files. Every page
-// composes with layout.html; pages that embed a polling fragment
+// composes with a layout — layout_legacy.html for the pages still in the old
+// design, layout.html and components.html for those that have been rebuilt
+// from the component kit (kitPages); pages that embed a polling fragment
 // (architecture.md § Panel HTTP surface) list that fragment's file too, so the
 // same {{define}} block renders both the initial page and the fragment's own
 // refresh responses identically. Pages sharing a block of markup (the
@@ -55,6 +57,17 @@ var pageFiles = map[string][]string{
 	"system_log":     {"templates/system_log.html", "templates/system_log_body.html"},
 	"status":         {"templates/status.html", "templates/status_body.html"},
 	"help":           {"templates/help.html"},
+	"components":     {"templates/kit.html"},
+}
+
+// kitPages are the pages built from the component kit: they are rendered by
+// layout.html with the partials of components.html and load panel.css. Every
+// other page is still the old design — layout_legacy.html and legacy.css — and
+// is listed in legacy_pages.txt; a page is in exactly one of the two, and
+// restyling one means moving it from the list to here in the same commit.
+// pageFiles stays a plain map of file lists because the guard tests read it.
+var kitPages = map[string]bool{
+	"components": true,
 }
 
 // fragmentFiles maps a fragment name (also its {{define}} block name) to its
@@ -74,8 +87,14 @@ func New(version string) (*Engine, error) {
 		version:   version,
 	}
 	for name, files := range pageFiles {
-		patterns := append([]string{"templates/layout.html", "templates/help_drawer.html"}, files...)
-		tmpl, err := template.New("layout.html").Funcs(templateFuncs()).ParseFS(assetsFS, patterns...)
+		// A page parses with the layout of its design. The template is named
+		// after the layout file so that its content is the layout's.
+		layout, shared := "layout_legacy.html", []string{"templates/help_drawer.html"}
+		if kitPages[name] {
+			layout, shared = "layout.html", []string{"templates/components.html"}
+		}
+		patterns := append([]string{"templates/" + layout}, append(shared, files...)...)
+		tmpl, err := template.New(layout).Funcs(templateFuncs()).ParseFS(assetsFS, patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
 		}
@@ -124,6 +143,11 @@ func templateFuncs() template.FuncMap {
 		"back": func(href, label string) map[string]string {
 			return map[string]string{"Href": href, "Label": label}
 		},
+		// status_tag and wbr_at are the adapters of the component kit
+		// (components.go): the one mapping of a status to Bulma's tag
+		// classes, and the break opportunity after the @ of an address.
+		"status_tag": StatusTag,
+		"wbr_at":     wbrAt,
 	}
 }
 
@@ -138,31 +162,48 @@ func (e *Engine) Pages() map[string]*template.Template {
 	return e.pages
 }
 
-// Render writes a page using the base layout. Rendering to a buffer first means
-// a template error yields a clean 500 instead of a half-written page.
+// Render writes a page using its layout. Rendering to a buffer first means a
+// template error yields a clean 500 instead of a half-written page.
 func (e *Engine) Render(w http.ResponseWriter, status int, page string, data any) {
 	tmpl, ok := e.pages[page]
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
-	// The layout's navigation compares .Active against each item, so the key
-	// must exist on every authenticated page. Defaulting it here keeps a page
-	// that forgets it from failing to render — it simply highlights nothing.
-	// Footer fields (.Version, .Copyright, .SourceURL) are the same on every
-	// page, so no handler should have to pass them.
-	if m, ok := data.(map[string]any); ok {
-		if _, has := m["Active"]; !has {
-			m["Active"] = ""
+	var (
+		buf    bytes.Buffer
+		layout string
+		frame  = data
+	)
+	if kitPages[page] {
+		// A page of the component kit: the shell is typed data derived from the
+		// page's Meta (components.go), and the page's own data travels beside it.
+		// With no user there is no navigation — the signed-out screen.
+		layout = "layout.html"
+		sh := e.shell(metaOf(data), legal.CopyrightLine, legal.SourceURL)
+		if sh.User == "" {
+			layout = "layout_signed_out"
 		}
-		m["Version"] = e.version
-		m["Copyright"] = legal.CopyrightLine
-		m["SourceURL"] = legal.SourceURL
-		m["InboundEnabled"] = e.inboundEnabled
-		m["DMARCEnabled"] = e.dmarcEnabled
+		frame = Frame{Shell: sh, Page: data}
+	} else {
+		layout = "layout_legacy.html"
+		// The layout's navigation compares .Active against each item, so the key
+		// must exist on every authenticated page. Defaulting it here keeps a page
+		// that forgets it from failing to render — it simply highlights nothing.
+		// Footer fields (.Version, .Copyright, .SourceURL) are the same on every
+		// page, so no handler should have to pass them.
+		if m, ok := data.(map[string]any); ok {
+			if _, has := m["Active"]; !has {
+				m["Active"] = ""
+			}
+			m["Version"] = e.version
+			m["Copyright"] = legal.CopyrightLine
+			m["SourceURL"] = legal.SourceURL
+			m["InboundEnabled"] = e.inboundEnabled
+			m["DMARCEnabled"] = e.dmarcEnabled
+		}
 	}
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {
+	if err := tmpl.ExecuteTemplate(&buf, layout, frame); err != nil {
 		log.Printf("panel: render %s: %v", page, err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

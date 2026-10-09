@@ -24,6 +24,8 @@ type route struct {
 // administrator is answered 404 rather than 403 so the panel does not confirm
 // that the page exists (security.md).
 var globalOnlyRoutes = []route{
+	{"GET", "/server/components", func(h *Handlers) http.HandlerFunc { return h.HandleComponents }, nil},
+
 	{"GET", "/users", func(h *Handlers) http.HandlerFunc { return h.HandleUsers }, nil},
 	{"GET", "/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},
 	{"POST", "/users/new", func(h *Handlers) http.HandlerFunc { return h.HandleUserNew }, nil},

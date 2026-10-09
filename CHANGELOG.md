@@ -18,9 +18,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   still pre-2.0 and may only shrink; CI also rejects a commit that changes a
   guard together with the implementation, or brings back a template from
   history. The kit and route tests stay skipped until their stages land.
+- panel-redesign (stage 0): the component kit. `panel.css` is the mockups'
+  stylesheet rule for rule; `components.html` holds every partial with its
+  typed input in `components.go`; the new `layout.html` is the shell (brick
+  navbar with the wordmark, perforated edge, sibling strip, user menu,
+  footer) and the signed-out screen; `GET /server/components` (global role)
+  renders every partial in every state. `@kit` is off the ratchet: the kit
+  is held to the design contract from here on.
 
 ### Changed
 
+- The old panel is untouched on screen but steps aside in the tree: its
+  stylesheet is `legacy.css` and its layout `layout_legacy.html` until the
+  last old page is restyled. The 2.0 menu paths in the new shell do not
+  exist before stage 1; only the kit page uses that shell so far.
 - panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
   the component kit.
 

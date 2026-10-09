@@ -130,7 +130,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 
 // deliveryLevel maps a send-log status onto the ok/warn/error/unknown badge
 // vocabulary the status page and the DNS checks already use (see .st in
-// panel.css), so a colour means the same thing on every page: delivered is the
+// legacy.css), so a colour means the same thing on every page: delivered is the
 // good outcome, deferred is not settled yet, and the two refusals are failures.
 // A queued row is "unknown" rather than "warn" — nothing has gone wrong, it is
 // simply that nothing has been reported.
