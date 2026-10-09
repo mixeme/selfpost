@@ -1,6 +1,0 @@
-{{define "mail_queue_body"}}
-<div id="mail-queue-body" data-poll aria-live="polite" hx-get="/outbound/queue/fragment" hx-trigger="load" hx-swap="outerHTML">
-  {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
-  <span class="code">{{if .Output}}{{.Output}}{{else}}Queue is empty.{{end}}</span>
-</div>
-{{end}}

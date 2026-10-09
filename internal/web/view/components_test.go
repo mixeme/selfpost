@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
 
 // Tests of the component kit's own code: the template functions, each partial
-// in each of its states, the shell's visibility rules and the agreement between
-// kitPages and legacy_pages.txt. The design contract itself (vocabulary, outlines,
-// the stylesheet) is held by the guard tests, which this file does not repeat.
+// in each of its states and the shell's visibility rules. The design contract
+// itself (vocabulary, outlines, the stylesheet) is held by the guard tests,
+// which this file does not repeat.
 
 func kitEngine(t *testing.T) *Engine {
 	t.Helper()
@@ -503,8 +502,29 @@ func TestMenuOfADomainAdministratorLeavesNoGap(t *testing.T) {
 	mustNotContain(t, out, "/outbound/dmarc")
 }
 
-// Signing out is a POST, as it is in the old layout and as the handler demands;
-// it has to work without scripts.
+// A domain administrator who was given inbound domains only is offered Inbound
+// and none of the sending pages, and the wordmark takes them to what they have.
+func TestMenuOfAnInboundOnlyAdministratorLeavesNoGap(t *testing.T) {
+	out := renderShell(t, kitEngine(t), Meta{Title: "t", User: "ops", HasInbound: true, Section: "inbound", Page: "domains"})
+	mustContain(t, out, `href="/inbound/domains"`, `href="/account"`, `href="/help"`,
+		`<a class="navbar-item" href="/inbound/domains"><img src="/static/wordmark.svg"`)
+	// (The kit page's own examples link to /outbound/domains, so the menu's group
+	// is looked for by its link.)
+	mustNotContain(t, out, `href="/overview"`, `href="/server/`, `navbar-link" href="/outbound/domains"`, `href="/outbound/log"`, `href="/outbound/dmarc"`)
+}
+
+// The Inbound entry needs the feature as well as something to reach in it.
+func TestInboundEntryNeedsTheFeature(t *testing.T) {
+	off, err := New("t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotContain(t, renderShell(t, off, Meta{Title: "t", User: "admin", IsGlobal: true}), "/inbound/domains")
+	mustContain(t, renderShell(t, kitEngine(t), Meta{Title: "t", User: "admin", IsGlobal: true}), `href="/inbound/domains"`)
+}
+
+// Signing out is a POST, as the handler demands; it has to work without
+// scripts.
 func TestSignOutStaysAPostForm(t *testing.T) {
 	out := renderShell(t, kitEngine(t), Meta{Title: "t", User: "admin", IsGlobal: true})
 	mustContain(t, out, `<form method="post" action="/logout"><button type="submit" class="navbar-item"><i class="ti ti-logout"></i>Sign out</button></form>`)
@@ -531,57 +551,20 @@ func TestKitLayoutLoadsOnlyTheKit(t *testing.T) {
 			`<link rel="stylesheet" href="/static/bulma.min.css">`+"\n"+`<link rel="stylesheet" href="/static/tabler-icons.css">`+"\n"+`<link rel="stylesheet" href="/static/panel.css">`,
 			`<script src="/static/htmx.min.js" defer></script>`, `<script src="/static/panel.js" defer></script>`,
 			`<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>`)
-		mustNotContain(t, out, "legacy.css", "http://", "https://cdn")
+		mustNotContain(t, out, "http://", "https://cdn")
 	}
 }
 
-// Meta can come from a struct that embeds it or from the map a handler builds.
-func TestMetaOfReadsAStructAndAMap(t *testing.T) {
+// Meta comes from a struct that embeds it; any other data has none, which is
+// the signed-out screen.
+func TestMetaOfReadsAStruct(t *testing.T) {
 	want := Meta{Title: "t", User: "u", IsGlobal: true, HasOutbound: true, HasInbound: true, Section: "server", Page: "users"}
 	if got := metaOf(&Kit{Meta: want}); got != want {
 		t.Errorf("metaOf(struct) = %+v", got)
 	}
-	got := metaOf(map[string]any{"Title": "t", "User": "u", "IsGlobal": true, "HasOutbound": true, "HasInbound": true, "Section": "server", "Page": "users", "Other": 1})
-	if got != want {
-		t.Errorf("metaOf(map) = %+v", got)
-	}
 	if got := metaOf(42); got != (Meta{}) {
 		t.Errorf("metaOf(other) = %+v", got)
 	}
-}
-
-// A page is on the new layout exactly when legacy_pages.txt does not list it.
-func TestKitPagesAreTheOnesOffTheRatchet(t *testing.T) {
-	b, err := os.ReadFile("legacy_pages.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	legacy := map[string]bool{}
-	for _, line := range strings.Split(string(b), "\n") {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, "@") {
-			legacy[line] = true
-		}
-	}
-	for name := range pageFiles {
-		if kitPages[name] == legacy[name] {
-			t.Errorf("page %q: kitPages=%v and legacy_pages.txt lists it=%v; it must be in exactly one", name, kitPages[name], legacy[name])
-		}
-	}
-	for name := range kitPages {
-		if _, ok := pageFiles[name]; !ok {
-			t.Errorf("kitPages names %q, which is not a page", name)
-		}
-	}
-}
-
-// The old pages keep rendering through the old layout and stylesheet.
-func TestLegacyPagesStayOnTheOldLayout(t *testing.T) {
-	e := kitEngine(t)
-	rec := httptest.NewRecorder()
-	e.Render(rec, http.StatusOK, "mail_queue", map[string]any{"Title": "t", "User": "admin", "IsGlobal": true})
-	out := rec.Body.String()
-	mustContain(t, out, `href="/static/legacy.css"`, `class="shell"`)
-	mustNotContain(t, out, "bulma.min.css", "tabler-icons.css", "/static/panel.css", "navbar")
 }
 
 // Poll, ID and OOB are optional attributes: empty, box_open and page_head write

@@ -113,6 +113,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the help drawer is gone. The user form sets the user's e-mail. The backup
   download is encrypted unless the box is unticked. Only the queue page is
   left on the ratchet.
+- panel-redesign (stage 2): the **Outbound queue** page is in the new shell
+  with its content unchanged - the listing of `postqueue -p` and how
+  retries work. With it every page is built from the component kit: the old
+  stylesheet, the old layout and the engine's second rendering path are
+  deleted, and the ratchet is empty.
 
 ### Changed
 

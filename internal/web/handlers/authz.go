@@ -22,17 +22,6 @@ func (h *Handlers) requireGlobal(w http.ResponseWriter, r *http.Request) (auth.P
 	return p, true
 }
 
-func (h *Handlers) pageBase(r *http.Request) map[string]any {
-	p, _ := h.principal(r)
-	return map[string]any{
-		"User":     auth.CurrentUser(r),
-		"IsGlobal": p.IsGlobal(),
-		// Which groups the menu shows this user (plan § Who sees what).
-		"HasOutbound": p.HasOutbound(),
-		"HasInbound":  p.HasInbound(),
-	}
-}
-
 // shellMeta is what the shell of a page of the component kit needs to know
 // about the person looking at it: their name and which groups of the menu they
 // reach. The page's constructor adds its title and where it sits in the menu.

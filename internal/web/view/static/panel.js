@@ -4,35 +4,7 @@
 (function () {
   "use strict";
 
-  // --- Copy buttons on .code values ------------------------------------
-  // Values that get carried into another interface (a DNS panel, a mail
-  // client) sit in a .code-row wrapper next to a Copy button. The text is read
-  // from the .code element itself, so it can never drift from what is shown.
-  // navigator.clipboard needs a secure context (HTTPS or localhost); over plain
-  // HTTP in development it is simply absent, in which case the value stays
-  // selectable by hand.
-  document.addEventListener("click", function (ev) {
-    var button = ev.target.closest("button.copy");
-    if (!button) {
-      return;
-    }
-    var row = button.closest(".code-row");
-    var code = row && row.querySelector(".code");
-    if (!code || !navigator.clipboard) {
-      return;
-    }
-    navigator.clipboard.writeText(code.textContent).then(function () {
-      var original = button.textContent;
-      button.textContent = "Copied";
-      setTimeout(function () {
-        button.textContent = original;
-      }, 1500);
-    }, function () {
-      /* Clipboard refused (permissions, insecure context): leave the page be. */
-    });
-  });
-
-  // --- Copy buttons of the component kit ------------------------------
+  // --- Copy buttons ---------------------------------------------------
   // copy_field joins a read-only input or textarea to a Copy button marked
   // data-copy; the two sit together in one .has-addons field, and the value is
   // read from the field itself, so it can never drift from what is shown. Where
@@ -143,17 +115,19 @@
       if (!control.matches(rule.match)) {
         continue;
       }
-      var target = form.querySelector(rule.target);
-      if (!target) {
-        continue;
-      }
+      // A block can be several elements (the user form's two lists of domains).
       var show = rule.visible(control);
-      target.hidden = !show;
-      if (!show && rule.clearWhenHidden) {
-        target.querySelectorAll("input").forEach(function (input) {
-          input.value = "";
-        });
-      }
+      form.querySelectorAll(rule.target).forEach(function (target) {
+        // hidden alone does not hide an element whose own stylesheet gives it a
+        // display (Bulma's .box), so Bulma's is-hidden helper goes with it.
+        target.hidden = !show;
+        target.classList.toggle("is-hidden", !show);
+        if (!show && rule.clearWhenHidden) {
+          target.querySelectorAll("input").forEach(function (input) {
+            input.value = "";
+          });
+        }
+      });
     }
   }
 

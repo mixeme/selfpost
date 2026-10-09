@@ -479,17 +479,17 @@ func fixtureRetryPolicy() postfix.RetryPolicy {
 	}
 }
 
-// The retry card sits on the page itself, outside the HTMX poll, and prints
+// The retry policy sits on the page itself, outside the HTMX poll, and prints
 // whatever policy was cached on Config — never a live postconf.
 func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{Version: "test", RetryPolicy: fixtureRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueue, "/outbound/queue")
 	for _, want := range []string{
-		"How delivery retries work",
-		"id=\"retry-policy\"",
+		"<h2>How retries work</h2>",
+		"This Postfix&#39;s policy, read at panel start",
 		">10 minutes<",
-		"doubling, cap about 1 hour 7 minutes",
+		"capped at about 1 hour 7 minutes",
 		">2 days<",
 	} {
 		if !strings.Contains(out, want) {
@@ -499,7 +499,7 @@ func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
 	if strings.Contains(out, ">5 minutes<") || strings.Contains(out, ">5 days<") {
 		t.Errorf("mail queue shows stock defaults instead of the fixture:\n%s", out)
 	}
-	if strings.Contains(out, "compiled-in defaults") {
+	if strings.Contains(out, "Compiled-in defaults") {
 		t.Error("a fixture policy must not show the fallback note")
 	}
 }
@@ -508,7 +508,10 @@ func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: fixtureRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueueBody, "/outbound/queue/fragment")
-	if strings.Contains(out, "How delivery retries work") || strings.Contains(out, "10 minutes") {
+	if !strings.HasPrefix(out, `<div class="box" id="out-queue" data-poll`) || strings.Contains(out, "<html") {
+		t.Errorf("the fragment is not the polled box alone:\n%.200s", out)
+	}
+	if strings.Contains(out, "How retries work") || strings.Contains(out, "10 minutes") {
 		t.Errorf("HTMX fragment includes the retry card:\n%s", out)
 	}
 }
@@ -517,7 +520,7 @@ func TestMailQueueNotesCompiledInFallback(t *testing.T) {
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: postfix.DefaultRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueue, "/outbound/queue")
-	if !strings.Contains(out, "compiled-in defaults") {
+	if !strings.Contains(out, "Compiled-in defaults") {
 		t.Errorf("fallback note missing:\n%s", out)
 	}
 }

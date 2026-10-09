@@ -1,0 +1,6 @@
+{{/* The polled part of the Outbound queue, in the page and in its fragment (GET
+     /outbound/queue/fragment) alike: the box itself polls (.Queue.Poll), so the
+     response replaces it whole. With nothing to list it says why instead. */}}
+{{define "out_queue_body"}}{{template "box_open" .Queue}}
+{{if .Lines}}{{template "log_pane" .Lines}}{{else}}{{template "empty_state" .Empty}}{{end}}
+{{template "box_close"}}{{end}}

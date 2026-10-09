@@ -184,9 +184,6 @@ func TestAccountPageIsDrawnInTheShell(t *testing.T) {
 			t.Errorf("account page missing %q", want)
 		}
 	}
-	if strings.Contains(out, "/static/legacy.css") {
-		t.Error("account page loads the old stylesheet")
-	}
 }
 
 // A refused form is shown again with the error above the boxes and what the

@@ -310,11 +310,11 @@ func NewUserForm(m Meta, in UserFormInput) *UserForm {
 		Role:       in.Role,
 		RoleLocked: in.RoleLocked,
 
-		Outbound:    Box{No: "02", Title: "Outbound domains", End: Plain("DNS records, applications, log")},
+		Outbound:    Box{No: "02", Title: "Outbound domains", End: Plain("DNS records, applications, log"), DomainPick: true},
 		AllOut:      in.AllOut,
 		OutDomains:  in.OutDomains,
 		ShowInbound: in.ShowInbound,
-		Inbound:     Box{No: "03", Title: "Inbound domains", End: Plain("Upstream, recipients, log")},
+		Inbound:     Box{No: "03", Title: "Inbound domains", End: Plain("Upstream, recipients, log"), DomainPick: true},
 		AllIn:       in.AllIn,
 		InDomains:   in.InDomains,
 	}

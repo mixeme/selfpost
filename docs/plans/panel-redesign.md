@@ -519,8 +519,8 @@ only when both are done. Every stage-2 step ends with the evidence of
 - [x] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
 - [x] Inbound: domains, domain with the *Spam filter* box, delete — **Sonnet**
 - [x] Server: system log, backup, users, user form, delete; Help as `help_topic` partials, the drawer removed — **Sonnet**
-- [ ] Queues: old content inside the new shell (outbound), Inbound › Queue hidden — **Sonnet**
-- [ ] Remove the old `panel.css`, the drawer code in `panel.js` and every class nothing references; `legacyPages` empty, vocabulary test green with no allow-list — **Sonnet**
+- [x] Queues: old content inside the new shell (outbound), Inbound › Queue hidden — **Sonnet**
+- [x] Remove the old `panel.css`, the drawer code in `panel.js` and every class nothing references; `legacyPages` empty, vocabulary test green with no allow-list — **Sonnet**
 
 **Stage 3 — reviews, docs, 2.0.0**
 

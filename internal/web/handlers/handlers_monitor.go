@@ -14,7 +14,6 @@ import (
 	"github.com/mixeme/selfpost/internal/mailhdr"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
-	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
 
@@ -333,26 +332,15 @@ func parsePage(v string) int {
 	return n
 }
 
-// HandleMailQueue renders the Mail queue page (architecture.md § Panel HTTP
+// HandleMailQueue renders the Outbound queue page (architecture.md § Panel HTTP
 // surface).
 func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	out, errText := readQueue()
 	policy := h.cfg.RetryPolicy
-	h.view.Render(w, http.StatusOK, "mail_queue", map[string]any{
-		"Title":             "SelfPost — mail queue",
-		"User":              auth.CurrentUser(r),
-		"Active":            "mail_queue",
-		"IsGlobal":          true,
-		"Output":            out,
-		"Error":             errText,
-		"FirstRetry":        policy.FirstRetry(),
-		"BackoffCap":        policy.BackoffCap(),
-		"QueueLifetime":     policy.QueueLifetime(),
-		"RetryFromDefaults": policy.FromDefaults,
-	})
+	h.view.Render(w, http.StatusOK, "out-queue", h.outQueuePage(r).
+		WithRetryPolicy(policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime(), policy.FromDefaults))
 }
 
 // HandleMailQueueBody serves the HTMX polling fragment for the queue view.
@@ -360,11 +348,14 @@ func (h *Handlers) HandleMailQueueBody(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
+	h.view.RenderFragment(w, http.StatusOK, "out_queue_body", h.outQueuePage(r))
+}
+
+// outQueuePage reads the queue and gives it to the view; the page and its
+// fragment draw the same box from it.
+func (h *Handlers) outQueuePage(r *http.Request) *view.OutQueue {
 	out, errText := readQueue()
-	h.view.RenderFragment(w, http.StatusOK, "mail_queue_body", map[string]any{
-		"Output": out,
-		"Error":  errText,
-	})
+	return view.NewOutQueue(h.shellMeta(r), out, errText)
 }
 
 // readQueue runs postqueue -p, returning a friendly message instead of the

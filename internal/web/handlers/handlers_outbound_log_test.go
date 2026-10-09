@@ -11,9 +11,8 @@ import (
 
 // The Outbound log and the page of one message, rendered from the real journal
 // by the handlers. Their markup is held to the mockups by the guards in
-// internal/web/view; what is checked here is the behaviour the pages keep from
-// the legacy ones — the polled region, the paging, the scoping — on the new
-// markup.
+// internal/web/view; what is checked here is the behaviour of the pages — the
+// polled region, the paging, the scoping.
 
 // regionOf cuts the polled region (the table and the foot under it) out of a
 // body: from the table's container to the end of the foot.

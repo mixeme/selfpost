@@ -233,7 +233,9 @@ type Flash struct {
 // Poll, when set, makes the box the element that polls: it is the address of the
 // fragment that answers with the box again (panel.js schedules the next request
 // by the box's ID, which Poll therefore requires). Used by Overview's Server
-// health box. It adds attributes only, no markup.
+// health box. DomainPick marks a box as one of the lists of domains on the user
+// form: panel.js hides it while the form's role is Global, which reaches every
+// domain. Poll and DomainPick add attributes only, no markup.
 type Box struct {
 	No      string
 	Icon    string
@@ -244,6 +246,8 @@ type Box struct {
 	Help    *HelpLink
 	Variant string
 	Poll    string
+	// DomainPick: see Box.
+	DomainPick bool
 }
 
 // HelpLink is a Box's link to its Help topic.
@@ -432,9 +436,7 @@ type HelpTopic struct {
 }
 
 // Meta is what a page says about itself to the shell. A page's data embeds it
-// (Engine.Render reads it through ShellMeta); a handler that still passes a map
-// gives the same names as keys: Title, User, IsGlobal, HasOutbound, HasInbound,
-// Section and Page.
+// (Engine.Render reads it through ShellMeta).
 //
 // Section is the group the page belongs to — overview, outbound, inbound,
 // server, or user for Account and Help — and Page the entry within it
@@ -458,20 +460,11 @@ func (m Meta) ShellMeta() Meta { return m }
 // shellMeta is implemented by Meta, and so by every page that embeds it.
 type shellMeta interface{ ShellMeta() Meta }
 
-// metaOf reads a page's Meta from its data: a struct that embeds Meta, or the
-// map a handler builds.
+// metaOf reads a page's Meta from its data, a struct that embeds it; anything
+// else has none, and is shown as the signed-out screen.
 func metaOf(data any) Meta {
-	switch d := data.(type) {
-	case shellMeta:
+	if d, ok := data.(shellMeta); ok {
 		return d.ShellMeta()
-	case map[string]any:
-		str := func(k string) string { s, _ := d[k].(string); return s }
-		flag := func(k string) bool { b, _ := d[k].(bool); return b }
-		return Meta{
-			Title: str("Title"), User: str("User"), IsGlobal: flag("IsGlobal"),
-			HasOutbound: flag("HasOutbound"), HasInbound: flag("HasInbound"),
-			Section: str("Section"), Page: str("Page"),
-		}
 	}
 	return Meta{}
 }

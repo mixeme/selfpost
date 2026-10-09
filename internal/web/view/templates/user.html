@@ -1,8 +1,10 @@
 {{/* The user form (mockup user.html): one form that creates a panel user and
      edits one. The account is the left column; on the right the domains the user
-     reaches, outbound and inbound as two lists, each with its All. The lists stay
-     in view whatever the role — the server ignores them for the global role. A
-     blank password keeps the current one. */}}
+     reaches, outbound and inbound as two lists, each with its All. panel.js hides
+     the lists while the role is Global (data-global-role on the select,
+     data-domain-pick on the boxes); without scripts they stay in view and the
+     server ignores them for the global role. A blank password keeps the current
+     one. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 {{if .Flash}}{{template "flash" .Flash}}{{end}}
@@ -19,7 +21,7 @@
   <p class="help">{{if .NewUser}}At least {{.PasswordMin}} characters.{{else}}Leave empty to keep the current one.{{end}}</p></div>
 <div class="field"><label class="label" for="role">Role</label>
   {{if .RoleLocked}}<input type="hidden" name="role" value="{{.Role}}">{{end}}
-  <div class="control"><div class="select is-fullwidth"><select id="role" name="role"{{if .RoleLocked}} disabled{{end}}>{{$sel := .Role}}{{range .Roles}}
+  <div class="control"><div class="select is-fullwidth"><select id="role" name="role" data-global-role="global"{{if .RoleLocked}} disabled{{end}}>{{$sel := .Role}}{{range .Roles}}
     <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
   </select></div></div>
   <p class="help">Everyone here is an administrator; the role is the reach. <em>Global</em> also sees Server and is the only one who adds or deletes domains. The only global user cannot be changed to <em>domain</em> or deleted.</p></div>

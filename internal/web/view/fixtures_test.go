@@ -6,8 +6,8 @@ import (
 )
 
 // pageFixtures is the data each redesigned page is rendered with by the guard
-// tests (guard_panel_test.go): one entry per page that has left
-// legacy_pages.txt, keyed by the page's engine name. The guards render the page
+// tests (guard_panel_test.go): one entry per page of the engine, keyed by the
+// page's engine name. The guards render the page
 // through Engine.Render with this value and hold the result to the design
 // contract — its class vocabulary, its page structure and the component
 // skeleton recorded for the mockup of the same name in
@@ -41,6 +41,7 @@ var pageFixtures = map[string]func() any{
 
 	"out-log":      func() any { return outLogFixture() },
 	"out-message":  func() any { return outMessageFixture() },
+	"out-queue":    func() any { return outQueueFixture() },
 	"dmarc":        func() any { return dmarcHubFixture() },
 	"dmarc-domain": func() any { return dmarcDomainFixture() },
 	"dmarc-report": func() any { return dmarcReportFixture() },
@@ -348,6 +349,18 @@ func inDomainFixture() *InDomain {
 	p.WithMX("mail.example.org", DNSCheck{Status: "ok", Found: []string{"10 mail.example.org."}})
 	p.WithFilter(true, "inet:antispam:11332", "accept")
 	return p
+}
+
+// outQueueFixture is the queue as Postfix prints it for the mockup's one waiting
+// message, greylisted by the receiving server, and the retry policy it shows.
+func outQueueFixture() *OutQueue {
+	listing := "-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------\n" +
+		"4XcB7k2Jm9z1     3174 Sun Sep 21 13:58:07  alerts@example.org\n" +
+		"(host mx1.example.org[192.0.2.10] said: 451 4.7.1 Greylisted, try again in 5 minutes (in reply to RCPT TO command))\n" +
+		"                                         noc@example.org\n" +
+		"\n" +
+		"-- 3 Kbytes in 1 Request.\n"
+	return NewOutQueue(admin(), listing, "").WithRetryPolicy("5 minutes", "about 1 hour 7 minutes", "5 days", false)
 }
 
 // systemLogFixture is the mockup's System log: ten lines of mail.log, as the

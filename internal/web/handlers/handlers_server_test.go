@@ -223,7 +223,7 @@ func TestUserFormOfTheOnlyGlobalUserSavesUntouched(t *testing.T) {
 	pv := map[string]string{"uid": idStr(root.ID)}
 
 	get := send(h.HandleUserEdit, &root, "GET", path, pv, nil).Body.String()
-	for _, want := range []string{`<input type="hidden" name="role" value="global">`, `<select id="role" name="role" disabled>`} {
+	for _, want := range []string{`<input type="hidden" name="role" value="global">`, `<select id="role" name="role" data-global-role="global" disabled>`} {
 		if !strings.Contains(get, want) {
 			t.Errorf("the form of the only global user is missing %q", want)
 		}

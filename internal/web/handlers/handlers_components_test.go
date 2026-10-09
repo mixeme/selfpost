@@ -50,7 +50,4 @@ func TestComponentsPageRendersTheKitForTheGlobalRole(t *testing.T) {
 			t.Errorf("the kit page is missing %q", want)
 		}
 	}
-	if strings.Contains(out, "/static/legacy.css") {
-		t.Error("the kit page loads the old stylesheet")
-	}
 }

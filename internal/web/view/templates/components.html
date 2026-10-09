@@ -72,7 +72,7 @@
      sp-credential (a secret shown once). A box foot, a table in its
      table-container, a run of records, a log or an empty state sit directly
      inside; anything else goes in body_open … body_close. */}}
-{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}>
+{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}{{if .DomainPick}} data-domain-pick{{end}}>
 {{template "box_head" .}}
 {{end}}
 {{define "box_close"}}</div>{{end}}

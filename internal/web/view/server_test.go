@@ -156,7 +156,7 @@ func TestUserFormShowsWhatIsStoredUnderTheHandlersFieldNames(t *testing.T) {
 		`<input class="input" id="email" name="email" type="email" value="ops@acme.io" autocomplete="off">`,
 		`name="password" type="password" autocomplete="new-password">`,
 		`Leave empty to keep the current one.`,
-		`<select id="role" name="role">`, `<option value="domain" selected>`, `<option value="global">`,
+		`<select id="role" name="role" data-global-role="global">`, `<option value="domain" selected>`, `<option value="global">`,
 		`name="all_domains" value="1" checked`, `name="domain_ids" value="1">`, `name="domain_ids" value="3">`,
 		`name="all_inbound_domains" value="1">`, `name="inbound_domain_ids" value="1">`, `name="inbound_domain_ids" value="2" checked`,
 		`>Save user</button>`, `href="/server/users">Cancel</a>`,
@@ -185,9 +185,23 @@ func TestUserFormOfTheOnlyGlobalUser(t *testing.T) {
 	p := NewUserForm(admin(), UserFormInput{ID: 1, Name: "admin", Username: "admin", Role: "global", RoleLocked: true,
 		PasswordMin: 12, ShowInbound: true})
 	out := renderSignedIn(t, "user", p)
-	pageHas(t, "User", out, `<input type="hidden" name="role" value="global">`, `<select id="role" name="role" disabled>`,
+	pageHas(t, "User", out, `<input type="hidden" name="role" value="global">`, `<select id="role" name="role" data-global-role="global" disabled>`,
 		`<option value="global" selected>`)
 	pageLacks(t, "User", out, `/delete`, `Delete user`)
+}
+
+// The role select names the value that reaches every domain, and each list of
+// domains is marked, so panel.js can hide the lists while the role is Global.
+func TestUserFormMarksTheListsTheGlobalRoleHides(t *testing.T) {
+	out := renderSignedIn(t, "user", userFixture())
+	pageHas(t, "User", out, `<select id="role" name="role" data-global-role="global">`)
+	if n := strings.Count(out, `<div class="box" data-domain-pick>`); n != 2 {
+		t.Errorf("%d boxes are marked data-domain-pick, want the outbound and the inbound list", n)
+	}
+	out = renderSignedIn(t, "user", NewUserForm(admin(), UserFormInput{ID: 2, Name: "shop-team", Username: "shop-team", Role: "domain", PasswordMin: 12}))
+	if n := strings.Count(out, "data-domain-pick"); n != 1 {
+		t.Errorf("%d boxes are marked without the inbound feature, want the outbound list alone", n)
+	}
 }
 
 // Inbound domains are offered only where the feature is on; the handler keeps
