@@ -154,6 +154,27 @@ func NewOutApp(m Meta, domainID int64, domain, login string) *OutApp {
 	return p
 }
 
+// newPasswordQuestion and deleteAppQuestion are what panel.js asks before an
+// application's password is replaced or the application is removed — the same
+// words in the application's head and in its row of the domain's table.
+func newPasswordQuestion(login string) string {
+	return "Generate a new password for " + login + "? The current password stops working immediately."
+}
+
+func deleteAppQuestion(login string) string {
+	return "Delete application " + login + "? Its credentials stop working immediately."
+}
+
+// AppRowActions are New password and Delete in an application's row of the
+// domain's table: the POSTs of the application's own page, with its questions.
+func AppRowActions(domainID, id int64, login string) []RowAction {
+	own := DomainHref(domainID) + "/applications/" + strconv.FormatInt(id, 10)
+	return []RowAction{
+		{Label: "New password", Post: own + "/password", Confirm: newPasswordQuestion(login)},
+		{Label: "Delete", Post: own + "/delete", Danger: true, Confirm: deleteAppQuestion(login)},
+	}
+}
+
 // WithApplication points an edit form at its application: the POST address, the
 // head's buttons (a new password and delete, each asking first) and the mail of
 // the statistics window under the title.
@@ -162,10 +183,8 @@ func (p *OutApp) WithApplication(domainID, id int64, total, peak int64, avg stri
 	p.Action = own
 	p.Head.Lead = StatsLead(total, peak, avg, days)
 	p.Head.Actions = []Action{
-		{Label: "New password", Icon: "ti-key", Post: own + "/password",
-			Confirm: "Generate a new password for " + p.Head.Title + "? The current password stops working immediately."},
-		{Label: "Delete", Icon: "ti-trash", Post: own + "/delete", Danger: true,
-			Confirm: "Delete application " + p.Head.Title + "? Its credentials stop working immediately."},
+		{Label: "New password", Icon: "ti-key", Post: own + "/password", Confirm: newPasswordQuestion(p.Head.Title)},
+		{Label: "Delete", Icon: "ti-trash", Post: own + "/delete", Danger: true, Confirm: deleteAppQuestion(p.Head.Title)},
 	}
 	p.recalc = own + "/ratelimit/recalc"
 	return p

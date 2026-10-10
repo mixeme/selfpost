@@ -73,7 +73,7 @@
     <div class="table-container"><table class="table is-fullwidth is-hoverable">
       <thead><tr><th>Time, UTC</th><th>Name</th><th>sp-clip</th><th>Status</th><th></th></tr></thead>
       <tbody>
-        <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td><a href="#"><strong>the row's link</strong></a></td><td class="sp-clip">A long subject is clipped with an ellipsis instead of wrapping the row</td><td><span class="{{status_tag "sent"}}">sent</span></td><td class="sp-actions"><a href="#">Details</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+        <tr><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 14:01:52</td><td><a href="#"><strong>the row's link</strong></a></td><td class="sp-clip">A long subject is clipped with an ellipsis instead of wrapping the row</td><td><span class="{{status_tag "sent"}}">sent</span></td><td class="sp-actions"><a href="#">Details</a>{{template "row_action" .RowAction}}</td></tr>
       </tbody>
     </table></div>
     {{template "box_foot" .TablesFoot}}

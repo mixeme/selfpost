@@ -310,7 +310,6 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save user. Please check the logs.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}
-	h.resyncAfterEmailChange(u, email)
 	if password != "" {
 		h.endSessionsAfterPasswordSet(r, p, u)
 	}
@@ -382,18 +381,6 @@ func (h *Handlers) HandleUserDeleteConfirm(w http.ResponseWriter, r *http.Reques
 			logf("panel: delete user %d: assigned domains: %v", u.ID, err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
-		}
-	}
-	// Domains that follow this user's default report address are left with none.
-	domains, err := h.store.ListDomains()
-	if err != nil {
-		logf("panel: delete user %d: list domains: %v", u.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	for _, d := range domains {
-		if d.DMARCRuaUserID.Valid && d.DMARCRuaUserID.Int64 == u.ID {
-			in.Following = append(in.Following, d.Name)
 		}
 	}
 	h.view.Render(w, http.StatusOK, "user-delete", view.NewUserDelete(h.shellMeta(r), in))

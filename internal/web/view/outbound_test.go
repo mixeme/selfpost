@@ -99,7 +99,7 @@ func TestOutDomainRecordsSayWhatDNSHolds(t *testing.T) {
 		`sp2026._domainkey.example.org`, `<textarea class="textarea" rows="3" readonly>`,
 		`<h3>SPF</h3>`, `<span class="tag is-danger is-light">mismatch</span>`, `v=spf1 ip4:203.0.113.25 ~all`,
 		`In DNS now`, `v=spf1 include:_spf.google.com ~all`, `Shallow check: <code>include:</code> is not followed.`,
-		`<h3>DMARC</h3>`, `Report address: <a href="/outbound/domains/1/settings#reports">admin&#39;s default</a>`,
+		`<h3>DMARC</h3>`, `Report address: <a href="/outbound/domains/1/settings#reports">example.org@dmarc.mail.example.org</a>`,
 		`<code>p=none</code> does not affect delivery.`, `<a href="/outbound/dmarc/domains/1">reports</a>`,
 	)
 	if got := strings.Count(out, `In DNS now`); got != 1 {
@@ -115,7 +115,7 @@ func TestOutDomainRecordsSayWhatDNSHolds(t *testing.T) {
 		DKIMRecord("sp2026", "sp2026._domainkey.example.org", "v=DKIM1; p=KEY", DNSCheck{Status: "error", Detail: "No DKIM record was found."}),
 		SPFRecord("example.org", "v=spf1 -all", DNSCheck{Status: "warn", Detail: "The record ends in ~all.", Found: []string{"v=spf1 ~all"}}),
 		DMARCRecord(DMARCRecordInput{Host: "_dmarc.example.org", Value: "v=DMARC1; p=none", Check: DNSCheck{Status: "unknown", Detail: "DNS could not be reached."},
-			Source: "none", SettingsHref: "/outbound/domains/1/settings", SameDomain: true}),
+			Source: "no reports", SettingsHref: "/outbound/domains/1/settings", SameDomain: true}),
 		ReportAuthRecord("_report._dmarc.hub.example", "v=DMARC1;", DNSCheck{Status: "error", Detail: "Not authorized."}),
 	}
 	out = renderSignedIn(t, "out-domain", outDomainFixture().WithRecords(records, "just now"))
@@ -133,14 +133,22 @@ func TestOutDomainApplicationsTable(t *testing.T) {
 	out := renderSignedIn(t, "out-domain", outDomainFixture())
 	pageHas(t, "Domain", out,
 		`<th>Login</th><th>May send as</th><th>30 days</th><th>Limits</th>`,
-		`<td class="sp-mono"><strong>prod-server</strong></td>`, `*@<wbr>example.org`,
+		`<td class="sp-mono sp-nowrap"><strong>prod-server</strong></td>`, `*@<wbr>example.org`,
 		`alerts@<wbr>example.org, noc@<wbr>example.org`, "1 102 msg · peak 96/h",
 		`<span class="tag is-success is-light">200 / h</span>`, `<span class="tag is-light">domain</span> <span class="tag is-success is-light">2 IPs</span>`,
 		`<a href="/outbound/domains/1/applications/2">Edit</a>`,
 	)
-	// A state change is never a link, and a table row has no control for one:
-	// a new password and deleting an application are on the application's page.
-	pageLacks(t, "Domain", out, `/password`, `/applications/1/delete`)
+	// A state change is never a link: New password and Delete are POST forms in
+	// the row, each with the question panel.js asks first, drawn like the Edit
+	// link beside them. Edit leads on to the application's page.
+	pageHas(t, "Domain", out,
+		`<td class="sp-actions"><a href="/outbound/domains/1/applications/1">Edit</a>`+
+			`<form method="post" action="/outbound/domains/1/applications/1/password" data-confirm="Generate a new password for prod-server? The current password stops working immediately."><button type="submit">New password</button></form>`+
+			`<form method="post" action="/outbound/domains/1/applications/1/delete" data-confirm="Delete application prod-server? Its credentials stop working immediately."><button type="submit" class="has-text-danger">Delete</button></form></td>`,
+		`action="/outbound/domains/1/applications/2/password" data-confirm="Generate a new password for alerts?`,
+		`action="/outbound/domains/1/applications/2/delete" data-confirm="Delete application alerts?`,
+		`New password and Delete ask for confirmation; the old password stops working at once.`,
+	)
 
 	p := outDomainFixture().WithApplications(nil)
 	out = renderSignedIn(t, "out-domain", p)
@@ -210,8 +218,11 @@ func TestOutDomainSettingsHasAFormPerBox(t *testing.T) {
 		`<a href="/outbound/domains">Outbound domains</a> /`, `<a href="/outbound/domains/1">example.org</a> /`,
 		`id="reports"`, `id="limit"`, `id="export"`,
 		`action="/outbound/domains/1/settings/reports"`, `name="dmarc_rua_mode"`, `data-custom-mode="custom"`, `data-custom-address`,
-		`name="dmarc_rua_email"`, `<option value="inherit" selected>admin&#39;s default — mix@example.org</option>`,
-		`<option value="hosted">`, `<option value="none">`, `<option value="custom">`, `href="/account#dmarc"`,
+		`name="dmarc_rua_email"`, `value="reports@acme.io"`, `<option value="none">No reports</option>`,
+		`<option value="hosted">SelfPost hosted — example.org@dmarc.mail.example.org</option>`,
+		`<option value="custom" selected>A specific address</option>`,
+		`<button type="button" class="button" data-fill="rua_email" data-fill-value="mix@example.org"><i class="ti ti-mail"></i>Use my e-mail</button>`,
+		`SelfPost hosted sends them to an address on this server`, `Changing this changes the DMARC record to publish.`,
 		`action="/outbound/domains/1/settings/export"`, `name="encrypt" value="1" checked data-encrypt-toggle`, `data-encrypt-fields`,
 		`name="password"`, `name="password_confirm"`, `minlength="12"`, `at least 12 characters`,
 		`action="/outbound/domains/1/settings/ratelimit"`, `name="mode"`, `data-ratelimit-mode`, `data-manual-fields`, `data-auto-fields`,
@@ -260,11 +271,25 @@ func TestOutDomainSettingsStatesTheFixtureDoesNotDraw(t *testing.T) {
 	pageLacks(t, "Settings", out, `Delete domain`, `/delete`)
 
 	// A refusal comes back as the flash, with the custom address that was typed.
-	p = outDomainSettingsFixture().WithReportAddress([]Option{{Value: "custom", Label: "Custom address"}}, "custom", `x"><i>`, nil).
+	p = outDomainSettingsFixture().WithReportAddress([]Option{{Value: "custom", Label: "A specific address"}}, "custom", `x"><i>`, "").
 		WithResult("", "Enter a valid e-mail address.")
 	out = renderSignedIn(t, "out-domain-settings", p)
 	pageHas(t, "Settings", out, `<div class="notification is-danger is-light">`, `Enter a valid e-mail address.`, `<option value="custom" selected>`)
 	pageLacks(t, "Settings", out, `<i>`)
+	// Without a profile e-mail there is nothing to fill with: no button. Without
+	// hosted reports on the server the sentence about them is not there either.
+	pageLacks(t, "Settings", out, `data-fill`, `Use my e-mail`, `SelfPost hosted`)
+}
+
+// The fill button carries the viewer's profile e-mail escaped, and only when
+// there is one.
+func TestReportAddressFillButton(t *testing.T) {
+	opts := []Option{{Value: ReportNone, Label: "No reports"}, {Value: ReportCustom, Label: "A specific address"}}
+	out := renderSignedIn(t, "out-domain-settings", outDomainSettingsFixture().WithReportAddress(opts, ReportNone, "", `a"><i>@x.example`))
+	pageHas(t, "Settings", out, `data-fill="rua_email" data-fill-value="a&#34;&gt;&lt;i&gt;@x.example"`)
+	pageLacks(t, "Settings", out, `<i>@`)
+	out = renderSignedIn(t, "out-domain-settings", outDomainSettingsFixture().WithReportAddress(opts, ReportNone, "", ""))
+	pageLacks(t, "Settings", out, `data-fill`, `Use my e-mail`)
 }
 
 func TestDeleteBoxNamesTheApplicationsItTakes(t *testing.T) {

@@ -16,7 +16,7 @@
 {{template "body_open"}}
 <div class="field"><label class="label" for="username">Username</label><div class="control"><input class="input" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required></div></div>
 <div class="field"><label class="label" for="email">E-mail</label><div class="control"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="off"></div>
-  <p class="help">The user's own address. They can change it under Account, and can choose it there as the address that receives DMARC reports.</p></div>
+  <p class="help">The user's own address. They can change it under Account.</p></div>
 <div class="field"><label class="label" for="password">Password</label><div class="control"><input class="input" id="password" name="password" type="password" autocomplete="new-password"{{if .NewUser}} required{{end}}></div>
   <p class="help">{{if .NewUser}}At least {{.PasswordMin}} characters.{{else}}Leave empty to keep the current one.{{end}}</p></div>
 <div class="field"><label class="label" for="role">Role</label>

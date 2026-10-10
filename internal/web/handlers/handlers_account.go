@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
 	"github.com/mixeme/selfpost/internal/web/view"
@@ -15,22 +12,20 @@ import (
 )
 
 // Account is the signed-in user's own half of what used to be one Settings
-// page: who they are to the panel (username, e-mail), their password, and their
-// default DMARC report address. Every role has it. Each part is its own form
-// and its own POST, so changing one never asks for the others.
+// page: who they are to the panel (username, e-mail) and their password. Every
+// role has it. Each part is its own form and its own POST, so changing one
+// never asks for the others.
 //
-// The e-mail is the user's — what the panel writes to. The DMARC default is a
-// separate choice that may use it: a domain whose report address is "this
-// user's default" resolves to whatever is chosen here (store.DMARCDefault).
+// The e-mail is the user's — what the panel writes to. A domain's DMARC report
+// address is set in the domain's settings, where a button fills it with this
+// e-mail; nothing here refers to a domain.
 
 // accountForm is what the page shows back: the stored values, or the ones just
 // submitted when a form is re-rendered with an error.
 type accountForm struct {
-	Err          string
-	Username     string
-	Email        string
-	DMARCMode    string
-	DMARCAddress string
+	Err      string
+	Username string
+	Email    string
 }
 
 func (h *Handlers) accountUser(w http.ResponseWriter, r *http.Request) (store.User, bool) {
@@ -49,7 +44,7 @@ func (h *Handlers) accountUser(w http.ResponseWriter, r *http.Request) (store.Us
 }
 
 func formOf(u store.User) accountForm {
-	return accountForm{Username: u.Username, Email: u.Email, DMARCMode: u.DMARCDefaultMode, DMARCAddress: u.DMARCDefaultAddress}
+	return accountForm{Username: u.Username, Email: u.Email}
 }
 
 // HandleAccount shows the Account page.
@@ -62,46 +57,10 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, u store.User, f accountForm) {
-	hosted := h.dmarc != nil && h.cfg.DMARCEnabled
-	page := view.NewAccount(h.shellMeta(r), string(u.Role), hosted, u.Email)
+	page := view.NewAccount(h.shellMeta(r), string(u.Role))
 	page.Username, page.Email = f.Username, f.Email
-	page.DMARCSelected, page.DMARCAddress = f.DMARCMode, f.DMARCAddress
 	page.WithResult(accountFlash(r), f.Err)
-	page.WithDomainUse(h.domainsFollowing(r, u))
-
-	// The stored default, not the one being typed: the authorization record
-	// belongs to the address domains are actually told to publish.
-	def := u.DMARCDefault()
-	if addr := def.Resolve(""); addr != "" && def.Mode != store.DMARCDefaultHosted {
-		if hub := dnscheck.EmailDomain(addr); hub != "" {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			ra := h.dns.ReportAuth(ctx, hub)
-			cancel()
-			page.WithAuthorization(dnscheck.ReportAuthRecordName(hub), dnscheck.ReportAuthExample(),
-				string(ra.Status), ra.Detail, ra.Records)
-		}
-	}
 	h.view.Render(w, status, "account", page)
-}
-
-// domainsFollowing counts the outbound domains the user reaches and how many of
-// them take their report address from this user's default.
-func (h *Handlers) domainsFollowing(r *http.Request, u store.User) (following, total int) {
-	p, ok := h.principal(r)
-	if !ok {
-		return 0, 0
-	}
-	domains, err := h.assignedDomains(p)
-	if err != nil {
-		logf("panel: account: list domains: %v", err)
-		return 0, 0
-	}
-	for _, d := range domains {
-		if d.DMARCRuaUserID.Valid && d.DMARCRuaUserID.Int64 == u.ID {
-			following++
-		}
-	}
-	return following, len(domains)
 }
 
 func accountFlash(r *http.Request) string {
@@ -110,8 +69,6 @@ func accountFlash(r *http.Request) string {
 		return "Profile saved."
 	case "password":
 		return "Password changed. Any other signed-in sessions were signed out."
-	case "dmarc":
-		return "Default report address saved."
 	}
 	return ""
 }
@@ -155,9 +112,6 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
 		return
 	}
-	// The e-mail is the report address of every domain that follows this
-	// user's "my account e-mail" default.
-	h.resyncAfterEmailChange(u, f.Email)
 	logf("panel: user %d profile updated (username: %t, e-mail: %t)", u.ID, f.Username != u.Username, f.Email != u.Email)
 	http.Redirect(w, r, "/account?done=profile", http.StatusSeeOther)
 }
@@ -214,79 +168,4 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 	}
 	logf("panel: user %d changed their password", u.ID)
 	http.Redirect(w, r, "/account?done=password", http.StatusSeeOther)
-}
-
-// HandleAccountDMARC saves the user's default report address: SelfPost hosted,
-// the account e-mail, another address, or none.
-func (h *Handlers) HandleAccountDMARC(w http.ResponseWriter, r *http.Request) {
-	u, ok := h.accountUser(w, r)
-	if !ok {
-		return
-	}
-	f := formOf(u)
-	fail := func(status int, msg string) {
-		f.Err = msg
-		h.renderAccount(w, r, status, u, f)
-	}
-	if err := r.ParseForm(); err != nil {
-		fail(http.StatusBadRequest, "Invalid form submission.")
-		return
-	}
-	f.DMARCMode = strings.TrimSpace(r.PostFormValue("dmarc_default"))
-	f.DMARCAddress = strings.TrimSpace(r.PostFormValue("dmarc_default_address"))
-	switch f.DMARCMode {
-	case store.DMARCDefaultNone:
-	case store.DMARCDefaultHosted:
-		if h.dmarc == nil || !h.dmarc.Enabled() {
-			fail(http.StatusBadRequest, "SelfPost-hosted reports are not enabled on this server.")
-			return
-		}
-	case store.DMARCDefaultAccount:
-		if u.Email == "" {
-			fail(http.StatusBadRequest, "Your account has no e-mail yet. Save one under Profile first, or choose another address.")
-			return
-		}
-	case store.DMARCDefaultCustom:
-		if f.DMARCAddress == "" {
-			fail(http.StatusBadRequest, "Enter the report address or choose another option.")
-			return
-		}
-		if err := validate.Email(f.DMARCAddress); err != nil {
-			fail(http.StatusBadRequest, err.Error())
-			return
-		}
-	default:
-		fail(http.StatusBadRequest, "Choose where your DMARC reports go.")
-		return
-	}
-	if err := h.store.SetDMARCDefault(u.ID, f.DMARCMode, f.DMARCAddress); err != nil {
-		logf("panel: account: set dmarc default of user %d: %v", u.ID, err)
-		fail(http.StatusInternalServerError, "Could not save the report address. Please check the logs and try again.")
-		return
-	}
-	h.resyncDMARC("default report address")
-	logf("panel: user %d set their default report address to %q", u.ID, f.DMARCMode)
-	http.Redirect(w, r, "/account?done=dmarc", http.StatusSeeOther)
-}
-
-// resyncAfterEmailChange is what changing a user's account e-mail does for
-// DMARC: the address is the report address of every domain that follows a user
-// whose default is "my account e-mail", so the ingest allow-list is rebuilt. It
-// is the one path both the Account page and the user form take.
-func (h *Handlers) resyncAfterEmailChange(u store.User, newEmail string) {
-	if newEmail != u.Email && u.DMARCDefaultMode == store.DMARCDefaultAccount {
-		h.resyncDMARC("account e-mail")
-	}
-}
-
-// resyncDMARC rebuilds the ingest allow-list after something that changes
-// where a domain's reports go. A failure is logged, not shown: the setting is
-// saved, and the next resync picks it up.
-func (h *Handlers) resyncDMARC(why string) {
-	if h.dmarc == nil || !h.dmarc.Enabled() {
-		return
-	}
-	if err := h.dmarc.Resync(); err != nil {
-		logf("panel: dmarc resync after %s change: %v", why, err)
-	}
 }

@@ -23,7 +23,7 @@ type DomainExport struct {
 	Domain         string           `json:"domain"`
 	DKIMSelector   string           `json:"dkim_selector"`
 	DKIMPrivateKey string           `json:"dkim_private_key"`    // PKCS#1 PEM
-	DMARCRua       *string          `json:"dmarc_rua,omitempty"` // nil = follows a user's default; set = the domain's own address ("" = none)
+	DMARCRua       string           `json:"dmarc_rua,omitempty"` // the domain's report address; absent = no reports
 	RateLimit      *RateLimitExport `json:"rate_limit,omitempty"`
 	Applications   []AppExport      `json:"applications"`
 }
@@ -71,13 +71,8 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 		Domain:         d.Name,
 		DKIMSelector:   d.DKIMSelector,
 		DKIMPrivateKey: string(pem),
+		DMARCRua:       d.DMARCRua,
 		Applications:   make([]AppExport, 0, len(apps)),
-	}
-	// A domain that follows a user's default exports no address: users do not
-	// travel with a domain, and whoever imports it becomes the one it follows.
-	if !d.DMARCRuaUserID.Valid {
-		rua := d.DMARCRua
-		exp.DMARCRua = &rua
 	}
 	rl, ok, err := s.store.GetRateLimit(store.RateLimitScopeDomain, id)
 	if err != nil {
@@ -147,12 +142,12 @@ func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 		return store.Domain{}, err
 	}
 
-	if exp.DMARCRua != nil {
-		if err := s.store.SetDomainDMARCAddress(d.ID, *exp.DMARCRua); err != nil {
+	if exp.DMARCRua != "" {
+		if err := s.store.SetDomainDMARCAddress(d.ID, exp.DMARCRua); err != nil {
 			s.importRollback(d.ID)
 			return store.Domain{}, err
 		}
-		d.DMARCRua = *exp.DMARCRua
+		d.DMARCRua = exp.DMARCRua
 	}
 	if exp.RateLimit != nil {
 		if err := s.importRateLimit(store.RateLimitScopeDomain, d.ID, *exp.RateLimit); err != nil {

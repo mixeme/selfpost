@@ -36,6 +36,11 @@
      never a link. */}}
 {{define "action"}}{{if .Post}}<form method="post" action="{{.Post}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}}><button type="submit" class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</button></form>{{else}}<a class="button{{if .Primary}} is-primary{{end}}{{if .Danger}} is-danger is-light{{end}}" href="{{.Href}}">{{if .Icon}}<i class="ti {{.Icon}}"></i>{{end}}{{.Label}}</a>{{end}}{{end}}
 
+{{/* row_action: a POST in the last cell of a table row (td.sp-actions), a form
+     with one button that is drawn like the links beside it. It sits against the
+     previous link with no whitespace between, as the cell's spacing is margins. */}}
+{{define "row_action"}}<form method="post" action="{{.Post}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}}><button type="submit"{{if .Danger}} class="has-text-danger"{{end}}>{{.Label}}</button></form>{{end}}
+
 {{/* ---- page head and postmark */}}
 
 {{/* page_head opens every page (input: Head): the path or section as the

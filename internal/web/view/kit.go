@@ -31,6 +31,7 @@ type Kit struct {
 	Records       []Record
 	Tables        Box
 	TablesFoot    Foot
+	RowAction     RowAction
 	LogPane       Box
 	LogLines      []LogLine
 	Facts         Box
@@ -123,6 +124,7 @@ func KitPage() *Kit {
 
 		Tables:     Box{No: "07", Title: "Table conventions", End: Rich("Always inside ", Code("table-container"), " · an address breaks after its @")},
 		TablesFoot: Foot{Text: Plain("Page 1 of 9"), Link: &Anchor{Href: "#", Label: "Older →"}},
+		RowAction:  RowAction{Label: "Delete", Post: "#", Danger: true},
 
 		LogPane: Box{No: "09", Title: "log_pane", End: Plain("sp-d time · sp-w warning · sp-e error")},
 		LogLines: []LogLine{

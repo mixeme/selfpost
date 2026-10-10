@@ -12,30 +12,34 @@ import (
 
 // Account is every user's own page: each part is its own form and its own
 // POST, and none of them touches what another saves.
-func TestAccountPageShowsThreeForms(t *testing.T) {
+func TestAccountPageShowsTwoForms(t *testing.T) {
 	h, _ := settingsServer(t)
 	out := getBody(t, h.HandleAccount, "/account")
 	for _, want := range []string{
 		`action="/account/profile"`, `name="email"`,
 		`action="/account/password"`, `name="current_password"`,
-		`action="/account/dmarc"`, `name="dmarc_default"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("account page missing %q", want)
 		}
 	}
-	for _, gone := range []string{`name="send_log_retention_days"`, `value="hosted"`} {
+	// A domain's report address is not an Account setting any more.
+	for _, gone := range []string{`name="send_log_retention_days"`, `/account/dmarc`, `name="dmarc_default"`, `<h2>DMARC reports</h2>`, `Report authorization`} {
 		if strings.Contains(out, gone) {
-			t.Errorf("account page shows %q (instance setting, or hosted reports with ingest off)", gone)
+			t.Errorf("account page shows %q", gone)
 		}
 	}
 }
 
 // The profile form saves the name and the e-mail without asking for the
-// password and without changing the password or the DMARC default.
+// password and without changing the password or any domain's report address.
 func TestAccountProfile(t *testing.T) {
 	h, _ := settingsServer(t)
 	before, _ := h.store.GetUser(globalPrincipal.ID)
+	d, _ := h.store.AddDomain("example.com", "mail")
+	if err := h.store.SetDomainDMARCAddress(d.ID, "reports@hub.example"); err != nil {
+		t.Fatal(err)
+	}
 
 	rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,
 		url.Values{"username": {"operator"}, "email": {"mix@example.org"}})
@@ -46,8 +50,11 @@ func TestAccountProfile(t *testing.T) {
 	if u.Username != "operator" || u.Email != "mix@example.org" {
 		t.Errorf("profile = %q / %q", u.Username, u.Email)
 	}
-	if u.PasswordHash != before.PasswordHash || u.DMARCDefaultMode != store.DMARCDefaultNone {
-		t.Errorf("saving the profile changed the password or the DMARC default (%q)", u.DMARCDefaultMode)
+	if u.PasswordHash != before.PasswordHash {
+		t.Error("saving the profile changed the password")
+	}
+	if got, _ := h.store.GetDomain(d.ID); got.DMARCRua != "reports@hub.example" {
+		t.Errorf("saving the profile moved a domain's report address to %q", got.DMARCRua)
 	}
 
 	for _, bad := range []url.Values{
@@ -97,62 +104,6 @@ func TestAccountPassword(t *testing.T) {
 	}
 }
 
-// The default report address is the user's choice between four modes; the
-// address field belongs to "another address" alone.
-func TestAccountDMARCDefault(t *testing.T) {
-	h, _ := settingsServer(t)
-	save := func(form url.Values) (int, store.User) {
-		rec := postFormAs(h.HandleAccountDMARC, globalPrincipal, "/account/dmarc", nil, form)
-		u, _ := h.store.GetUser(globalPrincipal.ID)
-		return rec.Code, u
-	}
-
-	// "My account e-mail" needs an e-mail.
-	if code, u := save(url.Values{"dmarc_default": {"account"}}); code != http.StatusBadRequest || u.DMARCDefaultMode != store.DMARCDefaultNone {
-		t.Errorf("account e-mail without an e-mail = %d, mode %q", code, u.DMARCDefaultMode)
-	}
-	// Hosted needs report ingest, which this server has off.
-	if code, u := save(url.Values{"dmarc_default": {"hosted"}}); code != http.StatusBadRequest || u.DMARCDefaultMode != store.DMARCDefaultNone {
-		t.Errorf("hosted with ingest off = %d, mode %q", code, u.DMARCDefaultMode)
-	}
-	for _, bad := range []url.Values{
-		{"dmarc_default": {"custom"}},
-		{"dmarc_default": {"custom"}, "dmarc_default_address": {"nope"}},
-		{"dmarc_default": {"profile"}},
-		{},
-	} {
-		if code, _ := save(bad); code != http.StatusBadRequest {
-			t.Errorf("%v = %d, want 400", bad, code)
-		}
-	}
-
-	code, u := save(url.Values{"dmarc_default": {"custom"}, "dmarc_default_address": {"dmarc@hub.example"}})
-	if code != http.StatusSeeOther || u.DMARCDefaultMode != store.DMARCDefaultCustom || u.DMARCDefaultAddress != "dmarc@hub.example" {
-		t.Errorf("another address = %d, %q %q", code, u.DMARCDefaultMode, u.DMARCDefaultAddress)
-	}
-	// A domain that follows this user now resolves to it.
-	d, _ := h.store.AddDomain("example.com", "mail")
-	h.followCreator(d.ID, globalPrincipal.ID)
-	d, _ = h.store.GetDomain(d.ID)
-	if rua, err := h.domainReportAddress(d); err != nil || rua != "dmarc@hub.example" {
-		t.Errorf("a following domain reports to %q, %v", rua, err)
-	}
-
-	if rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, url.Values{"username": {"admin"}, "email": {"mix@example.org"}}); rec.Code != http.StatusSeeOther {
-		t.Fatalf("save e-mail = %d", rec.Code)
-	}
-	code, u = save(url.Values{"dmarc_default": {"account"}, "dmarc_default_address": {"left-over@hub.example"}})
-	if code != http.StatusSeeOther || u.DMARCDefaultMode != store.DMARCDefaultAccount || u.DMARCDefaultAddress != "" {
-		t.Errorf("my account e-mail = %d, %q %q", code, u.DMARCDefaultMode, u.DMARCDefaultAddress)
-	}
-	if rua, _ := h.domainReportAddress(d); rua != "mix@example.org" {
-		t.Errorf("the following domain reports to %q, want the account e-mail", rua)
-	}
-	if code, u = save(url.Values{"dmarc_default": {"none"}}); code != http.StatusSeeOther || u.DMARCDefaultMode != store.DMARCDefaultNone {
-		t.Errorf("none = %d, %q", code, u.DMARCDefaultMode)
-	}
-}
-
 // A domain administrator has the same Account page; it is not a Server page.
 func TestAccountIsOpenToADomainAdministrator(t *testing.T) {
 	h, _ := settingsServer(t)
@@ -178,7 +129,7 @@ func TestAccountPageIsDrawnInTheShell(t *testing.T) {
 	out := getBody(t, h.HandleAccount, "/account")
 	for _, want := range []string{
 		`class="navbar is-primary"`, `Signed in as admin · global`, `<h1 class="title is-3">Account</h1>`,
-		`id="dmarc"`, `href="/static/panel.css"`,
+		`href="/static/panel.css"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("account page missing %q", want)
@@ -222,7 +173,6 @@ func TestAccountResultsAreTheFlash(t *testing.T) {
 	for done, want := range map[string]string{
 		"profile":  "Profile saved.",
 		"password": "Password changed.",
-		"dmarc":    "Default report address saved.",
 	} {
 		out := getBody(t, h.HandleAccount, "/account?done="+done)
 		if !strings.Contains(out, `notification is-success is-light`) || !strings.Contains(out, want) {
@@ -245,24 +195,5 @@ func TestAccountPageForADomainAdministrator(t *testing.T) {
 		if strings.Contains(out, gone) {
 			t.Errorf("a domain administrator's menu carries %s", gone)
 		}
-	}
-}
-
-// The default address needs an authorization record when it is on another
-// domain; with "no reports" nothing is asked of DNS and no record is drawn. The
-// count of following domains is the user's own.
-func TestAccountReportAuthorizationFollowsTheStoredDefault(t *testing.T) {
-	h, _ := settingsServer(t)
-	d, _ := h.store.AddDomain("example.com", "mail")
-	h.followCreator(d.ID, globalPrincipal.ID)
-	if _, err := h.store.AddDomain("other.example", "mail"); err != nil {
-		t.Fatal(err)
-	}
-	out := getBody(t, h.HandleAccount, "/account")
-	if strings.Contains(out, "Report authorization") {
-		t.Error("an authorization record for a default of no reports")
-	}
-	if !strings.Contains(out, "1 of 2 now") {
-		t.Errorf("the domains following the default are not counted:\n%s", out)
 	}
 }

@@ -26,11 +26,8 @@ func TestUpdateUser(t *testing.T) {
 	if got.Email != "reports@hub.example" {
 		t.Fatalf("email = %q", got.Email)
 	}
-	// The account e-mail is the user's own: saving it does not make it anyone's
-	// report address, and nothing is mirrored into the instance settings.
-	if got.DMARCDefaultMode != DMARCDefaultNone {
-		t.Fatalf("dmarc default mode = %q after setting the e-mail, want %q", got.DMARCDefaultMode, DMARCDefaultNone)
-	}
+	// The account e-mail is the user's own: nothing is mirrored into the
+	// instance settings.
 	if v, err := st.GetSetting("dmarc_report_email"); err == nil && v != "" {
 		t.Fatalf("the e-mail leaked into the instance settings: %q", v)
 	}

@@ -40,9 +40,9 @@ func TestBaselineSchema(t *testing.T) {
 	st := openTestStore(t)
 	want := map[string]string{
 		"settings":              "key value",
-		"users":                 "id username password_hash role email dmarc_default_mode dmarc_default_address all_domains all_inbound_domains created_at",
+		"users":                 "id username password_hash role email all_domains all_inbound_domains created_at",
 		"sessions":              "token_hash user_id created_at expires_at",
-		"domains":               "id name dkim_selector dmarc_rua dmarc_rua_user_id created_at",
+		"domains":               "id name dkim_selector dmarc_rua created_at",
 		"user_domains":          "user_id domain_id",
 		"applications":          "id domain_id login address_mode auth_ip_restrict auth_allowed_ips created_at",
 		"application_addresses": "id application_id address",
@@ -223,33 +223,30 @@ func TestOpenRefusesANewerSchema(t *testing.T) {
 // table does when either side goes away.
 func TestBaselineConstraints(t *testing.T) {
 	st := openTestStore(t)
-	insert := func(role, mode string, all int) error {
+	insert := func(name, role string, all int) error {
 		_, err := st.db.Exec(
-			"INSERT INTO users (username, password_hash, role, dmarc_default_mode, all_domains, created_at) VALUES (?, 'h', ?, ?, ?, 'now')",
-			role+mode, role, mode, all)
+			"INSERT INTO users (username, password_hash, role, all_domains, created_at) VALUES (?, 'h', ?, ?, 'now')",
+			name, role, all)
 		return err
 	}
-	if err := insert("global", "none", 0); err != nil {
+	if err := insert("plain", "global", 0); err != nil {
 		t.Fatalf("a plain global user: %v", err)
 	}
-	if err := insert("domain", "hosted", 1); err != nil {
+	if err := insert("everything", "domain", 1); err != nil {
 		t.Fatalf("a domain user with All: %v", err)
 	}
-	if err := insert("domain_admin", "none", 0); err == nil {
+	if err := insert("old-role", "domain_admin", 0); err == nil {
 		t.Error("the 1.x role name domain_admin was accepted")
 	}
-	if err := insert("global", "profile", 0); err == nil {
-		t.Error("an unknown dmarc_default_mode was accepted")
-	}
-	if err := insert("domain", "custom", 2); err == nil {
+	if err := insert("two", "domain", 2); err == nil {
 		t.Error("all_domains = 2 was accepted")
 	}
 
-	u, err := st.GetUserByUsername("domainhosted")
+	u, err := st.GetUserByUsername("everything")
 	if err != nil {
 		t.Fatalf("GetUserByUsername: %v", err)
 	}
-	if !u.AllDomains || u.AllInboundDomains || u.DMARCDefaultMode != DMARCDefaultHosted {
+	if !u.AllDomains || u.AllInboundDomains {
 		t.Errorf("flags read back as %+v", u)
 	}
 

@@ -24,27 +24,21 @@ CREATE TABLE settings (
 -- exists. role is a reach, not a rank: 'global' sees the whole instance,
 -- 'domain' only what is assigned below.
 --
--- email is the user's own address — what the panel writes to. The DMARC
--- default is a separate choice that may use it: dmarc_default_mode says where
--- aggregate reports go for a domain that follows this user
--- (domains.dmarc_rua_user_id): 'hosted' (SelfPost's own mailbox for that
--- domain), 'account' (email above), 'custom' (dmarc_default_address) or 'none'.
+-- email is the user's own address — what the panel writes to, and what the
+-- button beside a domain's typed report address fills it with.
 --
 -- all_domains / all_inbound_domains widen a 'domain' user's list to every
 -- domain of that direction, including the ones added later; with a flag set
 -- the rows of the matching assignment table are ignored.
 CREATE TABLE users (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-    username              TEXT NOT NULL UNIQUE,
-    password_hash         TEXT NOT NULL,
-    role                  TEXT NOT NULL CHECK (role IN ('global', 'domain')),
-    email                 TEXT NOT NULL DEFAULT '',
-    dmarc_default_mode    TEXT NOT NULL DEFAULT 'none'
-                          CHECK (dmarc_default_mode IN ('hosted', 'account', 'custom', 'none')),
-    dmarc_default_address TEXT NOT NULL DEFAULT '',
-    all_domains           INTEGER NOT NULL DEFAULT 0 CHECK (all_domains IN (0, 1)),
-    all_inbound_domains   INTEGER NOT NULL DEFAULT 0 CHECK (all_inbound_domains IN (0, 1)),
-    created_at            TEXT NOT NULL
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    username            TEXT NOT NULL UNIQUE,
+    password_hash       TEXT NOT NULL,
+    role                TEXT NOT NULL CHECK (role IN ('global', 'domain')),
+    email               TEXT NOT NULL DEFAULT '',
+    all_domains         INTEGER NOT NULL DEFAULT 0 CHECK (all_domains IN (0, 1)),
+    all_inbound_domains INTEGER NOT NULL DEFAULT 0 CHECK (all_inbound_domains IN (0, 1)),
+    created_at          TEXT NOT NULL
 );
 
 -- Panel login sessions. Persisted so a login survives a container restart or
@@ -65,18 +59,17 @@ CREATE INDEX idx_sessions_expires_at ON sessions (expires_at);
 -- Sending (outbound) domains. DKIM keys themselves live on disk under /data;
 -- this row records the selector and metadata.
 --
--- Where the domain's DMARC aggregate reports go (rua=): with dmarc_rua_user_id
--- set, the domain follows that user's default and dmarc_rua is ignored;
--- otherwise dmarc_rua is the address itself, '' meaning no reports. Deleting
--- the user leaves the domain at "none" rather than silently handing its
--- reports to someone else.
+-- Where the domain's DMARC aggregate reports go (rua=): dmarc_rua is the
+-- address itself, '' meaning no reports — which is what a new domain has. The
+-- three choices (no reports, SelfPost hosted, an address typed for the domain)
+-- are told apart by the value: the hosted one is the address SelfPost derives
+-- for the domain and the server's hostname. No user is involved.
 CREATE TABLE domains (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    name              TEXT NOT NULL UNIQUE,
-    dkim_selector     TEXT NOT NULL,
-    dmarc_rua         TEXT NOT NULL DEFAULT '',
-    dmarc_rua_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at        TEXT NOT NULL
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL UNIQUE,
+    dkim_selector TEXT NOT NULL,
+    dmarc_rua     TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL
 );
 
 -- Outbound domains assigned to a 'domain' user.

@@ -29,59 +29,15 @@ const (
 	RoleDomain Role = "domain"
 )
 
-// How a user's default DMARC report address is chosen (users.dmarc_default_mode).
-const (
-	DMARCDefaultHosted  = "hosted"  // SelfPost's own mailbox for the domain
-	DMARCDefaultAccount = "account" // the user's account e-mail
-	DMARCDefaultCustom  = "custom"  // DMARCDefault.Address
-	DMARCDefaultNone    = "none"    // no aggregate reports
-)
-
-// DMARCDefault is a user's default report address: the choice a domain takes
-// over when it follows that user (Domain.DMARCRuaUserID).
-type DMARCDefault struct {
-	UserID   int64
-	Username string
-	Mode     string
-	Address  string // for DMARCDefaultCustom
-	Email    string // the account e-mail, for DMARCDefaultAccount
-}
-
-// Resolve returns the address the default stands for on one domain. hosted is
-// the SelfPost-hosted mailbox for that domain, "" when report ingest is off —
-// a hosted default then resolves to no reports.
-func (d DMARCDefault) Resolve(hosted string) string {
-	switch d.Mode {
-	case DMARCDefaultHosted:
-		return hosted
-	case DMARCDefaultAccount:
-		return d.Email
-	case DMARCDefaultCustom:
-		return d.Address
-	}
-	return ""
-}
-
-// ValidDMARCDefaultMode reports whether mode is one of the stored choices.
-func ValidDMARCDefaultMode(mode string) bool {
-	switch mode {
-	case DMARCDefaultHosted, DMARCDefaultAccount, DMARCDefaultCustom, DMARCDefaultNone:
-		return true
-	}
-	return false
-}
-
 // User is a panel login (not an application SASL account).
 type User struct {
 	ID           int64
 	Username     string
 	PasswordHash string
 	Role         Role
-	// Email is the user's own address — what the panel writes to. DMARC may
-	// use it (DMARCDefaultAccount) but it is not a DMARC field.
-	Email               string
-	DMARCDefaultMode    string
-	DMARCDefaultAddress string
+	// Email is the user's own address — what the panel writes to, and what the
+	// button beside a domain's typed report address fills it with.
+	Email string
 	// AllDomains / AllInboundDomains widen a domain user's list to every
 	// domain of that direction, including those added later; the id lists
 	// are then ignored.
@@ -92,19 +48,14 @@ type User struct {
 	InboundDomainIDs  []int64
 }
 
-// DMARCDefault returns the user's default report address choice.
-func (u User) DMARCDefault() DMARCDefault {
-	return DMARCDefault{UserID: u.ID, Username: u.Username, Mode: u.DMARCDefaultMode, Address: u.DMARCDefaultAddress, Email: u.Email}
-}
-
-const userColumns = "id, username, password_hash, role, email, dmarc_default_mode, dmarc_default_address, all_domains, all_inbound_domains, created_at"
+const userColumns = "id, username, password_hash, role, email, all_domains, all_inbound_domains, created_at"
 
 func scanUser(r scanRow) (User, error) {
 	var (
 		u         User
 		createdAt string
 	)
-	err := r.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Email, &u.DMARCDefaultMode, &u.DMARCDefaultAddress,
+	err := r.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Email,
 		&u.AllDomains, &u.AllInboundDomains, &createdAt)
 	if err != nil {
 		return User{}, err
@@ -316,47 +267,6 @@ func (s *Store) UpdateUser(id int64, username, passwordHash, email string) error
 		return ErrUserNotFound
 	}
 	return nil
-}
-
-// SetDMARCDefault stores the user's default report address choice. address is
-// kept only for DMARCDefaultCustom. Every domain that follows this user
-// resolves to the new choice from the next read on.
-func (s *Store) SetDMARCDefault(userID int64, mode, address string) error {
-	if !ValidDMARCDefaultMode(mode) {
-		return fmt.Errorf("set dmarc default: unknown mode %q", mode)
-	}
-	if mode != DMARCDefaultCustom {
-		address = ""
-	}
-	res, err := s.db.Exec(
-		"UPDATE users SET dmarc_default_mode = ?, dmarc_default_address = ? WHERE id = ?", mode, address, userID)
-	if err != nil {
-		return fmt.Errorf("set dmarc default: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("set dmarc default: %w", err)
-	}
-	if n == 0 {
-		return ErrUserNotFound
-	}
-	return nil
-}
-
-// GetDMARCDefault returns a user's default report address choice, or
-// ErrUserNotFound.
-func (s *Store) GetDMARCDefault(userID int64) (DMARCDefault, error) {
-	d := DMARCDefault{UserID: userID}
-	err := s.db.QueryRow(
-		"SELECT username, dmarc_default_mode, dmarc_default_address, email FROM users WHERE id = ?", userID,
-	).Scan(&d.Username, &d.Mode, &d.Address, &d.Email)
-	if errors.Is(err, sql.ErrNoRows) {
-		return DMARCDefault{}, ErrUserNotFound
-	}
-	if err != nil {
-		return DMARCDefault{}, fmt.Errorf("get dmarc default: %w", err)
-	}
-	return d, nil
 }
 
 // SetUserRole updates a user's role.

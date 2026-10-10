@@ -359,9 +359,6 @@ type UserDeleteInput struct {
 	AllInbound  bool
 	Outbound    []string
 	Inbound     []string
-	// Following names the domains whose DMARC report address is this user's
-	// default: with the user gone they have none.
-	Following []string
 }
 
 // NewUserDelete builds the page.
@@ -386,7 +383,7 @@ func NewUserDelete(m Meta, in UserDeleteInput) *UserDelete {
 	}
 	if in.Global {
 		p.Consequences = append(p.Consequences, Plain("remove their global access to the server and to every domain."))
-		return p.withFollowing(in.Following)
+		return p
 	}
 	var out, inb Text
 	switch {
@@ -409,39 +406,6 @@ func NewUserDelete(m Meta, in UserDeleteInput) *UserDelete {
 	case len(inb) > 0:
 		p.Consequences = append(p.Consequences, Rich("remove the assignments to ", inb, " (inbound)."))
 	}
-	return p.withFollowing(in.Following)
-}
-
-// followingShown is how many domain names the DMARC consequence spells out
-// before it says "and N more".
-const followingShown = 3
-
-// withFollowing adds what deleting the user does to the domains that report to
-// their default address: they are left with none. Nothing is added when no
-// domain follows the user.
-func (p *UserDelete) withFollowing(domains []string) *UserDelete {
-	if len(domains) == 0 {
-		return p
-	}
-	shown, more := domains, 0
-	if len(domains) > followingShown {
-		shown, more = domains[:followingShown], len(domains)-followingShown
-	}
-	var list Text
-	for i, n := range shown {
-		switch {
-		case i == 0:
-		case i == len(shown)-1 && more == 0:
-			list = append(list, Inline{Text: " and "})
-		default:
-			list = append(list, Inline{Text: ", "})
-		}
-		list = append(list, Strong(n))
-	}
-	if more > 0 {
-		list = append(list, Inline{Text: " and " + strconv.Itoa(more) + " more"})
-	}
-	p.Consequences = append(p.Consequences, Rich(list, " will have no DMARC report address until someone sets one."))
 	return p
 }
 

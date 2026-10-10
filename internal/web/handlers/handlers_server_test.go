@@ -188,7 +188,7 @@ func TestUserFormSavedUntouchedChangesNothing(t *testing.T) {
 			}
 			after, _ := st.GetUser(p.ID)
 			if after.Username != before.Username || after.PasswordHash != before.PasswordHash || after.Role != before.Role ||
-				after.Email != before.Email || after.DMARCDefaultMode != before.DMARCDefaultMode ||
+				after.Email != before.Email ||
 				!equalReach(after.Reach(), before.Reach()) {
 				t.Errorf("saving untouched changed the user:\nbefore %+v\nafter  %+v", before, after)
 			}

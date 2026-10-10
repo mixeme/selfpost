@@ -16,8 +16,9 @@
       <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
     </select></div></div>
     <p class="help">{{template "inline" .RuaHelp}}</p></div>
-  <div class="field" data-custom-address><label class="label" for="rua_email">Custom report address</label>
-    <div class="control"><input class="input" id="rua_email" name="dmarc_rua_email" type="email" value="{{.RuaCustom}}" placeholder="reports@your-mail-domain.com" autocomplete="off" autocapitalize="none" spellcheck="false"></div></div>
+  <div class="field" data-custom-address><label class="label" for="rua_email">Report address</label>
+    <div class="field has-addons"><div class="control is-expanded"><input class="input" id="rua_email" name="dmarc_rua_email" type="email" value="{{.RuaCustom}}" placeholder="reports@your-mail-domain.com" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+      {{if .RuaMine}}<div class="control"><button type="button" class="button" data-fill="rua_email" data-fill-value="{{.RuaMine}}"><i class="ti ti-mail"></i>Use my e-mail</button></div>{{end}}</div></div>
   <button type="submit" class="button is-primary">Save report address</button>
 </form>
 {{template "body_close"}}

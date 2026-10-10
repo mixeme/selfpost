@@ -71,12 +71,7 @@ func (h *Handlers) renderDomain(w http.ResponseWriter, r *http.Request, status i
 
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with.
-	reportEmail, err := h.domainReportAddress(d)
-	if err != nil {
-		logf("panel: domain %d: dmarc report address: %v", d.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	reportEmail := d.DMARCRua
 	dns, srv := h.domainDNS(d, record, reportEmail, false)
 	records := []view.Record{
 		view.DKIMRecord(d.DKIMSelector, record.Name, record.Value, dnsCheck(dns.DKIM)),
@@ -88,7 +83,7 @@ func (h *Handlers) renderDomain(w http.ResponseWriter, r *http.Request, status i
 	}
 	records = append(records, view.DMARCRecord(view.DMARCRecordInput{
 		Host: dnscheck.DMARCRecordName(d.Name), Value: dnscheck.DMARCExample(reportEmail), Check: dnsCheck(dns.DMARC),
-		Source: h.reportSource(d, reportEmail), SettingsHref: view.DomainHref(d.ID) + "/settings", ReportsHref: reports,
+		Source: h.reportSource(d), SettingsHref: view.DomainHref(d.ID) + "/settings", ReportsHref: reports,
 		SameDomain: reportEmail != "" && strings.EqualFold(dnscheck.EmailDomain(reportEmail), d.Name) &&
 			!(h.cfg.DMARCEnabled && dmarc.IsHostedOnHostname(reportEmail, h.cfg.Hostname)),
 	}))
@@ -112,21 +107,14 @@ func dnsCheck(r dnscheck.Result) view.DNSCheck {
 	return view.DNSCheck{Status: string(r.Status), Detail: r.Detail, Found: r.Records}
 }
 
-// reportSource says in words where a domain's DMARC reports go: the default of
-// the user it follows, the hosted address, an address of its own, or nowhere.
-func (h *Handlers) reportSource(d store.Domain, reportEmail string) string {
-	switch {
-	case d.DMARCRuaUserID.Valid:
-		if def, err := h.store.GetDMARCDefault(d.DMARCRuaUserID.Int64); err == nil && def.Username != "" {
-			return def.Username + "'s default"
-		}
-		return "a user's default"
-	case reportEmail == "":
-		return "none"
-	case strings.EqualFold(reportEmail, h.hostedDMARCAddress(d.Name)):
-		return "SelfPost hosted"
+// reportSource says in words where a domain's DMARC reports go, for the note
+// of its DMARC record: the hosted address or the one typed for the domain,
+// written out, or "no reports".
+func (h *Handlers) reportSource(d store.Domain) string {
+	if d.DMARCRua == "" {
+		return "no reports"
 	}
-	return "a custom address"
+	return d.DMARCRua
 }
 
 // outAppRow is one line of the Applications table of a domain.
@@ -160,7 +148,8 @@ func (h *Handlers) outAppRow(d store.Domain, a store.Application, retention int)
 	}
 	return view.OutAppRow{
 		Login: a.Login, Senders: senders, Activity: view.FormatActivity(stats.Total, stats.PeakPerHour), Limits: limits,
-		Edit: fmt.Sprintf("%s/applications/%d", view.DomainHref(d.ID), a.ID),
+		Edit:    fmt.Sprintf("%s/applications/%d", view.DomainHref(d.ID), a.ID),
+		Actions: view.AppRowActions(d.ID, a.ID, a.Login),
 	}, nil
 }
 
@@ -214,76 +203,40 @@ func (h *Handlers) renderDomainSettings(w http.ResponseWriter, r *http.Request, 
 		rate.Computed = intOrBlank(rl.MaxMessages)
 	}
 
-	options, selected, custom, help := h.reportAddressForm(r, d)
+	options, selected, custom, mine := h.reportAddressForm(r, d)
 	if sv.RuaMode != "" {
 		selected, custom = sv.RuaMode, sv.RuaCustom
 	}
 	page := view.NewOutDomainSettings(h.shellMeta(r), d.ID, d.Name, d.AppCount, p.IsGlobal()).
-		WithReportAddress(options, selected, custom, help).
+		WithReportAddress(options, selected, custom, mine).
 		WithExport(validate.MinSecretFilePasswordLen).
 		WithRateLimit(rate).
 		WithResult("", sv.Err)
 	h.view.Render(w, status, "out-domain-settings", page)
 }
 
-// reportAddressForm is the choices of the report-address select for a domain
-// and the signed-in user. "inherit" makes the domain follow the default of the
-// user who saves the form (HandleDomainDMARC), so what the option says depends
-// on whom the domain follows now: the user themselves, someone else, or nobody.
-// A domain that follows someone else also offers "keep" — that user's default,
-// selected — so saving the form untouched does not take the domain over.
-func (h *Handlers) reportAddressForm(r *http.Request, d store.Domain) (options []view.Option, selected, custom string, help view.Text) {
-	hosted := h.hostedDMARCAddress(d.Name)
-	me, _ := h.principal(r)
-	mine, _ := h.store.GetDMARCDefault(me.ID)
-	address := func(a string) string {
-		if a == "" {
-			return "no report address yet"
-		}
-		return a
+// reportAddressForm is the report-address form of a domain: the three choices
+// of the select, the one the stored address stands for, the address typed for
+// the domain (only in the typed choice) and the button that fills it with the
+// signed-in user's profile e-mail ("" when the profile has none). SelfPost
+// hosted is offered only while hosted reports are enabled.
+func (h *Handlers) reportAddressForm(r *http.Request, d store.Domain) (options []view.Option, selected, custom, mine string) {
+	options = append(options, view.Option{Value: ruaNone, Label: "No reports"})
+	if hosted := h.hostedDMARCAddress(d.Name); hosted != "" {
+		options = append(options, view.Option{Value: ruaHosted, Label: "SelfPost hosted — " + hosted})
 	}
-	myAddr := address(mine.Resolve(hosted))
+	options = append(options, view.Option{Value: ruaCustom, Label: "A specific address"})
 
-	help = view.Rich("A default belongs to a user and is set under their ", view.Link("/account#dmarc", "Account"),
-		"; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish.")
-	inherit := view.Option{Value: "inherit", Label: "My default — " + myAddr}
-	followsOther := d.DMARCRuaUserID.Valid && d.DMARCRuaUserID.Int64 != me.ID
-	switch {
-	case followsOther:
-		inherit.Label = "My default instead — " + myAddr + " (you are " + me.Username + ")"
-		keep := view.Option{Value: "keep", Label: "Another user's default"}
-		if other, err := h.store.GetDMARCDefault(d.DMARCRuaUserID.Int64); err == nil {
-			keep.Label = other.Username + "'s default — " + address(other.Resolve(hosted))
+	selected = h.reportChoice(d)
+	if selected == ruaCustom {
+		custom = d.DMARCRua
+	}
+	if p, ok := h.principal(r); ok {
+		if u, err := h.store.GetUser(p.ID); err == nil {
+			mine = u.Email
 		}
-		options = append(options, keep)
-	case d.DMARCRuaUserID.Valid:
-		inherit.Label = me.Username + "'s default — " + myAddr
-		options = append(options, inherit)
-	default:
-		options = append(options, inherit)
 	}
-	if hosted != "" {
-		options = append(options, view.Option{Value: "hosted", Label: "SelfPost hosted (" + hosted + ")"})
-	}
-	// The mockup's order: whose default is followed now, hosted, "mine instead".
-	if followsOther {
-		options = append(options, inherit)
-	}
-	options = append(options, view.Option{Value: "none", Label: "No aggregate reports"}, view.Option{Value: "custom", Label: "Custom address"})
-
-	switch {
-	case followsOther:
-		selected = "keep"
-	case d.DMARCRuaUserID.Valid:
-		selected = "inherit"
-	case d.DMARCRua == "":
-		selected = "none"
-	case hosted != "" && strings.EqualFold(d.DMARCRua, hosted):
-		selected = "hosted"
-	default:
-		selected, custom = "custom", d.DMARCRua
-	}
-	return options, selected, custom, help
+	return options, selected, custom, mine
 }
 
 // formatBound writes a multiplier bound the short way: "1.5", "5".
@@ -320,13 +273,7 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	reportEmail, err := h.domainReportAddress(d)
-	if err != nil {
-		logf("panel: domain %d: dmarc report address: %v", d.ID, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	h.domainDNS(d, record, reportEmail, true)
+	h.domainDNS(d, record, d.DMARCRua, true)
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
 }
 

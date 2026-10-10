@@ -68,12 +68,7 @@ func (h *Handlers) outDomainRows(domains []store.Domain, retention int, canDelet
 				logf("panel: domains: domain %d: dkim record: %v", d.ID, err)
 				return
 			}
-			reportEmail, err := h.domainReportAddress(d)
-			if err != nil {
-				logf("panel: domains: domain %d: dmarc report address: %v", d.ID, err)
-				return
-			}
-			dns, _ := h.domainDNS(d, record, reportEmail, false)
+			dns, _ := h.domainDNS(d, record, d.DMARCRua, false)
 			rows[i].DNS = dnsTags(dns.DKIM.Status, dns.SPF.Status, dns.DMARC.Status)
 		}()
 	}
@@ -92,7 +87,7 @@ func dashboardFlash(r *http.Request) string {
 // OpenDKIM reload), and redirects to the domain's page so the DNS record to
 // publish is shown (product.md).
 func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
-	p, ok := h.requireGlobal(w, r)
+	_, ok := h.requireGlobal(w, r)
 	if !ok {
 		return
 	}
@@ -118,24 +113,7 @@ func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
 			"Could not add the domain. Please check the logs and try again.", raw)
 		return
 	}
-	h.followCreator(d.ID, p.ID)
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d", d.ID), http.StatusSeeOther)
-}
-
-// followCreator makes a new domain take its DMARC report address from the
-// default of whoever created it (plan § Account e-mail). The domain exists
-// either way: a failure here leaves it with no report address, which its page
-// shows and its DMARC form can change.
-func (h *Handlers) followCreator(domainID, userID int64) {
-	if err := h.store.SetDomainDMARCUser(domainID, userID); err != nil {
-		logf("panel: domain %d: follow user %d's dmarc default: %v", domainID, userID, err)
-		return
-	}
-	if h.dmarc != nil && h.dmarc.Enabled() {
-		if err := h.dmarc.Resync(); err != nil {
-			logf("panel: domain %d: dmarc resync: %v", domainID, err)
-		}
-	}
 }
 
 // HandleDeleteConfirm shows the cascade warning before a domain is removed.

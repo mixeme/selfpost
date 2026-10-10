@@ -164,7 +164,7 @@ func SPFRecord(domain, value string, c DNSCheck) Record {
 }
 
 // DMARCRecordInput is what a DMARC record needs besides its check: where the
-// reports go in words (Source, "admin's default") and the page that changes it,
+// reports go in words (Source: the address, or "no reports") and the page that changes it,
 // the page of the reports themselves ("" when the panel has none), and whether
 // the report address is on the sending domain with nobody to read it there.
 type DMARCRecordInput struct {
@@ -316,10 +316,10 @@ type OutDomain struct {
 
 	Apps Box
 	// Days is the length of the send window of the "N days" column.
-	Days       int
-	AppRows    []OutAppRow
-	AppsEmpty  EmptyState
-	AppsLegend Foot
+	Days      int
+	AppRows   []OutAppRow
+	AppsEmpty EmptyState
+	AppsFoot  Foot
 
 	Connection Box
 	ConnFacts  []Fact
@@ -332,15 +332,15 @@ type OutDomain struct {
 // OutAppRow is one line of the Applications table. Senders are the addresses
 // the login may send as (*@example.org for the whole domain); Limits are tags,
 // the application's own rate limit or "domain" and its client IP allow-list.
-// Edit leads to the application's page, where a new password and deleting it
-// are one click away: both are POSTs, and a row of a table has no control for
-// those (only links).
+// Edit leads to the application's page; New password and Delete are POSTs in
+// the row itself (RowAction), each asking before it is sent.
 type OutAppRow struct {
 	Login    string
 	Senders  []string
 	Activity string
 	Limits   []Tag
 	Edit     string
+	Actions  []RowAction
 }
 
 // NewOutDomain builds the page of a domain. canDelete is the global role: it
@@ -364,6 +364,7 @@ func NewOutDomain(m Meta, id int64, name string, canDelete bool) *OutDomain {
 		Apps: Box{No: "02", Title: "Applications", ID: "apps", End: Plain("SASL logins that may send as this domain"),
 			Help: topicLink(HelpApps, "What an application is")},
 		AppsEmpty:  EmptyState{Icon: "ti-apps", Text: Plain("No applications yet. Add one to let a program send as this domain.")},
+		AppsFoot:   Foot{Bare: true, Text: Plain("New password and Delete ask for confirmation; the old password stops working at once.")},
 		Connection: Box{No: "03", Title: "Connection", ID: "connection", End: Plain("The same for every domain")},
 	}
 }
@@ -529,6 +530,9 @@ type OutDomainSettings struct {
 	RuaSelected   string
 	RuaCustom     string
 	RuaHelp       Text
+	// RuaMine is the signed-in user's profile e-mail, which the button beside
+	// the typed address fills the field with; "" leaves the button out.
+	RuaMine string
 
 	Export       Box
 	ExportAction string
@@ -638,11 +642,30 @@ func NewOutDomainSettings(m Meta, id int64, name string, apps int, canDelete boo
 	return p
 }
 
+// The three choices of a domain's report address, the values of the select: no
+// reports, the address SelfPost hosts for the domain (offered only while hosted
+// reports are enabled) and an address typed for the domain.
+const (
+	ReportNone   = "none"
+	ReportHosted = "hosted"
+	ReportCustom = "custom"
+)
+
 // WithReportAddress sets the report-address form: the choices (the value of an
-// option is what the handler reads), the one selected, the custom address
-// typed, and the sentence under the select.
-func (p *OutDomainSettings) WithReportAddress(options []Option, selected, custom string, help Text) *OutDomainSettings {
-	p.RuaOptions, p.RuaSelected, p.RuaCustom, p.RuaHelp = options, selected, custom, help
+// option is what the handler reads), the one selected, the address typed for
+// the domain, and the profile e-mail of the viewer that the button beside the
+// field fills it with ("" for none). The sentence under the select says what
+// each choice offered means.
+func (p *OutDomainSettings) WithReportAddress(options []Option, selected, custom, mine string) *OutDomainSettings {
+	p.RuaOptions, p.RuaSelected, p.RuaCustom, p.RuaMine = options, selected, custom, mine
+	help := Rich("No reports leaves ", Code("rua="), " out of the DMARC record. ")
+	for _, o := range options {
+		if o.Value == ReportHosted {
+			help = append(help, Inline{Text: "SelfPost hosted sends them to an address on this server, which parses them for DMARC reports. "})
+		}
+	}
+	help = append(help, Inline{Text: "A specific address is any mailbox, and it receives the raw XML. Changing this changes the DMARC record to publish."})
+	p.RuaHelp = help
 	return p
 }
 

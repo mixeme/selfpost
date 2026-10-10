@@ -188,7 +188,6 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	authed.HandleFunc("GET /account", h.HandleAccount)
 	authed.HandleFunc("POST /account/profile", h.HandleAccountProfile)
 	authed.HandleFunc("POST /account/password", h.HandleAccountPassword)
-	authed.HandleFunc("POST /account/dmarc", h.HandleAccountDMARC)
 
 	// Overview. Its handler checks the role itself: the page is global-only
 	// but does not live under /server/.

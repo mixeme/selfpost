@@ -42,6 +42,26 @@
     });
   });
 
+  // --- Fill buttons -----------------------------------------------------
+  // A type="button" with data-fill="<id of an input>" and data-fill-value="<text>"
+  // puts the text in that input and tells the page it changed. It only fills:
+  // saving stays the form's own button. Without scripts the button does nothing
+  // and the field can be typed in.
+  document.addEventListener("click", function (ev) {
+    var button = ev.target.closest("button[data-fill]");
+    if (!button) {
+      return;
+    }
+    var input = document.getElementById(button.dataset.fill);
+    if (!input) {
+      return;
+    }
+    input.value = button.dataset.fillValue || "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.focus();
+  });
+
   // --- Confirmation on destructive forms --------------------------------
   // Forms that delete something or invalidate a working credential carry a
   // data-confirm message. The prompt lives here rather than in an inline

@@ -25,13 +25,13 @@ type Domain struct {
 	ID           int64
 	Name         string
 	DKIMSelector string
-	// Where DMARC aggregate reports go. With DMARCRuaUserID set the domain
-	// follows that user's default (DMARCDefault) and DMARCRua is ignored;
-	// otherwise DMARCRua is the address itself, "" meaning no reports.
-	DMARCRua       string
-	DMARCRuaUserID sql.NullInt64
-	CreatedAt      time.Time
-	AppCount       int
+	// Where DMARC aggregate reports go: the address itself, "" meaning no
+	// reports (which is what a new domain has). Whether it is the hosted
+	// address or one typed for the domain is told by its value; the store does
+	// not know the server's hostname.
+	DMARCRua  string
+	CreatedAt time.Time
+	AppCount  int
 }
 
 // AddDomain inserts a new sending domain. The caller is responsible for having
@@ -60,7 +60,7 @@ func (s *Store) AddDomain(name, selector string) (Domain, error) {
 // ordered by name.
 func (s *Store) ListDomains() ([]Domain, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.dmarc_rua_user_id, d.created_at,
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
 		ORDER BY d.name`)
@@ -86,7 +86,7 @@ func (s *Store) ListDomains() ([]Domain, error) {
 // The filter is in the query, so a caller cannot forget it.
 func (s *Store) ListDomainsForUser(userID int64) ([]Domain, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.dmarc_rua_user_id, d.created_at,
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
 		WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = ? AND u.all_domains = 1)
@@ -112,7 +112,7 @@ func (s *Store) ListDomainsForUser(userID int64) ([]Domain, error) {
 // ErrDomainNotFound.
 func (s *Store) GetDomain(id int64) (Domain, error) {
 	row := s.db.QueryRow(`
-		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.dmarc_rua_user_id, d.created_at,
+		SELECT d.id, d.name, d.dkim_selector, d.dmarc_rua, d.created_at,
 		       (SELECT COUNT(*) FROM applications a WHERE a.domain_id = d.id)
 		FROM domains d
 		WHERE d.id = ?`, id)
@@ -154,7 +154,7 @@ func scanDomain(r scanRow) (Domain, error) {
 		d         Domain
 		createdAt string
 	)
-	if err := r.Scan(&d.ID, &d.Name, &d.DKIMSelector, &d.DMARCRua, &d.DMARCRuaUserID, &createdAt, &d.AppCount); err != nil {
+	if err := r.Scan(&d.ID, &d.Name, &d.DKIMSelector, &d.DMARCRua, &createdAt, &d.AppCount); err != nil {
 		return Domain{}, err
 	}
 	d.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
@@ -172,21 +172,10 @@ func isUniqueViolation(err error) bool {
 	return false
 }
 
-// SetDomainDMARCAddress gives the domain a report address of its own; "" means
-// no aggregate reports. The domain stops following anyone's default.
+// SetDomainDMARCAddress sets where the domain's aggregate reports go; "" means
+// no reports.
 func (s *Store) SetDomainDMARCAddress(id int64, rua string) error {
-	return s.updateDomainDMARC(id, rua, sql.NullInt64{})
-}
-
-// SetDomainDMARCUser makes the domain follow userID's default report address
-// (DMARCDefault). If that user is later deleted the domain falls back to no
-// reports rather than to someone else's default.
-func (s *Store) SetDomainDMARCUser(id, userID int64) error {
-	return s.updateDomainDMARC(id, "", sql.NullInt64{Int64: userID, Valid: true})
-}
-
-func (s *Store) updateDomainDMARC(id int64, rua string, userID sql.NullInt64) error {
-	res, err := s.db.Exec("UPDATE domains SET dmarc_rua = ?, dmarc_rua_user_id = ? WHERE id = ?", rua, userID, id)
+	res, err := s.db.Exec("UPDATE domains SET dmarc_rua = ? WHERE id = ?", rua, id)
 	if err != nil {
 		return fmt.Errorf("update domain dmarc rua: %w", err)
 	}
@@ -198,24 +187,6 @@ func (s *Store) updateDomainDMARC(id int64, rua string, userID sql.NullInt64) er
 		return ErrDomainNotFound
 	}
 	return nil
-}
-
-// DomainDMARCRua resolves where the domain's aggregate reports go: its own
-// address, or the default of the user it follows. hosted is the SelfPost-hosted
-// mailbox for this domain, "" when report ingest is off (the store does not
-// know the server's hostname). The result is "" for a policy-only record.
-func (s *Store) DomainDMARCRua(d Domain, hosted string) (string, error) {
-	if !d.DMARCRuaUserID.Valid {
-		return d.DMARCRua, nil
-	}
-	def, err := s.GetDMARCDefault(d.DMARCRuaUserID.Int64)
-	if errors.Is(err, ErrUserNotFound) {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	return def.Resolve(hosted), nil
 }
 
 // DomainExists reports whether a sending domain with this name is configured.

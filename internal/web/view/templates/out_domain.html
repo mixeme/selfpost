@@ -22,14 +22,15 @@
 <div class="table-container"><table class="table is-fullwidth is-hoverable">
   <thead><tr><th>Login</th><th>May send as</th><th>{{.Days}} days</th><th>Limits</th><th></th></tr></thead>
   <tbody>{{range .AppRows}}
-    <tr><td class="sp-mono"><strong>{{.Login}}</strong></td><td>{{range $i, $a := .Senders}}{{if $i}}, {{end}}{{wbr_at $a}}{{end}}</td><td class="sp-muted">{{.Activity}}</td><td>{{range $i, $t := .Limits}}{{if $i}} {{end}}{{template "tag" $t}}{{end}}</td>
-      <td class="sp-actions"><a href="{{.Edit}}">Edit</a></td></tr>{{end}}
+    <tr><td class="sp-mono sp-nowrap"><strong>{{.Login}}</strong></td><td>{{range $i, $a := .Senders}}{{if $i}}, {{end}}{{wbr_at $a}}{{end}}</td><td class="sp-muted">{{.Activity}}</td><td>{{range $i, $t := .Limits}}{{if $i}} {{end}}{{template "tag" $t}}{{end}}</td>
+      <td class="sp-actions"><a href="{{.Edit}}">Edit</a>{{range .Actions}}{{template "row_action" .}}{{end}}</td></tr>{{end}}
   </tbody>
 </table></div>
 {{else}}
 {{template "empty_state" .AppsEmpty}}
 {{end}}
-{{template "box_close"}}
+{{if .AppRows}}{{template "box_foot" .AppsFoot}}
+{{end}}{{template "box_close"}}
 
 {{template "box_open" .Connection}}
 {{template "body_open"}}

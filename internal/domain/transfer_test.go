@@ -110,11 +110,11 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if got.Name != "example.com" || got.DKIMSelector != "selfpost" {
 		t.Errorf("imported domain = %+v", got)
 	}
-	if got.DMARCRuaUserID.Valid || got.DMARCRua != "reports@hub.example" {
-		t.Errorf("imported dmarc rua = %q (follows user: %v)", got.DMARCRua, got.DMARCRuaUserID.Valid)
+	if got.DMARCRua != "reports@hub.example" {
+		t.Errorf("imported dmarc rua = %q", got.DMARCRua)
 	}
-	if exp.DMARCRua == nil || *exp.DMARCRua != "reports@hub.example" {
-		t.Errorf("exported dmarc rua = %v", exp.DMARCRua)
+	if exp.DMARCRua != "reports@hub.example" {
+		t.Errorf("exported dmarc rua = %q", exp.DMARCRua)
 	}
 	// The DKIM key was imported byte-for-byte, so the DNS record is unchanged.
 	dstKey, err := dstOdk.ExportKey("example.com", "selfpost")

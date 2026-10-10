@@ -316,34 +316,18 @@ func TestEveryHelpLinkLandsOnATopic(t *testing.T) {
 // change it under Account, and it can receive DMARC reports if they choose.
 func TestUserFormEmailHelpSaysOnlyWhatIsTrue(t *testing.T) {
 	out := renderSignedIn(t, "user", userFixture())
-	pageHas(t, "User", out, `The user's own address. They can change it under Account, and can choose it there as the address that receives DMARC reports.`)
+	pageHas(t, "User", out, `The user's own address. They can change it under Account.`)
 	pageLacks(t, "User", out, `notification`, `reset`)
 }
 
-// With domains that follow the user's default report address, deleting them
-// leaves those domains with none, and the page says so: up to three names, then
-// the count of the rest. With none following, the page says nothing about it.
-func TestUserDeleteSaysWhichDomainsLoseTheirReportAddress(t *testing.T) {
-	for _, tt := range []struct {
-		following []string
-		want      string
-	}{
-		{[]string{"example.org"}, `<strong>example.org</strong> will have no DMARC report address until someone sets one.`},
-		{[]string{"example.org", "shop.example.org"}, `<strong>example.org</strong> and <strong>shop.example.org</strong> will have no DMARC report address until someone sets one.`},
-		{[]string{"a.example", "b.example", "c.example"}, `<strong>a.example</strong>, <strong>b.example</strong> and <strong>c.example</strong> will have no DMARC report address`},
-		{[]string{"a.example", "b.example", "c.example", "d.example", "e.example"}, `<strong>a.example</strong>, <strong>b.example</strong>, <strong>c.example</strong> and 2 more will have no DMARC report address`},
+// A domain's report address belongs to the domain, not to a user: deleting a
+// user, global or not, says nothing about any domain losing one.
+func TestUserDeleteSaysNothingOfReportAddresses(t *testing.T) {
+	for _, in := range []UserDeleteInput{
+		{ID: 3, Username: "acme-ops", AllOutbound: true, Outbound: []string{"example.org"}},
+		{ID: 2, Username: "root", Global: true},
 	} {
-		in := UserDeleteInput{ID: 3, Username: "acme-ops", AllOutbound: true, Following: tt.following}
 		out := renderSignedIn(t, "user-delete", NewUserDelete(admin(), in))
-		pageHas(t, "Delete user", out, tt.want)
-		if strings.Contains(out, "d.example") && len(tt.following) > 3 {
-			t.Errorf("a fourth name is spelled out: %v", tt.following)
-		}
+		pageLacks(t, "Delete user", out, `report address`, `will have no`, `The domains`)
 	}
-	// A global user's domains follow them as well.
-	out := renderSignedIn(t, "user-delete", NewUserDelete(admin(), UserDeleteInput{ID: 2, Username: "root", Global: true, Following: []string{"example.org"}}))
-	pageHas(t, "Delete user", out, `will have no DMARC report address`)
-
-	out = renderSignedIn(t, "user-delete", userDeleteFixture())
-	pageLacks(t, "Delete user", out, `DMARC report address`, `The domains`)
 }

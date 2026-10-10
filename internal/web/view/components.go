@@ -198,6 +198,18 @@ type Action struct {
 	Danger  bool
 }
 
+// RowAction is an action that changes something, in the last cell of a table
+// row (partial row_action; used by the Applications table of a domain). A link
+// cannot POST, so it is a form with one button that the stylesheet makes read as
+// the links beside it: Post is the address it submits to, Confirm the question
+// panel.js asks first (data-confirm), Danger the red of a delete.
+type RowAction struct {
+	Label   string
+	Post    string
+	Confirm string
+	Danger  bool
+}
+
 // Postmark is the round verdict stamp inside a Head: three lines of imprint
 // and the Level (ok, warn or fail) that colours it.
 type Postmark struct {

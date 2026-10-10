@@ -120,15 +120,12 @@ func healthFixture(refresh bool) *Health {
 	return h
 }
 
-// accountFixture is the mockup's Account: the global administrator, their
-// e-mail as the DMARC default, and the authorization record that default needs.
+// accountFixture is the mockup's Account: the global administrator, their name
+// and e-mail.
 func accountFixture() *Account {
-	m := admin()
-	a := NewAccount(m, "global", true, "mix@example.org")
+	a := NewAccount(admin(), "global")
 	a.Username, a.Email = "admin", "mix@example.org"
-	a.DMARCSelected = DMARCChoiceAccount
-	a.WithDomainUse(2, 3)
-	return a.WithAuthorization("*._report._dmarc.example.org", "v=DMARC1;", "ok", "", nil)
+	return a
 }
 
 // settingsFixture is the mockup's Settings: thirty days of log, a limit of 600
@@ -166,15 +163,17 @@ func outDomainFixture() *OutDomain {
 		SPFRecord("example.org", "v=spf1 ip4:203.0.113.25 ~all", DNSCheck{Status: "error",
 			Detail: "The published record does not authorize 203.0.113.25. Add ip4:203.0.113.25 before ~all.",
 			Found:  []string{"v=spf1 include:_spf.google.com ~all"}}),
-		DMARCRecord(DMARCRecordInput{Host: "_dmarc.example.org", Value: "v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org",
-			Check: DNSCheck{Status: "ok"}, Source: "admin's default", SettingsHref: "/outbound/domains/1/settings",
+		DMARCRecord(DMARCRecordInput{Host: "_dmarc.example.org", Value: "v=DMARC1; p=none; rua=mailto:example.org@dmarc.mail.example.org",
+			Check: DNSCheck{Status: "ok"}, Source: "example.org@dmarc.mail.example.org", SettingsHref: "/outbound/domains/1/settings",
 			ReportsHref: "/outbound/dmarc/domains/1"}),
 	}, "3 min ago")
 	p.WithApplications([]OutAppRow{
 		{Login: "prod-server", Senders: []string{"*@example.org"}, Activity: FormatActivity(1102, 96),
-			Limits: []Tag{{Status: "ok", Label: "200 / h"}}, Edit: "/outbound/domains/1/applications/1"},
+			Limits: []Tag{{Status: "ok", Label: "200 / h"}}, Edit: "/outbound/domains/1/applications/1",
+			Actions: AppRowActions(1, 1, "prod-server")},
 		{Login: "alerts", Senders: []string{"alerts@example.org", "noc@example.org"}, Activity: FormatActivity(182, 14),
-			Limits: []Tag{{Label: "domain"}, {Status: "ok", Label: "2 IPs"}}, Edit: "/outbound/domains/1/applications/2"},
+			Limits: []Tag{{Label: "domain"}, {Status: "ok", Label: "2 IPs"}}, Edit: "/outbound/domains/1/applications/2",
+			Actions: AppRowActions(1, 2, "alerts")},
 	})
 	p.WithConnection("mail.example.org", true)
 	p.WithSeeAlso("/outbound/log?domain=example.org", "/outbound/dmarc/domains/1")
@@ -182,17 +181,15 @@ func outDomainFixture() *OutDomain {
 	return p
 }
 
-// outDomainSettingsFixture is the mockup's Domain settings: reports go to the
-// default of the signed-in administrator, the rate limit is automatic.
+// outDomainSettingsFixture is the mockup's Domain settings: reports go to an
+// address typed for the domain, the rate limit is automatic.
 func outDomainSettingsFixture() *OutDomainSettings {
 	p := NewOutDomainSettings(admin(), 1, "example.org", 2, true)
 	p.WithReportAddress([]Option{
-		{Value: "inherit", Label: "admin's default — mix@example.org"},
-		{Value: "hosted", Label: "SelfPost hosted (example.org@dmarc.mail.example.org)"},
-		{Value: "none", Label: "No aggregate reports"},
-		{Value: "custom", Label: "Custom address"},
-	}, "inherit", "", Rich("A default belongs to a user and is set under their ", Link("/account#dmarc", "Account"),
-		"; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish."))
+		{Value: ReportNone, Label: "No reports"},
+		{Value: ReportHosted, Label: "SelfPost hosted — example.org@dmarc.mail.example.org"},
+		{Value: ReportCustom, Label: "A specific address"},
+	}, ReportCustom, "reports@acme.io", "mix@example.org")
 	p.WithExport(12)
 	return p.WithRateLimit(DomainRateLimit{
 		Active: true, Auto: true, MaxMessages: "288", Window: "3600", Multiplier: "2.5",

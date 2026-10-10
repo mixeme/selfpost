@@ -250,57 +250,25 @@ func TestNewHealthFlash(t *testing.T) {
 
 // ---- Account
 
-func TestAccountHasThreeFormsEachItsOwnPost(t *testing.T) {
+func TestAccountHasTwoFormsEachItsOwnPost(t *testing.T) {
 	out := renderSignedIn(t, "account", accountFixture())
 	pageHas(t, "Account", out,
 		`<h1 class="title is-3">Account</h1>`, `Signed in as admin · global`,
 		`action="/account/profile"`, `name="username"`, `name="email"`, `value="mix@example.org"`,
 		`action="/account/password"`, `name="current_password"`, `name="new_password"`, `name="new_password_confirm"`,
-		`action="/account/dmarc"`, `name="dmarc_default"`, `name="dmarc_default_address"`, `data-custom-mode="custom"`, `data-custom-address`,
-		`<option value="hosted">`, `<option value="account" selected>My account e-mail — mix@example.org</option>`,
-		`<option value="custom">`, `<option value="none">`,
-		`2 of 3 now`, `<em>admin&#39;s default</em>`,
+		`Your own address. A domain's report address can be filled with it from Domain settings.`,
 	)
-	pageLacks(t, "Account", out, `send_log_retention_days`)
-	// No form asks for another's fields: three forms, three submit buttons.
-	if got := strings.Count(out, `<form class="sp-form" method="post"`); got != 3 {
-		t.Errorf("Account has %d forms, want 3", got)
+	// Account is Profile and Password; where a domain's reports go is the
+	// domain's own setting.
+	pageLacks(t, "Account", out, `send_log_retention_days`, `/account/dmarc`, `dmarc_default`, `<h2>DMARC reports</h2>`,
+		`Report authorization`, `default report address`, `id="dmarc"`)
+	// No form asks for another's fields: two forms, two submit buttons.
+	if got := strings.Count(out, `<form class="sp-form" method="post"`); got != 2 {
+		t.Errorf("Account has %d forms, want 2", got)
 	}
-}
-
-func TestAccountReportAuthorizationRecord(t *testing.T) {
-	out := renderSignedIn(t, "account", accountFixture())
-	pageHas(t, "Account", out,
-		`<h3>Report authorization</h3>`, `<span class="tag is-success is-light">published</span>`,
-		`*._report._dmarc.example.org`, `v=DMARC1;`, `<span class="tag is-success is-light">authorized</span>`,
-	)
-	pageLacks(t, "Account", out, `In DNS now`)
-
-	// Not published: what DNS returned is shown, with the fix.
-	a := accountFixture().WithAuthorization("_report._dmarc.hub.example", "v=DMARC1;", "error", "The record says something else.", []string{`"v=DMARC2"`})
-	out = renderSignedIn(t, "account", a)
-	pageHas(t, "Account", out, `In DNS now`, `&#34;v=DMARC2&#34;`, `The record says something else.`,
-		`<span class="tag is-danger is-light">not published</span>`, `not authorized`)
-
-	// Not found at all: nothing to compare, so the explanation takes the note's place.
-	a = accountFixture().WithAuthorization("_report._dmarc.hub.example", "v=DMARC1;", "warn", "No record was found.", nil)
-	out = renderSignedIn(t, "account", a)
-	pageHas(t, "Account", out, `No record was found.`)
-	pageLacks(t, "Account", out, `In DNS now`)
-
-	// An address that needs no authorization draws no second record.
-	a = accountFixture()
-	a.Authorization, a.DMARC.End = nil, nil
-	out = renderSignedIn(t, "account", a)
-	pageLacks(t, "Account", out, `Report authorization`)
-}
-
-func TestAccountOffersHostedOnlyWithIngest(t *testing.T) {
-	a := NewAccount(admin(), "global", false, "")
-	if out := renderSignedIn(t, "account", a); strings.Contains(out, `value="hosted"`) {
-		t.Error("hosted reports are offered with ingest off")
-	} else if !strings.Contains(out, `<option value="account">My account e-mail</option>`) {
-		t.Error("the account e-mail choice names an e-mail the user has not set")
+	// Two equal columns, one box each.
+	if got := strings.Count(out, `<div class="column is-6">`); got != 2 {
+		t.Errorf("Account has %d equal columns, want 2", got)
 	}
 }
 
@@ -316,9 +284,9 @@ func TestAccountResultAndRefusalAreTheFlash(t *testing.T) {
 // What a person typed comes back escaped when a form is shown again.
 func TestAccountEscapesTheFormValues(t *testing.T) {
 	a := accountFixture()
-	a.Username, a.Email, a.DMARCAddress = `"><script>1</script>`, `a"onfocus="x`, `x"><i>`
+	a.Username, a.Email = `"><script>1</script>`, `a"onfocus="x`
 	out := renderSignedIn(t, "account", a)
-	pageLacks(t, "Account", out, `<script>1`, `"onfocus="x`, `<i>`)
+	pageLacks(t, "Account", out, `<script>1`, `"onfocus="x`)
 }
 
 // Event notifications are not built (roadmap: panel-notifications), and a page

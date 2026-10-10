@@ -95,7 +95,7 @@ func TestDomainPageShowsRecordsApplicationsAndConnection(t *testing.T) {
 	has(t, "domain", body,
 		`<h1 class="title is-3">example.org</h1>`, `class="sp-postmark`, `<h3>DKIM</h3>`, `<h3>SPF</h3>`, `<h3>DMARC</h3>`,
 		`mail._domainkey.example.org`, `v=DKIM1`, `_dmarc.example.org`, `v=DMARC1; p=none`, `v=spf1 `,
-		`<td class="sp-mono"><strong>prod-server</strong></td>`, `alerts@<wbr>example.org`, `200 / h`, `2 IPs`,
+		`<td class="sp-mono sp-nowrap"><strong>prod-server</strong></td>`, `alerts@<wbr>example.org`, `200 / h`, `2 IPs`,
 		`href="/outbound/domains/1/applications/`+idStr(a.ID)+`">Edit</a>`,
 		`mail.example.org`, `STARTTLS (submission)`, `action="/outbound/domains/1/dns-recheck"`,
 		`href="/outbound/log?domain=example.org"`, `href="/outbound/domains/1/settings#reports"`, `href="/outbound/domains/1/delete"`)
@@ -120,60 +120,16 @@ func TestDomainPageWithoutApplicationsSaysSo(t *testing.T) {
 	lacks(t, "domain", body, `<th>Login</th>`)
 }
 
-// The report address form offers what the viewer can choose, and says whose
-// default the domain follows.
-func TestDomainSettingsReportAddressChoices(t *testing.T) {
+// The rest of the settings page, beside the report address (the three choices
+// are in handlers_dmarc_test.go).
+func TestDomainSettingsPageHasItsBoxes(t *testing.T) {
 	s := newAppStand(t)
 	body := pageOf(t, s.h.HandleDomainSettings, "/outbound/domains/1/settings")
 	has(t, "settings", body, `<h1 class="title is-3">Domain settings</h1>`,
-		`action="/outbound/domains/1/settings/reports"`, `<option value="inherit">My default — no report address yet</option>`,
-		`<option value="none" selected>`, `<option value="custom">`,
+		`action="/outbound/domains/1/settings/reports"`, `<option value="none" selected>No reports</option>`, `<option value="custom">A specific address</option>`,
 		`action="/outbound/domains/1/settings/ratelimit"`, `action="/outbound/domains/1/settings/export"`,
 		`name="encrypt" value="1" checked`, `minlength="12"`, `<h2>Delete domain</h2>`, `Removes the DKIM key.`)
 	lacks(t, "settings", body, `value="hosted"`, `name="clear"`, `ratelimit/recalc`)
-
-	// Following the signed-in user's default.
-	if err := s.h.store.SetDomainDMARCUser(s.d.ID, globalPrincipal.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.h.store.SetDMARCDefault(globalPrincipal.ID, store.DMARCDefaultCustom, "dmarc@hub.example"); err != nil {
-		t.Fatal(err)
-	}
-	body = pageOf(t, s.h.HandleDomainSettings, "/outbound/domains/1/settings")
-	has(t, "settings", body, `<option value="inherit" selected>admin&#39;s default — dmarc@hub.example</option>`)
-
-	// "keep" names nobody when the domain follows the person saving: refused.
-	if rec := postFormAs(s.h.HandleDomainDMARC, globalPrincipal, "/outbound/domains/1/settings/reports", map[string]string{"id": "1"},
-		url.Values{"dmarc_rua_mode": {"keep"}}); rec.Code != http.StatusBadRequest {
-		t.Errorf("keep on a domain that follows the saver = %d, want 400", rec.Code)
-	}
-
-	// Following someone else's: theirs is selected and is what an untouched form
-	// saves; one's own is offered as the change.
-	other := domainAdmin(t, s.h.store, "ops", s.d.ID)
-	if err := s.h.store.SetDMARCDefault(other.ID, store.DMARCDefaultCustom, "ops@hub.example"); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.h.store.SetDomainDMARCUser(s.d.ID, other.ID); err != nil {
-		t.Fatal(err)
-	}
-	body = pageOf(t, s.h.HandleDomainSettings, "/outbound/domains/1/settings")
-	has(t, "settings", body, `<option value="keep" selected>ops&#39;s default — ops@hub.example</option>`,
-		`<option value="inherit">My default instead — dmarc@hub.example (you are admin)</option>`)
-	if rec := postFormAs(s.h.HandleDomainDMARC, globalPrincipal, "/outbound/domains/1/settings/reports", map[string]string{"id": "1"},
-		url.Values{"dmarc_rua_mode": {"keep"}}); rec.Code != http.StatusSeeOther {
-		t.Fatalf("saving the form untouched = %d, want 303:\n%s", rec.Code, rec.Body.String())
-	}
-	if got, err := s.h.store.GetDomain(s.d.ID); err != nil || !got.DMARCRuaUserID.Valid || got.DMARCRuaUserID.Int64 != other.ID {
-		t.Fatalf("an untouched form took the domain over: follows %v, %v; want user %d", got.DMARCRuaUserID, err, other.ID)
-	}
-
-	// An address of its own shows in the field.
-	if err := s.h.store.SetDomainDMARCAddress(s.d.ID, "reports@hub.example"); err != nil {
-		t.Fatal(err)
-	}
-	body = pageOf(t, s.h.HandleDomainSettings, "/outbound/domains/1/settings")
-	has(t, "settings", body, `<option value="custom" selected>`, `value="reports@hub.example"`)
 }
 
 func TestDomainSettingsShowsTheRateLimit(t *testing.T) {
@@ -216,7 +172,7 @@ func TestDomainSettingsRefusalsStayOnTheSettingsPage(t *testing.T) {
 	lacks(t, "report address refusal", body, `<b>`)
 
 	code, body = post(s.h.HandleDomainDMARC, "reports", url.Values{"dmarc_rua_mode": {"custom"}})
-	has(t, "report address refusal", body, `Enter a custom report address or choose another mode.`)
+	has(t, "report address refusal", body, `Enter the report address or choose another option.`)
 
 	code, body = post(s.h.HandleDomainDMARC, "reports", url.Values{"dmarc_rua_mode": {"hosted"}})
 	if code != http.StatusBadRequest {

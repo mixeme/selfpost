@@ -263,3 +263,42 @@ func TestRegeneratedPasswordIsNotCached(t *testing.T) {
 		t.Error("the response does not show the new password")
 	}
 }
+
+// New password and Delete are in the application's row of the domain page, for
+// whoever may edit the application: each is a POST form aimed at the
+// application's own handler and asks first. A domain administrator of another
+// domain gets a 404 from the same targets.
+func TestApplicationRowCarriesNewPasswordAndDelete(t *testing.T) {
+	s := newAppStand(t)
+	a, _, err := s.h.apps.CreateWithSettings(s.d.ID, "prod-server", app.Settings{Mode: store.AddressModeWildcard}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := `<td class="sp-actions"><a href="/outbound/domains/1/applications/` + idStr(a.ID) + `">Edit</a>` +
+		`<form method="post" action="/outbound/domains/1/applications/` + idStr(a.ID) + `/password" data-confirm="Generate a new password for prod-server? The current password stops working immediately."><button type="submit">New password</button></form>` +
+		`<form method="post" action="/outbound/domains/1/applications/` + idStr(a.ID) + `/delete" data-confirm="Delete application prod-server? Its credentials stop working immediately."><button type="submit" class="has-text-danger">Delete</button></form></td>`
+
+	has(t, "domain page", pageOf(t, s.h.HandleDomainDetail, "/outbound/domains/1"), row,
+		`New password and Delete ask for confirmation; the old password stops working at once.`)
+	ops := domainAdmin(t, s.h.store, "ops", s.d.ID)
+	has(t, "domain page for its administrator", send(s.h.HandleDomainDetail, &ops, "GET", "/outbound/domains/1", s.paths, nil).Body.String(), row)
+
+	// The row's targets are the application page's own handlers.
+	paths := map[string]string{"id": idStr(s.d.ID), "aid": idStr(a.ID)}
+	if rec := postFormAs(s.h.HandleRegenPassword, ops, "/outbound/domains/1/applications/1/password", paths, url.Values{}); rec.Code != http.StatusOK ||
+		rec.Header().Get("Cache-Control") != "no-store" || !strings.Contains(rec.Body.String(), s.sasl["prod-server"]) {
+		t.Errorf("the row's New password as a domain administrator = %d, Cache-Control %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	stranger := domainAdmin(t, s.h.store, "stranger")
+	for name, h := range map[string]http.HandlerFunc{"password": s.h.HandleRegenPassword, "delete": s.h.HandleDeleteApplication} {
+		if rec := postFormAs(h, stranger, "/outbound/domains/1/applications/1/"+name, paths, url.Values{}); rec.Code != http.StatusNotFound {
+			t.Errorf("%s as the administrator of another domain = %d, want 404", name, rec.Code)
+		}
+	}
+	if rec := postFormAs(s.h.HandleDeleteApplication, ops, "/outbound/domains/1/applications/1/delete", paths, url.Values{}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("the row's Delete as a domain administrator = %d", rec.Code)
+	}
+	if _, err := s.h.store.GetApplicationByLogin("prod-server"); err == nil {
+		t.Error("the application is still there after Delete")
+	}
+}

@@ -50,13 +50,6 @@ func (h *Handlers) hostedDMARCAddress(domainName string) string {
 	return dmarc.HostedReportAddress(h.cfg.Hostname, domainName)
 }
 
-// domainReportAddress resolves where a domain's DMARC aggregate reports go:
-// its own address, or the default of the user it follows. "" is a policy-only
-// record.
-func (h *Handlers) domainReportAddress(d store.Domain) (string, error) {
-	return h.store.DomainDMARCRua(d, h.hostedDMARCAddress(d.Name))
-}
-
 func domainNameSet(domains []store.Domain) map[string]bool {
 	m := make(map[string]bool, len(domains))
 	for _, d := range domains {

@@ -273,12 +273,8 @@ func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 		h.renderBackupPage(w, r, status, msg)
 		return
 	}
-	// An export without an address of its own followed someone's default on the
-	// server it came from; here it follows whoever imports it.
-	if exp.DMARCRua == nil {
-		if p, ok := h.principal(r); ok {
-			h.followCreator(d.ID, p.ID)
-		}
+	if exp.DMARCRua != "" {
+		h.resyncDMARC("domain import")
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?imported=1", d.ID), http.StatusSeeOther)
 }

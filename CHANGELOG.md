@@ -117,6 +117,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   seventeen topics for Overview, Outbound, Inbound, Server and Account - and
   the boxes of nearly every page carry a `?` that opens their topic (owner,
   2026-10-10). A reader sees the topics of the sections their menu shows.
+- panel-redesign (design, stage 3): **a domain's DMARC report address is one
+  of three choices** - no reports (a new domain), the SelfPost hosted
+  address, or an address typed for the domain - set in Domain settings, with
+  a button that fills in one's own profile e-mail. The per-user default
+  report address, a domain "following" a user and the DMARC box on Account
+  are gone, and with them `users.dmarc_default_mode`,
+  `users.dmarc_default_address` and `domains.dmarc_rua_user_id` (owner,
+  2026-10-10; replaces the design of 2026-09-21 described above).
+- panel-redesign (design, stage 3): **New password** and **Delete** are in
+  each row of a domain's Applications table again, as POST forms that look
+  like the links beside them.
 - panel-redesign (stage 2): the **Outbound queue** page is in the new shell
   with its content unchanged - the listing of `postqueue -p` and how
   retries work. With it every page is built from the component kit: the old
