@@ -46,7 +46,7 @@ var routes = struct{ always, inbound, dmarc []string }{
 		"GET /server/users/{uid}/delete", "POST /server/users/{uid}/delete",
 		"GET /server/settings", "POST /server/settings",
 		"GET /server/components",
-		"GET /account", "POST /account/profile", "POST /account/password", "POST /account/dmarc",
+		"GET /account", "POST /account/profile", "POST /account/password",
 		"GET /help",
 	},
 	inbound: []string{
