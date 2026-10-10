@@ -87,7 +87,7 @@ domain-admin access in v1.
 
 Mirror send-log retention:
 
-- Settings key `inbound_spam_log_retention_days` on `/settings` (global admin).
+- Settings key `inbound_spam_log_retention_days` on `/server/settings` (global admin).
 - Default **90** days; validation **7–365**; seed from env
   `INBOUND_SPAM_LOG_RETENTION_DAYS` when the setting is missing.
 - Prune every **6 hours** (same cadence as send-log retention).

@@ -8,7 +8,7 @@
 
 ## Goal
 
-A dedicated `/preflight` page (global-admin only) that runs infrastructure-level
+A dedicated `/server/preflight` page (global-admin only) that runs infrastructure-level
 checks and helps the administrator confirm the instance is fully configured and
 ready to deliver mail. Each failed check shows an actionable recommendation
 (what to do or where to look).
@@ -17,7 +17,7 @@ ready to deliver mail. Each failed check shows an actionable recommendation
 
 [preflight](../assets/panel-redesign/panel/preflight.html), under the design
 contract of [panel-redesign.md](panel-redesign.md): **Server › Preflight**,
-path `/server/preflight` once the routes are renamed.
+path `/server/preflight`.
 
 ## Scope
 
@@ -47,7 +47,7 @@ path `/server/preflight` once the routes are renamed.
 
 ## Done when
 
-An administrator can open `/preflight`, see a traffic-light summary of all
+An administrator can open `/server/preflight`, see a traffic-light summary of all
 infrastructure prerequisites, read specific fix instructions for any failures,
 and send a test email to verify end-to-end flow.
 
@@ -70,7 +70,7 @@ status is **agreed**. See [development.md](../development.md) § Plan checklists
       — **Sonnet**
 - [ ] Handler `handlers_preflight.go` (assemble all checks, actionable
       recommendations) — **Sonnet**
-- [ ] Test-email handler (`POST /preflight/test-email`, `net/smtp` to
+- [ ] Test-email handler (`POST /server/preflight/test-email`, `net/smtp` to
       localhost:25) — **Sonnet**
 - [ ] Template `preflight.html` (traffic-light cards + test-email form) —
       **Sonnet**
