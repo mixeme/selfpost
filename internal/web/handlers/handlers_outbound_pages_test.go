@@ -98,7 +98,7 @@ func TestDomainPageShowsRecordsApplicationsAndConnection(t *testing.T) {
 		`<td class="sp-mono sp-nowrap"><strong>prod-server</strong></td>`, `alerts@<wbr>example.org`, `200 / h`, `2 IPs`,
 		`href="/outbound/domains/1/applications/`+idStr(a.ID)+`">Edit</a>`,
 		`mail.example.org`, `STARTTLS (submission)`, `action="/outbound/domains/1/dns-recheck"`,
-		`href="/outbound/log?domain=example.org"`, `href="/outbound/domains/1/settings#reports"`, `href="/outbound/domains/1/delete"`)
+		`href="/outbound/log?domain=example.org"`, `href="/outbound/domains/1/settings"`, `href="/outbound/domains/1/delete"`)
 
 	// The flash the redirects carry.
 	rec := send(s.h.HandleDomainDetail, &globalPrincipal, "GET", "/outbound/domains/1?appsaved=1", s.paths, nil)
@@ -339,7 +339,7 @@ func TestDeleteConfirmNamesTheApplicationsThatGoWithTheDomain(t *testing.T) {
 		t.Fatalf("delete confirmation = %d:\n%s", rec.Code, body)
 	}
 	has(t, "delete", body, `<h1 class="title is-3">Delete example.org</h1>`, `permanently delete its DKIM signing key;`,
-		`<form method="post" action="/outbound/domains/1/delete">`, `Delete example.org</button>`, `href="/outbound/domains/1/settings#export"`)
+		`<form method="post" action="/outbound/domains/1/delete">`, `Delete example.org</button>`, `href="/outbound/domains/1/settings"`)
 	lacks(t, "delete", body, `credentials`)
 
 	for _, login := range []string{"prod-server", "alerts"} {

@@ -99,7 +99,7 @@ func TestOutDomainRecordsSayWhatDNSHolds(t *testing.T) {
 		`sp2026._domainkey.example.org`, `<textarea class="textarea" rows="3" readonly>`,
 		`<h3>SPF</h3>`, `<span class="tag is-danger is-light">mismatch</span>`, `v=spf1 ip4:203.0.113.25 ~all`,
 		`In DNS now`, `v=spf1 include:_spf.google.com ~all`, `Shallow check: <code>include:</code> is not followed.`,
-		`<h3>DMARC</h3>`, `Report address: <a href="/outbound/domains/1/settings#reports">example.org@dmarc.mail.example.org</a>`,
+		`<h3>DMARC</h3>`, `Report address: <a href="/outbound/domains/1/settings">example.org@dmarc.mail.example.org</a>`,
 		`<code>p=none</code> does not affect delivery.`, `<a href="/outbound/dmarc/domains/1">reports</a>`,
 	)
 	if got := strings.Count(out, `In DNS now`); got != 1 {
@@ -180,7 +180,7 @@ func TestOutDomainMenuFollowsTheViewer(t *testing.T) {
 	out := renderSignedIn(t, "out-domain", outDomainFixture())
 	pageHas(t, "Domain", out,
 		`href="#dns"`, `href="#apps"`, `href="#connection"`, `href="/outbound/log?domain=example.org"`, `href="/outbound/dmarc/domains/1"`,
-		`href="/outbound/domains/1/settings#reports"`, `href="/outbound/domains/1/settings#limit"`, `href="/outbound/domains/1/settings#export"`,
+		`href="/outbound/domains/1/settings"`, `href="/outbound/domains/1/settings"`, `href="/outbound/domains/1/settings"`,
 		`href="/outbound/domains/1/delete"`, `id="dns"`, `id="apps"`, `id="connection"`,
 		`class="sp-help" href="/help#dns"`, `class="sp-help" href="/help#apps"`,
 	)
@@ -437,7 +437,7 @@ func TestOutDomainDeleteNamesWhatGoesWithIt(t *testing.T) {
 		`reload OpenDKIM so the domain is no longer signed.`, `Inbound domains are not touched.`,
 		`<form method="post" action="/outbound/domains/1/delete">`, `class="button is-danger"`, `Delete example.org</button>`,
 		`href="/outbound/domains/1">Keep it</a>`,
-		`<h2>Moving it instead?</h2>`, `<a href="/outbound/domains/1/settings#export">Export the domain</a>`,
+		`<h2>Moving it instead?</h2>`, `<a href="/outbound/domains/1/settings">Export the domain</a>`,
 	)
 
 	// No applications: nothing to say about them.

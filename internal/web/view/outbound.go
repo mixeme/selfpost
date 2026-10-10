@@ -196,7 +196,7 @@ type DMARCRecordInput struct {
 // delivery, so the standing note says how to tighten it.
 func DMARCRecord(in DMARCRecordInput) Record {
 	r := Record{Name: "DMARC", Host: in.Host, Type: "TXT", Value: in.Value,
-		Note: Rich("Report address: ", Link(in.SettingsHref+"#reports", in.Source))}
+		Note: Rich("Report address: ", Link(in.SettingsHref, in.Source))}
 	reports := Rich("reports")
 	if in.ReportsHref != "" {
 		reports = Rich(Link(in.ReportsHref, "reports"))
@@ -497,9 +497,9 @@ func (p *OutDomain) Menu() SideMenu {
 	}
 	settings := DomainHref(p.id) + "/settings"
 	rare := MenuGroup{Label: "Rarely changed", Items: []MenuItem{
-		{Label: "Report address", Icon: "ti-mail-forward", Href: settings + "#reports"},
-		{Label: "Rate limit", Icon: "ti-gauge", Href: settings + "#limit", Tag: p.limitTag},
-		{Label: "Export", Icon: "ti-file-export", Href: settings + "#export"},
+		{Label: "Report address", Icon: "ti-mail-forward", Href: settings},
+		{Label: "Rate limit", Icon: "ti-gauge", Href: settings, Tag: p.limitTag},
+		{Label: "Export", Icon: "ti-file-export", Href: settings},
 	}}
 	if p.canDelete {
 		rare.Items = append(rare.Items, MenuItem{Label: "Delete domain", Icon: "ti-trash", Href: DomainHref(p.id) + "/delete", Danger: true})
@@ -748,7 +748,7 @@ func NewOutDomainDelete(m Meta, id int64, name string, logins []string) *OutDoma
 		Confirm:      "Delete " + name,
 		KeepHref:     href,
 		Moving:       Box{Icon: "ti-file-export", Title: "Moving it instead?"},
-		MovingText: Rich(Link(href+"/settings#export", "Export the domain"),
+		MovingText: Rich(Link(href+"/settings", "Export the domain"),
 			" first. The file carries the key and the application passwords, so the new instance needs no DNS change."),
 	}
 	if n := appsPhrase(len(logins)); n != "" {

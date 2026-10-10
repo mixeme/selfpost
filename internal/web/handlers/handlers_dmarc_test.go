@@ -105,7 +105,7 @@ func TestNewDomainHasNoReports(t *testing.T) {
 
 	// The domain the stand started with has none either.
 	has(t, "domain page", pageOf(t, s.h.HandleDomainDetail, "/outbound/domains/1"),
-		`Report address: <a href="/outbound/domains/1/settings#reports">no reports</a>`)
+		`Report address: <a href="/outbound/domains/1/settings">no reports</a>`)
 }
 
 // Each of the three choices is saved, comes back selected, and is what the
@@ -130,7 +130,7 @@ func TestDomainReportAddressThreeChoices(t *testing.T) {
 	has(t, "settings after hosted", settings(), `<option value="hosted" selected>`)
 	lacks(t, "settings after hosted", settings(), `value="`+hostedForExample+`"`) // the typed field stays empty
 	has(t, "domain page after hosted", pageOf(t, s.h.HandleDomainDetail, "/outbound/domains/1"),
-		`Report address: <a href="/outbound/domains/1/settings#reports">`+hostedEscaped+`</a>`,
+		`Report address: <a href="/outbound/domains/1/settings">`+hostedEscaped+`</a>`,
 		`rua=mailto:`+hostedEscaped)
 	// The ingest allow-list was rebuilt for the new address.
 	if last := maps.got[len(maps.got)-1]; !contains(last.Recipients, hostedForExample) {
@@ -145,7 +145,7 @@ func TestDomainReportAddressThreeChoices(t *testing.T) {
 	}
 	has(t, "settings after custom", settings(), `<option value="custom" selected>`, `value="reports@hub.example"`)
 	has(t, "domain page after custom", pageOf(t, s.h.HandleDomainDetail, "/outbound/domains/1"),
-		`Report address: <a href="/outbound/domains/1/settings#reports">reports@hub.example</a>`, `rua=mailto:reports@hub.example`,
+		`Report address: <a href="/outbound/domains/1/settings">reports@hub.example</a>`, `rua=mailto:reports@hub.example`,
 		`<h3>Report authorization</h3>`) // the address is on another domain than the senders
 	if last := maps.got[len(maps.got)-1]; contains(last.Recipients, hostedForExample) || contains(last.Recipients, "reports@hub.example") {
 		t.Errorf("the allow-list after choosing another host: %v", last.Recipients)
