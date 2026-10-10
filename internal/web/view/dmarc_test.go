@@ -12,7 +12,7 @@ func TestDMARCHubShowsIngestAndTheLatestReports(t *testing.T) {
 	pageHas(t, "DMARC reports", out,
 		`<h1 class="title is-3">DMARC reports</h1>`, `<code>rua=</code>`,
 		`<h2>Ingest</h2>`, `<span class="tag is-success is-light">ok</span>`,
-		`<dd>2026-09-21 06:12 UTC</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dt>Hosted addresses</dt>`, `<dd class="sp-mono">dmarc-reports&#43;&lt;domain&gt;@mail.example.org</dd>`, `<dd>500 reports or 90 days</dd>`,
+		`<dd>2026-09-21 06:12 UTC</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dt>Hosted addresses</dt>`, `<dd class="sp-mono sp-small">dmarc-reports&#43;&lt;domain&gt;@mail.example.org</dd>`, `<dd>500 reports or 90 days</dd>`,
 		`<th>Received, UTC</th>`, `09-21 06:12`, `<a href="/outbound/dmarc/domains/1">example.org</a>`,
 		"<td>1 903</td>", `<span class="tag is-warning is-light">7</span>`, `<td>0</td><td class="sp-actions"><a href="/outbound/dmarc/reports/41">View</a>`,
 	)
@@ -24,7 +24,7 @@ func TestDMARCHubWithoutReports(t *testing.T) {
 	p := NewDMARCHub(admin(), IngestInput{Hosted: "dmarc@mail.example.org", Host: "mail.example.org", RetentionMax: 500, RetentionDays: 90})
 	out := renderSignedIn(t, "dmarc", p.WithReports(nil))
 	pageHas(t, "DMARC reports", out, `<span class="tag is-warning is-light">quiet</span>`, `<dd>None yet</dd>`,
-		`publish MX for <span class="sp-mono">mail.example.org</span> on this server`, `No reports yet.`, `0 kept · 0 parse failures`)
+		`publish MX for <span class="sp-mono">mail.example.org</span> pointing at this server`, `No reports yet.`, `0 kept · 0 parse failures`)
 	pageLacks(t, "DMARC reports", out, `<table`, `UTC</dd>`)
 
 	one := NewDMARCHub(admin(), IngestInput{OK: true, Last: time.Now(), KeptThisWeek: 1, ParseFailures: 1})

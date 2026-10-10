@@ -95,7 +95,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 	}
 	last := Fact{Label: "Last report", Value: Plain("None yet")}
 	if in.Last.IsZero() {
-		last.Note = Rich("Point ", Code("rua="), " at the hosted address below and publish MX for ", Mono(in.Host), " on this server.")
+		last.Note = Rich("Set a domain to SelfPost hosted in its Domain settings, publish the DMARC record it then shows, and publish MX for ", Mono(in.Host), " pointing at this server.")
 	} else {
 		last.Value = Plain(in.Last.UTC().Format("2006-01-02 15:04") + " UTC")
 	}
@@ -112,7 +112,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 		IngestFacts: []Fact{
 			last,
 			{Label: "This week", Value: Plain(FormatCount(int64(in.KeptThisWeek)) + " kept · " + plural(int64(in.ParseFailures), "parse failure", "parse failures"))},
-			{Label: "Hosted addresses", Value: Plain(in.Hosted), Mono: true},
+			{Label: "Hosted addresses", Value: Plain(in.Hosted), Mono: true, Small: true},
 			{Label: "Retention", Value: Plain(FormatCount(int64(in.RetentionMax)) + " reports or " + plural(int64(in.RetentionDays), "day", "days"))},
 		},
 		Recent: Box{No: "02", Title: "Recent reports"},
