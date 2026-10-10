@@ -153,17 +153,26 @@
 
   function initShowWhen(root) {
     showWhenRules.forEach(function (rule) {
-      root.querySelectorAll(rule.match).forEach(function (control) {
-        syncShowWhen(control);
-        control.addEventListener("change", function () {
-          syncShowWhen(control);
-        });
-      });
+      root.querySelectorAll(rule.match).forEach(syncShowWhen);
     });
   }
 
+  // One listener for the document rather than one per control: a form that
+  // arrives in an htmx swap is covered without being wired up again.
+  document.addEventListener("change", function (ev) {
+    if (ev.target && ev.target.matches) {
+      syncShowWhen(ev.target);
+    }
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     initShowWhen(document);
+  });
+
+  // htmx:load fires for every element htmx puts into the page, so swapped-in
+  // markup starts with its blocks shown or hidden the way a full page does.
+  document.addEventListener("htmx:load", function (ev) {
+    initShowWhen(ev.detail.elt);
   });
 
   // --- Adaptive monitoring polling ---------------------------------------

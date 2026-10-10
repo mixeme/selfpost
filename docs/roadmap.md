@@ -279,7 +279,7 @@ is in the table below; the rest of it shipped in
 | Edge case | [dnscheck/resolver.go](../internal/dnscheck/resolver.go) fans out four parallel queries where a fallback chain would do — change it or write down why not |
 | UI | ~~`.pair` (DMARC templates) and `.split` (every other page) are two names for one layout~~ — struck: retired by [panel-redesign](#panel-redesign); both stylesheets are gone and every page is laid out by the component kit |
 | UI | ~~Two `back_link` elements in a row in `dmarc_domain.html`~~ — struck: retired by [panel-redesign](#panel-redesign); the page is rebuilt on the kit with one breadcrumb in its head |
-| UI | `initShowWhen` is not re-run after an htmx swap — safe today (no form arrives that way), fragile if one ever does |
+| UI | ~~`initShowWhen` is not re-run after an htmx swap~~ — struck: the show/hide rules listen on the document and are applied again on `htmx:load` |
 
 **Boundary:** no feature work and no behaviour change an operator would notice,
 apart from the backup re-auth prompt. Anything here that grows past an hour
