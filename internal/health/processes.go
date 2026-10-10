@@ -23,6 +23,10 @@ type Process struct {
 	State  string // supervisord's own state word, e.g. RUNNING
 	Detail string // the rest of the line: pid/uptime, or exit information
 	Status Status
+	// OneShot marks a program that is started on demand and exits at once
+	// (oneShotPrograms): idle is its healthy state, and it is not one of the
+	// programs that are expected to be running.
+	OneShot bool
 }
 
 // Processes returns the state of every supervised program (architecture.md §
@@ -71,10 +75,11 @@ func parseProcesses(out string) []Process {
 		}
 		name, state := fields[0], fields[1]
 		procs = append(procs, Process{
-			Name:   name,
-			State:  state,
-			Detail: strings.Join(fields[2:], " "),
-			Status: processStatus(name, state),
+			Name:    name,
+			State:   state,
+			Detail:  strings.Join(fields[2:], " "),
+			Status:  processStatus(name, state),
+			OneShot: oneShotPrograms[name],
 		})
 	}
 	return procs

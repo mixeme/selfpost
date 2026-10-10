@@ -92,7 +92,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 		}
 	}
 	card := socketCard(t, h)
-	if card.Value != "3 of 3 answering" || card.Sub != "OpenDKIM, send-log, Spam filter" || card.Level != "" {
+	if card.Value != "3 of 3 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 

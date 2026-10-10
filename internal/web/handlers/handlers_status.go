@@ -245,15 +245,22 @@ func healthCards(c map[string]any) []view.HealthCard {
 		ram = "RAM " + machine.Memory.PctText()
 	}
 
-	running, notRunning := 0, []string{}
+	// The count is of the programs that are meant to stay up. A one-shot helper
+	// (postfix-reload) idles between runs: it is not "running" and not missing,
+	// so it is left out of both numbers and named only when it is in trouble.
+	running, expected, notRunning := 0, 0, []string{}
 	for _, p := range procs {
-		if p.Status == health.StatusOK {
-			running++
-		} else {
+		if !p.OneShot {
+			expected++
+			if p.Status == health.StatusOK {
+				running++
+			}
+		}
+		if p.Status != health.StatusOK {
 			notRunning = append(notRunning, p.Name)
 		}
 	}
-	procValue, procSub := fmt.Sprintf("%d of %d running", running, len(procs)), "all programs"
+	procValue, procSub := fmt.Sprintf("%d of %d running", running, expected), "all programs"
 	if len(notRunning) > 0 {
 		procSub = strings.Join(notRunning, ", ")
 	}
@@ -271,12 +278,27 @@ func healthCards(c map[string]any) []view.HealthCard {
 		queueValue = "Could not be read"
 	}
 
-	answering, socketNames := 0, make([]string, 0, len(sockets))
+	// The line under the count has to fit a card: the sockets that do not
+	// answer when some do not; otherwise their names, or - with the inbound spam
+	// filter among them, when three names no longer fit - that it is included.
+	answering, socketNames, silent, withFilter := 0, make([]string, 0, len(sockets)), []string{}, false
 	for _, s := range sockets {
 		if s.Present {
 			answering++
+		} else {
+			silent = append(silent, s.Name)
+		}
+		if s.Note != "" {
+			withFilter = true
 		}
 		socketNames = append(socketNames, s.Name)
+	}
+	socketSub := strings.Join(socketNames, ", ")
+	switch {
+	case len(silent) > 0:
+		socketSub = strings.Join(silent, ", ")
+	case withFilter:
+		socketSub = "incl. the spam filter"
 	}
 
 	ptrValue := "Forward = reverse"
@@ -293,7 +315,7 @@ func healthCards(c map[string]any) []view.HealthCard {
 		card("TLS certificate", "ti-certificate", "/server/health#certificate", cert.Status, certValue, cert.Subject),
 		card("Queue", "ti-stack-2", "/outbound/queue", c["QueueStatus"].(health.Status), queueValue, "outbound"),
 		card("Milter sockets", "ti-plug-connected", "/server/health#sockets", c["SocketStatus"].(health.Status),
-			fmt.Sprintf("%d of %d answering", answering, len(sockets)), strings.Join(socketNames, ", ")),
+			fmt.Sprintf("%d of %d answering", answering, len(sockets)), socketSub),
 		card("Reverse DNS", "ti-arrows-exchange", "/server/health#hostname", ptr.Status, ptrValue, c["Hostname"].(string)),
 	}
 }

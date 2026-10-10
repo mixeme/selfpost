@@ -41,7 +41,7 @@ func TestHealthCards(t *testing.T) {
 		{"Processes", "fail", "1 of 2 running", "postfix", "/server/health#processes"},
 		{"TLS certificate", "warn", "Expires in 12 days", "mail.example.org", "/server/health#certificate"},
 		{"Queue", "", "Empty", "outbound", "/outbound/queue"},
-		{"Milter sockets", "warn", "1 of 2 answering", "OpenDKIM, send-log", "/server/health#sockets"},
+		{"Milter sockets", "warn", "1 of 2 answering", "send-log", "/server/health#sockets"},
 		{"Reverse DNS", "", "Forward = reverse", "mail.example.org", "/server/health#hostname"},
 	}
 	if len(cards) != len(want) {
@@ -78,5 +78,30 @@ func TestQueueCardValue(t *testing.T) {
 		if got := queueCardValue(in); got != want {
 			t.Errorf("queueCardValue(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// The Processes card counts the programs that are meant to stay up. The one-shot
+// reload helper idles between runs: it is neither running nor missing.
+func TestProcessesCardLeavesOutTheIdleOneShot(t *testing.T) {
+	c := checksFixture()
+	c["Processes"] = []health.Process{
+		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
+		{Name: "postfix", State: "RUNNING", Status: health.StatusOK},
+		{Name: "postfix-reload", State: "STOPPED", Status: health.StatusOK, OneShot: true},
+	}
+	c["ProcessStatus"] = health.StatusOK
+	card := healthCards(c)[1]
+	if card.Value != "2 of 2 running" || card.Sub != "all programs" {
+		t.Errorf("card = %q / %q, want 2 of 2 running / all programs", card.Value, card.Sub)
+	}
+
+	c["Processes"] = []health.Process{
+		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
+		{Name: "postfix-reload", State: "FATAL", Status: health.StatusError, OneShot: true},
+	}
+	card = healthCards(c)[1]
+	if card.Value != "1 of 1 running" || card.Sub != "postfix-reload" {
+		t.Errorf("card = %q / %q, want 1 of 1 running / postfix-reload", card.Value, card.Sub)
 	}
 }

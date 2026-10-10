@@ -216,6 +216,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   showq service: Permission denied"), the Queue card said "Could not be read"
   and the queue page had no listing. Present since the persistent queue of
   1.3.0; mail flow was not affected. The e2e suite opens the queue page now.
+- Overview's Processes card counts the programs that are meant to stay up
+  ("6 of 6 running"); the idle one-shot `postfix-reload` was counted as
+  running. The Milter sockets card no longer clips its second line with three
+  sockets, and a DKIM value is shown whole instead of scrolling inside its
+  field.
 - The confirmation before deleting a user names the domains that follow
   that user's default report address and will be left without one; it used
   to say the domains were not affected (replaced before release — see the

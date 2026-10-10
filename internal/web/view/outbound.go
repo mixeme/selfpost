@@ -145,11 +145,26 @@ func applyCheck(r *Record, c DNSCheck, standing Text, mismatch Text) {
 	}
 }
 
+// dkimRows is the height of the field that shows a DKIM value: enough lines for
+// the whole key, so the field does not scroll inside itself. A 2048-bit key is
+// about 410 characters; a line of the field holds some 80 of them at the
+// narrowest width the page is drawn for.
+func dkimRows(value string) int {
+	rows := (len(value)+79)/80 + 1
+	if rows < 3 {
+		return 3
+	}
+	if rows > 12 {
+		return 12
+	}
+	return rows
+}
+
 // DKIMRecord is the DKIM record to publish: the key is not a secret, and the
 // selector says which one it is.
 func DKIMRecord(selector, host, value string, c DNSCheck) Record {
 	r := Record{Name: "DKIM", Note: Rich("Not a secret · selector ", Code(selector)),
-		Host: host, Type: "TXT", Value: value, ValueRows: 3}
+		Host: host, Type: "TXT", Value: value, ValueRows: dkimRows(value)}
 	applyCheck(&r, c, nil, nil)
 	return r
 }

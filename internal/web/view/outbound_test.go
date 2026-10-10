@@ -508,3 +508,14 @@ func TestActionConfirmIsOnlyAnAttribute(t *testing.T) {
 		t.Errorf("Confirm changes more than the attribute:\n%s\n%s", plain, asked)
 	}
 }
+
+// The DKIM value is shown whole: the field grows with the key, so it does not
+// scroll inside itself.
+func TestDKIMFieldIsAsTallAsItsValue(t *testing.T) {
+	short := DKIMRecord("sp", "sp._domainkey.example.org", "v=DKIM1; p=AAA", DNSCheck{})
+	long := DKIMRecord("sp", "sp._domainkey.example.org", "v=DKIM1; h=sha256; k=rsa; p="+strings.Repeat("A", 392), DNSCheck{})
+	huge := DKIMRecord("sp", "sp._domainkey.example.org", strings.Repeat("A", 5000), DNSCheck{})
+	if short.ValueRows != 3 || long.ValueRows != 7 || huge.ValueRows != 12 {
+		t.Errorf("rows = %d, %d, %d; want 3, 7, 12", short.ValueRows, long.ValueRows, huge.ValueRows)
+	}
+}
