@@ -160,6 +160,25 @@ func TestE2E(t *testing.T) {
 		}
 	})
 
+	// The panel runs postqueue as its own user. That works only while the queue's
+	// public/ directory belongs to Postfix's setgid group, which the entrypoint
+	// has to restore after its recursive chown of the queue tree.
+	run("queue_readable_by_the_panel", func(t *testing.T) {
+		resp, body, err := sc.panel.get("/outbound/queue")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 200 {
+			t.Fatalf("GET /outbound/queue = %d", resp.StatusCode)
+		}
+		if strings.Contains(body, "Could not read the mail queue") {
+			t.Fatal("the panel could not run postqueue -p (queue directory permissions)")
+		}
+		if !strings.Contains(body, "Mail queue is empty") {
+			t.Fatalf("the queue page does not show postqueue's listing of an empty queue:\n%s", body)
+		}
+	})
+
 	run("add_domain_and_publish_dkim", func(t *testing.T) {
 		id, err := sc.panel.addDomain(senderDomain)
 		if err != nil {
