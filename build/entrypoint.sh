@@ -164,5 +164,9 @@ chown -R postfix:postfix /data/postfix/queue
 # "Connect to the Postfix showq service: Permission denied" and the panel cannot
 # read the queue (the Queue card and the Outbound queue page).
 chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
+# It would also leave the queue directory itself and pid/ owned by postfix.
+# Postfix keeps those two owned by root (master, which runs as root, is the only
+# writer) and logs "warning: not owned by root" for each at every start.
+chown root /data/postfix/queue /data/postfix/queue/pid
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
