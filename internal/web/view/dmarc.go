@@ -112,7 +112,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 		IngestFacts: []Fact{
 			last,
 			{Label: "This week", Value: Plain(FormatCount(int64(in.KeptThisWeek)) + " kept · " + plural(int64(in.ParseFailures), "parse failure", "parse failures"))},
-			{Label: "Hosted address", Value: Plain(in.Hosted), Mono: true},
+			{Label: "Hosted addresses", Value: Plain(in.Hosted), Mono: true},
 			{Label: "Retention", Value: Plain(FormatCount(int64(in.RetentionMax)) + " reports or " + plural(int64(in.RetentionDays), "day", "days"))},
 		},
 		Recent: Box{No: "02", Title: "Recent reports"},

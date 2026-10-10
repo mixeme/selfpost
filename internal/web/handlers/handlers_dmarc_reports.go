@@ -85,7 +85,7 @@ func (h *Handlers) HandleDMARCList(w http.ResponseWriter, r *http.Request) {
 	}
 	in := view.IngestInput{
 		OK: stats.IngestOK, KeptThisWeek: stats.KeptThisWeek, ParseFailures: stats.ParseFailures,
-		Hosted: h.dmarc.DefaultHostedSuggestion(), Host: h.cfg.Hostname,
+		Hosted: dmarc.HostedReportAddress(h.cfg.Hostname, "<domain>"), Host: h.cfg.Hostname,
 		RetentionMax: store.DMARCReportsMaxKeep, RetentionDays: store.DMARCReportsMaxAgeDays,
 	}
 	if stats.LastReceivedAt != nil {

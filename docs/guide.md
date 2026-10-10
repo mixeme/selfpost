@@ -874,9 +874,10 @@ settings) and nowhere else:
 
 Changing the choice changes the DMARC record to publish; the domain page shows
 the new value. There is no panel-wide or per-user default. Only addresses on
-`SELFPOST_HOSTNAME` are accepted on port 25: the generic
-`dmarc-reports@<hostname>` and any address on that host that a domain has
-chosen.
+`SELFPOST_HOSTNAME` that a domain has chosen are accepted on port 25 - the
+hosted address `dmarc-reports+<domain>@<hostname>` of a domain set to
+*SelfPost hosted*, or a typed address that happens to be on this host. There
+is no mailbox for the server as a whole.
 
 **DNS.** Publish the usual `_dmarc` TXT on each sending domain with
 `rua=mailto:…` pointing at the address the domain shows. Receivers deliver to the

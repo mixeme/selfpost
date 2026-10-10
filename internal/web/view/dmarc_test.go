@@ -12,7 +12,7 @@ func TestDMARCHubShowsIngestAndTheLatestReports(t *testing.T) {
 	pageHas(t, "DMARC reports", out,
 		`<h1 class="title is-3">DMARC reports</h1>`, `<code>rua=</code>`,
 		`<h2>Ingest</h2>`, `<span class="tag is-success is-light">ok</span>`,
-		`<dd>2026-09-21 06:12 UTC</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dd class="sp-mono">dmarc@mail.example.org</dd>`, `<dd>500 reports or 90 days</dd>`,
+		`<dd>2026-09-21 06:12 UTC</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dt>Hosted addresses</dt>`, `<dd class="sp-mono">dmarc-reports&#43;&lt;domain&gt;@mail.example.org</dd>`, `<dd>500 reports or 90 days</dd>`,
 		`<th>Received, UTC</th>`, `09-21 06:12`, `<a href="/outbound/dmarc/domains/1">example.org</a>`,
 		"<td>1 903</td>", `<span class="tag is-warning is-light">7</span>`, `<td>0</td><td class="sp-actions"><a href="/outbound/dmarc/reports/41">View</a>`,
 	)

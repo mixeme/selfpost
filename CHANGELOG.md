@@ -133,6 +133,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `unix:/path`, one second at most, nothing sent). A filter that does not
   answer is an error with `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` - inbound
   mail is deferred - and a warning otherwise - mail goes through unfiltered.
+- **Port 25 no longer accepts `dmarc-reports@<hostname>`**, the report
+  mailbox of the server as a whole. Only an address a domain has chosen is
+  accepted: its hosted address `dmarc-reports+<domain>@<hostname>`, or a
+  typed address that is on this host. A domain whose published `rua=` still
+  names the general mailbox must be set to *SelfPost hosted* and its DMARC
+  record republished (owner, 2026-10-10).
 - panel-redesign (design, stage 3): **New password** and **Delete** are in
   each row of a domain's Applications table again, as POST forms that look
   like the links beside them.

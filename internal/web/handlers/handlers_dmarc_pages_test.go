@@ -49,7 +49,7 @@ func TestDMARCHubShowsIngestAndRecentReports(t *testing.T) {
 	body := getBody(t, s.h.HandleDMARCList, "/outbound/dmarc")
 	has(t, "hub", body,
 		`<h1 class="title is-3">DMARC reports</h1>`, `<h2>Ingest</h2>`, `<span class="tag is-success is-light">ok</span>`,
-		`1 kept · 0 parse failures`, `dmarc-reports@mail.example.org`, `500 reports or 90 days`,
+		`1 kept · 0 parse failures`, `Hosted addresses`, `dmarc-reports&#43;&lt;domain&gt;@mail.example.org`, `500 reports or 90 days`,
 		`<h2>Recent reports</h2>`, `<a href="/outbound/dmarc/domains/1">example.org</a>`, `Outlook.com`,
 		"<td>1\u00a0903</td>", `<span class="tag is-warning is-light">7</span>`, `href="/outbound/dmarc/reports/`+idStr(s.reportID)+`">View</a>`)
 	lacks(t, "hub", body, `None yet`)
@@ -184,7 +184,7 @@ func TestDMARCPagesStayWithinTheViewersDomains(t *testing.T) {
 	has(t, "hub for its administrator", hub.Body.String(), `<h1 class="title is-3">DMARC reports</h1>`, `<h2>Recent reports</h2>`,
 		`<a href="/outbound/dmarc/domains/1">example.org</a>`, `Outlook.com`, `href="/outbound/dmarc/reports/`+idStr(s.reportID)+`"`)
 	lacks(t, "hub for its administrator", hub.Body.String(), "other.example.net", "google.com",
-		`/outbound/dmarc/reports/`+idStr(otherReport)+`"`, `<h2>Ingest</h2>`, `dmarc-reports@mail.example.org`,
+		`/outbound/dmarc/reports/`+idStr(otherReport)+`"`, `<h2>Ingest</h2>`, `Hosted addresses`, `dmarc-reports&#43;&lt;domain&gt;`,
 		`parse failure`, `Last report`, `Retention`)
 
 	// Their own domain and report are theirs, and so is the way back to the hub.

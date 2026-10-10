@@ -4,7 +4,8 @@ import (
 	"strings"
 )
 
-// DefaultLocalPart is the mailbox local-part for the panel-wide hosted address.
+// DefaultLocalPart is the local part of every hosted address; the domain
+// follows it after a plus sign.
 const DefaultLocalPart = "dmarc-reports"
 
 // HostedReportAddress is the per-domain SelfPost-hosted rua= destination.
@@ -12,11 +13,6 @@ func HostedReportAddress(hostname, domain string) string {
 	hostname = strings.ToLower(strings.TrimSpace(hostname))
 	domain = strings.ToLower(strings.TrimSpace(domain))
 	return DefaultLocalPart + "+" + domain + "@" + hostname
-}
-
-// DefaultHostedReportAddress is the settings-level hosted rua= when ingest is on.
-func DefaultHostedReportAddress(hostname string) string {
-	return DefaultLocalPart + "@" + strings.ToLower(strings.TrimSpace(hostname))
 }
 
 // IsHostedOnHostname reports whether addr is delivered locally on hostname.

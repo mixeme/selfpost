@@ -64,10 +64,9 @@ func (s *Service) AllowedRecipients() ([]string, error) {
 		seen[addr] = true
 		out = append(out, addr)
 	}
-	// The instance's generic mailbox is always open: it is the address the
-	// guide tells a fresh install to publish. A domain's own report address
-	// opens the mailbox it names, if that is on this host.
-	add(DefaultHostedReportAddress(s.hostname))
+	// Only what a domain has chosen is open: its report address opens the
+	// mailbox it names, if that is on this host. There is no mailbox for the
+	// server as a whole.
 	domains, err := s.store.ListDomains()
 	if err != nil {
 		return nil, err
@@ -99,11 +98,6 @@ func recipientDomains(addrs []string) []string {
 // HostedSuggestion returns the address the panel should suggest for a domain.
 func (s *Service) HostedSuggestion(domain string) string {
 	return HostedReportAddress(s.hostname, domain)
-}
-
-// DefaultHostedSuggestion is the settings-level hosted address.
-func (s *Service) DefaultHostedSuggestion() string {
-	return DefaultHostedReportAddress(s.hostname)
 }
 
 // ValidateHostedAddress ensures addr is on this hostname before saving.

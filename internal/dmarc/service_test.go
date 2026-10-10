@@ -7,8 +7,8 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 )
 
-// The ingest allow-list is the generic mailbox plus the report address of each
-// domain that points at this host: a new domain (no reports) and a domain
+// The ingest allow-list is the report address of each domain that points at
+// this host, and nothing for the server as a whole: a new domain (no reports) and a domain
 // reporting to another host open nothing of their own.
 func TestAllowedRecipientsFollowTheDomainAddresses(t *testing.T) {
 	st, err := store.Open(t.TempDir() + "/test.db")
@@ -36,7 +36,7 @@ func TestAllowedRecipientsFollowTheDomainAddresses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AllowedRecipients: %v", err)
 	}
-	want := []string{"dmarc-reports+hosted.example@mail.example.com", "dmarc-reports@mail.example.com", "ops@mail.example.com"}
+	want := []string{"dmarc-reports+hosted.example@mail.example.com", "ops@mail.example.com"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("allowed recipients = %v, want %v", got, want)
 	}

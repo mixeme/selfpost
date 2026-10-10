@@ -271,7 +271,7 @@ func outMessageFixture() *OutMessage {
 func dmarcHubFixture() *DMARCHub {
 	p := NewDMARCHub(admin(), IngestInput{
 		OK: true, Last: time.Date(2026, 9, 21, 6, 12, 0, 0, time.UTC), KeptThisWeek: 14, ParseFailures: 0,
-		Hosted: "dmarc@mail.example.org", Host: "mail.example.org", RetentionMax: 500, RetentionDays: 90,
+		Hosted: "dmarc-reports+<domain>@mail.example.org", Host: "mail.example.org", RetentionMax: 500, RetentionDays: 90,
 	})
 	row := func(id int64, at, domain, reporter, window string, pass, fail int) DMARCReportRow {
 		return DMARCReportRow{Received: at, Domain: domain, DomainHref: "/outbound/dmarc/domains/1", Reporter: reporter,
