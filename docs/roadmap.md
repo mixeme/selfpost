@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 24/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 25/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
@@ -277,8 +277,8 @@ is in the table below; the rest of it shipped in
 | Edge case | The log fingerprint in [logtail/offset.go](../internal/logtail/offset.go) can collide across a rotation — include the inode |
 | Edge case | `parsePage` in [handlers_monitor.go](../internal/web/handlers/handlers_monitor.go) does not clamp to `lastPage` |
 | Edge case | [dnscheck/resolver.go](../internal/dnscheck/resolver.go) fans out four parallel queries where a fallback chain would do — change it or write down why not |
-| UI | `.pair` (DMARC templates) and `.split` (every other page) are two names for one layout |
-| UI | Two `back_link` elements in a row in `dmarc_domain.html` |
+| UI | ~~`.pair` (DMARC templates) and `.split` (every other page) are two names for one layout~~ — struck: retired by [panel-redesign](#panel-redesign); both stylesheets are gone and every page is laid out by the component kit |
+| UI | ~~Two `back_link` elements in a row in `dmarc_domain.html`~~ — struck: retired by [panel-redesign](#panel-redesign); the page is rebuilt on the kit with one breadcrumb in its head |
 | UI | `initShowWhen` is not re-run after an htmx swap — safe today (no form arrives that way), fragile if one ever does |
 
 **Boundary:** no feature work and no behaviour change an operator would notice,
@@ -397,7 +397,9 @@ requests are rate-limited, and it passes a security review.
 
 **Dependencies / risks:** the account e-mail; an account-takeover surface where
 there was none — security review is part of the item, not an afterthought.
-Not drawn yet.
+Not drawn yet. Changing the account e-mail must then require the current
+password (2.0 security review), because the e-mail becomes where a reset link
+goes and today Account saves it without the password.
 
 **Version:** `2.x` MINOR; `candidate`.
 

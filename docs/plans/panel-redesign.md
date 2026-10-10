@@ -531,7 +531,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 - [ ] Technical review of the whole against the mockups, evidence pairs complete — **Opus**
 - [x] Security review of the route rename, subtree authorization and inbound delegation — **Fable**
-- [ ] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory; strike the three UI rows of review-2026-08-followups that the redesign retires — **Sonnet**
+- [x] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory; strike the three UI rows of review-2026-08-followups that the redesign retires — **Sonnet**
 - [ ] `go vet`, `go test ./...`, e2e suite; version cut `2.0.0` — **Haiku**
 
 **After 2.0** — features land in the kit, each from its own plan, mockup first

@@ -34,7 +34,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   (`dmarc_default_mode` / `dmarc_default_address`) and a domain either has an
   address of its own or follows a named user's default
   (`domains.dmarc_rua_user_id`) — a new domain follows whoever created it,
-  and deleting that user leaves it with no report address.
+  and deleting that user leaves it with no report address (replaced before
+  release — see the entry of 2026-10-10 below).
   `user_inbound_domains` and the per-user `all_domains` /
   `all_inbound_domains` flags are in the schema for the inbound delegation
   that follows. Details: `docs/schema-migrations.md`.
@@ -52,8 +53,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   **Server › Settings** (`/server/settings`, global role) replace the one
   Settings page. Account has three forms, each its own POST: profile
   (username, e-mail), password, and the default DMARC report address
-  (SelfPost hosted, my account e-mail, another address, none). Saving the
-  profile no longer asks for the password; changing the password still does.
+  (SelfPost hosted, my account e-mail, another address, none) (replaced before
+  release — see the entry of 2026-10-10 below). Saving the profile no longer
+  asks for the password; changing the password still does.
 - panel-redesign (stage 1): the application form is one POST. Who the
   application may send as, its client-IP allow-list and its rate limit
   ("use the domain limit", manual or auto) are validated together and saved
@@ -125,6 +127,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   are gone, and with them `users.dmarc_default_mode`,
   `users.dmarc_default_address` and `domains.dmarc_rua_user_id` (owner,
   2026-10-10; replaces the design of 2026-09-21 described above).
+- panel-redesign (stage 3): with the inbound spam filter on, its socket is one
+  of the milter sockets on **Server › Health** and counts in Overview's card.
+  The panel connects to the configured address (`inet:host:port` or
+  `unix:/path`, one second at most, nothing sent). A filter that does not
+  answer is an error with `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` - inbound
+  mail is deferred - and a warning otherwise - mail goes through unfiltered.
 - panel-redesign (design, stage 3): **New password** and **Delete** are in
   each row of a domain's Applications table again, as POST forms that look
   like the links beside them.
@@ -151,20 +159,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   export file.
 - The panel role `domain_admin` is stored as `domain`.
 - On the old domain page, "Same as Settings" makes the domain follow the
-  default report address of the user who chose it.
+  default report address of the user who chose it (replaced before release —
+  see the entry of 2026-10-10 below).
 - The old panel is untouched on screen but steps aside in the tree: its
   stylesheet is `legacy.css` and its layout `layout_legacy.html` until the
   last old page is restyled. The 2.0 menu paths in the new shell do not
-  exist before stage 1; only the kit page uses that shell so far.
+  exist before stage 1; only the kit page uses that shell so far (a stage-0
+  state: both files are deleted and every page is on the shell — see
+  *Removed*).
 - panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
   the component kit.
+- panel-redesign (stage 3): the operator guide, `architecture.md` (Panel HTTP
+  surface, Persistence) and `security.md` (roles, sessions, errors shown to
+  users) describe the 2.0 panel. `security.md` records two accepted risks from
+  the 2.0 review: a delegated inbound upstream may be any host and port, and
+  Account's profile is saved without the password.
 
 ### Security
 
 - A panel session belongs to a user by id and ends with them. It used to be
   keyed by user name: the cookie of a deleted or renamed user stayed valid
   and became a session of whoever was next created under that name. Signing
-  in again is required after upgrading.
+  in again is required after upgrading (there is no upgrade from 1.x; this
+  concerns development builds of 2.0).
 - Changing one's password ends one's own other sessions only; it used to
   sign every other user out. A password set by an administrator on the user
   form ends that user's sessions.
@@ -180,17 +197,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - Saving a domain's report-address form untouched no longer moves a domain
   that follows another user's default to whoever saved it: that user's
-  default is its own choice, and "My default instead" is the change.
+  default is its own choice, and "My default instead" is the change
+  (replaced before release — see the entry of 2026-10-10 below).
 - The auto rate-limit fields follow the limit mode on the domain and
   application forms (the script applied only the first matching rule).
 - The DMARC page of a domain no longer answers 500 once the domain has a
   reported source.
 - The confirmation before deleting a user names the domains that follow
   that user's default report address and will be left without one; it used
-  to say the domains were not affected.
+  to say the domains were not affected (replaced before release — see the
+  entry of 2026-10-10 below).
 
 ### Removed
 
+- **2.0 starts from an empty data directory.** A 1.x `/data` is not upgraded:
+  its database is refused at start and left untouched, and a 1.x backup is not
+  restored; a domain is carried over with its export file. Gone with it, as
+  built: the 1.x migration chain, every pre-2.0 panel path (listed next), the
+  help drawer (Help is a page of topics), the default DMARC report address —
+  the panel-wide one of 1.x (`dmarc_report_email`, "Same as Settings") and the
+  per-user one with a domain following a user that earlier entries of this
+  release describe (`users.dmarc_default_*`, `domains.dmarc_rua_user_id`) —
+  together with the DMARC box on Account, the old stylesheet `legacy.css`, the
+  old layout `layout_legacy.html`, and the unused `rate_limits.allowed_ips`
+  column.
 - Old panel paths, GET and POST alike, without redirects: `/status`,
   `/status/fragment`, `/status/recheck`, `/reload`, `/domains` and everything
   under it (`/domains/import`, `/domains/{id}`, `…/dns-recheck`, `…/delete`,

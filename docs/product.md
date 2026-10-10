@@ -59,7 +59,7 @@ Explicitly excluded to prevent scope creep:
 
 - Inbound mail (IMAP/POP3, mailboxes, delivery to user inboxes)
 - Webmail
-- Organisations / tenancy beyond global + domain-admin roles; managing
+- Organisations / tenancy beyond the `global` and `domain` roles; managing
   **multiple sending domains** under one global administrator is in scope (see
   below)
 - Inbound antispam/antivirus engines (rspamd, ClamAV, etc.) — SelfPost may
@@ -67,9 +67,9 @@ Explicitly excluded to prevent scope creep:
 - A custom MTA — Postfix is used as-is
 - Dovecot or a full mail stack for SASL — Cyrus SASL (`sasldb2`) only
 
-The **domain-admin** role ships in the current line (global administrator plus
-domain administrators with assigned domains). The optional **inbound relay**
-(backup-MX / forwarder on port 25) ships in `[1.4.0]`, off by default behind
+The **`domain`** role ships in the current line (a `global` user plus
+`domain` users with assigned domains, outbound and inbound separately). The
+optional **inbound relay** (backup-MX / forwarder on port 25) ships in `[1.4.0]`, off by default behind
 `INBOUND_RELAY_ENABLE`; it is relay/forward, not IMAP/webmail. **Send-log
 retention in Settings** ships in `[1.5.0]`. **30-day send statistics** and
 **auto level-2 rate limits** ship in `[1.6.0]`. **DMARC aggregate report

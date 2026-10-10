@@ -114,10 +114,10 @@ One process, four roles:
    parameters (`queue_run_delay`, `minimal_backoff_time`,
    `maximal_backoff_time`, `maximal_queue_lifetime`, `bounce_queue_lifetime`,
    `delay_warning_time`) and caches the snapshot on the handlers config. The
-   Mail queue card and a delivery's `deferred` / `bounced` history print those
+   Outbound queue box and a delivery's `deferred` / `bounced` history print those
    numbers; they never call `postconf` per request. If `postconf` is missing,
    the panel logs a warning and uses Postfix 3.x compiled-in defaults
-   (`300s` / `4000s` / `5d` / `0`) with a muted note on the card.
+   (`300s` / `4000s` / `5d` / `0`) with a muted note on the box.
 2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
@@ -133,8 +133,8 @@ One process, four roles:
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
-4. **rate-limit recalc** — every six hours (and on demand from the domain
-   page), recomputes level-2 **Auto** rate limits from send-log statistics.
+4. **rate-limit recalc** — every six hours (and on demand from Domain settings and
+   the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
 
 Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
 
@@ -159,7 +159,7 @@ panel user cannot read). `follow()` drains the old inode once more before
 switching descriptors; the panel treats a missing log file as an empty tail, not
 an error.
 
-**Read offset is persisted** (`logtail_state` table, migration `0003`): the
+**Read offset is persisted** (`logtail_state` table, in the baseline schema): the
 tailer stores its position plus a fingerprint of the log's first 512 bytes, and
 on start resumes from it, parsing the tail written while the panel was down. If
 the fingerprint no longer matches (rotated or recreated in the meantime) it reads
@@ -185,8 +185,8 @@ rotated past fourteen files while the panel was down, or deleted.
 
 **Two one-shot reads** sit beside the follow loop and are unrelated to it, both
 serving panel pages on request: `TailLines` (the last *n* lines, for
-`/system-log`) and `QueueLines` (the lines carrying one queue-id, for
-`/deliveries/{id}`). `QueueLines` scans a bounded tail of the current file —
+`/server/log`) and `QueueLines` (the lines carrying one queue-id, for
+`/outbound/log/{id}`). `QueueLines` scans a bounded tail of the current file —
 finding a message's lines means reading rather than seeking — and matches the id
 anchored on the character before it, since queue ids are hexadecimal runs and a
 shorter one is regularly the tail of a longer one. Send-log rows outlive the log
@@ -197,61 +197,227 @@ state for an older message and the page reports it as such, not as a failure.
 
 ## Panel HTTP surface
 
-Canonical routes: [internal/web/web.go](../internal/web/web.go). Authenticated
-unless noted. Routes marked **global** return **404** for domain administrators
-(`requireGlobal()` in
-[internal/web/handlers/authz.go](../internal/web/handlers/authz.go)). The table
-below is a summary — HTMX fragment endpoints
-(`/status/fragment`, `/deliveries/rows`, `/mail-queue/body`,
-`/system-log/body`, …) and every POST variant live in `web.go`.
+Canonical routes: [internal/web/web.go](../internal/web/web.go). The router is
+two flat `http.ServeMux`es built by `muxes()` — one pattern per route, method
+included (`GET /outbound/log/{id}`), nothing mounted as a sub-router, and
+building them only takes method values, so the route guard test can run it on
+a bare `Server` and ask which pattern answers a path:
 
-| Route | Purpose |
+- **public** — `/healthz` (liveness), `/license` (the embedded `LICENSE`),
+  `/static/`, `/setup/`, `/login`, `/logout`;
+- **authenticated** — everything else, behind `RequireAuth`: a request without
+  a live session is redirected to `/login`.
+
+Both sit inside `secure()`, which sets the security headers and runs the origin
+check on every state-changing request (see below).
+
+### Routes
+
+A path reads like the menu: `/<group>/<page>`, an entity under its list, an
+action under the thing it changes. Every state change is a `POST`; a `GET`
+only reads (the delete confirmation at `GET …/delete` renders a form).
+
+| Group | Routes |
 |---|---|
-| `/healthz` | Liveness (no auth) |
-| `/license` | Embedded `LICENSE` text (no auth) |
-| `/setup/*` | One-time admin bootstrap |
-| `/login`, `/logout` | Session auth |
-| `/account` | 308 redirect to `/settings` (pre-1.2.3 route, kept as a compat shim) |
-| `/status`, `/status/*` | **Global.** Process, cert, socket, PTR checks; machine CPU/memory/network |
-| `/domains` | Domain list; `POST /domains` (add domain) is **global** |
-| `/domains/{id}`, `/domains/{id}/*` | Assigned-domain detail for domain-admins; delete domain is **global** |
-| `/domains/import` | **Global.** Domain import (`POST`; form on the Backup page) |
-| `/deliveries`, `/deliveries/{id}` | Send log with filters; scoped to assigned domains for domain-admins |
-| `/mail-queue`, `/mail-queue/*` | **Global.** Postfix queue view; retry-policy card on the page (not the HTMX fragment) |
-| `/system-log`, `/system-log/*` | **Global.** `mail.log` tail |
-| `/reload` | **Global.** `POST` — reload OpenDKIM tables, Postfix sender map, and inbound relay maps when enabled (not DMARC maps — see § Persistence restore) |
-| `/backup`, `/backup/*` | **Global.** Full backup download (page also hosts the import form) |
-| `/help` | In-panel operator help (any authenticated user) |
-| `/settings` | Username/password for any user; DMARC report default is **global** only |
-| `/users`, `/users/*` | **Global.** Panel user CRUD |
-| `/inbound`, `/inbound/{id}`, `/inbound/{id}/*` | **Global.** Inbound relay domains. Registered only when `INBOUND_RELAY_ENABLE=true`; otherwise 404. |
-| `/dmarc`, `/dmarc/reports/{id}`, `/dmarc/domains/{id}` | **Global** list and report detail; domain roll-up scoped like deliveries. Registered only when `DMARC_REPORTS_ENABLE=true`; otherwise 404. |
+| Home | `GET /` → `/overview`, or for a user with the *domain* role to the first list they reach (`/outbound/domains`, or `/inbound/domains` when that is all) |
+| Overview | `GET /overview`, `GET /overview/fragment` |
+| Outbound › Domains | `GET, POST /outbound/domains` · `/outbound/domains/{id}` · `POST …/dns-recheck` · `GET, POST …/delete` · `GET …/settings` · `POST …/settings/reports`, `…/ratelimit`, `…/ratelimit/recalc`, `…/export` |
+| Outbound › Applications | `GET, POST /outbound/domains/{id}/applications/new` · `GET, POST …/applications/{aid}` · `POST …/applications/{aid}/password`, `…/{aid}/ratelimit/recalc`, `…/{aid}/delete` |
+| Outbound › Log, Queue | `GET /outbound/log` · `/outbound/log/fragment` · `/outbound/log/{id}` · `GET /outbound/queue` · `/outbound/queue/fragment` |
+| Outbound › DMARC reports | `GET /outbound/dmarc` · `…/dmarc/domains/{id}` · `…/dmarc/reports/{id}` — registered only with `DMARC_REPORTS_ENABLE=true` |
+| Inbound › Domains | `GET, POST /inbound/domains` · `/inbound/domains/{id}` · `POST …/dns-recheck`, `…/upstream`, `…/recipients` · `GET, POST …/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
+| Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `GET /server/components` |
+| Account | `GET /account` · `POST /account/profile`, `/account/password` |
+| User menu | `GET /help` · `POST /logout` (public mux) |
 
-HTMX polling refreshes monitoring fragments (5 s while the operator is active on
-the page, 30 s when the tab is visible but idle, none when hidden — scheduled in
-`panel.js` via `data-poll`, not `hx-trigger="every …"`); polling does not extend
-session idle timeout (only non-`HX-Request` GET and mutating requests count as
-activity). The Mail queue retry-policy card is outside that fragment: it is the
-start-up `postconf -h` snapshot (see [Panel binary](#panel-binary-cmdpanel)),
-not a live re-read.
+An application is addressed under its domain, and an application id that does
+not belong to the domain in the path is a 404. The application form is one
+`POST`: sender, client IPs and rate limit are validated and saved together or
+not at all, also at creation. The page that shows a new password is the
+response to the `POST` that created or regenerated it; it has no `GET` path and
+carries `Cache-Control: no-store`.
+
+The pre-2.0 paths are not served and not redirected (`/status`, `/domains/…`,
+`/inbound/{id}/…`, `/deliveries`, `/mail-queue`, `/system-log`, `/backup`,
+`/users/…`, `/settings`, `/reload`, `/dmarc/…`, and `/account` as a redirect):
+each answers 404 once signed in. `TestRoutesFollowNavigation`
+([internal/web/guard_routes_test.go](../internal/web/guard_routes_test.go))
+holds the table: every path is registered with its methods, every menu entry
+points at a registered path, every old path answers 404, and no template
+contains an old path.
+
+### Who may open what
+
+Authorization is by tree where the tree is the boundary, and by object where it
+is not.
+
+- **`/server/` is guarded once.** Routes under it are registered through
+  `server()` in `web.go`, which wraps the handler in `globalOnly` (404 for
+  anyone but the global role — the answer a missing page gets, so the panel does
+  not confirm the page exists) and panics at start-up for a pattern outside
+  `/server/`. The handlers also call `requireGlobal()` themselves.
+- **Overview and the Outbound queue** are global-only but not under `/server/`,
+  so their handlers call `requireGlobal()`.
+- **Outbound is checked per domain.** `lookupDomain` resolves `{id}` and answers
+  404 for a missing domain and for one the principal may not reach alike
+  ([handlers/handlers_domains.go](../internal/web/handlers/handlers_domains.go));
+  application routes go on to check the application belongs to that domain.
+  Lists and the log are filtered by assignment in the query
+  (`ListDomainsForUser`), not in the template. Adding and deleting a domain is
+  `requireGlobal()`.
+- **Inbound is checked per inbound domain**, separately from outbound
+  ([handlers/handlers_inbound.go](../internal/web/handlers/handlers_inbound.go)):
+  `requireInbound` (the list), `requireInboundDomain` (one domain — page,
+  upstream, recipients, DNS re-check) and `requireInboundGlobal` (add, delete).
+  All three answer 404 alike.
+- **The DMARC hub** is open to anyone with outbound reach for the reports of
+  their own domains; the *Ingest* box (server-wide statistics) is rendered for
+  the global role only.
+- **Account and Help** are open to every signed-in user.
+- The principal ([web/auth/principal.go](../internal/web/auth/principal.go))
+  carries the role, the assigned outbound and inbound domain ids and the two
+  *All* flags; `CanAccessDomain` and `CanAccessInboundDomain` are the only
+  predicates. The reach, not the role, decides which menu groups exist.
+
+Routes marked global are tested per path for a user with the *domain* role,
+including another tenant's domain id
+([handlers/handlers_delegation_test.go](../internal/web/handlers/handlers_delegation_test.go),
+[authz_test.go](../internal/web/handlers/authz_test.go)).
+
+### Polled fragments
+
+A polled page answers its refresh at `<page>/fragment` (`/overview/fragment`,
+`/outbound/log/fragment`, `/server/health/fragment`, …). The fragment is the
+same `{{define}}` block that renders the page's own box, so the first paint and
+a refresh cannot differ. HTMX refreshes them every 5 s while the operator is
+active on the page, every 30 s when the tab is visible but idle, and not at all
+when it is hidden — scheduled in `panel.js` via `data-poll`, not
+`hx-trigger="every …"`, because a trigger filter is evaluated with `new
+Function`, which the CSP forbids. Polling does not extend the session idle
+timeout (only non-`HX-Request` `GET`s and mutating requests count as
+activity). The Outbound queue's retry-policy box is outside the polled region:
+it is the start-up `postconf -h` snapshot (see [Panel
+binary](#panel-binary-cmdpanel)), not a live re-read.
+
+### View engine and component kit
+
+Pages are rendered by [internal/web/view](../internal/web/view/view.go). There
+is one layout and one way to render.
+
+- **One layout.** Every page is parsed with `layout.html` (the shell: brick
+  navbar with the wordmark, the perforated edge, the strip of sibling pages,
+  user menu, footer) and `components.html` (the partials), then its own file.
+  `layout_signed_out` is the same document without navigation, used for sign-in
+  and setup; `Engine.Render` picks it when the page data names no user. The
+  page's file defines `content`; `pageFiles` in `view.go` lists the files of
+  each page, and fragments are listed in `fragmentFiles` and rendered by
+  `RenderFragment` with no layout.
+- **Typed page data.** A page's data is a struct that embeds `Meta` (title,
+  user, the viewer's reach, the menu group and page it sits in) and carries
+  the page's boxes and rows as fields, built by a constructor in the `view`
+  package (`NewOutDomain`, `NewHelp`, …) that the handler fills. The shell is
+  derived from `Meta` and the feature flags (`SetInboundEnabled`,
+  `SetDMARCEnabled`) in one place, `Engine.shell`, so which entries the menu
+  has is decided once. No template reads a `map[string]any`; the one map left
+  in the handlers is the health sampler's, which is turned into a typed
+  `Health` before rendering.
+- **The component kit.** [components.html](../internal/web/view/templates/components.html)
+  holds one `{{define}}` per partial (page head, postmark, box and its head and
+  foot, flash, health card, DNS record, facts, side menu, timeline, log pane,
+  empty state, confirm list, help topic, form rows) and is the only file that
+  writes their `sp-` markup. [components.go](../internal/web/view/components.go)
+  is the typed input of each (`Head`, `Box`, `Record`, `Fact`, `SideMenu`, …),
+  so a page passes a struct, never a `dict`. Template functions: `status_tag`
+  (a status → Bulma's tag classes, once), `wbr_at` (a break after the `@` in a
+  table cell). A page that needs a component the kit lacks is a design change
+  made in the mockups first
+  ([plans/panel-redesign.md](plans/panel-redesign.md) § The contract).
+- **Help.** [help.go](../internal/web/view/help.go) is the Help page's data:
+  topics grouped by section of the panel. A box's head links to its topic with
+  `Box.Help` (`/help#<topic>`), and the page lists only the
+  sections the viewer's menu shows.
+- **Assets.** [static/](../internal/web/view/static) is embedded
+  (`//go:embed`): vendored `bulma.min.css` and a Tabler icon subset (checksummed),
+  `panel.css` (the mockups' stylesheet, rule for rule), `htmx.min.js`, `panel.js`,
+  the IBM Plex subset and the logo files. Served with a content-derived `ETag`,
+  and `/static/` does not list its files. The kit page
+  `GET /server/components` renders every partial in every state from fixtures
+  (global role only).
+
+**Guard tests** hold the design in place; they run in `go test ./...` and CI.
+They read their rules from the accepted mockups
+([docs/assets/panel-redesign/panel/](assets/panel-redesign/index.html)) rather
+than keep a copy: `TestPanelClassVocabulary` (only the Bulma subset and the
+`sp-` classes of `panel.css`; every `sp-` class defined, used and shown on the
+components page), `TestPanelCSSIsTheMockupStylesheet`, `TestPanelCSSContract`
+(no `!important`, no id or page selector, type floor, widths),
+`TestTemplatesUseComponents` (no hand-written component markup in a page),
+`TestPanelOutlinesMatchMockups` and `TestPanelPageStructure` (each rendered page
+has the component skeleton of its mockup), `TestRedesignedPagesLoadOnlyTheKit`,
+`TestVendoredAssetsArePinned`, `TestStaticHoldsOnlyTheKnownAssets`,
+`TestRoutesFollowNavigation`, `TestNoTemplateUsesInlineScriptOrStyle`. The
+ratchet list `internal/web/view/legacy_pages.txt` is empty and can only shrink;
+the CI step
+[design-first](../.github/scripts/design-first.sh) rejects a commit that
+changes a guard together with the code it judges, and a template that is a
+byte-for-byte return of one from history. The design contract and the process
+are in [plans/panel-redesign.md](plans/panel-redesign.md) § Enforcement.
+
+### Security headers, CSP and scripts
+
+`secure()` ([internal/web/security.go](../internal/web/security.go)) puts these
+on every response: `Content-Security-Policy: default-src 'self'; object-src
+'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: no-referrer`, and `Strict-Transport-Security` when the cookie
+is `Secure`. Because the policy has no exemptions, no template carries an
+inline `<script>`, an event-handler attribute or `style="…"` — the page's
+behaviour is `htmx.min.js` plus `panel.js` (copy and *fill* buttons, the
+`data-confirm` prompt on destructive forms, conditional field visibility,
+adaptive polling), both optional: every form works as a native HTML `POST`
+with scripts off. htmx is told not to inject its indicator stylesheet
+(`htmx-config` meta), which the CSP would otherwise have to allow.
+
+State-changing requests (every non-`GET`/`HEAD`/`OPTIONS`) pass `originAllowed`
+first: `Sec-Fetch-Site` must say `same-origin`, or `Origin` must name the
+panel's host; a request with neither header is let through (an accepted risk).
+There are no CSRF tokens — see [security.md](security.md).
+
+### Errors shown to users
+
+A validation refusal is shown as the text the validator wrote (on the form,
+next to the field, or in a notice above the first box). Anything else — a
+database error, `saslpasswd2`, a Postfix reload — is logged
+and the page gets a fixed sentence saying so; the error text never reaches the
+browser. A template error renders a bare `500` rather than a half-written page
+(`Engine.Render` buffers).
 
 ### Sessions
 
-Stored in SQLite (`sessions` table, migration `0002`): cookie holds a random
-token; the database stores **SHA-256 of the token**, not the token itself — a
-stolen DB or backup archive does not alone grant login, but a browser that still
-holds the cookie works after process restart, redeploy, or full backup restore.
+Stored in SQLite (`sessions` table of the baseline, `0001_init.sql`): the cookie
+holds a random token; the database stores **SHA-256 of the token**, not the
+token itself — a stolen DB or backup archive does not alone grant login, but a
+browser that still holds the cookie works after process restart, redeploy, or
+full backup restore.
 
+- **A session belongs to a user by id** (`sessions.user_id`, `ON DELETE
+  CASCADE`). Deleting a user ends their sessions; renaming one keeps them;
+  `RequireAuth` loads the user on every request, so a session whose user is
+  gone is a redirect to `/login`.
 - **Idle timeout** — sliding window, `PANEL_SESSION_IDLE_DAYS` (default 7); no
   absolute cap (regular use keeps the session alive indefinitely).
-- **Renewal** — DB `last_seen` and cookie `Max-Age` update at most once per hour
-  (`renewThreshold` in [internal/web/auth/session.go](../internal/web/auth/session.go)).
-- **Password change on `/settings`** — changing your own password deletes
-  every other session for that user; the current session stays active
+- **Renewal** — the DB `expires_at` and the cookie `Max-Age` update at most once per
+  hour (`renewThreshold` in
+  [internal/web/auth/session.go](../internal/web/auth/session.go)).
+- **Password change on Account** — deletes every other session of that user;
+  the current one stays active
   ([internal/store/sessions.go](../internal/store/sessions.go),
-  [handlers_settings.go](../internal/web/handlers/handlers_settings.go)).
-  A global administrator resetting another user's password on `/users` updates
-  the hash but does not delete that user's existing sessions.
+  [handlers_account.go](../internal/web/handlers/handlers_account.go)).
+- **A password set by a global user on the user form** deletes all of that
+  user's sessions (`DestroyUserSessions`); set for oneself, it keeps the
+  current one
+  ([handlers_users.go](../internal/web/handlers/handlers_users.go),
+  `endSessionsAfterPasswordSet`).
 
 Restoring an **older** backup also restores session rows: a session removed
 after that backup was taken can become valid again if the browser still holds
@@ -264,7 +430,7 @@ the cookie and the restored row's `expires_at` has not passed.
 Multi-store writes that must land in more than one place (SQLite row,
 `sasldb2` entry, Postfix map, OpenDKIM table) go through a service, which is
 also where the rollback of a partial failure lives. Handlers may call
-`store` directly for single-table reads and simple writes (sessions, admin,
+`store` directly for single-table reads and simple writes (sessions, users,
 send-log queries); the first-run setup-token file is read and written in
 `web` itself. The adapters below the services are the only code that knows
 about Postfix, OpenDKIM, DNS or the log file, which is what makes them
@@ -295,7 +461,7 @@ flowchart TB
     dmarcSvc["internal/dmarc"]
   end
   subgraph persistence ["Persistence"]
-    store["internal/store — SQLite, embedded migrations"]
+    store["internal/store — SQLite, embedded schema"]
   end
   subgraph adapters ["Adapters — the only infrastructure-aware code"]
     postfix["internal/postfix"]
@@ -344,7 +510,7 @@ single-connection trade-off that follows from it.
 
 | Path | Contents |
 |---|---|
-| `selfpost.db` | SQLite panel state (domains, apps, users, sessions, send log, L2 limits, log-tailer offset, inbound relay, DMARC reports) — see [schema-migrations.md](schema-migrations.md) |
+| `selfpost.db` | SQLite panel state (users, sessions, domains, apps, send log, L2 limits, log-tailer offset, inbound relay, DMARC reports) — see [Database](#database) and [schema-migrations.md](schema-migrations.md) |
 | `setup-token` | First-run setup token file |
 | `opendkim/` | DKIM keys + tables |
 | `sasl/sasldb2` | Application SASL credentials |
@@ -363,6 +529,49 @@ single-connection trade-off that follows from it.
 Not in `/data`: TLS certificates for the panel (reverse-proxy mount) — though
 full backups also archive the operator's `./certs` PEM files when present.
 
+### Database
+
+The schema is one embedded baseline, `internal/store/migrations/0001_init.sql`,
+applied by `store.Open` into an empty file; `PRAGMA user_version` is `1` and
+`PRAGMA application_id` is `0x53503230` ("SP20"). There is no 1.x migration
+chain. **2.0 starts from an empty data directory:** a database with a schema
+version but without the 2.x `application_id` — what every 1.x file looks like —
+is refused at start with `ErrForeignSchema` and left untouched, as is one whose
+version is newer than the build knows. A restored 1.x backup fails the same
+way. Domains are carried across with a domain export, whose format is not the
+database. Later schema changes are new files (`0002_*.sql`, …); once `2.0.0` is
+released the baseline is never edited. History and the per-table list:
+[schema-migrations.md](schema-migrations.md).
+
+The tables that carry the panel's model:
+
+- **`users`** — `role` is `global` or `domain` (a reach, not a rank); `email` is
+  the user's own address, edited on Account and set by the global role on the
+  user form; `all_domains` / `all_inbound_domains` widen a *domain* user to
+  every domain of that direction, including ones added later (with a flag set
+  the assignment rows are ignored).
+- **`user_domains`** and **`user_inbound_domains`** — the outbound and inbound
+  domains assigned to a *domain* user. Separate tables: the same name on both
+  is two assignments, and a sending domain gives no inbound access or the other
+  way round.
+- **`sessions`** — `token_hash`, `user_id` (`ON DELETE CASCADE`), `expires_at`.
+  Keyed by user id, not by name.
+- **`domains`** — `dmarc_rua` is the whole of a domain's report-address choice:
+  `''` is no reports (a new domain), the address SelfPost derives for the
+  domain and the server's hostname is the hosted choice, anything else is an
+  address typed for the domain. Nothing refers to a user, and deleting one
+  changes no domain.
+- **`settings`** — key/value, what holds for the instance whoever is signed in
+  (send-log retention). Nothing that belongs to a user.
+- `applications` (with `auth_ip_restrict` / `auth_allowed_ips`),
+  `application_addresses`, `rate_limits` (no `allowed_ips` column), `send_log`,
+  `logtail_state`, `inbound_domains`, `inbound_transports`,
+  `inbound_recipients`, `dmarc_reports`, `dmarc_report_records`.
+
+The panel is the only writer; SQLite runs in WAL mode on one connection (see
+[Panel binary](#panel-binary-cmdpanel)), which is why a full backup snapshots
+with `VACUUM INTO` instead of copying the file.
+
 **Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90);
 `mail.log` via logrotate (14 rotated files, check every 6h, rename +
 `postfix reload` in `postrotate` — see § Log tailer above).
@@ -377,7 +586,8 @@ tables, Postfix's sender map, inbound relay maps (when
 `INBOUND_RELAY_ENABLE=true`), and DMARC maps (when `DMARC_REPORTS_ENABLE=true`)
 are re-derived from SQLite and both daemons are reloaded, so drift between the
 extracted archive and the database is healed before mail flows. Manual
-`POST /reload` on the Status page resyncs OpenDKIM, the sender map, and
+`POST /server/health/reload` (the *Reload configuration* button on Server ›
+Health) resyncs OpenDKIM, the sender map, and
 inbound maps only — not DMARC maps. Stopped-container
 `tar` of `./data` alone remains possible for state-only copies (see guide).
 
@@ -386,9 +596,12 @@ inbound maps only — not DMARC maps. Stopped-container
 scrypt → AES-256-GCM over 64 KiB chunks, each authenticated with the header,
 its counter and an end-of-stream flag (so truncation and reordering fail to
 open). Full backup `.tar.gz` → `.spbk` (SelfPost backup), domain export
-`.json` → `.spde` (SelfPost domain export); the plain forms remain the
-default. Domain import detects the envelope by magic bytes; an encrypted full
-backup is converted back with `selfpost-backup -decrypt` before restore.
+`.json` → `.spde` (SelfPost domain export). In the panel the *Encrypt with a
+password* box is ticked by default on both downloads and the plain form is
+what an unticked box gives; the `selfpost-backup` CLI stays plain unless it is
+given a password. Domain import detects the envelope by magic bytes; an
+encrypted full backup is converted back with `selfpost-backup -decrypt` before
+restore.
 
 ---
 

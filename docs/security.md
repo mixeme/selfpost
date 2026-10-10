@@ -16,7 +16,17 @@ whole diff from 1.3.0 (`7052395`) to HEAD past 1.9.1 — the inbound-relay path
 limiting, application auth-IP allow-lists, and the new panel surface
 (handlers, templates, settings): no exploitable findings; two deliberate
 behaviours the pass examined are now recorded under Accepted risks
-(unauthenticated DMARC ingest, fail-open auth-IP enforcement).
+(unauthenticated DMARC ingest, fail-open auth-IP enforcement). The 2.0 review
+(Fable, 2026-10-10; fixed and re-checked by other models) covered the route
+rename, the `/server/` subtree guard, inbound delegation and the new pages: no
+Critical or High finding; sessions were keyed by user name (now by user id),
+a password change ended other users' sessions, a password set for a user on
+the user form did not end that user's sessions, internal errors reached forms a
+`domain` user can open, and `/static/` listed its files — all fixed
+(see [Authentication and sessions](#authentication-and-sessions) and [Errors
+shown to users](#errors-shown-to-users)); two deliberate behaviours are
+recorded under Accepted risks (upstream of a delegated inbound domain, profile
+saved without the password).
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -74,6 +84,72 @@ The panel is exposed to the internet — the items below are **not optional**.
   `SameSite`.
 - Sessions live in SQLite (SHA-256 of the token, not the token itself); sliding
   idle timeout (`PANEL_SESSION_IDLE_DAYS`).
+- **A session belongs to a user by id** (`sessions.user_id`, deleted with the
+  user). The user is loaded on every request and a session is renewed only
+  after it was found, so the cookie of a deleted user is dead and cannot become
+  the session of whoever is created under the same name later; renaming a user
+  leaves their sessions alone.
+- **What ends a user's sessions:** deleting the user (all); a password change on
+  Account (that user's *other* sessions — never another user's); a password set
+  for them by a global user on the user form (all of theirs, except the current
+  one when they set their own); signing out (the current one only). There is no
+  "sign out everywhere", and a restored backup brings back the session rows it
+  held.
+- Polling by the monitoring screens (`HX-Request` `GET`s) does not renew a
+  session.
+
+### Roles
+
+Everyone who signs in to the panel is an administrator, so the two roles name a
+*reach*, never a rank: `global` and `domain` (in the users list, the role
+select, the page headers and these documents — not "admin"). A `domain` user is
+assigned outbound domains and inbound domains **separately**, each list with
+*All* (which includes domains added later and widens the list, not the role).
+
+| | `global` | `domain` |
+|---|---|---|
+| Overview, Server (Health, System log, Backup, Users, Settings, kit page) | yes | no — 404 |
+| Outbound queue | yes | no — 404 (a queue is not filtered by domain) |
+| Outbound: domain page, applications, Domain settings (report address, rate limit, export), log | every domain | assigned outbound domains |
+| Outbound › DMARC reports | every report, with the server's ingest statistics | reports of assigned domains, without the ingest box |
+| Inbound: domain page, upstream, recipients | every inbound domain | assigned inbound domains |
+| Add or delete a domain, either direction; import a domain | yes | no |
+| Account, Help | yes | yes |
+
+- A path a user may not reach, a domain or application that does not exist,
+  and one that belongs to another tenant answer the **same 404**, so the panel
+  does not confirm what exists. A group with nothing assigned is absent from
+  the user's menu.
+- `/server/` is guarded once, by `globalOnly` where its routes are registered
+  (a route outside the subtree cannot be added through that helper), and every
+  handler checks again. Outbound and inbound handlers check per object
+  (`lookupDomain`, `requireInboundDomain`) and lists are filtered by assignment
+  in the query. Each denied path has a test for a `domain` user, including
+  another tenant's id.
+- The panel will not remove or demote the last `global` user.
+- A `domain` user can export an assigned domain, and an export carries the
+  working application passwords (encrypted unless the box is unticked): assign
+  domains with that in mind.
+
+### State-changing requests
+
+- Every state change is a `POST`; a `GET` never changes state (the delete
+  confirmation pages only render a form).
+- Every non-read request first passes the origin check
+  (`originAllowed`, [internal/web/security.go](../internal/web/security.go)):
+  `Sec-Fetch-Site` must be `same-origin`, or `Origin` must name the panel's own
+  host; the session cookie is `SameSite` as well.
+- There are **no CSRF tokens yet**. The decision, its price and the conditions
+  for revisiting it are in the accepted risks and the ADR below.
+
+### Errors shown to users
+
+A page shows a validation message (what to fix) and nothing else of an error. A
+database, `saslpasswd2` or Postfix-reload failure is logged and the page says
+only that the change could not be saved and to check the logs. This holds on
+every form a `domain` user can open. The global-only Backup page (full backup,
+domain import) still shows the underlying message of an import failure, so the
+operator can act on it.
 
 ### Output and process
 
@@ -103,11 +179,12 @@ The panel is exposed to the internet — the items below are **not optional**.
 ### Backup and domain export
 
 - Both files are secrets: a full backup carries DKIM keys, `sasldb2`, the
-  administrator's password hash, `docker-compose.yml`, `.env`, and the TLS
+  panel users' password hashes, `docker-compose.yml`, `.env`, and the TLS
   private key from `certs/` when present; a domain export carries the DKIM key
   and **working** application passwords in the clear (otherwise a transfer
   without recreating credentials would be impossible).
-- Both downloads can be encrypted with a password (a checkbox on the form):
+- Both downloads are encrypted with a password unless the box on the form is
+  unticked (it is ticked by default):
   scrypt (N=2¹⁵, r=8, p=1) → AES-256-GCM, streamed in 64 KiB chunks, each
   authenticated with the header, the chunk number, and an end-of-stream flag —
   a truncated or substituted file fails to open instead of silently restoring a
@@ -134,7 +211,7 @@ deferred item from the roadmap.
 - **A `POST` with neither `Sec-Fetch-Site` nor `Origin` is allowed through.**
   A client that sends neither — a genuinely old browser, or a webview with a
   frozen engine — stays vulnerable to CSRF from any site. Accepted
-  deliberately: every panel user (global or domain-admin) is an operator who
+  deliberately: every panel user (role `global` or `domain`) is an operator who
   picks their own browser, not an untrusted party the panel needs to defend
   against, and a strict mode would not "protect" such a client, it would
   simply break the panel in it. Tightening is one line in `originAllowed`
@@ -144,7 +221,7 @@ deferred item from the roadmap.
   neighbouring-subdomain case but depends on browser behaviour; a token does
   not. The price is a hidden field in roughly two dozen forms. The trigger to
   revisit is a requirement for protection that holds regardless of the browser,
-  or a domain-admin population the global administrator does not fully trust
+  or a population of `domain` users the global user does not fully trust
   (see the ADR below). A token would not save the panel from XSS inside it
   either: code executing in the panel's origin sends the request itself —
   against that, `html/template` auto-escaping and CSP do the work, which is why
@@ -162,20 +239,24 @@ deferred item from the roadmap.
   gate every one of these `POST`s whether or not JavaScript ran. Progressive
   enhancement means the panel must work with JavaScript off; a
   server-rendered confirmation step would need a second page (or a `?confirm=1`
-  round trip) for every one of these forms, which is what
-  [`user_delete.html`](../internal/web/view/templates/user_delete.html) and
-  `domain_delete.html` already do for the two highest-blast-radius deletes.
-- **Encrypting backups and exports is an option, not the default.** With the
-  checkbox cleared the file downloads in the clear, as in 1.0. Otherwise an
-  operator with nowhere to keep a password would lose the ability to take a
-  backup at all, and a permanently undecryptable archive is worse than an
-  unencrypted one: SelfPost does not store the password. The trigger to make
-  encryption mandatory is a second administrator (at which point "who
-  downloaded it" stops being one person).
+  round trip) for every one of these forms, which is what the delete pages
+  ([`user_delete.html`](../internal/web/view/templates/user_delete.html),
+  [`out_domain_delete.html`](../internal/web/view/templates/out_domain_delete.html),
+  [`in_domain_delete.html`](../internal/web/view/templates/in_domain_delete.html))
+  already do for the highest-blast-radius deletes.
+- **Encrypting backups and exports can be switched off.** The panel's
+  *Encrypt with a password* box is ticked by default, but with it cleared the
+  file downloads in the clear, and the `selfpost-backup` CLI writes a plain
+  archive unless it is given a password. Otherwise an operator with nowhere to
+  keep a password would lose the ability to take a backup at all, and a
+  permanently undecryptable archive is worse than an unencrypted one:
+  SelfPost does not store the password. The trigger to make encryption
+  mandatory is a second administrator (at which point "who downloaded it"
+  stops being one person).
 - **A journal row left without delivery lines is closed as `bounced` rather
   than left as it is.** The "forever `queued`" risk is gone: `mail.log` moved to
   `/data/log/` and survives container recreation, and the log tailer keeps its
-  read position (`logtail_state`, migration `0003`), so the tail is read after a
+  read position (`logtail_state`), so the tail is read after a
   start. What remains are rows whose delivery lines are lost for good (the log
   rotated past 14 files while the panel was down, or was deleted): the
   reconciliation against `postqueue -p` sees the message is not in the queue and
@@ -223,14 +304,35 @@ deferred item from the roadmap.
   client IPs, but neither message bodies nor headers; it is excluded from
   backups (`log/` is skipped) so that a dump stays state rather than
   diagnostics.
+- **A `domain` user may point an inbound domain's upstream at any host and
+  port.** The upstream form checks that the host is a well-formed name or IP
+  and the port is 1–65535; loopback, private and link-local addresses are
+  allowed, so a `domain` user with an assigned inbound domain can make this
+  server's Postfix open SMTP connections to any address it can reach and hand
+  mail for that domain to it. Accepted deliberately: delegation is within the trusted-operator model — a `domain`
+  user is an operator the `global` user chose to give that domain, and the
+  upstream of a backup-MX is by nature a host on someone's private network.
+  The connection is made by Postfix and carries only mail for that domain; the
+  panel itself makes no request to the upstream. Trigger to revisit: `domain`
+  users who are not trusted operators — the same condition as for CSRF tokens
+  — at which point an allow-list of upstream networks, or restricting the
+  field to the global role, is the fix.
+- **Account's profile (username, e-mail) is saved without the password.**
+  Saving the profile does not ask for the current password, as changing the
+  password does. Today the e-mail is only the address the *Use my e-mail*
+  button fills in, so a stolen session gains nothing it did not have. It
+  becomes a requirement to ask for the current password when changing
+  `users.email` as soon as [password-reset](roadmap.md#password-reset) mails a
+  link to it — from then on whoever can change the address could take the
+  account over.
 
 ## ADR: CSRF via origin checking, without tokens
 
 **Context.** The panel is forms (`POST`) with a cookie session — the classic
 CSRF surface. What is needed is a way to tell a request from the panel's own
 page apart from one initiated by a third-party site in a logged-in user's
-browser. The panel is multi-user since 1.2.0 (a global administrator plus
-zero or more domain-admin users, each scoped to their assigned domains), but
+browser. The panel is multi-user since 1.2.0 (a `global` user plus
+zero or more `domain` users, each scoped to their assigned domains), but
 that is an authorization boundary (who can see or change what), not a change
 to the CSRF threat: the attacker in scope here is still an external site
 riding a legitimate user's cookie, not one panel user attacking another
@@ -244,7 +346,7 @@ There are no session-bound tokens embedded in forms. The check applies the same
 way regardless of the requesting user's role.
 
 **Why not tokens.** Cross-user CSRF is not the threat model here: a
-domain-admin's browser sending a request still needs that domain-admin's own
+`domain` user's browser sending a request still needs that user's own
 cookie, so a token would not add a boundary between roles that the
 authorization checks (`Principal.CanAccessDomain`,
 [internal/web/auth/principal.go](../internal/web/auth/principal.go); route
@@ -264,8 +366,8 @@ genuinely old browser, or a webview with a frozen engine) stays vulnerable — s
 such a client, at the price of a narrow residual surface.
 
 **Revisit if:** a requirement appears for protection that does not depend on
-browser behaviour, or domain-admin accounts stop being trusted operators (for
-example, if a future release lets a global administrator invite domain-admins
+browser behaviour, or `domain` accounts stop being trusted operators (for
+example, if a future release lets a `global` user invite `domain` users
 whose browsers/devices are not vetted) — at that point cross-role request
 forgery inside the panel would need its own analysis, separate from the
 external-site case this ADR covers.

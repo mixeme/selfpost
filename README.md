@@ -26,9 +26,9 @@ send log and DNS checks in the panel, encrypted backups.
 - Outbound SMTP (465/smtps; optional 587 submission) with per-domain DKIM signing
 - Optional inbound relay on port 25 (backup-MX / forwarder; off by default)
 - Optional DMARC aggregate report ingest on port 25 (off by default)
-- In-panel Help drawer and `/help` page for Status and domain controls
+- In-panel Help: a page of topics, opened from the `?` in the head of a box
 - Per-application client IP allow-list for SMTP AUTH (optional)
-- Web panel — domains, applications, deliveries, mail queue, system log, backup
+- Web panel grouped by mail direction — Overview, Outbound (domains, log, queue, DMARC reports), Inbound, Server (health, system log, backup, users, settings)
 - Multi-domain relay — each SASL application is bound to one sending domain
 - DNS status checks (PTR, SPF, DKIM, DMARC) with in-panel re-check
 - Two-level rate limiting — IP backstop (Postfix), per-domain ceilings, and trusted-IP app overrides

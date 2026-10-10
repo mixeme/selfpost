@@ -6,9 +6,15 @@ overview and quick start, see [README.md](../README.md).
 This guide has three parts: **[Installation](#installation)** (getting a
 container running with a working reverse proxy and TLS), **[Instance
 administration](#instance-administration)** (running and maintaining the
-SelfPost server itself — status, backups, users, upgrades), and **[Domain
-administration](#domain-administration)** (day-to-day work on the sending
-domains hosted on that instance — DNS, deliveries, rate limits, applications).
+SelfPost server itself — the panel's layout, health, backups, users,
+upgrades), and **[Domain administration](#domain-administration)** (day-to-day
+work on the sending domains hosted on that instance — DNS, the outbound log,
+rate limits, applications).
+
+SelfPost 2.0 starts from an empty data directory: a `/data` written by 1.x is
+refused at start, not upgraded. A domain moves over with its
+[export file](#exporting-and-importing-a-single-domain), and every panel path
+changed (see the CHANGELOG, *Removed*).
 
 ## Table of contents
 
@@ -21,8 +27,11 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
   - [Environment variables](#environment-variables)
   - [Reverse proxy (mandatory)](#reverse-proxy-mandatory)
 - [Instance administration](#instance-administration)
-  - [Status](#status)
-  - [Mail queue and System log](#mail-queue-and-system-log)
+  - [The panel](#the-panel)
+  - [Help](#help)
+  - [Overview and Health](#overview-and-health)
+  - [Queue and System log](#queue-and-system-log)
+  - [Account](#account)
   - [Settings](#settings)
   - [Users](#users)
   - [Sessions](#sessions)
@@ -37,11 +46,11 @@ domains hosted on that instance — DNS, deliveries, rate limits, applications).
   - [Inbound relay](#inbound-relay)
   - [DMARC reports](#dmarc-reports)
 - [Domain administration](#domain-administration)
-  - [Domains page](#domains-page)
+  - [Outbound domains](#outbound-domains)
   - [Domain-level DNS (SPF, DKIM, DMARC)](#domain-level-dns-spf-dkim-dmarc)
   - [IP warmup](#ip-warmup)
   - [Rate limiting — level 2 (domain and application)](#rate-limiting--level-2-domain-and-application)
-  - [Deliveries](#deliveries)
+  - [Outbound log](#outbound-log)
   - [Exporting and importing a single domain](#exporting-and-importing-a-single-domain)
 
 ## Installation
@@ -61,8 +70,8 @@ ports in external scans.
 
 The [README quick start](../README.md#quick-start) runs a single container
 with `PANEL_COOKIE_SECURE=false` and port 8080 published on localhost. No
-reverse proxy, no `./certs` bind mount — Postfix still starts, but the Status
-page will report missing TLS material until you mount PEM files at
+reverse proxy, no `./certs` bind mount — Postfix still starts, but Overview
+and Health will report missing TLS material until you mount PEM files at
 `/etc/postfix/tls/fullchain.pem` and `privkey.pem`.
 
 The one-time setup link is always printed as
@@ -71,8 +80,8 @@ The one-time setup link is always printed as
 scheme to `http://127.0.0.1:8080/setup/<token>` — the path token is what
 matters; the hostname in the printed URL is not reachable as written.
 
-**What works:** the full panel — setup, domains, applications, deliveries view,
-mail queue, system log. **What does not:** reliable outbound delivery to the
+**What works:** the full panel — setup, domains, applications, outbound log,
+queue, system log. **What does not:** reliable outbound delivery to the
 public internet (no PTR, no real DNS for your domains, port 25 may be blocked
 on your network, HELO does not match anything receivers trust).
 
@@ -98,8 +107,9 @@ On first start the one-time setup URL is printed in the container log
 container — `./data/setup-token` on the host, mode `0600` — then deleted when
 setup completes. The link is `https://<SELFPOST_HOSTNAME>/setup/<token>` (path
 token, not a query string), valid for ten minutes. Open it to choose the
-administrator username and password — until then the panel has no login. If
-this host ships container logs to a central aggregator, prefer reading the
+administrator username and password — until then the panel has no login, and
+its sign-in page says there is no administrator yet and points at the setup
+link. If this host ships container logs to a central aggregator, prefer reading the
 file:
 
 ```sh
@@ -164,8 +174,8 @@ cat ./data/setup-token
 
 **4. DNS and sending.** Before sending real mail:
 
-1. Confirm PTR/rDNS for the server IP points at `SELFPOST_HOSTNAME` (Status
-   page → *Re-check*) — see [Server-level DNS](#server-level-dns-ptrrdns).
+1. Confirm PTR/rDNS for the server IP points at `SELFPOST_HOSTNAME` (Server ›
+   Health → *Re-check DNS*) — see [Server-level DNS](#server-level-dns-ptrrdns).
 2. For each domain you add in the panel, publish SPF, DKIM, and DMARC at the
    same time ([Domain-level DNS](#domain-level-dns-spf-dkim-dmarc)).
 3. Warm up a new IP gradually ([IP warmup](#ip-warmup)).
@@ -193,18 +203,18 @@ expected to set; defaults match the code exactly.
 |---|---|---|---|
 | `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
-| `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
-| `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip/XML, and show summaries under *DMARC*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
+| `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound › Domains* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
+| `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip/XML, and show summaries under *Outbound › DMARC reports*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
 | `DMARC_RATE_LIMIT_MESSAGES_PER_IP` | Per-client-IP cap on port 25 when DMARC ingest is on. When inbound relay is also enabled, **`INBOUND_RATE_LIMIT_MESSAGES_PER_IP`** applies to the shared listener instead. | `20` | `.env` |
 | `DMARC_MESSAGE_SIZE_LIMIT` | Maximum report message size in bytes when DMARC ingest is on. | `5242880` (5 MiB) | `.env` |
-| `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. | *(empty)* | `.env` |
-| `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). | `accept` | `.env` |
+| `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. The panel reads it to report on the *Spam filter* box of the inbound pages and to check that the filter answers (Server › Health). | *(empty)* | `.env` |
+| `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). The *Spam filter* box states which. | `accept` | `.env` |
 | `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
 | `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
-| `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows — the main driver of `/data` growth over time. After the first panel start, change retention on **Settings** (global administrator); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
-| `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: an admin who keeps coming back stays signed in indefinitely. | `7` | `.env` |
+| `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows — the main driver of `/data` growth over time. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
+| `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. Behind the default Apache host-network setup this is typically the Docker bridge gateway, e.g. `172.18.0.1`. | *(empty — XFF ignored)* | `.env` |
 
@@ -311,98 +321,172 @@ Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
 
 ## Instance administration
 
-After sign-in the panel opens on **Status** — the place to answer "is the
-service healthy and will mail be accepted?"
+After sign-in the global role opens on **Overview** — the place to answer "is
+the service healthy and will mail be accepted?" A user with the *domain* role
+opens on the first list they reach: Outbound › Domains, or Inbound › Domains
+when that is all they are assigned.
 
-### In-panel help
+### The panel
 
-The panel carries short operator notes so day-to-day work does not require
-opening this guide. **Help** in the navigation opens an index; each Status or
-domain card's «?» opens the same text in a side drawer (CSS only, no extra
-script). That content explains what a check or control *means* — kernel
-counters, TLS on port 465, forward-confirmed PTR, DNS publish hints, rate
-limits, and similar. It is not a second copy of this document: installation,
+The menu is grouped by mail direction, and a path reads like the menu:
+`/<group>/<page>`, an entity under its list, an action under the thing it
+changes.
+
+| Menu | Pages | Path |
+|---|---|---|
+| Overview | Overview | `/overview` |
+| Outbound | Domains · Log · Queue · DMARC reports | `/outbound/domains`, `/outbound/log`, `/outbound/queue`, `/outbound/dmarc` |
+| Inbound | Domains | `/inbound/domains` |
+| Server | Health · System log · Backup · Users · Settings | `/server/health`, `/server/log`, `/server/backup`, `/server/users`, `/server/settings` |
+| User menu (your name) | Account · Help · Sign out | `/account`, `/help`, `POST /logout` |
+
+A page a user cannot reach, or a feature that is off, leaves no gap in the
+menu: a group with nothing in it is absent. *Inbound* appears only with
+`INBOUND_RELAY_ENABLE=true` and *DMARC reports* only with
+`DMARC_REPORTS_ENABLE=true`. Everything under `/server/`, and Overview and the
+queue, answer 404 to a user with the *domain* role — the same answer a missing
+page gets.
+
+Pages that used to be one are now several. The old Status page is **Overview**
+(one verdict per check) and **Server › Health** (the tables behind them). The
+old Settings page is **Account** (your own name, e-mail and password) and
+**Server › Settings** (the instance). A domain has its own page, **Domain
+settings** under it, and an **application** form of its own under the domain.
+
+### Help
+
+**Help** (user menu) is a page of topics, one box per section of the panel —
+Overview, Outbound, Inbound, Server, Account — and a user is shown the sections
+their menu shows. The **?** in the head of a box opens the topic about that box
+on the Help page, scrolled to it. The topics explain what a check
+or control *means* — kernel counters, TLS on port 465, forward-confirmed PTR,
+DNS publish hints, rate limits, DMARC report addresses, the spam filter, and
+similar. They are not a second copy of this document: installation,
 reverse-proxy setup, backup/restore, environment variables, and security
-assumptions stay here in `docs/guide.md` (linked from the drawer and Help
-page).
+assumptions stay here in `docs/guide.md`.
 
-### Status
+### Overview and Health
 
-`/status` shows supervised processes (Postfix, OpenDKIM, panel), TLS
-certificate validity and expiry, milter socket presence, and a short Postfix
-queue summary. The **Machine** card adds the resource usage of the host
-underneath — processor (core and thread counts), memory and swap, and
-per-interface network throughput and totals — read from the kernel's
-counters; CPU and throughput are measured between refreshes, so they appear
-one refresh after the page opens. A fully busy processor or a machine out of
-memory is a warning here, because both delay or kill the mail path;
-throughput is only reported. The hostname block compares `SELFPOST_HOSTNAME`
-against the PTR record the internet publishes for this server's IP
-(forward-confirmed reverse DNS) — see
-[Server-level DNS](#server-level-dns-ptrrdns); use *Re-check* after changing
-DNS. The **Reload configuration** button re-applies OpenDKIM tables and the
-Postfix sender map from the database (and inbound relay maps when
-`INBOUND_RELAY_ENABLE=true`) — use it if daemons drifted from what the panel
-shows after manual edits under `/data`. It does **not** rebuild DMARC Postfix
-maps; a full restore Resync does (see [Restore](#restore)).
+**Overview** (`/overview`, global role) shows the stamp — the worst of its
+checks — and one card per check: machine (processor and memory), supervised
+processes (Postfix, OpenDKIM, panel), TLS certificate, queue, milter sockets
+and reverse DNS. A check the panel could not run shows as a warning, never as
+fine. Below the cards are the outbound domain list and, with the inbound relay
+on, the inbound one. Each card leads to its table on **Server › Health**
+(`/server/health`) — the queue card to the Outbound queue — and Health has the
+readings:
 
-### Mail queue and System log
+- **Machine** — processor (core and thread counts), memory and swap, and
+  per-interface network throughput and totals, read from the kernel's
+  counters; CPU and throughput are measured between refreshes, so they appear
+  one refresh after the page opens. A fully busy processor or a machine out of
+  memory is a warning, because both delay or kill the mail path; throughput is
+  only reported.
+- **Processes**, **TLS certificate** (validity and expiry) and **Milter
+  sockets** (OpenDKIM and the journal-milter).
+- **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
+  record the internet publishes for this server's IP (forward-confirmed
+  reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
+  *Re-check DNS* after changing DNS.
+- **Configuration** — the **Reload configuration** button re-applies OpenDKIM
+  tables and the Postfix sender map from the database (and inbound relay maps
+  when `INBOUND_RELAY_ENABLE=true`) — use it if daemons drifted from what the
+  panel shows after manual edits under `/data`. It does **not** rebuild DMARC
+  Postfix maps; a full restore Resync does (see [Restore](#restore)).
 
-- **Mail queue** (`/mail-queue`) — live view of messages Postfix is still
-  trying to deliver or deferring. A card at the top states this instance's
-  retry policy — first retry delay, later backoff cap, how long a message
-  stays in the queue — from `postconf -h`, read once when the panel starts.
-  A `postconf -e` override inside the container is visible after the next
-  panel (or container) restart. There is no maximum attempt count: Postfix
-  retries until the message is delivered or the queue lifetime runs out.
-- **System log** (`/system-log`) — tail of `/data/log/mail.log` (Postfix and
-  related daemon lines). The log rotates daily (14 files kept) with a
-  `postfix reload` after each rotation; a background loop checks every six
-  hours. It lives in the data volume, so it survives a container recreate along
-  with the rest of the state — `./data/log/` on the host — but it is *not*
-  included in backups: it is diagnostics, not state.
+### Queue and System log
+
+- **Outbound › Queue** (`/outbound/queue`, global role) — live view of
+  messages Postfix is still trying to deliver or deferring, as `postqueue -p`
+  lists them. It only shows: nothing there deletes or forces a message. A box
+  states this instance's retry policy — first retry delay, later backoff cap,
+  how long a message stays in the queue — from `postconf -h`, read once when
+  the panel starts. A `postconf -e` override inside the container is visible
+  after the next panel (or container) restart. There is no maximum attempt
+  count: Postfix retries until the message is delivered or the queue lifetime
+  runs out.
+- **Server › System log** (`/server/log`) — tail of `/data/log/mail.log`
+  (Postfix and related daemon lines). The log rotates daily (14 files kept)
+  with a `postfix reload` after each rotation; a background loop checks every
+  six hours. It lives in the data volume, so it survives a container recreate
+  along with the rest of the state — `./data/log/` on the host — but it is
+  *not* included in backups: it is diagnostics, not state.
+
+### Account
+
+**Account** (`/account`, every role) is the signed-in user's own: **Profile**
+(username and e-mail) and **Password**. Saving the profile does not ask for the
+password; changing the password asks for the current one and is rate-limited
+like a sign-in. The e-mail is the user's own address. Nothing is sent to it
+yet; it is what a domain's *Use my e-mail* button fills in (see [Domain-level
+DNS](#domain-level-dns-spf-dkim-dmarc)). Application SASL logins are separate
+and are not changed here.
 
 ### Settings
 
-`/settings` changes the signed-in user's username and/or password. **Global
-administrators** also set the panel-wide default DMARC report address (`rua=`)
-offered when a domain doesn't set its own — see
-[Domain-level DNS](#domain-level-dns-spf-dkim-dmarc) — and how many days
-**Deliveries** rows are kept before the background sweep deletes them (7–365
-days; takes effect on the next six-hour prune cycle without a container
-restart). Application SASL logins are separate and are not changed here.
+**Server › Settings** (`/server/settings`, global role) holds what is true for
+the whole instance: how many days the **Outbound log** keeps its rows before the
+background sweep deletes them (7–365 days; takes effect on the next six-hour
+prune cycle without a container restart), and, read-only, the level-1 rate
+limit that comes from `.env` ([Rate limiting — level 1](#rate-limiting--level-1-ip-backstop)).
+There is no panel-wide DMARC report address: each domain has its own.
 
 ### Users
 
-`/users` (global administrator only) creates, edits, and deletes panel users.
-There are two roles:
+**Server › Users** (`/server/users`, global role only) creates, edits, and
+deletes panel users. Everyone in the panel is an administrator, so the two
+roles name a *reach*, not a rank, and are called `global` and `domain` in the
+list, the role select and the page headers:
 
-- **Global administrator** — full access to every page and every domain,
-  including Users, Backup, Status, Mail queue, System log, Help, Inbound (when
-  the inbound relay flag is on), and DMARC (when `DMARC_REPORTS_ENABLE=true`).
-- **Domain-admin** — scoped to one or more domains assigned by a global
-  administrator. Sees only those domains' pages, applications, and
-  Deliveries rows; cannot add or delete domains. `/users`, `/backup`,
-  `/status`, `/mail-queue`, `/system-log`, `/inbound`, and `POST /reload` are
-  not reachable (404). A domain-admin can *export* the
-  domains assigned to them — see
-  [Exporting and importing a single domain](#exporting-and-importing-a-single-domain).
+- **global** — every page and every domain: Overview, Server (Health, System
+  log, Backup, Users, Settings), the Outbound queue, and every outbound and
+  inbound domain. The only role that adds or deletes a domain and that manages
+  users.
+- **domain** — only the domains assigned to the user, outbound and inbound
+  **separately**: the user form has one list for each, and the same name on
+  both lists is two assignments. Each list has **All**, which includes domains
+  added later; with it ticked the rows below are ignored. A *domain* user needs
+  at least one domain, or *All*, on either list. A group with nothing assigned
+  is absent from that user's menu.
 
-The panel refuses to remove or demote the **last** global administrator, so
-it can never end up with none.
+What the *domain* role reaches inside what is assigned:
+
+| | `global` | `domain` |
+|---|---|---|
+| Overview, Server, the Outbound queue | yes | no (404) |
+| Outbound: domain page, applications, Domain settings, log | every domain | assigned domains |
+| Outbound › DMARC reports | every report, with the ingest statistics | reports of assigned domains, without the ingest box |
+| Inbound: domain page, upstream, recipients | every domain | assigned inbound domains |
+| Add or delete a domain, either direction | yes | no |
+| Export a domain (Domain settings) | yes | assigned domains |
+| Import a domain (Server › Backup) | yes | no |
+| Account, Help | yes | yes |
+
+A domain that is not assigned, one that does not exist, and a user with no
+reach in that direction all get the same 404.
+
+The panel refuses to remove or demote the **last** global user, so it can never
+end up with none. A user cannot delete the account they are signed in with.
+The user form also sets the user's e-mail, which the users list shows.
 
 ### Sessions
 
 A login survives a container restart: sessions live in SQLite, not in
-memory. Expiry is a sliding idle window (`PANEL_SESSION_IDLE_DAYS`, default
-seven days) with no absolute lifetime cap — an admin who keeps using the panel
-stays signed in indefinitely. HTMX polling on the monitoring screens
-(Deliveries, Mail queue, System log, and the Status health fragment) does
-**not** count as activity, so an auto-refreshing tab left open will not keep a
-session alive forever. Changing **your own** password on `/settings` signs out
-every other session for that user but leaves the current browser signed in.
-Signing out (`POST /logout`) ends only the current session — other browsers or
-tabs for the same user keep working until their session rows expire.
+memory. A session belongs to the user it was created for, by id: deleting the
+user ends their sessions, and renaming them keeps theirs. Expiry is a sliding
+idle window (`PANEL_SESSION_IDLE_DAYS`, default seven days) with no absolute
+lifetime cap — a user who keeps using the panel stays signed in indefinitely.
+HTMX polling on the monitoring screens (Overview, Health, Outbound log and
+queue, System log) does **not** count as activity, so an auto-refreshing tab
+left open will not keep a session alive forever.
+
+- Changing **your own** password on **Account** signs out every other session
+  of yours but leaves the current browser signed in.
+- A password that a global user sets for **another** user on the user form
+  ends all of that user's sessions; set for oneself, it behaves like the
+  previous item.
+- Signing out (`POST /logout`) ends only the current session — other browsers or
+  tabs for the same user keep working until their session rows expire.
 
 ### Upgrading
 
@@ -418,7 +502,8 @@ The image declares a Docker `HEALTHCHECK` that probes `GET /healthz` on port
 Postfix are all `RUNNING` under supervisord; otherwise `503 unhealthy`. This
 catches a dead mail path that would still leave the HTTP server up, but it
 does **not** verify TLS certificates, DNS records, or end-to-end delivery —
-use the authenticated [Status](#status) page for that. External monitoring
+use the authenticated [Overview and Health](#overview-and-health) pages for
+that. External monitoring
 can use the same endpoint through the reverse proxy if you expose it, or poll
 `docker inspect` health state on the host.
 
@@ -429,9 +514,10 @@ its mail hostname. Most receiving mail servers weigh this heavily; get it
 from whoever assigns the IP (hosting provider's panel/support), not from
 your own DNS zone.
 
-The [Status](#status) page verifies the server's hostname against this
-record (forward-confirmed reverse DNS). Results are cached for about one
-minute; use *Re-check* right after publishing a record.
+**Server › Health** verifies the server's hostname against this record
+(forward-confirmed reverse DNS), and Overview shows the verdict. Results are
+cached for about one minute; use *Re-check DNS* right after publishing a
+record.
 
 Per-domain DNS (SPF, DKIM, DMARC) is a separate scope — see
 [Domain-level DNS](#domain-level-dns-spf-dkim-dmarc).
@@ -468,9 +554,9 @@ deploy files — without that mount, *Full backup* refuses with an error.
 There are four ways to capture a full backup. They differ in whether the
 instance keeps running, what goes into the archive, and what happens on restore.
 
-**1. Panel — while the container is running (no downtime).** *Backup* → *Full
-backup* (optionally tick *Encrypt with a password*). Same archive as the CLI
-below.
+**1. Panel — while the container is running (no downtime).** *Server › Backup*
+→ *Full backup*. *Encrypt with a password* is ticked; untick it for a plain
+archive. Same archive as the CLI below.
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
@@ -552,8 +638,8 @@ blocked. On that same first boot the panel also runs one **Resync** — OpenDKIM
 tables and Postfix's sender map are re-derived from SQLite (inbound relay maps
 when `INBOUND_RELAY_ENABLE=true`; DMARC maps when `DMARC_REPORTS_ENABLE=true`)
 and both daemons are reloaded, healing any drift between the extracted files and
-the database. The Status page's *Reload configuration* button resyncs OpenDKIM,
-the sender map, and inbound maps only — not DMARC maps. This is why the
+the database. The *Reload configuration* button on Server › Health resyncs
+OpenDKIM, the sender map, and inbound maps only — not DMARC maps. This is why the
 compose file pins a fixed tag rather than `:latest`: without a known version,
 there'd be no way to tell which image restoring a given backup actually requires
 (see [Fixed image tag](#fixed-image-tag)).
@@ -619,34 +705,35 @@ the resulting `.tar.gz` — see [Encrypting a backup or
 export](#encrypting-a-backup-or-export) for the decrypt command's password
 options.
 
-**Archives from older SelfPost versions** (flat layout: `manifest.json` and
-`selfpost.db` at the archive root, no `data/` prefix, no deploy files) restore
-with the previous procedure: `tar xzf backup.tar.gz -C ./data` into a project
-that already has `docker-compose.yml` and `.env`.
+**Archives and data directories from 1.x cannot be restored into 2.0.** The
+database is refused at start and left untouched — 2.0 starts from an empty data
+directory. Carry each domain over with its
+[export file](#exporting-and-importing-a-single-domain) instead.
 
 Restoring an archive taken **before** a session row was removed can bring
 that session back: session rows travel with the backup, and a browser that
 still holds the matching cookie is signed in again on the next request if the
 restored row's idle expiry has not passed. `POST /logout` removes only the
-current session; there is no "logout everywhere". Changing your own password
-on `/settings` deletes your other sessions, but a global administrator
-resetting another user's password on `/users` does not invalidate that user's
-existing sessions.
+current session; there is no "logout everywhere" — see
+[Sessions](#sessions) for what ends a user's sessions.
 
 See also [Exporting and importing a single
 domain](#exporting-and-importing-a-single-domain) — a different, domain-scoped
-operation that also lives on the *Backup* page (`/backup`).
+operation: *Export domain* is on the domain's settings page, *Import a domain*
+on *Server › Backup* (`/server/backup`).
 
 Both a full backup and a domain export are **secrets** — they contain the
-admin password hash (full backup), TLS private keys and `.env` (full backup),
-or working application credentials (domain export) in the clear or in
-directly reversible form. Treat them like any other credential material: restrict who can read them, don't email them
-around — and encrypt them, which SelfPost can do for you.
+password hashes of the panel's users (full backup), TLS private keys and `.env`
+(full backup), or working application credentials (domain export) in the clear
+or in directly reversible form. Treat them like any other credential material:
+restrict who can read them, don't email them around — and encrypt them, which
+SelfPost does unless you untick the box.
 
 #### Encrypting a backup or export
 
-Both download forms carry an **Encrypt with a password** checkbox. Ticked, the
-file that comes down is an encrypted envelope instead of the plain archive:
+Both download forms carry an **Encrypt with a password** checkbox, ticked by
+default. Ticked, the file that comes down is an encrypted envelope instead of
+the plain archive; unticked, it is the plain archive:
 
 | Artefact | Plain | Encrypted |
 |----------|-------|-----------|
@@ -686,27 +773,33 @@ With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
 ### Inbound relay
 
 Optional backup-MX / forwarder: Postfix accepts mail on port **25** for
-domains you list under *Inbound* and hands each message to the upstream host
-you configure. It is **not** mailboxes, IMAP, or webmail — SelfPost never
-stores the message locally.
+domains you list under *Inbound › Domains* and hands each message to the
+upstream host you configure. It is **not** mailboxes, IMAP, or webmail —
+SelfPost never stores the message locally.
 
 **Off by default.** Set `INBOUND_RELAY_ENABLE=true` in `.env` and recreate the
 container. Until then there is no inbound-relay `smtp inet` listener, no
-*Inbound* item in the nav, and `/inbound` is 404. (Port 25 can still listen
-when only `DMARC_REPORTS_ENABLE=true` — see [DMARC reports](#dmarc-reports).)
-Outbound 465/587 is unchanged.
+*Inbound* group in the menu, and `/inbound/…` is 404. (Port 25 can still
+listen when only `DMARC_REPORTS_ENABLE=true` — see [DMARC
+reports](#dmarc-reports).) Outbound 465/587 is unchanged.
 
-**Panel** (`/inbound`, global administrator only): add a domain, set the
-upstream host/port and TLS to that hop (opportunistic / required / off), and
-choose recipients — an allow-list, or any address at that domain. A domain
-with an empty upstream is kept in the database but is **not** published into
-Postfix maps, so mail is never accepted with nowhere to send it.
+**Panel** (`/inbound/domains`): the global role adds and deletes domains. On a
+domain's page, set the upstream host/port and TLS to that hop (opportunistic /
+required / off), and choose recipients — an allow-list, or any address at that
+domain. Inbound domains are assigned to a user with the *domain* role
+separately from outbound ones (see [Users](#users)); such a user sees and
+changes the upstream and recipients of the inbound domains assigned to them,
+and cannot add or delete one. The upstream may be any host and port, including
+loopback and private addresses — see the accepted risks in
+[security.md](security.md). A domain with an empty upstream is kept in the
+database but is **not** published into Postfix maps, so mail is never accepted
+with nowhere to send it.
 
 **DNS.** Unlike sending domains, an inbound domain needs an **MX** record that
 points at `SELFPOST_HOSTNAME`. The domain page shows the value to publish
 (`10 <hostname>.`) and a check that succeeds when *any* MX host matches this
 server — other MX targets (a primary mail server) are fine; this is how
-backup-MX is meant to work. Use *Re-check* after publishing.
+backup-MX is meant to work. Use *Re-check DNS* after publishing.
 
 **Not an open relay.** The inbound smtpd offers no SASL. It accepts only
 domains in `relay_domains` and only listed recipients (`relay_recipient_maps`);
@@ -729,10 +822,23 @@ only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
 does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
 defer instead.
 
-**Inbound mail is not in Deliveries.** Port 25 runs its own milter chain: the
-optional anti-spam milter, and nothing else. OpenDKIM does not sign relayed
+The panel only reports this setting; it does not change it. Every inbound
+domain page has a **Spam filter** box — on or off, what happens to mail while
+the filter is down, and that the filter belongs to the server, not to the
+domain — and the domain list says in its head whether the filter is on. The
+filter's address (`INBOUND_ANTISPAM_MILTER`) is shown to the global role only,
+so a user with the *domain* role sees the state without the server's internals.
+For the global role the filter is also one of the milter sockets on **Server ›
+Health** and in the Overview card: the panel connects to the address (one
+second at most, nothing is sent) and, if there is no answer, says whether
+inbound mail is being deferred (`tempfail`) or going through unfiltered
+(`accept`).
+
+**Inbound mail is not in the Outbound log.** Port 25 runs its own milter chain:
+the optional anti-spam milter, and nothing else. OpenDKIM does not sign relayed
 mail (and a signing outage therefore cannot defer it), and the journal-milter
-does not file it — [Deliveries](#deliveries) stays a record of what *you* sent.
+does not file it — the [Outbound log](#outbound-log) stays a record of what
+*you* sent.
 This also keeps a forged `From:` on inbound mail from counting against a
 sending domain's [level-2 rate limit](#rate-limiting--level-2-domain-and-application).
 
@@ -749,26 +855,42 @@ are not stored. This is separate from [Inbound relay](#inbound-relay) — no
 backup-MX, no forwarding upstream.
 
 **Off by default.** Set `DMARC_REPORTS_ENABLE=true` in `.env` and recreate the
-container. Until then there is no report ingest, no *DMARC* item in the nav,
-and `/dmarc` is 404. Outbound 465/587 is unchanged.
+container. Until then there is no report ingest, no *DMARC reports* entry in
+the Outbound menu, and `/outbound/dmarc` is 404. Outbound 465/587 is unchanged.
 
-**Addresses.** In *Settings* (global administrator), set the default
-`rua=` mailbox to an address on `SELFPOST_HOSTNAME`, e.g.
-`dmarc-reports@mail.example.com`. Per domain you can choose **SelfPost hosted**
-(`dmarc-reports+<domain>@<hostname>`) under *Domain settings → DMARC reports*.
-Only those allow-listed addresses are accepted on port 25.
+**Addresses.** A domain's report address (`rua=`) is one of three choices, set
+in that domain's **Domain settings** (Outbound › Domains › the domain › Domain
+settings) and nowhere else:
+
+- **No reports** — the state of a new domain; `rua=` is left out of the DMARC
+  record.
+- **SelfPost hosted** — `dmarc-reports+<domain>@<hostname>`, an address on this
+  server whose reports are parsed and shown under *DMARC reports*. Offered only
+  while `DMARC_REPORTS_ENABLE=true`.
+- **A specific address** — any mailbox, typed for this domain; it receives the
+  raw XML. Beside the field, *Use my e-mail* fills it with the e-mail of your
+  profile (Account); it only fills the field, and saving is the form's own
+  button. The button is absent when your profile has no e-mail.
+
+Changing the choice changes the DMARC record to publish; the domain page shows
+the new value. There is no panel-wide or per-user default. Only addresses on
+`SELFPOST_HOSTNAME` are accepted on port 25: the generic
+`dmarc-reports@<hostname>` and any address on that host that a domain has
+chosen.
 
 **DNS.** Publish the usual `_dmarc` TXT on each sending domain with
-`rua=mailto:…` pointing at your hosted address. Receivers deliver to the
+`rua=mailto:…` pointing at the address the domain shows. Receivers deliver to the
 address domain — publish **MX** for `SELFPOST_HOSTNAME` (or the report
 address domain if different) so reports reach this server. If a hub domain
 authorises external destinations, publish `_report._dmarc` there too; the panel
 checks it on the domain page.
 
-**Panel.** *DMARC* (global administrator) lists recent reports and ingest
-health. Open a domain's roll-up from the list or from *View DMARC reports* on
-the domain page. Domain administrators see reports only for domains assigned to
-them. Summaries are pruned (500 kept, 90 days max).
+**Panel.** *Outbound › DMARC reports* lists recent reports. The global role also
+sees the *Ingest* box — whether ingest works, the last report received, reports
+kept this week and parse failures. Open a domain's roll-up from the list or
+from *DMARC reports* in the domain page's menu. A user with the *domain* role
+sees the reports of the domains assigned to them, without the *Ingest* box.
+Summaries are pruned (500 kept, 90 days max).
 
 **Not an open relay.** The inbound smtpd offers no SASL. With DMARC ingest
 alone, `check_recipient_access` permits only configured report addresses;
@@ -780,7 +902,7 @@ predictable, so the report XML is treated as untrusted input: a report is
 accepted only when the domain it claims in `policy_published` is a sending
 domain configured here, and — when it arrived at a per-domain hosted address —
 only when that domain matches the address's `+tag`. Anything else is refused
-and counted in *parse failures* on the DMARC page, so a stranger cannot file
+and counted in *parse failures* on the DMARC reports page, so a stranger cannot file
 reports under your domain or push genuine ones out through the retention cap.
 Reports are accepted as gzip, zip, or plain XML.
 
@@ -789,17 +911,32 @@ Parsed report data lives in SQLite and is included in a
 
 ## Domain administration
 
-### Domains page
+### Outbound domains
 
-`/domains` lists sending domains and hosts the add-domain form (**global
-administrator only**). Domain administrators see only domains assigned to
-them. Each row shows its DKIM TXT value, SPF/DMARC checks, and SASL
-applications. Per-domain rate limits (level 2), per-application limits, and
-optional client IP allow-lists are configured here — see [Rate limiting —
-level 2](#rate-limiting--level-2-domain-and-application). *Export domain*
-writes a single-domain archive; *Import a domain* on the Backup page reads
-one back in (**global administrator only**) — see [Exporting and importing a single
-domain](#exporting-and-importing-a-single-domain).
+**Outbound › Domains** (`/outbound/domains`) lists sending domains with the
+verdict of each DNS check, the DKIM selector, the number of applications and
+recent mail, and hosts the add-domain form (**global role only**). A user with
+the *domain* role sees only the domains assigned to them. Three pages belong
+to a domain:
+
+- **The domain page** (`/outbound/domains/{id}`) — the *DNS records* to
+  publish and what is in DNS now, the *Applications* (SASL logins) with *New
+  password* and *Delete* in their rows, and the *Connection* settings. *Re-check
+  DNS* and *Add application* are in its head; its menu leads to the domain's
+  log and DMARC reports.
+- **The application form** (`…/applications/new`, `…/applications/{aid}`) —
+  who the application may send as, its client IP allow-list and its rate limit
+  are validated and saved together, or not at all, also when the application
+  is created. A password is shown once, on the page that answers the creation
+  or *New password*, and is never shown again.
+- **Domain settings** (`…/settings`) — the *DMARC report address* (see [DMARC
+  reports](#dmarc-reports)), the domain's *Rate limit* (see [Rate limiting —
+  level 2](#rate-limiting--level-2-domain-and-application)), *Export domain*
+  and, for the global role, *Delete domain*, which asks once more.
+
+*Export domain* writes a single-domain file; *Import a domain* on *Server ›
+Backup* reads one back in (**global role only**) — see [Exporting and importing
+a single domain](#exporting-and-importing-a-single-domain).
 
 ### Domain-level DNS (SPF, DKIM, DMARC)
 
@@ -810,12 +947,14 @@ records; see [Inbound relay](#inbound-relay).
 - **SPF** — a TXT record on the domain authorizing this server to send on its
   behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).
 - **DKIM** — a TXT record with the exact value the panel shows on that
-  domain's page (`domain page → DKIM TXT record`), one selector per domain.
+  domain's page (*DNS records* box), one selector per domain.
 - **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring
-  only, safe to publish immediately). Set `rua=` to receive aggregate reports:
-  with [DMARC reports](#dmarc-reports) enabled, use a SelfPost-hosted address
-  from *Settings* or per-domain *Domain settings*; otherwise point `rua=` at a
-  mailbox elsewhere that receives inbound mail. If `rua=` points at another
+  only, safe to publish immediately). Set `rua=` to receive aggregate reports
+  by choosing the domain's report address in *Domain settings*: with [DMARC
+  reports](#dmarc-reports) enabled, the SelfPost-hosted address; otherwise an
+  address typed for the domain — a mailbox elsewhere that receives mail (*Use
+  my e-mail* fills in your profile's) — or no reports, which leaves `rua=` out.
+  The record the page shows follows that choice. If `rua=` points at another
   domain, publish `_report._dmarc` on that hub domain too; the panel checks
   it. Public mail hosts (Gmail, Outlook, …) cannot be used as external
   report destinations.
@@ -825,10 +964,10 @@ lands in spam even though SelfPost delivered it correctly — DKIM passing
 doesn't help if SPF/DMARC are absent. **Whenever you add a new domain in the
 panel, add its DNS records at the same time**, not later.
 
-Each domain's page shows a *DNS status* card comparing the published DKIM
+Each domain's page has a *DNS records* box comparing the published DKIM
 record against the key this server signs with, plus the domain's SPF,
 DMARC, and (when configured) DMARC report-authorisation records. Results are
-cached for a few minutes; use *Re-check* right after publishing a record.
+cached for a few minutes; use *Re-check DNS* right after publishing a record.
 The SPF check is deliberately shallow — it looks for a mechanism that
 literally covers this server's address and does not follow `include:` or
 `redirect=`, so a record that authorizes the server through an include is
@@ -848,12 +987,13 @@ public internet, not something SelfPost's configuration can shortcut.
 
 ### Rate limiting — level 2 (domain and application)
 
-Level 2 is optional, configured on each domain's page, and layers on top of
+Level 2 is optional, configured in each domain's settings (the domain) and
+on each application's form (the application), and layers on top of
 the always-on [level-1 IP backstop](#rate-limiting--level-1-ip-backstop).
 Level-2 ceilings cannot exceed level 1 (the panel shows the level-1 values
 and rejects higher numbers). When a level-2 ceiling is exceeded, Postfix
-returns a 4xx and the refusal is recorded in [Deliveries](#deliveries) as
-`rejected`.
+returns a 4xx and the refusal is recorded in the [Outbound log](#outbound-log)
+as `rejected`.
 
 **Level 2 — domain** — a message ceiling and window for **every** client IP
 sending as that domain. When unset, only level 1 applies for non-privileged
@@ -896,43 +1036,45 @@ accept rather than defer when it cannot reach it. Level 1 is the backstop
 that keeps working even when level 2 cannot run, and it is the only one of
 the two that does not depend on the panel process.
 
-### Deliveries
+### Outbound log
 
-`/deliveries` is a searchable send log with server-side filters by domain
-and application. A row identifies its message and nothing more — time,
+**Outbound › Log** (`/outbound/log`) is a searchable send log with server-side
+filters by domain and application; a user with the *domain* role sees only the
+rows of their domains. It refreshes its rows without resetting a filter being
+chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
 retrying), `bounced` (final failure), or `rejected` (refused — for example
 by a [level-2 rate limit](#rate-limiting--level-2-domain-and-application));
-*Details* opens that row's own page (`/deliveries/{id}`). That page carries
+*Details* opens that row's own page (`/outbound/log/{id}`). That page carries
 the sending domain, the application it was submitted under, the Postfix
 queue id and the journal id, beside the message's history — when it was
 accepted and what Postfix later reported for the recipient. A `deferred`
 or `bounced` row includes this Postfix's retry intervals (first delay,
-backoff cap, queue lifetime), the same numbers Mail queue shows; domain
-administrators see them here because they cannot open Mail queue. Under
+backoff cap, queue lifetime), the same numbers the Outbound queue shows; users
+with the *domain* role see them here because they cannot open the queue. Under
 both sit the `mail.log` lines for its queue id: the connection to the
 receiving server, the server's reply, and the status that reply was filed
 as. Rows outlive `mail.log`, so an older message's lines may have rotated
-away; the page says so. Retention is set on **Settings** (global
-administrator); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial
-default until it is changed there.
+away; the page says so. Retention is set under **Server › Settings** (global
+role); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial default until it
+is changed there.
 
 ### Exporting and importing a single domain
 
-Domain page → *Export domain* to write the file, *Backup* → *Import a
-domain* to read it back in. This moves one domain — its DKIM key, its
+Domain settings → *Export domain* to write the file, *Server › Backup* →
+*Import a domain* to read it back in. This moves one domain — its DKIM key, its
 applications' **working** SASL passwords, and configured **rate limits**
 (mode, ceilings, multipliers) and client IP allow-lists — to a different SelfPost
 instance without regenerating anything, so DNS (the DKIM TXT record)
 doesn't need to change. Unlike a full restore (see [Full backup and
 restore](#full-backup-and-restore)), this works across different
-hostnames/instances. *Import* is global-administrator only; *export* is
-available to any user who can access the domain, **including a domain-admin**
-for a domain assigned to them — so a domain-admin can walk away with that
-domain's working SASL passwords in the clear. Weigh that when deciding which
-domains to assign to a domain-admin account.
+hostnames/instances. *Import* is for the global role only; *export* is
+available to any user who can access the domain, **including a user with the
+*domain* role** for a domain assigned to them — so that user can walk away with
+the domain's working SASL passwords, in the clear if they untick the encryption
+box. Weigh that when deciding which domains to assign to a *domain* user.
 
-A domain export is a secret in the same way a full backup is, and can be
-encrypted the same way — see [Encrypting a backup or
-export](#encrypting-a-backup-or-export).
+A domain export is a secret in the same way a full backup is. The *Encrypt with
+a password* box is ticked by default, and the export is sealed the same way —
+see [Encrypting a backup or export](#encrypting-a-backup-or-export).

@@ -352,6 +352,30 @@ go test ./...
 — every new `loadConfig` key must appear in the env lists in [guide.md](guide.md)
 ([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
 
+### Panel pages: the component kit and its guards
+
+Every panel page is built from the component kit in
+[internal/web/view](../internal/web/view): partials in
+`templates/components.html`, their typed input in `components.go`, one stylesheet
+`static/panel.css`, one layout `layout.html`. A page template calls partials with
+a struct from a `view.New…` constructor and writes no component markup of its
+own ([architecture.md § Panel HTTP surface](architecture.md#panel-http-surface)).
+The guard tests (`internal/web/guard_*_test.go`, `internal/web/view/guard_*_test.go`)
+run in `go test ./...` and read their rules from the accepted mockups under
+[docs/assets/panel-redesign/panel/](assets/panel-redesign/index.html): which
+classes and icons exist, what `panel.css` may contain, what component skeleton
+each page has, which routes exist. A failing guard means the page is wrong, not
+the guard.
+
+Changing the design is mockup first: edit the fragment under `panel/src/`, run
+`build.py` and `check.py --write`, commit as `design: …`, get it accepted, and
+only then touch `internal/web`. CI enforces the order with `design-first`
+([.github/scripts/design-first.sh](../.github/scripts/design-first.sh)): a commit
+that changes the mockups, a guard or the script touches nothing else under
+`internal/web/`, and a template that returns from git history is refused.
+[plans/panel-redesign.md](plans/panel-redesign.md) § The contract and
+§ Enforcement have the full rules.
+
 ### End-to-end (container suite)
 
 Separate Go module `test/e2e/`; **not** included in the main module's
@@ -391,7 +415,9 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 ### `test.yml` — every push and PR to `main`
 
-`gofmt -l` → `go vet ./...` → `go test ./...` (main module, no e2e).
+`design-first` (needs the full history) → `gofmt -l` → `go vet ./...` →
+`go test ./...` (main module, no e2e; includes the panel guard tests, see
+[§ Panel pages](#panel-pages-the-component-kit-and-its-guards)).
 
 ### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 
