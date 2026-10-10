@@ -123,7 +123,10 @@
     {
      "is-9": [
       "box[Overview]:help×3",
-      "box[Outbound]:help×3"
+      "box[Outbound]:help×6",
+      "box[Inbound]:help×4",
+      "box[Server]:help×3",
+      "box[Account]:help"
      ]
     }
    ]

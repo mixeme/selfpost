@@ -76,7 +76,7 @@
     <div class="columns">
       <div class="column is-6">
         <div class="box">
-          <div class="sp-box-head"><span class="sp-no">01</span><h2>Full backup</h2></div>
+          <div class="sp-box-head"><span class="sp-no">01</span><h2>Full backup</h2><a class="sp-help" href="help.html#backup" title="Backups, encryption and restore"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <p class="mb-3"><code>data/</code> (database, DKIM keys, credentials, the queue), <code>docker-compose.yml</code>, <code>.env</code> and <code>certs/</code> in one archive. Restore into an empty project directory and start the <strong>same SelfPost version</strong>. The reverse-proxy vhost is not included.</p>
             <form class="sp-form" method="post" action="#">
@@ -94,7 +94,7 @@
 
       <div class="column is-6">
         <div class="box" id="import">
-          <div class="sp-box-head"><span class="sp-no">02</span><h2>Import a domain</h2></div>
+          <div class="sp-box-head"><span class="sp-no">02</span><h2>Import a domain</h2><a class="sp-help" href="help.html#backup" title="Moving a domain to another instance"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <p class="mb-3">A domain export from another instance — plain <code>.json</code> or encrypted <code>.spde</code>. Its DKIM key and application passwords come across, so the published DNS needs no change. The export itself is made on the <a href="out-domain-settings.html#export">domain's settings</a>.</p>
             <form class="sp-form" method="post" action="out-domain.html" enctype="multipart/form-data">
