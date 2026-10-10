@@ -4,14 +4,13 @@
   {
    "columns": [
     {
-     "is-5": [
-      "box[Profile]:body",
-      "box[Password]:body"
+     "is-6": [
+      "box[Profile]:body"
      ]
     },
     {
-     "is-7": [
-      "box[DMARC reports]:record×2"
+     "is-6": [
+      "box[Password]:body"
      ]
     }
    ]

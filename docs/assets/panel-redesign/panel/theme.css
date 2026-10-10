@@ -161,7 +161,14 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .box > .table-container td:first-child, .box > .table-container th:first-child { padding-left: 1.25rem; }
 .box > .table-container td:last-child, .box > .table-container th:last-child { padding-right: 1.25rem; }
 .table td.sp-actions { text-align: right; white-space: nowrap; }
-.table td.sp-actions a { margin-left: .9rem; }
+/* An action that changes state (New password, Delete) is a POST, so it is a form
+   with a button, not a link. The form sits inline like the links beside it and
+   the button is handed the link's colour and type; Bulma already resets the
+   button and shares the pointer and the focus ring between a and button, and a
+   link here has no hover colour of its own. */
+.table td.sp-actions a, .table td.sp-actions form { margin-left: .9rem; }
+.table td.sp-actions form { display: inline; }
+.table td.sp-actions button { color: var(--bulma-link-text); font: inherit; }
 .table td.sp-clip { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag { font-family: var(--sp-mono); font-weight: 600; letter-spacing: .04em; }
 .sp-empty { padding: 2.2rem 1.25rem; text-align: center; color: var(--sp-muted); }

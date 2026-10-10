@@ -81,13 +81,13 @@
             <form class="sp-form" method="post" action="#">
               <div class="field"><label class="label" for="rua">Aggregate reports (rua=)</label>
                 <div class="control"><div class="select is-fullwidth"><select id="rua" name="dmarc_rua_mode">
-                  <option selected>admin's default — mix@example.org</option>
-                  <option>SelfPost hosted (example.org@dmarc.mail.example.org)</option>
-                  <option>My default instead — (you are admin)</option>
-                  <option>No aggregate reports</option>
-                  <option>Custom address</option>
+                  <option>No reports</option>
+                  <option>SelfPost hosted — example.org@dmarc.mail.example.org</option>
+                  <option selected>A specific address</option>
                 </select></div></div>
-                <p class="help">A default belongs to a user and is set under their <a href="account.html#dmarc">Account</a>; a domain follows one named user, so two people sharing a domain never pull it two ways. Changing this changes the DMARC record to publish.</p></div>
+                <p class="help">No reports leaves <code>rua=</code> out of the DMARC record. SelfPost hosted sends them to an address on this server, which parses them for DMARC reports. A specific address is any mailbox, and it receives the raw XML. Changing this changes the DMARC record to publish.</p></div>
+              <div class="field"><label class="label" for="rua_email">Report address</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" id="rua_email" name="dmarc_rua_email" type="email" value="reports@acme.io" placeholder="reports@your-mail-domain.com" autocomplete="off" spellcheck="false"></div><div class="control"><button type="button" class="button" data-fill="rua_email" data-fill-value="mix@example.org"><i class="ti ti-mail"></i>Use my e-mail</button></div></div></div>
               <button type="submit" class="button is-primary">Save report address</button>
             </form>
           </div>

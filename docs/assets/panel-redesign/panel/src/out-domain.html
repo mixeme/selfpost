@@ -66,14 +66,14 @@
           </div>
 
           <div class="sp-record">
-            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address: <a href="out-domain-settings.html#reports">admin's default</a></small></div>
+            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address: <a href="out-domain-settings.html#reports">example.org@dmarc.mail.example.org</a></small></div>
             <div class="sp-row">
               <div class="field"><label class="label">Host / name</label>
                 <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="_dmarc.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
               <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
             </div>
             <div class="field"><label class="label">Value to publish</label>
-              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=none; rua=mailto:dmarc@mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=none; rua=mailto:example.org@dmarc.mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div>
               <p class="help"><code>p=none</code> does not affect delivery. Tighten to <code>quarantine</code>, then <code>reject</code>, once the <a href="dmarc-domain.html">reports</a> look clean.</p></div>
           </div>
         </div>
@@ -83,10 +83,10 @@
           <div class="table-container"><table class="table is-fullwidth is-hoverable">
             <thead><tr><th>Login</th><th>May send as</th><th>30 days</th><th>Limits</th><th></th></tr></thead>
             <tbody>
-              <tr><td class="sp-mono"><strong>prod-server</strong></td><td>*@example.org</td><td class="sp-muted">1 102 msg · peak 96/h</td><td><span class="tag is-success is-light">200 / h</span></td>
-                <td class="sp-actions"><a href="out-app.html">Edit</a><a href="out-app-created.html">New password</a><a class="has-text-danger" href="#">Delete</a></td></tr>
-              <tr><td class="sp-mono"><strong>alerts</strong></td><td>alerts@example.org, noc@example.org</td><td class="sp-muted">182 msg · peak 14/h</td><td><span class="tag is-light">domain</span> <span class="tag is-success is-light">2 IPs</span></td>
-                <td class="sp-actions"><a href="out-app.html">Edit</a><a href="out-app-created.html">New password</a><a class="has-text-danger" href="#">Delete</a></td></tr>
+              <tr><td class="sp-mono sp-nowrap"><strong>prod-server</strong></td><td>*@example.org</td><td class="sp-muted">1 102 msg · peak 96/h</td><td><span class="tag is-success is-light">200 / h</span></td>
+                <td class="sp-actions"><a href="out-app.html">Edit</a><form method="post" action="out-app-created.html"><button type="submit">New password</button></form><form method="post" action="out-domain.html"><button type="submit" class="has-text-danger">Delete</button></form></td></tr>
+              <tr><td class="sp-mono sp-nowrap"><strong>alerts</strong></td><td>alerts@example.org, noc@example.org</td><td class="sp-muted">182 msg · peak 14/h</td><td><span class="tag is-light">domain</span> <span class="tag is-success is-light">2 IPs</span></td>
+                <td class="sp-actions"><a href="out-app.html">Edit</a><form method="post" action="out-app-created.html"><button type="submit">New password</button></form><form method="post" action="out-domain.html"><button type="submit" class="has-text-danger">Delete</button></form></td></tr>
             </tbody>
           </table></div>
           <div class="sp-box-foot">New password and Delete ask for confirmation; the old password stops working at once.</div>

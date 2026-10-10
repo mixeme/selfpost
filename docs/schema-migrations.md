@@ -83,9 +83,9 @@ for operators upgrading from older 2.x images.
 | Table | Role |
 |-------|------|
 | `settings` | Key/value settings of the instance — what is true whoever is signed in (send-log retention). Nothing that belongs to a user |
-| `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `dmarc_default_mode` / `dmarc_default_address` are their default DMARC report address; `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
+| `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
 | `sessions` | Panel login sessions (token hash, owning user by id and deleted with them, sliding idle expiry) |
-| `domains` | Sending (outbound) domains. `dmarc_rua` / `dmarc_rua_user_id` say where aggregate reports go |
+| `domains` | Sending (outbound) domains. `dmarc_rua` is where aggregate reports go (`''` = no reports) |
 | `user_domains` | Outbound domains assigned to a `domain` user |
 | `applications` | SASL applications per domain, with the client-IP restriction (`auth_ip_restrict`, `auth_allowed_ips`) |
 | `application_addresses` | Explicit From addresses (`list` mode) |
@@ -108,27 +108,20 @@ and index of this list.
 |---|---|---|
 | `admin` created in 0001, dropped in 0005 | never exists | the reason for the squash |
 | `users.role` = `global` / `domain_admin` | `global` / `domain` | the role is a reach, not a rank — everyone in the panel is an administrator |
-| `users.dmarc_report_email` | `users.email` | a user's e-mail is theirs; it is what the panel writes to, and DMARC only *may* use it |
-| instance setting `dmarc_report_email` (mirror of the global user's field) | `users.dmarc_default_mode`, `users.dmarc_default_address` | the default report address is a user's setting, not the server's |
-| `domains.dmarc_rua` NULL = inherit the instance default, `''` = none | `domains.dmarc_rua_user_id` set = follows that user's default; otherwise `dmarc_rua` is the address, `''` = none | a domain can have several users, so "the default" has to be someone's |
+| `users.dmarc_report_email` | `users.email` | a user's e-mail is theirs; it is what the panel writes to, and a domain's report address can be filled with it |
+| instance setting `dmarc_report_email` (mirror of the global user's field); `domains.dmarc_rua` NULL = inherit the instance default | `domains.dmarc_rua` alone: the address, `''` = no reports | a domain's report address is one of three explicit choices — no reports, hosted, a typed address; nothing is inherited and no user's default exists (2026-10-10) |
 | — | `user_inbound_domains` | inbound is delegated per user, separately from outbound |
 | — | `users.all_domains`, `users.all_inbound_domains` | "All" includes domains added later |
 | `rate_limits.allowed_ips` (unused since 1.9.0) | gone | client IPs belong to the application (`auth_allowed_ips`) |
 
 ### Where a domain's DMARC reports go
 
-Resolved in one place, `Store.DomainDMARCRua`:
-
-1. `domains.dmarc_rua_user_id` is set → the domain follows that user's default
-   (`DMARCDefault.Resolve`): `hosted` → SelfPost's own mailbox for the domain
-   (no reports while ingest is off), `account` → `users.email`, `custom` →
-   `users.dmarc_default_address`, `none` → no reports.
-2. Otherwise `domains.dmarc_rua` is the address itself; `''` means a
-   policy-only record.
-
-A new domain follows whoever created it. Deleting the followed user sets
-`dmarc_rua_user_id` to NULL (`ON DELETE SET NULL`), which leaves the domain at
-"no reports" — never at another user's default.
+`domains.dmarc_rua` is the address itself and the only thing stored; `''` means
+no reports, and it is what a new domain has. The choice shown in Domain
+settings is derived from it: `''` is no reports, the address SelfPost derives
+for the domain and the server's hostname (`dmarc.HostedReportAddress`, offered
+while hosted reports are enabled) is hosted, anything else is an address typed
+for the domain. Nothing refers to a user: deleting one changes no domain.
 
 ---
 

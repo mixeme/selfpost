@@ -56,7 +56,7 @@ Navigation is grouped by mail direction. Page titles carry the group
 | Outbound | Domains · Log · Queue · DMARC reports | `/domains`, `/deliveries`, `/mail-queue`, `/dmarc` |
 | Inbound | Domains · Log · Queue | `/inbound`; Log and Queue are new |
 | Server | Health · System log · Backup · Users · Settings | Health is new (the tables that left `/status`) |
-| User menu | Account · Help · Sign out | Account is the user's half of `/settings`: credentials, e-mail, DMARC default |
+| User menu | Account · Help · Sign out | Account is the user's half of `/settings`: credentials and e-mail |
 
 A hidden page leaves no gap in the menu. The inbound and DMARC feature flags
 stay as in [web.go](../../internal/web/web.go); who sees what changes — see
@@ -125,28 +125,33 @@ only.
 
 ## Account e-mail
 
-**Decided 2026-09-21 (owner): a user's e-mail is theirs, not a DMARC field.**
-Today the column is `users.dmarc_report_email` and the only place it shows is
-the DMARC card, so it reads as if it existed for that alone.
+**Decided 2026-10-10 (owner): a domain's DMARC report address is one of three
+choices, and nothing else exists.** This replaces the 2026-09-21 design, where
+a domain followed a named user's default: a co-administrator of a domain was
+shown another user's login name, and three explicit choices are simpler.
 
-- The 2.0 baseline has `users.email`. It is what the panel writes to: event
-  notifications ([panel-notifications](../roadmap.md#panel-notifications)) and
-  a reset link ([password-reset](../roadmap.md#password-reset)).
-- **Account** edits it; the global administrator sees and sets it on the user
-  form and sees it in the users list.
-- DMARC only *may* use it. **The default report address is a user's setting,
-  not the server's** (owner, 2026-09-21): it lives on **Account** with its
-  report-authorization record, as a choice — SelfPost hosted, *my account
-  e-mail*, another address, none. Historically it was the administrator's
-  profile field, later mirrored into an instance setting only the global user
-  could edit; Server › Settings keeps nothing of it.
-- A domain can have several users, so "the default" must be someone's. A
-  domain's report address is *the default of a named user* (shown as
-  `admin's default — mix@example.org`), the hosted address, a custom one or
-  none. A new domain follows whoever created it; any user of the domain may
-  switch it to their own default. If that user is deleted the domain falls
-  to *none* and its DMARC check says so. Baseline: `users.dmarc_default_mode`,
-  `users.dmarc_default_address`, `domains.dmarc_rua_user_id`.
+- A domain's aggregate-report address (`rua=`) is exactly one of: **no
+  reports** (the state of a new domain), **the SelfPost hosted address**
+  (offered only while hosted reports are enabled on the server), or **an
+  address typed for this domain**. There is no per-user default, no domain
+  following a user, and no keep / inherit. Changing the choice changes the
+  DMARC record to publish.
+- It is set in **Domain settings** and nowhere else. Beside the typed-address
+  field there is a button that fills it with the signed-in user's profile
+  e-mail (`panel.js`, `data-fill`): it only fills, saving is the form's own
+  button, and it is absent when the profile has no e-mail. Without scripts the
+  field is typed in.
+- The 2.0 baseline has `users.email`: the user's own address, edited on
+  **Account**, set by the global administrator on the user form and shown in
+  the users list. It is what the panel writes to — event notifications
+  ([panel-notifications](../roadmap.md#panel-notifications)) and a reset link
+  ([password-reset](../roadmap.md#password-reset)) — and what the fill button
+  offers. **Account** is Profile and Password; Server › Settings keeps nothing
+  of DMARC.
+- Baseline: `domains.dmarc_rua` alone (`''` = no reports). The hosted choice is
+  the address SelfPost derives for the domain and the server's hostname, so it
+  is stored as that address and read back as hosted when it equals it. Deleting
+  a user changes no domain's address.
 
 ## Routes
 
@@ -177,7 +182,7 @@ list, an action under the thing it changes.
 | backup | `GET, POST /server/backup` · `POST /server/backup/import` | `/backup` · `POST /domains/import` |
 | users · user · user-delete | `/server/users` · `…/new` · `…/{uid}` · `…/{uid}/delete` | `/users/…` |
 | settings | `GET, POST /server/settings` | the instance half of `/settings`: log retention, rate limits |
-| account | `GET /account` · `POST /account/profile`, `/password`, `/dmarc` | `/settings`: credentials and the DMARC default (today `/account` redirects there) |
+| account | `GET /account` · `POST /account/profile`, `/password` | `/settings`: credentials and the DMARC default (today `/account` redirects there) |
 | help · components | `GET /help` · `GET /server/components` | `/help` · — |
 
 Unchanged: `/healthz`, `/license`, `/static/`, `/setup/{token}`, `/login`,
@@ -505,7 +510,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 
 **Stage 1 — data and routes** (no template work; parallel with stage 0)
 
-- [x] Schema from zero: single `0001_init.sql` baseline with `users.email`, the DMARC default fields, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
+- [x] Schema from zero: single `0001_init.sql` baseline with `users.email`, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
 - [x] Inbound delegation: `requireInboundDomain`, lists and log filtered in the query, two-list user form data, per-route 404 tests for both roles including another tenant's id — **Opus**
 - [x] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/`; links in the old templates retargeted so the panel works on every commit — **Opus**
 - [x] The application form as one POST; `out-app-created` as the response with `Cache-Control: no-store` — **Opus**
