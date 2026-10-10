@@ -167,7 +167,7 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 
 	page.Sockets.End = view.Verdict(string(c["SocketStatus"].(health.Status)))
 	for _, s := range c["Sockets"].([]health.Socket) {
-		row := view.SocketRow{Name: s.Name, Path: s.Path, State: view.Tag{Status: string(s.Status)}}
+		row := view.SocketRow{Name: s.Name, Note: s.Note, Path: s.Path, State: view.Tag{Status: string(s.Status)}}
 		if s.Status != health.StatusOK {
 			row.Detail = s.Detail
 		}
@@ -351,6 +351,9 @@ func (h *Handlers) healthChecks() map[string]any {
 		health.CheckSocket("OpenDKIM", h.cfg.OpenDKIMSocket, true),
 		health.CheckSocket("send-log", h.cfg.JournalSocket, false),
 	}
+	if on, milter, action := h.inboundFilter(); on {
+		sockets = append(sockets, filterSocket(milter, action))
+	}
 	socketStatus := health.StatusUnknown
 	for _, sock := range sockets {
 		socketStatus = health.Worst(socketStatus, sock.Status)
@@ -373,6 +376,26 @@ func (h *Handlers) healthChecks() map[string]any {
 		"Hostname":      h.cfg.Hostname,
 		"PTR":           srv.PTR,
 	}
+}
+
+// filterSocket is the inbound spam filter's row among the milter sockets. A
+// filter that is down costs what the server's setting says: with the action
+// tempfail Postfix defers inbound mail (an error, like OpenDKIM), otherwise it
+// accepts the mail unfiltered (a warning, like the send log). The address is the
+// one in INBOUND_ANTISPAM_MILTER as configured; Health and Overview, the only
+// pages that show it, are for the global administrator.
+func filterSocket(milter, action string) health.Socket {
+	tempfail := action == "tempfail"
+	s := health.CheckMilter("Spam filter", milter, tempfail)
+	s.Note = "inbound"
+	switch {
+	case s.Status != health.StatusError && s.Status != health.StatusWarn:
+	case tempfail:
+		s.Detail += " Inbound mail is deferred until it is back."
+	default:
+		s.Detail += " Inbound mail goes through unfiltered."
+	}
+	return s
 }
 
 func queueSummary(out string) string {

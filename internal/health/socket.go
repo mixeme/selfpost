@@ -7,7 +7,10 @@ import (
 
 // Socket is the state of one milter socket Postfix connects to.
 type Socket struct {
-	Name    string
+	Name string
+	// Note qualifies the name where the socket is not one of the two Postfix
+	// always has ("inbound"); the Health table shows it beside the name.
+	Note    string
 	Path    string
 	Present bool
 	Status  Status
