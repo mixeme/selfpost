@@ -227,6 +227,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   value with whitespace, and the e2e check asks Postfix what it reads.
   Present since DMARC ingest was fitted into the 1.9.1 fix of the same
   stanza.
+- **DMARC reports are accepted with the inbound relay on.** With both
+  features enabled every report address was refused as "User unknown in
+  relay recipient table": the relay's unlisted-recipient check runs after the
+  restriction list, and the report addresses - on the server's own name, a
+  relay domain - were not in `relay_recipient_maps`. Their table is a
+  recipient table now. Hidden until now by the port-25 failure above.
 - Overview's Processes card counts the programs that are meant to stay up
   ("6 of 6 running"); the idle one-shot `postfix-reload` was counted as
   running. The Milter sockets card no longer clips its second line with three

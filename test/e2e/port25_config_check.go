@@ -22,6 +22,9 @@ type port25Case struct {
 	name  string
 	env   []string
 	check []optionCheck
+	// main are main.cf parameters the combination must end up with, read with
+	// postconf -h.
+	main []optionCheck
 }
 
 var port25Cases = []port25Case{
@@ -60,6 +63,13 @@ var port25Cases = []port25Case{
 		check: []optionCheck{
 			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access,texthash:/data/postfix/dmarc_recipients,reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
 			{param: "smtpd_milters", contains: "", wantExact: true},
+		},
+		// Both on: the report addresses sit on a relay domain, and the relay's
+		// unlisted-recipient check runs after the restriction list. Unless their
+		// table is a recipient table too, every report is refused as "User
+		// unknown in relay recipient table".
+		main: []optionCheck{
+			{param: "relay_recipient_maps", contains: "texthash:/data/postfix/relay_recipients texthash:/data/postfix/dmarc_recipients", wantExact: true},
 		},
 	},
 	{
@@ -127,6 +137,15 @@ func checkPort25ConfigCombinations(s *stack) error {
 			}
 			if strings.TrimSpace(seen) != got {
 				return fmt.Errorf("%s: master.cf has -o %s = %q but Postfix reads %q - the value contains whitespace", tc.name, c.param, got, strings.TrimSpace(seen))
+			}
+		}
+		for _, c := range tc.main {
+			got, err := s.execIn("selfpost", "postconf", "-h", c.param)
+			if err != nil {
+				return fmt.Errorf("%s: postconf -h %s: %v\n%s", tc.name, c.param, err, got)
+			}
+			if got = strings.TrimSpace(got); got != c.contains {
+				return fmt.Errorf("%s: %s = %q, want %q", tc.name, c.param, got, c.contains)
 			}
 		}
 	}

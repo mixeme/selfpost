@@ -306,8 +306,19 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		"transport_maps=${TRANSPORT_SETTING}" \
 		"smtpd_reject_unlisted_recipient=yes"
 	if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+		# With the relay on, Postfix refuses every recipient of a relay domain
+		# that relay_recipient_maps does not list (smtpd_reject_unlisted_recipient
+		# above) - and it does so after the restriction list, whatever
+		# check_recipient_access answered. The DMARC report addresses live on a
+		# relay domain too (the server's own name), so their table is a recipient
+		# table as well; without it they are "User unknown in relay recipient
+		# table" and no report is ever accepted while both features are on.
+		RELAY_RECIPIENT_SETTING="texthash:${RELAY_RECIPIENTS_MAP}"
+		if [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
+			RELAY_RECIPIENT_SETTING="${RELAY_RECIPIENT_SETTING} texthash:${DMARC_RECIPIENTS_MAP}"
+		fi
 		postconf -e \
-			"relay_recipient_maps=texthash:${RELAY_RECIPIENTS_MAP}" \
+			"relay_recipient_maps=${RELAY_RECIPIENT_SETTING}" \
 			"smtp_tls_policy_maps=texthash:${TLS_POLICY_MAP}"
 	else
 		postconf -e \
