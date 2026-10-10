@@ -360,9 +360,9 @@ func NewOutDomain(m Meta, id int64, name string, canDelete bool) *OutDomain {
 		},
 		id: id, name: name, canDelete: canDelete,
 		DNS: Box{No: "01", Title: "DNS records", ID: "dns",
-			Help: &HelpLink{Href: "/help#dns", Title: "What to publish and why"}},
+			Help: topicLink(HelpDNS, "What to publish and why")},
 		Apps: Box{No: "02", Title: "Applications", ID: "apps", End: Plain("SASL logins that may send as this domain"),
-			Help: &HelpLink{Href: "/help#apps", Title: "What an application is"}},
+			Help: topicLink(HelpApps, "What an application is")},
 		AppsEmpty:  EmptyState{Icon: "ti-apps", Text: Plain("No applications yet. Add one to let a program send as this domain.")},
 		Connection: Box{No: "03", Title: "Connection", ID: "connection", End: Plain("The same for every domain")},
 	}
@@ -610,16 +610,21 @@ func NewOutDomainSettings(m Meta, id int64, name string, apps int, canDelete boo
 			Title:  "Domain settings",
 			Lead:   Plain("The things set once and rarely touched: where DMARC reports go, the sending ceiling, moving the domain elsewhere."),
 		},
-		Reports:       Box{No: "01", Title: "DMARC report address", ID: "reports"},
+		Reports:       Box{No: "01", Title: "DMARC report address", ID: "reports", Help: topicLink(HelpDMARC, "Where DMARC reports go")},
 		ReportsAction: href + "/settings/reports",
 		Export:        Box{No: "03", Title: "Export domain", ID: "export"},
 		ExportAction:  href + "/settings/export",
 		Encrypt:       true,
 		Limit: Box{No: "02", Title: "Rate limit", ID: "limit",
-			Help: &HelpLink{Href: "/help#limits", Title: "Levels 1 and 2"}},
+			Help: topicLink(HelpLimits, "Levels 1 and 2")},
 		LimitAction:  href + "/settings/ratelimit",
 		RecalcAction: href + "/settings/ratelimit/recalc",
 		CanDelete:    canDelete,
+	}
+	// The topic about exports is in the Server group of Help, which a domain
+	// administrator is not shown, so the box links to it for the global role only.
+	if m.IsGlobal {
+		p.Export.Help = topicLink(HelpBackup, "Moving a domain to another instance")
 	}
 	if canDelete {
 		text := "Removes the DKIM key"

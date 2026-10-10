@@ -108,7 +108,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 				") only; open a report for the parsed XML."),
 		},
 		IngestOn: true,
-		Ingest:   Box{No: "01", Title: "Ingest", End: Rich(TagOf(status, label))},
+		Ingest:   Box{No: "01", Title: "Ingest", End: Rich(TagOf(status, label)), Help: topicLink(HelpDMARC, "What the reports are and where they go")},
 		IngestFacts: []Fact{
 			last,
 			{Label: "This week", Value: Plain(FormatCount(int64(in.KeptThisWeek)) + " kept · " + plural(int64(in.ParseFailures), "parse failure", "parse failures"))},
@@ -126,6 +126,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 func (p *DMARCHub) WithoutIngest() *DMARCHub {
 	p.IngestOn = false
 	p.Recent.No = "01"
+	p.Recent.Help = p.Ingest.Help
 	return p
 }
 
@@ -226,7 +227,7 @@ func NewDMARCDomain(m Meta, id int64, name string, hub bool, pass, fail, days in
 				withCode(hint)...),
 			Actions: []Action{{Label: "Domain page", Icon: "ti-world-upload", Href: DomainHref(id)}},
 		},
-		Sources:      Box{No: "01", Title: fmt.Sprintf("Sources · %d days", days)},
+		Sources:      Box{No: "01", Title: fmt.Sprintf("Sources · %d days", days), Help: topicLink(HelpDMARC, "How to read pass, fail and sources")},
 		SourcesEmpty: EmptyState{Icon: "ti-world-upload", Text: Plain("No mail from any source in this window.")},
 		Reports:      Box{No: "02", Title: "Reports"},
 		ReportsEmpty: EmptyState{Icon: "ti-report-analytics", Text: Plain("No reports for this domain yet.")},
@@ -379,7 +380,7 @@ func NewDMARCReport(m Meta, in ReportInput) *DMARCReport {
 			Compact: true,
 			Route:   route,
 		},
-		Report:       Box{No: "01", Title: "Report"},
+		Report:       Box{No: "01", Title: "Report", Help: topicLink(HelpDMARC, "What an aggregate report is")},
 		ReportFacts:  report,
 		Policy:       Box{No: "02", Title: "Published policy"},
 		PolicyFacts:  policy,

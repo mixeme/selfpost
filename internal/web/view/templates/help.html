@@ -1,7 +1,7 @@
-{{/* Help (mockup help.html): one topic per heading, stacked in two boxes, with a
-     menu that jumps to each. A box on another page links to the topic that
-     explains it by the topic's id (Box.Help). Overview is absent for a viewer
-     who does not see the pages it explains. */}}
+{{/* Help (mockup help.html): one topic per heading, stacked in one box per section
+     of the panel, with a menu that jumps to each. A box on another page links to
+     the topic that explains it by the topic's id (Box.Help). A section is absent
+     for a viewer who cannot open its pages, and so is its part of the menu. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 
@@ -10,16 +10,12 @@
 {{template "side_menu" .Menu}}
   </div>
   <div class="column is-9">
-{{if .ShowOverview}}
-{{template "box_open" .Overview}}
-{{range .OverviewTopics}}{{template "help_topic" .}}
+{{range .Groups}}
+{{template "box_open" .Box}}
+{{range .Topics}}{{template "help_topic" .}}
 {{end}}
 {{template "box_close"}}
 {{end}}
-{{template "box_open" .Outbound}}
-{{range .OutboundTopics}}{{template "help_topic" .}}
-{{end}}
-{{template "box_close"}}
   </div>
 </div>
 {{end}}

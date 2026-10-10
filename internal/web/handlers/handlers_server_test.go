@@ -347,6 +347,49 @@ func TestHelpPageForBothRoles(t *testing.T) {
 	}
 }
 
+// Help shows the sections of the pages the reader can open, as the shell does for
+// the menu: Inbound needs the feature and a reach in it, Outbound a reach in it,
+// and Overview and Server are the global role's. Account is everyone's.
+func TestHelpSectionsFollowReachAndFeature(t *testing.T) {
+	h, st := inboundHandlers(t)
+	out, _ := st.AddDomain("out.example.com", "mail")
+	in, _ := st.AddInboundDomain("in.example.com")
+	root := auth.Principal{ID: 1, Username: "admin", Role: auth.RoleGlobal}
+	outOnly := userWith(t, st, "out-only", store.RoleDomain, store.Reach{DomainIDs: []int64{out.ID}})
+	inOnly := userWith(t, st, "in-only", store.RoleDomain, store.Reach{InboundDomainIDs: []int64{in.ID}})
+
+	for _, tt := range []struct {
+		name    string
+		who     auth.Principal
+		inbound bool
+		want    []string
+		lacks   []string
+	}{
+		{"global", root, true, []string{"<h2>Overview</h2>", "<h2>Outbound</h2>", "<h2>Inbound</h2>", "<h2>Server</h2>", "<h2>Account</h2>"}, nil},
+		{"global, feature off", root, false, []string{"<h2>Outbound</h2>", "<h2>Server</h2>"}, []string{"<h2>Inbound</h2>", `id="filter"`}},
+		{"outbound only", outOnly, true, []string{"<h2>Outbound</h2>", "<h2>Account</h2>"}, []string{"<h2>Inbound</h2>", "<h2>Overview</h2>", "<h2>Server</h2>"}},
+		{"inbound only", inOnly, true, []string{"<h2>Inbound</h2>", `id="upstream"`, "<h2>Account</h2>"}, []string{"<h2>Outbound</h2>", `id="dns"`, "<h2>Server</h2>"}},
+		{"inbound only, feature off", inOnly, false, []string{"<h2>Account</h2>"}, []string{"<h2>Inbound</h2>", "<h2>Outbound</h2>"}},
+	} {
+		h.cfg.InboundEnabled = tt.inbound
+		rec := send(h.HandleHelp, &tt.who, "GET", "/help", nil, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: GET /help = %d", tt.name, rec.Code)
+		}
+		body := rec.Body.String()
+		for _, w := range tt.want {
+			if !strings.Contains(body, w) {
+				t.Errorf("%s: Help is missing %q", tt.name, w)
+			}
+		}
+		for _, g := range tt.lacks {
+			if strings.Contains(body, g) {
+				t.Errorf("%s: Help carries %q", tt.name, g)
+			}
+		}
+	}
+}
+
 // ---- Backup
 
 // A refused pre-flight says what to add to docker-compose.yml as plain text: the

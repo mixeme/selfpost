@@ -98,11 +98,11 @@ func NewBackup(m Meta, passwordMin int, refusal string) *Backup {
 			Title:  "Backup",
 			Lead:   Plain("Take the whole instance with you, or bring one domain in from another SelfPost. Both files are secrets."),
 		},
-		Full:         Box{No: "01", Title: "Full backup"},
+		Full:         Box{No: "01", Title: "Full backup", Help: topicLink(HelpBackup, "Backups, encryption and restore")},
 		FullAction:   serverBackup,
 		Encrypt:      true,
 		PasswordMin:  passwordMin,
-		Import:       Box{No: "02", Title: "Import a domain", ID: "import"},
+		Import:       Box{No: "02", Title: "Import a domain", ID: "import", Help: topicLink(HelpBackup, "Moving a domain to another instance")},
 		ImportAction: serverBackup + "/import",
 	}
 	if refusal != "" {
@@ -198,7 +198,7 @@ func NewUsers(m Meta, inbound bool, flash string) *Users {
 				Em("global"), " is the whole server, ", Em("domain"), " is ", reach),
 			Actions: []Action{{Label: "Create user", Icon: "ti-user-plus", Href: serverUsers + "/new", Primary: true}},
 		},
-		List:        Box{No: "01", Title: "Panel users"},
+		List:        Box{No: "01", Title: "Panel users", Help: topicLink(HelpUsers, "Roles are a reach, not a rank")},
 		ShowInbound: inbound,
 	}
 	if flash != "" {
@@ -298,7 +298,7 @@ func NewUserForm(m Meta, in UserFormInput) *UserForm {
 		Head:       Head{Crumbs: crumbs, Title: title},
 		CancelHref: serverUsers,
 
-		Account:     Box{No: "01", Title: "Account"},
+		Account:     Box{No: "01", Title: "Account", Help: topicLink(HelpUsers, "Roles and domain assignments")},
 		Username:    in.Username,
 		Email:       in.Email,
 		NewUser:     in.ID == 0,

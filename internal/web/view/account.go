@@ -172,9 +172,9 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 			Lead: Rich("What holds for the whole instance, whoever is signed in. Your own name, e-mail and DMARC report address are under ",
 				Link("/account", "Account"), "."),
 		},
-		Retention:     Box{No: "01", Title: "Log retention"},
+		Retention:     Box{No: "01", Title: "Log retention", Help: topicLink(HelpSettings, "How long rows are kept")},
 		RetentionDays: retention,
-		RateLimits:    Box{No: "02", Title: "Sending rate limits", ID: "rate-limits", End: Plain("Read-only")},
+		RateLimits:    Box{No: "02", Title: "Sending rate limits", ID: "rate-limits", End: Plain("Read-only"), Help: topicLink(HelpLimits, "Levels 1 and 2")},
 		RateFacts: []Fact{
 			{Label: "Level 1 · per client IP", Value: Plain(level1), Big: true,
 				Note: Rich("Set in ", Code(".env"), "; restart to change. Nothing below may exceed it.")},

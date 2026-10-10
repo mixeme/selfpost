@@ -123,8 +123,8 @@ func NewOutApp(m Meta, domainID int64, domain, login string) *OutApp {
 	p := &OutApp{
 		Cancel: href,
 		Sender: Box{No: "01", Title: "Sender"},
-		IPs:    Box{No: "02", Title: "Client IP allow-list"},
-		Limit:  Box{No: "03", Title: "Rate limit"},
+		IPs:    Box{No: "02", Title: "Client IP allow-list", Help: topicLink(HelpApps, "What an application is")},
+		Limit:  Box{No: "03", Title: "Rate limit", Help: topicLink(HelpLimits, "Levels 1 and 2")},
 		Modes: []Option{
 			{Value: AddressWildcard, Label: "Any address of the domain"},
 			{Value: AddressList, Label: "Specific addresses (list)"},

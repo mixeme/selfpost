@@ -69,7 +69,7 @@ func NewOverview(m Meta, host string, cards []HealthCard, updated time.Time, day
 		Head:  overviewHead(host, cards, updated),
 		Health: Box{No: "01", Title: "Server health", ID: "health", Poll: "/overview/fragment",
 			End:  Rich(Link("/server/health", "All details")),
-			Help: &HelpLink{Href: "/help#checks", Title: "What these checks mean"}},
+			Help: topicLink(HelpChecks, "What these checks mean")},
 		Outbound: Box{No: "02", Title: "Outbound domains", End: Rich(Link("/outbound/domains", "Manage"))},
 		OutboundEmpty: EmptyState{Icon: "ti-world-upload",
 			Text: Plain("No outbound domains yet. Add the first one under Outbound.")},

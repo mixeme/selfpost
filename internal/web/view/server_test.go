@@ -259,11 +259,23 @@ func TestUserDeleteNamesWhatGoesWithTheUser(t *testing.T) {
 
 // ---- Help
 
-var helpLink = regexp.MustCompile(`class="sp-help" href="/help#([a-z-]+)"`)
+var (
+	helpLink  = regexp.MustCompile(`class="sp-help" href="/help#([a-z-]+)"`)
+	helpTopic = regexp.MustCompile(`class="sp-help-topic" id="([a-z-]+)"`)
+)
+
+// menuOnlyTopics are the topics of the Help page that no box of a fixture page
+// links to, each with the reason it is reached from the menu alone. The rest of
+// the Help tests are in help_test.go.
+var menuOnlyTopics = map[string]string{
+	HelpAccount: "the Account page is its own topic: its boxes (profile, password) explain themselves, so no box leads to it",
+}
 
 // A box's Help link is only worth having if the Help page has the topic it
-// names. Every page of the panel is rendered with its fixture, and every anchor
-// it links to must be a topic of the Help page.
+// names, and a topic is only worth having if something leads to it. Every page
+// of the panel is rendered with its fixture; every anchor it links to must be a
+// topic of the Help page, and every topic must be linked from a page, except
+// those in menuOnlyTopics.
 func TestEveryHelpLinkLandsOnATopic(t *testing.T) {
 	help := renderSignedIn(t, "help", NewHelp(admin(), true))
 	linked := map[string][]string{}
@@ -275,37 +287,29 @@ func TestEveryHelpLinkLandsOnATopic(t *testing.T) {
 	if len(linked) == 0 {
 		t.Fatal("no page links to a Help topic, so nothing was checked")
 	}
+	topics := map[string]bool{}
+	for _, m := range helpTopic.FindAllStringSubmatch(help, -1) {
+		topics[m[1]] = true
+	}
 	for anchor, pages := range linked {
-		if !strings.Contains(help, `class="sp-help-topic" id="`+anchor+`"`) {
+		if !topics[anchor] {
 			t.Errorf("%v link to /help#%s, which is not a topic of the Help page", pages, anchor)
 		}
 	}
-}
-
-// The menu of the Help page jumps to topics that exist, and every topic is in it.
-func TestHelpMenuAndTopicsAgree(t *testing.T) {
-	for _, global := range []bool{true, false} {
-		out := renderSignedIn(t, "help", NewHelp(admin(), global))
-		topics := regexp.MustCompile(`class="sp-help-topic" id="([a-z-]+)"`).FindAllStringSubmatch(out, -1)
-		menu := regexp.MustCompile(`<a href="#([a-z-]+)">`).FindAllStringSubmatch(out, -1)
-		if len(topics) != len(menu) || len(topics) == 0 {
-			t.Fatalf("global=%v: %d topics, %d menu entries", global, len(topics), len(menu))
+	for topic := range topics {
+		reason, menuOnly := menuOnlyTopics[topic]
+		switch {
+		case len(linked[topic]) == 0 && !menuOnly:
+			t.Errorf("Help topic %q is linked from no page: link it from the box it explains, or list it in menuOnlyTopics with the reason", topic)
+		case len(linked[topic]) > 0 && menuOnly:
+			t.Errorf("Help topic %q is listed as menu-only (%s) but %v link to it", topic, reason, linked[topic])
 		}
-		for i := range topics {
-			if topics[i][1] != menu[i][1] {
-				t.Errorf("global=%v: topic %d is %q, its menu entry points at %q", global, i, topics[i][1], menu[i][1])
-			}
-		}
-		unique(t, "Help", ids(out))
 	}
-}
-
-// The topics about Overview and Health are for the role that sees those pages;
-// a domain administrator is not shown checks they cannot open.
-func TestHelpLeavesOutTheOverviewForADomainAdministrator(t *testing.T) {
-	out := renderSignedIn(t, "help", NewHelp(Meta{User: "ops", HasOutbound: true}, false))
-	pageHas(t, "Help", out, `id="dns"`, `id="apps"`, `id="limits"`, `<h2>Outbound</h2>`)
-	pageLacks(t, "Help", out, `id="checks"`, `id="certificate"`, `id="rdns"`, `<h2>Overview</h2>`, `href="/server/health"`)
+	for topic := range menuOnlyTopics {
+		if !topics[topic] {
+			t.Errorf("menuOnlyTopics names %q, which is not a topic of the Help page", topic)
+		}
+	}
 }
 
 // The e-mail help says only what is so: it is the user's own address, they can

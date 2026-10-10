@@ -137,7 +137,7 @@ func NewInDomains(m Meta, canManage bool) *InDomains {
 			Lead:   Plain("Backup-MX / forwarder. Port 25 accepts mail only for the domains listed here and hands it to their upstream. No mailboxes."),
 		},
 		CanManage: canManage,
-		List:      Box{No: "01", Title: "Domains"},
+		List:      Box{No: "01", Title: "Domains", Help: topicLink(HelpInbound, "Backup-MX and forwarding")},
 		Empty:     EmptyState{Icon: "ti-world-download", Text: Plain("No inbound domains yet.")},
 		Legend:    Foot{Bare: true, Text: Plain("The MX tag is green when at least one MX of the domain points at this server.")},
 	}
@@ -295,9 +295,9 @@ func NewInDomain(m Meta, in InDomainInput) *InDomain {
 		},
 		id: in.ID, name: in.Name, dnsStatus: in.DNSStatus, recipientCount: in.RecipientCount, recipientMode: in.RecipientMode,
 
-		DNS: Box{No: "01", Title: "MX record", ID: "dns"},
+		DNS: Box{No: "01", Title: "MX record", ID: "dns", Help: topicLink(HelpInbound, "Backup-MX and forwarding")},
 
-		Upstream:       Box{No: "02", Title: "Upstream", ID: "upstream", End: Plain("Not a mailbox")},
+		Upstream:       Box{No: "02", Title: "Upstream", ID: "upstream", End: Plain("Not a mailbox"), Help: topicLink(HelpUpstream, "Host, port and TLS")},
 		UpstreamAction: href + "/upstream",
 		Host:           in.Host,
 		Port:           strconv.Itoa(in.Port),
@@ -305,7 +305,7 @@ func NewInDomain(m Meta, in InDomainInput) *InDomain {
 			{Value: tlsModeNone, Label: "Off"}},
 		TLSSelected: in.TLSMode,
 
-		Recipients:       Box{No: "03", Title: "Valid recipients", ID: "recipients"},
+		Recipients:       Box{No: "03", Title: "Valid recipients", ID: "recipients", Help: topicLink(HelpRecipients, "Listed addresses or any address")},
 		RecipientsAction: href + "/recipients",
 		ModeOptions: []Option{{Value: "list", Label: "Listed addresses only"},
 			{Value: recipientModeAny, Label: "Any recipient at this domain"}},
@@ -313,7 +313,7 @@ func NewInDomain(m Meta, in InDomainInput) *InDomain {
 		Addresses:      strings.Join(in.Addresses, "\n"),
 		RecipientsHelp: Plain("One per line or comma-separated. Unknown recipients are rejected at RCPT, so this relay generates no backscatter. Prefer a list unless the upstream itself rejects unknowns."),
 
-		Filter: Box{No: "04", Title: "Spam filter", ID: "filter"},
+		Filter: Box{No: "04", Title: "Spam filter", ID: "filter", Help: topicLink(HelpFilter, "A server setting")},
 	}
 }
 

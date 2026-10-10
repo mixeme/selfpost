@@ -113,6 +113,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the help drawer is gone. The user form sets the user's e-mail. The backup
   download is encrypted unless the box is unticked. Only the queue page is
   left on the ratchet.
+- panel-redesign (design, stage 3): **Help** covers every section -
+  seventeen topics for Overview, Outbound, Inbound, Server and Account - and
+  the boxes of nearly every page carry a `?` that opens their topic (owner,
+  2026-10-10). A reader sees the topics of the sections their menu shows.
 - panel-redesign (stage 2): the **Outbound queue** page is in the new shell
   with its content unchanged - the listing of `postqueue -p` and how
   retries work. With it every page is built from the component kit: the old

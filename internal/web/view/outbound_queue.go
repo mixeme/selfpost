@@ -45,7 +45,8 @@ func NewOutQueue(m Meta, listing, errText string) *OutQueue {
 			Lead:   Rich("What applications handed over and the receiving server has not yet taken, as ", Code("postqueue -p"), " lists it."),
 		},
 		Queue: Box{No: "01", Title: "Waiting", ID: "out-queue", Poll: outboundQueue + "/fragment",
-			End: Plain("Refreshes on its own")},
+			Help: topicLink(HelpQueue, "What waits here and how Postfix retries"),
+			End:  Plain("Refreshes on its own")},
 		Empty:   EmptyState{Icon: "ti-stack-2", Text: Plain("Queue is empty.")},
 		Retries: Box{No: "02", Title: "How retries work"},
 	}

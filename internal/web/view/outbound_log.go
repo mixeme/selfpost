@@ -104,7 +104,7 @@ func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []stri
 	return &OutLog{
 		Meta: m,
 		Head: Head{Kicker: "Outbound", Title: "Outbound log", Lead: lead},
-		Messages: Box{No: "01", Title: "Messages", Filter: &Filter{
+		Messages: Box{No: "01", Title: "Messages", Help: topicLink(HelpLog, "What the statuses mean"), Filter: &Filter{
 			Action: outboundLog,
 			Selects: []Select{
 				{Name: "domain", Label: "Domain", Options: options("All domains", domains), Selected: domain},
@@ -238,7 +238,7 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 			{Label: "Queue id", Value: Plain(orDash(in.QueueID)), Mono: true},
 			{Label: "Journal id", Value: Plain(strconv.FormatInt(in.ID, 10)), Mono: true},
 		},
-		History:  Box{No: "02", Title: "History"},
+		History:  Box{No: "02", Title: "History", Help: topicLink(HelpLog, "What the statuses mean")},
 		Delivery: Box{No: "03", Title: "Delivery log", End: Rich("Lines from ", Code("mail.log"), " with this queue id")},
 		LogEmpty: EmptyState{Icon: "ti-file-text"},
 	}
