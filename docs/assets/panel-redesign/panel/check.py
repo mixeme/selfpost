@@ -27,7 +27,7 @@ box button buttons checkbox column columns control field file file-cta file-inpu
 file-name has-addons has-icons-left has-name has-text-danger help icon input label menu menu-label
 menu-list notification progress select table table-container tag textarea title
 is-3 is-4 is-5 is-6 is-7 is-9 is-active is-danger is-expanded is-fullwidth is-gapless is-half
-is-hoverable is-left is-light is-primary is-small is-success is-text is-warning
+is-hidden is-hoverable is-left is-light is-primary is-small is-success is-text is-warning
 mb-1 mb-2 mb-3 mb-4 ml-2 mt-4 mt-5
 """.split())
 # Classes the shell (build.py, later layout.html) owns; screens never write them.
