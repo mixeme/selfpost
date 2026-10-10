@@ -13,12 +13,25 @@
 # a fixed literal or a container environment variable.
 set -eu
 
-# postconf -P refuses master.cf -o values that contain whitespace; inbound port
-# 25 needs restriction lists and milter specs that include spaces. Patch the
-# smtp/inet service stanza directly instead.
+# Sets one -o option of the smtp/inet (port 25) service by patching its stanza.
+#
+# A master.cf -o value must not contain whitespace: master splits the line on
+# it, so "-o name=check_recipient_access texthash:/x,reject" reaches smtpd as
+# the option "name=check_recipient_access" plus a stray argument, and smtpd dies
+# at start with "fatal: unexpected command-line argument" - port 25 then
+# answers nobody. (postconf -P refuses such values for the same reason.) Postfix
+# splits a restriction list on commas as well as on whitespace, so every value
+# passed here is written with commas only; a value with whitespace is a bug in
+# this script and stops the container.
 master_cf_set_smtp_inet_o() {
 	param="$1"
 	value="$2"
+	case "$value" in
+		*[[:space:]]*)
+			echo "FATAL: master.cf -o ${param} would contain whitespace: ${value}" >&2
+			exit 1
+			;;
+	esac
 	awk -v p="$param" -v v="$value" '
 		/^smtp[ \t]+inet[ \t]/ && !done {
 			print
@@ -284,7 +297,9 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 			RELAY_DOMAINS_SETTING="texthash:${DMARC_RELAY_DOMAINS_MAP}"
 			TRANSPORT_SETTING="texthash:${DMARC_TRANSPORT_MAP}"
 		fi
-		RECIPIENT_RESTRICTIONS="check_recipient_access texthash:${DMARC_RECIPIENTS_MAP},${RECIPIENT_RESTRICTIONS}"
+		# Comma, not a space, between check_recipient_access and its table: see
+		# master_cf_set_smtp_inet_o.
+		RECIPIENT_RESTRICTIONS="check_recipient_access,texthash:${DMARC_RECIPIENTS_MAP},${RECIPIENT_RESTRICTIONS}"
 	fi
 	postconf -e \
 		"relay_domains=${RELAY_DOMAINS_SETTING}" \

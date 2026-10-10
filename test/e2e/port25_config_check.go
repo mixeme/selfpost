@@ -47,7 +47,7 @@ var port25Cases = []port25Case{
 			"DMARC_REPORTS_ENABLE=true",
 		},
 		check: []optionCheck{
-			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access texthash:/data/postfix/dmarc_recipients,reject", wantExact: true},
+			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access,texthash:/data/postfix/dmarc_recipients,reject", wantExact: true},
 			{param: "smtpd_milters", contains: "", wantExact: true},
 		},
 	},
@@ -58,7 +58,7 @@ var port25Cases = []port25Case{
 			"DMARC_REPORTS_ENABLE=true",
 		},
 		check: []optionCheck{
-			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access texthash:/data/postfix/dmarc_recipients,reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
+			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access,texthash:/data/postfix/dmarc_recipients,reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
 			{param: "smtpd_milters", contains: "", wantExact: true},
 		},
 	},
@@ -115,6 +115,18 @@ func checkPort25ConfigCombinations(s *stack) error {
 				return fmt.Errorf("%s: -o %s = %q, want exactly %q", tc.name, c.param, got, c.contains)
 			case !c.wantExact && !strings.Contains(got, c.contains):
 				return fmt.Errorf("%s: -o %s = %q, want it to contain %q", tc.name, c.param, got, c.contains)
+			}
+			// What the file says is not yet what Postfix reads: master splits
+			// a service line on whitespace, so a value with a space in it is
+			// cut at the space and the rest becomes a stray smtpd argument
+			// ("fatal: unexpected command-line argument", port 25 dead while
+			// `postfix check` stays silent). Ask Postfix itself.
+			seen, err := s.execIn("selfpost", "postconf", "-Ph", "smtp/inet/"+c.param)
+			if err != nil {
+				return fmt.Errorf("%s: postconf -P smtp/inet/%s: %v\n%s", tc.name, c.param, err, seen)
+			}
+			if strings.TrimSpace(seen) != got {
+				return fmt.Errorf("%s: master.cf has -o %s = %q but Postfix reads %q - the value contains whitespace", tc.name, c.param, got, strings.TrimSpace(seen))
 			}
 		}
 	}

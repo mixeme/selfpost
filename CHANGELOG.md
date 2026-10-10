@@ -216,6 +216,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   showq service: Permission denied"), the Queue card said "Could not be read"
   and the queue page had no listing. Present since the persistent queue of
   1.3.0; mail flow was not affected. The e2e suite opens the queue page now.
+- **Port 25 answers again with DMARC report ingest on.** The generated
+  `master.cf` gave the port-25 service `-o smtpd_recipient_restrictions=
+  check_recipient_access texthash:…,…` with a space in the value; Postfix
+  cuts a service line at whitespace, so `smtpd` was started with a stray
+  argument and died with "fatal: unexpected command-line argument" on every
+  connection - no inbound relay and no DMARC reports were accepted while
+  `DMARC_REPORTS_ENABLE=true`, although `postfix check` and the suite were
+  silent. The list is written with commas only, the generator refuses a
+  value with whitespace, and the e2e check asks Postfix what it reads.
+  Present since DMARC ingest was fitted into the 1.9.1 fix of the same
+  stanza.
 - Overview's Processes card counts the programs that are meant to stay up
   ("6 of 6 running"); the idle one-shot `postfix-reload` was counted as
   running. The Milter sockets card no longer clips its second line with three
