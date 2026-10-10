@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -27,15 +28,20 @@ func (s *Store) RecalcAllAutoRateLimits(retentionDays, l1Max, l1Window int) (int
 	return updated, nil
 }
 
-// RecalcAutoRateLimit recomputes one auto-mode limit. Returns an error when
-// the row is missing or not in auto mode.
+// ErrNotAutoRateLimit is returned by RecalcAutoRateLimit for a limit that is
+// missing or not in auto mode: there is nothing to recalculate. It is the one
+// refusal of that call that is the administrator's to read.
+var ErrNotAutoRateLimit = errors.New("rate limit not in auto mode")
+
+// RecalcAutoRateLimit recomputes one auto-mode limit. Returns
+// ErrNotAutoRateLimit when the row is missing or not in auto mode.
 func (s *Store) RecalcAutoRateLimit(scope string, refID int64, retentionDays, l1Max, l1Window int) error {
 	rl, ok, err := s.GetRateLimit(scope, refID)
 	if err != nil {
 		return err
 	}
 	if !ok || !rl.IsAuto() {
-		return fmt.Errorf("rate limit not in auto mode")
+		return ErrNotAutoRateLimit
 	}
 	rl.Scope, rl.RefID = scope, refID
 	return s.recalcAutoRateLimit(rl, retentionDays, l1Max, l1Window)

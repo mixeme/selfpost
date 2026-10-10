@@ -7,6 +7,18 @@ import (
 	"strings"
 )
 
+// ValidationError is a refusal of what was submitted: its text says what the
+// administrator must fix and is written to be shown on the page. Any other
+// error from this package (a failed write, a failed reload) is not, and the
+// caller must not put its text in front of a user.
+type ValidationError struct{ msg string }
+
+func (e *ValidationError) Error() string { return e.msg }
+
+func invalid(format string, args ...any) error {
+	return &ValidationError{msg: fmt.Sprintf(format, args...)}
+}
+
 func normalizeDomain(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
@@ -21,14 +33,14 @@ func normalizeHost(host string) string {
 
 func checkDomain(name string) error {
 	if name == "" {
-		return fmt.Errorf("domain is required")
+		return invalid("domain is required")
 	}
 	if len(name) > 253 {
-		return fmt.Errorf("domain must be at most 253 characters")
+		return invalid("domain must be at most 253 characters")
 	}
 	labels := strings.Split(name, ".")
 	if len(labels) < 2 {
-		return fmt.Errorf("domain must include at least one dot (e.g. example.com)")
+		return invalid("domain must include at least one dot (e.g. example.com)")
 	}
 	for _, label := range labels {
 		if err := checkLabel(label); err != nil {
@@ -40,10 +52,10 @@ func checkDomain(name string) error {
 
 func checkHost(host string) error {
 	if host == "" {
-		return fmt.Errorf("host is required")
+		return invalid("host is required")
 	}
 	if len(host) > 253 {
-		return fmt.Errorf("host must be at most 253 characters")
+		return invalid("host must be at most 253 characters")
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		return nil
@@ -58,20 +70,20 @@ func checkHost(host string) error {
 
 func checkLabel(label string) error {
 	if len(label) == 0 {
-		return fmt.Errorf("must not contain an empty label")
+		return invalid("must not contain an empty label")
 	}
 	if len(label) > 63 {
-		return fmt.Errorf("each label must be at most 63 characters")
+		return invalid("each label must be at most 63 characters")
 	}
 	if label[0] == '-' || label[len(label)-1] == '-' {
-		return fmt.Errorf("labels must not start or end with '-'")
+		return invalid("labels must not start or end with '-'")
 	}
 	for i := 0; i < len(label); i++ {
 		c := label[i]
 		lower := c >= 'a' && c <= 'z'
 		digit := c >= '0' && c <= '9'
 		if !lower && !digit && c != '-' {
-			return fmt.Errorf("may contain only lower-case letters, digits, '.' and '-'")
+			return invalid("may contain only lower-case letters, digits, '.' and '-'")
 		}
 	}
 	return nil
@@ -80,11 +92,11 @@ func checkLabel(label string) error {
 func parsePort(raw string) (int, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return 0, fmt.Errorf("port is required")
+		return 0, invalid("port is required")
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 1 || n > 65535 {
-		return 0, fmt.Errorf("port must be between 1 and 65535")
+		return 0, invalid("port must be between 1 and 65535")
 	}
 	return n, nil
 }
@@ -94,7 +106,7 @@ func checkTLSMode(mode string) error {
 	case "may", "encrypt", "none":
 		return nil
 	default:
-		return fmt.Errorf("invalid TLS mode")
+		return invalid("invalid TLS mode")
 	}
 }
 
@@ -103,28 +115,28 @@ func checkRecipientMode(mode string) error {
 	case "list", "any":
 		return nil
 	default:
-		return fmt.Errorf("invalid recipient mode")
+		return invalid("invalid recipient mode")
 	}
 }
 
 func checkMailbox(addr, domain string) error {
 	at := strings.LastIndexByte(addr, '@')
 	if at <= 0 || at >= len(addr)-1 {
-		return fmt.Errorf("%q is not a valid email address", addr)
+		return invalid("%q is not a valid email address", addr)
 	}
 	local, host := addr[:at], addr[at+1:]
 	if host != domain {
-		return fmt.Errorf("%q does not belong to domain %s", addr, domain)
+		return invalid("%q does not belong to domain %s", addr, domain)
 	}
 	if local == "" || local[0] == '.' || local[len(local)-1] == '.' {
-		return fmt.Errorf("%q: invalid local part", addr)
+		return invalid("%q: invalid local part", addr)
 	}
 	for i := 0; i < len(local); i++ {
 		c := local[i]
 		lower := c >= 'a' && c <= 'z'
 		digit := c >= '0' && c <= '9'
 		if !lower && !digit && c != '.' && c != '-' && c != '_' && c != '+' {
-			return fmt.Errorf("%q: local part contains invalid characters", addr)
+			return invalid("%q: local part contains invalid characters", addr)
 		}
 	}
 	return nil

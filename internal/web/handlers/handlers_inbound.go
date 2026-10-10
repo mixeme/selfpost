@@ -9,6 +9,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
@@ -225,6 +226,19 @@ func (h *Handlers) inboundFilter() (on bool, milter, action string) {
 	return true, h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction
 }
 
+// inboundErrorMessage is what a form of the inbound domain page says about a
+// failed save. A validation error says what to fix and is shown as it is;
+// anything else (the reload of the Postfix maps, the database) goes to the log
+// and the page gets a fixed line.
+func inboundErrorMessage(err error, form, what string) string {
+	var validation *inbound.ValidationError
+	if errors.As(err, &validation) {
+		return err.Error()
+	}
+	logf("panel: inbound: save %s: %v", form, err)
+	return "Could not save " + what + ". Check the logs and try again."
+}
+
 func firstNonEmpty(ss ...string) string {
 	for _, s := range ss {
 		if s != "" {
@@ -271,7 +285,9 @@ func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request
 	port := r.PostFormValue("port")
 	tlsMode := r.PostFormValue("tls_mode")
 	if err := h.inbound.SetTransport(d.ID, host, port, tlsMode); err != nil {
-		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{TransportErr: err.Error()})
+		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{
+			TransportErr: inboundErrorMessage(err, "upstream", "the upstream"),
+		})
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?saved=1", d.ID), http.StatusSeeOther)
@@ -289,7 +305,9 @@ func (h *Handlers) HandleInboundRecipients(w http.ResponseWriter, r *http.Reques
 	mode := r.PostFormValue("recipient_mode")
 	addrs := splitAddresses(r.PostFormValue("addresses"))
 	if err := h.inbound.SetRecipients(d.ID, mode, addrs); err != nil {
-		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{RecipientErr: err.Error()})
+		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{
+			RecipientErr: inboundErrorMessage(err, "recipients", "the recipients"),
+		})
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?recipients=1", d.ID), http.StatusSeeOther)

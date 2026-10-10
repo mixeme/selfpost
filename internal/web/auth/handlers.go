@@ -120,7 +120,7 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := m.sessions.Create(user.Username)
+	token, err := m.sessions.Create(user.ID)
 	if err != nil {
 		logf("panel: login: create session failed: %v", err)
 		m.renderLogin(w, http.StatusInternalServerError, "Internal error. Please try again.")

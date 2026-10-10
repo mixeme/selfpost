@@ -1,13 +1,17 @@
 {{/* DMARC reports (mockup dmarc.html): whether aggregate reports are arriving,
-     and the latest of them across the domains the viewer reaches. */}}
+     and the latest of them across the domains the viewer reaches. The ingest box
+     is the instance's, so a viewer who reaches only some domains gets the
+     reports alone. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 
+{{if .IngestOn}}
 {{template "box_open" .Ingest}}
 {{template "body_open"}}
 {{template "facts" .IngestFacts}}
 {{template "body_close"}}
 {{template "box_close"}}
+{{end}}
 
 {{template "box_open" .Recent}}
 {{if .Rows}}

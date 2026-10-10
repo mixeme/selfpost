@@ -30,11 +30,14 @@ func FormatReceived(t time.Time) string { return t.UTC().Format("01-02 15:04") }
 // ---- The hub
 
 // DMARCHub is the data of the DMARC reports hub: whether reports are arriving
-// and the latest of them.
+// and the latest of them. The ingest box describes the whole instance (the
+// hosted mailbox, the reports kept across every domain), so it is drawn only
+// for the viewer it belongs to — see WithoutIngest.
 type DMARCHub struct {
 	Meta
 	Head Head
 
+	IngestOn    bool
 	Ingest      Box
 	IngestFacts []Fact
 
@@ -104,7 +107,8 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 			Lead: Rich("How receivers saw mail claiming to be from your domains. Aggregate (", Code("rua="),
 				") only; open a report for the parsed XML."),
 		},
-		Ingest: Box{No: "01", Title: "Ingest", End: Rich(TagOf(status, label))},
+		IngestOn: true,
+		Ingest:   Box{No: "01", Title: "Ingest", End: Rich(TagOf(status, label))},
 		IngestFacts: []Fact{
 			last,
 			{Label: "This week", Value: Plain(FormatCount(int64(in.KeptThisWeek)) + " kept · " + plural(int64(in.ParseFailures), "parse failure", "parse failures"))},
@@ -114,6 +118,15 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 		Recent: Box{No: "02", Title: "Recent reports"},
 		Empty:  EmptyState{Icon: "ti-report-analytics", Text: Plain("No reports yet.")},
 	}
+}
+
+// WithoutIngest leaves the ingest box out, for a viewer who reaches some of the
+// domains and not the instance: the box is about all of them, so what it says
+// is not theirs to read. The reports box is then the page's first and only one.
+func (p *DMARCHub) WithoutIngest() *DMARCHub {
+	p.IngestOn = false
+	p.Recent.No = "01"
+	return p
 }
 
 // WithReports sets the table of the latest reports.

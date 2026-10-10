@@ -99,7 +99,7 @@ func TestIngestMessageStoresReport(t *testing.T) {
 	if err := IngestMessage(st, msg, "dmarc-reports@mail.example.com", time.Now().UTC()); err != nil {
 		t.Fatalf("IngestMessage: %v", err)
 	}
-	list, err := st.ListDMARCReports(nil, 10)
+	list, err := st.ListDMARCReports(store.DMARCReportScope{AllDomains: true}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestIngestMessageRejectsUnknownDomain(t *testing.T) {
 	if err := IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports@mail.example.com", time.Now().UTC()); err == nil {
 		t.Fatal("report for an unconfigured domain was accepted")
 	}
-	list, err := st.ListDMARCReports(nil, 10)
+	list, err := st.ListDMARCReports(store.DMARCReportScope{AllDomains: true}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}

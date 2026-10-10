@@ -12,6 +12,18 @@ const (
 	maxLoginLen = 64
 )
 
+// ValidationError is a refusal of what was submitted: its text says what the
+// administrator must fix and is written to be shown on the page. Any other
+// error from this package (a failed write, a failed reload) is not, and the
+// caller must not put its text in front of a user.
+type ValidationError struct{ msg string }
+
+func (e *ValidationError) Error() string { return e.msg }
+
+func invalid(format string, args ...any) error {
+	return &ValidationError{msg: fmt.Sprintf(format, args...)}
+}
+
 // validateLogin enforces a strict server-side whitelist for the SASL login
 // (security.md). It intentionally excludes '@': the login is stored in sasldb2,
 // where '@' separates the user from the realm, so allowing it would change the
@@ -22,14 +34,14 @@ const (
 // makes that safe.
 func validateLogin(login string) error {
 	if len(login) < minLoginLen || len(login) > maxLoginLen {
-		return fmt.Errorf("login must be %d-%d characters", minLoginLen, maxLoginLen)
+		return invalid("login must be %d-%d characters", minLoginLen, maxLoginLen)
 	}
 	for _, r := range login {
 		lower := r >= 'a' && r <= 'z'
 		upper := r >= 'A' && r <= 'Z'
 		digit := r >= '0' && r <= '9'
 		if !lower && !upper && !digit && r != '.' && r != '-' && r != '_' {
-			return fmt.Errorf("login may contain only letters, digits, '.', '-' and '_'")
+			return invalid("login may contain only letters, digits, '.', '-' and '_'")
 		}
 	}
 	return nil
@@ -43,14 +55,14 @@ func validateLogin(login string) error {
 // (security.md).
 func validateImportedPassword(password string) error {
 	if password == "" {
-		return fmt.Errorf("imported application password is empty")
+		return invalid("imported application password is empty")
 	}
 	if len(password) > 1024 {
-		return fmt.Errorf("imported application password is too long")
+		return invalid("imported application password is too long")
 	}
 	for _, r := range password {
 		if r < 0x20 || r == 0x7f {
-			return fmt.Errorf("imported application password contains control characters")
+			return invalid("imported application password contains control characters")
 		}
 	}
 	return nil
@@ -59,7 +71,7 @@ func validateImportedPassword(password string) error {
 // validateAddressMode checks the submitted mode is one of the two known values.
 func validateAddressMode(mode string) error {
 	if mode != store.AddressModeWildcard && mode != store.AddressModeList {
-		return fmt.Errorf("invalid address mode")
+		return invalid("invalid address mode")
 	}
 	return nil
 }
@@ -79,11 +91,11 @@ func normalizeAddress(addr string) string {
 func validateSenderAddress(addr, domain string) error {
 	at := strings.LastIndexByte(addr, '@')
 	if at < 0 {
-		return fmt.Errorf("%q is not a valid email address", addr)
+		return invalid("%q is not a valid email address", addr)
 	}
 	local, host := addr[:at], addr[at+1:]
 	if host != domain {
-		return fmt.Errorf("%q does not belong to domain %s", addr, domain)
+		return invalid("%q does not belong to domain %s", addr, domain)
 	}
 	if err := validateLocalPart(local); err != nil {
 		return fmt.Errorf("%q: %w", addr, err)
@@ -96,17 +108,17 @@ func validateSenderAddress(addr, domain string) error {
 // value is always safe to write verbatim into the Postfix map (security.md).
 func validateLocalPart(local string) error {
 	if local == "" {
-		return fmt.Errorf("missing the part before '@'")
+		return invalid("missing the part before '@'")
 	}
 	if local[0] == '.' || local[len(local)-1] == '.' {
-		return fmt.Errorf("local part must not start or end with '.'")
+		return invalid("local part must not start or end with '.'")
 	}
 	for i := 0; i < len(local); i++ {
 		c := local[i]
 		lower := c >= 'a' && c <= 'z'
 		digit := c >= '0' && c <= '9'
 		if !lower && !digit && c != '.' && c != '-' && c != '_' && c != '+' {
-			return fmt.Errorf("local part may contain only lower-case letters, digits, '.', '-', '_' and '+'")
+			return invalid("local part may contain only lower-case letters, digits, '.', '-', '_' and '+'")
 		}
 	}
 	return nil
@@ -134,7 +146,7 @@ func parseAddresses(raw []string, domain string) ([]string, error) {
 		out = append(out, addr)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("list mode requires at least one address")
+		return nil, invalid("list mode requires at least one address")
 	}
 	return out, nil
 }

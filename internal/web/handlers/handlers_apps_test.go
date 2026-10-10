@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -32,7 +33,13 @@ type appStand struct {
 
 func newAppStand(t *testing.T) appStand {
 	t.Helper()
-	h, _ := settingsServer(t)
+	return newAppStandAt(t, filepath.Join(t.TempDir(), "test.db"))
+}
+
+// newAppStandAt is newAppStand over a database at a path the test knows.
+func newAppStandAt(t *testing.T, dbPath string) appStand {
+	t.Helper()
+	h, _ := settingsServerAt(t, dbPath)
 	s := appStand{h: h, sasl: map[string]string{}}
 	sasl := app.NewSASLDB("/data/sasl/sasldb2", "mail.example.org").WithRunner(func(args []string, stdin []byte) error {
 		login := args[len(args)-1]

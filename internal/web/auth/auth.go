@@ -75,14 +75,14 @@ func (m *Module) SessionToken(r *http.Request) (string, bool) {
 	return m.sessionToken(r)
 }
 
-// RenameSession updates the username carried by a session.
-func (m *Module) RenameSession(token, username string) {
-	m.sessions.Rename(token, username)
+// DestroyOtherSessions invalidates every session of the user except keep.
+func (m *Module) DestroyOtherSessions(userID int64, keep string) {
+	m.sessions.DestroyOthers(userID, keep)
 }
 
-// DestroyOtherSessions invalidates every session except keep.
-func (m *Module) DestroyOtherSessions(keep string) {
-	m.sessions.DestroyOthers(keep)
+// DestroyUserSessions invalidates every session of the user.
+func (m *Module) DestroyUserSessions(userID int64) {
+	m.sessions.DestroyAll(userID)
 }
 
 func logf(format string, args ...any) {

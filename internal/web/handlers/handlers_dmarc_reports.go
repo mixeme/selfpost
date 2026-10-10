@@ -38,13 +38,13 @@ func (h *Handlers) canViewDMARCDomain(p auth.Principal, d store.Domain) bool {
 	return p.CanAccessDomain(d.ID)
 }
 
-// HandleDMARCList is the global DMARC reports index.
+// HandleDMARCList is the DMARC reports hub. The global role sees every report
+// and the ingest statistics of the instance; a domain administrator sees the
+// reports of the sending domains assigned to them, and no ingest statistics
+// (the box describes the whole instance: its mailbox, its failures).
 func (h *Handlers) HandleDMARCList(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.requireDMARC(w, r)
-	if !ok || !p.IsGlobal() {
-		if ok && !p.IsGlobal() {
-			http.NotFound(w, r)
-		}
+	if !ok {
 		return
 	}
 	assigned, err := h.assignedDomains(p)
@@ -53,21 +53,15 @@ func (h *Handlers) HandleDMARCList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	names := make([]string, 0, len(assigned))
+	scope := store.DMARCReportScope{AllDomains: p.IsGlobal()}
 	domainIDs := make(map[string]int64, len(assigned))
 	for _, d := range assigned {
-		names = append(names, d.Name)
+		scope.Domains = append(scope.Domains, d.Name)
 		domainIDs[d.Name] = d.ID
 	}
-	reports, err := h.store.ListDMARCReports(names, 100)
+	reports, err := h.store.ListDMARCReports(scope, 100)
 	if err != nil {
 		logf("panel: dmarc list: %v", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	stats, err := h.store.DMARCIngestStats()
-	if err != nil {
-		logf("panel: dmarc ingest stats: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -77,6 +71,17 @@ func (h *Handlers) HandleDMARCList(w http.ResponseWriter, r *http.Request) {
 		if id := domainIDs[rep.Domain]; id != 0 {
 			rows[i].DomainHref = view.DMARCDomainHref(id)
 		}
+	}
+	if !p.IsGlobal() {
+		page := view.NewDMARCHub(h.shellMeta(r), view.IngestInput{}).WithoutIngest().WithReports(rows)
+		h.view.Render(w, http.StatusOK, "dmarc", page)
+		return
+	}
+	stats, err := h.store.DMARCIngestStats()
+	if err != nil {
+		logf("panel: dmarc ingest stats: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
 	}
 	in := view.IngestInput{
 		OK: stats.IngestOK, KeptThisWeek: stats.KeptThisWeek, ParseFailures: stats.ParseFailures,
@@ -135,7 +140,7 @@ func (h *Handlers) HandleDMARCDomain(w http.ResponseWriter, r *http.Request) {
 			Source: s.SourceIP, ThisRelay: relay[s.SourceIP], Pass: s.PassCount, Fail: s.FailCount, Disposition: s.Disposition,
 		}
 	}
-	page := view.NewDMARCDomain(h.shellMeta(r), d.ID, d.Name, p.IsGlobal(), pass, fail, windowDays,
+	page := view.NewDMARCDomain(h.shellMeta(r), d.ID, d.Name, true, pass, fail, windowDays,
 		dmarc.TightenPolicyHint(pass, fail, hints)).
 		WithSources(sourceRows).WithReports(reportRows)
 	h.view.Render(w, http.StatusOK, "dmarc-domain", page)
@@ -198,7 +203,7 @@ func (h *Handlers) HandleDMARCReport(w http.ResponseWriter, r *http.Request) {
 		Received: rep.ReceivedAt.UTC().Format("2006-01-02 15:04") + " UTC",
 		PolicyP:  rep.PolicyP, PolicySP: rep.PolicySP, PolicyPct: rep.PolicyPct,
 		PolicyADKIM: rep.PolicyADKIM, PolicyASPF: rep.PolicyASPF, Recipient: rep.Recipient,
-		Hub: p.IsGlobal(),
+		Hub: true,
 	}).WithRecords(records)
 	h.view.Render(w, http.StatusOK, "dmarc-report", page)
 }

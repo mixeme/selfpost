@@ -41,14 +41,14 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Create issues a new session for username and returns its token. It fails
+// Create issues a new session for the user and returns its token. It fails
 // closed: if the row cannot be written the caller gets an error and must not
 // hand out a cookie, because a token that is not in the database looks like a
 // signed-in browser while every request it makes bounces back to /login.
-func (s *sessionStore) Create(username string) (string, error) {
+func (s *sessionStore) Create(userID int64) (string, error) {
 	token := randomToken(32)
 	now := time.Now()
-	if err := s.store.CreateSession(hashToken(token), username, now.Add(s.idle)); err != nil {
+	if err := s.store.CreateSession(hashToken(token), userID, now.Add(s.idle)); err != nil {
 		return "", err
 	}
 	// Pruning is housekeeping: the new session is already valid, so a failure
@@ -59,28 +59,28 @@ func (s *sessionStore) Create(username string) (string, error) {
 	return token, nil
 }
 
-// Lookup returns the session username for a token if it exists and is
-// unexpired.
-func (s *sessionStore) Lookup(token string) (string, bool) {
+// Lookup returns the id of the user a token's session belongs to, if the
+// session exists and is unexpired.
+func (s *sessionStore) Lookup(token string) (int64, bool) {
 	if token == "" {
-		return "", false
+		return 0, false
 	}
 	hash := hashToken(token)
 	row, found, err := s.store.LookupSession(hash)
 	if err != nil {
 		logf("panel: session: lookup failed: %v", err)
-		return "", false
+		return 0, false
 	}
 	if !found {
-		return "", false
+		return 0, false
 	}
 	if time.Now().After(row.ExpiresAt) {
 		if err := s.store.DeleteSession(hash); err != nil {
 			logf("panel: session: delete expired failed: %v", err)
 		}
-		return "", false
+		return 0, false
 	}
-	return row.Username, true
+	return row.UserID, true
 }
 
 // Touch extends a session's sliding expiry if it has been at least
@@ -107,17 +107,17 @@ func (s *sessionStore) Touch(token string) bool {
 	return true
 }
 
-// Rename updates the username carried by a session, keeping its expiry.
-func (s *sessionStore) Rename(token, username string) {
-	if err := s.store.RenameSession(hashToken(token), username); err != nil {
-		logf("panel: session: rename failed: %v", err)
+// DestroyOthers invalidates every session of the user except keep.
+func (s *sessionStore) DestroyOthers(userID int64, keep string) {
+	if err := s.store.DeleteOtherSessions(userID, hashToken(keep)); err != nil {
+		logf("panel: session: destroy others failed: %v", err)
 	}
 }
 
-// DestroyOthers invalidates every session except keep.
-func (s *sessionStore) DestroyOthers(keep string) {
-	if err := s.store.DeleteOtherSessions(hashToken(keep)); err != nil {
-		logf("panel: session: destroy others failed: %v", err)
+// DestroyAll invalidates every session of the user.
+func (s *sessionStore) DestroyAll(userID int64) {
+	if err := s.store.DeleteUserSessions(userID); err != nil {
+		logf("panel: session: destroy all failed: %v", err)
 	}
 }
 

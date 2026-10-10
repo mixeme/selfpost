@@ -41,7 +41,7 @@ func TestBaselineSchema(t *testing.T) {
 	want := map[string]string{
 		"settings":              "key value",
 		"users":                 "id username password_hash role email dmarc_default_mode dmarc_default_address all_domains all_inbound_domains created_at",
-		"sessions":              "token_hash username created_at expires_at",
+		"sessions":              "token_hash user_id created_at expires_at",
 		"domains":               "id name dkim_selector dmarc_rua dmarc_rua_user_id created_at",
 		"user_domains":          "user_id domain_id",
 		"applications":          "id domain_id login address_mode auth_ip_restrict auth_allowed_ips created_at",

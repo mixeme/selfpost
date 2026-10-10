@@ -155,11 +155,6 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
 		return
 	}
-	if f.Username != u.Username {
-		if token, ok := h.auth.SessionToken(r); ok {
-			h.auth.RenameSession(token, f.Username)
-		}
-	}
 	// The e-mail is the report address of every domain that follows this
 	// user's "my account e-mail" default.
 	h.resyncAfterEmailChange(u, f.Email)
@@ -215,7 +210,7 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if token, ok := h.auth.SessionToken(r); ok {
-		h.auth.DestroyOtherSessions(token)
+		h.auth.DestroyOtherSessions(u.ID, token)
 	}
 	logf("panel: user %d changed their password", u.ID)
 	http.Redirect(w, r, "/account?done=password", http.StatusSeeOther)

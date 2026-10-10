@@ -5,7 +5,6 @@
 package inbound
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -150,7 +149,7 @@ func parseRecipientAddresses(raw []string, domain string) ([]string, error) {
 		out = append(out, addr)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("listed-recipients mode requires at least one address")
+		return nil, invalid("listed-recipients mode requires at least one address")
 	}
 	return out, nil
 }

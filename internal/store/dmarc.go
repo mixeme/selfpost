@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -167,34 +168,37 @@ func (s *Store) IncrDMARCParseFailures() error {
 	return s.SetSetting(DMARCParseFailuresKey, fmt.Sprintf("%d", n+1))
 }
 
-// ListDMARCReports returns recent summaries, optionally limited to domains.
-func (s *Store) ListDMARCReports(domains []string, limit int) ([]DMARCReportSummary, error) {
+// DMARCReportScope is whose reports a listing may return: every domain's
+// (AllDomains) or those of the named domains. A scope with neither is a viewer
+// who reaches nothing and gets no rows — an empty list is never "all"; see
+// SendLogFilter, which has the same shape.
+type DMARCReportScope struct {
+	AllDomains bool
+	Domains    []string
+}
+
+// ListDMARCReports returns recent summaries within the scope.
+func (s *Store) ListDMARCReports(scope DMARCReportScope, limit int) ([]DMARCReportSummary, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if len(domains) == 0 {
-		rows, err = s.db.Query(`
-			SELECT id, domain, reporter, period_begin, period_end, received_at, pass_count, fail_count
-			FROM dmarc_reports ORDER BY received_at DESC LIMIT ?`, limit)
-	} else {
-		placeholders := make([]any, 0, len(domains)+1)
-		q := `SELECT id, domain, reporter, period_begin, period_end, received_at, pass_count, fail_count
-			FROM dmarc_reports WHERE domain IN (`
-		for i, d := range domains {
-			if i > 0 {
-				q += ","
-			}
-			q += "?"
-			placeholders = append(placeholders, d)
+	q := `SELECT id, domain, reporter, period_begin, period_end, received_at, pass_count, fail_count
+		FROM dmarc_reports`
+	var args []any
+	if !scope.AllDomains {
+		if len(scope.Domains) == 0 {
+			return nil, nil
 		}
-		q += `) ORDER BY received_at DESC LIMIT ?`
-		placeholders = append(placeholders, limit)
-		rows, err = s.db.Query(q, placeholders...)
+		marks := make([]string, len(scope.Domains))
+		for i, d := range scope.Domains {
+			marks[i] = "?"
+			args = append(args, d)
+		}
+		q += " WHERE domain IN (" + strings.Join(marks, ",") + ")"
 	}
+	q += " ORDER BY received_at DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list dmarc reports: %w", err)
 	}
@@ -242,7 +246,7 @@ func (s *Store) GetDMARCReport(id int64) (DMARCReport, error) {
 
 // ListDMARCReportsForDomain returns summaries for one sending domain.
 func (s *Store) ListDMARCReportsForDomain(domain string, limit int) ([]DMARCReportSummary, error) {
-	return s.ListDMARCReports([]string{domain}, limit)
+	return s.ListDMARCReports(DMARCReportScope{Domains: []string{domain}}, limit)
 }
 
 // DMARCDomainRollup summarises pass/fail for a domain over the last windowDays.

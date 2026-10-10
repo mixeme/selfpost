@@ -51,10 +51,12 @@ CREATE TABLE users (
 -- redeploy; only the SHA-256 of the session token is stored, never the token
 -- itself, so a stolen database file cannot be used to sign in. expires_at
 -- implements the sliding idle timeout: it is pushed forward on activity rather
--- than being fixed at creation time.
+-- than being fixed at creation time. A session belongs to a user by id, not by
+-- name: deleting the user ends their sessions, and renaming them leaves the
+-- sessions where they are.
 CREATE TABLE sessions (
     token_hash TEXT PRIMARY KEY,
-    username   TEXT NOT NULL,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
 );

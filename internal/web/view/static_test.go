@@ -106,3 +106,26 @@ func TestOFLTravelsWithFonts(t *testing.T) {
 		t.Error("GET /static/OFL.txt did not serve the OFL text")
 	}
 }
+
+// /static/ is a set of known assets, not a directory to browse: the folder, and
+// a path that is not an asset, answer 404 rather than a listing of what the
+// binary embeds.
+func TestStaticDoesNotListOrServeWhatIsNotAnAsset(t *testing.T) {
+	for _, target := range []string{"/static/", "/static", "/static/nope", "/static/../static/", "/static/panel.css/../"} {
+		rec := serveStatic(target, nil)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404:\n%s", target, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), "panel.css") {
+			t.Errorf("GET %s lists the assets:\n%s", target, rec.Body.String())
+		}
+	}
+
+	rec := serveStatic("/static/panel.css", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /static/panel.css = %d, want 200", rec.Code)
+	}
+	if got, want := rec.Header().Get("ETag"), staticETags["/static/panel.css"]; got == "" || got != want {
+		t.Errorf("ETag of panel.css = %q, want %q", got, want)
+	}
+}

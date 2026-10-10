@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -168,8 +169,7 @@ func (h *Handlers) HandleDomainRateLimitRecalc(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if err := h.recalcRateLimit(store.RateLimitScopeDomain, d.ID); err != nil {
-		logf("panel: domain %d: recalc rate limit: %v", d.ID, err)
-		h.renderDomainSettings(w, r, http.StatusBadRequest, d, settingsView{Err: err.Error()})
+		h.renderDomainSettings(w, r, http.StatusBadRequest, d, settingsView{Err: recalcErrorMessage(err, "domain", d.ID)})
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", d.ID), http.StatusSeeOther)
@@ -181,10 +181,22 @@ func (h *Handlers) HandleAppRateLimitRecalc(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := h.recalcRateLimit(store.RateLimitScopeApp, a.ID); err != nil {
-		h.renderApplicationForm(w, r, http.StatusBadRequest, d, &a, nil, fmt.Sprintf("%s: %s", a.Login, err.Error()))
+		h.renderApplicationForm(w, r, http.StatusBadRequest, d, &a, nil,
+			fmt.Sprintf("%s: %s", a.Login, recalcErrorMessage(err, "application", a.ID)))
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?recalculated=1", a.DomainID), http.StatusSeeOther)
+}
+
+// recalcErrorMessage is what the page says about a recalculation that did not
+// happen. A limit that is not automatic has nothing to recalculate, and the
+// administrator is told so; any other failure goes to the log.
+func recalcErrorMessage(err error, what string, id int64) string {
+	if errors.Is(err, store.ErrNotAutoRateLimit) {
+		return err.Error()
+	}
+	logf("panel: %s %d: recalc rate limit: %v", what, id, err)
+	return "Could not recalculate the limit. Check the logs and try again."
 }
 
 func (h *Handlers) recalcRateLimit(scope string, refID int64) error {

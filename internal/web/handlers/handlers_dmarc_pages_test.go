@@ -155,8 +155,9 @@ func TestDMARCPagesAreAbsentWithIngestOff(t *testing.T) {
 }
 
 // A domain administrator reaches the reports of the domains assigned to them
-// and nothing else: not the hub, not another tenant's domain page, not another
-// tenant's report. A report that does not exist is the same 404 as one that is
+// and nothing else: the hub lists only theirs and does not carry the ingest
+// statistics of the whole instance, and another tenant's domain page and report
+// are not there. A report that does not exist is the same 404 as one that is
 // not theirs.
 func TestDMARCPagesStayWithinTheViewersDomains(t *testing.T) {
 	s := newDMARCStand(t)
@@ -174,22 +175,31 @@ func TestDMARCPagesStayWithinTheViewersDomains(t *testing.T) {
 	}
 	ops := domainAdmin(t, s.h.store, "ops", s.d.ID)
 
-	// Their own domain and report are theirs; the way back to the hub is not
-	// offered, since the hub is not theirs.
+	// The hub is open to them: their own domain's reports, no one else's, and
+	// not the statistics of the instance's ingest box.
+	hub := send(s.h.HandleDMARCList, &ops, "GET", "/outbound/dmarc", nil, nil)
+	if hub.Code != http.StatusOK {
+		t.Fatalf("hub for its administrator = %d, want 200: %s", hub.Code, hub.Body.String())
+	}
+	has(t, "hub for its administrator", hub.Body.String(), `<h1 class="title is-3">DMARC reports</h1>`, `<h2>Recent reports</h2>`,
+		`<a href="/outbound/dmarc/domains/1">example.org</a>`, `Outlook.com`, `href="/outbound/dmarc/reports/`+idStr(s.reportID)+`"`)
+	lacks(t, "hub for its administrator", hub.Body.String(), "other.example.net", "google.com",
+		`/outbound/dmarc/reports/`+idStr(otherReport)+`"`, `<h2>Ingest</h2>`, `dmarc-reports@mail.example.org`,
+		`parse failure`, `Last report`, `Retention`)
+
+	// Their own domain and report are theirs, and so is the way back to the hub.
 	own := send(s.h.HandleDMARCDomain, &ops, "GET", "/outbound/dmarc/domains/1", map[string]string{"id": "1"}, nil)
 	if own.Code != http.StatusOK {
 		t.Fatalf("own domain = %d", own.Code)
 	}
-	has(t, "domain for its administrator", own.Body.String(), `<h1 class="title is-3">example.org</h1>`)
-	lacks(t, "domain for its administrator", own.Body.String(), `<a href="/outbound/dmarc">`)
+	has(t, "domain for its administrator", own.Body.String(), `<h1 class="title is-3">example.org</h1>`, `<a href="/outbound/dmarc">DMARC reports</a>`)
 	rep := send(s.h.HandleDMARCReport, &ops, "GET", "/outbound/dmarc/reports/"+idStr(s.reportID), map[string]string{"id": idStr(s.reportID)}, nil)
 	if rep.Code != http.StatusOK {
 		t.Fatalf("own report = %d", rep.Code)
 	}
-	lacks(t, "report for its administrator", rep.Body.String(), `<a href="/outbound/dmarc">`)
+	has(t, "report for its administrator", rep.Body.String(), `<a href="/outbound/dmarc">DMARC reports</a>`)
 
 	for name, code := range map[string]int{
-		"hub": send(s.h.HandleDMARCList, &ops, "GET", "/outbound/dmarc", nil, nil).Code,
 		"another tenant's domain": send(s.h.HandleDMARCDomain, &ops, "GET", "/outbound/dmarc/domains/"+idStr(other.ID),
 			map[string]string{"id": idStr(other.ID)}, nil).Code,
 		"another tenant's report": send(s.h.HandleDMARCReport, &ops, "GET", "/outbound/dmarc/reports/"+idStr(otherReport),
@@ -201,4 +211,33 @@ func TestDMARCPagesStayWithinTheViewersDomains(t *testing.T) {
 			t.Errorf("%s for a domain administrator = %d, want 404", name, code)
 		}
 	}
+}
+
+// A domain administrator with no outbound domain is not shown every tenant's
+// reports because their own list is empty: the hub has no rows, and no error.
+func TestDMARCHubForAnAdministratorWithoutOutboundDomains(t *testing.T) {
+	s := newDMARCStand(t)
+	nobody := domainAdmin(t, s.h.store, "nobody")
+
+	rec := send(s.h.HandleDMARCList, &nobody, "GET", "/outbound/dmarc", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("hub = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	has(t, "hub", rec.Body.String(), `No reports yet.`)
+	lacks(t, "hub", rec.Body.String(), "example.org", "Outlook.com", `<table`, `<h2>Ingest</h2>`)
+}
+
+// The global role sees the ingest box and every report, including those of a
+// domain that has since been removed.
+func TestDMARCHubForTheGlobalRoleSeesEverything(t *testing.T) {
+	s := newDMARCStand(t)
+	if _, err := s.h.store.InsertDMARCReport(store.DMARCReport{
+		Domain: "gone.example.net", Reporter: "yahoo.com", ReportID: "gone", ReceivedAt: time.Now(),
+		PeriodBegin: time.Now().Add(-24 * time.Hour), PeriodEnd: time.Now(), PassCount: 3,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := getBody(t, s.h.HandleDMARCList, "/outbound/dmarc")
+	has(t, "hub", body, `<h2>Ingest</h2>`, `<h2>Recent reports</h2>`, `example.org`, `Outlook.com`, `gone.example.net`, `yahoo.com`)
 }

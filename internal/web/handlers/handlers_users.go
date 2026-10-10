@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/validate"
 	"github.com/mixeme/selfpost/internal/web/view"
 	"golang.org/x/crypto/bcrypt"
@@ -310,6 +311,9 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		return
 	}
 	h.resyncAfterEmailChange(u, email)
+	if password != "" {
+		h.endSessionsAfterPasswordSet(r, p, u)
+	}
 
 	if role != u.Role {
 		if err := h.store.SetUserRole(u.ID, role); err != nil {
@@ -333,6 +337,19 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	}
 
 	http.Redirect(w, r, "/server/users?done=updated", http.StatusSeeOther)
+}
+
+// endSessionsAfterPasswordSet signs out the logins a user had under the old
+// password when an administrator sets a new one on the user form. An
+// administrator who sets their own password keeps the browser they are using.
+func (h *Handlers) endSessionsAfterPasswordSet(r *http.Request, by auth.Principal, u store.User) {
+	if u.ID == by.ID {
+		if token, ok := h.auth.SessionToken(r); ok {
+			h.auth.DestroyOtherSessions(u.ID, token)
+			return
+		}
+	}
+	h.auth.DestroyUserSessions(u.ID)
 }
 
 // HandleUserDeleteConfirm shows the cascade warning before a panel user is

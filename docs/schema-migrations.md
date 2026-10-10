@@ -84,7 +84,7 @@ for operators upgrading from older 2.x images.
 |-------|------|
 | `settings` | Key/value settings of the instance — what is true whoever is signed in (send-log retention). Nothing that belongs to a user |
 | `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `dmarc_default_mode` / `dmarc_default_address` are their default DMARC report address; `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
-| `sessions` | Panel login sessions (token hash, sliding idle expiry) |
+| `sessions` | Panel login sessions (token hash, owning user by id and deleted with them, sliding idle expiry) |
 | `domains` | Sending (outbound) domains. `dmarc_rua` / `dmarc_rua_user_id` say where aggregate reports go |
 | `user_domains` | Outbound domains assigned to a `domain` user |
 | `applications` | SASL applications per domain, with the client-IP restriction (`auth_ip_restrict`, `auth_allowed_ips`) |

@@ -14,18 +14,19 @@ func (m *Module) RequireAuth(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		username, ok := m.sessions.Lookup(token)
+		userID, ok := m.sessions.Lookup(token)
 		if !ok {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		if isSessionActivity(r) && m.sessions.Touch(token) {
-			m.setSessionCookie(w, token)
-		}
-		u, err := m.store.GetUserByUsername(username)
+		u, err := m.store.GetUser(userID)
 		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
+		}
+		// Only a session whose user exists is kept alive by being used.
+		if isSessionActivity(r) && m.sessions.Touch(token) {
+			m.setSessionCookie(w, token)
 		}
 		p := principalFromUser(u)
 		ctx := withPrincipal(r.Context(), p)

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,9 +27,20 @@ func newTestSessionStore(t *testing.T) *sessionStore {
 	return newSessionStore(st, 7*24*time.Hour)
 }
 
+// mustCreate signs the named user in, creating the user first if there is none
+// by that name.
 func mustCreate(t *testing.T, s *sessionStore, username string) string {
 	t.Helper()
-	token, err := s.Create(username)
+	u, err := s.store.GetUserByUsername(username)
+	if errors.Is(err, store.ErrUserNotFound) {
+		var id int64
+		id, err = s.store.CreateUser(username, "hash", store.RoleGlobal, store.Reach{})
+		u.ID = id
+	}
+	if err != nil {
+		t.Fatalf("user %q: %v", username, err)
+	}
+	token, err := s.Create(u.ID)
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -199,33 +211,26 @@ func dropSessionsTable(t *testing.T, path string) {
 	}
 }
 
-func TestSessionRename(t *testing.T) {
-	s := newTestSessionStore(t)
-	token := mustCreate(t, s, "admin")
-
-	s.Rename(token, "operator")
-
-	name, ok := s.Lookup(token)
-	if !ok {
-		t.Fatal("session lost after rename")
-	}
-	if name != "operator" {
-		t.Fatalf("session username = %q, want %q", name, "operator")
-	}
-}
-
 func TestSessionDestroyOthers(t *testing.T) {
 	s := newTestSessionStore(t)
 	keep := mustCreate(t, s, "admin")
 	other := mustCreate(t, s, "admin")
+	elsewhere := mustCreate(t, s, "operator")
+	admin, err := s.store.GetUserByUsername("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	s.DestroyOthers(keep)
+	s.DestroyOthers(admin.ID, keep)
 
 	if _, ok := s.Lookup(keep); !ok {
 		t.Fatal("current session was destroyed")
 	}
 	if _, ok := s.Lookup(other); ok {
 		t.Fatal("other session survived")
+	}
+	if _, ok := s.Lookup(elsewhere); !ok {
+		t.Fatal("another user's session was destroyed")
 	}
 }
 
@@ -252,5 +257,105 @@ func TestSessionTouchThrottled(t *testing.T) {
 	}
 	if !s.Touch(token) {
 		t.Fatal("touch did not renew a session past the throttle window")
+	}
+}
+
+// requireAuthAs runs one request carrying token through RequireAuth and
+// returns the response and the principal the handler saw (nil when it never
+// ran). It is a POST, an activity request of the kind that renews a session.
+func requireAuthAs(t *testing.T, m *Module, token string) (*httptest.ResponseRecorder, *Principal) {
+	t.Helper()
+	var seen *Principal
+	h := m.RequireAuth(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if p, ok := CurrentPrincipal(r.Context()); ok {
+			seen = &p
+		}
+	}))
+	r := httptest.NewRequest(http.MethodPost, "http://panel.example.com/domains", nil)
+	r.AddCookie(&http.Cookie{Name: m.sessionCookie(), Value: token})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	return rec, seen
+}
+
+func mustUser(t *testing.T, m *Module, username string) int64 {
+	t.Helper()
+	id, err := m.store.CreateUser(username, "hash", store.RoleGlobal, store.Reach{})
+	if err != nil {
+		t.Fatalf("create user %q: %v", username, err)
+	}
+	return id
+}
+
+// A session is the person's, not the name's: when the user is deleted the
+// cookie is dead, and a new user created under the same name does not inherit
+// it (with that account's role).
+func TestRequireAuthDoesNotRebindASessionToANewUserWithTheSameName(t *testing.T) {
+	m := testModule(t, false)
+	mustUser(t, m, "admin")
+	id := mustUser(t, m, "alice")
+	token := mustCreate(t, m.sessions, "alice")
+
+	if err := m.store.DeleteUser(id); err != nil {
+		t.Fatalf("delete user: %v", err)
+	}
+	mustUser(t, m, "alice")
+
+	rec, seen := requireAuthAs(t, m, token)
+	if seen != nil {
+		t.Fatalf("the old cookie signed in as %q after the user was deleted and the name reused", seen.Username)
+	}
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Fatalf("status = %d, Location = %q; want a redirect to /login", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+// Renaming a user (the Account page, or an administrator on the user form)
+// leaves every session of theirs signed in, under the new name.
+func TestRenamingAUserKeepsTheirOtherSessions(t *testing.T) {
+	m := testModule(t, false)
+	id := mustUser(t, m, "alice")
+	current := mustCreate(t, m.sessions, "alice")
+	other := mustCreate(t, m.sessions, "alice")
+
+	if err := m.store.UpdateUser(id, "alicia", "hash", ""); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	for name, token := range map[string]string{"current": current, "other": other} {
+		_, seen := requireAuthAs(t, m, token)
+		if seen == nil {
+			t.Errorf("the %s session was lost by the rename", name)
+			continue
+		}
+		if seen.Username != "alicia" || seen.ID != id {
+			t.Errorf("the %s session is %q (id %d) after the rename, want alicia (id %d)", name, seen.Username, seen.ID, id)
+		}
+	}
+}
+
+// A session whose user is gone is not renewed by being used: the renewal would
+// keep a dead cookie alive for as long as someone presses it.
+func TestRequireAuthDoesNotRenewASessionWhoseUserIsGone(t *testing.T) {
+	m := testModule(t, false)
+	mustUser(t, m, "admin")
+	id := mustUser(t, m, "alice")
+	token := mustCreate(t, m.sessions, "alice")
+	// Past the renewal throttle, so a Touch would write.
+	stale := time.Now().Add(-2 * time.Hour).Add(m.sessions.idle)
+	if err := m.store.RenewSession(hashToken(token), stale); err != nil {
+		t.Fatalf("age session: %v", err)
+	}
+	if err := m.store.DeleteUser(id); err != nil {
+		t.Fatalf("delete user: %v", err)
+	}
+
+	rec, _ := requireAuthAs(t, m, token)
+
+	if got := rec.Header().Values("Set-Cookie"); len(got) != 0 {
+		t.Errorf("a session of a missing user was renewed: %v", got)
+	}
+	if row, found, _ := m.store.LookupSession(hashToken(token)); found && !row.ExpiresAt.Equal(stale.UTC().Truncate(time.Second)) {
+		t.Errorf("expiry of a missing user's session moved to %v", row.ExpiresAt)
 	}
 }

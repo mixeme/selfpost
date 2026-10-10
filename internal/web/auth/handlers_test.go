@@ -64,9 +64,9 @@ func TestLoginSignsInWithTheRightPassword(t *testing.T) {
 	if token == "" {
 		t.Fatal("no session cookie was issued")
 	}
-	name, ok := m.sessions.Lookup(token)
-	if !ok || name != "admin" {
-		t.Fatalf("the cookie's session resolves to %q, %t; want admin", name, ok)
+	id, ok := m.sessions.Lookup(token)
+	if u, err := m.store.GetUser(id); !ok || err != nil || u.Username != "admin" {
+		t.Fatalf("the cookie's session resolves to user %d (%q), %t, %v; want admin", id, u.Username, ok, err)
 	}
 }
 

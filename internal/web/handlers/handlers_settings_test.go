@@ -91,7 +91,14 @@ func TestServerSettingsIsGlobalOnly(t *testing.T) {
 
 func settingsServer(t *testing.T) (*Handlers, string) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	return settingsServerAt(t, filepath.Join(t.TempDir(), "test.db"))
+}
+
+// settingsServerAt is settingsServer over a database at a path the test knows,
+// for the tests that break the database from outside.
+func settingsServerAt(t *testing.T, dbPath string) (*Handlers, string) {
+	t.Helper()
+	st, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

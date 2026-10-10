@@ -8,18 +8,19 @@ import (
 )
 
 // SessionRow is a persisted login session, keyed by the SHA-256 of its token
-// (see internal/web, which owns the token itself).
+// (see internal/web, which owns the token itself). It belongs to a user by id:
+// deleting the user deletes their sessions, and renaming them keeps them.
 type SessionRow struct {
-	Username  string
+	UserID    int64
 	ExpiresAt time.Time
 }
 
-// CreateSession inserts a new session row.
-func (s *Store) CreateSession(tokenHash, username string, expiresAt time.Time) error {
+// CreateSession inserts a new session row for a user.
+func (s *Store) CreateSession(tokenHash string, userID int64, expiresAt time.Time) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
-		`INSERT INTO sessions (token_hash, username, created_at, expires_at) VALUES (?, ?, ?, ?)`,
-		tokenHash, username, now, expiresAt.UTC().Format(time.RFC3339),
+		`INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		tokenHash, userID, now, expiresAt.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return fmt.Errorf("insert session: %w", err)
@@ -36,9 +37,9 @@ func (s *Store) LookupSession(tokenHash string) (SessionRow, bool, error) {
 		expiresAt string
 	)
 	err := s.db.QueryRow(
-		`SELECT username, expires_at FROM sessions WHERE token_hash = ?`,
+		`SELECT user_id, expires_at FROM sessions WHERE token_hash = ?`,
 		tokenHash,
-	).Scan(&row.Username, &expiresAt)
+	).Scan(&row.UserID, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SessionRow{}, false, nil
 	}
@@ -65,20 +66,6 @@ func (s *Store) RenewSession(tokenHash string, expiresAt time.Time) error {
 	return nil
 }
 
-// RenameSession updates the username carried by a session, keeping its
-// expiry, so a session stays usable after the administrator renames their own
-// account.
-func (s *Store) RenameSession(tokenHash, username string) error {
-	_, err := s.db.Exec(
-		`UPDATE sessions SET username = ? WHERE token_hash = ?`,
-		username, tokenHash,
-	)
-	if err != nil {
-		return fmt.Errorf("rename session: %w", err)
-	}
-	return nil
-}
-
 // DeleteSession removes a session row (logout, or a lookup finding it
 // expired).
 func (s *Store) DeleteSession(tokenHash string) error {
@@ -88,13 +75,22 @@ func (s *Store) DeleteSession(tokenHash string) error {
 	return nil
 }
 
-// DeleteOtherSessions removes every session except keepHash. It is called
-// when the administrator changes their password: a stolen cookie issued
-// under the old password must stop working, while the session performing the
-// change stays signed in.
-func (s *Store) DeleteOtherSessions(keepHash string) error {
-	if _, err := s.db.Exec(`DELETE FROM sessions WHERE token_hash != ?`, keepHash); err != nil {
+// DeleteOtherSessions removes every session of the user except keepHash. It is
+// called when the user changes their password: a stolen cookie issued under the
+// old password must stop working, while the session performing the change
+// stays signed in. Other users' sessions are not touched.
+func (s *Store) DeleteOtherSessions(userID int64, keepHash string) error {
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE user_id = ? AND token_hash != ?`, userID, keepHash); err != nil {
 		return fmt.Errorf("delete other sessions: %w", err)
+	}
+	return nil
+}
+
+// DeleteUserSessions removes every session of the user, for when somebody else
+// has set their password.
+func (s *Store) DeleteUserSessions(userID int64) error {
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID); err != nil {
+		return fmt.Errorf("delete user sessions: %w", err)
 	}
 	return nil
 }

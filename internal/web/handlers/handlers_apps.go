@@ -737,18 +737,21 @@ func splitAddresses(s string) []string {
 	})
 }
 
-// applicationErrorMessage turns a service error into a user-facing message,
-// passing through the validation errors (which are safe, fixed strings) and
-// masking anything unexpected.
+// applicationErrorMessage turns a service error into what the form says. A
+// validation error is the administrator's to read — it says what to fix — and
+// is shown as it is. Anything else is the server's own business (a path, a
+// command's output, SQL): it goes to the log and the page gets a fixed line.
 func applicationErrorMessage(err error) string {
+	var validation *app.ValidationError
 	switch {
 	case errors.Is(err, store.ErrLoginExists):
 		return "That login is already in use. Choose another."
 	case errors.Is(err, store.ErrDomainNotFound), errors.Is(err, store.ErrApplicationNotFound):
 		return "The item no longer exists."
-	default:
-		// Validation errors from the app service are safe to surface verbatim;
-		// they describe what the admin must fix (login/address rules).
+	case errors.As(err, &validation):
 		return err.Error()
+	default:
+		logf("panel: application: %v", err)
+		return "Could not save the application. Check the logs and try again."
 	}
 }

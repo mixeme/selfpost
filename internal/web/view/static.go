@@ -40,6 +40,9 @@ func buildStaticETags() map[string]string {
 }
 
 // StaticHandler serves the embedded assets under /static/ with a content ETag.
+// A path that is not one of those assets — the folder itself included — is a
+// 404: the file server would otherwise answer the folder with a listing of
+// everything the binary embeds.
 //
 // Cache-Control is no-cache rather than a max-age: it lets the browser keep the
 // copy but requires it to revalidate, so an asset that changed is picked up on
@@ -50,10 +53,13 @@ func buildStaticETags() map[string]string {
 func StaticHandler() http.Handler {
 	files := http.FileServer(http.FS(assetsFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if etag, ok := staticETags[path.Clean(r.URL.Path)]; ok {
-			w.Header().Set("ETag", etag)
-			w.Header().Set("Cache-Control", "no-cache")
+		etag, ok := staticETags[path.Clean(r.URL.Path)]
+		if !ok {
+			http.NotFound(w, r)
+			return
 		}
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "no-cache")
 		files.ServeHTTP(w, r)
 	})
 }

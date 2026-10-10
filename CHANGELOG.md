@@ -144,6 +144,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - panel-redesign is `agreed` (owner, 2026-10-09); work starts with stage 0,
   the component kit.
 
+### Security
+
+- A panel session belongs to a user by id and ends with them. It used to be
+  keyed by user name: the cookie of a deleted or renamed user stayed valid
+  and became a session of whoever was next created under that name. Signing
+  in again is required after upgrading.
+- Changing one's password ends one's own other sessions only; it used to
+  sign every other user out. A password set by an administrator on the user
+  form ends that user's sessions.
+- Internal errors (database, `saslpasswd2`, Postfix reload) are no longer
+  shown on the application, inbound upstream / recipients and limit forms;
+  they are logged and the page says so.
+- `/static/` no longer answers with a listing of the embedded files.
+- The DMARC reports hub is open to a domain administrator for the domains
+  assigned to them, without the server's ingest statistics; the list of
+  reports no longer treats "no domains" as "all domains".
+
 ### Fixed
 
 - Saving a domain's report-address form untouched no longer moves a domain
