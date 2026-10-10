@@ -157,5 +157,12 @@ if [ ! -d /data/postfix/queue/active ]; then
 	postfix set-permissions
 fi
 chown -R postfix:postfix /data/postfix/queue
+# The recursive chown above would leave public/ and maildrop/ in group postfix.
+# Postfix keeps those two in its setgid group: postqueue and postdrop are setgid
+# postdrop and reach the showq socket and the maildrop directory through that
+# group alone. With the wrong group `postqueue -p` run by the panel answers
+# "Connect to the Postfix showq service: Permission denied" and the panel cannot
+# read the queue (the Queue card and the Outbound queue page).
+chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
