@@ -221,6 +221,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   running. The Milter sockets card no longer clips its second line with three
   sockets, and a DKIM value is shown whole instead of scrolling inside its
   field.
+- Server › Health shows the idle reload helper (`postfix-reload`) as
+  **on demand**, with when it last ran, instead of `stopped` beside the
+  running programs (owner, 2026-10-10).
 - The confirmation before deleting a user names the domains that follow
   that user's default report address and will be left without one; it used
   to say the domains were not affected (replaced before release — see the

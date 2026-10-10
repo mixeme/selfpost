@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
@@ -103,5 +104,26 @@ func TestProcessesCardLeavesOutTheIdleOneShot(t *testing.T) {
 	card = healthCards(c)[1]
 	if card.Value != "1 of 1 running" || card.Sub != "postfix-reload" {
 		t.Errorf("card = %q / %q, want 1 of 1 running / postfix-reload", card.Value, card.Sub)
+	}
+}
+
+// An idle one-shot helper is "on demand", not "stopped"; a daemon keeps its
+// state word, and a one-shot in trouble keeps its own.
+func TestProcessRowOfAnIdleOneShotSaysOnDemand(t *testing.T) {
+	idle := processRow(health.Process{Name: "postfix-reload", State: "STOPPED", Detail: "Not started", Status: health.StatusOK, OneShot: true})
+	if idle.State.Label != "on demand" || idle.State.Status != "off" || !strings.Contains(idle.Detail, "not run since the container started") {
+		t.Errorf("idle one-shot = %+v", idle)
+	}
+	ran := processRow(health.Process{Name: "postfix-reload", State: "EXITED", Detail: "Oct 10 08:42 PM", Status: health.StatusOK, OneShot: true})
+	if ran.State.Label != "on demand" || !strings.HasSuffix(ran.Detail, "last run: Oct 10 08:42 PM") {
+		t.Errorf("one-shot that ran = %+v", ran)
+	}
+	bad := processRow(health.Process{Name: "postfix-reload", State: "FATAL", Detail: "Exited too quickly", Status: health.StatusError, OneShot: true})
+	if bad.State.Label != "fatal" || bad.State.Status != "error" || bad.Detail != "Exited too quickly" {
+		t.Errorf("one-shot in trouble = %+v", bad)
+	}
+	daemon := processRow(health.Process{Name: "postfix", State: "STOPPED", Detail: "Oct 10 08:42 PM", Status: health.StatusError})
+	if daemon.State.Label != "stopped" || daemon.State.Status != "error" {
+		t.Errorf("stopped daemon = %+v", daemon)
 	}
 }

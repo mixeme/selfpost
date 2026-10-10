@@ -150,9 +150,7 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 	page.Processes.End = view.Verdict(string(c["ProcessStatus"].(health.Status)))
 	page.ProcessError = c["ProcessError"].(bool)
 	for _, p := range c["Processes"].([]health.Process) {
-		page.ProcessRows = append(page.ProcessRows, view.ProcessRow{
-			Name: p.Name, State: view.Tag{Status: string(p.Status), Label: strings.ToLower(p.State)}, Detail: p.Detail,
-		})
+		page.ProcessRows = append(page.ProcessRows, processRow(p))
 	}
 
 	cert := c["Cert"].(health.Certificate)
@@ -192,6 +190,24 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 		page.HostFacts = append(page.HostFacts, view.Fact{Label: "Lookup", Value: lookup, Mono: true})
 	}
 	return page
+}
+
+// processRow is one line of the Processes table. A one-shot helper that sits
+// idle is not "stopped" the way a daemon is: it runs when asked and exits, so
+// its row says "on demand" in a neutral tag and when it last ran, instead of a
+// word that reads as a fault beside the running programs.
+func processRow(p health.Process) view.ProcessRow {
+	if p.OneShot && p.Status == health.StatusOK && p.State != "RUNNING" {
+		detail := "Runs when the configuration is reloaded"
+		switch {
+		case p.Detail == "" || strings.EqualFold(p.Detail, "Not started"):
+			detail += "; not run since the container started"
+		default:
+			detail += "; last run: " + p.Detail
+		}
+		return view.ProcessRow{Name: p.Name, State: view.Tag{Status: "off", Label: "on demand"}, Detail: detail}
+	}
+	return view.ProcessRow{Name: p.Name, State: view.Tag{Status: string(p.Status), Label: strings.ToLower(p.State)}, Detail: p.Detail}
 }
 
 // machineRows is the Machine table: processor and memory as bars with their
