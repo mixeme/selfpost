@@ -209,6 +209,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   application forms (the script applied only the first matching rule).
 - The DMARC page of a domain no longer answers 500 once the domain has a
   reported source.
+- **The panel can read the mail queue.** The container's entrypoint left the
+  queue's `public/` and `maildrop/` directories in group `postfix` on every
+  start; Postfix keeps them in `postdrop`, the group `postqueue` works
+  through, so the panel's `postqueue -p` was refused ("Connect to the Postfix
+  showq service: Permission denied"), the Queue card said "Could not be read"
+  and the queue page had no listing. Present since the persistent queue of
+  1.3.0; mail flow was not affected. The e2e suite opens the queue page now.
 - The confirmation before deleting a user names the domains that follow
   that user's default report address and will be left without one; it used
   to say the domains were not affected (replaced before release — see the
