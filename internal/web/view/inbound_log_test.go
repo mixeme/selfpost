@@ -22,7 +22,7 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">`,
 		`<input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">`,
 		`href="/help#inbound-log" title="What the decisions mean"`,
-		`<th>Time, UTC</th><th>From · client</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th>`,
+		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th>`,
 		`09-21 14:00:18`,
 		`t.berg@<wbr>uni.example<br><span class="sp-mono sp-muted sp-small">192.0.2.77</span>`,
 		`dev@<wbr>lists.example.org`, `title="Re: [dev] patch series v3"`,

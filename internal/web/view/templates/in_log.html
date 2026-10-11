@@ -9,7 +9,7 @@
 {{template "box_open" .Messages}}
 {{if .Rows}}
 <div class="table-container"><table class="table is-fullwidth is-hoverable">
-  <thead><tr><th>Time, UTC</th><th>From · client</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th><th></th></tr></thead>
+  <thead><tr><th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th><th></th></tr></thead>
   <tbody>{{range .Rows}}
     <tr><td class="sp-mono sp-muted sp-nowrap sp-small">{{.Time}}</td><td>{{wbr_at .From}}{{if .Client}}<br><span class="sp-mono sp-muted sp-small">{{.Client}}</span>{{end}}</td><td>{{wbr_at .To}}</td>{{if .Subject}}<td class="sp-clip" title="{{.Subject}}">{{.Subject}}</td>{{else}}<td class="sp-clip sp-muted">—</td>{{end}}<td>{{template "tag" .Decision}}</td><td class="sp-muted sp-small">{{.Why}}</td><td class="sp-actions">{{if .Action}}<a href="{{.Action.Href}}">{{.Action.Label}}</a>{{end}}</td></tr>{{end}}
   </tbody>
