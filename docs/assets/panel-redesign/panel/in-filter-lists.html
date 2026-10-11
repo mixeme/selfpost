@@ -74,7 +74,7 @@
     </div>
 
     <div class="box">
-      <div class="sp-box-head"><span class="sp-no">01</span><h2>Add an entry</h2><a class="sp-help" href="help.html#inbound" title="How the lists are applied"><i class="ti ti-help-circle"></i></a></div>
+      <div class="sp-box-head"><span class="sp-no">01</span><h2>Add an entry</h2><a class="sp-help" href="help.html#filter-lists" title="How the lists are applied"><i class="ti ti-help-circle"></i></a></div>
       <div class="sp-box-body">
         <form class="sp-form" method="post" action="#">
           <div class="columns">
@@ -84,7 +84,7 @@
             </div>
             <div class="column is-3">
               <div class="field"><label class="label" for="etype">Entry is</label>
-                <div class="control"><div class="select is-fullwidth"><select id="etype" name="entry_type"><option>a sender address</option><option>a sender domain</option><option>a client IP or CIDR</option></select></div></div></div>
+                <div class="control"><div class="select is-fullwidth"><select id="etype" name="entry_type"><option>a sender address</option><option>a sender domain</option><option>a client address or network</option></select></div></div></div>
             </div>
             <div class="column is-6">
               <div class="field"><label class="label" for="value">Value</label>
@@ -105,9 +105,9 @@
           <div class="table-container"><table class="table is-fullwidth is-hoverable">
             <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
             <tbody>
-              <tr><td class="sp-mono sp-small">@bulk.example <span class="tag is-light">domain</span></td><td class="sp-muted">newsletter nobody subscribed to</td><td class="sp-muted sp-nowrap sp-small">2026-09-02</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
-              <tr><td class="sp-mono sp-small">198.51.100.0/24 <span class="tag is-light">ip</span></td><td class="sp-muted">dictionary attack on lists.example.org</td><td class="sp-muted sp-nowrap sp-small">2026-08-19</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
-              <tr><td class="sp-mono sp-small">win@lottery.example <span class="tag is-light">address</span></td><td class="sp-muted">—</td><td class="sp-muted sp-nowrap sp-small">2026-07-30</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+              <tr><td class="sp-mono sp-small">bulk.example <span class="tag is-light">domain</span></td><td class="sp-muted">newsletter nobody subscribed to</td><td class="sp-muted sp-nowrap sp-small">2026-09-02</td><td class="sp-actions"><form method="post" action="#"><button type="submit" class="has-text-danger">Remove</button></form></td></tr>
+              <tr><td class="sp-mono sp-small">198.51.100.0/24 <span class="tag is-light">ip</span></td><td class="sp-muted">dictionary attack on lists.example.org</td><td class="sp-muted sp-nowrap sp-small">2026-08-19</td><td class="sp-actions"><form method="post" action="#"><button type="submit" class="has-text-danger">Remove</button></form></td></tr>
+              <tr><td class="sp-mono sp-small">win@lottery.example <span class="tag is-light">address</span></td><td class="sp-muted">—</td><td class="sp-muted sp-nowrap sp-small">2026-07-30</td><td class="sp-actions"><form method="post" action="#"><button type="submit" class="has-text-danger">Remove</button></form></td></tr>
             </tbody>
           </table></div>
         </div>
@@ -118,8 +118,8 @@
           <div class="table-container"><table class="table is-fullwidth is-hoverable">
             <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
             <tbody>
-              <tr><td class="sp-mono sp-small">@partner.example <span class="tag is-light">domain</span></td><td class="sp-muted">invoices were scored as spam</td><td class="sp-muted sp-nowrap sp-small">2026-09-11</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
-              <tr><td class="sp-mono sp-small">noreply@github.example <span class="tag is-light">address</span></td><td class="sp-muted">security advisories</td><td class="sp-muted sp-nowrap sp-small">2026-06-04</td><td class="sp-actions"><a class="has-text-danger" href="#">Remove</a></td></tr>
+              <tr><td class="sp-mono sp-small">partner.example <span class="tag is-light">domain</span></td><td class="sp-muted">invoices were scored as spam</td><td class="sp-muted sp-nowrap sp-small">2026-09-11</td><td class="sp-actions"><form method="post" action="#"><button type="submit" class="has-text-danger">Remove</button></form></td></tr>
+              <tr><td class="sp-mono sp-small">noreply@github.example <span class="tag is-light">address</span></td><td class="sp-muted">security advisories</td><td class="sp-muted sp-nowrap sp-small">2026-06-04</td><td class="sp-actions"><form method="post" action="#"><button type="submit" class="has-text-danger">Remove</button></form></td></tr>
             </tbody>
           </table></div>
         </div>
@@ -130,10 +130,10 @@
       <div class="sp-box-head"><span class="sp-no">04</span><h2>Where the lists go</h2><div class="sp-end"><span class="tag is-success is-light">applied</span></div></div>
       <div class="sp-box-body">
         <dl class="sp-facts">
-          <div><dt>Applied by</dt><dd>rspamd, from map files</dd></div>
-          <div><dt>Files</dt><dd class="sp-mono sp-small">/data/antispam/allow.map<br>/data/antispam/deny.map</dd></div>
+          <div><dt>Applied by</dt><dd>rspamd, from map files it rereads within seconds of a change</dd></div>
+          <div><dt>Files</dt><dd><span class="sp-mono sp-small">/data/antispam/</span> — six, one for each list and kind of entry</dd></div>
           <div><dt>Last written</dt><dd>2026-09-11 08:40 UTC</dd></div>
-          <div><dt>When the filter is off</dt><dd class="sp-muted">The lists are kept and editable, but nothing reads them until <code>INBOUND_ANTISPAM_MILTER</code> is set.</dd></div>
+          <div><dt>When both lists match</dt><dd>Deny wins, whichever entries they are.</dd></div>
         </dl>
       </div>
     </div>
