@@ -28,6 +28,7 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -79,7 +80,24 @@ type Params struct {
 	Version    string
 	DeployRoot string
 	OnWarn     func(string)
+	// Unprivileged says the archive is made by the panel, which runs as its
+	// own user and not as root. Two things under the roots are then not its to
+	// read, and are left out instead of failing the whole archive:
+	//
+	//   - the Postfix queue (QueueDir). Postfix keeps every queue file and
+	//     directory readable by its own user alone, and that cannot be
+	//     configured. What is lost is mail not yet delivered at that moment;
+	//     a start without a queue directory builds an empty one.
+	//   - a file under certs/ the panel may not open, which is usually the
+	//     private key (root and Postfix's group only). OnWarn names it.
+	//
+	// The selfpost-backup command, run as root, leaves this unset and takes
+	// both.
+	Unprivileged bool
 }
+
+// QueueDir is the Postfix queue, relative to the data directory.
+const QueueDir = "postfix/queue"
 
 // excludedFromArchive lists the data-directory entries a backup never carries.
 // The live database files are replaced by a consistent VACUUM INTO snapshot
@@ -145,11 +163,11 @@ func Create(w io.Writer, p Params) error {
 		return err
 	}
 
-	if err := addTree(tw, p.DataDir, DataArchivePrefix, excludedFromArchive); err != nil {
+	if err := addTree(tw, p.DataDir, DataArchivePrefix, excludedFromArchive, p.skipData()); err != nil {
 		return err
 	}
 
-	if err := addDeployFiles(tw, p.DeployRoot, p.OnWarn); err != nil {
+	if err := addDeployFiles(tw, p.DeployRoot, p.OnWarn, p.skipCert()); err != nil {
 		return err
 	}
 
@@ -181,7 +199,66 @@ func validateDeployRoot(deployRoot string) error {
 	return nil
 }
 
-func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) error {
+// skipFunc says whether the entry at path (rel to the root being walked) is
+// left out of the archive. A directory left out is not descended into.
+type skipFunc func(path, rel string, d fs.DirEntry) bool
+
+// skipData leaves the Postfix queue out of an unprivileged archive.
+func (p Params) skipData() skipFunc {
+	if !p.Unprivileged {
+		return nil
+	}
+	return func(_, rel string, _ fs.DirEntry) bool {
+		return filepath.ToSlash(rel) == QueueDir
+	}
+}
+
+// skipCert leaves a file under certs/ that cannot be opened out of an
+// unprivileged archive, and says so through OnWarn.
+func (p Params) skipCert() skipFunc {
+	if !p.Unprivileged {
+		return nil
+	}
+	return func(path, rel string, d fs.DirEntry) bool {
+		if d.IsDir() {
+			return false
+		}
+		f, err := os.Open(path)
+		if err == nil {
+			f.Close()
+			return false
+		}
+		if !errors.Is(err, fs.ErrPermission) {
+			return false
+		}
+		if p.OnWarn != nil {
+			p.OnWarn(CertsDirName + "/" + filepath.ToSlash(rel) + " is not readable by the panel and is left out of the backup")
+		}
+		return true
+	}
+}
+
+// Check reads through everything Create would put into the archive, without
+// writing one, and returns the first thing that cannot be read. The panel
+// streams its archive to the browser, so once Create has begun a failure can
+// only cut the download short; this is run first, while a refusal can still be
+// shown as a page.
+func Check(p Params) error {
+	if p.DataDir == "" || p.DBPath == "" {
+		return fmt.Errorf("backup: DataDir and DBPath are required")
+	}
+	if err := ValidateDeployRoot(p.DeployRoot); err != nil {
+		return err
+	}
+	quiet := p
+	quiet.OnWarn = nil
+	if err := addTree(nil, p.DataDir, DataArchivePrefix, excludedFromArchive, quiet.skipData()); err != nil {
+		return err
+	}
+	return addDeployFiles(nil, p.DeployRoot, nil, quiet.skipCert())
+}
+
+func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string), skip skipFunc) error {
 	for _, name := range []string{ComposeFileName, EnvFileName} {
 		src := filepath.Join(deployRoot, name)
 		info, err := os.Stat(src)
@@ -206,14 +283,16 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 		}
 		return fmt.Errorf("backup: stat %s: %w", CertsDirName, err)
 	}
-	return addTree(tw, certsDir, CertsDirName+"/", nil)
+	return addTree(tw, certsDir, CertsDirName+"/", nil, skip)
 }
 
 // addTree walks root and adds every regular file (and directory, to preserve
 // empty ones and modes) to tw under archivePrefix + path relative to root.
-// When exclude is non-nil, top-level names relative to root are skipped.
+// When exclude is non-nil, top-level names relative to root are skipped; skip,
+// when non-nil, leaves out whatever it says. With a nil tw nothing is written:
+// every file is opened and closed, which is how Check finds what cannot be read.
 // Non-regular, non-directory entries (symlinks, sockets) are skipped.
-func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool) error {
+func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool, skip skipFunc) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -236,12 +315,22 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 			}
 		}
 
+		if skip != nil && skip(path, rel, d) {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
 		switch {
 		case d.IsDir():
+			if tw == nil {
+				return nil
+			}
 			hdr := &tar.Header{
 				Typeflag: tar.TypeDir,
 				Name:     name + "/",
@@ -282,6 +371,9 @@ func writeTarFile(tw *tar.Writer, name string, mode fs.FileMode, srcPath string)
 		return fmt.Errorf("backup: open %s: %w", srcPath, err)
 	}
 	defer f.Close()
+	if tw == nil {
+		return nil
+	}
 
 	info, err := f.Stat()
 	if err != nil {

@@ -13,7 +13,7 @@
   <div class="column is-6">
 {{template "box_open" .Full}}
 {{template "body_open"}}
-<p class="mb-3"><code>data/</code> (database, DKIM keys, credentials, the queue), <code>docker-compose.yml</code>, <code>.env</code> and <code>certs/</code> in one archive. Restore into an empty project directory and start the <strong>same SelfPost version</strong>. The reverse-proxy vhost is not included.</p>
+<p class="mb-3"><code>data/</code> (database, DKIM keys, credentials), <code>docker-compose.yml</code>, <code>.env</code> and <code>certs/</code> in one archive, without the Postfix queue and without a certificate file the panel may not read. Restore into an empty project directory and start the <strong>same SelfPost version</strong>. The reverse-proxy vhost is not included.</p>
 <form class="sp-form" method="post" action="{{.FullAction}}">
   <div class="field"><label class="checkbox"><input type="checkbox" name="encrypt" value="1"{{if .Encrypt}} checked{{end}} data-encrypt-toggle> Encrypt with a password (<code>.spbk</code>)</label></div>
   <div data-encrypt-fields>

@@ -556,12 +556,23 @@ instance keeps running, what goes into the archive, and what happens on restore.
 
 **1. Panel — while the container is running (no downtime).** *Server › Backup*
 → *Full backup*. *Encrypt with a password* is ticked; untick it for a plain
-archive. Same archive as the CLI below.
+archive. The archive of the CLI below, less two things the panel may not read:
+it runs as its own user, not as root. **The Postfix queue** is left out —
+Postfix keeps it readable by its own user alone — so mail that was waiting for
+delivery at that moment is not in the archive; the restored instance starts
+with an empty queue. **A file in `certs/` the panel cannot open** is left out
+too, which is usually the private key (the panel's log names it); put the key
+back into `certs/` before starting a restored instance. If anything else
+cannot be read, the panel says so and downloads nothing.
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
 snapshot via `VACUUM INTO`, then a gzip tar of `data/` (minus diagnostics) plus
-deploy files.
+deploy files. `docker exec` runs the command as root, so this archive is the
+complete one: it has the Postfix queue and everything in `certs/`. The queue is
+copied while Postfix works on it, so a message on its way through may be in the
+archive twice or not at all; stop the service first (method 3) if the queue
+matters.
 
 ```sh
 docker exec <container> selfpost-backup > selfpost-backup.tar.gz
@@ -616,6 +627,8 @@ methods avoid it by stopping first.
 | Self-contained archive | Yes | Yes | No — deploy files separate |
 | SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
 | `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
+| Postfix queue | CLI: yes, copied live. Panel: no | Yes | Yes |
+| `certs/` private key | CLI: yes. Panel: only if the panel may read it | Yes | No — deploy files separate |
 | `data/manifest.json` | Written (version stamp) | Absent | Absent |
 | Restore version check | Yes — must match image tag | No | No |
 | Post-restore *Resync* | Yes, on first boot | No | No |

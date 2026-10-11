@@ -235,3 +235,47 @@ func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 		t.Error("CheckRestore wrong format reported a restore")
 	}
 }
+
+// The panel's archive: no Postfix queue, everything else as before, and Check
+// agrees that it can be made.
+func TestCreateUnprivilegedLeavesTheQueueOut(t *testing.T) {
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot, Unprivileged: true}
+
+	if err := Check(p); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := Create(&buf, p); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	files := readArchive(t, buf.Bytes())
+	for name := range files {
+		if strings.HasPrefix(name, DataArchivePrefix+QueueDir) {
+			t.Errorf("the panel's archive holds %s", name)
+		}
+	}
+	for _, name := range []string{
+		DataArchivePrefix + "selfpost.db",
+		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
+		DataArchivePrefix + "sasl/sasldb2",
+		DataArchivePrefix + "postfix/sender_login_maps",
+		ComposeFileName, EnvFileName,
+		CertsDirName + "/fullchain.pem",
+	} {
+		if _, ok := files[name]; !ok {
+			t.Errorf("archive missing %s", name)
+		}
+	}
+}
+
+// Check finds what Create would stumble over, before anything is written.
+func TestCheckReportsWhatCannotBeRead(t *testing.T) {
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	if err := os.Remove(filepath.Join(deployRoot, EnvFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := Check(Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot}); err == nil {
+		t.Fatal("Check passed with .env missing from the deploy root")
+	}
+}

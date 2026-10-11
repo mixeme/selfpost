@@ -70,9 +70,31 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
 		return
 	}
+	// The panel is not root: its archive leaves out the Postfix queue and a
+	// certificate file it may not open (backup.Params.Unprivileged).
+	params := backup.Params{
+		DataDir:      h.cfg.DataDir,
+		DBPath:       h.cfg.DBPath,
+		Version:      h.cfg.Version,
+		DeployRoot:   h.cfg.DeployRoot,
+		Unprivileged: true,
+		OnWarn: func(msg string) {
+			logf("panel: full backup: %s", msg)
+		},
+	}
 	if err := backup.ValidateDeployRoot(h.cfg.DeployRoot); err != nil {
 		logf("panel: full backup: %v", err)
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", deployBackupErr(err))
+		return
+	}
+	// Everything is read through once before the first byte goes out. Past the
+	// headers a failure can only cut the download short - which is what the
+	// button did from 1.3.0 to 2.0.0, with a 200 and ten bytes, because the
+	// queue was not the panel's to read.
+	if err := backup.Check(params); err != nil {
+		logf("panel: full backup: %v", err)
+		h.renderBackupPageWith(w, r, http.StatusInternalServerError, "",
+			"Could not read everything a backup holds. Nothing was downloaded; the reason is in the panel's log.")
 		return
 	}
 
@@ -109,15 +131,7 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 		sink = env
 	}
 
-	if err := backup.Create(sink, backup.Params{
-		DataDir:    h.cfg.DataDir,
-		DBPath:     h.cfg.DBPath,
-		Version:    h.cfg.Version,
-		DeployRoot: h.cfg.DeployRoot,
-		OnWarn: func(msg string) {
-			logf("panel: full backup: %s", msg)
-		},
-	}); err != nil {
+	if err := backup.Create(sink, params); err != nil {
 		logf("panel: full backup failed: %v", err)
 		return
 	}
