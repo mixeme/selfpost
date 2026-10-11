@@ -131,14 +131,18 @@ func (s *Store) InsertDMARCReport(rep DMARCReport) (int64, error) {
 	return id, nil
 }
 
-// PruneDMARCReports enforces count and age caps.
-func (s *Store) PruneDMARCReports() error {
+// PruneDMARCReports enforces the age cap for every domain and the count cap
+// for domain. The count is kept per domain on purpose: reports are accepted
+// from anyone who knows a domain's report address, and with one cap for the
+// whole instance a stranger filing reports under one domain would push every
+// other domain's reports out.
+func (s *Store) PruneDMARCReports(domain string) error {
 	cutoff := time.Now().UTC().AddDate(0, 0, -DMARCReportsMaxAgeDays).Format(time.RFC3339)
 	if _, err := s.db.Exec(`DELETE FROM dmarc_reports WHERE received_at < ?`, cutoff); err != nil {
 		return fmt.Errorf("prune dmarc by age: %w", err)
 	}
 	var count int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM dmarc_reports`).Scan(&count); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM dmarc_reports WHERE domain = ?`, domain).Scan(&count); err != nil {
 		return fmt.Errorf("count dmarc reports: %w", err)
 	}
 	if count <= DMARCReportsMaxKeep {
@@ -147,8 +151,8 @@ func (s *Store) PruneDMARCReports() error {
 	excess := count - DMARCReportsMaxKeep
 	_, err := s.db.Exec(`
 		DELETE FROM dmarc_reports WHERE id IN (
-			SELECT id FROM dmarc_reports ORDER BY received_at ASC LIMIT ?
-		)`, excess)
+			SELECT id FROM dmarc_reports WHERE domain = ? ORDER BY received_at ASC LIMIT ?
+		)`, domain, excess)
 	if err != nil {
 		return fmt.Errorf("prune dmarc by count: %w", err)
 	}

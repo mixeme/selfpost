@@ -113,7 +113,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 			last,
 			{Label: "This week", Value: Plain(FormatCount(int64(in.KeptThisWeek)) + " kept · " + plural(int64(in.ParseFailures), "parse failure", "parse failures"))},
 			{Label: "Hosted addresses", Value: Plain(in.Hosted), Mono: true, Small: true},
-			{Label: "Retention", Value: Plain(FormatCount(int64(in.RetentionMax)) + " reports or " + plural(int64(in.RetentionDays), "day", "days"))},
+			{Label: "Retention", Value: Plain(FormatCount(int64(in.RetentionMax)) + " reports a domain or " + plural(int64(in.RetentionDays), "day", "days"))},
 		},
 		Recent: Box{No: "02", Title: "Recent reports"},
 		Empty:  EmptyState{Icon: "ti-report-analytics", Text: Plain("No reports yet.")},

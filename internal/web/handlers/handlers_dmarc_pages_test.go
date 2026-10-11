@@ -49,7 +49,7 @@ func TestDMARCHubShowsIngestAndRecentReports(t *testing.T) {
 	body := getBody(t, s.h.HandleDMARCList, "/outbound/dmarc")
 	has(t, "hub", body,
 		`<h1 class="title is-3">DMARC reports</h1>`, `<h2>Ingest</h2>`, `<span class="tag is-success is-light">ok</span>`,
-		`1 kept · 0 parse failures`, `Hosted addresses`, `dmarc-reports&#43;&lt;domain&gt;@mail.example.org`, `500 reports or 90 days`,
+		`1 kept · 0 parse failures`, `Hosted addresses`, `dmarc-reports&#43;&lt;domain&gt;@mail.example.org`, `500 reports a domain or 90 days`,
 		`<h2>Recent reports</h2>`, `<a href="/outbound/dmarc/domains/1">example.org</a>`, `Outlook.com`,
 		"<td>1\u00a0903</td>", `<span class="tag is-warning is-light">7</span>`, `href="/outbound/dmarc/reports/`+idStr(s.reportID)+`">View</a>`)
 	lacks(t, "hub", body, `None yet`)

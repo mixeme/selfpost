@@ -58,7 +58,7 @@ func TestPruneDMARCReports(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := st.PruneDMARCReports(); err != nil {
+	if err := st.PruneDMARCReports("example.com"); err != nil {
 		t.Fatal(err)
 	}
 	list, _ := st.ListDMARCReports(DMARCReportScope{AllDomains: true}, 100)

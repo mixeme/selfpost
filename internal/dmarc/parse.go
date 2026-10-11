@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // ParsedReport is the structured form of a DMARC aggregate XML payload.
@@ -74,6 +75,31 @@ type feedbackXML struct {
 	} `xml:"record"`
 }
 
+// What a report may hold. The XML comes from anyone who knows a report address,
+// and eight megabytes of it (maxAggregateXML) fit some 160 000 empty records or
+// one name of eight megabytes - every one of them a row or a table cell later.
+// A real report has tens of records, a few thousand from the largest
+// receivers, and no field longer than a line.
+const (
+	maxReportRecords = 5000
+	maxFieldLen      = 255
+	maxRecordCount   = 1_000_000_000
+)
+
+// field trims a text value of the report and cuts it to maxFieldLen bytes, on
+// a character boundary.
+func field(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= maxFieldLen {
+		return s
+	}
+	s = s[:maxFieldLen]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 // ParseAggregate decodes gzip- or zip-compressed, or raw, DMARC aggregate XML.
 func ParseAggregate(raw []byte) (ParsedReport, error) {
 	data, err := decompress(raw)
@@ -87,33 +113,42 @@ func ParseAggregate(raw []byte) (ParsedReport, error) {
 	if doc.Metadata.ReportID == "" || doc.Policy.Domain == "" {
 		return ParsedReport{}, fmt.Errorf("dmarc xml: missing report_id or domain")
 	}
+	if len(doc.Records) > maxReportRecords {
+		return ParsedReport{}, fmt.Errorf("dmarc xml: %d records, more than the %d a report may hold", len(doc.Records), maxReportRecords)
+	}
+	// Cut, not refused: a domain name is at most 253 bytes, so a longer one
+	// names nothing this relay sends for and is turned away as such.
 	out := ParsedReport{
-		Reporter:     strings.TrimSpace(doc.Metadata.OrgName),
-		ReportID:     strings.TrimSpace(doc.Metadata.ReportID),
-		ContactEmail: strings.TrimSpace(doc.Metadata.Email),
+		Reporter:     field(doc.Metadata.OrgName),
+		ReportID:     field(doc.Metadata.ReportID),
+		ContactEmail: field(doc.Metadata.Email),
 		PeriodBegin:  time.Unix(doc.Metadata.DateRange.Begin, 0).UTC(),
 		PeriodEnd:    time.Unix(doc.Metadata.DateRange.End, 0).UTC(),
-		Domain:       strings.ToLower(strings.TrimSpace(doc.Policy.Domain)),
-		PolicyP:      strings.TrimSpace(doc.Policy.P),
-		PolicySP:     strings.TrimSpace(doc.Policy.SP),
+		Domain:       strings.ToLower(field(doc.Policy.Domain)),
+		PolicyP:      field(doc.Policy.P),
+		PolicySP:     field(doc.Policy.SP),
 		PolicyPct:    doc.Policy.Pct,
-		PolicyADKIM:  strings.TrimSpace(doc.Policy.ADKIM),
-		PolicyASPF:   strings.TrimSpace(doc.Policy.ASPF),
+		PolicyADKIM:  field(doc.Policy.ADKIM),
+		PolicyASPF:   field(doc.Policy.ASPF),
 	}
 	if out.PolicyPct == 0 {
 		out.PolicyPct = 100
 	}
 	for _, rec := range doc.Records {
 		row := ParsedRecord{
-			SourceIP:    strings.TrimSpace(rec.Row.SourceIP),
+			SourceIP:    field(rec.Row.SourceIP),
 			Count:       rec.Row.Count,
-			Disposition: strings.TrimSpace(rec.Row.Policy.Disposition),
-			SPFResult:   strings.TrimSpace(rec.Row.Policy.SPF),
-			DKIMResult:  strings.TrimSpace(rec.Row.Policy.DKIM),
-			HeaderFrom:  strings.TrimSpace(rec.Identifiers.HeaderFrom),
+			Disposition: field(rec.Row.Policy.Disposition),
+			SPFResult:   field(rec.Row.Policy.SPF),
+			DKIMResult:  field(rec.Row.Policy.DKIM),
+			HeaderFrom:  field(rec.Identifiers.HeaderFrom),
 		}
 		if row.Count <= 0 {
 			row.Count = 1
+		}
+		// Bounded so that the sums of a report cannot wrap around.
+		if row.Count > maxRecordCount {
+			row.Count = maxRecordCount
 		}
 		if dmarcRecordPasses(row) {
 			out.PassCount += row.Count
@@ -172,12 +207,12 @@ func unzip(raw []byte) ([]byte, error) {
 		}
 		rc, err := f.Open()
 		if err != nil {
-			return nil, fmt.Errorf("dmarc zip open %s: %w", f.Name, err)
+			return nil, fmt.Errorf("dmarc zip open %q: %w", field(f.Name), err)
 		}
 		data, err := io.ReadAll(io.LimitReader(rc, maxAggregateXML))
 		rc.Close()
 		if err != nil {
-			return nil, fmt.Errorf("dmarc zip read %s: %w", f.Name, err)
+			return nil, fmt.Errorf("dmarc zip read %q: %w", field(f.Name), err)
 		}
 		return data, nil
 	}

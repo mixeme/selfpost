@@ -47,7 +47,8 @@ development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11); th
 **inbound-antispam-panel** (`2.1.0`), built in the new component kit —
 styling its two screens once instead of twice. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
-(security review of the ingest path pending); domain-stats-auto-ratelimit in
+(its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
+[security.md](security.md)); domain-stats-auto-ratelimit in
 `[1.6.0]`; send-log-retention in `[1.5.0]`; inbound-relay in `[1.4.0]`;
 queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
 `[1.3.0]`. Candidates need explicit agreement before they join the queue.

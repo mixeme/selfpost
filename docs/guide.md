@@ -891,7 +891,7 @@ sees the *Ingest* box — whether ingest works, the last report received, report
 kept this week and parse failures. Open a domain's roll-up from the list or
 from *DMARC reports* in the domain page's menu. A user with the *domain* role
 sees the reports of the domains assigned to them, without the *Ingest* box.
-Summaries are pruned (500 kept, 90 days max).
+Summaries are pruned (500 kept for each domain, 90 days max).
 
 A message that is not a report the relay keeps — unreadable as an aggregate
 report, about a domain not sent from here, or delivered to another domain's

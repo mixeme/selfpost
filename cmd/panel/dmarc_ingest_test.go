@@ -18,3 +18,17 @@ func TestIngestRecipient(t *testing.T) {
 		}
 	}
 }
+
+func TestLogSafe(t *testing.T) {
+	got := logSafe("zip entry \"a\nstatus=bounced\tx\" \x1b[31m é")
+	if want := "zip entry \"a?status=bounced?x\" ?[31m ?"; got != want {
+		t.Errorf("logSafe = %q, want %q", got, want)
+	}
+	long := make([]byte, 1000)
+	for i := range long {
+		long[i] = 'a'
+	}
+	if got := logSafe(string(long)); len(got) != 200 {
+		t.Errorf("logSafe kept %d bytes of 1000, want 200", len(got))
+	}
+}

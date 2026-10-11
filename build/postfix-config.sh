@@ -291,11 +291,23 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		# attribute" on every report. They go into the service line itself.
 		# ${recipient} is expanded by pipe(8), not by the shell: the command
 		# learns which report address the message came to from its argument.
-		postconf -M 'dmarc-ingest/unix=dmarc-ingest unix - n n - - pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}'
+		# One at a time (the 1 before "pipe"): reports are in no hurry, every run
+		# writes to the database the panel writes to, and a hundred of them in
+		# parallel - Postfix's default - is what a flood of reports would start.
+		postconf -M 'dmarc-ingest/unix=dmarc-ingest unix - n n - 1 pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}'
 		# One recipient per run, so ${recipient} is one argument.
 		postconf -e "dmarc-ingest_destination_recipient_limit=1"
 		# pipe(8) starts the command with export_environment only, so what the
 		# command reads from the container's environment is named there.
+		# export_environment is a list split at whitespace in which Postfix
+		# expands "$": a path with either would reach the command as another
+		# path, and it would quietly open a database of its own.
+		case "${SELFPOST_DATA_DIR:-}${SELFPOST_DB_PATH:-}" in
+			*[[:space:]]* | *'$'*)
+				echo "postfix-config: SELFPOST_DATA_DIR and SELFPOST_DB_PATH must not contain whitespace or \$ when DMARC_REPORTS_ENABLE=true" >&2
+				exit 1
+				;;
+		esac
 		DMARC_INGEST_ENV="DMARC_REPORTS_ENABLE=true"
 		[ -z "${SELFPOST_DATA_DIR:-}" ] || DMARC_INGEST_ENV="${DMARC_INGEST_ENV} SELFPOST_DATA_DIR=${SELFPOST_DATA_DIR}"
 		[ -z "${SELFPOST_DB_PATH:-}" ] || DMARC_INGEST_ENV="${DMARC_INGEST_ENV} SELFPOST_DB_PATH=${SELFPOST_DB_PATH}"

@@ -50,8 +50,24 @@ func runDMARCIngestMode() error {
 // all of which that line already has. postlog is no use here: pipe(8) starts
 // the command without the group that may write to Postfix's log socket.
 func logRejected(reason error) {
-	text := strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")
-	fmt.Fprintln(os.Stderr, "dropped: "+text)
+	fmt.Fprintln(os.Stderr, "dropped: "+logSafe(strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")))
+}
+
+// logSafe makes a reason fit for a log line. Parts of it are the sender's own
+// bytes - a header line, a file name inside an archive, a piece of XML - so it
+// is cut short and anything that is not printable ASCII becomes "?", whatever
+// Postfix would have done with it.
+func logSafe(s string) string {
+	const max = 200
+	if len(s) > max {
+		s = s[:max]
+	}
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r > 0x7e {
+			return '?'
+		}
+		return r
+	}, s)
 }
 
 // ingestRecipient is the report address the message was delivered to. Postfix's

@@ -34,7 +34,7 @@ type port25Case struct {
 // flags=, user= and argv= are arguments of pipe(8); set as -o parameters they
 // are dropped, and a bare "pipe" dies on every report with "fatal: missing
 // user= command-line attribute" - the state of 1.7.0 through 1.9.5.
-const ingestService = "dmarc-ingest unix - n n - - pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}"
+const ingestService = "dmarc-ingest unix - n n - 1 pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}"
 
 var port25Cases = []port25Case{
 	{

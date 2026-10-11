@@ -26,7 +26,14 @@ the user form did not end that user's sessions, internal errors reached forms a
 (see [Authentication and sessions](#authentication-and-sessions) and [Errors
 shown to users](#errors-shown-to-users)); two deliberate behaviours are
 recorded under Accepted risks (upstream of a delegated inbound domain, profile
-saved without the password).
+saved without the password). The 2026-10-11 review (Fable) covered the DMARC
+report path from port 25 to the report pages, which ran for the first time in
+2.0.0 - the 2026-08-19 pass read code that Postfix could not yet start: no
+Critical or High finding; a report's size was bounded only as bytes (now 5 000
+records, 255 bytes a field), the retention cap was one for the whole server
+(now per domain), the delivery command could run a hundred at once (now one),
+and the reason logged for a dropped message carried the sender's bytes as they
+came (now cut and reduced to printable ASCII).
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -274,8 +281,15 @@ deferred item from the roadmap.
   reporters are arbitrary third parties and the mailbox address is published in
   DNS. The ingest already constrains the meaningful part — a report cannot be
   filed under a domain this instance does not host, and the claimed domain is
-  cross-checked against the `+tag` of the delivery address — and the data is
-  advisory statistics only; nothing enforces off it. The trigger to revisit is
+  cross-checked against the `+tag` of the delivery address (effective since
+  2.0.0: before it the recipient never reached the command) — and the data is
+  advisory statistics only; nothing enforces off it. What a stranger can do is
+  limited to a domain that chose a SelfPost-hosted address, through that
+  address: file reports under it, replace one whose reporter and id they know,
+  and fill that domain's 500 — not another domain's. A message that is not a
+  report the relay keeps is dropped, not bounced (the envelope sender is the
+  author's to write); a genuine report the parser cannot read is lost the same
+  way, with a count and a line in the mail log. The trigger to revisit is
   any feature that lets report contents drive an automatic action (policy
   changes, rate limiting, alerting an operator into a config change).
 - **The application auth-IP allow-list is enforced fail-open.** The check runs

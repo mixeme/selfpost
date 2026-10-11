@@ -84,7 +84,7 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 	if _, err := st.InsertDMARCReport(rep); err != nil {
 		return err
 	}
-	return st.PruneDMARCReports()
+	return st.PruneDMARCReports(rep.Domain)
 }
 
 // checkReportDomain refuses a report whose policy domain is not one of this
