@@ -61,7 +61,7 @@ func TestOverviewHeadFollowsTheCards(t *testing.T) {
 	pageHas(t, "Overview", out,
 		`<h1 class="title is-3">Running, with warnings.</h1>`,
 		`class="sp-postmark sp-warn"`, `<b>WARN</b>`, `1 OF 6 CHECKS`,
-		`Needs attention: <a href="/server/health#certificate">TLS certificate</a> (Expires in 12 days).`,
+		`Needs attention: <a href="/server/health">TLS certificate</a> (Expires in 12 days).`,
 		`Updated 14:02:31 UTC`, `<p class="sp-kicker">mail.example.org</p>`,
 		`class="sp-warn"`, // the certificate card
 		`href="/server/health"`, `>All details</a>`,

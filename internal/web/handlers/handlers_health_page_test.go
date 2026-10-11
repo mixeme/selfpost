@@ -201,7 +201,7 @@ func TestOverviewPageShowsVerdictsAndDomains(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<h1 class="title is-3">`, `class="sp-postmark`, `<p class="sp-kicker">mail.example.org</p>`,
-		`href="/server/health#certificate"`, `href="/server/health#sockets"`, `href="/outbound/queue"`,
+		`href="/server/health"`, `href="/server/health"`, `href="/outbound/queue"`,
 		`<h2>Outbound domains</h2>`, `<a href="/outbound/domains/1"><strong>example.org</strong></a>`,
 		"DKIM", "SPF", "DMARC", "1\u00a0msg", `<th>30 days</th>`,
 		`href="/server/health"`,

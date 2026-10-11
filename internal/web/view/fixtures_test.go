@@ -61,12 +61,12 @@ func admin() Meta { return Meta{User: "admin", IsGlobal: true} }
 // checks, three outbound domains and two inbound.
 func overviewFixture() *Overview {
 	cards := []HealthCard{
-		{Name: "Machine", Value: "CPU 12%", Sub: "RAM 41%", Icon: "ti-cpu", Href: "/server/health#machine"},
-		{Name: "Processes", Value: "5 of 5 running", Sub: "all programs", Icon: "ti-server-cog", Href: "/server/health#processes"},
-		{Name: "TLS certificate", Value: "Expires in 12 days", Sub: "mail.example.org", Icon: "ti-certificate", Href: "/server/health#certificate", Level: LevelWarn},
+		{Name: "Machine", Value: "CPU 12%", Sub: "RAM 41%", Icon: "ti-cpu", Href: "/server/health"},
+		{Name: "Processes", Value: "5 of 5 running", Sub: "all programs", Icon: "ti-server-cog", Href: "/server/health"},
+		{Name: "TLS certificate", Value: "Expires in 12 days", Sub: "mail.example.org", Icon: "ti-certificate", Href: "/server/health", Level: LevelWarn},
 		{Name: "Queue", Value: "Empty", Sub: "outbound", Icon: "ti-stack-2", Href: "/outbound/queue"},
-		{Name: "Milter sockets", Value: "2 of 2 answering", Sub: "OpenDKIM, send-log", Icon: "ti-plug-connected", Href: "/server/health#sockets"},
-		{Name: "Reverse DNS", Value: "Forward = reverse", Sub: "mail.example.org", Icon: "ti-arrows-exchange", Href: "/server/health#hostname"},
+		{Name: "Milter sockets", Value: "2 of 2 answering", Sub: "OpenDKIM, send-log", Icon: "ti-plug-connected", Href: "/server/health"},
+		{Name: "Reverse DNS", Value: "Forward = reverse", Sub: "mail.example.org", Icon: "ti-arrows-exchange", Href: "/server/health"},
 	}
 	o := NewOverview(admin(), "mail.example.org", cards, time.Date(2026, 10, 9, 14, 2, 31, 0, time.UTC), 30, true)
 	dns := func(dkim, spf, dmarc string) []Tag {

@@ -38,12 +38,12 @@ func checksFixture() map[string]any {
 func TestHealthCards(t *testing.T) {
 	cards := healthCards(checksFixture())
 	want := []struct{ name, level, value, sub, href string }{
-		{"Machine", "warn", "No reading", "", "/server/health#machine"},
-		{"Processes", "fail", "1 of 2 running", "postfix", "/server/health#processes"},
-		{"TLS certificate", "warn", "Expires in 12 days", "mail.example.org", "/server/health#certificate"},
+		{"Machine", "warn", "No reading", "", "/server/health"},
+		{"Processes", "fail", "1 of 2 running", "postfix", "/server/health"},
+		{"TLS certificate", "warn", "Expires in 12 days", "mail.example.org", "/server/health"},
 		{"Queue", "", "Empty", "outbound", "/outbound/queue"},
-		{"Milter sockets", "warn", "1 of 2 answering", "send-log", "/server/health#sockets"},
-		{"Reverse DNS", "", "Forward = reverse", "mail.example.org", "/server/health#hostname"},
+		{"Milter sockets", "warn", "1 of 2 answering", "send-log", "/server/health"},
+		{"Reverse DNS", "", "Forward = reverse", "mail.example.org", "/server/health"},
 	}
 	if len(cards) != len(want) {
 		t.Fatalf("%d cards, want %d", len(cards), len(want))

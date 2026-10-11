@@ -326,13 +326,13 @@ func healthCards(c map[string]any) []view.HealthCard {
 	}
 
 	return []view.HealthCard{
-		card("Machine", "ti-cpu", "/server/health#machine", machine.Status, cpu, ram),
-		card("Processes", "ti-server-cog", "/server/health#processes", c["ProcessStatus"].(health.Status), procValue, procSub),
-		card("TLS certificate", "ti-certificate", "/server/health#certificate", cert.Status, certValue, cert.Subject),
+		card("Machine", "ti-cpu", "/server/health", machine.Status, cpu, ram),
+		card("Processes", "ti-server-cog", "/server/health", c["ProcessStatus"].(health.Status), procValue, procSub),
+		card("TLS certificate", "ti-certificate", "/server/health", cert.Status, certValue, cert.Subject),
 		card("Queue", "ti-stack-2", "/outbound/queue", c["QueueStatus"].(health.Status), queueValue, "outbound"),
-		card("Milter sockets", "ti-plug-connected", "/server/health#sockets", c["SocketStatus"].(health.Status),
+		card("Milter sockets", "ti-plug-connected", "/server/health", c["SocketStatus"].(health.Status),
 			fmt.Sprintf("%d of %d answering", answering, len(sockets)), socketSub),
-		card("Reverse DNS", "ti-arrows-exchange", "/server/health#hostname", ptr.Status, ptrValue, c["Hostname"].(string)),
+		card("Reverse DNS", "ti-arrows-exchange", "/server/health", ptr.Status, ptrValue, c["Hostname"].(string)),
 	}
 }
 

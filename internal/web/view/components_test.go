@@ -250,12 +250,12 @@ func TestBoxFootVariants(t *testing.T) {
 
 func TestHealthCards(t *testing.T) {
 	out := squash(partial(t, "health_cards", []HealthCard{
-		{Name: "Machine", Value: "CPU 12 %", Sub: "RAM 41 %", Icon: "ti-cpu", Href: "/server/health#machine"},
-		{Name: "TLS certificate", Value: "Expires in 12 days", Sub: "renewal has not run", Icon: "ti-certificate", Href: "/server/health#certificate", Level: LevelWarn},
-		{Name: "Sockets", Value: "1 of 2", Sub: "x", Icon: "ti-plug-connected-x", Href: "/server/health#sockets", Level: LevelFail},
+		{Name: "Machine", Value: "CPU 12 %", Sub: "RAM 41 %", Icon: "ti-cpu", Href: "/server/health"},
+		{Name: "TLS certificate", Value: "Expires in 12 days", Sub: "renewal has not run", Icon: "ti-certificate", Href: "/server/health", Level: LevelWarn},
+		{Name: "Sockets", Value: "1 of 2", Sub: "x", Icon: "ti-plug-connected-x", Href: "/server/health", Level: LevelFail},
 	}))
-	mustContain(t, out, `<div class="sp-health"><a href="/server/health#machine"><span class="sp-h-icon"><i class="ti ti-cpu"></i></span><span><span class="sp-h-name">Machine</span><span class="sp-h-value">CPU 12 %</span><span class="sp-h-sub">RAM 41 %</span></span></a>`,
-		`<a href="/server/health#certificate" class="sp-warn">`, `<a href="/server/health#sockets" class="sp-fail">`)
+	mustContain(t, out, `<div class="sp-health"><a href="/server/health"><span class="sp-h-icon"><i class="ti ti-cpu"></i></span><span><span class="sp-h-name">Machine</span><span class="sp-h-value">CPU 12 %</span><span class="sp-h-sub">RAM 41 %</span></span></a>`,
+		`<a href="/server/health" class="sp-warn">`, `<a href="/server/health" class="sp-fail">`)
 }
 
 func TestDNSRecordShowsInDNSNowOnlyOnAMismatch(t *testing.T) {
