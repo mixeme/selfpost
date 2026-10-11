@@ -19,6 +19,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - DMARC reports are kept 500 **for each domain** (and 90 days), not 500 for
   the whole server - see Security.
 
+### Fixed
+
+- **Full backup from the panel works.** Since the Postfix queue moved under
+  `/data` in 1.3.0 the button answered with a 200 and ten bytes: the archive
+  includes the queue, Postfix keeps the queue readable by its own user alone,
+  and the panel is not that user ("open /data/postfix/queue/active:
+  permission denied" in the log). `selfpost-backup` run with `docker exec`
+  was not affected - it runs as root. The panel's archive now leaves the queue
+  out, and likewise a file in `certs/` it may not open (usually the private
+  key, named in the log); the page, Help and the guide say so, and the guide
+  says to put the key back before starting a restored instance. Everything is
+  read through before the download starts, so a failure is a message on the
+  page and not a file cut short.
+
 ### Security
 
 Review of the DMARC report path (Fable, 2026-10-11), which started to run for
@@ -49,6 +63,11 @@ the first time in 2.0.0. Nothing Critical or High.
   report are accepted and dropped; mail for an inbound domain reaches its
   upstream and other recipients are refused. Until now the suite only read
   back the generated configuration of these features.
+- e2e: full backup and restore. The run takes a backup from the panel, throws
+  the installation away, unpacks the archive into the empty project directory
+  and starts it: the administrator signs in, the domain has the same DKIM key,
+  and mail sent by the application verifies against the record published
+  before the backup.
 
 ## [2.0.0] - 2026-10-11
 

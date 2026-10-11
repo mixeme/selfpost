@@ -275,7 +275,11 @@ func TestE2E(t *testing.T) {
 		testLevel1RateLimit(t, sc)
 	})
 
-	// From here on the stand accepts mail on port 25.
+	// From here on the installation is no longer the one the run started: it
+	// is restored from its own backup, then switched to accept mail on port 25.
+	run("full_backup_restore", func(t *testing.T) {
+		testFullBackupRestore(t, sc)
+	})
 	run("enable_port25_features", func(t *testing.T) {
 		testEnablePort25Features(t, sc)
 	})
