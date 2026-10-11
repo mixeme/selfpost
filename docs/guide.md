@@ -893,6 +893,12 @@ from *DMARC reports* in the domain page's menu. A user with the *domain* role
 sees the reports of the domains assigned to them, without the *Ingest* box.
 Summaries are pruned (500 kept, 90 days max).
 
+A message that is not a report the relay keeps — unreadable as an aggregate
+report, about a domain not sent from here, or delivered to another domain's
+report address — is dropped without a retry and without a bounce. It adds one
+to *parse failures*, and the reason is on the message's delivery line in the mail log
+(*Server › System log*, `dropped: …`).
+
 **Not an open relay.** The inbound smtpd offers no SASL. With DMARC ingest
 alone, `check_recipient_access` permits only configured report addresses;
 everything else is rejected. With inbound relay enabled too, both allow-lists

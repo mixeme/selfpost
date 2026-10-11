@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A message that is not a report this relay keeps is dropped at once.**
+  One that cannot be read as an aggregate report, reports on a domain not
+  sent from here, or came to another domain's report address used to be put
+  off and offered again by Postfix for days, counted as a parse failure each
+  time. It is now accepted and discarded - no retry, and no bounce, since the
+  envelope sender of such a message is whatever its author wrote. It counts
+  as one parse failure and the reason is in the mail log, on the message's
+  own delivery line (Server › System log, `dropped: …`). Only a failure of the database is still
+  retried.
+
 ## [2.0.0] - 2026-10-11
 
 The panel redesign. A breaking release: every panel URL changed and the

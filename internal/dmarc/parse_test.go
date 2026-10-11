@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"testing"
 	"time"
 
@@ -126,8 +127,9 @@ func TestIngestMessageRejectsUnknownDomain(t *testing.T) {
 	}
 	defer st.Close()
 
-	if err := IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports@mail.example.com", time.Now().UTC()); err == nil {
-		t.Fatal("report for an unconfigured domain was accepted")
+	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports@mail.example.com", time.Now().UTC())
+	if !errors.Is(err, ErrRejected) {
+		t.Fatalf("report for an unconfigured domain: err = %v, want ErrRejected", err)
 	}
 	list, err := st.ListDMARCReports(store.DMARCReportScope{AllDomains: true}, 10)
 	if err != nil {
@@ -155,8 +157,47 @@ func TestIngestMessageRejectsTagMismatch(t *testing.T) {
 
 	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)),
 		"dmarc-reports+other.example@mail.example.com", time.Now().UTC())
-	if err == nil {
-		t.Fatal("report was accepted at an address tagged for another domain")
+	if !errors.Is(err, ErrRejected) {
+		t.Fatalf("report at an address tagged for another domain: err = %v, want ErrRejected", err)
+	}
+}
+
+// What cannot be read as a report is rejected, not put off: Postfix would
+// offer the same bytes again for days.
+func TestIngestMessageRejectsWhatIsNotAReport(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if _, err := st.AddDomain("example.com", "selfpost"); err != nil {
+		t.Fatal(err)
+	}
+	for name, msg := range map[string]string{
+		"plain text":  "From: someone@example.net\r\nSubject: hello\r\n\r\nnot a report\r\n",
+		"no headers":  "garbage",
+		"broken gzip": "From: a@example.net\r\nContent-Type: application/gzip\r\n\r\nnot gzip at all",
+	} {
+		err := IngestMessage(st, bytes.NewBufferString(msg), "dmarc-reports+example.com@mail.example.com", time.Now().UTC())
+		if !errors.Is(err, ErrRejected) {
+			t.Errorf("%s: err = %v, want ErrRejected", name, err)
+		}
+	}
+}
+
+// A failing store is not the report's fault: the message is to be tried again.
+func TestIngestMessageStoreFailureIsNotARejection(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddDomain("example.com", "selfpost"); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports+example.com@mail.example.com", time.Now().UTC())
+	if err == nil || errors.Is(err, ErrRejected) {
+		t.Fatalf("closed store: err = %v, want an error that is not ErrRejected", err)
 	}
 }
 

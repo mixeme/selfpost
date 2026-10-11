@@ -3,6 +3,7 @@ package dmarc
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -15,6 +16,15 @@ import (
 
 	"github.com/mixeme/selfpost/internal/store"
 )
+
+// ErrRejected marks a message that is not a report this relay keeps and never
+// will be: it cannot be read as an aggregate report, or it reports on a domain
+// that is not sent from here, or it came to another domain's address. Sending
+// it again changes nothing, so the caller drops it. Any other error is the
+// store's and worth another try.
+var ErrRejected = errors.New("dmarc report rejected")
+
+func rejected(err error) error { return fmt.Errorf("%w: %w", ErrRejected, err) }
 
 // IngestMessage parses a raw RFC 5322 message from r and stores any DMARC
 // aggregate attachment it finds.
@@ -34,11 +44,11 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 	}
 	payload, err := extractAggregatePayload(raw)
 	if err != nil {
-		return err
+		return rejected(err)
 	}
 	parsed, err := ParseAggregate(payload)
 	if err != nil {
-		return err
+		return rejected(err)
 	}
 	recipient = strings.ToLower(strings.TrimSpace(recipient))
 	if err := checkReportDomain(st, parsed.Domain, recipient); err != nil {
@@ -82,17 +92,17 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 // delivered to.
 func checkReportDomain(st *store.Store, domain, recipient string) error {
 	if domain == "" {
-		return fmt.Errorf("dmarc report: no policy domain")
+		return rejected(fmt.Errorf("no policy domain"))
 	}
 	if tagged := TaggedDomain(recipient); tagged != "" && tagged != domain {
-		return fmt.Errorf("dmarc report: domain %q does not match the address it was sent to (%s)", domain, recipient)
+		return rejected(fmt.Errorf("domain %q does not match the address it was sent to (%s)", domain, recipient))
 	}
 	ok, err := st.DomainExists(domain)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("dmarc report: %q is not a domain configured on this relay", domain)
+		return rejected(fmt.Errorf("%q is not a domain configured on this relay", domain))
 	}
 	return nil
 }

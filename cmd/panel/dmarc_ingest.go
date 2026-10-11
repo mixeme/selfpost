@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -28,12 +29,29 @@ func runDMARCIngestMode() error {
 
 	recipient := ingestRecipient(os.Args[1:])
 	if err := dmarc.IngestMessage(st, io.LimitReader(os.Stdin, maxIngestStdin), recipient, time.Now().UTC()); err != nil {
+		if !errors.Is(err, dmarc.ErrRejected) {
+			return err
+		}
+		// Not a report this relay keeps. It is dropped: deferring would have
+		// Postfix try it again for days, and a bounce would go to an envelope
+		// sender anyone can write - the report addresses are public.
 		if incrErr := st.IncrDMARCParseFailures(); incrErr != nil {
 			log.Printf("dmarc ingest: record failure: %v", incrErr)
 		}
-		return err
+		logRejected(err)
 	}
 	return nil
+}
+
+// logRejected leaves the reason in the mail log. Postfix puts the start of
+// what a delivery command wrote - about a hundred bytes - into its own line
+// for the message ("status=sent (delivered via dmarc-ingest service (...))"),
+// so the reason goes out first and bare: no prefix, no date, no recipient,
+// all of which that line already has. postlog is no use here: pipe(8) starts
+// the command without the group that may write to Postfix's log socket.
+func logRejected(reason error) {
+	text := strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")
+	fmt.Fprintln(os.Stderr, "dropped: "+text)
 }
 
 // ingestRecipient is the report address the message was delivered to. Postfix's
