@@ -712,6 +712,15 @@ needed) for the new hostname or proxy, then `docker compose up -d`. The archive
 carries `certs/` from the old host — re-issue certificates when the hostname or
 IP changes. Set up the reverse-proxy vhost separately (not in the backup).
 
+The inbound log and the filter lists are in the database and so in the
+backup, and so are the list files under `data/antispam/`; the panel writes
+those files again from the database on the first start after a restore. What
+the backup does not hold is the spam filter's own side: the `antispam/`
+directory with the compose fragment and the rspamd configuration. Like the
+reverse-proxy fragments it is part of the installation, not of its state -
+copy it from [deploy/antispam/](../deploy/antispam/) again, or the restored
+instance runs with no filter.
+
 **Restoring an encrypted (`.spbk`) backup** needs a running container to
 decrypt it first — any container with the `selfpost-backup` CLI works; decryption
 does not read `/data` and performs no version check. Start one normally

@@ -44,10 +44,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   rspamd rereads a changed file by itself. Deny wins over allow. The files
   are there from the first start with the inbound relay on.
 - **Inbound › Log**: the journal as a page - time, sender and client address,
-  recipient, subject, decision and why, filtered by domain, decision and day.
-  A user with the *domain* role sees the rows of the inbound domains assigned
-  to them. For the global role each row links to the filter lists with the
-  sender filled in (*Deny sender* / *Allow sender*).
+  recipient, subject and decision, filtered by domain, decision and day. The
+  decision opens a sheet over the page with who decided and why: the filter's
+  verdict and symbols, or the reply a refusal was given. A user with the
+  *domain* role sees the rows of the inbound domains assigned to them. For the
+  global role a row links to the filter lists with the sender filled in:
+  *Deny sender* on accepted mail, *Allow sender* on mail the filter refused.
 - **Inbound › Filter lists** (global role): add and remove allow and deny
   entries; the page says where the lists go and whether the filter is on to
   read them.
@@ -55,6 +57,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   relay on.
 - Help: *Inbound log* and *Filter lists*.
 - New setting `ANTISPAM_DIR` (default `/data/antispam`).
+- A full backup carries the inbound log, the filter lists and their files
+  under `data/antispam/`. It does not carry the `antispam/` directory with the
+  compose fragment and the rspamd configuration - copy that from
+  `deploy/antispam/` when restoring.
 - New setting `INBOUND_JOURNAL_MILTER_SOCKET` (default
   `/run/selfpost/inbound-journal.sock`).
 

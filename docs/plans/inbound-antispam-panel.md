@@ -91,6 +91,15 @@ them and nothing else, without the *Allow / Deny sender* links. That is what
 the accepted `in-log` mockup draws (no "global role" in its head). The owner
 was told and can turn it back into a global-only page.
 
+**Inbound › Log accepted by the owner on 2026-10-12** ("Этот экран
+утверждаем"), from screenshots of the page built from its fixture, after his
+changes to it: the sender column is headed *From*; *Why* is not a column but
+a sheet over the page, opened by the decision tag, holding a centred table of
+who decided, the verdict and symbols or the reply, and the subject whole
+(kept on the sheet at his word: the table clips it); a message Postfix itself
+refused offers no *Deny sender*. Inbound › Filter lists is built and not yet
+accepted.
+
 ### Retention
 
 Mirror send-log retention:
@@ -256,7 +265,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] mail.log tailer: inbound reject rows — **Composer**
 - [x] List CRUD + validation + atomic rspamd map sync — **Composer**
 - [x] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
-- [ ] Backup includes `/data/antispam/` — **Composer**
+- [x] Backup includes `/data/antispam/` — **Composer** (it always did: a backup walks all of `/data`; now held by a test, and the guide says the `antispam/` fragment directory is not in it)
 - [ ] Unit + handler tests — **Composer**
 - [ ] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer**
 - [ ] `go vet`, `go test`, e2e if applicable — **Composer**

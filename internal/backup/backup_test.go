@@ -42,6 +42,7 @@ func seedDataDir(t *testing.T) (dataDir, dbPath, deployRoot string) {
 	writeFile(t, filepath.Join(dataDir, "opendkim", "keys", "example.com", "selfpost.private"), "PRIVATE KEY")
 	writeFile(t, filepath.Join(dataDir, "sasl", "sasldb2"), "SASLDB")
 	writeFile(t, filepath.Join(dataDir, "postfix", "sender_login_maps"), "@example.com login")
+	writeFile(t, filepath.Join(dataDir, "antispam", "deny_domain.map"), "evil.example\n")
 	writeFile(t, filepath.Join(dataDir, "postfix", "queue", "deferred", "sample"), "queue-file")
 	// Transient files that must NOT be archived.
 	writeFile(t, filepath.Join(dataDir, "setup-token"), "secret-token")
@@ -114,6 +115,10 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
 		DataArchivePrefix + "sasl/sasldb2",
 		DataArchivePrefix + "postfix/sender_login_maps",
+		// The filter lists as the spam filter reads them. They are rewritten
+		// from the database on the first start after a restore; carrying them
+		// means the filter has its lists before the panel is up.
+		DataArchivePrefix + "antispam/deny_domain.map",
 		ComposeFileName,
 		EnvFileName,
 		CertsDirName + "/fullchain.pem",
