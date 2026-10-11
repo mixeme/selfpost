@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- Schema: migration `0002_inbound_spam_log.sql`, the first after the 2.0
+  baseline - two empty tables for the inbound antispam journal and the filter
+  lists (inbound-antispam-panel). A 2.0.x database is migrated when the panel
+  starts; nothing reads or writes the tables yet.
+
 ## [2.0.1] - 2026-10-11
 
 ### Changed

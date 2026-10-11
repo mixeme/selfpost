@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 1` |
-| Files | `0001_init.sql` (the 2.0 baseline) |
+| Chain head | `user_version = 2` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -60,10 +60,9 @@ What that means in practice:
 
 **Implication:** once `2.0.0` is released, `0001_init.sql` is never edited
 again and no file is deleted, renamed or reordered — every 2.x database has
-already run it. Until that release the baseline is still being written:
-later steps of the redesign and the features queued behind it (the next one
-is `0002_inbound_spam_log.sql` of inbound-antispam-panel, `2.1.0`) add files
-after it.
+already run it. `2.0.0` and `2.0.1` shipped with the baseline alone; the
+features after them add files, the first being `0002_inbound_spam_log.sql` of
+inbound-antispam-panel (`2.1.0`).
 
 ---
 
@@ -72,13 +71,14 @@ after it.
 | Ver | File | Shipped | Kind | Summary |
 |-----|------|---------|------|---------|
 | 1 | `0001_init.sql` | 2.0.0 | DDL | The whole 2.0 schema, below |
+| 2 | `0002_inbound_spam_log.sql` | 2.1.0 (unreleased) | DDL | `inbound_spam_log`, `inbound_spam_list` and two indexes; nothing existing changes |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.
 
 ---
 
-## Schema at head (v1)
+## Schema at head (v2)
 
 | Table | Role |
 |-------|------|
@@ -98,9 +98,12 @@ for operators upgrading from older 2.x images.
 | `user_inbound_domains` | Inbound domains assigned to a `domain` user — granted separately from the outbound ones |
 | `dmarc_reports` | Parsed aggregate report summaries |
 | `dmarc_report_records` | Per-source rows inside a report |
+| `inbound_spam_log` | Inbound antispam journal: one row per recipient of a message offered on port 25, with the decision (`accept`, `reject`, `tempfail`, `quarantine`) and who made it (`rspamd`, `postfix`, `selfpost`). Metadata only (v2) |
+| `inbound_spam_list` | Allow / deny entries for the external filter (`address`, `domain`, `ip`), instance-wide; unique per list (v2) |
 
 `TestBaselineSchema` (`internal/store/schema_test.go`) pins every table, column
-and index of this list.
+and index of this list; `TestOpenMigratesA20Database` opens a database that
+holds the baseline alone.
 
 ### What changed against the last 1.x schema
 
@@ -129,7 +132,7 @@ for the domain. Nothing refers to a user: deleting one changes no domain.
 
 1. Add `internal/store/migrations/00NN_short_name.sql` (next number).
 2. Update the table in [Migration chain](#migration-chain), the snapshot at the
-   top, and the affected rows of [Schema at head](#schema-at-head-v1).
+   top, and the affected rows of [Schema at head](#schema-at-head-v2).
 3. Update `TestBaselineSchema` if tables, columns or indexes change, and add a
    test that opens a database at the previous version and migrates it.
 4. A *data* migration states in a comment which 2.x versions it is written for.

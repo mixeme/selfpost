@@ -243,7 +243,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
-- [ ] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
+- [x] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
 - [ ] Inbound journal-milter + Postfix wiring — **Composer**
 - [ ] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**

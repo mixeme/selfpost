@@ -55,6 +55,8 @@ func TestBaselineSchema(t *testing.T) {
 		"user_inbound_domains":  "user_id inbound_domain_id",
 		"dmarc_reports":         "id domain reporter report_id period_begin period_end received_at contact_email policy_p policy_sp policy_pct policy_adkim policy_aspf pass_count fail_count recipient",
 		"dmarc_report_records":  "id report_row_id source_ip count disposition spf_result dkim_result header_from",
+		"inbound_spam_log":      "id inbound_domain client_ip from_addr to_addr subject decision engine detail created_at",
+		"inbound_spam_list":     "id list_type entry_type value note created_at",
 	}
 	rows, err := st.db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -99,6 +101,7 @@ func TestBaselineSchema(t *testing.T) {
 	rows.Close()
 	wantIdx := []string{
 		"idx_dmarc_report_records_report", "idx_dmarc_reports_domain", "idx_dmarc_reports_received",
+		"idx_inbound_spam_log_created_at", "idx_inbound_spam_log_domain_created_at",
 		"idx_send_log_app_login_created_at", "idx_send_log_created_at", "idx_send_log_domain", "idx_send_log_queue_id",
 		"idx_sessions_expires_at",
 	}
@@ -108,8 +111,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 1 {
-		t.Errorf("user_version = %d, %v; want 1", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 2 {
+		t.Errorf("user_version = %d, %v; want 2", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -153,6 +156,96 @@ func TestReopenKeepsTheDatabase(t *testing.T) {
 	defer st.Close()
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Fatalf("after reopen: user exists = %v, %v", ok, err)
+	}
+}
+
+// A 2.0.x data directory - the baseline and nothing after it - is brought to
+// the head by opening it, with what it holds left alone.
+func TestOpenMigratesA20Database(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	baseline, err := migrationsFS.ReadFile("migrations/0001_init.sql")
+	if err != nil {
+		t.Fatalf("read the baseline: %v", err)
+	}
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatalf("create a 2.0 db: %v", err)
+	}
+	for _, stmt := range []string{
+		string(baseline),
+		"PRAGMA user_version = 1",
+		"INSERT INTO users (username, password_hash, role, created_at) VALUES ('admin', 'hash', 'global', '2026-10-11T00:00:00Z')",
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("prepare a 2.0 db: %v", err)
+		}
+	}
+	db.Close()
+
+	st, err := Open(path)
+	if err != nil {
+		t.Fatalf("open a 2.0 database: %v", err)
+	}
+	defer st.Close()
+	var version int
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 2 {
+		t.Errorf("user_version = %d, %v; want 2", version, err)
+	}
+	if ok, err := st.UserExists(); err != nil || !ok {
+		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)
+	}
+	for _, table := range []string{"inbound_spam_log", "inbound_spam_list"} {
+		if len(tableColumns(t, st, table)) == 0 {
+			t.Errorf("table %s was not created", table)
+		}
+	}
+}
+
+// What the antispam tables refuse: a decision, engine or list the panel does
+// not know, and the same entry twice in one list.
+func TestInboundSpamConstraints(t *testing.T) {
+	st := openTestStore(t)
+	logRow := func(decision, engine string) error {
+		_, err := st.db.Exec(
+			"INSERT INTO inbound_spam_log (inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at)"+
+				" VALUES ('in.example.com', '192.0.2.1', 'a@example.net', 'b@in.example.com', '', ?, ?, '', '2026-10-11T00:00:00Z')",
+			decision, engine)
+		return err
+	}
+	if err := logRow("reject", "postfix"); err != nil {
+		t.Fatalf("a reject by postfix: %v", err)
+	}
+	if err := logRow("bounce", "postfix"); err == nil {
+		t.Error("decision bounce was accepted")
+	}
+	if err := logRow("accept", "spamassassin"); err == nil {
+		t.Error("engine spamassassin was accepted")
+	}
+
+	entry := func(list, kind, value string) error {
+		_, err := st.db.Exec(
+			"INSERT INTO inbound_spam_list (list_type, entry_type, value, created_at) VALUES (?, ?, ?, '2026-10-11T00:00:00Z')",
+			list, kind, value)
+		return err
+	}
+	if err := entry("allow", "address", "billing@vendor.example"); err != nil {
+		t.Fatalf("an allow entry: %v", err)
+	}
+	if err := entry("allow", "address", "billing@vendor.example"); err == nil {
+		t.Error("the same entry was added to one list twice")
+	}
+	if err := entry("deny", "address", "billing@vendor.example"); err != nil {
+		t.Errorf("the same value on the other list: %v", err)
+	}
+	if err := entry("block", "address", "x@example.net"); err == nil {
+		t.Error("list type block was accepted")
+	}
+	if err := entry("deny", "subject", "pills"); err == nil {
+		t.Error("entry type subject was accepted")
+	}
+	var note string
+	if err := st.db.QueryRow("SELECT note FROM inbound_spam_list WHERE list_type = 'allow'").Scan(&note); err != nil || note != "" {
+		t.Errorf("note of an entry added without one = %q, %v", note, err)
 	}
 }
 

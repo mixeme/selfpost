@@ -531,16 +531,17 @@ full backups also archive the operator's `./certs` PEM files when present.
 
 ### Database
 
-The schema is one embedded baseline, `internal/store/migrations/0001_init.sql`,
-applied by `store.Open` into an empty file; `PRAGMA user_version` is `1` and
+The schema is an embedded baseline, `internal/store/migrations/0001_init.sql`,
+and the migrations after it (`0002_inbound_spam_log.sql`), applied by
+`store.Open` in file order; `PRAGMA user_version` counts the files applied and
 `PRAGMA application_id` is `0x53503230` ("SP20"). There is no 1.x migration
 chain. **2.0 starts from an empty data directory:** a database with a schema
 version but without the 2.x `application_id` — what every 1.x file looks like —
 is refused at start with `ErrForeignSchema` and left untouched, as is one whose
 version is newer than the build knows. A restored 1.x backup fails the same
 way. Domains are carried across with a domain export, whose format is not the
-database. Later schema changes are new files (`0002_*.sql`, …); once `2.0.0` is
-released the baseline is never edited. History and the per-table list:
+database. A schema change is a new file; the baseline has not been edited
+since `2.0.0`. History and the per-table list:
 [schema-migrations.md](schema-migrations.md).
 
 The tables that carry the panel's model:
