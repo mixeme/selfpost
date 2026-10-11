@@ -25,7 +25,16 @@ type port25Case struct {
 	// main are main.cf parameters the combination must end up with, read with
 	// postconf -h.
 	main []optionCheck
+	// ingest is set when the combination must carry the DMARC report delivery
+	// service, with everything the command it runs depends on.
+	ingest bool
 }
+
+// ingestService is the dmarc-ingest service as Postfix must read it back.
+// flags=, user= and argv= are arguments of pipe(8); set as -o parameters they
+// are dropped, and a bare "pipe" dies on every report with "fatal: missing
+// user= command-line attribute" - the state of 1.7.0 through 1.9.5.
+const ingestService = "dmarc-ingest unix - n n - - pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}"
 
 var port25Cases = []port25Case{
 	{
@@ -53,6 +62,7 @@ var port25Cases = []port25Case{
 			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access,texthash:/data/postfix/dmarc_recipients,reject", wantExact: true},
 			{param: "smtpd_milters", contains: "", wantExact: true},
 		},
+		ingest: true,
 	},
 	{
 		name: "inbound relay and dmarc ingest",
@@ -71,6 +81,7 @@ var port25Cases = []port25Case{
 		main: []optionCheck{
 			{param: "relay_recipient_maps", contains: "texthash:/data/postfix/relay_recipients texthash:/data/postfix/dmarc_recipients", wantExact: true},
 		},
+		ingest: true,
 	},
 	{
 		name: "inbound relay with antispam milter",
@@ -148,6 +159,9 @@ func checkPort25ConfigCombinations(s *stack) error {
 				return fmt.Errorf("%s: %s = %q, want %q", tc.name, c.param, got, c.contains)
 			}
 		}
+		if err := checkIngestService(s, tc); err != nil {
+			return err
+		}
 	}
 
 	// Back to the stand's own configuration: flags off, no port-25 listener.
@@ -155,6 +169,39 @@ func checkPort25ConfigCombinations(s *stack) error {
 		return fmt.Errorf("restore flags-off configuration: %w", err)
 	}
 	return checkInboundRelayOff(s)
+}
+
+// checkIngestService asks Postfix for the dmarc-ingest service and the two
+// main.cf parameters its command depends on: one recipient per run, so
+// ${recipient} is one argument, and DMARC_REPORTS_ENABLE in the environment
+// pipe(8) gives the command - it passes export_environment and nothing else.
+// A combination without DMARC ingest must have none of the three left over.
+func checkIngestService(s *stack, tc port25Case) error {
+	service, _ := s.execIn("selfpost", "postconf", "-M", "dmarc-ingest/unix")
+	service = strings.Join(strings.Fields(service), " ")
+	limit, _ := s.execIn("selfpost", "postconf", "-h", "dmarc-ingest_destination_recipient_limit")
+	limit = strings.TrimSpace(limit)
+	environ, err := s.execIn("selfpost", "postconf", "-h", "export_environment")
+	if err != nil {
+		return fmt.Errorf("%s: postconf -h export_environment: %v\n%s", tc.name, err, environ)
+	}
+	exported := strings.Contains(" "+strings.TrimSpace(environ)+" ", " DMARC_REPORTS_ENABLE=true ")
+	if !tc.ingest {
+		if strings.Contains(service, "pipe") || limit == "1" || exported {
+			return fmt.Errorf("%s: DMARC ingest is off but left behind: service %q, recipient limit %q, export_environment %q", tc.name, service, limit, environ)
+		}
+		return nil
+	}
+	if service != ingestService {
+		return fmt.Errorf("%s: Postfix reads the dmarc-ingest service as %q, want %q", tc.name, service, ingestService)
+	}
+	if limit != "1" {
+		return fmt.Errorf("%s: dmarc-ingest_destination_recipient_limit = %q, want 1", tc.name, limit)
+	}
+	if !exported {
+		return fmt.Errorf("%s: export_environment = %q, want DMARC_REPORTS_ENABLE=true in it", tc.name, environ)
+	}
+	return nil
 }
 
 // runPostfixConfig re-runs the config generator with env overrides. The script

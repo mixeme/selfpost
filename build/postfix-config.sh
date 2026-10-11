@@ -285,11 +285,21 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 			[ -e "$f" ] || : > "$f"
 		done
 		ln -sf /usr/local/bin/panel /usr/local/bin/dmarc-ingest
-		postconf -M "dmarc-ingest/unix-pipe=dmarc-ingest unix - n n - - pipe"
-		postconf -P \
-			"dmarc-ingest/unix-pipe/flags=Rq" \
-			"dmarc-ingest/unix-pipe/user=panel" \
-			"dmarc-ingest/unix-pipe/argv=/usr/local/bin/dmarc-ingest"
+		# flags=, user= and argv= are arguments of pipe(8), not -o parameters:
+		# postconf -P refuses them ("unmatched service_name/type") and leaves a
+		# bare "pipe", which dies with "fatal: missing user= command-line
+		# attribute" on every report. They go into the service line itself.
+		# ${recipient} is expanded by pipe(8), not by the shell: the command
+		# learns which report address the message came to from its argument.
+		postconf -M 'dmarc-ingest/unix=dmarc-ingest unix - n n - - pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}'
+		# One recipient per run, so ${recipient} is one argument.
+		postconf -e "dmarc-ingest_destination_recipient_limit=1"
+		# pipe(8) starts the command with export_environment only, so what the
+		# command reads from the container's environment is named there.
+		DMARC_INGEST_ENV="DMARC_REPORTS_ENABLE=true"
+		[ -z "${SELFPOST_DATA_DIR:-}" ] || DMARC_INGEST_ENV="${DMARC_INGEST_ENV} SELFPOST_DATA_DIR=${SELFPOST_DATA_DIR}"
+		[ -z "${SELFPOST_DB_PATH:-}" ] || DMARC_INGEST_ENV="${DMARC_INGEST_ENV} SELFPOST_DB_PATH=${SELFPOST_DB_PATH}"
+		postconf -e "export_environment=TZ MAIL_CONFIG LANG ${DMARC_INGEST_ENV}"
 		if [ -n "$RELAY_DOMAINS_SETTING" ]; then
 			RELAY_DOMAINS_SETTING="${RELAY_DOMAINS_SETTING} texthash:${DMARC_RELAY_DOMAINS_MAP}"
 			TRANSPORT_SETTING="${TRANSPORT_SETTING} texthash:${DMARC_TRANSPORT_MAP}"
@@ -300,6 +310,9 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		# Comma, not a space, between check_recipient_access and its table: see
 		# master_cf_set_smtp_inet_o.
 		RECIPIENT_RESTRICTIONS="check_recipient_access,texthash:${DMARC_RECIPIENTS_MAP},${RECIPIENT_RESTRICTIONS}"
+	else
+		postconf -MX "dmarc-ingest/unix" 2>/dev/null || true
+		postconf -X dmarc-ingest_destination_recipient_limit export_environment 2>/dev/null || true
 	fi
 	postconf -e \
 		"relay_domains=${RELAY_DOMAINS_SETTING}" \
@@ -381,7 +394,8 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	master_cf_set_smtp_inet_o smtpd_milters "${INBOUND_MILTERS}"
 else
 	postconf -MX "smtp/inet" 2>/dev/null || true
-	postconf -MX "dmarc-ingest/unix-pipe" 2>/dev/null || true
+	postconf -MX "dmarc-ingest/unix" 2>/dev/null || true
+	postconf -X dmarc-ingest_destination_recipient_limit export_environment 2>/dev/null || true
 	postconf -e \
 		"relay_domains=" \
 		"transport_maps=" \

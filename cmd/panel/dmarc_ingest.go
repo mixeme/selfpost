@@ -26,10 +26,7 @@ func runDMARCIngestMode() error {
 	}
 	defer st.Close()
 
-	recipient := strings.ToLower(strings.TrimSpace(os.Getenv("RECIPIENT")))
-	if recipient == "" {
-		recipient = strings.ToLower(strings.TrimSpace(os.Getenv("ORIGINAL_RECIPIENT")))
-	}
+	recipient := ingestRecipient(os.Args[1:])
 	if err := dmarc.IngestMessage(st, io.LimitReader(os.Stdin, maxIngestStdin), recipient, time.Now().UTC()); err != nil {
 		if incrErr := st.IncrDMARCParseFailures(); incrErr != nil {
 			log.Printf("dmarc ingest: record failure: %v", incrErr)
@@ -37,6 +34,21 @@ func runDMARCIngestMode() error {
 		return err
 	}
 	return nil
+}
+
+// ingestRecipient is the report address the message was delivered to. Postfix's
+// pipe(8) hands it over as an argument (${recipient} in the service's argv,
+// build/postfix-config.sh) - it sets no RECIPIENT variable, that is local(8).
+// Without it the check that a report came to its own domain's address is
+// skipped.
+func ingestRecipient(args []string) string {
+	for _, a := range args {
+		if a == "-dmarc-ingest" {
+			continue
+		}
+		return strings.ToLower(strings.TrimSpace(a))
+	}
+	return ""
 }
 
 func isDMARCIngestInvocation() bool {
