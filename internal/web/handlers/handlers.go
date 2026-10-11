@@ -50,6 +50,9 @@ type Config struct {
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start; used
 	// as bootstrap and fallback when the settings row is missing or invalid.
 	SendLogRetentionEnvDefault int
+	// InboundSpamLogRetentionEnvDefault is INBOUND_SPAM_LOG_RETENTION_DAYS at
+	// panel start, the same bootstrap and fallback for the inbound journal.
+	InboundSpamLogRetentionEnvDefault int
 }
 
 // Handlers holds dependencies for authenticated panel routes.
@@ -58,6 +61,7 @@ type Handlers struct {
 	domains *domain.Service
 	apps    *app.Service
 	inbound *inbound.Service
+	lists   *inbound.Lists
 	dmarc   *dmarc.Service
 	cfg     Config
 	view    *view.Engine
@@ -72,6 +76,7 @@ func New(
 	domains *domain.Service,
 	apps *app.Service,
 	inboundSvc *inbound.Service,
+	lists *inbound.Lists,
 	dmarcSvc *dmarc.Service,
 	cfg Config,
 	v *view.Engine,
@@ -84,6 +89,7 @@ func New(
 		domains: domains,
 		apps:    apps,
 		inbound: inboundSvc,
+		lists:   lists,
 		dmarc:   dmarcSvc,
 		cfg:     cfg,
 		view:    v,

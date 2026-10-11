@@ -1,0 +1,63 @@
+{{/* Inbound > Filter lists (mockup in-filter-lists.html): the allow and deny
+     lists that correct the spam filter by hand, for the whole instance, and
+     where they go. Global role only. The form adds an entry; each row of a list
+     removes its own. */}}
+{{define "content"}}
+{{template "page_head" .Head}}
+{{if .Flash}}{{template "flash" .Flash}}{{end}}
+
+{{template "box_open" .Add}}
+{{template "body_open"}}
+<form class="sp-form" method="post" action="/inbound/filter-lists">
+  <div class="columns">
+    <div class="column is-3">
+      <div class="field"><label class="label" for="list">List</label>
+        <div class="control"><div class="select is-fullwidth"><select id="list" name="list_type">{{$list := .List}}{{range .ListOptions}}
+          <option value="{{.Value}}"{{if eq .Value $list}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select></div></div></div>
+    </div>
+    <div class="column is-3">
+      <div class="field"><label class="label" for="etype">Entry is</label>
+        <div class="control"><div class="select is-fullwidth"><select id="etype" name="entry_type">{{$kind := .Kind}}{{range .KindOptions}}
+          <option value="{{.Value}}"{{if eq .Value $kind}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select></div></div></div>
+    </div>
+    <div class="column is-6">
+      <div class="field"><label class="label" for="value">Value</label>
+        <div class="control"><input class="input sp-mono" id="value" name="value" value="{{.Value}}" placeholder="promo@bulk.example" autocomplete="off" autocapitalize="none" spellcheck="false" required></div></div>
+    </div>
+  </div>
+  <div class="field"><label class="label" for="note">Note</label>
+    <div class="control"><input class="input" id="note" name="note" value="{{.Note}}" placeholder="Why — for whoever reads this list next year"></div></div>
+  <button type="submit" class="button is-primary"><i class="ti ti-plus"></i>Add entry</button>
+</form>
+{{template "body_close"}}
+{{template "box_close"}}
+
+<div class="columns">
+  <div class="column is-6">
+{{template "filter_list" .Deny}}
+  </div>
+  <div class="column is-6">
+{{template "filter_list" .Allow}}
+  </div>
+</div>
+
+{{template "box_open" .Where}}
+{{template "body_open"}}
+{{template "facts" .WhereFacts}}
+{{template "body_close"}}
+{{template "box_close"}}
+{{end}}
+
+{{/* filter_list is one of the two boxes of entries (input: FilterList): the
+     table, or what is absent when the list is empty. */}}
+{{define "filter_list"}}{{template "box_open" .Box}}
+{{if .Rows}}<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
+  <tbody>{{range .Rows}}
+    <tr><td class="sp-mono sp-small">{{.Value}} {{template "tag" .Kind}}</td>{{if .Note}}<td class="sp-muted">{{.Note}}</td>{{else}}<td class="sp-muted">—</td>{{end}}<td class="sp-muted sp-nowrap sp-small">{{.Added}}</td><td class="sp-actions">{{template "row_action" .Remove}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{else}}{{template "empty_state" .Empty}}
+{{end}}{{template "box_close"}}{{end}}

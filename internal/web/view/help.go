@@ -52,6 +52,9 @@ const (
 	HelpUpstream   = "upstream"
 	HelpRecipients = "recipients"
 	HelpFilter     = "filter"
+	// HelpInboundLog and HelpFilterLists: the plain "log" is the Outbound log's.
+	HelpInboundLog  = "inbound-log"
+	HelpFilterLists = "filter-lists"
 	// Server
 	HelpBackup   = "backup"
 	HelpUsers    = "users"
@@ -109,6 +112,8 @@ func NewHelp(m Meta, inbound bool) *Help {
 			{Label: "Upstream", Icon: "ti-arrow-forward-up", Href: "#" + HelpUpstream},
 			{Label: "Valid recipients", Icon: "ti-address-book", Href: "#" + HelpRecipients},
 			{Label: "Spam filter", Icon: "ti-shield-check", Href: "#" + HelpFilter},
+			{Label: "Inbound log", Icon: "ti-list-details", Href: "#" + HelpInboundLog},
+			{Label: "Filter lists", Icon: "ti-filter", Href: "#" + HelpFilterLists},
 		})
 	}
 	if m.IsGlobal {
@@ -184,6 +189,24 @@ var inboundTopics = []HelpTopic{
 		Rich("The spam filter belongs to the server, not to a domain. The server's administrator attaches it in the server's ", Code(".env"),
 			", and from then on every inbound domain is screened by it before mail is handed on; the box shows on or off and has nothing to switch. Off means mail goes to the upstream unfiltered. While the filter is down, mail is either accepted unfiltered (the default) or deferred, so the sending server tries again later, as the server's setting says; the box states which."),
 	}},
+	{ID: HelpInboundLog, Title: "Inbound log", Body: []Text{
+		Rich("One row per recipient of a message offered on port 25 for an inbound domain, with what was decided: ",
+			TagOf("accept", ""), " — handed on to the upstream; ", TagOf("reject", ""), " — refused for good; ",
+			TagOf("tempfail", ""), " — the sender was asked to come back later; ", TagOf("quarantine", ""), " — held by the filter. ",
+			Em("Why"), " names who decided. ", Code("rspamd"), " is the spam filter, with its action, the score against the reject threshold and the heaviest symbols; ",
+			Code("postfix"), " is the relay's own rule — an unknown recipient, a sender domain that does not exist — with its reply; ",
+			Code("selfpost"), " means nobody judged the message: it was relayed with no filter attached. Accept says what this server did, not what the upstream did with the message afterwards.",
+			Br(), Br(),
+			"Accepted mail is recorded as it passes; refused mail is read from ", Code("mail.log"),
+			", so its row has no subject, and a message refused after its text was sent is one row however many recipients it had. A refusal to relay for a domain that is not an inbound one is every scanner on the internet and is not recorded. Rows are kept for the number of days set in Settings, and never more than 10 000."),
+	}},
+	{ID: HelpFilterLists, Title: "Filter lists", Body: []Text{
+		Rich("Two lists for the whole server that correct the spam filter by hand. An entry is a sender address, a sender domain — that domain, not its subdomains — or a client address or network in CIDR form. A sender on the Deny list is refused outright. A sender on the Allow list is given a weight no spam score outweighs, so the filter lets it through. When entries of both lists match one message, ",
+			Strong("Deny wins"), ".",
+			Br(), Br(),
+			"SelfPost does not apply the lists itself: it writes them as files under ", Code("/data/antispam/"),
+			", and rspamd rereads a file within seconds of a change. With the spam filter off the lists are kept and can be edited, but nothing reads them. The sender matched is the envelope sender — the one in the log — not the From line a mail program shows."),
+	}},
 }
 
 var serverTopics = []HelpTopic{
@@ -208,7 +231,7 @@ var serverTopics = []HelpTopic{
 	}},
 	{ID: HelpSettings, Title: "Settings", Body: []Text{
 		Rich("Settings holds what is true of the whole instance. Log retention is how many days the Outbound log keeps its rows, from 7 to 365 and 90 by default; a sweep every six hours deletes older ones, and it is the main driver of how fast ",
-			Code("/data"), " grows. It does not change the rotation of ", Code("mail.log"),
+			Code("/data"), " grows. With the inbound relay on there is a second number, for the Inbound log, with the same range. It does not change the rotation of ", Code("mail.log"),
 			", which is daily with about two weeks kept. The sending rate limit shown under it is level 1, the per-client-IP ceiling set in ",
 			Code(".env"), ": changing it needs a restart, and no level-2 limit can exceed it."),
 	}},

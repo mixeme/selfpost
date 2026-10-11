@@ -92,9 +92,9 @@ func KitPage() *Kit {
 
 		StatusTag: Box{No: "03", Title: "status_tag", End: Plain("One mapping, one function")},
 		StatusRows: []KitStatusRow{
-			{"ok, published, running, sent", Tag{Status: "ok"}},
-			{"warn, deferred, quiet", Tag{Status: "warn"}},
-			{"error, fail, mismatch, bounced", Tag{Status: "fail"}},
+			{"ok, published, running, sent, accept", Tag{Status: "ok"}},
+			{"warn, deferred, quiet, tempfail", Tag{Status: "warn"}},
+			{"error, fail, mismatch, bounced, reject", Tag{Status: "fail"}},
 			{"unknown, off, neutral counts", Tag{Status: "off"}},
 			{"held: quarantine · role: global", Tag{Status: "quarantine"}},
 		},

@@ -265,12 +265,9 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("mail for the inbound domain never reached its upstream: %v\n%s", err, mailLogTail(h, "postfix/"))
 	}
 
-	// The inbound journal milter saw it go through. No page shows the journal
-	// yet, so the row is read where it is kept. No filter is attached on the
-	// stand: the row is an accept by nobody.
 	// The filter lists exist as files from the first start with the relay on,
 	// readable by a filter that is another user in another container. Nothing
-	// is on them: no page edits them yet.
+	// is on them until someone adds an entry.
 	maps, err := h.execIn("selfpost", "sh", "-c", `cd /data/antispam && stat -c "%a %n" . *.map && { grep -vc "^#" *.map; true; }`)
 	if err != nil {
 		t.Fatalf("list /data/antispam: %v\n%s", err, maps)
@@ -285,28 +282,57 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		}
 	}
 
-	// journalHas waits for a row and returns the journal as it then stands.
-	journalHas := func(want string) string {
+	// The inbound journal milter saw it go through, and the Inbound log shows it.
+	// No filter is attached on the stand: the row is an accept by nobody, so its
+	// reason is the engine alone.
+	logRows := func(want string) []string {
 		t.Helper()
+		var rows []string
+		var body string
 		for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(time.Second) {
-			rows, err := h.execIn("selfpost", "python3", "-c",
-				`import sqlite3; print("\n".join("|".join(r) for r in sqlite3.connect("file:/data/selfpost.db?mode=ro", uri=True).execute("select inbound_domain, from_addr, to_addr, subject, decision, engine from inbound_spam_log")))`)
-			if err != nil {
-				t.Fatalf("read the inbound journal: %v\n%s", err, rows)
+			resp, b, err := sc.panel.get("/inbound/log")
+			if err != nil || resp.StatusCode != 200 {
+				t.Fatalf("GET /inbound/log: status %v, %v\n%.800s", resp, err, b)
 			}
-			if strings.Contains(rows, want) {
-				return strings.TrimSpace(rows)
+			body = b
+			rows = rows[:0]
+			for _, row := range strings.Split(body, "<tr><td")[1:] {
+				rows = append(rows, row[:strings.Index(row, "</tr>")])
+			}
+			if strings.Contains(body, want) {
+				return rows
 			}
 			if time.Now().After(deadline) {
-				t.Fatalf("no journal row %q, journal:\n%s\n%s", want, rows, mailLogTail(h, "postfix/"))
+				t.Fatalf("no row with %q in the Inbound log:\n%.3000s\n%s", want, body, mailLogTail(h, "postfix/"))
 			}
 		}
 	}
-	rows := journalHas(fmt.Sprintf("%s|someone@stranger.e2e.test|%s|e2e %s|accept|selfpost", inboundDomain, inboundRecipient, token))
+	// rowWith finds the one row that holds all of wants.
+	rowWith := func(rows []string, wants ...string) string {
+		t.Helper()
+		for _, row := range rows {
+			ok := true
+			for _, w := range wants {
+				ok = ok && strings.Contains(row, w)
+			}
+			if ok {
+				return row
+			}
+		}
+		t.Fatalf("no row of the Inbound log holds all of %q in\n%s", wants, strings.Join(rows, "\n"))
+		return ""
+	}
+
+	rows := logRows("e2e " + token)
+	rowWith(rows,
+		"someone@<wbr>stranger.e2e.test", "user@<wbr>"+inboundDomain, "e2e "+token,
+		`<span class="tag is-success is-light">accept</span>`, `<td class="sp-muted sp-small">selfpost</td>`,
+		// the way to correct it, which only the global role is given
+		`href="/inbound/filter-lists?list=deny&amp;kind=address&amp;value=someone%40stranger.e2e.test">Deny sender</a>`)
 	// A report mailed to the server's own name earlier in the run came through
 	// the same listener and is not the relay's mail.
-	if n := strings.Count(rows, "\n") + 1; n != 1 {
-		t.Fatalf("the journal holds %d rows, want the relayed message alone:\n%s", n, rows)
+	if len(rows) != 1 {
+		t.Fatalf("the Inbound log holds %d rows, want the relayed message alone:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
 	for _, to := range []string{"nobody@" + inboundDomain, "someone@elsewhere.e2e.test"} {
@@ -319,8 +345,71 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	// The refusal of an unknown recipient at the inbound domain is read from
 	// the mail log into the journal; the refusal to relay for a stranger's
 	// domain is not the relay's mail and is not.
-	rows = journalHas(fmt.Sprintf("%s|someone@stranger.e2e.test|nobody@%s||reject|postfix", inboundDomain, inboundDomain))
-	if n := strings.Count(rows, "\n") + 1; n != 2 {
-		t.Fatalf("the journal holds %d rows, want the relayed message and one refusal:\n%s", n, rows)
+	rows = logRows("nobody@<wbr>" + inboundDomain)
+	rowWith(rows,
+		"someone@<wbr>stranger.e2e.test", "nobody@<wbr>"+inboundDomain, `<td class="sp-clip sp-muted">—</td>`,
+		`<span class="tag is-danger is-light">reject</span>`, `<td class="sp-muted sp-small">postfix`,
+		`>Deny sender</a>`)
+	if len(rows) != 2 {
+		t.Fatalf("the Inbound log holds %d rows, want the relayed message and one refusal:\n%s", len(rows), strings.Join(rows, "\n"))
+	}
+
+	// The filter lists: an entry added in the panel is in the map file the
+	// filter reads, and one removed is gone from it. Nothing reads the file on
+	// this stand (no filter is attached), so the file is the whole effect.
+	const spammer = "spammer.e2e.test"
+	denyDomain := func() string {
+		t.Helper()
+		out, err := h.execIn("selfpost", "cat", "/data/antispam/deny_domain.map")
+		if err != nil {
+			t.Fatalf("read deny_domain.map: %v\n%s", err, out)
+		}
+		return out
+	}
+	resp, body, err = sc.panel.postForm("/inbound/filter-lists", url.Values{
+		"list_type": {"deny"}, "entry_type": {"domain"}, "value": {"  @" + strings.ToUpper(spammer)}, "note": {"e2e"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || resp.Request.URL.Path != "/inbound/filter-lists" || !strings.Contains(body, "Entry added.") {
+		t.Fatalf("add a filter list entry: status %d, landed on %s:\n%.800s", resp.StatusCode, resp.Request.URL.Path, body)
+	}
+	if got := denyDomain(); !strings.Contains(got, "\n"+spammer+"\n") {
+		t.Fatalf("deny_domain.map after adding %s:\n%s", spammer, got)
+	}
+	if got, err := h.execIn("selfpost", "sh", "-c", `cd /data/antispam && { grep -vc "^#" *.map; true; }`); err != nil ||
+		strings.Count(got, ":0") != 5 || !strings.Contains(got, "deny_domain.map:1") {
+		t.Fatalf("the entry is in other files than deny_domain.map (%v):\n%s", err, got)
+	}
+	// The same entry again is refused on the page, and the file still holds it once.
+	resp, body, err = sc.panel.postForm("/inbound/filter-lists", url.Values{
+		"list_type": {"deny"}, "entry_type": {"domain"}, "value": {spammer}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 422 || !strings.Contains(body, "That entry is already on the list.") {
+		t.Fatalf("add the same entry again: status %d:\n%.800s", resp.StatusCode, body)
+	}
+	if got := denyDomain(); strings.Count(got, spammer) != 1 {
+		t.Fatalf("deny_domain.map after a duplicate:\n%s", got)
+	}
+
+	resp, body, err = sc.panel.get("/inbound/filter-lists")
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("GET /inbound/filter-lists: status %v, %v", resp, err)
+	}
+	m = regexp.MustCompile(`action="(/inbound/filter-lists/\d+/delete)"`).FindStringSubmatch(body)
+	if m == nil || !strings.Contains(body, spammer) {
+		t.Fatalf("the list does not show %s with a Remove:\n%.2000s", spammer, body)
+	}
+	resp, body, err = sc.panel.postForm(m[1], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || resp.Request.URL.Path != "/inbound/filter-lists" || !strings.Contains(body, "Entry removed.") {
+		t.Fatalf("remove the entry: status %d, landed on %s:\n%.800s", resp.StatusCode, resp.Request.URL.Path, body)
+	}
+	if got := denyDomain(); strings.Contains(got, spammer) {
+		t.Fatalf("deny_domain.map after removing %s:\n%s", spammer, got)
 	}
 }

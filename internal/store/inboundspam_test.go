@@ -158,3 +158,97 @@ func TestInboundSpamLogRetentionDays(t *testing.T) {
 		t.Errorf("after Set(365): %d", days)
 	}
 }
+
+func TestQueryInboundSpamFilters(t *testing.T) {
+	st := openTestStore(t)
+	day := func(d, h int) time.Time { return time.Date(2026, 9, d, h, 0, 0, 0, time.UTC) }
+	add := func(domain, to, decision string, at time.Time) {
+		t.Helper()
+		err := st.InsertInboundSpam(InboundSpamEntry{
+			InboundDomain: domain, ClientIP: "203.0.113.7", From: "s@example.net", To: to,
+			Subject: "S " + to, Decision: decision, Engine: SpamEngineRspamd, Detail: "d", At: at,
+		})
+		if err != nil {
+			t.Fatalf("InsertInboundSpam: %v", err)
+		}
+	}
+	add("a.example", "1@a.example", SpamDecisionAccept, day(20, 23))
+	add("a.example", "2@a.example", SpamDecisionReject, day(21, 0))
+	add("b.example", "3@b.example", SpamDecisionAccept, day(21, 12))
+	add("b.example", "4@b.example", SpamDecisionTempfail, day(22, 0))
+	// Written last but dated earliest: the tailer reads a refusal after the fact.
+	add("a.example", "5@a.example", SpamDecisionReject, day(19, 8))
+
+	to := func(f InboundSpamFilter) string {
+		t.Helper()
+		rows, err := st.QueryInboundSpam(f, 50, 0)
+		if err != nil {
+			t.Fatalf("QueryInboundSpam(%+v): %v", f, err)
+		}
+		n, err := st.CountInboundSpam(f)
+		if err != nil || n != int64(len(rows)) {
+			t.Fatalf("CountInboundSpam(%+v) = %d, %v; the query returned %d", f, n, err, len(rows))
+		}
+		var out string
+		for _, r := range rows {
+			out += r.To[:1]
+		}
+		return out
+	}
+
+	// Newest first by time, not by the order of writing.
+	if got := to(InboundSpamFilter{}); got != "43215" {
+		t.Errorf("no filter = %q, want 43215", got)
+	}
+	if got := to(InboundSpamFilter{Domain: "a.example"}); got != "215" {
+		t.Errorf("domain = %q, want 215", got)
+	}
+	if got := to(InboundSpamFilter{Decision: SpamDecisionReject}); got != "25" {
+		t.Errorf("decision = %q, want 25", got)
+	}
+	// Days are whole UTC days and both ends are in: 21 st is 00:00 up to 23:59.
+	if got := to(InboundSpamFilter{Since: day(21, 15), Until: day(21, 3)}); got != "32" {
+		t.Errorf("one day = %q, want 32", got)
+	}
+	if got := to(InboundSpamFilter{Since: day(22, 0)}); got != "4" {
+		t.Errorf("since = %q, want 4", got)
+	}
+	if got := to(InboundSpamFilter{Until: day(20, 0)}); got != "15" {
+		t.Errorf("until = %q, want 15", got)
+	}
+	// A time in another zone is read as the UTC day it falls on.
+	msk := time.FixedZone("msk", 3*3600)
+	if got := to(InboundSpamFilter{Since: time.Date(2026, 9, 22, 2, 0, 0, 0, msk)}); got != "432" {
+		t.Errorf("since in another zone = %q, want 432 (it is the 21st in UTC)", got)
+	}
+	if got := to(InboundSpamFilter{Domain: "b.example", Decision: SpamDecisionAccept, Since: day(21, 0), Until: day(21, 0)}); got != "3" {
+		t.Errorf("all filters = %q, want 3", got)
+	}
+
+	// The scope: nil is everything, a set is its domains, an empty set nothing,
+	// and a chosen domain outside the set is nothing too.
+	if got := to(InboundSpamFilter{Domains: []string{"b.example"}}); got != "43" {
+		t.Errorf("scope = %q, want 43", got)
+	}
+	if got := to(InboundSpamFilter{Domains: []string{}}); got != "" {
+		t.Errorf("empty scope = %q, want nothing", got)
+	}
+	if got := to(InboundSpamFilter{Domains: []string{"b.example"}, Domain: "a.example"}); got != "" {
+		t.Errorf("a chosen domain outside the scope = %q, want nothing", got)
+	}
+
+	// Paging.
+	rows, err := st.QueryInboundSpam(InboundSpamFilter{}, 2, 2)
+	if err != nil || len(rows) != 2 || rows[0].To != "2@a.example" || rows[1].To != "1@a.example" {
+		t.Errorf("page 2 of 2 rows = %+v, %v", rows, err)
+	}
+	if rows[0].ID == 0 || !rows[0].CreatedAt.Equal(day(21, 0)) || rows[0].Subject != "S 2@a.example" ||
+		rows[0].Engine != SpamEngineRspamd || rows[0].Detail != "d" || rows[0].ClientIP != "203.0.113.7" || rows[0].From != "s@example.net" {
+		t.Errorf("a row read back = %+v", rows[0])
+	}
+
+	// A value is data, not SQL.
+	if got := to(InboundSpamFilter{Domain: "a.example' OR '1'='1"}); got != "" {
+		t.Errorf("injected domain = %q", got)
+	}
+}

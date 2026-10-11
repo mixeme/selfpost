@@ -111,12 +111,14 @@ type Tag struct {
 var statusClass = map[string]string{
 	"ok": "tag is-success is-light", "published": "tag is-success is-light",
 	"running": "tag is-success is-light", "sent": "tag is-success is-light",
+	"accept": "tag is-success is-light",
 
 	"warn": "tag is-warning is-light", "deferred": "tag is-warning is-light",
-	"quiet": "tag is-warning is-light",
+	"quiet": "tag is-warning is-light", "tempfail": "tag is-warning is-light",
 
 	"error": "tag is-danger is-light", "fail": "tag is-danger is-light",
 	"mismatch": "tag is-danger is-light", "bounced": "tag is-danger is-light",
+	"reject": "tag is-danger is-light",
 
 	"quarantine": "tag is-primary is-light", "held": "tag is-primary is-light",
 	"global": "tag is-primary is-light",
@@ -503,6 +505,9 @@ type Shell struct {
 	ShowDMARC    bool
 	ShowInbound  bool
 	ShowServer   bool
+	// ShowFilterLists is the Filter lists entry of Inbound: the lists are the
+	// instance's, so only the global role has them.
+	ShowFilterLists bool
 }
 
 // Frame is what layout.html is executed with: the shell and the page's own
@@ -523,6 +528,8 @@ func (e *Engine) shell(m Meta, copyright, sourceURL string) Shell {
 		ShowQueue:    m.IsGlobal,
 		ShowOutbound: m.IsGlobal || m.HasOutbound,
 		ShowInbound:  e.inboundEnabled && (m.IsGlobal || m.HasInbound),
+
+		ShowFilterLists: e.inboundEnabled && m.IsGlobal,
 	}
 	s.ShowDMARC = e.dmarcEnabled && s.ShowOutbound
 	switch {

@@ -38,6 +38,8 @@ var pageFixtures = map[string]func() any{
 	"in-domains":       func() any { return inDomainsFixture() },
 	"in-domain":        func() any { return inDomainFixture() },
 	"in-domain-delete": func() any { return inDomainDeleteFixture() },
+	"in-log":           func() any { return inLogFixture() },
+	"in-filter-lists":  func() any { return inFilterListsFixture() },
 
 	"out-log":      func() any { return outLogFixture() },
 	"out-message":  func() any { return outMessageFixture() },
@@ -131,7 +133,7 @@ func accountFixture() *Account {
 // settingsFixture is the mockup's Settings: thirty days of log, a limit of 600
 // messages an hour.
 func settingsFixture() *Settings {
-	return NewSettings(admin(), "30", FormatRate(600, 3600))
+	return NewSettings(admin(), "30", FormatRate(600, 3600)).WithInbound("90")
 }
 
 // outDomainsFixture is the mockup's Outbound domains: three domains, the first
@@ -410,4 +412,48 @@ func userFixture() *UserForm {
 // outbound domains and acme.io inbound.
 func userDeleteFixture() *UserDelete {
 	return NewUserDelete(admin(), UserDeleteInput{ID: 3, Username: "acme-ops", AllOutbound: true, Inbound: []string{"acme.io"}})
+}
+
+// inLogFixture is the mockup's Inbound log: six rows of a week's mail, as the
+// global role sees them - an accepted message scored as spam and one let through
+// by an Allow entry, refusals by Postfix and by the filter, and a tempfail.
+func inLogFixture() *InLog {
+	p := NewInLog(admin(), 90, []string{"lists.example.org", "acme.io"},
+		InLogFilter{From: "2026-09-14", To: "2026-09-21"})
+	row := func(clock, from, client, to, subject, decision, engine, detail string) InLogRow {
+		at, err := time.Parse("2006-01-02 15:04:05", "2026-09-21 "+clock)
+		if err != nil {
+			panic(err)
+		}
+		return p.NewRow(InLogRowInput{At: at, From: from, Client: client, To: to, Subject: subject,
+			Decision: decision, Engine: engine, Detail: detail})
+	}
+	return p.WithRows([]InLogRow{
+		row("14:00:18", "t.berg@uni.example", "192.0.2.77", "dev@lists.example.org", "Re: [dev] patch series v3",
+			"accept", "rspamd", "no action, score 0.40 / 15.00"),
+		row("13:59:02", "invoice@partner-billing.example", "203.0.113.140", "owner@lists.example.org", "Outstanding invoice — action required",
+			"accept", "rspamd", "add header, score 9.80 / 15.00; PHISHING(5.00) FORGED_SENDER(3.00) R_SPF_FAIL(1.00)"),
+		row("13:57:41", "promo@bulk.example", "198.51.100.90", "sales@lists.example.org", "",
+			"reject", "postfix", "550 5.1.1 <sales@lists.example.org>: Recipient address rejected: User unknown in relay recipient table"),
+		row("13:51:30", "billing@partner.example", "198.51.100.12", "owner@lists.example.org", "",
+			"reject", "rspamd", "5.7.1 Spam message rejected"),
+		row("13:44:02", "hr@partner.example", "192.0.2.31", "jobs@acme.io", "",
+			"tempfail", "rspamd", "4.7.1 Try again later"),
+		row("13:30:55", "noreply@github.example", "192.0.2.200", "security@lists.example.org", "[advisory] new report",
+			"accept", "rspamd", "no action, score -98.10 / 15.00; SELFPOST_ALLOW_FROM(-100.00) R_DKIM_ALLOW(-0.20)"),
+	}, 1, 38)
+}
+
+// inFilterListsFixture is the mockup's Filter lists: three senders denied, two
+// allowed, and a filter that reads them.
+func inFilterListsFixture() *FilterLists {
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
+	return NewFilterLists(admin(), FilterListsInput{FilterOn: true, LastWritten: time.Date(2026, 9, 11, 8, 40, 0, 0, time.UTC)}).
+		WithEntries([]FilterEntryInput{
+			{ID: 1, List: "deny", Kind: "domain", Value: "bulk.example", Note: "newsletter nobody subscribed to", Added: day(9, 2)},
+			{ID: 2, List: "deny", Kind: "ip", Value: "198.51.100.0/24", Note: "dictionary attack on lists.example.org", Added: day(8, 19)},
+			{ID: 3, List: "deny", Kind: "address", Value: "win@lottery.example", Added: day(7, 30)},
+			{ID: 4, List: "allow", Kind: "domain", Value: "partner.example", Note: "invoices were scored as spam", Added: day(9, 11)},
+			{ID: 5, List: "allow", Kind: "address", Value: "noreply@github.example", Note: "security advisories", Added: day(6, 4)},
+		})
 }

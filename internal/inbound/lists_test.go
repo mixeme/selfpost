@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -233,5 +234,45 @@ func TestListsSyncWritesEmptyMaps(t *testing.T) {
 		if got := mapLines(t, dir, name); len(got) != 0 {
 			t.Errorf("%s = %v", name, got)
 		}
+	}
+}
+
+func TestListsLastWritten(t *testing.T) {
+	l, _, dir := testLists(t)
+	if got := l.LastWritten(); !got.IsZero() {
+		t.Fatalf("LastWritten before anything was written = %v", got)
+	}
+	if err := l.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.LastWritten(); got.IsZero() || time.Since(got) > time.Minute {
+		t.Errorf("LastWritten after a sync = %v", got)
+	}
+
+	// The newest of the six counts, whichever it is.
+	old := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	for _, name := range mapFiles {
+		if err := os.Chtimes(filepath.Join(dir, name), old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	newest := old.Add(48 * time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "deny_domain.map"), newest, newest); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.LastWritten(); !got.Equal(newest) {
+		t.Errorf("LastWritten = %v, want %v", got, newest)
+	}
+
+	// A file that is not one of the six does not count.
+	other := newest.Add(time.Hour)
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(filepath.Join(dir, "notes.txt"), other, other); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.LastWritten(); !got.Equal(newest) {
+		t.Errorf("LastWritten counts a stray file: %v", got)
 	}
 }

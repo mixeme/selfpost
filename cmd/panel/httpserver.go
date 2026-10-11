@@ -98,7 +98,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	// effective config, including a manual override; the panel keeps this
 	// snapshot for the process lifetime (architecture.md).
 	retryPolicy := postfix.LoadRetryPolicy()
-	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, ms.DMARC, web.Config{
+	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, ms.Lists, ms.DMARC, web.Config{
 		Hostname:                   cfg.hostname,
 		CookieSecure:               cfg.cookieSecure,
 		SubmissionEnabled:          cfg.submissionEnabled,
@@ -121,6 +121,8 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		InboundAntispamAction:      cfg.inboundAntispamAction,
 		DMARCEnabled:               cfg.dmarcEnabled,
 		SendLogRetentionEnvDefault: cfg.retentionDays,
+
+		InboundSpamLogRetentionEnvDefault: cfg.inboundSpamLogRetentionDays,
 	}, cfg.setupTokenPath)
 }
 

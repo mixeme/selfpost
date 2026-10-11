@@ -84,6 +84,13 @@ configured.
 **Global administrator only** for journal and lists — same as inbound relay. No
 domain-admin access in v1.
 
+*As built (2026-10-11):* the lists are the global role's; the **log follows
+the delegation of Inbound** that 2.0 introduced after this was written - a
+user with the `domain` role sees the rows of the inbound domains assigned to
+them and nothing else, without the *Allow / Deny sender* links. That is what
+the accepted `in-log` mockup draws (no "global role" in its head). The owner
+was told and can turn it back into a global-only page.
+
 ### Retention
 
 Mirror send-log retention:
@@ -248,7 +255,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] Inbound journal-milter + Postfix wiring — **Composer**
 - [x] mail.log tailer: inbound reject rows — **Composer**
 - [x] List CRUD + validation + atomic rspamd map sync — **Composer**
-- [ ] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
+- [x] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
 - [ ] Backup includes `/data/antispam/` — **Composer**
 - [ ] Unit + handler tests — **Composer**
 - [ ] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer**

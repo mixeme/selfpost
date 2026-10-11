@@ -23,7 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   of a message that was accepted for an inbound domain: client address,
   envelope, subject and - with a spam filter attached - the filter's action,
   score and heaviest symbols. It only watches: it refuses nothing and Postfix
-  accepts mail when it is down. There is no page for the journal yet.
+  accepts mail when it is down.
 - **Refused inbound mail is recorded too**, from the mail log: a recipient
   Postfix refused at an inbound domain (unknown user, sender domain not
   found), and a message the spam filter rejected, deferred, held or
@@ -42,8 +42,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   They are written as six files under `data/antispam/`, which the fragment
   mounts into the sidecar together with `antispam/rspamd/multimap.conf`;
   rspamd rereads a changed file by itself. Deny wins over allow. The files
-  are there from the first start with the inbound relay on; the page that
-  edits the lists comes next.
+  are there from the first start with the inbound relay on.
+- **Inbound › Log**: the journal as a page - time, sender and client address,
+  recipient, subject, decision and why, filtered by domain, decision and day.
+  A user with the *domain* role sees the rows of the inbound domains assigned
+  to them. For the global role each row links to the filter lists with the
+  sender filled in (*Deny sender* / *Allow sender*).
+- **Inbound › Filter lists** (global role): add and remove allow and deny
+  entries; the page says where the lists go and whether the filter is on to
+  read them.
+- **Server › Settings**: *Keep inbound log rows, days*, shown with the inbound
+  relay on.
+- Help: *Inbound log* and *Filter lists*.
 - New setting `ANTISPAM_DIR` (default `/data/antispam`).
 - New setting `INBOUND_JOURNAL_MILTER_SOCKET` (default
   `/run/selfpost/inbound-journal.sock`).

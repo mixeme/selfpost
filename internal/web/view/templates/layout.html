@@ -104,7 +104,9 @@
           <a class="navbar-link" href="/inbound/domains">Inbound</a>
           <div class="navbar-dropdown">
             <a class="navbar-item{{if and (eq .Section "inbound") (eq .Page "domains")}} is-active{{end}}" href="/inbound/domains"><i class="ti ti-world-download"></i>Domains</a>
-          </div>
+            <a class="navbar-item{{if and (eq .Section "inbound") (eq .Page "log")}} is-active{{end}}" href="/inbound/log"><i class="ti ti-list-details"></i>Log</a>
+{{if .ShowFilterLists}}            <a class="navbar-item{{if and (eq .Section "inbound") (eq .Page "filter-lists")}} is-active{{end}}" href="/inbound/filter-lists"><i class="ti ti-filter"></i>Filter lists</a>
+{{end}}          </div>
         </div>
 {{end}}{{if .ShowServer}}        <div class="navbar-item has-dropdown is-hoverable{{if eq .Section "server"}} sp-current{{end}}">
           <a class="navbar-link" href="/server/health">Server</a>
@@ -143,6 +145,6 @@
      pages of the current group, the current one marked. A page outside every
      group (the user menu, the kit page's neighbours) has none. */}}
 {{define "subnav"}}{{if and .ShowOutbound (eq .Section "outbound")}}<div class="sp-subnav"><div class="container"><a href="/outbound/domains"{{if eq .Page "domains"}} aria-current="page"{{end}}><i class="ti ti-world-upload"></i>Domains</a><a href="/outbound/log"{{if eq .Page "log"}} aria-current="page"{{end}}><i class="ti ti-list-details"></i>Log</a>{{if .ShowQueue}}<a href="/outbound/queue"{{if eq .Page "queue"}} aria-current="page"{{end}}><i class="ti ti-stack-2"></i>Queue</a>{{end}}{{if .ShowDMARC}}<a href="/outbound/dmarc"{{if eq .Page "dmarc"}} aria-current="page"{{end}}><i class="ti ti-report-analytics"></i>DMARC reports</a>{{end}}</div></div>
-{{else if and .ShowInbound (eq .Section "inbound")}}<div class="sp-subnav"><div class="container"><a href="/inbound/domains"{{if eq .Page "domains"}} aria-current="page"{{end}}><i class="ti ti-world-download"></i>Domains</a></div></div>
+{{else if and .ShowInbound (eq .Section "inbound")}}<div class="sp-subnav"><div class="container"><a href="/inbound/domains"{{if eq .Page "domains"}} aria-current="page"{{end}}><i class="ti ti-world-download"></i>Domains</a><a href="/inbound/log"{{if eq .Page "log"}} aria-current="page"{{end}}><i class="ti ti-list-details"></i>Log</a>{{if .ShowFilterLists}}<a href="/inbound/filter-lists"{{if eq .Page "filter-lists"}} aria-current="page"{{end}}><i class="ti ti-filter"></i>Filter lists</a>{{end}}</div></div>
 {{else if and .ShowServer (eq .Section "server")}}<div class="sp-subnav"><div class="container"><a href="/server/health"{{if eq .Page "health"}} aria-current="page"{{end}}><i class="ti ti-heartbeat"></i>Health</a><a href="/server/log"{{if eq .Page "log"}} aria-current="page"{{end}}><i class="ti ti-file-text"></i>System log</a><a href="/server/backup"{{if eq .Page "backup"}} aria-current="page"{{end}}><i class="ti ti-archive"></i>Backup</a><a href="/server/users"{{if eq .Page "users"}} aria-current="page"{{end}}><i class="ti ti-users"></i>Users</a><a href="/server/settings"{{if eq .Page "settings"}} aria-current="page"{{end}}><i class="ti ti-settings"></i>Settings</a></div></div>
 {{end}}{{end}}

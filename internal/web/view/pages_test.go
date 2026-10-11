@@ -402,3 +402,23 @@ func TestOverviewFragmentIsTheBoxAndTheHeadOutOfBand(t *testing.T) {
 		}
 	}
 }
+
+// With the inbound relay on the retention box has a second field, for the Inbound
+// log; with it off the field is not there, since there is no journal to keep.
+func TestSettingsHasTheInboundRetentionOnlyWithTheRelay(t *testing.T) {
+	out := renderSignedIn(t, "settings", settingsFixture())
+	pageHas(t, "Settings", out,
+		`for="inbound_spam_log_retention_days">Keep inbound log rows, days</label>`,
+		`name="inbound_spam_log_retention_days" type="number" min="7" max="365" step="1" value="90" required`,
+		`The inbound log also never holds more than 10 000 rows: refused mail is logged at the rate strangers knock on port 25.`,
+		`name="send_log_retention_days"`)
+	if got := strings.Count(out, `<form class="sp-form"`); got != 1 {
+		t.Errorf("Settings has %d forms, want 1", got)
+	}
+	pageLacks(t, "Settings", renderSignedIn(t, "settings", NewSettings(admin(), "30", "600 / h")),
+		`inbound_spam_log_retention_days`, `Keep inbound log rows`, `10 000 rows`)
+
+	// A refused value comes back as typed.
+	out = renderSignedIn(t, "settings", NewSettings(admin(), "30", "600 / h").WithInbound("3").WithResult("", "Inbound log retention must be between 7 and 365."))
+	pageHas(t, "Settings", out, `value="3"`, `between 7 and 365`)
+}

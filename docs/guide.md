@@ -864,6 +864,13 @@ spam score outweighs, so it is accepted - unless a deny entry matches the same
 message: **deny wins**, whichever entries they are. The files are readable by
 anyone on the host; they hold addresses, not secrets.
 
+In the panel the lists are **Inbound › Filter lists** (global role), and what
+port 25 decided about each message is **Inbound › Log**: accepted mail with the
+filter's verdict, refused mail with the reply it was given. A row of the log
+leads to the lists with its sender filled in. A user with the *domain* role
+sees the log of the inbound domains assigned to them, and not the lists. How
+long the log keeps a row is set under **Server › Settings**.
+
 The panel only reports this setting; it does not change it. Every inbound
 domain page has a **Spam filter** box — on or off, what happens to mail while
 the filter is down, and that the filter belongs to the server, not to the

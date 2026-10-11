@@ -19,7 +19,7 @@ func TestInDomainShowsTheMockupsBoxes(t *testing.T) {
 		`<h2>Spam filter</h2>`, `href="#filter"`, `href="/inbound/domains/1/delete"`, `Delete domain`,
 	)
 	// What has no source in this build is not drawn.
-	pageLacks(t, "Inbound domain", out, `rspamd`, `quarantine`, `Quarantine`, `Log for this domain`, `/inbound/log`, `/inbound/quarantine`, `Allow and deny`)
+	pageLacks(t, "Inbound domain", out, `rspamd`, `quarantine`, `Quarantine`, `Log for this domain`, `/inbound/quarantine`, `Allow and deny`)
 }
 
 // The Spam filter box states what the server is set up with, and what of it the

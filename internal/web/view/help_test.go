@@ -164,3 +164,30 @@ func TestHelpLinksStayInsideWhatTheirViewerIsShown(t *testing.T) {
 		landsOn("DMARC hub", hub.Recent.Help)
 	}
 }
+
+// The Inbound log and Filter lists have their topics, after the spam filter's, in
+// the menu and on the page, for everyone who is shown Inbound; the Settings topic
+// mentions the second retention.
+func TestHelpHasTheInboundLogAndFilterListsTopics(t *testing.T) {
+	out := renderSignedIn(t, "help", NewHelp(admin(), true))
+	pageHas(t, "Help", out,
+		`<li><a href="#inbound-log"><i class="ti ti-list-details"></i>Inbound log</a></li>`,
+		`<li><a href="#filter-lists"><i class="ti ti-filter"></i>Filter lists</a></li>`,
+		`<div class="sp-help-topic" id="inbound-log"><h3>Inbound log</h3>`,
+		`<span class="tag is-primary is-light">quarantine</span> — held by the filter. <em>Why</em> names who decided.`,
+		`a message refused after its text was sent is one row however many recipients it had.`,
+		`and never more than 10 000.`,
+		`<div class="sp-help-topic" id="filter-lists"><h3>Filter lists</h3>`,
+		`<strong>Deny wins</strong>.`, `files under <code>/data/antispam/</code>`,
+		`With the inbound relay on there is a second number, for the Inbound log, with the same range.`)
+	for _, v := range helpViewers {
+		out := renderSignedIn(t, "help", NewHelp(v.meta, v.inbound))
+		shown := strings.Contains(out, `id="inbound-log"`)
+		if want := v.inbound && (v.meta.IsGlobal || v.meta.HasInbound); shown != want {
+			t.Errorf("%s: inbound log topic shown = %v, want %v", v.name, shown, want)
+		}
+	}
+	if HelpInboundLog != "inbound-log" || HelpFilterLists != "filter-lists" {
+		t.Errorf("anchors %q and %q", HelpInboundLog, HelpFilterLists)
+	}
+}

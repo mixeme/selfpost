@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/mixeme/selfpost/internal/atomicfile"
@@ -138,6 +139,19 @@ func (l *Lists) Sync() error {
 		}
 	}
 	return nil
+}
+
+// LastWritten is when the maps were last written: the newest modification
+// time of the six files, the zero time while none exists (the filter lists
+// have never been touched, or the directory is gone).
+func (l *Lists) LastWritten() time.Time {
+	var newest time.Time
+	for _, name := range mapFiles {
+		if fi, err := os.Stat(filepath.Join(l.dir, name)); err == nil && fi.ModTime().After(newest) {
+			newest = fi.ModTime()
+		}
+	}
+	return newest
 }
 
 // normalizeListValue validates one entry and returns the form it is stored and

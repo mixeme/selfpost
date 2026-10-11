@@ -97,6 +97,9 @@ type Config struct {
 	DMARCEnabled bool
 	// SendLogRetentionEnvDefault is SEND_LOG_RETENTION_DAYS at panel start.
 	SendLogRetentionEnvDefault int
+	// InboundSpamLogRetentionEnvDefault is INBOUND_SPAM_LOG_RETENTION_DAYS at
+	// panel start.
+	InboundSpamLogRetentionEnvDefault int
 }
 
 // Server is the panel HTTP application.
@@ -111,7 +114,7 @@ type Server struct {
 // that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
 // apps owns application SASL accounts and the Postfix sender map
 // (architecture.md § Mail path).
-func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, dmarcSvc *dmarc.Service, cfg Config, setupTokenPath string) (*Server, error) {
+func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, lists *inbound.Lists, dmarcSvc *dmarc.Service, cfg Config, setupTokenPath string) (*Server, error) {
 	v, err := view.New(cfg.Version)
 	if err != nil {
 		return nil, err
@@ -124,7 +127,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		SessionIdleDays:   cfg.SessionIdleDays,
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
-	h := handlers.New(st, domains, apps, inboundSvc, dmarcSvc, handlers.Config{
+	h := handlers.New(st, domains, apps, inboundSvc, lists, dmarcSvc, handlers.Config{
 		Hostname:                   cfg.Hostname,
 		SubmissionEnabled:          cfg.SubmissionEnabled,
 		MailLogPath:                cfg.MailLogPath,
@@ -143,6 +146,8 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		InboundAntispamAction:      cfg.InboundAntispamAction,
 		DMARCEnabled:               cfg.DMARCEnabled,
 		SendLogRetentionEnvDefault: cfg.SendLogRetentionEnvDefault,
+
+		InboundSpamLogRetentionEnvDefault: cfg.InboundSpamLogRetentionEnvDefault,
 	}, v, dnscheck.New(cfg.DNSResolvers), &health.MachineSampler{}, a)
 	return &Server{cfg: cfg, auth: a, handlers: h}, nil
 }
@@ -240,6 +245,13 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 		authed.HandleFunc("POST /inbound/domains/{id}/recipients", h.HandleInboundRecipients)
 		authed.HandleFunc("GET /inbound/domains/{id}/delete", h.HandleInboundDeleteConfirm)
 		authed.HandleFunc("POST /inbound/domains/{id}/delete", h.HandleInboundDelete)
+		// The log is for everyone who reaches an inbound domain (scoped to
+		// theirs); the lists are the instance's, so the handlers keep the
+		// global role's check (requireInboundGlobal) and answer 404 to the rest.
+		authed.HandleFunc("GET /inbound/log", h.HandleInboundLog)
+		authed.HandleFunc("GET /inbound/filter-lists", h.HandleFilterLists)
+		authed.HandleFunc("POST /inbound/filter-lists", h.HandleFilterListAdd)
+		authed.HandleFunc("POST /inbound/filter-lists/{id}/delete", h.HandleFilterListDelete)
 	}
 
 	// Server: everything under /server/ is for the global role, so the subtree

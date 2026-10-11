@@ -30,7 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 |---|---|---|---|---|
 | preflight | Installation check page (`/preflight`) | candidate | — | [plans/preflight.md](plans/preflight.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
-| inbound-antispam-panel | Inbound antispam journal + allow/deny lists | in progress | 5/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
+| inbound-antispam-panel | Inbound antispam journal + allow/deny lists | in progress | 6/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
 | csrf-tokens | Per-session CSRF tokens on state-changing forms | candidate | — | — |
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |

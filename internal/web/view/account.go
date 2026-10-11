@@ -56,6 +56,10 @@ type Settings struct {
 
 	Retention     Box
 	RetentionDays string
+	// Inbound is whether the inbound relay is on, which gives the retention box
+	// its second field; InboundRetentionDays is what that field shows.
+	Inbound              bool
+	InboundRetentionDays string
 
 	RateLimits Box
 	RateFacts  []Fact
@@ -84,6 +88,14 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 				Value: Rich("Set on each ", Link("/outbound/domains", "domain"), " and on each application of a domain.")},
 		},
 	}
+}
+
+// WithInbound adds the retention of the Inbound log to the Log retention box.
+// days is what the field shows, like retention in NewSettings. The field exists
+// only while the inbound relay is on: with it off there is no journal to keep.
+func (s *Settings) WithInbound(days string) *Settings {
+	s.Inbound, s.InboundRetentionDays = true, days
+	return s
 }
 
 // WithResult shows the result of the last action, or its refusal, between the

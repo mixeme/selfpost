@@ -81,6 +81,132 @@ func (s *Store) PruneInboundSpam(cutoff time.Time, keep int) (int64, error) {
 	return n + m, nil
 }
 
+// InboundSpamRow is one row of the inbound antispam journal as it is read
+// back for the panel: the entry as it was written, with its id and when it
+// happened.
+type InboundSpamRow struct {
+	ID            int64
+	InboundDomain string
+	ClientIP      string
+	From          string
+	To            string
+	Subject       string
+	Decision      string
+	Engine        string
+	Detail        string
+	CreatedAt     time.Time
+}
+
+// InboundSpamFilter narrows QueryInboundSpam and CountInboundSpam. Like
+// SendLogFilter it carries two kinds of narrowing that behave in opposite ways
+// on purpose.
+//
+// Domain, Decision, Since and Until are the operator's own filters, chosen in
+// the UI: an empty field matches everything. Since and Until are days, both
+// inclusive and read as UTC days whatever the time of day they carry.
+//
+// Domains is the authorization scope, which no query parameter may widen: the
+// exhaustive set of inbound domain names the caller may read, applied as an IN
+// constraint. nil lifts it (the global role reads the whole journal, including
+// rows of a domain deleted since); an empty set is a caller who reaches
+// nothing and gets nothing. Unlike SendLogFilter, forgetting the scope is
+// therefore the permissive case - the caller states "all" by leaving it out -
+// so every caller that serves someone other than the global role must set it.
+type InboundSpamFilter struct {
+	Domain   string
+	Decision string
+	Since    time.Time
+	Until    time.Time
+	Domains  []string
+}
+
+// QueryInboundSpam returns journal rows matching filter, newest first, for
+// the Inbound log's server-side pagination. A refusal is dated by the mail.log
+// line the tailer read it from, which can be older than rows written since, so
+// the order is by time and not by id.
+func (s *Store) QueryInboundSpam(filter InboundSpamFilter, limit, offset int) ([]InboundSpamRow, error) {
+	where, args := inboundSpamWhere(filter)
+	args = append(args, limit, offset)
+	rows, err := s.db.Query(
+		`SELECT id, inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at
+		 FROM inbound_spam_log`+where+`
+		 ORDER BY created_at DESC, id DESC
+		 LIMIT ? OFFSET ?`,
+		args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query inbound_spam_log: %w", err)
+	}
+	defer rows.Close()
+
+	var out []InboundSpamRow
+	for rows.Next() {
+		var (
+			row     InboundSpamRow
+			created string
+		)
+		if err := rows.Scan(&row.ID, &row.InboundDomain, &row.ClientIP, &row.From, &row.To,
+			&row.Subject, &row.Decision, &row.Engine, &row.Detail, &created); err != nil {
+			return nil, fmt.Errorf("scan inbound_spam_log row: %w", err)
+		}
+		row.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// CountInboundSpam returns how many journal rows match filter, for the page
+// numbers under the Inbound log.
+func (s *Store) CountInboundSpam(filter InboundSpamFilter) (int64, error) {
+	where, args := inboundSpamWhere(filter)
+	var n int64
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM inbound_spam_log`+where, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count inbound_spam_log: %w", err)
+	}
+	return n, nil
+}
+
+func inboundSpamWhere(f InboundSpamFilter) (string, []any) {
+	var clauses []string
+	var args []any
+	if f.Domains != nil {
+		if len(f.Domains) == 0 {
+			return " WHERE 1 = 0", nil
+		}
+		marks := make([]string, len(f.Domains))
+		for i, name := range f.Domains {
+			marks[i] = "?"
+			args = append(args, name)
+		}
+		clauses = append(clauses, "inbound_domain IN ("+strings.Join(marks, ", ")+")")
+	}
+	if f.Domain != "" {
+		clauses = append(clauses, "inbound_domain = ?")
+		args = append(args, f.Domain)
+	}
+	if f.Decision != "" {
+		clauses = append(clauses, "decision = ?")
+		args = append(args, f.Decision)
+	}
+	// created_at is RFC3339 UTC, so comparing it as text against the same
+	// format is comparing moments: from midnight of the first day up to, not
+	// including, midnight after the last.
+	if !f.Since.IsZero() {
+		y, m, d := f.Since.UTC().Date()
+		clauses = append(clauses, "created_at >= ?")
+		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+	}
+	if !f.Until.IsZero() {
+		y, m, d := f.Until.UTC().Date()
+		clauses = append(clauses, "created_at < ?")
+		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+	}
+	if len(clauses) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
 // IsInboundDomain reports whether name is a configured inbound domain. Port 25
 // also takes mail that is not the relay's - DMARC reports for the server's own
 // name - and the journal keeps rows for inbound domains only.

@@ -71,7 +71,8 @@ func TestStatusTagMapsEveryStatusOfTheKitTable(t *testing.T) {
 		"ok": "tag is-success is-light", "published": "tag is-success is-light",
 		"running": "tag is-success is-light", "sent": "tag is-success is-light",
 		"warn": "tag is-warning is-light", "deferred": "tag is-warning is-light",
-		"quiet": "tag is-warning is-light",
+		"quiet":  "tag is-warning is-light",
+		"accept": "tag is-success is-light", "tempfail": "tag is-warning is-light", "reject": "tag is-danger is-light",
 		"error": "tag is-danger is-light", "fail": "tag is-danger is-light",
 		"mismatch": "tag is-danger is-light", "bounced": "tag is-danger is-light",
 		"quarantine": "tag is-primary is-light", "global": "tag is-primary is-light",
@@ -413,7 +414,7 @@ func TestShellVisibilityFollowsRoleAndFlags(t *testing.T) {
 		wantIn bool
 	}{
 		{"global, everything on", on, Meta{IsGlobal: true},
-			Shell{Home: "/overview", ShowOverview: true, ShowOutbound: true, ShowQueue: true, ShowDMARC: true, ShowInbound: true, ShowServer: true}, true},
+			Shell{Home: "/overview", ShowOverview: true, ShowOutbound: true, ShowQueue: true, ShowDMARC: true, ShowInbound: true, ShowServer: true, ShowFilterLists: true}, true},
 		{"global, inbound and DMARC off", off, Meta{IsGlobal: true},
 			Shell{Home: "/overview", ShowOverview: true, ShowOutbound: true, ShowQueue: true, ShowServer: true}, true},
 		{"domain admin with both reaches", on, Meta{HasOutbound: true, HasInbound: true},
@@ -446,19 +447,19 @@ func renderShell(t *testing.T, e *Engine, m Meta) string {
 	return rec.Body.String()
 }
 
-// The menu has the 2.0 entries and none of the ones that are not in 2.0 (plan
-// § Routes): no Inbound Log, Queue, Quarantine or Filter lists, no Preflight.
+// The menu has the entries that are built and none of the ones that are not (plan
+// § Routes): no Inbound Queue or Quarantine, no Preflight.
 func TestMenuHoldsTheTwoDotZeroEntries(t *testing.T) {
 	out := renderShell(t, kitEngine(t), Meta{Title: "t", User: "admin", IsGlobal: true})
 	for _, href := range []string{
 		"/overview", "/outbound/domains", "/outbound/log", "/outbound/queue", "/outbound/dmarc",
-		"/inbound/domains", "/server/health", "/server/log", "/server/backup", "/server/users", "/server/settings",
+		"/inbound/domains", "/inbound/log", "/inbound/filter-lists", "/server/health", "/server/log", "/server/backup", "/server/users", "/server/settings",
 		"/account", "/help", "/license",
 	} {
 		mustContain(t, out, `href="`+href+`"`)
 	}
 	for _, gone := range []string{
-		"/inbound/log", "/inbound/queue", "/inbound/quarantine", "/inbound/filter-lists", "/server/preflight",
+		"/inbound/queue", "/inbound/quarantine", "/server/preflight",
 		`href="/status"`, `href="/domains"`, `href="/users"`, `href="/settings"`,
 	} {
 		mustNotContain(t, out, gone)

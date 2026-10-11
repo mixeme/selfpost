@@ -54,6 +54,8 @@ var pageFiles = map[string][]string{
 	"in-domains":          {"templates/in_domains.html"},
 	"in-domain":           {"templates/in_domain.html"},
 	"in-domain-delete":    {"templates/in_domain_delete.html"},
+	"in-log":              {"templates/in_log.html"},
+	"in-filter-lists":     {"templates/in_filter_lists.html"},
 	"out-log":             {"templates/out_log.html", "templates/out_log_rows.html"},
 	"out-message":         {"templates/out_message.html"},
 	"dmarc":               {"templates/dmarc.html"},
