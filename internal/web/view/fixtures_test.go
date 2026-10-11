@@ -420,12 +420,14 @@ func userDeleteFixture() *UserDelete {
 func inLogFixture() *InLog {
 	p := NewInLog(admin(), 90, []string{"lists.example.org", "acme.io"},
 		InLogFilter{From: "2026-09-14", To: "2026-09-21"})
+	var id int64
 	row := func(clock, from, client, to, subject, decision, engine, detail string) InLogRow {
 		at, err := time.Parse("2006-01-02 15:04:05", "2026-09-21 "+clock)
 		if err != nil {
 			panic(err)
 		}
-		return p.NewRow(InLogRowInput{At: at, From: from, Client: client, To: to, Subject: subject,
+		id++
+		return p.NewRow(InLogRowInput{ID: id, At: at, From: from, Client: client, To: to, Subject: subject,
 			Decision: decision, Engine: engine, Detail: detail})
 	}
 	return p.WithRows([]InLogRow{

@@ -105,6 +105,27 @@ type Tag struct {
 	Label  string
 }
 
+// Sheet is what does not fit a table row, opened over the page from the row's
+// tag (partials "sheet_tag" and "sheet"; used by the Inbound log, where it says
+// why a message was decided the way it was). It is the browser's own popover:
+// the tag is a button that names the sheet by ID, so ID is unique on the page.
+// Its content is a table of name and value.
+type Sheet struct {
+	ID    string
+	Tag   Tag
+	Title string
+	Rows  []SheetRow
+}
+
+// SheetRow is one name and its value in a sheet. A value of several lines is
+// one line each; Mono is for what is read as written - a reply, a list of
+// symbols.
+type SheetRow struct {
+	Label string
+	Lines []string
+	Mono  bool
+}
+
 // statusClass is the one mapping of status to Bulma tag classes — box 03 of the
 // kit page. A page passes the status it knows (a DKIM check says ok, a message
 // says deferred) and never picks a colour.

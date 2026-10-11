@@ -327,3 +327,27 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
   .sp-record-head small { margin-left: 0; text-align: left; flex-basis: 100%; }
   .sp-postmark { display: none; }
 }
+
+/* sheet: what does not fit a table row, opened over the page from the row's
+   tag. It is the browser's own popover (the tag is a button with
+   popovertarget), so it needs no script: Esc, a click outside and the close
+   button all shut it, and focus returns to the tag. It rises from the bottom
+   edge across the whole window - the one component that is not laid out by the
+   page, hence the widths - with its content, a table of name and value, in a
+   column of reading width in the middle. */
+.sp-sheet {
+  inset: auto 0 0 0; width: auto; margin: 0; padding: 0; border: 0; border-top: 3px solid var(--sp-brick);
+  max-height: 75vh; overflow: auto; background: #fff; color: inherit; box-shadow: 0 -12px 40px rgba(40, 20, 15, .22);
+}
+.sp-sheet-in { max-width: 44rem; margin: 0 auto; padding: 0 1.25rem; }
+.sp-sheet::backdrop { background: rgba(40, 20, 15, .38); }
+.sp-sheet-head { display: flex; align-items: center; gap: .7rem; padding: 1rem 0 .8rem; border-bottom: 1px solid var(--sp-rule); }
+.sp-sheet-head h2 { font-size: 1.15rem; font-weight: 600; margin-right: auto; }
+.sp-sheet-head button { border: 0; background: none; cursor: pointer; font-size: 1.3rem; color: var(--sp-muted); }
+.sp-sheet-body { padding: .4rem 0 1.4rem; }
+/* The sheet's content is a table of name and value: the name is a label, set like the dt of facts. */
+.sp-sheet .table th { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); white-space: nowrap; vertical-align: top; width: 1%; padding-right: 2rem; }
+.sp-sheet .table td { overflow-wrap: anywhere; }
+/* A tag that opens a sheet is a button: it keeps the tag's look and says it can
+   be pressed with the dotted underline links to more detail carry. */
+button.tag { border: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }

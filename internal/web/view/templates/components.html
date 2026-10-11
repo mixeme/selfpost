@@ -27,6 +27,13 @@
      mapping of status to Bulma classes; the label defaults to the status. */}}
 {{define "tag"}}<span class="{{status_tag .Status}}">{{if .Label}}{{.Label}}{{else}}{{.Status}}{{end}}</span>{{end}}
 
+{{/* sheet_tag is a status tag that opens a sheet (input: Sheet): the tag as a
+     button, and the sheet it names right after it. sheet is what opens: the tag
+     again, a title, the cross that closes it, and a table of name and value.
+     The browser's popover does the rest - no script. */}}
+{{define "sheet_tag"}}<button type="button" class="{{status_tag .Tag.Status}}" popovertarget="{{.ID}}">{{if .Tag.Label}}{{.Tag.Label}}{{else}}{{.Tag.Status}}{{end}}</button>{{template "sheet" .}}{{end}}
+{{define "sheet"}}<div class="sp-sheet" id="{{.ID}}" popover><div class="sp-sheet-in"><div class="sp-sheet-head">{{template "tag" .Tag}}<h2>{{.Title}}</h2><button type="button" popovertarget="{{.ID}}" popovertargetaction="hide" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="sp-sheet-body"><div class="table-container"><table class="table is-fullwidth"><tbody>{{range .Rows}}<tr><th>{{.Label}}</th><td{{if .Mono}} class="sp-mono sp-small"{{end}}>{{range $i, $line := .Lines}}{{if $i}}<br>{{end}}{{$line}}{{end}}</td></tr>{{end}}</tbody></table></div></div></div></div>{{end}}
+
 {{/* kicker is the upper-case mono micro-label on its own (input: string).
      page_head writes its own kicker as the line above the title. */}}
 {{define "kicker"}}<span class="sp-kicker">{{.}}</span>{{end}}

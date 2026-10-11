@@ -22,19 +22,29 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">`,
 		`<input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">`,
 		`href="/help#inbound-log" title="What the decisions mean"`,
-		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Why</th>`,
+		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th></th></tr>`,
 		`09-21 14:00:18`,
 		`t.berg@<wbr>uni.example<br><span class="sp-mono sp-muted sp-small">192.0.2.77</span>`,
 		`dev@<wbr>lists.example.org`, `title="Re: [dev] patch series v3"`,
 		`<td class="sp-clip sp-muted">—</td>`,
-		`<span class="tag is-success is-light">accept</span>`, `<span class="tag is-danger is-light">reject</span>`,
-		`<span class="tag is-warning is-light">tempfail</span>`,
-		`rspamd · no action, score 0.40 / 15.00`,
-		`postfix · 550 5.1.1 &lt;sales@lists.example.org&gt;: Recipient address rejected`,
+		// the decision is a tag that opens the sheet with who decided and why
+		`<button type="button" class="tag is-success is-light" popovertarget="why-1">accept</button><div class="sp-sheet" id="why-1" popover>`,
+		`<div class="sp-sheet-head"><span class="tag is-success is-light">accept</span><h2>Why</h2><button type="button" popovertarget="why-1" popovertargetaction="hide" aria-label="Close">`,
+		`<button type="button" class="tag is-danger is-light" popovertarget="why-3">reject</button>`,
+		`<button type="button" class="tag is-warning is-light" popovertarget="why-5">tempfail</button>`,
+		`<tr><th>Decided by</th><td>rspamd</td></tr><tr><th>Verdict</th><td>no action, score 0.40 / 15.00</td></tr><tr><th>Subject</th><td>Re: [dev] patch series v3</td></tr>`,
+		`<tr><th>Verdict</th><td>add header, score 9.80 / 15.00</td></tr><tr><th>Symbols</th><td class="sp-mono sp-small">PHISHING(5.00)<br>FORGED_SENDER(3.00)<br>R_SPF_FAIL(1.00)</td></tr>`,
+		`<tr><th>Decided by</th><td>postfix</td></tr><tr><th>Reply</th><td class="sp-mono sp-small">550 5.1.1 &lt;sales@lists.example.org&gt;: Recipient address rejected: User unknown in relay recipient table</td></tr></tbody>`,
 		`Page 1 of 38`, `<a href="/inbound/log?from=2026-09-14&amp;p=2&amp;to=2026-09-21">Older →</a>`,
-		`Allow / Deny sender opens <a href="/inbound/filter-lists">Filter lists</a> with the entry filled in`,
+		`A decision opens its reason · Allow / Deny sender opens <a href="/inbound/filter-lists">Filter lists</a> with the entry filled in`,
 	)
-	pageLacks(t, "Inbound log", out, `← Newer`, `data-poll`, `hx-get`)
+	pageLacks(t, "Inbound log", out, `← Newer`, `data-poll`, `hx-get`, `<th>Why</th>`)
+	// A message Postfix itself refused offers no way into the lists: one Deny
+	// for each of the three accepted messages, one Allow for each the filter
+	// refused or put off.
+	if deny, allow := strings.Count(out, `>Deny sender</a>`), strings.Count(out, `>Allow sender</a>`); deny != 3 || allow != 2 {
+		t.Errorf("the fixture's six rows offer Deny %d times and Allow %d times, want 3 and 2", deny, allow)
+	}
 
 	// Without the global role there is nowhere to change the retention, and
 	// nowhere to send a sender.
@@ -96,11 +106,11 @@ func TestInLogRowWording(t *testing.T) {
 	p := NewInLog(admin(), 90, nil, InLogFilter{})
 	at := time.Date(2026, 9, 21, 14, 0, 18, 0, time.UTC)
 	r := p.NewRow(InLogRowInput{At: at, From: "a@example.net", To: "b@acme.io", Decision: "accept", Engine: "selfpost"})
-	if r.Why != "selfpost" || r.Time != "09-21 14:00:18" || r.Client != "" {
+	if len(r.Why.Rows) != 1 || r.Why.Rows[0].Lines[0] != "selfpost" || r.Time != "09-21 14:00:18" || r.Client != "" {
 		t.Errorf("row = %+v", r)
 	}
-	r = p.NewRow(InLogRowInput{At: at, To: "b@acme.io", Decision: "reject", Engine: "postfix", Detail: "550 5.1.1 no"})
-	if r.Why != "postfix · 550 5.1.1 no" || r.From != "—" || r.Action != nil {
+	r = p.NewRow(InLogRowInput{ID: 7, At: at, To: "b@acme.io", Decision: "reject", Engine: "postfix", Detail: "550 5.1.1 no"})
+	if r.Why.ID != "why-7" || r.Why.Tag.Status != "reject" || len(r.Why.Rows) != 2 || r.Why.Rows[1].Label != "Reply" || r.From != "—" || r.Action != nil {
 		t.Errorf("row = %+v", r)
 	}
 	out := renderSignedIn(t, "in-log", p.WithRows([]InLogRow{r}, 1, 1))
@@ -110,7 +120,7 @@ func TestInLogRowWording(t *testing.T) {
 
 // Which decisions lead to which list, for the global role: the sender of mail
 // that got through can be denied, the sender of mail the filter turned away or
-// put off can be allowed, and a refusal that is Postfix's own can only be denied.
+// put off can be allowed, and a refusal that is Postfix's own offers neither.
 func TestInLogSenderAction(t *testing.T) {
 	for _, c := range []struct {
 		decision, engine, from, label, href string
@@ -120,7 +130,7 @@ func TestInLogSenderAction(t *testing.T) {
 		{"reject", "rspamd", "a+b@example.net", "Allow sender", "/inbound/filter-lists?list=allow&kind=address&value=a%2Bb%40example.net"},
 		{"tempfail", "rspamd", "a@example.net", "Allow sender", "/inbound/filter-lists?list=allow&kind=address&value=a%40example.net"},
 		{"quarantine", "rspamd", "a@example.net", "Allow sender", "/inbound/filter-lists?list=allow&kind=address&value=a%40example.net"},
-		{"reject", "postfix", "a@example.net", "Deny sender", "/inbound/filter-lists?list=deny&kind=address&value=a%40example.net"},
+		{"reject", "postfix", "a@example.net", "", ""},
 		{"tempfail", "postfix", "a@example.net", "", ""},
 		{"reject", "selfpost", "a@example.net", "", ""},
 		{"accept", "rspamd", "", "", ""},
@@ -253,4 +263,30 @@ func TestInboundMenuHasLogAndFilterLists(t *testing.T) {
 	out = renderSignedIn(t, "in-log", domain)
 	pageHas(t, "Inbound log", out, `<a class="navbar-item is-active" href="/inbound/log">`, `<a href="/inbound/log" aria-current="page">`)
 	pageLacks(t, "Inbound log", out, `/inbound/filter-lists`)
+}
+
+// What a sheet says, from the two shapes a row's detail has: the filter's
+// verdict on mail that passed, and the reply a refusal was given.
+func TestWhyRows(t *testing.T) {
+	flat := func(rows []SheetRow) string {
+		var out []string
+		for _, r := range rows {
+			out = append(out, r.Label+"="+strings.Join(r.Lines, "|"))
+		}
+		return strings.Join(out, "; ")
+	}
+	for _, c := range []struct{ engine, detail, subject, want string }{
+		{"selfpost", "", "", "Decided by=selfpost"},
+		{"selfpost", "", "Hello", "Decided by=selfpost; Subject=Hello"},
+		{"rspamd", "no action, score 0.40 / 15.00", "Hi", "Decided by=rspamd; Verdict=no action, score 0.40 / 15.00; Subject=Hi"},
+		{"rspamd", "add header, score 9.80 / 15.00; A(5.00) B(-0.10)", "", "Decided by=rspamd; Verdict=add header, score 9.80 / 15.00; Symbols=A(5.00)|B(-0.10)"},
+		// a verdict with symbols and no action or score
+		{"rspamd", "A(5.00)", "", "Decided by=rspamd; Verdict=A(5.00)"},
+		{"rspamd", "5.7.1 Spam message rejected", "", "Decided by=rspamd; Reply=5.7.1 Spam message rejected"},
+		{"postfix", "450 4.1.8 <a@nx.example>: Sender address rejected; see x", "", "Decided by=postfix; Reply=450 4.1.8 <a@nx.example>: Sender address rejected; see x"},
+	} {
+		if got := flat(whyRows(c.engine, c.detail, c.subject)); got != c.want {
+			t.Errorf("whyRows(%q, %q, %q)\n got: %s\nwant: %s", c.engine, c.detail, c.subject, got, c.want)
+		}
+	}
 }

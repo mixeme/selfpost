@@ -21,6 +21,7 @@ type Kit struct {
 	Postmarks     []Postmark
 	StatusTag     Box
 	StatusRows    []KitStatusRow
+	Sheet         Sheet
 	BoxHead       Box
 	BoxFoot       Foot
 	DangerZone    Box
@@ -91,6 +92,10 @@ func KitPage() *Kit {
 		},
 
 		StatusTag: Box{No: "03", Title: "status_tag", End: Plain("One mapping, one function")},
+		Sheet: Sheet{ID: "kit-sheet", Tag: Tag{Status: "reject"}, Title: "sheet", Rows: []SheetRow{
+			{Label: "What it holds", Lines: []string{"What does not fit the row, as name and value"}},
+			{Label: "How it closes", Lines: []string{"Esc", "a click outside", "the cross"}, Mono: true},
+		}},
 		StatusRows: []KitStatusRow{
 			{"ok, published, running, sent, accept", Tag{Status: "ok"}},
 			{"warn, deferred, quiet, tempfail", Tag{Status: "warn"}},

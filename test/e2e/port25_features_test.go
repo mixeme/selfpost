@@ -297,7 +297,9 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 			body = b
 			rows = rows[:0]
 			for _, row := range strings.Split(body, "<tr><td")[1:] {
-				rows = append(rows, row[:strings.Index(row, "</tr>")])
+				// The row's own end is the last one: the sheet in its
+				// decision cell holds a table of its own.
+				rows = append(rows, row[:strings.LastIndex(row, "</tr>")])
 			}
 			if strings.Contains(body, want) {
 				return rows
@@ -326,7 +328,7 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	rows := logRows("e2e " + token)
 	rowWith(rows,
 		"someone@<wbr>stranger.e2e.test", "user@<wbr>"+inboundDomain, "e2e "+token,
-		`<span class="tag is-success is-light">accept</span>`, `<td class="sp-muted sp-small">selfpost</td>`,
+		`class="tag is-success is-light" popovertarget="why-`, `<th>Decided by</th><td>selfpost</td>`,
 		// the way to correct it, which only the global role is given
 		`href="/inbound/filter-lists?list=deny&amp;kind=address&amp;value=someone%40stranger.e2e.test">Deny sender</a>`)
 	// A report mailed to the server's own name earlier in the run came through
@@ -346,10 +348,14 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	// the mail log into the journal; the refusal to relay for a stranger's
 	// domain is not the relay's mail and is not.
 	rows = logRows("nobody@<wbr>" + inboundDomain)
-	rowWith(rows,
+	refused := rowWith(rows,
 		"someone@<wbr>stranger.e2e.test", "nobody@<wbr>"+inboundDomain, `<td class="sp-clip sp-muted">—</td>`,
-		`<span class="tag is-danger is-light">reject</span>`, `<td class="sp-muted sp-small">postfix`,
-		`>Deny sender</a>`)
+		`class="tag is-danger is-light" popovertarget="why-`, `<th>Decided by</th><td>postfix</td>`,
+		`<th>Reply</th><td class="sp-mono sp-small">550 5.1.1 `)
+	// A message Postfix itself refused offers no way into the lists.
+	if strings.Contains(refused, "sender</a>") {
+		t.Fatalf("the refused row offers a way into the filter lists:\n%s", refused)
+	}
 	if len(rows) != 2 {
 		t.Fatalf("the Inbound log holds %d rows, want the relayed message and one refusal:\n%s", len(rows), strings.Join(rows, "\n"))
 	}

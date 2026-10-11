@@ -31,6 +31,7 @@
       <thead><tr><th>Status</th><th>Tag</th><th>Bulma classes</th></tr></thead>
       <tbody>{{range .StatusRows}}
         <tr><td>{{.Words}}</td><td>{{template "tag" .Tag}}</td><td class="sp-mono sp-small">{{status_tag .Tag.Status}}</td></tr>{{end}}
+        <tr><td>a tag that opens a <code>sheet</code></td><td>{{template "sheet_tag" .Sheet}}</td><td class="sp-mono sp-small">button.tag + sp-sheet (popover)</td></tr>
       </tbody>
     </table></div>
     {{template "box_close"}}

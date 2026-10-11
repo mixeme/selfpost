@@ -12,6 +12,7 @@ package view
 import (
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,23 +68,24 @@ type InLog struct {
 
 // InLogRow is one recipient of one message: when it was decided, who the mail
 // was from (and the address of the server that offered it) and for, its subject,
-// the decision as a tag, who decided and why, and — for the global role, who
-// alone edits the filter lists — the way to correct the decision.
+// the decision as a tag that opens the sheet saying who decided and why, and —
+// for the global role, who alone edits the filter lists — the way to correct
+// the decision.
 type InLogRow struct {
-	Time     string
-	From     string
-	Client   string
-	To       string
-	Subject  string
-	Decision Tag
-	Why      string
-	Action   *Anchor
+	Time    string
+	From    string
+	Client  string
+	To      string
+	Subject string
+	Why     Sheet
+	Action  *Anchor
 }
 
 // InLogRowInput is what the journal holds about one row. Subject, Detail and
 // From may be empty: refused mail is read from mail.log, which has no subject,
 // and a filter that said nothing has no detail.
 type InLogRowInput struct {
+	ID       int64
 	At       time.Time
 	From     string
 	Client   string
@@ -140,13 +142,12 @@ func NewInLog(m Meta, retentionDays int, domains []string, filter InLogFilter) *
 
 // NewRow words one row of the journal for the viewer of the page.
 func (p *InLog) NewRow(in InLogRowInput) InLogRow {
-	why := in.Engine
-	if in.Detail != "" {
-		why += " · " + in.Detail
-	}
 	r := InLogRow{
 		Time: FormatLogTime(in.At), From: orDash(in.From), Client: in.Client, To: in.To, Subject: in.Subject,
-		Decision: Tag{Status: in.Decision}, Why: why,
+		Why: Sheet{
+			ID: "why-" + strconv.FormatInt(in.ID, 10), Tag: Tag{Status: in.Decision}, Title: "Why",
+			Rows: whyRows(in.Engine, in.Detail, in.Subject),
+		},
 	}
 	if p.IsGlobal {
 		r.Action = senderAction(in.Decision, in.Engine, in.From)
@@ -154,11 +155,36 @@ func (p *InLog) NewRow(in InLogRowInput) InLogRow {
 	return r
 }
 
+// whyRows is the content of a row's sheet: who decided, what they said, and
+// the subject whole, which the table clips. What was said has one of two
+// shapes, told apart by how it starts. The inbound journal milter writes the
+// filter's verdict on mail that passed - an action and a score, then the
+// symbols after a semicolon. The log tailer writes the reply a refusal was
+// given, which starts with its code.
+func whyRows(engine, detail, subject string) []SheetRow {
+	rows := []SheetRow{{Label: "Decided by", Lines: []string{engine}}}
+	switch {
+	case detail == "":
+	case detail[0] >= '0' && detail[0] <= '9':
+		rows = append(rows, SheetRow{Label: "Reply", Lines: []string{detail}, Mono: true})
+	default:
+		verdict, symbols, _ := strings.Cut(detail, "; ")
+		rows = append(rows, SheetRow{Label: "Verdict", Lines: []string{verdict}})
+		if symbols != "" {
+			rows = append(rows, SheetRow{Label: "Symbols", Lines: strings.Fields(symbols), Mono: true})
+		}
+	}
+	if subject != "" {
+		rows = append(rows, SheetRow{Label: "Subject", Lines: []string{subject}})
+	}
+	return rows
+}
+
 // senderAction is the way to correct a decision from its row, if there is one:
-// a message that got through is the one to deny its sender for, a message the
-// filter turned away or put off is the one to allow its sender for, and a
-// refusal by Postfix's own policy (an unknown recipient, say) can only be
-// answered by denying — allowing the sender would not change what Postfix
+// a message that got through is the one to deny its sender for, and a message
+// the filter turned away, put off or held is the one to allow its sender for.
+// A refusal by Postfix's own policy (an unknown recipient, say) offers nothing:
+// the message is refused already and the lists would not change what Postfix
 // thinks of the recipient. A row with no sender has nobody to list.
 func senderAction(decision, engine, from string) *Anchor {
 	if from == "" {
@@ -170,8 +196,6 @@ func senderAction(decision, engine, from string) *Anchor {
 		list = "deny"
 	case engine == "rspamd":
 		list = "allow"
-	case decision == "reject" && engine == "postfix":
-		list = "deny"
 	default:
 		return nil
 	}
@@ -199,7 +223,9 @@ func (p *InLog) WithRows(rows []InLogRow, page, last int) *InLog {
 		p.Foot.Link = &Anchor{Href: InLogHref(p.filter, page+1), Label: "Older →"}
 	}
 	if p.IsGlobal {
-		p.Foot.End = Rich("Allow / Deny sender opens ", Link(inboundFilterLists, "Filter lists"), " with the entry filled in")
+		p.Foot.End = Rich("A decision opens its reason · Allow / Deny sender opens ", Link(inboundFilterLists, "Filter lists"), " with the entry filled in")
+	} else {
+		p.Foot.End = Plain("A decision opens its reason")
 	}
 	return p
 }
