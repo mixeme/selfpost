@@ -542,10 +542,14 @@ journal-milter (level 2) is down. There is no per-IP bypass.
 ### Full backup and restore
 
 **Full backup** is a self-contained project archive: `data/` (SQLite, all
-domains' DKIM keys, all applications' SASL credentials, the Postfix queue,
-`manifest.json` with the version that created it), plus `docker-compose.yml`,
-`.env`, and `certs/` from the operator directory next to `./data`. Delivery
-logs under `data/log/` are excluded. The base compose file mounts the project
+domains' DKIM keys, all applications' SASL credentials, `manifest.json` with
+the version that created it), plus `docker-compose.yml`, `.env`, and `certs/`
+from the operator directory next to `./data`. Delivery logs under `data/log/`
+are excluded, and so is the Postfix queue: the archive is taken while the
+instance runs, and a copy of a queue Postfix is working on can hold a message
+twice or not at all. Mail still waiting for delivery is therefore not carried
+over, and a restored instance starts with an empty queue; to keep the queue,
+stop the instance and use `tar` (methods 3 and 4 below). The base compose file mounts the project
 directory read-only at `/selfpost-deploy` so the panel and CLI can read those
 deploy files — without that mount, *Full backup* refuses with an error.
 
@@ -556,23 +560,17 @@ instance keeps running, what goes into the archive, and what happens on restore.
 
 **1. Panel — while the container is running (no downtime).** *Server › Backup*
 → *Full backup*. *Encrypt with a password* is ticked; untick it for a plain
-archive. The archive of the CLI below, less two things the panel may not read:
-it runs as its own user, not as root. **The Postfix queue** is left out —
-Postfix keeps it readable by its own user alone — so mail that was waiting for
-delivery at that moment is not in the archive; the restored instance starts
-with an empty queue. **A file in `certs/` the panel cannot open** is left out
-too, which is usually the private key (the panel's log names it); put the key
+archive. The archive of the CLI below, less one thing the panel may not read:
+it runs as its own user, not as root, and **a file in `certs/` it cannot open**
+is left out — usually the private key (the panel's log names it). Put the key
 back into `certs/` before starting a restored instance. If anything else
 cannot be read, the panel says so and downloads nothing.
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
 snapshot via `VACUUM INTO`, then a gzip tar of `data/` (minus diagnostics) plus
-deploy files. `docker exec` runs the command as root, so this archive is the
-complete one: it has the Postfix queue and everything in `certs/`. The queue is
-copied while Postfix works on it, so a message on its way through may be in the
-archive twice or not at all; stop the service first (method 3) if the queue
-matters.
+deploy files. `docker exec` runs the command as root, so this archive has
+everything in `certs/`, the private key included.
 
 ```sh
 docker exec <container> selfpost-backup > selfpost-backup.tar.gz
@@ -627,7 +625,7 @@ methods avoid it by stopping first.
 | Self-contained archive | Yes | Yes | No — deploy files separate |
 | SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
 | `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
-| Postfix queue | CLI: yes, copied live. Panel: no | Yes | Yes |
+| Postfix queue | No | Yes | Yes |
 | `certs/` private key | CLI: yes. Panel: only if the panel may read it | Yes | No — deploy files separate |
 | `data/manifest.json` | Written (version stamp) | Absent | Absent |
 | Restore version check | Yes — must match image tag | No | No |

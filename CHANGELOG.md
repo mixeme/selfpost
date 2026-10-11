@@ -16,6 +16,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   as one parse failure and the reason is in the mail log, on the message's
   own delivery line (Server › System log, `dropped: …`). Only a failure of
   the database is still retried.
+- **A full backup no longer holds the Postfix queue**, from the panel or from
+  `selfpost-backup`. It is taken while the instance runs, and a copy of a
+  queue Postfix is working on can hold a message twice or not at all. Mail
+  still waiting for delivery is not carried over; a restored instance starts
+  with an empty queue. To keep the queue, stop the instance and `tar` the
+  project directory.
 - DMARC reports are kept 500 **for each domain** (and 90 days), not 500 for
   the whole server - see Security.
 
@@ -26,12 +32,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   includes the queue, Postfix keeps the queue readable by its own user alone,
   and the panel is not that user ("open /data/postfix/queue/active:
   permission denied" in the log). `selfpost-backup` run with `docker exec`
-  was not affected - it runs as root. The panel's archive now leaves the queue
-  out, and likewise a file in `certs/` it may not open (usually the private
-  key, named in the log); the page, Help and the guide say so, and the guide
-  says to put the key back before starting a restored instance. Everything is
-  read through before the download starts, so a failure is a message on the
-  page and not a file cut short.
+  was not affected - it runs as root. The queue is no longer part of a backup
+  (see Changed), and the panel's archive leaves out a file in `certs/` it may
+  not open (usually the private key, named in the log); the page, Help and
+  the guide say so, and the guide says to put the key back before starting a
+  restored instance. Everything is read through before the download starts,
+  so a failure is a message on the page and not a file cut short.
 
 ### Security
 

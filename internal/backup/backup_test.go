@@ -112,7 +112,6 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
 		DataArchivePrefix + "sasl/sasldb2",
 		DataArchivePrefix + "postfix/sender_login_maps",
-		DataArchivePrefix + "postfix/queue/deferred/sample",
 		ComposeFileName,
 		EnvFileName,
 		CertsDirName + "/fullchain.pem",
@@ -129,6 +128,7 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 		DataArchivePrefix + "selfpost.db-shm",
 		DataArchivePrefix + "log/mail.log",
 		DataArchivePrefix + "log/mail.log.1",
+		DataArchivePrefix + "postfix/queue/deferred/sample",
 	} {
 		if _, ok := files[name]; ok {
 			t.Errorf("archive should not contain %s", name)
@@ -236,8 +236,8 @@ func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 	}
 }
 
-// The panel's archive: no Postfix queue, everything else as before, and Check
-// agrees that it can be made.
+// The panel's archive: like any other it has no Postfix queue, the rest is
+// there, and Check agrees that it can be made.
 func TestCreateUnprivilegedLeavesTheQueueOut(t *testing.T) {
 	dataDir, dbPath, deployRoot := seedDataDir(t)
 	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot, Unprivileged: true}

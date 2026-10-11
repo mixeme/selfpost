@@ -1,16 +1,16 @@
 // Package backup implements SelfPost's full-server backup and the restore
 // version guard (architecture.md § Persistence). A full backup is a
 // gzip-compressed tar of the consolidated persistent state under /data — the
-// SQLite database (as a consistent snapshot), the per-domain DKIM keys, the
-// SASL database, and the Postfix queue — plus docker-compose.yml, .env, and
-// certs/ from the operator's deploy directory, and a manifest recording the
-// SelfPost version that produced it. Postfix delivery logs under log/ are
-// excluded (diagnostics, not state).
+// SQLite database (as a consistent snapshot), the per-domain DKIM keys and the
+// SASL database — plus docker-compose.yml, .env, and certs/ from the
+// operator's deploy directory, and a manifest recording the SelfPost version
+// that produced it. Postfix delivery logs under log/ are excluded
+// (diagnostics, not state), and so is the Postfix queue (see QueueDir).
 //
 // Restore is not a separate code path in the panel: a backup is extracted into
 // the operator's project directory (data/, docker-compose.yml, .env, certs/)
 // before first start. The archive carries everything needed to bring the
-// instance back — DKIM keys, sasldb2, sender map, queue, and deploy files —
+// instance back — DKIM keys, sasldb2, sender map, and deploy files —
 // so the operator only adjusts hostname or proxy settings on a new host. The
 // restore-specific steps the panel runs are CheckRestore, which refuses to
 // boot if the manifest's version does not match the running binary so
@@ -81,22 +81,23 @@ type Params struct {
 	DeployRoot string
 	OnWarn     func(string)
 	// Unprivileged says the archive is made by the panel, which runs as its
-	// own user and not as root. Two things under the roots are then not its to
-	// read, and are left out instead of failing the whole archive:
-	//
-	//   - the Postfix queue (QueueDir). Postfix keeps every queue file and
-	//     directory readable by its own user alone, and that cannot be
-	//     configured. What is lost is mail not yet delivered at that moment;
-	//     a start without a queue directory builds an empty one.
-	//   - a file under certs/ the panel may not open, which is usually the
-	//     private key (root and Postfix's group only). OnWarn names it.
-	//
-	// The selfpost-backup command, run as root, leaves this unset and takes
-	// both.
+	// own user and not as root. A file under certs/ it may not open - usually
+	// the private key, root and Postfix's group only - is then left out
+	// instead of failing the whole archive, and OnWarn names it. The
+	// selfpost-backup command, run as root, leaves this unset and takes it.
 	Unprivileged bool
 }
 
-// QueueDir is the Postfix queue, relative to the data directory.
+// QueueDir is the Postfix queue, relative to the data directory. No backup
+// holds it (owner, 2026-10-11). An archive is made while the instance runs,
+// and Postfix moves messages between the queue's directories all the time: a
+// copy taken then can hold a message twice or not at all, so what it would
+// bring back is not the queue. Nor could the panel read it - Postfix keeps
+// every queue file readable by its own user alone, which is why the panel's
+// backup failed outright from 1.3.0 to 2.0.0. What is not carried over is mail
+// still waiting for delivery; a start without a queue directory builds an
+// empty one. Whoever needs the queue stops the instance and archives the
+// project directory (guide § Taking a full backup).
 const QueueDir = "postfix/queue"
 
 // excludedFromArchive lists the data-directory entries a backup never carries.
@@ -203,11 +204,8 @@ func validateDeployRoot(deployRoot string) error {
 // left out of the archive. A directory left out is not descended into.
 type skipFunc func(path, rel string, d fs.DirEntry) bool
 
-// skipData leaves the Postfix queue out of an unprivileged archive.
+// skipData leaves the Postfix queue out of every archive.
 func (p Params) skipData() skipFunc {
-	if !p.Unprivileged {
-		return nil
-	}
 	return func(_, rel string, _ fs.DirEntry) bool {
 		return filepath.ToSlash(rel) == QueueDir
 	}
