@@ -114,6 +114,13 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   prefilters rspamd lets the one that ran first decide, and deny then won or
   lost by rule order (seen on rspamd 3.11). A refusal by the deny list
   overrides any score, so deny wins whichever entries match.
+  How often an entry decided a message is not stored: `Lists.Usage` reads it
+  off the journal on each view of Filter lists - the rows a list decided (the
+  deny rule's reply, the allow rule's symbol, which the journal milter keeps
+  ahead of its six-symbol cap) matched against the entries as rspamd matches
+  them. When that stops being good enough is written in
+  [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) § Filter
+  list usage.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,

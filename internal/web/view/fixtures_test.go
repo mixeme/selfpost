@@ -450,12 +450,13 @@ func inLogFixture() *InLog {
 // allowed, and a filter that reads them.
 func inFilterListsFixture() *FilterLists {
 	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
-	return NewFilterLists(admin(), FilterListsInput{FilterOn: true, LastWritten: time.Date(2026, 9, 11, 8, 40, 0, 0, time.UTC)}).
+	at := func(d, h, m int) time.Time { return time.Date(2026, 9, d, h, m, 0, 0, time.UTC) }
+	return NewFilterLists(admin(), FilterListsInput{FilterOn: true, LastWritten: time.Date(2026, 9, 11, 8, 40, 0, 0, time.UTC), RetentionDays: 90}).
 		WithEntries([]FilterEntryInput{
-			{ID: 1, List: "deny", Kind: "domain", Value: "bulk.example", Note: "newsletter nobody subscribed to", Added: day(9, 2)},
-			{ID: 2, List: "deny", Kind: "ip", Value: "198.51.100.0/24", Note: "dictionary attack on lists.example.org", Added: day(8, 19)},
+			{ID: 1, List: "deny", Kind: "domain", Value: "bulk.example", Note: "newsletter nobody subscribed to", Added: day(9, 2), Hits: 41, LastHit: at(21, 13, 57)},
+			{ID: 2, List: "deny", Kind: "ip", Value: "198.51.100.0/24", Note: "dictionary attack on lists.example.org", Added: day(8, 19), Hits: 1203, LastHit: at(21, 9, 12)},
 			{ID: 3, List: "deny", Kind: "address", Value: "win@lottery.example", Added: day(7, 30)},
-			{ID: 4, List: "allow", Kind: "domain", Value: "partner.example", Note: "invoices were scored as spam", Added: day(9, 11)},
-			{ID: 5, List: "allow", Kind: "address", Value: "noreply@github.example", Note: "security advisories", Added: day(6, 4)},
+			{ID: 4, List: "allow", Kind: "domain", Value: "partner.example", Note: "invoices were scored as spam", Added: day(9, 11), Hits: 7, LastHit: at(19, 16, 40)},
+			{ID: 5, List: "allow", Kind: "address", Value: "noreply@github.example", Note: "security advisories", Added: day(6, 4), Hits: 18, LastHit: at(21, 13, 30)},
 		})
 }

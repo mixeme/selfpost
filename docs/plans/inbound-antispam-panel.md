@@ -97,8 +97,9 @@ changes to it: the sender column is headed *From*; *Why* is not a column but
 a sheet over the page, opened by the decision tag, holding a centred table of
 who decided, the verdict and symbols or the reply, and the subject whole
 (kept on the sheet at his word: the table clips it); a message Postfix itself
-refused offers no *Deny sender*. Inbound › Filter lists is built and not yet
-accepted.
+refused offers no *Deny sender*. Inbound › Filter lists was redrawn at his word
+the same day - kind in a column of its own, the note on the entry's sheet,
+matches counted (§ Filter list usage) - and awaits his look at the result.
 
 ### Retention
 
@@ -125,6 +126,46 @@ Mirror send-log retention:
 
 List change → atomic map rewrite (same pattern as Postfix maps). No reload:
 rspamd rereads a changed map file by itself (about ten seconds on 3.11).
+
+### Filter list usage (owner, 2026-10-12)
+
+Each entry shows how often it decided a message (*Matched*, or *never*) and,
+on its sheet, when it last did - so that entries nothing matches any more can
+be removed. **The count is read off the journal on every view of the page;
+nothing is stored for it.** A journal row counts for an entry when the list
+decided the message - a rejected row whose reply is the deny rule's message,
+an accepted row whose verdict carries the allow rule's symbol
+(`SELFPOST_ALLOW_IP` / `_FROM` / `_DOMAIN`, which the journal milter always
+keeps) - and the entry fits the row's sender or client address the way rspamd
+matches it (`inbound.Lists.Usage`).
+
+What follows from counting this way, and is accepted:
+
+- the count reaches back as far as the journal does: its retention (90 days by
+  default), which is what the sheet says;
+- a row counts for every fitting entry of the deciding list, since the journal
+  does not say which of two the filter met first;
+- a message refused at end-of-message is one row whatever its recipient count,
+  so a count is of messages, roughly.
+
+**When to move to a counter kept with each entry** (a migration adding hits
+and last-hit to `inbound_spam_list`, bumped where the journal row is written;
+the owner asked for the condition to be written down). Any one of:
+
+1. **The journal is cut by its 10 000-row cap and not by age.** Then it holds
+   fewer days than its retention, the sheet's "in the last 90 days" is no
+   longer true, and *never* stops being evidence that an entry is stale. The
+   sign: the log tailer's prune line keeps reporting rows removed while the
+   oldest row of Inbound › Log is younger than the retention.
+2. **The retention is set short** (towards its minimum of 7 days) for reasons
+   of its own, privacy or disk. A week without a match does not make an entry
+   stale.
+3. **Counts are wanted that outlive the journal** - since the entry was added.
+4. **The page is slow.** A view reads every journal row a list decided and
+   tries it against every entry. With the cap that is at most 10 000 rows
+   times the number of entries; past a few hundred entries, measure it.
+
+Until then no migration is spent on it.
 
 ### Activation
 

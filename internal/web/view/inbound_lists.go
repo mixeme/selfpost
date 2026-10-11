@@ -46,6 +46,8 @@ type FilterLists struct {
 
 	Where      Box
 	WhereFacts []Fact
+
+	retentionDays int
 }
 
 // FilterList is one of the two boxes of entries.
@@ -55,24 +57,29 @@ type FilterList struct {
 	Empty EmptyState
 }
 
-// FilterRow is one entry of a list: the value with the kind of entry as a tag,
-// the operator's note, the day it was added and the way to remove it.
+// FilterRow is one entry of a list: the value, the kind of entry as a tag that
+// opens the entry's sheet (the note, the day it was added, how often it decided
+// a message and when last), how often it decided, and the way to remove it.
+// Matched is empty for an entry that never did; the table then says "never".
 type FilterRow struct {
-	Value  string
-	Kind   Tag
-	Note   string
-	Added  string
-	Remove RowAction
+	Value   string
+	Entry   Sheet
+	Matched string
+	Remove  RowAction
 }
 
-// FilterEntryInput is what the page knows of one entry of a list.
+// FilterEntryInput is what the page knows of one entry of a list. Hits and
+// LastHit are counted from the Inbound log, so they reach back as far as it
+// does.
 type FilterEntryInput struct {
-	ID    int64
-	List  string
-	Kind  string
-	Value string
-	Note  string
-	Added time.Time
+	ID      int64
+	List    string
+	Kind    string
+	Value   string
+	Note    string
+	Added   time.Time
+	Hits    int
+	LastHit time.Time
 }
 
 // FilterListsInput is the state of the filter the lists are written for: whether
@@ -80,6 +87,9 @@ type FilterEntryInput struct {
 type FilterListsInput struct {
 	FilterOn    bool
 	LastWritten time.Time
+	// RetentionDays is how long the Inbound log keeps a row: how far back an
+	// entry's matches are counted.
+	RetentionDays int
 }
 
 // NewFilterLists builds the page. The form starts on the Deny list for a sender
@@ -113,6 +123,7 @@ func NewFilterLists(m Meta, in FilterListsInput) *FilterLists {
 	}
 	p.Deny.Box.End = Plain(plural(0, "entry", "entries") + " · wins over Allow")
 	p.Allow.Box.End = Plain(plural(0, "entry", "entries"))
+	p.retentionDays = in.RetentionDays
 	p.setWhere(in)
 	return p
 }
@@ -144,10 +155,25 @@ func (p *FilterLists) setWhere(in FilterListsInput) {
 func (p *FilterLists) WithEntries(entries []FilterEntryInput) *FilterLists {
 	p.Deny.Rows, p.Allow.Rows = nil, nil
 	for _, e := range entries {
-		row := FilterRow{
-			Value: e.Value, Kind: Tag{Label: e.Kind}, Note: e.Note, Added: e.Added.UTC().Format("2006-01-02"),
-			Remove: RowAction{Label: "Remove", Post: inboundFilterLists + "/" + strconv.FormatInt(e.ID, 10) + "/delete", Danger: true},
+		id := strconv.FormatInt(e.ID, 10)
+		window := "in the last " + plural(int64(p.retentionDays), "day", "days")
+		sheet := []SheetRow{
+			{Label: "Note", Lines: []string{orDash(e.Note)}},
+			{Label: "Added", Lines: []string{e.Added.UTC().Format("2006-01-02")}, Mono: true},
 		}
+		row := FilterRow{
+			Value:  e.Value,
+			Remove: RowAction{Label: "Remove", Post: inboundFilterLists + "/" + id + "/delete", Danger: true},
+		}
+		if e.Hits > 0 {
+			row.Matched = strconv.Itoa(e.Hits)
+			sheet = append(sheet,
+				SheetRow{Label: "Matched", Lines: []string{row.Matched + " " + window}},
+				SheetRow{Label: "Last match", Lines: []string{e.LastHit.UTC().Format("2006-01-02 15:04")}, Mono: true})
+		} else {
+			sheet = append(sheet, SheetRow{Label: "Matched", Lines: []string{"never " + window}})
+		}
+		row.Entry = Sheet{ID: "entry-" + id, Tag: Tag{Label: e.Kind}, Title: e.Value, Rows: sheet}
 		switch e.List {
 		case "deny":
 			p.Deny.Rows = append(p.Deny.Rows, row)

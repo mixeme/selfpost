@@ -364,9 +364,10 @@ func TestFilterListsAddAndRemove(t *testing.T) {
 	has(t, "lists", page,
 		`<div class="notification is-success is-light">`, `Entry added.`,
 		`<h2>Deny</h2><div class="sp-end">1 entry · wins over Allow</div>`, `<h2>Allow</h2><div class="sp-end">1 entry</div>`,
-		`bulk.example <span class="tag is-light">domain</span></td><td class="sp-muted">newsletter</td>`,
-		`198.51.100.0/24 <span class="tag is-light">ip</span></td><td class="sp-muted">—</td>`,
-		`<td class="sp-muted sp-nowrap sp-small">`+time.Now().UTC().Format("2006-01-02")+`</td>`,
+		`<td class="sp-mono sp-small">bulk.example</td><td><button type="button" class="tag is-light" popovertarget="entry-`,
+		`<tr><th>Note</th><td>newsletter</td></tr><tr><th>Added</th><td class="sp-mono sp-small">`+time.Now().UTC().Format("2006-01-02")+`</td></tr><tr><th>Matched</th><td>never in the last 90 days</td></tr>`,
+		`<td class="sp-mono sp-small">198.51.100.0/24</td>`, `<tr><th>Note</th><td>—</td></tr>`,
+		`<td class="sp-muted sp-nowrap">never</td>`,
 	)
 	lacks(t, "lists", page, `No sender is turned away`)
 
@@ -634,4 +635,40 @@ func TestHelpHasTheInboundLogAndFilterListsTopics(t *testing.T) {
 	h.lists = inbound.NewLists(h.store, s.dir)
 	has(t, "log", s.get(h.HandleInboundLog, "/inbound/log", globalPrincipal).Body.String(), `href="/help#inbound-log"`)
 	has(t, "lists", s.get(h.HandleFilterLists, "/inbound/filter-lists", globalPrincipal).Body.String(), `href="/help#filter-lists"`)
+}
+
+// An entry's count comes from the journal: a row counts for the entry that
+// fits it on the list that decided it.
+func TestFilterListsCountMatchesFromTheJournal(t *testing.T) {
+	s := newInboundLogStand(t)
+	for _, e := range [][3]string{{"deny", "domain", "bulk.example"}, {"allow", "address", "billing@vendor.example"}, {"deny", "ip", "203.0.113.0/24"}} {
+		if _, err := s.h.lists.Add(e[0], e[1], e[2], ""); err != nil {
+			t.Fatalf("Add %v: %v", e, err)
+		}
+	}
+	at := time.Date(2026, 10, 1, 9, 30, 0, 0, time.UTC)
+	for i, row := range []store.InboundSpamEntry{
+		{From: "promo@bulk.example", ClientIP: "198.51.100.9", Decision: store.SpamDecisionReject, Engine: store.SpamEngineRspamd, Detail: "5.7.1 Refused by this server's deny list"},
+		{From: "other@BULK.example", ClientIP: "198.51.100.9", Decision: store.SpamDecisionReject, Engine: store.SpamEngineRspamd, Detail: "5.7.1 Refused by this server's deny list"},
+		{From: "billing@vendor.example", ClientIP: "192.0.2.5", Decision: store.SpamDecisionAccept, Engine: store.SpamEngineRspamd, Detail: "no action, score -99.00 / 15.00; SELFPOST_ALLOW_FROM(-100.00)"},
+		// refused by the filter for its own reasons: nobody's match
+		{From: "promo@bulk.example", ClientIP: "198.51.100.9", Decision: store.SpamDecisionReject, Engine: store.SpamEngineRspamd, Detail: "5.7.1 Spam message rejected"},
+	} {
+		row.InboundDomain, row.To, row.At = "a.example.com", "alice@a.example.com", at.Add(time.Duration(i)*time.Hour)
+		if err := s.st.InsertInboundSpam(row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := s.get(s.h.HandleFilterLists, "/inbound/filter-lists", globalPrincipal).Body.String()
+	has(t, "lists", page,
+		`<tr><th>Matched</th><td>2 in the last 90 days</td></tr><tr><th>Last match</th><td class="sp-mono sp-small">2026-10-01 10:30</td></tr>`,
+		`<td class="sp-nowrap">2</td>`,
+		`<tr><th>Matched</th><td>1 in the last 90 days</td></tr><tr><th>Last match</th><td class="sp-mono sp-small">2026-10-01 11:30</td></tr>`,
+		`<td class="sp-nowrap">1</td>`,
+		// the network nobody came from
+		`<td class="sp-muted sp-nowrap">never</td>`,
+	)
+	if got := strings.Count(page, `<td class="sp-muted sp-nowrap">never</td>`); got != 1 {
+		t.Errorf("%d entries say never, want the one network", got)
+	}
 }

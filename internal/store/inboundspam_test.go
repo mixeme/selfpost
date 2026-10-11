@@ -252,3 +252,35 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 		t.Errorf("injected domain = %q", got)
 	}
 }
+
+func TestListSpamListHits(t *testing.T) {
+	st := openTestStore(t)
+	add := func(engine, decision, detail string) {
+		t.Helper()
+		err := st.InsertInboundSpam(InboundSpamEntry{
+			InboundDomain: "in.example.com", ClientIP: "203.0.113.7", From: "a@example.net", To: "a@in.example.com",
+			Decision: decision, Engine: engine, Detail: detail, At: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	add(SpamEngineRspamd, SpamDecisionReject, "5.7.1 Refused by this server's deny list")
+	add(SpamEngineRspamd, SpamDecisionAccept, "no action, score -99.00 / 15.00; SELFPOST_ALLOW_IP(-100.00)")
+	add(SpamEngineRspamd, SpamDecisionReject, "5.7.1 Spam message rejected")
+	add(SpamEnginePostfix, SpamDecisionReject, "550 5.1.1 this server's deny list")
+	// a mark with the characters LIKE would treat as wildcards is text
+	add(SpamEngineRspamd, SpamDecisionAccept, "no action; SELFPOSTXALLOWX(1.00)")
+
+	hits, err := st.ListSpamListHits("this server's deny list", "SELFPOST_ALLOW_")
+	if err != nil || len(hits) != 2 {
+		t.Fatalf("hits = %+v, %v; want the two rows a list decided", hits, err)
+	}
+	h := hits[0]
+	if h.From != "a@example.net" || h.ClientIP != "203.0.113.7" || h.Decision != SpamDecisionReject || h.CreatedAt.Hour() != 9 {
+		t.Errorf("hit = %+v", h)
+	}
+	if hits, err := st.ListSpamListHits(); err != nil || hits != nil {
+		t.Errorf("no marks: %v, %v", hits, err)
+	}
+}

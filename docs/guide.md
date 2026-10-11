@@ -876,7 +876,13 @@ anyone on the host; they hold addresses, not secrets.
 In the panel the lists are **Inbound › Filter lists** (global role), and what
 port 25 decided about each message is **Inbound › Log**: accepted mail with the
 filter's verdict, refused mail with the reply it was given. A row of the log
-leads to the lists with its sender filled in. A user with the *domain* role
+leads to the lists with its sender filled in. Beside each entry of a list is
+how often it decided a message, counted from the log - so over the days the
+log keeps - and *never* marks an entry that may have outlived its use. The
+count depends on two things in
+[multimap.conf](../deploy/antispam/rspamd/multimap.conf): the message of the
+deny rules and the names of the allow symbols; change them and every entry
+reads *never*. A user with the *domain* role
 sees the log of the inbound domains assigned to them, and not the lists. How
 long the log keeps a row is set under **Server › Settings**.
 

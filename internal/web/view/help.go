@@ -205,7 +205,7 @@ var inboundTopics = []HelpTopic{
 			Strong("Deny wins"), ".",
 			Br(), Br(),
 			"SelfPost does not apply the lists itself: it writes them as files under ", Code("/data/antispam/"),
-			", and rspamd rereads a file within seconds of a change. With the spam filter off the lists are kept and can be edited, but nothing reads them. The sender matched is the envelope sender — the one in the log — not the From line a mail program shows."),
+			", and rspamd rereads a file within seconds of a change. With the spam filter off the lists are kept and can be edited, but nothing reads them. The sender matched is the envelope sender — the one in the log — not the From line a mail program shows. Matched counts the messages in the Inbound log that the entry decided, so it reaches back as far as the log does; never means not once in that time, and such an entry is one to consider removing."),
 	}},
 }
 

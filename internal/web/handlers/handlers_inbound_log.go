@@ -167,12 +167,21 @@ func (h *Handlers) renderFilterLists(w http.ResponseWriter, r *http.Request, sta
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// How often each entry decided a message is counted from the journal. A
+	// failure there is not a reason to hide the lists: they are shown without
+	// the counts' worth - every entry "never" - and the log says why.
+	usage, err := h.lists.Usage()
+	if err != nil {
+		logf("panel: filter lists: usage: %v", err)
+	}
 	on, _, _ := h.inboundFilter()
 	in := make([]view.FilterEntryInput, len(entries))
 	for i, e := range entries {
-		in[i] = view.FilterEntryInput{ID: e.ID, List: e.List, Kind: e.Kind, Value: e.Value, Note: e.Note, Added: e.CreatedAt}
+		in[i] = view.FilterEntryInput{ID: e.ID, List: e.List, Kind: e.Kind, Value: e.Value, Note: e.Note, Added: e.CreatedAt,
+			Hits: usage[e.ID].Hits, LastHit: usage[e.ID].Last}
 	}
-	page := view.NewFilterLists(h.shellMeta(r), view.FilterListsInput{FilterOn: on, LastWritten: h.lists.LastWritten()}).
+	page := view.NewFilterLists(h.shellMeta(r), view.FilterListsInput{
+		FilterOn: on, LastWritten: h.lists.LastWritten(), RetentionDays: h.inboundSpamLogRetentionDays()}).
 		WithEntries(in).
 		WithResult(flash, formErr)
 	// A blank list or kind leaves the form on its first choice.

@@ -21,6 +21,7 @@ type ListStore interface {
 	AddSpamListEntry(list, kind, value, note string) (store.SpamListEntry, error)
 	ListSpamListEntries() ([]store.SpamListEntry, error)
 	DeleteSpamListEntry(id int64) error
+	ListSpamListHits(marks ...string) ([]store.SpamListHit, error)
 }
 
 // Lists owns the allow and deny lists of the external spam filter: the rows in
@@ -235,4 +236,116 @@ func normalizeNote(raw string) (string, error) {
 		}
 	}
 	return note, nil
+}
+
+// What a list leaves in the journal when it decides a message - the two ends
+// of deploy/antispam/rspamd/multimap.conf this package depends on. A deny rule
+// refuses with a message, which the log tailer files as the reply of a
+// rejected row. An allow rule adds a symbol named after the kind of entry,
+// which the journal milter keeps in the verdict of an accepted row.
+const (
+	denyReplyMark = "this server's deny list"
+	allowMark     = "SELFPOST_ALLOW_"
+)
+
+var allowSymbol = map[string]string{
+	store.SpamEntryIP:      "SELFPOST_ALLOW_IP(",
+	store.SpamEntryAddress: "SELFPOST_ALLOW_FROM(",
+	store.SpamEntryDomain:  "SELFPOST_ALLOW_DOMAIN(",
+}
+
+// Usage is how often an entry decided a message, as far back as the journal
+// reaches, and when it last did. The zero value is an entry that never did.
+type Usage struct {
+	Hits int
+	Last time.Time
+}
+
+// Usage counts, for every entry, the journal rows it decided. Nothing is
+// stored for this: the journal already says which list decided a message and
+// who the message was from, and an entry is matched against that the way the
+// filter matches it - an address whole, a domain as the sender's domain, an
+// address or network against the client's. So the count reaches back as far
+// as the journal does (its retention, or less when it is full), and a row
+// counts for every entry of the deciding list that fits it: the journal does
+// not say which of two fitting entries the filter met first.
+//
+// A counter kept with each entry would not depend on the journal; the plan
+// (docs/plans/inbound-antispam-panel.md, Filter list usage) says when that is
+// worth a migration.
+func (l *Lists) Usage() (map[int64]Usage, error) {
+	entries, err := l.store.ListSpamListEntries()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]Usage, len(entries))
+	if len(entries) == 0 {
+		return out, nil
+	}
+	hits, err := l.store.ListSpamListHits(denyReplyMark, allowMark)
+	if err != nil {
+		return nil, err
+	}
+	type matcher struct {
+		id     int64
+		list   string
+		kind   string
+		value  string
+		prefix netip.Prefix
+	}
+	matchers := make([]matcher, 0, len(entries))
+	for _, e := range entries {
+		m := matcher{id: e.ID, list: e.List, kind: e.Kind, value: e.Value}
+		if e.Kind == store.SpamEntryIP {
+			if p, err := netip.ParsePrefix(e.Value); err == nil {
+				m.prefix = p
+			} else if a, err := netip.ParseAddr(e.Value); err == nil {
+				m.prefix = netip.PrefixFrom(a, a.BitLen())
+			} else {
+				continue // not an entry this package wrote
+			}
+		}
+		matchers = append(matchers, m)
+	}
+	for _, h := range hits {
+		from := strings.ToLower(h.From)
+		domain := ""
+		if i := strings.LastIndexByte(from, '@'); i >= 0 {
+			domain = from[i+1:]
+		}
+		client, clientErr := netip.ParseAddr(h.ClientIP)
+		client = client.Unmap()
+		denied := h.Decision != store.SpamDecisionAccept && strings.Contains(h.Detail, denyReplyMark)
+		for _, m := range matchers {
+			switch m.list {
+			case store.SpamListDeny:
+				if !denied {
+					continue
+				}
+			case store.SpamListAllow:
+				if h.Decision != store.SpamDecisionAccept || !strings.Contains(h.Detail, allowSymbol[m.kind]) {
+					continue
+				}
+			}
+			fits := false
+			switch m.kind {
+			case store.SpamEntryAddress:
+				fits = from == m.value
+			case store.SpamEntryDomain:
+				fits = domain == m.value
+			case store.SpamEntryIP:
+				fits = clientErr == nil && m.prefix.Contains(client)
+			}
+			if !fits {
+				continue
+			}
+			u := out[m.id]
+			u.Hits++
+			if h.CreatedAt.After(u.Last) {
+				u.Last = h.CreatedAt
+			}
+			out[m.id] = u
+		}
+	}
+	return out, nil
 }

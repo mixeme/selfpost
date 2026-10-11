@@ -276,3 +276,95 @@ func TestListsLastWritten(t *testing.T) {
 		t.Errorf("LastWritten counts a stray file: %v", got)
 	}
 }
+
+// How often an entry decided a message is read off the journal: the list that
+// decided, and whether the entry fits who the message was from.
+func TestListsUsage(t *testing.T) {
+	l, st, _ := testLists(t)
+	add := func(list, kind, value string) int64 {
+		t.Helper()
+		e, err := l.Add(list, kind, value, "")
+		if err != nil {
+			t.Fatalf("Add(%s, %s, %s): %v", list, kind, value, err)
+		}
+		return e.ID
+	}
+	denyDomain := add(store.SpamListDeny, store.SpamEntryDomain, "evil.example")
+	denyAddr := add(store.SpamListDeny, store.SpamEntryAddress, "spammer@evil.example")
+	denyNet := add(store.SpamListDeny, store.SpamEntryIP, "198.51.100.0/24")
+	denyV6 := add(store.SpamListDeny, store.SpamEntryIP, "2001:db8::/32")
+	allowAddr := add(store.SpamListAllow, store.SpamEntryAddress, "billing@vendor.example")
+	allowDomain := add(store.SpamListAllow, store.SpamEntryDomain, "vendor.example")
+	allowIP := add(store.SpamListAllow, store.SpamEntryIP, "203.0.113.5")
+	unused := add(store.SpamListAllow, store.SpamEntryDomain, "quiet.example")
+
+	const denied = "5.7.1 Refused by this server's deny list"
+	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	hour := 0
+	row := func(from, ip, decision, engine, detail string) {
+		t.Helper()
+		hour++
+		err := st.InsertInboundSpam(store.InboundSpamEntry{
+			InboundDomain: "in.example.com", To: "a@in.example.com", From: from, ClientIP: ip,
+			Decision: decision, Engine: engine, Detail: detail, At: at.Add(time.Duration(hour) * time.Hour),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// hour 1: the address and its domain are both on the deny list, and both fit.
+	row("Spammer@Evil.Example", "192.0.2.9", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
+	// hour 2: another address of the domain.
+	row("other@evil.example", "192.0.2.9", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
+	// hour 3, 4: the networks, v4 (as Postfix may log it, mapped) and v6.
+	row("x@elsewhere.example", "::ffff:198.51.100.77", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
+	row("x@elsewhere.example", "2001:db8::1", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
+	// hour 5: a subdomain is not the domain.
+	row("x@sub.evil.example", "192.0.2.9", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
+	// hour 6: allowed by its address and its domain - two symbols, two entries.
+	row("billing@vendor.example", "192.0.2.50", store.SpamDecisionAccept, store.SpamEngineRspamd,
+		"no action, score -199.00 / 15.00; SELFPOST_ALLOW_DOMAIN(-100.00) SELFPOST_ALLOW_FROM(-100.00)")
+	// hour 7: allowed by its domain alone.
+	row("accounts@vendor.example", "192.0.2.50", store.SpamDecisionAccept, store.SpamEngineRspamd,
+		"no action, score -99.00 / 15.00; SELFPOST_ALLOW_DOMAIN(-100.00)")
+	// hour 8: allowed by the client address; the sender's domain is not why.
+	row("x@quiet.example", "203.0.113.5", store.SpamDecisionAccept, store.SpamEngineRspamd,
+		"no action, score -99.00 / 15.00; SELFPOST_ALLOW_IP(-100.00)")
+	// Nobody's: the filter's own refusal, an accept with no list symbol, a
+	// refusal by Postfix, and a sender who spells the mark in his own address.
+	row("spammer@evil.example", "192.0.2.9", store.SpamDecisionReject, store.SpamEngineRspamd, "5.7.1 Spam message rejected")
+	row("billing@vendor.example", "192.0.2.50", store.SpamDecisionAccept, store.SpamEngineRspamd, "no action, score 0.10 / 15.00")
+	row("spammer@evil.example", "198.51.100.1", store.SpamDecisionReject, store.SpamEnginePostfix, "550 5.1.1 <nobody@in.example.com>: this server's deny list")
+	row("billing@vendor.example", "203.0.113.5", store.SpamDecisionAccept, store.SpamEngineSelfPost, "")
+
+	usage, err := l.Usage()
+	if err != nil {
+		t.Fatalf("Usage: %v", err)
+	}
+	for name, c := range map[string]struct {
+		id   int64
+		hits int
+		last int // hour
+	}{
+		"deny domain": {denyDomain, 2, 2}, "deny address": {denyAddr, 1, 1},
+		"deny network": {denyNet, 1, 3}, "deny v6 network": {denyV6, 1, 4},
+		"allow address": {allowAddr, 1, 6}, "allow domain": {allowDomain, 2, 7}, "allow ip": {allowIP, 1, 8},
+		"unused": {unused, 0, 0},
+	} {
+		got := usage[c.id]
+		wantLast := time.Time{}
+		if c.hits > 0 {
+			wantLast = at.Add(time.Duration(c.last) * time.Hour)
+		}
+		if got.Hits != c.hits || !got.Last.Equal(wantLast) {
+			t.Errorf("%s: %d hits, last %v; want %d, %v", name, got.Hits, got.Last, c.hits, wantLast)
+		}
+	}
+}
+
+func TestListsUsageWithNoEntries(t *testing.T) {
+	l, _, _ := testLists(t)
+	if usage, err := l.Usage(); err != nil || len(usage) != 0 {
+		t.Errorf("Usage = %v, %v", usage, err)
+	}
+}

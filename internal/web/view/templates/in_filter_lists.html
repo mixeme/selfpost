@@ -1,7 +1,8 @@
 {{/* Inbound > Filter lists (mockup in-filter-lists.html): the allow and deny
      lists that correct the spam filter by hand, for the whole instance, and
      where they go. Global role only. The form adds an entry; each row of a list
-     removes its own. */}}
+     removes its own, says how often the entry decided a message, and opens a
+     sheet with the entry's note from the tag of its kind. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 {{if .Flash}}{{template "flash" .Flash}}{{end}}
@@ -54,9 +55,9 @@
      table, or what is absent when the list is empty. */}}
 {{define "filter_list"}}{{template "box_open" .Box}}
 {{if .Rows}}<div class="table-container"><table class="table is-fullwidth is-hoverable">
-  <thead><tr><th>Value</th><th>Note</th><th>Added</th><th></th></tr></thead>
+  <thead><tr><th>Value</th><th>Kind</th><th>Matched</th><th></th></tr></thead>
   <tbody>{{range .Rows}}
-    <tr><td class="sp-mono sp-small">{{.Value}} {{template "tag" .Kind}}</td>{{if .Note}}<td class="sp-muted">{{.Note}}</td>{{else}}<td class="sp-muted">—</td>{{end}}<td class="sp-muted sp-nowrap sp-small">{{.Added}}</td><td class="sp-actions">{{template "row_action" .Remove}}</td></tr>{{end}}
+    <tr><td class="sp-mono sp-small">{{.Value}}</td><td>{{template "sheet_tag" .Entry}}</td>{{if .Matched}}<td class="sp-nowrap">{{.Matched}}</td>{{else}}<td class="sp-muted sp-nowrap">never</td>{{end}}<td class="sp-actions">{{template "row_action" .Remove}}</td></tr>{{end}}
   </tbody>
 </table></div>
 {{else}}{{template "empty_state" .Empty}}

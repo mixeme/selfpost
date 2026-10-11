@@ -52,7 +52,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   *Deny sender* on accepted mail, *Allow sender* on mail the filter refused.
 - **Inbound › Filter lists** (global role): add and remove allow and deny
   entries; the page says where the lists go and whether the filter is on to
-  read them.
+  read them. Each entry shows how often it decided a message - *Matched*, or
+  *never* - and its kind opens a sheet with the note, the day it was added and
+  the last match, so that entries nothing matches any more can be found and
+  removed. The count is read from the inbound log and reaches back as far as
+  the log does.
 - **Server › Settings**: *Keep inbound log rows, days*, shown with the inbound
   relay on.
 - Help: *Inbound log* and *Filter lists*.

@@ -304,3 +304,48 @@ func (s *Store) DeleteSpamListEntry(id int64) error {
 	}
 	return nil
 }
+
+// SpamListHit is what the journal holds about one message a filter list
+// decided: who it was from, which server offered it, when, and the detail that
+// says which list it was.
+type SpamListHit struct {
+	ClientIP  string
+	From      string
+	Decision  string
+	Detail    string
+	CreatedAt time.Time
+}
+
+// ListSpamListHits returns the journal rows of the filter in whose detail one
+// of the marks occurs - the marks the filter lists leave (internal/inbound).
+// Which entry a row belongs to is for the caller to work out; here the rows
+// are only narrowed, so that a page view does not read the whole journal.
+func (s *Store) ListSpamListHits(marks ...string) ([]SpamListHit, error) {
+	if len(marks) == 0 {
+		return nil, nil
+	}
+	likes := make([]string, len(marks))
+	args := []any{SpamEngineRspamd}
+	for i, m := range marks {
+		likes[i] = "instr(detail, ?) > 0"
+		args = append(args, m)
+	}
+	rows, err := s.db.Query(
+		`SELECT client_ip, from_addr, decision, detail, created_at FROM inbound_spam_log
+		 WHERE engine = ? AND (`+strings.Join(likes, " OR ")+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query filter list hits: %w", err)
+	}
+	defer rows.Close()
+	var out []SpamListHit
+	for rows.Next() {
+		var h SpamListHit
+		var created string
+		if err := rows.Scan(&h.ClientIP, &h.From, &h.Decision, &h.Detail, &created); err != nil {
+			return nil, fmt.Errorf("scan filter list hit: %w", err)
+		}
+		h.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}

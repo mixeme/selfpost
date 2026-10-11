@@ -183,18 +183,27 @@ func TestFilterListsShowsTheFormTheListsAndWhereTheyGo(t *testing.T) {
 		`href="/help#filter-lists" title="How the lists are applied"`,
 		`<h2>Deny</h2><div class="sp-end">3 entries · wins over Allow</div>`,
 		`<h2>Allow</h2><div class="sp-end">2 entries</div>`,
-		`<td class="sp-mono sp-small">bulk.example <span class="tag is-light">domain</span></td><td class="sp-muted">newsletter nobody subscribed to</td><td class="sp-muted sp-nowrap sp-small">2026-09-02</td>`,
-		`198.51.100.0/24 <span class="tag is-light">ip</span>`,
-		`win@lottery.example <span class="tag is-light">address</span></td><td class="sp-muted">—</td>`,
+		`<thead><tr><th>Value</th><th>Kind</th><th>Matched</th><th></th></tr></thead>`,
+		// the kind is a tag that opens the entry's sheet; the count is beside it
+		`<td class="sp-mono sp-small">bulk.example</td><td><button type="button" class="tag is-light" popovertarget="entry-1">domain</button><div class="sp-sheet" id="entry-1" popover>`,
+		`<div class="sp-sheet-head"><span class="tag is-light">domain</span><h2>bulk.example</h2>`,
+		`<tr><th>Note</th><td>newsletter nobody subscribed to</td></tr><tr><th>Added</th><td class="sp-mono sp-small">2026-09-02</td></tr><tr><th>Matched</th><td>41 in the last 90 days</td></tr><tr><th>Last match</th><td class="sp-mono sp-small">2026-09-21 13:57</td></tr></tbody>`,
+		`</div></td><td class="sp-nowrap">41</td><td class="sp-actions">`,
+		`<td class="sp-nowrap">1203</td>`,
+		// an entry that never decided anything says so, in the row and on its sheet
+		`<td class="sp-mono sp-small">win@lottery.example</td><td><button type="button" class="tag is-light" popovertarget="entry-3">address</button>`,
+		`<tr><th>Note</th><td>—</td></tr><tr><th>Added</th><td class="sp-mono sp-small">2026-07-30</td></tr><tr><th>Matched</th><td>never in the last 90 days</td></tr></tbody>`,
+		`</div></td><td class="sp-muted sp-nowrap">never</td><td class="sp-actions">`,
 		`<form method="post" action="/inbound/filter-lists/3/delete"><button type="submit" class="has-text-danger">Remove</button></form>`,
 		`<h2>Where the lists go</h2><div class="sp-end"><span class="tag is-success is-light">applied</span></div>`,
 		`rspamd, from map files it rereads within seconds of a change`,
 		`<span class="sp-mono">/data/antispam/</span> — six, one for each list and kind of entry`,
 		`2026-09-11 08:40 UTC`, `Deny wins, whichever entries they are.`,
 	)
-	if got := strings.Count(out, `<table`); got != 2 {
-		t.Errorf("%d tables, want the two lists", got)
+	if got := strings.Count(out, `<table class="table is-fullwidth is-hoverable">`); got != 2 {
+		t.Errorf("%d list tables, want the two lists", got)
 	}
+	pageLacks(t, "Filter lists", out, `<th>Note</th><th>`, `<th>Added</th><th>`)
 }
 
 // With no filter attached the lists are still the operator's to edit, and the
@@ -213,8 +222,8 @@ func TestFilterListsOffAndEmpty(t *testing.T) {
 		`No sender is turned away by hand.`,
 	)
 	pageLacks(t, "Filter lists", out, `rspamd, from map files`, `is-success is-light">applied`, `No sender is let through by hand.`)
-	if got := strings.Count(out, `<table`); got != 1 {
-		t.Errorf("%d tables, want the one list that has entries", got)
+	if got := strings.Count(out, `<table class="table is-fullwidth is-hoverable">`); got != 1 {
+		t.Errorf("%d list tables, want the one list that has entries", got)
 	}
 }
 

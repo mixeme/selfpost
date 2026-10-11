@@ -142,11 +142,15 @@ func (s *inboundSession) record() {
 	}
 }
 
-// What the journal keeps of a verdict: enough to see why, on one table row.
+// What the journal keeps of a verdict: enough to see why, on one line.
 const (
 	verdictMaxSymbols = 6
 	verdictMaxBytes   = 255
 )
+
+// ListSymbolPrefix starts the names of the symbols the filter lists' rules add
+// (deploy/antispam/rspamd/multimap.conf): SELFPOST_ALLOW_IP, _FROM, _DOMAIN.
+const ListSymbolPrefix = "SELFPOST_"
 
 var (
 	// "default: False [7.20 / 15.00]" - the score and the reject threshold.
@@ -182,15 +186,28 @@ func rspamdVerdict(actionHeader, resultHeader string) (action, detail string) {
 	}
 	detail = strings.Join(parts, ", ")
 
-	var symbols []string
+	// The filter lists' own symbols come first and are kept whatever else there
+	// is: Filter lists counts how often an entry decided by finding them here,
+	// and rspamd writes symbols heaviest first, which puts an allow entry's
+	// -100 last, behind any six others.
+	var symbols, rest []string
 	for _, m := range rspamdSymbol.FindAllStringSubmatch(resultHeader, -1) {
 		if strings.Trim(m[2], "-0.") == "" { // weight zero: informational
 			continue
 		}
-		symbols = append(symbols, m[1]+"("+m[2]+")")
+		if strings.HasPrefix(m[1], ListSymbolPrefix) {
+			if len(symbols) < verdictMaxSymbols {
+				symbols = append(symbols, m[1]+"("+m[2]+")")
+			}
+			continue
+		}
+		rest = append(rest, m[1]+"("+m[2]+")")
+	}
+	for _, sym := range rest {
 		if len(symbols) == verdictMaxSymbols {
 			break
 		}
+		symbols = append(symbols, sym)
 	}
 	if len(symbols) > 0 {
 		if detail != "" {

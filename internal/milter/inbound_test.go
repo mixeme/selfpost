@@ -222,3 +222,15 @@ func TestInboundAcceptsWhenTheStoreFails(t *testing.T) {
 		}
 	}
 }
+
+// rspamd writes symbols heaviest first, so an allow entry's -100 comes last.
+// Filter lists counts an entry's matches by finding that symbol in the journal:
+// it is kept whatever else there is.
+func TestRspamdVerdictKeepsTheListSymbols(t *testing.T) {
+	result := "default: False [-91.00 / 15.00]; SYM_A(3.00)[]; SYM_B(2.00)[]; SYM_C(1.50)[]; SYM_D(1.00)[]; SYM_E(0.80)[]; SYM_F(0.50)[]; SYM_G(0.20)[]; ARC_NA(0.00)[]; SELFPOST_ALLOW_FROM(-100.00)[billing@vendor.example]"
+	_, detail := rspamdVerdict("no action", result)
+	want := "no action, score -91.00 / 15.00; SELFPOST_ALLOW_FROM(-100.00) SYM_A(3.00) SYM_B(2.00) SYM_C(1.50) SYM_D(1.00) SYM_E(0.80)"
+	if detail != want {
+		t.Errorf("detail = %q\nwant     %q", detail, want)
+	}
+}
