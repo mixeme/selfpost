@@ -560,17 +560,25 @@ instance keeps running, what goes into the archive, and what happens on restore.
 
 **1. Panel — while the container is running (no downtime).** *Server › Backup*
 → *Full backup*. *Encrypt with a password* is ticked; untick it for a plain
-archive. The archive of the CLI below, less one thing the panel may not read:
-it runs as its own user, not as root, and **a file in `certs/` it cannot open**
-is left out — usually the private key (the panel's log names it). Put the key
-back into `certs/` before starting a restored instance. If anything else
-cannot be read, the panel says so and downloads nothing.
+archive. Same archive as the CLI below. The panel runs as its own user, not as
+root, so **the private key in `certs/` has to be readable by it**: give the
+file to the container's `selfpost` group, which has the fixed id 998 and holds
+both the panel and Postfix —
+
+```sh
+chgrp 998 certs/privkey.pem && chmod 640 certs/privkey.pem
+```
+
+— and have whatever renews the certificate do the same (a certbot deploy hook,
+for one). A key readable by root alone is enough for Postfix, but then the
+panel refuses to make a backup and names the file: it does not hand over an
+archive without the key.
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
 snapshot via `VACUUM INTO`, then a gzip tar of `data/` (minus diagnostics) plus
-deploy files. `docker exec` runs the command as root, so this archive has
-everything in `certs/`, the private key included.
+deploy files. `docker exec` runs the command as root, so it reads the private
+key whatever its permissions.
 
 ```sh
 docker exec <container> selfpost-backup > selfpost-backup.tar.gz
@@ -626,7 +634,7 @@ methods avoid it by stopping first.
 | SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
 | `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
 | Postfix queue | No | Yes | Yes |
-| `certs/` private key | CLI: yes. Panel: only if the panel may read it | Yes | No — deploy files separate |
+| `certs/` private key | Yes (the panel needs it readable by group 998) | Yes | No — deploy files separate |
 | `data/manifest.json` | Written (version stamp) | Absent | Absent |
 | Restore version check | Yes — must match image tag | No | No |
 | Post-restore *Resync* | Yes, on first boot | No | No |

@@ -62,7 +62,10 @@ RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
 # entrypoint.sh) — lets OpenDKIM read the panel-owned keys and lets Postfix read
 # the sasldb2/sender map, and lets the panel reach the supervisor control socket
 # to signal OpenDKIM/Postfix reloads without any process running as root.
-RUN groupadd --system selfpost \
+# The id is fixed, and it is the one the group has always had: an operator
+# gives the TLS private key on the host to this group by number, so that the
+# panel can put it into a full backup (guide § Taking a full backup).
+RUN groupadd --system --gid 998 selfpost \
  && usermod -aG selfpost panel \
  && usermod -aG selfpost opendkim \
  && usermod -aG selfpost postfix

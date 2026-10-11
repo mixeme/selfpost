@@ -17,12 +17,30 @@ import (
 // testFullBackupRestore takes a full backup from the panel, throws the
 // installation away and brings it back the way the guide tells an operator to
 // (§ Full backup and restore): unpack the archive into an empty project
-// directory, put the private key back, start the same image. What has to come back is what an operator
+// directory, start the same image. What has to come back is what an operator
 // cannot recreate - the administrator, the domain with its DKIM key, the
 // application with its password - and the proof is the same one the first
 // send gave: a message signed with the restored key verifies against the
 // record that was published before the backup.
 func testFullBackupRestore(t *testing.T, sc *scenario) {
+	// A private key the panel may not read - the state a server is in until
+	// its operator gives the key to group 998. The panel does not make an
+	// archive without it: it refuses, names the file and says what to do.
+	keyPath := filepath.Join(h.stageDir, "certs", "privkey.pem")
+	if err := os.Chmod(keyPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resp, body, err := sc.panel.postForm("/server/backup", url.Values{})
+	if err != nil {
+		t.Fatalf("full backup with an unreadable key: %v", err)
+	}
+	if resp.StatusCode != 500 || !strings.Contains(body, "not allowed to read certs/privkey.pem") || !strings.Contains(body, "chgrp 998") {
+		t.Fatalf("full backup with an unreadable key: status %d, want a refusal that names the file and the way out:\n%.800s", resp.StatusCode, body)
+	}
+	if err := os.Chmod(keyPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	resp, archive, err := sc.panel.postForm("/server/backup", url.Values{})
 	if err != nil {
 		t.Fatalf("full backup: %v", err)
@@ -41,14 +59,6 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	// The installation goes: containers down, then everything the archive is
 	// supposed to bring back. The fake zone and the sink's directory are the
 	// outside world and stay.
-	// The private key is the operator's to keep: the panel may not read it (it
-	// is the host user's, mode 0600, here as on a real server) and its archive
-	// comes without it.
-	keyPath := filepath.Join(h.stageDir, "certs", "privkey.pem")
-	key, err := os.ReadFile(keyPath)
-	if err != nil {
-		t.Fatalf("read the stand's private key: %v", err)
-	}
 	h.reclaimData()
 	h.down()
 	for _, name := range []string{"data", "certs", "docker-compose.yml", ".env"} {
@@ -60,21 +70,16 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatalf("unpack the backup into the empty project directory: %v", err)
 	}
-	for _, want := range []string{"docker-compose.yml", ".env", "data/manifest.json", "data/selfpost.db", "certs/fullchain.pem"} {
+	for _, want := range []string{"docker-compose.yml", ".env", "data/manifest.json", "data/selfpost.db", "certs/fullchain.pem", "certs/privkey.pem"} {
 		if !names[want] {
 			t.Fatalf("the backup has no %s (it has %d entries)", want, len(names))
 		}
 	}
-	// The panel's archive is the one without the Postfix queue (guide § Taking
-	// a full backup): the restored instance has to build an empty one.
+	// No backup holds the Postfix queue (guide § Full backup and restore): the
+	// restored instance has to build an empty one.
 	for name := range names {
 		if name == "data/postfix/queue" || strings.HasPrefix(name, "data/postfix/queue/") {
-			t.Fatalf("the panel's backup holds %s", name)
-		}
-	}
-	if !names["certs/privkey.pem"] {
-		if err := os.WriteFile(keyPath, key, 0o600); err != nil {
-			t.Fatalf("put the private key back: %v", err)
+			t.Fatalf("the backup holds %s", name)
 		}
 	}
 

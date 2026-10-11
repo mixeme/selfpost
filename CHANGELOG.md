@@ -33,11 +33,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and the panel is not that user ("open /data/postfix/queue/active:
   permission denied" in the log). `selfpost-backup` run with `docker exec`
   was not affected - it runs as root. The queue is no longer part of a backup
-  (see Changed), and the panel's archive leaves out a file in `certs/` it may
-  not open (usually the private key, named in the log); the page, Help and
-  the guide say so, and the guide says to put the key back before starting a
-  restored instance. Everything is read through before the download starts,
-  so a failure is a message on the page and not a file cut short.
+  (see Changed), so the two archives are the same again. Everything is read
+  through before the download starts, so a failure is a message on the page
+  and not a file cut short. One thing the panel may still be unable to read
+  is the private key in `certs/`: it then refuses and says what to do -
+  `chgrp 998 certs/privkey.pem && chmod 640 certs/privkey.pem` on the host,
+  998 being the container's `selfpost` group, whose id is now fixed in the
+  image.
 
 ### Security
 

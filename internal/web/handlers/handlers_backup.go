@@ -70,14 +70,11 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", pwErr)
 		return
 	}
-	// The panel is not root: its archive leaves out the Postfix queue and a
-	// certificate file it may not open (backup.Params.Unprivileged).
 	params := backup.Params{
-		DataDir:      h.cfg.DataDir,
-		DBPath:       h.cfg.DBPath,
-		Version:      h.cfg.Version,
-		DeployRoot:   h.cfg.DeployRoot,
-		Unprivileged: true,
+		DataDir:    h.cfg.DataDir,
+		DBPath:     h.cfg.DBPath,
+		Version:    h.cfg.Version,
+		DeployRoot: h.cfg.DeployRoot,
 		OnWarn: func(msg string) {
 			logf("panel: full backup: %s", msg)
 		},
@@ -90,11 +87,11 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	// Everything is read through once before the first byte goes out. Past the
 	// headers a failure can only cut the download short - which is what the
 	// button did from 1.3.0 to 2.0.0, with a 200 and ten bytes, because the
-	// queue was not the panel's to read.
+	// queue was not the panel's to read. Nothing is skipped to make the archive
+	// possible: it is the one selfpost-backup makes, or it is refused.
 	if err := backup.Check(params); err != nil {
 		logf("panel: full backup: %v", err)
-		h.renderBackupPageWith(w, r, http.StatusInternalServerError, "",
-			"Could not read everything a backup holds. Nothing was downloaded; the reason is in the panel's log.")
+		h.renderBackupPageWith(w, r, http.StatusInternalServerError, "", unreadableBackupErr(err, h.cfg.DeployRoot))
 		return
 	}
 
@@ -331,6 +328,18 @@ func decryptErrorMessage(err error) string {
 	default:
 		return "Could not decrypt the file."
 	}
+}
+
+// unreadableBackupErr phrases what backup.Check found. The usual case is the
+// private key: the panel runs as its own user, and a key readable by root
+// alone is not its to read. The way out is on the host, so the message says
+// what to do there (guide § Taking a full backup).
+func unreadableBackupErr(err error, deployRoot string) string {
+	if name, ok := backup.UnreadableCert(err, deployRoot); ok {
+		return "The panel is not allowed to read " + name + ", and a backup without it would not bring the server back. " +
+			"On the host, give the file to group 998 and make it group-readable (chgrp 998, chmod 640), then try again. Nothing was downloaded."
+	}
+	return "Could not read everything a backup holds. Nothing was downloaded; the reason is in the panel's log."
 }
 
 // deployBackupErr phrases a pre-flight backup failure for the operator.

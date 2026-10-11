@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -236,11 +238,11 @@ func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 	}
 }
 
-// The panel's archive: like any other it has no Postfix queue, the rest is
-// there, and Check agrees that it can be made.
-func TestCreateUnprivilegedLeavesTheQueueOut(t *testing.T) {
+// No archive holds the Postfix queue; the rest is there, the private key
+// included, and Check agrees that it can be made.
+func TestCreateLeavesTheQueueOut(t *testing.T) {
 	dataDir, dbPath, deployRoot := seedDataDir(t)
-	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot, Unprivileged: true}
+	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot}
 
 	if err := Check(p); err != nil {
 		t.Fatalf("Check: %v", err)
@@ -262,10 +264,33 @@ func TestCreateUnprivilegedLeavesTheQueueOut(t *testing.T) {
 		DataArchivePrefix + "postfix/sender_login_maps",
 		ComposeFileName, EnvFileName,
 		CertsDirName + "/fullchain.pem",
+		CertsDirName + "/privkey.pem",
 	} {
 		if _, ok := files[name]; !ok {
 			t.Errorf("archive missing %s", name)
 		}
+	}
+}
+
+// A file under certs/ that may not be read is told apart from any other
+// failure, so the panel can say what to do about it.
+func TestUnreadableCert(t *testing.T) {
+	root := filepath.Join("srv", "deploy")
+	denied := func(path string) error {
+		return fmt.Errorf("backup: open %s: %w", path, &fs.PathError{Op: "open", Path: path, Err: fs.ErrPermission})
+	}
+	if name, ok := UnreadableCert(denied(filepath.Join(root, "certs", "privkey.pem")), root); !ok || name != "certs/privkey.pem" {
+		t.Errorf("certs/privkey.pem: got %q, %v", name, ok)
+	}
+	if name, ok := UnreadableCert(denied(filepath.Join(root, ".env")), root); ok {
+		t.Errorf(".env was taken for a certificate file: %q", name)
+	}
+	if name, ok := UnreadableCert(denied(filepath.Join("data", "postfix", "x")), root); ok {
+		t.Errorf("a data file was taken for a certificate file: %q", name)
+	}
+	missing := &fs.PathError{Op: "open", Path: filepath.Join(root, "certs", "privkey.pem"), Err: fs.ErrNotExist}
+	if _, ok := UnreadableCert(missing, root); ok {
+		t.Error("a missing file was taken for one that may not be read")
 	}
 }
 
