@@ -70,6 +70,12 @@ const (
 	recipient    = "rcpt@sink.e2e.test"
 )
 
+// The one administrator of the run.
+const (
+	adminUser     = "e2eadmin"
+	adminPassword = "correct-horse-battery-staple"
+)
+
 // scenario carries state forward between the ordered subtests of TestE2E:
 // each later step needs something an earlier one produced (the domain id, the
 // DKIM record, the application credentials, an observed client IP).
@@ -131,10 +137,10 @@ func TestE2E(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := p.setup(token, "e2eadmin", "correct-horse-battery-staple"); err != nil {
+		if err := p.setup(token, adminUser, adminPassword); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
-		if err := p.login("e2eadmin", "correct-horse-battery-staple"); err != nil {
+		if err := p.login(adminUser, adminPassword); err != nil {
 			t.Fatalf("login: %v", err)
 		}
 		sc.panel = p
@@ -267,6 +273,20 @@ func TestE2E(t *testing.T) {
 	})
 	run("negative_level1_ratelimit", func(t *testing.T) {
 		testLevel1RateLimit(t, sc)
+	})
+
+	// From here on the stand accepts mail on port 25.
+	run("enable_port25_features", func(t *testing.T) {
+		testEnablePort25Features(t, sc)
+	})
+	run("dmarc_report_reaches_the_panel", func(t *testing.T) {
+		testDMARCReportReachesThePanel(t, sc)
+	})
+	run("dmarc_junk_is_dropped", func(t *testing.T) {
+		testDMARCJunkIsDropped(t, sc)
+	})
+	run("inbound_relay_delivers_and_refuses", func(t *testing.T) {
+		testInboundRelay(t, sc)
 	})
 }
 

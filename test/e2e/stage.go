@@ -39,6 +39,9 @@ func prepareStage(s *stack) error {
 	); err != nil {
 		return err
 	}
+	if err := writeDeployFiles(s); err != nil {
+		return err
+	}
 	corefile, err := os.ReadFile(filepath.Join("dns", "Corefile"))
 	if err != nil {
 		return fmt.Errorf("read Corefile: %w", err)
@@ -47,6 +50,22 @@ func prepareStage(s *stack) error {
 		return fmt.Errorf("write Corefile: %w", err)
 	}
 	return writeZone(s.stageDir, nil)
+}
+
+// writeDeployFiles puts docker-compose.yml and .env into the stage directory.
+// The stage directory is what the container sees as /selfpost-deploy, the
+// operator's project directory, and a full backup refuses to run unless both
+// files are there to be archived. compose reads neither: the stand names its
+// files with -f, and the .env repeats what compose is given anyway.
+func writeDeployFiles(s *stack) error {
+	compose, err := os.ReadFile(s.baseComposeFile)
+	if err != nil {
+		return fmt.Errorf("read the shipped compose file: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(s.stageDir, "docker-compose.yml"), compose, 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.stageDir, ".env"), []byte("SELFPOST_HOSTNAME="+selfpostHostname+"\n"), 0o644)
 }
 
 // removeAllBestEffort deletes path; if a previous run left container-UID files

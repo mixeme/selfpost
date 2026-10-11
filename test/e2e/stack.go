@@ -24,6 +24,10 @@ type stack struct {
 	baseComposeFile string
 	overrideFile    string
 	stageDir        string
+	// env is added to compose's own environment. The shipped compose file takes
+	// the optional features from there (${INBOUND_RELAY_ENABLE:-false} and the
+	// like), so this is how a later part of the run switches them on.
+	env []string
 }
 
 func newStack() (*stack, error) {
@@ -64,6 +68,7 @@ func (s *stack) compose(args ...string) ([]byte, error) {
 	// looked at (that mapping only reaches the container, not compose's own
 	// variable interpolation), so it has to be set here too.
 	cmd.Env = append(os.Environ(), "SELFPOST_HOSTNAME="+selfpostHostname)
+	cmd.Env = append(cmd.Env, s.env...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -99,6 +104,14 @@ func (s *stack) up() error {
 // tearing down the DNS/sink sidecars or their state.
 func (s *stack) restartSelfpost() error {
 	_, err := s.compose("restart", "selfpost")
+	return err
+}
+
+// recreateSelfpost replaces the selfpost container with one started from the
+// same /data and the environment as it is now (see env), leaving the DNS and
+// sink sidecars and their state alone.
+func (s *stack) recreateSelfpost() error {
+	_, err := s.compose("up", "-d", "--force-recreate", "--no-deps", "selfpost")
 	return err
 }
 

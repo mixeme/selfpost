@@ -14,8 +14,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   time. It is now accepted and discarded - no retry, and no bounce, since the
   envelope sender of such a message is whatever its author wrote. It counts
   as one parse failure and the reason is in the mail log, on the message's
-  own delivery line (Server › System log, `dropped: …`). Only a failure of the database is still
-  retried.
+  own delivery line (Server › System log, `dropped: …`). Only a failure of
+  the database is still retried.
+- DMARC reports are kept 500 **for each domain** (and 90 days), not 500 for
+  the whole server - see Security.
+
+### Security
+
+Review of the DMARC report path (Fable, 2026-10-11), which started to run for
+the first time in 2.0.0. Nothing Critical or High.
+
+- **A report is bounded before it is stored.** The XML comes from anyone who
+  knows a report address, and its 8 MiB limit left room for some 160 000
+  records or a single name of megabytes - rows in the database and cells of
+  the report page. A report holds at most 5 000 records (a larger one is
+  dropped), every text field is cut to 255 bytes, and a record's count is
+  capped so the sums cannot wrap.
+- **One domain's reports cannot push out another's.** The cap of 500 was for
+  the whole server, so a stranger filing reports under one domain's address
+  could evict every other domain's history. It is counted per domain now.
+- The delivery command runs one at a time, not up to a hundred in parallel.
+- The reason written to the mail log for a dropped message is cut to 200
+  bytes and anything outside printable ASCII is replaced: parts of it are the
+  sender's own bytes (a header line, a file name inside an archive).
+- `SELFPOST_DATA_DIR` / `SELFPOST_DB_PATH` with whitespace or `$` are refused
+  at start when DMARC ingest is on, instead of handing the delivery command
+  another path and so an empty database of its own.
+
+### Added
+
+- e2e: the run now ends on port 25 with both optional features on. A DMARC
+  report is mailed to a domain's hosted address and has to appear under
+  Outbound › DMARC reports; a report on another domain and a message with no
+  report are accepted and dropped; mail for an inbound domain reaches its
+  upstream and other recipients are refused. Until now the suite only read
+  back the generated configuration of these features.
 
 ## [2.0.0] - 2026-10-11
 
