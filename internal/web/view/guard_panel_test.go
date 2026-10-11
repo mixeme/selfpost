@@ -46,8 +46,6 @@ const mockupDir = "../../../docs/assets/panel-redesign/panel"
 // with its own plan (panel-redesign.md § Room for roadmap items). They are the
 // only keys of outlines.json the finished panel may lack.
 var deferredScreens = map[string]string{
-	"in-log":                "inbound-antispam-panel, 2.1.0",
-	"in-filter-lists":       "inbound-antispam-panel, 2.1.0",
 	"in-queue":              "queue as a table / inbound queue, undecided",
 	"in-quarantine":         "inbound-quarantine, candidate",
 	"in-quarantine-message": "inbound-quarantine, candidate",
