@@ -37,7 +37,7 @@ SIGNED_OUT = {"sp-signin", "sp-signin-brand", "sp-signin-form", "sp-foot"}
 # Selectors allowed to set a width. Everything else gets its width from the
 # layout it sits in — that is the whole point of the redesign.
 WIDTH_OK = (".navbar-brand img", ".sp-head .sp-lead", ".sp-head .sp-grow", ".sp-postmark", ".table td.sp-clip",
-            ".sp-h-icon", ".sp-signin", ".sp-timeline li::before", ".sp-perf")
+            ".sp-h-icon", ".sp-signin", ".sp-timeline li::before", ".sp-perf", ".sp-sheet")
 
 
 class Node:
