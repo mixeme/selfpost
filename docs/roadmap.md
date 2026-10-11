@@ -39,6 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
+| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
@@ -403,6 +404,41 @@ password (2.0 security review), because the e-mail becomes where a reset link
 goes and today Account saves it without the password.
 
 **Version:** `2.x` MINOR; `candidate`.
+
+---
+
+## phone-desktop-mode
+
+**Problem (owner, 2026-10-11):** the panel opened on a phone with the
+browser's "desktop site" switched on does not become the desktop panel.
+Seen on Server › Health at `selfpost.mixfed.ru`: the page body is laid out in
+columns (Machine and Processes side by side, three cards in the next row),
+while the navigation is the phone one - not a bar but a stack with every
+section open (Outbound, Inbound, Server, the user menu), filling the first
+screen before the page starts. The content also sits flush against the left
+edge of the screen.
+
+**Goal:** find out why, then decide what the panel should be in that mode -
+the desktop panel, or a phone panel that is at least consistent.
+
+**Where to look first (a guess, not checked):** "desktop site" on Android
+lays a page out about 980 px wide. Bulma turns the navigation into a bar at
+1024 px and puts columns side by side from 769 px, so 980 px falls between
+the two: desktop columns under a touch navigation. `panel.css` has its own
+breakpoints at 768, 1023 and 1407 px. Check the width the phone really
+reports, why every dropdown is open rather than folded behind the burger,
+and where the left padding went.
+
+**Boundary:** the navigation and page gutter between 769 and 1023 px, which
+is also a tablet in portrait and a narrow desktop window - the same defect is
+expected there. A design change is mockup-first
+([plans/panel-redesign.md](plans/panel-redesign.md) § Enforcement).
+
+**Done when:** the cause is written down here, and the panel at that width
+has one coherent layout, checked on a phone in "desktop site" mode and in a
+980 px window.
+
+**Version:** `2.x` PATCH or MINOR; `candidate`.
 
 ---
 
