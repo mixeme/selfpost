@@ -27,3 +27,6 @@ services:
     image: rspamd/rspamd:3.11
     restart: unless-stopped
     # No host ports: only SelfPost talks to the milter on the compose network.
+    volumes:
+      # The verdict headers SelfPost's inbound journal reads.
+      - ./antispam/rspamd/milter_headers.conf:/etc/rspamd/local.d/milter_headers.conf:ro

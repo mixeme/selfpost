@@ -10,7 +10,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - Schema: migration `0002_inbound_spam_log.sql`, the first after the 2.0
   baseline - two empty tables for the inbound antispam journal and the filter
   lists (inbound-antispam-panel). A 2.0.x database is migrated when the panel
-  starts; nothing reads or writes the tables yet.
+  starts.
+- **Inbound mail is recorded.** With the inbound relay on, the panel runs a
+  second milter, the last one on port 25, and writes a row for every recipient
+  of a message that was accepted for an inbound domain: client address,
+  envelope, subject and - with a spam filter attached - the filter's action,
+  score and heaviest symbols. It only watches: it refuses nothing and Postfix
+  accepts mail when it is down. Refused mail is not there yet (it comes from
+  the mail log, next), and there is no page for the journal yet.
+- The antispam compose fragment mounts `antispam/rspamd/milter_headers.conf`
+  into the rspamd sidecar, which makes it write its verdict into
+  `X-Rspamd-Action` and `X-Spamd-Result`. **Copy `deploy/antispam/rspamd/`
+  next to the fragment before starting it** - Docker creates a directory in
+  place of a missing file and the sidecar then fails to read its
+  configuration.
+- New setting `INBOUND_JOURNAL_MILTER_SOCKET` (default
+  `/run/selfpost/inbound-journal.sock`).
 
 ## [2.0.1] - 2026-10-11
 

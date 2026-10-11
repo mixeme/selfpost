@@ -47,9 +47,10 @@ var port25Cases = []port25Case{
 			{param: "smtpd_sasl_auth_enable", contains: "no", wantExact: true},
 			{param: "smtpd_relay_restrictions", contains: "reject_unauth_destination", wantExact: true},
 			{param: "smtpd_recipient_restrictions", contains: "reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
-			// No antispam milter configured: the submission chain (strict
-			// OpenDKIM + journal-milter) must not reach inbound mail.
-			{param: "smtpd_milters", contains: "", wantExact: true},
+			// No antispam milter configured: the inbound journal milter
+			// alone. The submission chain (strict OpenDKIM + journal-milter)
+			// must not reach inbound mail.
+			{param: "smtpd_milters", contains: "{unix:/run/selfpost/inbound-journal.sock,default_action=accept}", wantExact: true},
 		},
 	},
 	{
@@ -72,7 +73,7 @@ var port25Cases = []port25Case{
 		},
 		check: []optionCheck{
 			{param: "smtpd_recipient_restrictions", contains: "check_recipient_access,texthash:/data/postfix/dmarc_recipients,reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
-			{param: "smtpd_milters", contains: "", wantExact: true},
+			{param: "smtpd_milters", contains: "{unix:/run/selfpost/inbound-journal.sock,default_action=accept}", wantExact: true},
 		},
 		// Both on: the report addresses sit on a relay domain, and the relay's
 		// unlisted-recipient check runs after the restriction list. Unless their
@@ -94,7 +95,7 @@ var port25Cases = []port25Case{
 		check: []optionCheck{
 			// Exact equality also covers the absence of OpenDKIM/journal-milter
 			// sockets — anything else there would fail the comparison.
-			{param: "smtpd_milters", contains: "{inet:antispam:11332,default_action=accept}", wantExact: true},
+			{param: "smtpd_milters", contains: "{inet:antispam:11332,default_action=accept},{unix:/run/selfpost/inbound-journal.sock,default_action=accept}", wantExact: true},
 		},
 	},
 }

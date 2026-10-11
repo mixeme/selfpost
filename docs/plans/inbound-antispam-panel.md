@@ -57,8 +57,9 @@ smtpd_milters = { antispam, inbound-journal }
 ```
 
 Antispam runs first; inbound-journal runs at end-of-message on the **accept**
-path and reads rspamd-added headers (`X-Rspamd-Action`, `X-Rspamd-Score`, symbol
-summary when present).
+path and reads rspamd-added headers (`X-Rspamd-Action`, and `X-Spamd-Result`
+for the score and symbols - rspamd has no `X-Rspamd-Score`; the sidecar adds
+both through `deploy/antispam/rspamd/milter_headers.conf`).
 
 **Antispam rejects** do not reach end-of-message on the journal milter. v1 also
 tails `mail.log` for inbound `postfix/smtpd` **`milter-reject`** / **`reject`**
@@ -244,7 +245,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
 - [x] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
-- [ ] Inbound journal-milter + Postfix wiring — **Composer**
+- [x] Inbound journal-milter + Postfix wiring — **Composer**
 - [ ] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**
 - [ ] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**

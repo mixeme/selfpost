@@ -209,6 +209,7 @@ expected to set; defaults match the code exactly.
 | `DMARC_MESSAGE_SIZE_LIMIT` | Maximum report message size in bytes when DMARC ingest is on. | `5242880` (5 MiB) | `.env` |
 | `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. The panel reads it to report on the *Spam filter* box of the inbound pages and to check that the filter answers (Server › Health). | *(empty)* | `.env` |
 | `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). The *Spam filter* box states which. | `accept` | `.env` |
+| `INBOUND_JOURNAL_MILTER_SOCKET` | Unix socket of the panel's inbound journal milter, the last milter on port 25 while the inbound relay is on. It records accepted inbound mail and never refuses any; there is no reason to change it. | `/run/selfpost/inbound-journal.sock` | compose |
 | `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
 | `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
@@ -840,6 +841,14 @@ The milter sees the real client IP, HELO and PTR — unlike the upstream, which
 only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
 does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
 defer instead.
+
+The fragment mounts one file into the sidecar,
+[deploy/antispam/rspamd/milter_headers.conf](../deploy/antispam/rspamd/milter_headers.conf):
+it makes rspamd write its verdict - the action and the score with its symbols
+- into two headers of every message it lets through. SelfPost records them
+with the message, and the upstream receives them with the mail. Copy the
+`antispam/rspamd/` directory next to the fragment; without the file accepted
+mail is still recorded, with no verdict.
 
 The panel only reports this setting; it does not change it. Every inbound
 domain page has a **Spam filter** box — on or off, what happens to mail while

@@ -27,7 +27,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | Program | User | Priority | Role |
 |---|---|---|---|
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
-| `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer + rate-limit recalc |
+| `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
 | `postfix` | root (wrapper) | 300 | MTA — started only after both milter sockets exist |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily `postfix reload` for renewed TLS certs |
@@ -74,10 +74,21 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `smtpd_tls_security_level=encrypt`.
 - **25/smtp inet** — when `INBOUND_RELAY_ENABLE=true` and/or
   `DMARC_REPORTS_ENABLE=true`. No SASL, no OpenDKIM, no journal-milter —
-  `smtpd_milters` is always overridden on this service (to the antispam milter
-  or to nothing), because main.cf's submission chain would otherwise let a
-  signing outage defer relayed mail and would file inbound mail into the
-  outbound send log under the sender's domain.
+  `smtpd_milters` is always overridden on this service, because main.cf's
+  submission chain would otherwise let a signing outage defer relayed mail and
+  would file inbound mail into the outbound send log under the sender's
+  domain. With the inbound relay on the chain is the optional antispam milter,
+  then the panel's **inbound journal milter** (unix socket
+  `INBOUND_JOURNAL_MILTER_SOCKET`, default
+  `/run/selfpost/inbound-journal.sock`, `default_action=accept`); with DMARC
+  ingest alone it is empty. Postfix hands a message to its milters one after
+  another at end-of-message, each seeing what the one before added, so the
+  journal milter sees only mail the filter let through and reads the filter's
+  verdict headers (`X-Rspamd-Action`, `X-Spamd-Result`) off it. It writes one
+  `inbound_spam_log` row per recipient at an inbound domain - a DMARC report
+  address is not one - and never refuses anything
+  ([internal/milter/inbound.go](../internal/milter/inbound.go)). The headers
+  are read only while a filter is attached; refused mail never reaches it.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,

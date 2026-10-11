@@ -117,6 +117,9 @@ SUBMISSION_ENABLE="${SUBMISSION_ENABLE:-false}"
 INBOUND_RELAY_ENABLE="${INBOUND_RELAY_ENABLE:-false}"
 INBOUND_ANTISPAM_MILTER="${INBOUND_ANTISPAM_MILTER:-}"
 INBOUND_ANTISPAM_MILTER_ACTION="${INBOUND_ANTISPAM_MILTER_ACTION:-accept}"
+# The panel's inbound journal milter (monitoring, fail-open), on port 25 only
+# and only while the inbound relay is on. Matched by postfix-wrapper.sh.
+INBOUND_JOURNAL_SOCK="${INBOUND_JOURNAL_MILTER_SOCKET:-/run/selfpost/inbound-journal.sock}"
 INBOUND_RATE_LIMIT_MESSAGES_PER_IP="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}"
 INBOUND_MESSAGE_SIZE_LIMIT="${INBOUND_MESSAGE_SIZE_LIMIT:-26214400}"
 RELAY_DOMAINS_MAP="${POSTFIX_RELAY_DOMAINS:-/data/postfix/relay_domains}"
@@ -357,7 +360,8 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	# would file inbound mail into the outbound send log under the *sender's*
 	# domain — polluting Deliveries and letting a forged From: consume that
 	# domain's level-2 rate-limit budget. So smtpd_milters is always overridden
-	# here: either the optional antispam milter, or nothing at all.
+	# here: the optional antispam milter, then - with the inbound relay on - the
+	# panel's inbound journal milter, or nothing at all.
 	INBOUND_MILTERS=""
 	if [ "${INBOUND_RELAY_ENABLE}" = "true" ] && [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
 		case "${INBOUND_ANTISPAM_MILTER}" in
@@ -375,6 +379,22 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 				;;
 		esac
 		INBOUND_MILTERS="{${INBOUND_ANTISPAM_MILTER},default_action=${INBOUND_ANTISPAM_MILTER_ACTION}}"
+	fi
+	if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+		# Last in the chain: Postfix hands a message to its milters one after
+		# another at end-of-message, so this one reads the verdict headers the
+		# filter added and sees only what the filter let through. It watches and
+		# never refuses, and must never hold up someone else's mail: accept when
+		# it is down. A comma, not a space, between the two - see
+		# master_cf_set_smtp_inet_o.
+		case "${INBOUND_JOURNAL_SOCK}" in
+			/[A-Za-z0-9._/-]*) ;;
+			*)
+				echo "FATAL: INBOUND_JOURNAL_MILTER_SOCKET must be an absolute path, got: ${INBOUND_JOURNAL_SOCK}" >&2
+				exit 1
+				;;
+		esac
+		INBOUND_MILTERS="${INBOUND_MILTERS:+${INBOUND_MILTERS},}{unix:${INBOUND_JOURNAL_SOCK},default_action=accept}"
 	fi
 
 	PORT25_RATE="${INBOUND_RATE_LIMIT_MESSAGES_PER_IP}"

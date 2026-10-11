@@ -96,7 +96,10 @@ type config struct {
 	// what attaches it; the panel only says so. See antispamAction.
 	inboundAntispamMilter string
 	inboundAntispamAction string
-	dmarcEnabled          bool
+	// The inbound journal milter's socket; the default mirrors
+	// build/postfix-config.sh. Served only while the inbound relay is on.
+	inboundJournalSocket string
+	dmarcEnabled         bool
 }
 
 func loadConfig() config {
@@ -162,6 +165,7 @@ func loadConfig() config {
 		inboundEnabled:        os.Getenv("INBOUND_RELAY_ENABLE") == "true",
 		inboundAntispamMilter: os.Getenv("INBOUND_ANTISPAM_MILTER"),
 		inboundAntispamAction: antispamAction(os.Getenv("INBOUND_ANTISPAM_MILTER_ACTION")),
+		inboundJournalSocket:  envDefault("INBOUND_JOURNAL_MILTER_SOCKET", "/run/selfpost/inbound-journal.sock"),
 		// Optional DMARC aggregate ingest on port 25. Off unless exactly "true".
 		dmarcEnabled: os.Getenv("DMARC_REPORTS_ENABLE") == "true",
 	}
@@ -294,7 +298,7 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	errc := make(chan error, 4)
+	errc := make(chan error, 5)
 
 	roles := []struct {
 		name string
@@ -316,6 +320,13 @@ func run() error {
 			runAutoRateLimitRecalc(ctx, cfg, st)
 			return nil
 		}},
+	}
+
+	if cfg.inboundEnabled {
+		roles = append(roles, struct {
+			name string
+			fn   func(context.Context) error
+		}{"inbound-journal-milter", func(ctx context.Context) error { return serveInboundJournal(ctx, cfg, st) }})
 	}
 
 	for _, r := range roles {
