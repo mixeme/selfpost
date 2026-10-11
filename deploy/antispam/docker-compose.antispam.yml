@@ -30,3 +30,7 @@ services:
     volumes:
       # The verdict headers SelfPost's inbound journal reads.
       - ./antispam/rspamd/milter_headers.conf:/etc/rspamd/local.d/milter_headers.conf:ro
+      # The allow and deny lists kept in the panel: the rules, and the files
+      # SelfPost writes them to.
+      - ./antispam/rspamd/multimap.conf:/etc/rspamd/local.d/multimap.conf:ro
+      - ./data/antispam:/etc/rspamd/selfpost:ro

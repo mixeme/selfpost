@@ -37,6 +37,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   next to the fragment before starting it** - Docker creates a directory in
   place of a missing file and the sidecar then fails to read its
   configuration.
+- **Allow and deny lists for the spam filter**, kept by SelfPost and applied
+  by rspamd: sender addresses, sender domains, client addresses and networks.
+  They are written as six files under `data/antispam/`, which the fragment
+  mounts into the sidecar together with `antispam/rspamd/multimap.conf`;
+  rspamd rereads a changed file by itself. Deny wins over allow. The files
+  are there from the first start with the inbound relay on; the page that
+  edits the lists comes next.
+- New setting `ANTISPAM_DIR` (default `/data/antispam`).
 - New setting `INBOUND_JOURNAL_MILTER_SOCKET` (default
   `/run/selfpost/inbound-journal.sock`).
 

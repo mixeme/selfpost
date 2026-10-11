@@ -102,6 +102,18 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   journal is pruned every six hours: rows
   older than the `inbound_spam_log_retention_days` setting, then down to
   10 000.
+  **Filter lists** (`inbound_spam_list`): allow and deny entries for the
+  external filter - sender address, sender domain, client address or network -
+  validated and normalised by `internal/inbound` (`lists.go`) and written as
+  six map files under `/data/antispam/` (`ANTISPAM_DIR`), each atomically, on
+  every change and on every start with the relay on. SelfPost never consults
+  them. The sidecar mounts the directory and rspamd's multimap rules
+  ([deploy/antispam/rspamd/multimap.conf](../deploy/antispam/rspamd/multimap.conf))
+  read them: a deny entry is a prefilter `reject`, an allow entry a symbol
+  weighing -100. Allow is deliberately not a prefilter `accept`: with two
+  prefilters rspamd lets the one that ran first decide, and deny then won or
+  lost by rule order (seen on rspamd 3.11). A refusal by the deny list
+  overrides any score, so deny wins whichever entries match.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,

@@ -851,6 +851,19 @@ with the message, and the upstream receives them with the mail. Copy the
 `antispam/rspamd/` directory next to the fragment; without the file accepted
 mail is still recorded, with no verdict.
 
+The same directory holds
+[multimap.conf](../deploy/antispam/rspamd/multimap.conf), the rules for the
+**allow and deny lists** kept in the panel. SelfPost does not apply the lists
+itself: it writes them as six files under `data/antispam/` (`allow_ip.map`,
+`allow_from.map`, `allow_domain.map` and the three `deny_` ones), the fragment
+mounts that directory into the sidecar, and rspamd rereads a file within
+seconds of a change - no restart. An entry is a sender address, a sender
+domain (that domain, not its subdomains) or a client address or network. A
+denied sender is refused outright. An allowed one is given a weight that no
+spam score outweighs, so it is accepted - unless a deny entry matches the same
+message: **deny wins**, whichever entries they are. The files are readable by
+anyone on the host; they hold addresses, not secrets.
+
 The panel only reports this setting; it does not change it. Every inbound
 domain page has a **Spam filter** box — on or off, what happens to mail while
 the filter is down, and that the filter belongs to the server, not to the

@@ -95,3 +95,86 @@ func (s *Store) IsInboundDomain(name string) (bool, error) {
 	}
 	return true, nil
 }
+
+// Lists and entry kinds of the filter lists. Kept in sync with the CHECK
+// constraints of inbound_spam_list.
+const (
+	SpamListAllow = "allow"
+	SpamListDeny  = "deny"
+
+	SpamEntryAddress = "address" // sender address
+	SpamEntryDomain  = "domain"  // sender domain
+	SpamEntryIP      = "ip"      // client address or network
+)
+
+// ErrSpamListEntryExists is returned when the entry is already on that list.
+var ErrSpamListEntryExists = errors.New("filter list entry already exists")
+
+// ErrSpamListEntryNotFound is returned when a filter list entry id does not exist.
+var ErrSpamListEntryNotFound = errors.New("filter list entry not found")
+
+// SpamListEntry is one allow or deny entry for the external filter. Value is
+// stored normalised by the caller (internal/inbound), which is what makes the
+// uniqueness of an entry on its list mean anything.
+type SpamListEntry struct {
+	ID        int64
+	List      string
+	Kind      string
+	Value     string
+	Note      string
+	CreatedAt time.Time
+}
+
+// AddSpamListEntry inserts an entry. The caller must have validated it.
+func (s *Store) AddSpamListEntry(list, kind, value, note string) (SpamListEntry, error) {
+	now := time.Now().UTC()
+	res, err := s.db.Exec(
+		"INSERT INTO inbound_spam_list (list_type, entry_type, value, note, created_at) VALUES (?, ?, ?, ?, ?)",
+		list, kind, value, note, now.Format(time.RFC3339),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return SpamListEntry{}, ErrSpamListEntryExists
+		}
+		return SpamListEntry{}, fmt.Errorf("insert inbound_spam_list: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return SpamListEntry{}, fmt.Errorf("filter list entry id: %w", err)
+	}
+	return SpamListEntry{ID: id, List: list, Kind: kind, Value: value, Note: note, CreatedAt: now.Truncate(time.Second)}, nil
+}
+
+// ListSpamListEntries returns every entry of both lists: by list, then kind,
+// then value.
+func (s *Store) ListSpamListEntries() ([]SpamListEntry, error) {
+	rows, err := s.db.Query(
+		"SELECT id, list_type, entry_type, value, note, created_at FROM inbound_spam_list ORDER BY list_type, entry_type, value")
+	if err != nil {
+		return nil, fmt.Errorf("list inbound_spam_list: %w", err)
+	}
+	defer rows.Close()
+	var out []SpamListEntry
+	for rows.Next() {
+		var e SpamListEntry
+		var created string
+		if err := rows.Scan(&e.ID, &e.List, &e.Kind, &e.Value, &e.Note, &created); err != nil {
+			return nil, fmt.Errorf("scan inbound_spam_list: %w", err)
+		}
+		e.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// DeleteSpamListEntry removes an entry by id.
+func (s *Store) DeleteSpamListEntry(id int64) error {
+	res, err := s.db.Exec("DELETE FROM inbound_spam_list WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete inbound_spam_list: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrSpamListEntryNotFound
+	}
+	return nil
+}

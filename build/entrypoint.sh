@@ -112,6 +112,15 @@ for f in relay_domains transport relay_recipients tls_policy; do
 done
 chown panel:selfpost /data/postfix
 chmod 2750 /data/postfix
+
+# Filter lists for the external spam filter (written by the panel when
+# INBOUND_RELAY_ENABLE=true, read by the antispam sidecar, which mounts this
+# directory). The sidecar runs under a user of its own in another container,
+# so the directory and its files are readable by anyone: they hold sender
+# addresses and networks, no secrets.
+mkdir -p /data/antispam
+chown panel:selfpost /data/antispam
+chmod 0755 /data/antispam
 chown panel:selfpost /data/postfix/sender_login_maps
 chmod 0640 /data/postfix/sender_login_maps
 

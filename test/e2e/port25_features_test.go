@@ -268,6 +268,23 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	// The inbound journal milter saw it go through. No page shows the journal
 	// yet, so the row is read where it is kept. No filter is attached on the
 	// stand: the row is an accept by nobody.
+	// The filter lists exist as files from the first start with the relay on,
+	// readable by a filter that is another user in another container. Nothing
+	// is on them: no page edits them yet.
+	maps, err := h.execIn("selfpost", "sh", "-c", `cd /data/antispam && stat -c "%a %n" . *.map && { grep -vc "^#" *.map; true; }`)
+	if err != nil {
+		t.Fatalf("list /data/antispam: %v\n%s", err, maps)
+	}
+	for _, want := range []string{"755 .",
+		"644 allow_domain.map", "644 allow_from.map", "644 allow_ip.map",
+		"644 deny_domain.map", "644 deny_from.map", "644 deny_ip.map",
+		"allow_ip.map:0", "deny_from.map:0",
+	} {
+		if !strings.Contains(maps, want) {
+			t.Fatalf("/data/antispam: no %q in\n%s", want, maps)
+		}
+	}
+
 	// journalHas waits for a row and returns the journal as it then stands.
 	journalHas := func(want string) string {
 		t.Helper()

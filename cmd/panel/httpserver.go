@@ -24,6 +24,7 @@ type mailStack struct {
 	Domains        *domain.Service
 	Apps           *app.Service
 	Inbound        *inbound.Service
+	Lists          *inbound.Lists
 	DMARC          *dmarc.Service
 	pf             *postfix.Postfix
 	odk            *domain.OpenDKIM
@@ -40,7 +41,8 @@ func newMailStack(cfg config, st *store.Store) *mailStack {
 	dmarcSvc := dmarc.NewService(st, pf, cfg.hostname, cfg.dmarcEnabled)
 	return &mailStack{
 		Domains: domains, Apps: apps, Inbound: inb, DMARC: dmarcSvc,
-		pf: pf, odk: odk, inboundEnabled: cfg.inboundEnabled, dmarcEnabled: cfg.dmarcEnabled,
+		Lists: inbound.NewLists(st, cfg.antispamDir),
+		pf:    pf, odk: odk, inboundEnabled: cfg.inboundEnabled, dmarcEnabled: cfg.dmarcEnabled,
 	}
 }
 
@@ -56,6 +58,11 @@ func (m *mailStack) Resync() error {
 	if m.inboundEnabled {
 		if err := m.Inbound.Resync(); err != nil {
 			return fmt.Errorf("inbound maps resync: %w", err)
+		}
+		// The filter's configuration names all six list files; they exist from
+		// the first start, empty until an entry is added.
+		if err := m.Lists.Sync(); err != nil {
+			return fmt.Errorf("filter lists resync: %w", err)
 		}
 	}
 	if m.dmarcEnabled {

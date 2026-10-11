@@ -23,6 +23,7 @@ import (
 	"github.com/mixeme/selfpost/internal/backup"
 	"github.com/mixeme/selfpost/internal/buildinfo"
 	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -89,6 +90,9 @@ type config struct {
 	saslRealm  string
 	postfixDir string
 	deployRoot string
+	// Where the filter lists are written as map files for the external spam
+	// filter; the antispam compose fragment mounts it into the sidecar.
+	antispamDir string
 
 	inboundEnabled bool
 	// The optional milter on the inbound listener (INBOUND_ANTISPAM_MILTER) and
@@ -162,7 +166,9 @@ func loadConfig() config {
 		saslDBPath: envDefault("SASL_DB_PATH", filepath.Join(dataDir, "sasl", "sasldb2")),
 		saslRealm:  saslRealm(),
 		postfixDir: envDefault("POSTFIX_DIR", filepath.Join(dataDir, "postfix")),
-		deployRoot: envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
+
+		antispamDir: envDefault("ANTISPAM_DIR", filepath.Join(dataDir, "antispam")),
+		deployRoot:  envDefault("SELFPOST_DEPLOY_ROOT", "/selfpost-deploy"),
 		// Optional inbound relay (backup-MX / forwarder). Off unless exactly "true".
 		inboundEnabled:        os.Getenv("INBOUND_RELAY_ENABLE") == "true",
 		inboundAntispamMilter: os.Getenv("INBOUND_ANTISPAM_MILTER"),
@@ -294,6 +300,16 @@ func run() error {
 		ms.pf.SetReloadHook(func() error { return nil })
 		if err := ms.DMARC.Resync(); err != nil {
 			log.Printf("dmarc maps bootstrap: %v", err)
+		}
+	}
+
+	// The filter lists as files, on every start: the spam filter's
+	// configuration names all six, and a data directory from before the lists
+	// existed has none. Not fatal - the lists are the filter's business, and
+	// the panel has mail to relay either way.
+	if cfg.inboundEnabled && !restored {
+		if err := inbound.NewLists(st, cfg.antispamDir).Sync(); err != nil {
+			log.Printf("filter lists bootstrap: %v", err)
 		}
 	}
 

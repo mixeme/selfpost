@@ -102,13 +102,13 @@ Mirror send-log retention:
 | Entry types | sender address, sender domain (`@domain` suffix), client IP / CIDR |
 | Precedence | **deny overrides allow** |
 | Scope | instance-wide (not per inbound domain in v1) |
-| Where applied | **rspamd map files** under `/data/antispam/` (allow.map, deny.map); documented compose fragment mounts them into the sidecar |
+| Where applied | **rspamd map files** under `/data/antispam/`, one per list and entry type (`allow_ip.map`, `allow_from.map`, `allow_domain.map`, `deny_…`) - an IP map and a sender map are different map types to rspamd; documented compose fragment mounts them into the sidecar. Deny is a prefilter reject, allow a weight of -100 (as built: two prefilters do not give "deny overrides allow") |
 | SelfPost pre-check | **out of v1** — lists live in rspamd only |
 | Edit access | global administrator only |
 | When inactive | lists editable in the panel but UI warns that sync applies only when `INBOUND_ANTISPAM_MILTER` is set; `postfix reload` / rspamd reload documented in guide |
 
-List change → atomic map rewrite (same pattern as Postfix maps) → rspamd reload
-via documented operator step or sidecar `SIGHUP` in the compose fragment.
+List change → atomic map rewrite (same pattern as Postfix maps). No reload:
+rspamd rereads a changed map file by itself (about ten seconds on 3.11).
 
 ### Activation
 
@@ -247,7 +247,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
 - [x] Inbound journal-milter + Postfix wiring — **Composer**
 - [x] mail.log tailer: inbound reject rows — **Composer**
-- [ ] List CRUD + validation + atomic rspamd map sync — **Composer**
+- [x] List CRUD + validation + atomic rspamd map sync — **Composer**
 - [ ] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
 - [ ] Backup includes `/data/antispam/` — **Composer**
 - [ ] Unit + handler tests — **Composer**

@@ -1,0 +1,224 @@
+package inbound
+
+import (
+	"fmt"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/mixeme/selfpost/internal/atomicfile"
+	"github.com/mixeme/selfpost/internal/configsafe"
+	"github.com/mixeme/selfpost/internal/store"
+)
+
+// ListStore is the slice of the store the filter lists need. *store.Store
+// satisfies it.
+type ListStore interface {
+	AddSpamListEntry(list, kind, value, note string) (store.SpamListEntry, error)
+	ListSpamListEntries() ([]store.SpamListEntry, error)
+	DeleteSpamListEntry(id int64) error
+}
+
+// Lists owns the allow and deny lists of the external spam filter: the rows in
+// SQLite and the map files the filter reads. SelfPost does not consult the
+// lists itself - it writes them out, six files in one directory, one entry a
+// line, and the filter (rspamd, deploy/antispam/rspamd/multimap.conf) rereads
+// a file when it changes. Which list wins when both match is the filter's
+// configuration: deny.
+type Lists struct {
+	store ListStore
+	dir   string
+}
+
+// NewLists builds the filter lists over the store and the map directory
+// (/data/antispam).
+func NewLists(st ListStore, dir string) *Lists {
+	return &Lists{store: st, dir: dir}
+}
+
+// noteMaxRunes caps the operator's comment on an entry.
+const noteMaxRunes = 200
+
+// mapFiles names the file of every (list, kind). An IP map and a sender map
+// are different things to the filter, and a domain entry is matched against
+// another part of the sender than an address, so each has its own file.
+var mapFiles = map[[2]string]string{
+	{store.SpamListAllow, store.SpamEntryIP}:      "allow_ip.map",
+	{store.SpamListAllow, store.SpamEntryAddress}: "allow_from.map",
+	{store.SpamListAllow, store.SpamEntryDomain}:  "allow_domain.map",
+	{store.SpamListDeny, store.SpamEntryIP}:       "deny_ip.map",
+	{store.SpamListDeny, store.SpamEntryAddress}:  "deny_from.map",
+	{store.SpamListDeny, store.SpamEntryDomain}:   "deny_domain.map",
+}
+
+// Entries returns every entry of both lists.
+func (l *Lists) Entries() ([]store.SpamListEntry, error) {
+	return l.store.ListSpamListEntries()
+}
+
+// Add validates an entry, stores it normalised and rewrites the maps. A
+// refusal is a *ValidationError; an entry already on that list is
+// store.ErrSpamListEntryExists.
+func (l *Lists) Add(list, kind, rawValue, rawNote string) (store.SpamListEntry, error) {
+	if list != store.SpamListAllow && list != store.SpamListDeny {
+		return store.SpamListEntry{}, invalid("choose the allow or the deny list")
+	}
+	value, err := normalizeListValue(kind, rawValue)
+	if err != nil {
+		return store.SpamListEntry{}, err
+	}
+	note, err := normalizeNote(rawNote)
+	if err != nil {
+		return store.SpamListEntry{}, err
+	}
+	e, err := l.store.AddSpamListEntry(list, kind, value, note)
+	if err != nil {
+		return store.SpamListEntry{}, err
+	}
+	if err := l.Sync(); err != nil {
+		// An entry the filter never got is worse than no entry: the page
+		// would show a rule that does nothing.
+		_ = l.store.DeleteSpamListEntry(e.ID)
+		return store.SpamListEntry{}, err
+	}
+	return e, nil
+}
+
+// Delete removes an entry and rewrites the maps.
+func (l *Lists) Delete(id int64) error {
+	if err := l.store.DeleteSpamListEntry(id); err != nil {
+		return err
+	}
+	return l.Sync()
+}
+
+// Sync writes all six map files from SQLite, each atomically, so the filter
+// reads a whole old file or a whole new one. Every file is written even when
+// empty: the filter's configuration names all six.
+func (l *Lists) Sync() error {
+	entries, err := l.store.ListSpamListEntries()
+	if err != nil {
+		return err
+	}
+	lines := make(map[string][]string, len(mapFiles))
+	for _, name := range mapFiles {
+		lines[name] = nil
+	}
+	for _, e := range entries {
+		name, ok := mapFiles[[2]string{e.List, e.Kind}]
+		if !ok {
+			return fmt.Errorf("filter list entry %d: unknown list %q or kind %q", e.ID, e.List, e.Kind)
+		}
+		// Values were validated on the way in; this is the writer's own guard
+		// against a row that got into the table some other way. In a map file a
+		// newline ends the entry, whitespace starts its value and # a comment.
+		if err := configsafe.Token("filter list entry", e.Value, " \t\r\n#"); err != nil {
+			return err
+		}
+		lines[name] = append(lines[name], e.Value)
+	}
+	// The filter runs under another user in another container: the directory
+	// and the files are readable by anyone. They hold addresses, not secrets.
+	if err := os.MkdirAll(l.dir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", l.dir, err)
+	}
+	for name, vals := range lines {
+		sort.Strings(vals)
+		var b strings.Builder
+		b.WriteString("# Written by SelfPost (Inbound > Filter lists). Do not edit: the next change in the panel replaces this file.\n")
+		for _, v := range vals {
+			b.WriteString(v)
+			b.WriteByte('\n')
+		}
+		if err := atomicfile.Write(filepath.Join(l.dir, name), []byte(b.String()), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// normalizeListValue validates one entry and returns the form it is stored and
+// written in: lower case for an address or a domain, the canonical text of an
+// address or a network for an IP.
+func normalizeListValue(kind, raw string) (string, error) {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	switch kind {
+	case store.SpamEntryAddress:
+		if v == "" {
+			return "", invalid("sender address is required")
+		}
+		if len(v) > 254 {
+			return "", invalid("sender address must be at most 254 characters")
+		}
+		at := strings.LastIndexByte(v, '@')
+		if at <= 0 || at >= len(v)-1 {
+			return "", invalid("%q is not a valid email address", v)
+		}
+		local, domain := v[:at], v[at+1:]
+		if local[0] == '.' || local[len(local)-1] == '.' || len(local) > 64 {
+			return "", invalid("%q: invalid local part", v)
+		}
+		for i := 0; i < len(local); i++ {
+			c := local[i]
+			lower := c >= 'a' && c <= 'z'
+			digit := c >= '0' && c <= '9'
+			// '=' for the rewritten senders of forwarders (SRS0=…).
+			if !lower && !digit && !strings.ContainsRune("._+-=", rune(c)) {
+				return "", invalid("%q: local part contains invalid characters", v)
+			}
+		}
+		if err := checkDomain(domain); err != nil {
+			return "", err
+		}
+		return v, nil
+	case store.SpamEntryDomain:
+		// "@example.com" is how a domain is often written in such a list.
+		v = strings.TrimPrefix(v, "@")
+		if err := checkDomain(v); err != nil {
+			return "", err
+		}
+		return v, nil
+	case store.SpamEntryIP:
+		if v == "" {
+			return "", invalid("address or network is required")
+		}
+		if strings.Contains(v, "/") {
+			p, err := netip.ParsePrefix(v)
+			if err != nil {
+				return "", invalid("%q is not a network in CIDR form (e.g. 192.0.2.0/24)", v)
+			}
+			if p.Addr().Is4In6() {
+				return "", invalid("%q: write an IPv4 network as IPv4 (e.g. 192.0.2.0/24)", v)
+			}
+			if p.Bits() == 0 {
+				return "", invalid("%q is every address there is", v)
+			}
+			return p.Masked().String(), nil
+		}
+		a, err := netip.ParseAddr(v)
+		if err != nil || a.Zone() != "" {
+			return "", invalid("%q is not an IP address or a network in CIDR form", v)
+		}
+		return a.Unmap().String(), nil
+	default:
+		return "", invalid("choose what the entry is: a sender address, a sender domain or a client address")
+	}
+}
+
+// normalizeNote trims the operator's comment and refuses what a single line of
+// text cannot be.
+func normalizeNote(raw string) (string, error) {
+	note := strings.TrimSpace(raw)
+	if utf8.RuneCountInString(note) > noteMaxRunes {
+		return "", invalid("note must be at most %d characters", noteMaxRunes)
+	}
+	for _, r := range note {
+		if r < 0x20 || r == 0x7f || r == utf8.RuneError {
+			return "", invalid("note must be one line of plain text")
+		}
+	}
+	return note, nil
+}
