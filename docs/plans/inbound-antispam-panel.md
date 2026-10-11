@@ -246,7 +246,7 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] Agree journal fields, retention, and RBAC (this plan § Decisions) — **Composer**
 - [x] Migration `0002_inbound_spam_log.sql` on the 2.0 baseline — **Composer**
 - [x] Inbound journal-milter + Postfix wiring — **Composer**
-- [ ] mail.log tailer: inbound reject rows — **Composer**
+- [x] mail.log tailer: inbound reject rows — **Composer**
 - [ ] List CRUD + validation + atomic rspamd map sync — **Composer**
 - [ ] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
 - [ ] Backup includes `/data/antispam/` — **Composer**

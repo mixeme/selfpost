@@ -37,23 +37,48 @@ type InboundSpamEntry struct {
 	Decision      string
 	Engine        string
 	Detail        string
+	// At is when it happened; zero means now. The log tailer dates a refusal
+	// by its mail.log line, which it may read long after.
+	At time.Time
 }
 
 // InsertInboundSpam records one journal row. It is called from the inbound
 // journal milter's hot path and from the log tailer, so it returns any error
 // for the caller to log; neither of them may hold up mail over it.
 func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
+	at := e.At
+	if at.IsZero() {
+		at = time.Now()
+	}
 	_, err := s.db.Exec(
 		`INSERT INTO inbound_spam_log
 			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail,
-		time.Now().UTC().Format(time.RFC3339),
+		at.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return fmt.Errorf("insert inbound_spam_log: %w", err)
 	}
 	return nil
+}
+
+// PruneInboundSpam deletes journal rows older than cutoff and then, if more
+// than keep rows are left, the oldest of those. It returns how many went.
+func (s *Store) PruneInboundSpam(cutoff time.Time, keep int) (int64, error) {
+	res, err := s.db.Exec("DELETE FROM inbound_spam_log WHERE created_at < ?", cutoff.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("prune inbound_spam_log by age: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	res, err = s.db.Exec(
+		`DELETE FROM inbound_spam_log WHERE id <=
+			(SELECT id FROM inbound_spam_log ORDER BY id DESC LIMIT 1 OFFSET ?)`, keep)
+	if err != nil {
+		return n, fmt.Errorf("prune inbound_spam_log by count: %w", err)
+	}
+	m, _ := res.RowsAffected()
+	return n + m, nil
 }
 
 // IsInboundDomain reports whether name is a configured inbound domain. Port 25

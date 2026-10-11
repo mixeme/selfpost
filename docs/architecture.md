@@ -89,6 +89,19 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   address is not one - and never refuses anything
   ([internal/milter/inbound.go](../internal/milter/inbound.go)). The headers
   are read only while a filter is attached; refused mail never reaches it.
+  Refusals come from `mail.log`: this listener logs as `postfix/inbound`
+  (`syslog_name`), and the log tailer turns a `reject:` line of
+  `postfix/inbound/smtpd` (Postfix's own policy) and a `milter-reject` /
+  `milter-hold` / `milter-discard` line of `cleanup` (the filter's verdict,
+  counted only for a queue id that listener opened) into a row, dated by the
+  line, when the recipient is at an inbound domain
+  ([internal/logtail/inbound.go](../internal/logtail/inbound.go)). A line
+  names one recipient, so a message refused at end-of-message is one row
+  whatever its recipient count, and a line read twice (the tailer saves its
+  place once a second; an unclean stop can lose that second) is two rows. The
+  journal is pruned every six hours: rows
+  older than the `inbound_spam_log_retention_days` setting, then down to
+  10 000.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,

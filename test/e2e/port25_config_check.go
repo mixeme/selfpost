@@ -47,6 +47,9 @@ var port25Cases = []port25Case{
 			{param: "smtpd_sasl_auth_enable", contains: "no", wantExact: true},
 			{param: "smtpd_relay_restrictions", contains: "reject_unauth_destination", wantExact: true},
 			{param: "smtpd_recipient_restrictions", contains: "reject_unauth_destination,reject_unlisted_recipient", wantExact: true},
+			// The log tailer tells this listener's refusals from the
+			// submission ports' by the name they are logged under.
+			{param: "syslog_name", contains: "postfix/inbound", wantExact: true},
 			// No antispam milter configured: the inbound journal milter
 			// alone. The submission chain (strict OpenDKIM + journal-milter)
 			// must not reach inbound mail.

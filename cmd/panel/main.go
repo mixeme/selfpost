@@ -99,7 +99,9 @@ type config struct {
 	// The inbound journal milter's socket; the default mirrors
 	// build/postfix-config.sh. Served only while the inbound relay is on.
 	inboundJournalSocket string
-	dmarcEnabled         bool
+	// Retention of the inbound journal until Server > Settings says otherwise.
+	inboundSpamLogRetentionDays int
+	dmarcEnabled                bool
 }
 
 func loadConfig() config {
@@ -166,6 +168,8 @@ func loadConfig() config {
 		inboundAntispamMilter: os.Getenv("INBOUND_ANTISPAM_MILTER"),
 		inboundAntispamAction: antispamAction(os.Getenv("INBOUND_ANTISPAM_MILTER_ACTION")),
 		inboundJournalSocket:  envDefault("INBOUND_JOURNAL_MILTER_SOCKET", "/run/selfpost/inbound-journal.sock"),
+
+		inboundSpamLogRetentionDays: envInt("INBOUND_SPAM_LOG_RETENTION_DAYS", store.InboundSpamLogRetentionDaysDefault),
 		// Optional DMARC aggregate ingest on port 25. Off unless exactly "true".
 		dmarcEnabled: os.Getenv("DMARC_REPORTS_ENABLE") == "true",
 	}
@@ -296,6 +300,22 @@ func run() error {
 	if err := st.EnsureSendLogRetentionDays(cfg.retentionDays); err != nil {
 		return fmt.Errorf("bootstrap send-log retention: %w", err)
 	}
+	// With the inbound relay on, the tailer also writes the inbound journal's
+	// rows for refused mail and prunes that journal.
+	var inboundTail *logtail.Inbound
+	if cfg.inboundEnabled {
+		if err := st.EnsureInboundSpamLogRetentionDays(cfg.inboundSpamLogRetentionDays); err != nil {
+			return fmt.Errorf("bootstrap inbound journal retention: %w", err)
+		}
+		inboundTail = &logtail.Inbound{Store: st, Retention: func() int {
+			days, err := st.GetInboundSpamLogRetentionDays(cfg.inboundSpamLogRetentionDays)
+			if err != nil {
+				log.Printf("inbound journal retention: %v", err)
+				return cfg.inboundSpamLogRetentionDays
+			}
+			return days
+		}}
+	}
 
 	var wg sync.WaitGroup
 	errc := make(chan error, 5)
@@ -314,7 +334,7 @@ func run() error {
 					return cfg.retentionDays
 				}
 				return days
-			})
+			}, inboundTail)
 		}},
 		{"rate-limit-recalc", func(ctx context.Context) error {
 			runAutoRateLimitRecalc(ctx, cfg, st)

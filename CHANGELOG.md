@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Port 25 logs as `postfix/inbound`.** Its lines in the mail log (Server ›
+  System log) now read `postfix/inbound/smtpd[…]` where they read
+  `postfix/smtpd[…]`; the submission ports keep `postfix/smtpd`. This is how a
+  refusal on port 25 is told from one on 465 / 587.
+
 ### Added
 
 - Schema: migration `0002_inbound_spam_log.sql`, the first after the 2.0
@@ -16,8 +23,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   of a message that was accepted for an inbound domain: client address,
   envelope, subject and - with a spam filter attached - the filter's action,
   score and heaviest symbols. It only watches: it refuses nothing and Postfix
-  accepts mail when it is down. Refused mail is not there yet (it comes from
-  the mail log, next), and there is no page for the journal yet.
+  accepts mail when it is down. There is no page for the journal yet.
+- **Refused inbound mail is recorded too**, from the mail log: a recipient
+  Postfix refused at an inbound domain (unknown user, sender domain not
+  found), and a message the spam filter rejected, deferred, held or
+  discarded. The row is dated by its log line and carries the reply text. A
+  refusal to relay for a domain that is not an inbound one is not recorded.
+- The inbound journal is pruned every six hours: rows older than 90 days
+  (`INBOUND_SPAM_LOG_RETENTION_DAYS`, 7-365) and anything beyond 10 000 rows.
 - The antispam compose fragment mounts `antispam/rspamd/milter_headers.conf`
   into the rspamd sidecar, which makes it write its verdict into
   `X-Rspamd-Action` and `X-Spamd-Result`. **Copy `deploy/antispam/rspamd/`

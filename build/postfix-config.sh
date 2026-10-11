@@ -412,8 +412,12 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		fi
 	fi
 
+	# syslog_name: this listener's lines read postfix/inbound/smtpd, the
+	# submission ports' postfix/smtpd. The log tailer files a refusal on port 25
+	# into the inbound journal and has to tell the two apart.
 	postconf -M "smtp/inet=smtp inet n - n - - smtpd"
 	postconf -P \
+		"smtp/inet/syslog_name=postfix/inbound" \
 		"smtp/inet/smtpd_sasl_auth_enable=no" \
 		"smtp/inet/smtpd_tls_auth_only=no" \
 		"smtp/inet/smtpd_sender_login_maps=" \

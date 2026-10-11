@@ -47,6 +47,7 @@ services:
       # How long the send log keeps rows before the background sweep deletes
       # them — the main driver of /data growth over time.
       SEND_LOG_RETENTION_DAYS: "${SEND_LOG_RETENTION_DAYS:-90}"
+      INBOUND_SPAM_LOG_RETENTION_DAYS: "${INBOUND_SPAM_LOG_RETENTION_DAYS:-90}"
       # Sliding idle timeout for the panel login session, in days.
       PANEL_SESSION_IDLE_DAYS: "${PANEL_SESSION_IDLE_DAYS:-7}"
       # Resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly, so they

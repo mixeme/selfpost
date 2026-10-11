@@ -107,9 +107,16 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 // Run follows path and updates send-log statuses until ctx is cancelled, while
 // a background sweep prunes rows older than retention(). Reading resumes at
 // the offset the previous run persisted, so a restart parses the delivery lines
-// written while the panel was down. It returns nil on a clean shutdown.
-func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays) error {
+// written while the panel was down. With inbound set it also writes the
+// inbound journal's rows for refused mail and prunes that journal
+// (inbound.go). It returns nil on a clean shutdown.
+func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound) error {
 	go retentionLoop(ctx, st, retention)
+	var journal *inboundJournal
+	if inbound != nil {
+		go inboundRetentionLoop(ctx, inbound)
+		journal = newInboundJournal(inbound.Store)
+	}
 
 	// The reconcile sweep must not run against a backlog the tailer has not
 	// read yet: on a restart the log holds the very lines that resolve the rows
@@ -119,6 +126,9 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	go reconcileLoop(ctx, st, caughtUp)
 
 	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, func(line string) {
+		if journal != nil {
+			journal.handle(line, time.Now().UTC())
+		}
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return

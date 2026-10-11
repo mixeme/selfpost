@@ -77,6 +77,72 @@ func (s *Store) EnsureSendLogRetentionDays(envDefault int) error {
 	return s.SetSendLogRetentionDays(sendLogRetentionFallback(envDefault))
 }
 
+const (
+	// InboundSpamLogRetentionDaysKey is the settings table key for the
+	// inbound antispam journal's retention. Same range as the send log's.
+	InboundSpamLogRetentionDaysKey = "inbound_spam_log_retention_days"
+	InboundSpamLogRetentionDaysMin = 7
+	InboundSpamLogRetentionDaysMax = 365
+	// InboundSpamLogRetentionDaysDefault matches
+	// INBOUND_SPAM_LOG_RETENTION_DAYS when unset.
+	InboundSpamLogRetentionDaysDefault = 90
+)
+
+// ErrInboundSpamLogRetentionDaysOutOfRange is returned when the inbound
+// journal's retention is outside the allowed panel range.
+var ErrInboundSpamLogRetentionDaysOutOfRange = errors.New("inbound journal retention days out of range")
+
+// ValidateInboundSpamLogRetentionDays checks the panel-allowed window.
+func ValidateInboundSpamLogRetentionDays(days int) error {
+	if days < InboundSpamLogRetentionDaysMin || days > InboundSpamLogRetentionDaysMax {
+		return fmt.Errorf("%w: must be between %d and %d days", ErrInboundSpamLogRetentionDaysOutOfRange, InboundSpamLogRetentionDaysMin, InboundSpamLogRetentionDaysMax)
+	}
+	return nil
+}
+
+func inboundSpamLogRetentionFallback(envDefault int) int {
+	if ValidateInboundSpamLogRetentionDays(envDefault) == nil {
+		return envDefault
+	}
+	return InboundSpamLogRetentionDaysDefault
+}
+
+// GetInboundSpamLogRetentionDays returns the effective retention window of
+// the inbound journal. When the setting is missing or invalid, envDefault is
+// used (INBOUND_SPAM_LOG_RETENTION_DAYS).
+func (s *Store) GetInboundSpamLogRetentionDays(envDefault int) (int, error) {
+	raw, err := s.GetSetting(InboundSpamLogRetentionDaysKey)
+	if err != nil {
+		return 0, err
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil || ValidateInboundSpamLogRetentionDays(days) != nil {
+		return inboundSpamLogRetentionFallback(envDefault), nil
+	}
+	return days, nil
+}
+
+// SetInboundSpamLogRetentionDays persists the inbound journal's retention.
+func (s *Store) SetInboundSpamLogRetentionDays(days int) error {
+	if err := ValidateInboundSpamLogRetentionDays(days); err != nil {
+		return err
+	}
+	return s.SetSetting(InboundSpamLogRetentionDaysKey, strconv.Itoa(days))
+}
+
+// EnsureInboundSpamLogRetentionDays seeds the setting from envDefault when it
+// has never been written.
+func (s *Store) EnsureInboundSpamLogRetentionDays(envDefault int) error {
+	raw, err := s.GetSetting(InboundSpamLogRetentionDaysKey)
+	if err != nil {
+		return err
+	}
+	if raw != "" {
+		return nil
+	}
+	return s.SetInboundSpamLogRetentionDays(inboundSpamLogRetentionFallback(envDefault))
+}
+
 // GetSetting returns a settings value or empty string when missing.
 func (s *Store) GetSetting(key string) (string, error) {
 	var value string

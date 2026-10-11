@@ -268,24 +268,27 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	// The inbound journal milter saw it go through. No page shows the journal
 	// yet, so the row is read where it is kept. No filter is attached on the
 	// stand: the row is an accept by nobody.
-	want := fmt.Sprintf("%s|someone@stranger.e2e.test|%s|e2e %s|accept|selfpost", inboundDomain, inboundRecipient, token)
-	var rows string
-	for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(time.Second) {
-		rows, err = h.execIn("selfpost", "python3", "-c",
-			`import sqlite3; print("\n".join("|".join(r) for r in sqlite3.connect("file:/data/selfpost.db?mode=ro", uri=True).execute("select inbound_domain, from_addr, to_addr, subject, decision, engine from inbound_spam_log")))`)
-		if err != nil {
-			t.Fatalf("read the inbound journal: %v\n%s", err, rows)
-		}
-		if strings.Contains(rows, want) {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("no journal row for the relayed message, want %q, journal:\n%s\n%s", want, rows, h.logs("selfpost"))
+	// journalHas waits for a row and returns the journal as it then stands.
+	journalHas := func(want string) string {
+		t.Helper()
+		for deadline := time.Now().Add(15 * time.Second); ; time.Sleep(time.Second) {
+			rows, err := h.execIn("selfpost", "python3", "-c",
+				`import sqlite3; print("\n".join("|".join(r) for r in sqlite3.connect("file:/data/selfpost.db?mode=ro", uri=True).execute("select inbound_domain, from_addr, to_addr, subject, decision, engine from inbound_spam_log")))`)
+			if err != nil {
+				t.Fatalf("read the inbound journal: %v\n%s", err, rows)
+			}
+			if strings.Contains(rows, want) {
+				return strings.TrimSpace(rows)
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("no journal row %q, journal:\n%s\n%s", want, rows, mailLogTail(h, "postfix/"))
+			}
 		}
 	}
+	rows := journalHas(fmt.Sprintf("%s|someone@stranger.e2e.test|%s|e2e %s|accept|selfpost", inboundDomain, inboundRecipient, token))
 	// A report mailed to the server's own name earlier in the run came through
 	// the same listener and is not the relay's mail.
-	if n := strings.Count(strings.TrimSpace(rows), "\n") + 1; n != 1 {
+	if n := strings.Count(rows, "\n") + 1; n != 1 {
 		t.Fatalf("the journal holds %d rows, want the relayed message alone:\n%s", n, rows)
 	}
 
@@ -294,5 +297,13 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		if res.rcptErr == nil {
 			t.Fatalf("port 25 accepted the recipient %s (first error: %v)", to, res.firstErr())
 		}
+	}
+
+	// The refusal of an unknown recipient at the inbound domain is read from
+	// the mail log into the journal; the refusal to relay for a stranger's
+	// domain is not the relay's mail and is not.
+	rows = journalHas(fmt.Sprintf("%s|someone@stranger.e2e.test|nobody@%s||reject|postfix", inboundDomain, inboundDomain))
+	if n := strings.Count(rows, "\n") + 1; n != 2 {
+		t.Fatalf("the journal holds %d rows, want the relayed message and one refusal:\n%s", n, rows)
 	}
 }
