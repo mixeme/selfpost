@@ -1,6 +1,6 @@
 # Plan: panel-redesign
 
-**Status:** agreed (owner, 2026-10-09)  
+**Status:** shipped in `2.0.0` (2026-10-11)  
 **Date:** 2026-09-21 (replaces the 2026-09-08 givens)  
 **Version:** `2.0.0` MAJOR — a breaking release by the owner's decision (§ No compatibility).
 
@@ -532,7 +532,7 @@ only when both are done. Every stage-2 step ends with the evidence of
 - [x] Technical review of the whole against the mockups, evidence pairs complete — **Opus**
 - [x] Security review of the route rename, subtree authorization and inbound delegation — **Fable**
 - [x] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory; strike the three UI rows of review-2026-08-followups that the redesign retires — **Sonnet**
-- [ ] `go vet`, `go test ./...`, e2e suite; version cut `2.0.0` — **Haiku**
+- [x] `go vet`, `go test ./...`, e2e suite; version cut `2.0.0` — **Haiku**
 
 **After 2.0** — features land in the kit, each from its own plan, mockup first
 (§ Room for roadmap items): inbound-antispam-panel `2.1.0`; then, in whatever

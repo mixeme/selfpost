@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-11
+
+The panel redesign. A breaking release: every panel URL changed and the
+database starts from zero - a 1.x `/data` is not upgraded (see Changed and
+Removed).
+
 ### Added
 
 - panel-redesign (stage 0): Bulma 1.0.4 and a 57-icon subset of Tabler Icons
@@ -233,6 +239,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   restriction list, and the report addresses - on the server's own name, a
   relay domain - were not in `relay_recipient_maps`. Their table is a
   recipient table now. Hidden until now by the port-25 failure above.
+- **DMARC reports reach the panel.** A report accepted on port 25 stayed in
+  the queue: the generated delivery service was a bare `pipe` ("fatal:
+  missing user= command-line attribute"), because the generator addressed it
+  under a type Postfix does not have and set `flags=`, `user=` and `argv=`
+  as `-o` parameters, which they are not. Behind that, the command would
+  have refused to run (Postfix starts it without the container's
+  environment) and was never told the recipient, so the check that a report
+  came to the address of its own domain was skipped. The service line
+  carries its arguments, the recipient is one of them, and
+  `export_environment` names what the command reads. No report had been
+  delivered since the feature shipped in 1.7.0; the e2e check asks Postfix
+  how it reads the service.
+- Postfix no longer logs "warning: not owned by root" for the queue
+  directory and its `pid/` at every start: the entrypoint hands the two back
+  to root after its recursive change of owner.
 - Overview's Processes card counts the programs that are meant to stay up
   ("6 of 6 running"); the idle one-shot `postfix-reload` was counted as
   running. The Milter sockets card no longer clips its second line with three

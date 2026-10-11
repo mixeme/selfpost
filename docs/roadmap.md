@@ -39,12 +39,12 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
 | password-reset | Password reset by e-mail | candidate | — | — |
-| panel-redesign | Panel redesign (accepted mockups, design contract) | agreed | 26/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
+| panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
-development convenience): the next stage is **panel-redesign** (`2.0.0`),
-then **inbound-antispam-panel** (`2.1.0`) built in the new component kit —
+development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11); the next stage is
+**inbound-antispam-panel** (`2.1.0`), built in the new component kit —
 styling its two screens once instead of twice. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (security review of the ingest path pending); domain-stats-auto-ratelimit in
@@ -438,7 +438,7 @@ of their own — answered by guard tests that land before the templates, a
 `design-first` CI step and evidence-based acceptance (plan § Enforcement).
 Competes with feature work; Bulma is ~680 kB minified, embedded once.
 
-**Version:** `2.0.0` MAJOR; `agreed` (owner, 2026-10-09).
+**Version:** shipped `2.0.0` (2026-10-11), MAJOR.
 
 ---
 
