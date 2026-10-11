@@ -190,8 +190,10 @@ var serverTopics = []HelpTopic{
 	{ID: HelpBackup, Title: "Backup and moving a domain", Body: []Text{
 		Rich("Full backup downloads one archive of the whole instance: ", Code("data/"), " (the database, DKIM keys and application credentials), ",
 			Code("docker-compose.yml"), ", ", Code(".env"), " and ", Code("certs/"),
-			". The Postfix queue is not in it: mail still waiting for delivery is not carried over. Nor, usually, is the private key in ", Code("certs/"),
-			", which the panel cannot read; ", Code("selfpost-backup"), " run in the container takes the key. It holds secrets, so leave Encrypt with a password ticked: the file is sealed as ", Code(".spbk"),
+			". The Postfix queue is not in it. The backup is taken while the server is running, and Postfix keeps moving messages through the queue, "+
+				"so a copy could hold a message twice or miss it; mail still waiting for delivery is therefore not carried over, and a restored server "+
+				"starts with an empty queue. To keep the queue, stop the container and archive the project directory instead. The private key in ", Code("certs/"),
+			" is usually missing too, because the panel is not allowed to read it; ", Code("selfpost-backup"), " run in the container takes the key. It holds secrets, so leave Encrypt with a password ticked: the file is sealed as ", Code(".spbk"),
 			", the password is not stored, and without it nothing can be recovered. To restore, unpack it into an empty project directory (decrypt a ",
 			Code(".spbk"), " first with ", Code("selfpost-backup -decrypt"),
 			") and start the same SelfPost version that made it; the panel refuses data from another version. The reverse-proxy configuration and ",
