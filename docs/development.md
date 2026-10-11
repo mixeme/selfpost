@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `2.0.0`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `2.0.1`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -124,7 +124,8 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 11 | panel-redesign plan: component kit, stages, reorder (docs only, owner-requested cut) | `1.9.4` (PATCH) |
 | 12 | GHCR release fix: keep per-arch images, sweep orphaned versions (CI only) | `1.9.5` (PATCH) |
 | 13 | panel-redesign | `2.0.0` (MAJOR, no compatibility) |
-| 14 | inbound-antispam-panel | `2.1.0` (planned; was `1.10.0`, reordered 2026-10-09) |
+| 14 | DMARC ingest drops and bounds, full backup from the panel, no queue in a backup | `2.0.1` (PATCH) |
+| 15 | inbound-antispam-panel | `2.1.0` (planned; was `1.10.0`, reordered 2026-10-09) |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.

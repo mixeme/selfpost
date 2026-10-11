@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-11
+
 ### Changed
 
 - **A message that is not a report this relay keeps is dropped at once.**
