@@ -85,7 +85,10 @@ type InLogRow struct {
 // From may be empty: refused mail is read from mail.log, which has no subject,
 // and a filter that said nothing has no detail.
 type InLogRowInput struct {
-	ID       int64
+	ID int64
+	// Listable says the sender is an address the filter lists would take. A
+	// row whose sender they would refuse offers no way into them.
+	Listable bool
 	At       time.Time
 	From     string
 	Client   string
@@ -149,7 +152,7 @@ func (p *InLog) NewRow(in InLogRowInput) InLogRow {
 			Rows: whyRows(in.Decision, in.Engine, in.Detail, in.Subject),
 		},
 	}
-	if p.IsGlobal {
+	if p.IsGlobal && in.Listable {
 		r.Action = senderAction(in.Decision, in.Engine, in.From)
 	}
 	return r

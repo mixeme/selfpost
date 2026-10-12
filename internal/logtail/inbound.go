@@ -15,6 +15,7 @@ import (
 // pruning. *store.Store satisfies it.
 type InboundStore interface {
 	InsertInboundSpam(e store.InboundSpamEntry) error
+	InsertInboundSpamOnce(e store.InboundSpamEntry) (bool, error)
 	IsInboundDomain(name string) (bool, error)
 	PruneInboundSpam(cutoff time.Time, keep int) (int64, error)
 }
@@ -107,7 +108,14 @@ func newInboundJournal(st InboundStore) *inboundJournal {
 
 // handle looks at one mail.log line and writes a journal row when it is a
 // refusal of mail for an inbound domain. Errors are logged; the tailer goes on.
-func (j *inboundJournal) handle(line string, now time.Time) {
+//
+// catchingUp says the line is one of those the tailer reads when it starts,
+// from where it last saved its place to the end of the file. It saves its
+// place every few seconds, so after an unclean stop some of those lines were
+// read before; a row is then written only if it is not there already. Lines
+// read as they are written are always new, and two identical refusals in one
+// second stay two rows.
+func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 	at, rest := lineTime(line, now)
 	if m := inboundClientRe.FindStringSubmatch(rest); m != nil {
 		j.remember(m[1])
@@ -174,7 +182,14 @@ func (j *inboundJournal) handle(line string, now time.Time) {
 	if e.Decision == store.SpamDecisionReject && strings.HasPrefix(reason, "4") {
 		e.Decision = store.SpamDecisionTempfail
 	}
-	if err := j.st.InsertInboundSpam(e); err != nil {
+	if catchingUp {
+		if wrote, err := j.st.InsertInboundSpamOnce(e); err != nil {
+			log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
+			return
+		} else if !wrote {
+			return // read before the last stop
+		}
+	} else if err := j.st.InsertInboundSpam(e); err != nil {
 		log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
 		return
 	}

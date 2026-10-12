@@ -127,7 +127,13 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 
 	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, func(line string) {
 		if journal != nil {
-			journal.handle(line, time.Now().UTC())
+			catchingUp := true
+			select {
+			case <-caughtUp:
+				catchingUp = false
+			default:
+			}
+			journal.handle(line, time.Now().UTC(), catchingUp)
 		}
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {

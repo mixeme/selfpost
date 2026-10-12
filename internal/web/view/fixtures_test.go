@@ -427,7 +427,7 @@ func inLogFixture() *InLog {
 			panic(err)
 		}
 		id++
-		return p.NewRow(InLogRowInput{ID: id, At: at, From: from, Client: client, To: to, Subject: subject,
+		return p.NewRow(InLogRowInput{ID: id, Listable: true, At: at, From: from, Client: client, To: to, Subject: subject,
 			Decision: decision, Engine: engine, Detail: detail})
 	}
 	return p.WithRows([]InLogRow{

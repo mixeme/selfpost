@@ -46,6 +46,8 @@ func TestNormalizeListValue(t *testing.T) {
 		{store.SpamEntryDomain, "sub.evil.example", "sub.evil.example"},
 		{store.SpamEntryIP, "192.0.2.7", "192.0.2.7"},
 		{store.SpamEntryIP, "192.0.2.77/24", "192.0.2.0/24"},
+		{store.SpamEntryIP, "192.0.2.7/32", "192.0.2.7"},
+		{store.SpamEntryIP, "2001:db8::1/128", "2001:db8::1"},
 		{store.SpamEntryIP, "::ffff:192.0.2.7", "192.0.2.7"},
 		{store.SpamEntryIP, "2001:DB8:0:0::1", "2001:db8::1"},
 		{store.SpamEntryIP, "2001:db8:1::5/48", "2001:db8:1::/48"},
@@ -366,5 +368,30 @@ func TestListsUsageWithNoEntries(t *testing.T) {
 	l, _, _ := testLists(t)
 	if usage, err := l.Usage(); err != nil || len(usage) != 0 {
 		t.Errorf("Usage = %v, %v", usage, err)
+	}
+}
+
+// The same address written as a network of one is the same entry.
+func TestListsOneAddressNetworkIsTheAddress(t *testing.T) {
+	l, _, dir := testLists(t)
+	if _, err := l.Add(store.SpamListDeny, store.SpamEntryIP, "192.0.2.7", ""); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if _, err := l.Add(store.SpamListDeny, store.SpamEntryIP, "192.0.2.7/32", ""); !errors.Is(err, store.ErrSpamListEntryExists) {
+		t.Errorf("192.0.2.7/32 after 192.0.2.7: %v, want ErrSpamListEntryExists", err)
+	}
+	if got := strings.Join(mapLines(t, dir, "deny_ip.map"), " "); got != "192.0.2.7" {
+		t.Errorf("deny_ip.map = %q", got)
+	}
+}
+
+func TestListable(t *testing.T) {
+	for value, want := range map[string]bool{
+		"billing@vendor.example": true, "srs0=ab=cd=example.org=user@forwarder.example": true,
+		"o'brien@example.org": false, "a#b@example.org": false, "": false, "not-an-address": false,
+	} {
+		if got := Listable(store.SpamEntryAddress, value); got != want {
+			t.Errorf("Listable(address, %q) = %v, want %v", value, got, want)
+		}
 	}
 }

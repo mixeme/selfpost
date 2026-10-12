@@ -90,7 +90,7 @@ func (h *Handlers) HandleInboundLog(w http.ResponseWriter, r *http.Request) {
 	table := make([]view.InLogRow, len(rows))
 	for i, row := range rows {
 		table[i] = out.NewRow(view.InLogRowInput{
-			ID: row.ID, At: row.CreatedAt, From: row.From, Client: row.ClientIP, To: row.To, Subject: row.Subject,
+			ID: row.ID, Listable: inbound.Listable(store.SpamEntryAddress, row.From), At: row.CreatedAt, From: row.From, Client: row.ClientIP, To: row.To, Subject: row.Subject,
 			Decision: row.Decision, Engine: row.Engine, Detail: row.Detail,
 		})
 	}

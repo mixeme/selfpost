@@ -22,8 +22,8 @@ const (
 	// persistInterval throttles the offset write. Losing up to this much
 	// progress on a crash means re-parsing a few lines, which is much cheaper
 	// than a database write per poll tick. For a delivery status that changes
-	// nothing (UpdateStatus is idempotent); a refusal in those lines gets a
-	// second row in the inbound journal.
+	// nothing (UpdateStatus is idempotent), and a refusal among them is not
+	// written to the inbound journal a second time (inboundJournal.handle).
 	persistInterval = 5 * time.Second
 )
 
@@ -49,7 +49,7 @@ type tracker struct {
 // tail written while the panel was down; anything else means the file is not
 // the one the offset referred to (rotated, recreated or truncated in the
 // meantime), so read it from the start. Re-parsing lines already seen writes
-// the same status onto the same send-log row, and a second inbound journal
+// the same status onto the same send-log row, and no second inbound journal
 // row for a refusal among them.
 func (t *tracker) resume(f *os.File) int64 {
 	size, err := fileSize(f)

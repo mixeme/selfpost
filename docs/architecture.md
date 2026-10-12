@@ -97,9 +97,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   line, when the recipient is at an inbound domain
   ([internal/logtail/inbound.go](../internal/logtail/inbound.go)). A line
   names one recipient, so a message refused at end-of-message is one row
-  whatever its recipient count, and a line read twice (the tailer saves its
-  place every five seconds; an unclean stop can lose those seconds) is two
-  rows. The
+  whatever its recipient count. The tailer saves its place every five seconds,
+  so after an unclean stop it reads some lines again; the lines it reads on
+  start are written only if the same row is not there already. The
   journal is pruned every six hours: rows
   older than the `inbound_spam_log_retention_days` setting, then down to
   10 000.

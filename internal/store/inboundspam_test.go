@@ -310,3 +310,29 @@ func TestPruneInboundSpamCapIsByTime(t *testing.T) {
 		t.Errorf("left = %+v, %v; want the two newest by time", rows, err)
 	}
 }
+
+func TestInsertInboundSpamOnce(t *testing.T) {
+	st := openTestStore(t)
+	e := InboundSpamEntry{
+		InboundDomain: "in.example.com", ClientIP: "203.0.113.7", From: "a@example.net", To: "nobody@in.example.com",
+		Decision: SpamDecisionReject, Engine: SpamEnginePostfix, Detail: "550 5.1.1 no",
+		At: time.Date(2026, 10, 12, 9, 0, 5, 0, time.UTC),
+	}
+	for i, want := range []bool{true, false, false} {
+		if wrote, err := st.InsertInboundSpamOnce(e); err != nil || wrote != want {
+			t.Fatalf("attempt %d: wrote %v, %v; want %v", i+1, wrote, err, want)
+		}
+	}
+	// Anything that tells two refusals apart makes a second row.
+	later, other := e, e
+	later.At = e.At.Add(time.Second)
+	other.To = "somebody@in.example.com"
+	for name, v := range map[string]InboundSpamEntry{"a second later": later, "another recipient": other} {
+		if wrote, err := st.InsertInboundSpamOnce(v); err != nil || !wrote {
+			t.Errorf("%s: wrote %v, %v", name, wrote, err)
+		}
+	}
+	if n, err := st.CountInboundSpam(InboundSpamFilter{}); err != nil || n != 3 {
+		t.Errorf("rows = %d, %v; want 3", n, err)
+	}
+}

@@ -147,10 +147,17 @@ func TestInLogSenderAction(t *testing.T) {
 
 	// The address in the link is data: it cannot leave the attribute.
 	p := NewInLog(admin(), 90, nil, InLogFilter{})
-	row := p.NewRow(InLogRowInput{At: time.Now(), From: `"><script>1</script>@x`, To: "b@acme.io", Decision: "accept", Engine: "rspamd"})
+	// (The handler would not call such a sender listable; the view must not
+	// depend on that.)
+	row := p.NewRow(InLogRowInput{Listable: true, At: time.Now(), From: `"><script>1</script>@x`, To: "b@acme.io", Decision: "accept", Engine: "rspamd"})
 	out := renderSignedIn(t, "in-log", p.WithRows([]InLogRow{row}, 1, 1))
 	pageLacks(t, "Inbound log", out, `<script>1`)
 	pageHas(t, "Inbound log", out, `value=%22%3E%3Cscript%3E1%3C%2Fscript%3E%40x`)
+
+	// A sender the lists would refuse is offered no way into them.
+	if row := p.NewRow(InLogRowInput{At: time.Now(), From: "o'brien@example.org", To: "b@acme.io", Decision: "accept", Engine: "rspamd"}); row.Action != nil {
+		t.Errorf("a sender that is not listable is offered %+v", *row.Action)
+	}
 }
 
 // What a sender wrote is text on the page: an address, a subject or a reply from

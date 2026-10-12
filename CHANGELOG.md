@@ -23,7 +23,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   inbound log row; the log's row cap was applied only every six hours; rows of
   a connection's later messages had no client address; two changes of the
   filter lists at once could leave the filter's files behind the page; a held
-  message was logged twice. Recorded as accepted in
+  message was logged twice; after an unclean stop of the panel the refusals of
+  its last seconds were logged twice. Recorded as accepted in
   [docs/security.md](docs/security.md): the filter's verdict in the log is the
   sender's own while the filter is down; an allow entry for a sender address
   trusts an address anyone can claim; the list files are readable by anyone on
@@ -76,14 +77,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   verdict and symbols, or the reply a refusal was given. A user with the
   *domain* role sees the rows of the inbound domains assigned to them. For the
   global role a row links to the filter lists with the sender filled in:
-  *Deny sender* on accepted mail, *Allow sender* on mail the filter refused.
+  *Deny sender* on accepted mail, *Allow sender* on mail the filter refused -
+  unless the sender is spelt in a way the lists do not take.
 - **Inbound › Filter lists** (global role): add and remove allow and deny
   entries; the page says where the lists go and whether the filter is on to
   read them. Each entry shows how often it decided a message - *Matched*, or
   *never* - and its kind opens a sheet with the note, the day it was added and
   the last match, so that entries nothing matches any more can be found and
   removed. The count is read from the inbound log and reaches back as far as
-  the log does.
+  the log does. A network of one address (`192.0.2.7/32`) is stored as the
+  address, so it cannot be on a list twice.
 - **Server › Settings**: *Keep inbound log rows, days*, shown with the inbound
   relay on.
 - Help: *Inbound log* and *Filter lists*.

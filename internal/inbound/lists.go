@@ -194,6 +194,14 @@ func (l *Lists) LastWritten() time.Time {
 	return newest
 }
 
+// Listable reports whether value could be added to a list as an entry of kind.
+// The Inbound log asks before it offers a row's sender to the lists: an
+// envelope sender may be spelt in ways the lists do not take.
+func Listable(kind, value string) bool {
+	_, err := normalizeListValue(kind, value)
+	return err == nil
+}
+
 // normalizeListValue validates one entry and returns the form it is stored and
 // written in: lower case for an address or a domain, the canonical text of an
 // address or a network for an IP.
@@ -249,6 +257,11 @@ func normalizeListValue(kind, raw string) (string, error) {
 			}
 			if p.Bits() == 0 {
 				return "", invalid("%q is every address there is", v)
+			}
+			// A network of one address is that address: 192.0.2.7/32 and
+			// 192.0.2.7 are one entry, not two that look different.
+			if p.Bits() == p.Addr().BitLen() {
+				return p.Addr().String(), nil
 			}
 			return p.Masked().String(), nil
 		}

@@ -22,6 +22,17 @@ func (f *fakeInboundStore) InsertInboundSpam(e store.InboundSpamEntry) error {
 	return nil
 }
 
+// InsertInboundSpamOnce writes unless an equal row is there, like the store's.
+func (f *fakeInboundStore) InsertInboundSpamOnce(e store.InboundSpamEntry) (bool, error) {
+	for _, r := range f.rows {
+		if r == e {
+			return false, nil
+		}
+	}
+	f.rows = append(f.rows, e)
+	return true, nil
+}
+
 func (f *fakeInboundStore) IsInboundDomain(name string) (bool, error) {
 	if f.lookupErr != nil {
 		return false, f.lookupErr
@@ -50,7 +61,7 @@ const (
 // its line.
 func TestInboundRejectByPostfix(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(unknownRcp, tailNow)
+	j.handle(unknownRcp, tailNow, false)
 	if len(st.rows) != 1 {
 		t.Fatalf("rows = %+v", st.rows)
 	}
@@ -68,7 +79,7 @@ func TestInboundRejectByPostfix(t *testing.T) {
 
 func TestInboundTempfailByPostfix(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from unknown[2001:db8::9]: 450 4.1.8 <a@nx.example>: Sender address rejected: Domain not found; from=<a@nx.example> to=<B@IN.example.com> proto=ESMTP helo=<x>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from unknown[2001:db8::9]: 450 4.1.8 <a@nx.example>: Sender address rejected: Domain not found; from=<a@nx.example> to=<B@IN.example.com> proto=ESMTP helo=<x>", tailNow, false)
 	if len(st.rows) != 1 || st.rows[0].Decision != store.SpamDecisionTempfail || st.rows[0].ClientIP != "2001:db8::9" || st.rows[0].InboundDomain != "in.example.com" {
 		t.Errorf("rows = %+v", st.rows)
 	}
@@ -81,14 +92,14 @@ func TestInboundMilterVerdictNeedsAPort25QueueID(t *testing.T) {
 
 	j, st := inboundFixture()
 	// Opened by a submission port: postfix/smtpd, not postfix/inbound/smtpd.
-	j.handle(head+"postfix/smtpd[20]: 4A1B2C3D: client=app.example.com[203.0.113.4], sasl_method=PLAIN, sasl_username=app", tailNow)
-	j.handle(head+verdict, tailNow)
+	j.handle(head+"postfix/smtpd[20]: 4A1B2C3D: client=app.example.com[203.0.113.4], sasl_method=PLAIN, sasl_username=app", tailNow, false)
+	j.handle(head+verdict, tailNow, false)
 	if len(st.rows) != 0 {
 		t.Fatalf("a submission-port verdict was journalled: %+v", st.rows)
 	}
 
-	j.handle(head+"postfix/inbound/smtpd[41]: 4A1B2C3D: client=mx.example.net[203.0.113.9]", tailNow)
-	j.handle(head+verdict, tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: 4A1B2C3D: client=mx.example.net[203.0.113.9]", tailNow, false)
+	j.handle(head+verdict, tailNow, false)
 	if len(st.rows) != 1 {
 		t.Fatalf("rows = %+v", st.rows)
 	}
@@ -97,7 +108,7 @@ func TestInboundMilterVerdictNeedsAPort25QueueID(t *testing.T) {
 		t.Errorf("row = %+v", got)
 	}
 	// One verdict per message: the id is forgotten with it.
-	j.handle(head+verdict, tailNow)
+	j.handle(head+verdict, tailNow, false)
 	if len(st.rows) != 1 {
 		t.Errorf("the same queue id was journalled twice")
 	}
@@ -109,8 +120,8 @@ func TestInboundMilterDecisions(t *testing.T) {
 		"milter-discard": {"milter triggers DISCARD action", store.SpamDecisionReject},
 	} {
 		j, st := inboundFixture()
-		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow)
-		j.handle(head+"postfix/cleanup[52]: Q1: "+kind+": END-OF-MESSAGE from mx.example.net[203.0.113.9]: "+c.reply+"; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow)
+		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)
+		j.handle(head+"postfix/cleanup[52]: Q1: "+kind+": END-OF-MESSAGE from mx.example.net[203.0.113.9]: "+c.reply+"; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow, false)
 		if len(st.rows) != 1 || st.rows[0].Decision != c.decision || st.rows[0].Engine != store.SpamEngineRspamd {
 			t.Errorf("%s: rows = %+v", kind, st.rows)
 		}
@@ -130,7 +141,7 @@ func TestInboundIgnores(t *testing.T) {
 		"an address with a bracket in it":       head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 554 5.7.1 <b@elsewhere.example>: Relay access denied; from=<\"a> to=<v@in.example.com> proto=X helo=<y\"@example.net> to=<b@elsewhere.example> proto=ESMTP helo=<x>",
 	} {
 		j, st := inboundFixture()
-		j.handle(line, tailNow)
+		j.handle(line, tailNow, false)
 		if len(st.rows) != 0 {
 			t.Errorf("%s: journalled %+v", name, st.rows)
 		}
@@ -139,7 +150,7 @@ func TestInboundIgnores(t *testing.T) {
 
 func TestInboundDetailIsCutAndPrintable(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.7.1 caf\xc3\xa9 \x1b[31m"+strings.Repeat("x", 400)+"; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<x>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.7.1 caf\xc3\xa9 \x1b[31m"+strings.Repeat("x", 400)+"; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<x>", tailNow, false)
 	if len(st.rows) != 1 {
 		t.Fatalf("rows = %+v", st.rows)
 	}
@@ -152,7 +163,7 @@ func TestInboundDetailIsCutAndPrintable(t *testing.T) {
 func TestInboundLookupFailureLeavesNoRow(t *testing.T) {
 	j, st := inboundFixture()
 	st.lookupErr = errors.New("boom")
-	j.handle(unknownRcp, tailNow)
+	j.handle(unknownRcp, tailNow, false)
 	if len(st.rows) != 0 {
 		t.Errorf("rows = %+v", st.rows)
 	}
@@ -162,8 +173,8 @@ func TestInboundLookupFailureLeavesNoRow(t *testing.T) {
 // writes its row; a second one from the log would be the same message twice.
 func TestInboundHoldIsTheMiltersRow(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow)
-	j.handle(head+"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: milter triggers HOLD action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)
+	j.handle(head+"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: milter triggers HOLD action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow, false)
 	if len(st.rows) != 0 {
 		t.Errorf("rows = %+v", st.rows)
 	}
@@ -174,7 +185,7 @@ func TestInboundHoldIsTheMiltersRow(t *testing.T) {
 // which is Postfix's own.
 func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x 5.7.1 Refused by this server's deny list; from=<victim@bank.example> to=<ceo@in.example.com> proto=ESMTP helo=<y>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x 5.7.1 Refused by this server's deny list; from=<victim@bank.example> to=<ceo@in.example.com> proto=ESMTP helo=<y>", tailNow, false)
 	if len(st.rows) != 1 {
 		t.Fatalf("rows = %+v", st.rows)
 	}
@@ -186,7 +197,7 @@ func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 
 	// A HELO name with a closing bracket in it does not lose the line either.
 	j, st = inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: no; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<a>b>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: no; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<a>b>", tailNow, false)
 	if len(st.rows) != 1 || st.rows[0].From != "real@example.net" {
 		t.Errorf("rows = %+v", st.rows)
 	}
@@ -194,8 +205,8 @@ func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 	// The same on a verdict line: the filter's reply is not extended by the
 	// HELO name, so a stranger cannot make a refusal look like the deny list's.
 	j, st = inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=x[203.0.113.9]", tailNow)
-	j.handle(head+"postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from x[203.0.113.9]: 5.7.1 Spam message rejected; from=<real@example.net> to=<b@in.example.com> proto=ESMTP helo=<x this server's deny list; from=<spoofed@example.org> to=<b@in.example.com> proto=ESMTP helo=<y>", tailNow)
+	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=x[203.0.113.9]", tailNow, false)
+	j.handle(head+"postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from x[203.0.113.9]: 5.7.1 Spam message rejected; from=<real@example.net> to=<b@in.example.com> proto=ESMTP helo=<x this server's deny list; from=<spoofed@example.org> to=<b@in.example.com> proto=ESMTP helo=<y>", tailNow, false)
 	if len(st.rows) != 1 || st.rows[0].Detail != "5.7.1 Spam message rejected" || st.rows[0].From != "real@example.net" {
 		t.Errorf("rows = %+v", st.rows)
 	}
@@ -210,9 +221,9 @@ func TestInboundQueueIDIsForgotten(t *testing.T) {
 		"reused by the submission port": "postfix/smtpd[20]: Q1: client=app.example.com[203.0.113.4], sasl_method=PLAIN, sasl_username=app",
 	} {
 		j, st := inboundFixture()
-		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow)
-		j.handle(head+forget, tailNow)
-		j.handle(head+verdict, tailNow)
+		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)
+		j.handle(head+forget, tailNow, false)
+		j.handle(head+verdict, tailNow, false)
 		if len(st.rows) != 0 || len(j.port25) != 0 {
 			t.Errorf("%s: rows %+v, remembered %v", name, st.rows, j.port25)
 		}
@@ -240,7 +251,7 @@ func TestInboundStaleArrivalDoesNotDropALiveID(t *testing.T) {
 func TestInboundCutsTheJournalAsItWrites(t *testing.T) {
 	j, st := inboundFixture()
 	for i := 0; i < inboundPruneEvery*2+10; i++ {
-		j.handle(unknownRcp, tailNow)
+		j.handle(unknownRcp, tailNow, false)
 	}
 	if len(st.pruned) != 2 || st.pruned[0] != inboundSpamLogMaxRows {
 		t.Errorf("cuts = %v, want two, to %d rows", st.pruned, inboundSpamLogMaxRows)
@@ -303,4 +314,20 @@ func TestInboundRetentionPrunesAtStart(t *testing.T) {
 
 func contextWithCancel() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
+}
+
+// The lines the tailer reads when it starts may be ones it read before its
+// last stop: a refusal among them is one row, not two. Lines read as they are
+// written are always new.
+func TestInboundCatchUpDoesNotWriteARowTwice(t *testing.T) {
+	j, st := inboundFixture()
+	j.handle(unknownRcp, tailNow, false) // before the stop
+	j.handle(unknownRcp, tailNow, true)  // the same line, read again on start
+	if len(st.rows) != 1 {
+		t.Fatalf("rows = %d, want the one refusal", len(st.rows))
+	}
+	j.handle(unknownRcp, tailNow, false) // a second refusal in the same second
+	if len(st.rows) != 2 {
+		t.Errorf("rows = %d, want two: a line read as it is written is new", len(st.rows))
+	}
 }

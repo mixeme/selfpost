@@ -63,6 +63,32 @@ func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 	return nil
 }
 
+// InsertInboundSpamOnce records a journal row unless the same row is there
+// already - same moment, client, sender, recipient, decision, engine and
+// detail - and says whether it wrote. The log tailer uses it for the lines it
+// reads when it starts: after an unclean stop those are lines it may have read
+// before, and a refusal read twice is otherwise two rows. e.At must be set; a
+// row dated "now" is never the same as another.
+func (s *Store) InsertInboundSpamOnce(e InboundSpamEntry) (bool, error) {
+	at := e.At.UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`INSERT INTO inbound_spam_log
+			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at)
+		 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+		 WHERE NOT EXISTS (
+			SELECT 1 FROM inbound_spam_log
+			WHERE created_at = ? AND client_ip = ? AND from_addr = ? AND to_addr = ?
+			  AND decision = ? AND engine = ? AND detail = ?)`,
+		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail, at,
+		at, e.ClientIP, e.From, e.To, e.Decision, e.Engine, e.Detail,
+	)
+	if err != nil {
+		return false, fmt.Errorf("insert inbound_spam_log once: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // PruneInboundSpam deletes journal rows older than cutoff and then, if more
 // than keep rows are left, the oldest of those. It returns how many went.
 func (s *Store) PruneInboundSpam(cutoff time.Time, keep int) (int64, error) {
