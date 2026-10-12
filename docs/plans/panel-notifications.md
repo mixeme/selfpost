@@ -109,9 +109,9 @@ to the owner before any code ([panel-redesign.md](panel-redesign.md)
 
 - [x] Mockups: Account checkbox, Settings switch and records, Health status card, help topic; accepted by the owner 2026-10-12 (`design:` commit)
 - [x] Migration and store: user flag, instance switch, event state
-- [ ] Sending: local submission from `postmaster@<hostname>`, message text
-- [ ] Background checker: DNS, certificate, queue; the rules of *When a message is sent*
-- [ ] Level-2 refusal event
+- [x] Sending: local submission from `postmaster@<hostname>`, message text (`sendmail` as the panel user; signed through `non_smtpd_milters` with a key of the server's own name; no link in the text - the panel does not know its own address)
+- [x] Background checker: DNS, certificate, queue; the rules of *When a message is sent*
+- [x] Level-2 refusal event (from the `rejected` rows of the send log, looked at every five minutes)
 - [ ] Panel: Account, Settings, Health check, help
 - [ ] guide.md, architecture.md, security.md, schema-migrations.md
 - [ ] `go vet`, `go test`, e2e: an event reaches a mailbox once and clears once

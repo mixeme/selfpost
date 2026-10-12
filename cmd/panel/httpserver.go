@@ -37,6 +37,9 @@ func newMailStack(cfg config, st *store.Store) *mailStack {
 	odk := domain.NewOpenDKIM(cfg.opendkimDir)
 	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
 	domains := domain.NewService(st, odk, apps, cfg.dkimSelectorDef)
+	// The panel's notifications are sent as postmaster@ the server's own name,
+	// and signed as it.
+	domains.SetServerName(cfg.hostname)
 	inb := inbound.NewService(st, pf)
 	dmarcSvc := dmarc.NewService(st, pf, cfg.hostname, cfg.dmarcEnabled)
 	return &mailStack{

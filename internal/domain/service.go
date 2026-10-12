@@ -38,6 +38,64 @@ type Service struct {
 	odk      *OpenDKIM
 	apps     Applications
 	selector string
+	// serverName is the server's own hostname, which the panel's notifications
+	// are sent from and signed as (SetServerName). Empty: nothing is signed
+	// for it.
+	serverName string
+}
+
+// SetServerName gives the service the server's own hostname. The panel sends
+// its notifications from postmaster@ that name, and for a receiver to believe
+// them the name is signed like a sending domain: it gets a DKIM key and a line
+// in OpenDKIM's tables, without being a row of the registry - no application
+// can send as it. The name comes from SELFPOST_HOSTNAME, which the entrypoint
+// has validated; it is not user input.
+func (s *Service) SetServerName(hostname string) {
+	s.serverName = hostname
+}
+
+// ServerMail is how the server's own name is signed.
+type ServerMail struct {
+	Name     string
+	Selector string
+	Record   DKIMRecord
+}
+
+// ServerMail returns the name notifications are sent as, its DKIM selector and
+// the record to publish for it, creating the key the first time. When the
+// hostname is itself a sending domain, it is that domain's key and selector:
+// one name has one key.
+func (s *Service) ServerMail() (ServerMail, error) {
+	if s.serverName == "" {
+		return ServerMail{}, fmt.Errorf("server mail: no hostname")
+	}
+	selector, err := s.serverSelector()
+	if err != nil {
+		return ServerMail{}, err
+	}
+	if _, err := s.odk.EnsureKey(s.serverName, selector); err != nil {
+		return ServerMail{}, err
+	}
+	rec, err := s.odk.Record(s.serverName, selector)
+	if err != nil {
+		return ServerMail{}, err
+	}
+	return ServerMail{Name: s.serverName, Selector: selector, Record: rec}, nil
+}
+
+// serverSelector is the selector the server's own name is signed with: that of
+// the sending domain of the same name if there is one, the default otherwise.
+func (s *Service) serverSelector() (string, error) {
+	domains, err := s.store.ListDomains()
+	if err != nil {
+		return "", err
+	}
+	for _, d := range domains {
+		if d.Name == s.serverName {
+			return d.DKIMSelector, nil
+		}
+	}
+	return s.selector, nil
 }
 
 // NewService builds the domain service. selectorDefault is the DKIM selector
@@ -125,6 +183,12 @@ func (s *Service) Delete(id int64) error {
 	if err := s.apps.Resync(); err != nil {
 		return fmt.Errorf("rebuild sender map after deleting %s: %w", d.Name, err)
 	}
+	// A sending domain named like the server shared its key with the server's
+	// own mail, which goes on being signed with it (resync above kept the name
+	// in the tables).
+	if d.Name == s.serverName {
+		return nil
+	}
 	if err := s.odk.RemoveKey(d.Name); err != nil {
 		// The domain is gone from the registry and tables; a leftover key
 		// directory is harmless. Surface it so it is not silently ignored.
@@ -172,9 +236,21 @@ func (s *Service) resync() error {
 	if err != nil {
 		return err
 	}
-	signing := make([]SigningDomain, 0, len(domains))
+	signing := make([]SigningDomain, 0, len(domains)+1)
+	registered := false
 	for _, d := range domains {
 		signing = append(signing, SigningDomain{Name: d.Name, Selector: d.DKIMSelector})
+		if d.Name == s.serverName {
+			registered = true
+		}
+	}
+	// The server's own name, for the panel's notifications - unless it is a
+	// sending domain already and so in the tables above.
+	if s.serverName != "" && !registered {
+		if _, err := s.odk.EnsureKey(s.serverName, s.selector); err != nil {
+			return fmt.Errorf("dkim key for %s: %w", s.serverName, err)
+		}
+		signing = append(signing, SigningDomain{Name: s.serverName, Selector: s.selector})
 	}
 	return s.odk.Rebuild(signing)
 }

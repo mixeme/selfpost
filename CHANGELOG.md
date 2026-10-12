@@ -11,8 +11,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   a user's own switch, `users.notify`, on for everyone; `notify_state`, what
   the panel has already written to its users about. The instance switch is a
   settings key, on unless turned off
-  ([plans/panel-notifications.md](docs/plans/panel-notifications.md)). Nothing
-  is sent yet.
+  ([plans/panel-notifications.md](docs/plans/panel-notifications.md)).
+- **The panel writes to its users when something needs them.** Four things,
+  each said once: a sending domain's DKIM, SPF or DMARC record stops matching
+  (after two hourly checks in a row, and once more when it matches again); a
+  level-2 rate limit refuses mail (at most once a day per limit); the TLS
+  certificate is 14 days from expiry, and 3; a message has waited in the
+  queue for more than three days (and once more when none has). Global users
+  are told all of it, domain users about their own domains. Sent from
+  `postmaster@<SELFPOST_HOSTNAME>` by local submission, one message per
+  recipient; not rows of the Outbound log and counted against no limit.
+- **The server's own name is signed.** The panel generates a DKIM key for
+  `SELFPOST_HOSTNAME` and OpenDKIM signs mail submitted locally as that name
+  (`non_smtpd_milters`), so that notifications arrive. The name is not a
+  sending domain: no application can send as it.
 
 ## [2.2.0] - 2026-10-12
 

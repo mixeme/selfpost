@@ -224,11 +224,17 @@ postconf -e \
 # if it is unreachable, defer rather than send unsigned). The journal-milter is
 # monitoring only and is fail-open (default_action=accept): its failure must
 # never block the relay. Per-milter settings use Postfix 3.0+ brace syntax.
+#
+# non_smtpd_milters is the chain for mail submitted locally with sendmail(1) -
+# the panel's own notifications, sent as postmaster@ the hostname. OpenDKIM
+# signs them with the key of the server's own name; the journal-milter is not
+# on this chain, since they are not an application's mail. Bounces Postfix
+# generates itself do not pass it (internal_mail_filter_classes is empty).
 postconf -e \
 	"milter_protocol=6" \
 	"milter_default_action=tempfail" \
 	"smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
-	"non_smtpd_milters="
+	"non_smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }"
 
 # What Postfix tells a milter with MAIL FROM: its defaults plus the client's
 # address. The panel's milters judge every message by that address (an

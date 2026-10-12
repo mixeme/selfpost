@@ -341,7 +341,8 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	errc := make(chan error, 5)
+	// Room for every role to report a failure without blocking: six at most.
+	errc := make(chan error, 6)
 
 	roles := []struct {
 		name string
@@ -363,6 +364,7 @@ func run() error {
 			runAutoRateLimitRecalc(ctx, cfg, st)
 			return nil
 		}},
+		{"notifier", func(ctx context.Context) error { return runNotifier(ctx, cfg, st) }},
 	}
 
 	if cfg.inboundEnabled {
