@@ -176,6 +176,9 @@ type LimitRefusal struct {
 // The same status is written when an application is refused for its client
 // address (applications.auth_ip_restrict), which is no limit at all; so a
 // login counts only while a level-2 limit is set on it or on its domain.
+// Since 2.4.0 a row says why it was refused, and one refused for its client
+// address or its From: line is left out by that; a row from before has no
+// reason and is still judged the old way.
 func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
 	// The status is a literal so that the partial index of migration 0005
 	// answers the question.
@@ -184,7 +187,7 @@ func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
 		 FROM send_log l
 		 JOIN applications a ON a.login = l.app_login
 		 JOIN domains d ON d.id = a.domain_id
-		 WHERE l.status = 'rejected' AND l.created_at >= ?
+		 WHERE l.status = 'rejected' AND l.created_at >= ? AND l.reason IN ('', 'limit')
 		   AND (EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'application' AND r.ref_id = a.id)
 		     OR EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'domain' AND r.ref_id = d.id))
 		 GROUP BY d.name, a.login ORDER BY d.name, a.login`,

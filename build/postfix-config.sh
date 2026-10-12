@@ -97,6 +97,8 @@ RATE_WINDOW="${RATE_LIMIT_WINDOW_SECONDS:-3600}"
 # (monitoring, fail-open). Fixed container paths, matched by postfix-wrapper.sh.
 OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
 JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
+# The panel's sender check (the From: line against the login, strict).
+SENDER_SOCK="${SENDER_CHECK_SOCKET:-/run/selfpost/sender.sock}"
 
 # Persistent panel-managed sender map; texthash needs no postmap, so the
 # unprivileged panel can rewrite it and just ask for a reload.
@@ -225,6 +227,11 @@ postconf -e \
 # monitoring only and is fail-open (default_action=accept): its failure must
 # never block the relay. Per-milter settings use Postfix 3.0+ brace syntax.
 #
+# The sender check comes first and is strict as well: it holds the From: line
+# against the login, which is what OpenDKIM then chooses the key by, so a
+# message it could not judge must not reach the signer. While the panel does
+# not answer on that socket, mail is deferred (docs/security.md).
+#
 # non_smtpd_milters is the chain for mail submitted locally with sendmail(1) -
 # the panel's own notifications, sent as postmaster@ the hostname. OpenDKIM
 # signs them with the key of the server's own name; the journal-milter is not
@@ -233,7 +240,7 @@ postconf -e \
 postconf -e \
 	"milter_protocol=6" \
 	"milter_default_action=tempfail" \
-	"smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
+	"smtpd_milters={ unix:${SENDER_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
 	"non_smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }"
 
 # What Postfix tells a milter with MAIL FROM: its defaults plus the client's

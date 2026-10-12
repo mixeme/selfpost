@@ -269,7 +269,7 @@ func TestHealthNotificationMailCard(t *testing.T) {
 }
 
 // With both records in place the card is green. The card is part of the polled
-// fragment, swapped in by its id like the second row.
+// fragment, swapped in by its id.
 func TestHealthNotificationMailCardIsGreenAndPolled(t *testing.T) {
 	h, zone, mail := serverMailStand(t)
 	publishMail(zone, mail)
@@ -279,7 +279,7 @@ func TestHealthNotificationMailCardIsGreenAndPolled(t *testing.T) {
 	h.HandleHealthFragment(rec, auth.RequestWithPrincipal(req, globalPrincipal))
 	out := rec.Body.String()
 	for _, want := range []string{
-		`id="health-mail" hx-swap-oob="true"`,
+		`id="notification-mail" hx-swap-oob="true"`,
 		`<h2>Notification mail</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div>`,
 		`<td><span class="tag is-success is-light">published</span></td>`,
 	} {
@@ -287,7 +287,7 @@ func TestHealthNotificationMailCardIsGreenAndPolled(t *testing.T) {
 			t.Errorf("health fragment is missing %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out[strings.Index(out, `id="health-mail"`):], "is-warning") {
+	if strings.Contains(out[strings.Index(out, `id="notification-mail"`):], "is-warning") {
 		t.Error("the card warns while both records are published")
 	}
 }

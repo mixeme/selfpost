@@ -281,8 +281,11 @@ func TestE2E(t *testing.T) {
 	run("negative_foreign_relay_rejected", func(t *testing.T) {
 		testForeignRelayRejected(t, sc)
 	})
-	run("negative_journal_milter_fail_open", func(t *testing.T) {
-		testJournalMilterFailOpen(t, sc)
+	run("sender_check_holds_the_from_line", func(t *testing.T) {
+		testSenderCheck(t, sc)
+	})
+	run("panel_down_defers_mail", func(t *testing.T) {
+		testPanelDownDefersMail(t, sc)
 	})
 	run("session_survives_restart", func(t *testing.T) {
 		testSessionSurvivesRestart(t, sc)

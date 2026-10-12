@@ -326,7 +326,23 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
   .sp-record-head { flex-wrap: wrap; }
   .sp-record-head small { margin-left: 0; text-align: left; flex-basis: 100%; }
   .sp-postmark { display: none; }
+  .sp-cards { display: flex; flex-direction: column; padding-inline: .75rem; }
+  .sp-cards > .column { display: contents; }
+  .sp-cards .box { margin-bottom: 1.5rem; }
+  .sp-cards > .column:first-child > .box:nth-child(1) { order: 1; }
+  .sp-cards > .column:first-child > .box:nth-child(2) { order: 3; }
+  .sp-cards > .column:first-child > .box:nth-child(3) { order: 5; }
+  .sp-cards > .column:first-child > .box:nth-child(4) { order: 7; }
+  .sp-cards > .column:last-child > .box:nth-child(1) { order: 2; }
+  .sp-cards > .column:last-child > .box:nth-child(2) { order: 4; }
+  .sp-cards > .column:last-child > .box:nth-child(3) { order: 6; }
+  .sp-cards > .column:last-child > .box:nth-child(4) { order: 8; }
 }
+
+/* cards: two stacks of boxes that are read in rows - the odd ones on the left,
+   the even ones on the right, each stack closed up so a short box leaves no
+   gap beside a tall one. On a phone the stacks dissolve and the boxes come in
+   the order of their numbers (the rules above). */
 
 /* sheet: what does not fit a table row, opened over the page from the row's
    tag. It is the browser's own popover (the tag is a button with

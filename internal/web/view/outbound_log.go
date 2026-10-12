@@ -168,6 +168,10 @@ type MessageInput struct {
 	To         string
 	Subject    string
 	Status     string
+	// Reason and HeaderFrom are a refused row's: why it was refused
+	// (store.Reason*) and, for its From: line, what that line said.
+	Reason     string
+	HeaderFrom string
 	Accepted   time.Time
 	Reported   time.Time
 	// BackHref is the log the message was opened from, filters and page kept.
@@ -191,6 +195,24 @@ type OutMessage struct {
 	// LogEmpty says why there are no lines: a message that never reached the
 	// queue, or that predates the stored lines, is an ordinary outcome.
 	LogEmpty EmptyState
+}
+
+// SendLogTag is the tag of a send-log row. A refused row says why in the tag,
+// so that the log answers it without the message being opened: the reasons
+// are store.Reason*, and a row from before they were recorded is "rejected".
+func SendLogTag(status, reason string) Tag {
+	if status != "rejected" {
+		return Tag{Status: status}
+	}
+	switch reason {
+	case "from":
+		return Tag{Status: "reject", Label: "wrong From"}
+	case "client":
+		return Tag{Status: "reject", Label: "wrong client"}
+	case "limit":
+		return Tag{Status: "rate-limited"}
+	}
+	return Tag{Status: status}
 }
 
 // dash is the value of a field a row does not have.
@@ -218,6 +240,28 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 		}
 		return Rich(Link(href, text))
 	}
+	tag := SendLogTag(in.Status, in.Reason)
+	facts := []Fact{
+		{Label: "Domain", Value: value(in.Domain, in.DomainHref)},
+		{Label: "Application", Value: value(in.App, in.AppHref), Mono: true},
+	}
+	history := Box{No: "02", Title: "History", Help: topicLink(HelpLog, "What the statuses mean")}
+	if in.Status == "rejected" {
+		// A refused message was never accepted and never queued: its one date
+		// is the refusal, and it has no queue id to look anything up by.
+		facts = append(facts, Fact{Label: "Refused", Value: Plain(formatStamp(in.Accepted))})
+		if in.Reason == "from" {
+			facts = append(facts, Fact{Label: "From: line", Value: Plain(orDash(in.HeaderFrom)), Mono: true, Small: true})
+			history.Help = topicLink(HelpSenderCheck, "What an application may write in From:")
+		}
+		facts = append(facts, Fact{Label: "Queue id", Value: Plain("none - never queued")})
+	} else {
+		facts = append(facts,
+			Fact{Label: "Accepted", Value: Plain(formatStamp(in.Accepted))},
+			Fact{Label: "Status reported", Value: Plain(formatStamp(in.Reported))},
+			Fact{Label: "Queue id", Value: Plain(orDash(in.QueueID)), Mono: true})
+	}
+	facts = append(facts, Fact{Label: "Journal id", Value: Plain(strconv.FormatInt(in.ID, 10)), Mono: true})
 	return &OutMessage{
 		Meta: m,
 		Head: Head{
@@ -226,19 +270,12 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 			Compact: true,
 			Route: Route{
 				{Text: orDash(in.From)}, {Arrow: true}, {Text: orDash(in.To)},
-				{Tag: &Tag{Status: in.Status}},
+				{Tag: &tag},
 			},
 		},
-		Message: Box{No: "01", Title: "Message"},
-		Facts: []Fact{
-			{Label: "Domain", Value: value(in.Domain, in.DomainHref)},
-			{Label: "Application", Value: value(in.App, in.AppHref), Mono: true},
-			{Label: "Accepted", Value: Plain(formatStamp(in.Accepted))},
-			{Label: "Status reported", Value: Plain(formatStamp(in.Reported))},
-			{Label: "Queue id", Value: Plain(orDash(in.QueueID)), Mono: true},
-			{Label: "Journal id", Value: Plain(strconv.FormatInt(in.ID, 10)), Mono: true},
-		},
-		History:  Box{No: "02", Title: "History", Help: topicLink(HelpLog, "What the statuses mean")},
+		Message:  Box{No: "01", Title: "Message"},
+		Facts:    facts,
+		History:  history,
 		Delivery: Box{No: "03", Title: "Delivery log", End: Rich("Lines from ", Code("mail.log"), " with this queue id")},
 		LogEmpty: EmptyState{Icon: "ti-file-text"},
 	}

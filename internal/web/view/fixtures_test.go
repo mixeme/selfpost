@@ -92,7 +92,14 @@ func overviewFixture() *Overview {
 // record. refresh renders it as the polled fragment.
 func healthFixture(refresh bool) *Health {
 	h := NewHealth(admin(), "")
-	h.Refresh = refresh
+	if refresh {
+		h.AsFragment()
+	}
+	h.WithSenderCheck([]SenderCheckRow{
+		{Period: "Today", Down: "0 s", Deferred: "0"},
+		{Period: "Last 30 days", Down: "4 s", Deferred: "0"},
+		{Period: "Last 12 months", Down: "41 s", Deferred: "3"},
+	}, "2026-10-13", "ok")
 	h.Machine.End = Verdict("ok")
 	h.MachineRows = []MachineRow{
 		{Resource: "CPU", Gauge: &Gauge{Percent: 12, Text: "12%", Level: LevelOK}, Detail: []string{"2 cores · 2 threads"}},
@@ -113,6 +120,7 @@ func healthFixture(refresh bool) *Health {
 	h.Sockets.End = Verdict("ok")
 	h.SocketRows = []SocketRow{
 		{Name: "OpenDKIM", Path: "inet:127.0.0.1:8891", State: Tag{Status: "ok"}},
+		{Name: "sender-check", Path: "unix:/run/selfpost/sender.sock", State: Tag{Status: "ok"}},
 		{Name: "send-log", Path: "unix:/run/selfpost/journal.sock", State: Tag{Status: "ok"}},
 	}
 	h.Hostname.End = Verdict("ok")
@@ -245,8 +253,10 @@ func outDomainDeleteFixture() *OutDomainDelete {
 func outLogFixture() *OutLog {
 	p := NewOutLog(admin(), 30, true,
 		[]string{"example.org", "shop.example.org", "notify.acme.io"}, []string{"prod-server", "alerts"}, "", "")
+	// status is a row's status, or for a refused row "rejected:" and its reason.
 	row := func(id int64, at, from, to, subject, status string) OutLogRow {
-		return OutLogRow{Time: at, From: from, To: to, Subject: subject, Status: Tag{Status: status},
+		status, reason, _ := strings.Cut(status, ":")
+		return OutLogRow{Time: at, From: from, To: to, Subject: subject, Status: SendLogTag(status, reason),
 			Href: p.DetailHref(id, 1)}
 	}
 	return p.WithRows([]OutLogRow{
@@ -254,7 +264,8 @@ func outLogFixture() *OutLog {
 		row(184222, "09-21 14:01:50", "shop@shop.example.org", "anna.lind@outlook.com", "Your order #48212 has shipped", "sent"),
 		row(184220, "09-21 13:58:07", "alerts@example.org", "noc@example.org", "[FIRING] disk usage above 90 % on db-2", "deferred"),
 		row(184211, "09-21 13:41:19", "no-reply@notify.acme.io", "j.doe@nonexistent.example", "Reset your password", "bounced"),
-		row(184209, "09-21 13:40:02", "prod@example.org", "billing@partner.example", "Invoice 2026-0917", "rejected"),
+		row(184231, "09-21 13:40:55", "shop@shop.example.org", "k.berg@web.de", "A message from the director", "rejected:from"),
+		row(184209, "09-21 13:40:02", "prod@example.org", "billing@partner.example", "Invoice 2026-0917", "rejected:limit"),
 		row(184198, "09-21 13:12:44", "shop@shop.example.org", "p.novak@seznam.cz", "We received your return request", "sent"),
 	}, 1, 412)
 }

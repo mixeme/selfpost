@@ -144,6 +144,12 @@ func (o *OpenDKIM) Record(domainName, selector string) (DKIMRecord, error) {
 	return dkimRecord(selector, domainName, &key.PublicKey)
 }
 
+// SigningTablePath is the SigningTable's location: the names this server
+// signs for, which the sender check reads (internal/milter/sender.go).
+func (o *OpenDKIM) SigningTablePath() string {
+	return o.signingTablePath
+}
+
 // Rebuild regenerates KeyTable and SigningTable from the full domain set and
 // reloads OpenDKIM (architecture.md § OpenDKIM). Full regeneration (rather
 // than incremental edits) keeps the files a pure function of the registry, so

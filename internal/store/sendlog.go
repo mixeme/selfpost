@@ -34,6 +34,10 @@ type SendLogEntry struct {
 	From     string
 	To       string
 	Subject  string
+	// Reason and HeaderFrom are set on refused rows only: why the message
+	// was refused (Reason*), and for ReasonFrom what its From: line said.
+	Reason     string
+	HeaderFrom string
 }
 
 // InsertQueued records an accepted message in the send log with status
@@ -63,9 +67,9 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
 		`INSERT INTO send_log
-			(queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, now, now,
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, e.Reason, e.HeaderFrom, now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert rejected send_log: %w", err)
@@ -136,15 +140,18 @@ func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) 
 // Persistence): a SendLogEntry plus the fields that only exist once a row has
 // been written (id, current status, timestamps).
 type SendLogRow struct {
-	ID        int64
-	QueueID   string
-	Domain    string
-	AppLogin  string
-	From      string
-	To        string
-	Subject   string
-	Status    string
-	CreatedAt time.Time
+	ID       int64
+	QueueID  string
+	Domain   string
+	AppLogin string
+	From     string
+	To       string
+	Subject  string
+	Status   string
+	// Reason and HeaderFrom: see SendLogEntry.
+	Reason     string
+	HeaderFrom string
+	CreatedAt  time.Time
 	// UpdatedAt is when the status last changed — the log-tailer's report of
 	// the delivery attempt. It equals CreatedAt while a row is still queued.
 	UpdatedAt time.Time
@@ -163,10 +170,10 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(
-		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at
+		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
 		 FROM send_log WHERE id = ?`, id,
 	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin, &row.From, &row.To,
-		&row.Subject, &row.Status, &createdAt, &updatedAt)
+		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendLogRow{}, ErrSendLogNotFound
 	}
@@ -205,7 +212,7 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
 	rows, err := s.db.Query(
-		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at
+		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
 		 FROM send_log`+where+`
 		 ORDER BY id DESC
 		 LIMIT ? OFFSET ?`,
@@ -223,7 +230,7 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 			createdAt, updatedAt string
 		)
 		if err := rows.Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin,
-			&row.From, &row.To, &row.Subject, &row.Status, &createdAt, &updatedAt); err != nil {
+			&row.From, &row.To, &row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan send_log row: %w", err)
 		}
 		row.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)

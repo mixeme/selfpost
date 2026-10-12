@@ -377,7 +377,7 @@ and reverse DNS. A check the panel could not run shows as a warning, never as
 fine. Below the cards are the outbound domain list and, with the inbound relay
 on, the inbound one. Each card leads to its table on **Server › Health**
 (`/server/health`) — the queue card to the Outbound queue — and Health has the
-readings:
+readings, in the order of what stops mail first:
 
 - **Machine** — processor (core and thread counts), memory and swap, and
   per-interface network throughput and totals, read from the kernel's
@@ -386,7 +386,16 @@ readings:
   memory is a warning, because both delay or kill the mail path; throughput is
   only reported.
 - **Processes**, **TLS certificate** (validity and expiry) and **Milter
-  sockets** (OpenDKIM and the journal-milter).
+  sockets** (OpenDKIM, the sender check and the journal-milter).
+- **Sender check** — what the strict check of the `From:` line has cost
+  today, in the last 30 days and in the last 12 months: for how long the
+  panel did not answer while Postfix was running, and how many messages
+  Postfix deferred because of it (see [Who an application may send
+  as](#who-an-application-may-send-as)). A restart of the whole container is
+  not counted: mail was stopped for another reason then. The card warns when
+  a message was deferred in the last 24 hours. If these numbers do not stay
+  at nothing, the panel is in the way of your mail more than it should be -
+  report it.
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
   record the internet publishes for this server's IP (forward-confirmed
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
@@ -1076,6 +1085,38 @@ to a domain:
   level 2](#rate-limiting--level-2-domain-and-application)), *Export domain*
   and, for the global role, *Delete domain*, which asks once more.
 
+#### Who an application may send as
+
+An application sends as any address of its domain, or only as the addresses
+listed for it. Since `2.4.0` that rule covers both senders a message has:
+
+- the **envelope sender** (`MAIL FROM`), which Postfix checks;
+- the **`From:` line** of the message - the one a mail program shows and the
+  one the DKIM signature is chosen by - which the panel checks.
+
+A message whose `From:` is anything else is refused with `550 5.7.1` and a
+text naming the line: another of your domains, the server's own name, an
+address at a domain that is not on this server, a line with two addresses,
+or no `From:` at all. A name this server signs for may not appear anywhere
+in the line besides the address itself, a display name included. The refusal
+is permanent, so the application does not send the message again; it is a
+row of the [Outbound log](#outbound-log) tagged `wrong From`, and the row's
+page shows what the line said.
+
+What this stops working when you upgrade from an earlier version:
+
+- an application that sends with the `From:` of another of your domains -
+  give that domain an application of its own;
+- an application with a list whose envelope address and `From:` address
+  differ - add the second address to the list;
+- a contact form that puts its visitor's address into `From:` - put it into
+  `Reply-To:` and send from an address of your own, which is also what
+  DMARC requires.
+
+The check is strict: while the panel does not answer, Postfix replies `451`
+and applications send again later; nothing is accepted unchecked. **Server ›
+Health** counts how often that happens.
+
 *Export domain* writes a single-domain file; *Import a domain* on *Server ›
 Backup* reads one back in (**global role only**) — see [Exporting and importing
 a single domain](#exporting-and-importing-a-single-domain).
@@ -1149,8 +1190,8 @@ rate limits, and it takes exact addresses only — CIDR ranges are not parsed.
 
 It is **not an authentication boundary.** The SASL login itself still succeeds;
 the check runs in the journal-milter, on the same fail-open path as level 2
-(below), so if the milter is unavailable the restriction is skipped rather than
-enforced. Use it to narrow where an application may send from, not to contain a
+(below), so if that milter does not answer the restriction is skipped rather
+than enforced. Use it to narrow where an application may send from, not to contain a
 leaked password — for that, regenerate the password.
 
 **Level 2 — application** — optional override of the domain limit for one
@@ -1173,10 +1214,12 @@ hours and on demand via **Recalculate now**.
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
 a store error, or the connecting client's IP is not available to the
 milter, level 2 is skipped and the message is accepted rather than held up.
-The same applies if the milter itself is down — Postfix is configured to
-accept rather than defer when it cannot reach it. Level 1 is the backstop
-that keeps working even when level 2 cannot run, and it is the only one of
-the two that does not depend on the panel process.
+The same applies if the journal-milter itself does not answer — Postfix is
+configured to accept rather than defer when it cannot reach it. (Since
+`2.4.0` a panel that is down altogether defers mail anyway, through the
+[sender check](#who-an-application-may-send-as) of the same process.) Level 1
+is the backstop that keeps working even when level 2 cannot run, and it is
+the only one of the two that does not depend on the panel process.
 
 ### Outbound log
 
@@ -1186,8 +1229,12 @@ rows of their domains. It refreshes its rows without resetting a filter being
 chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
-retrying), `bounced` (final failure), or `rejected` (refused — for example
-by a [level-2 rate limit](#rate-limiting--level-2-domain-and-application));
+retrying), `bounced` (final failure), or refused before it was queued. A
+refused row says why in its tag: `rate-limited` (a [level-2 rate
+limit](#rate-limiting--level-2-domain-and-application)), `wrong client` (the
+application's client IP list) or `wrong From` (see [Who an application may
+send as](#who-an-application-may-send-as)); a row refused before `2.4.0`
+says `rejected`;
 *Details* opens that row's own page (`/outbound/log/{id}`). That page carries
 the sending domain, the application it was submitted under, the Postfix
 queue id and the journal id, beside the message's history — when it was

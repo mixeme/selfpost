@@ -15,7 +15,7 @@
 {{template "body_close"}}
 {{template "box_close"}}
 
-<div class="columns">
+{{template "cards_open"}}
   <div class="column is-6">
     {{template "box_open" .Postmark}}
     {{template "body_open"}}
@@ -58,7 +58,7 @@
     {{template "body_close"}}
     {{template "box_close"}}
   </div>
-</div>
+{{template "cards_close"}}
 
 {{template "box_open" .HealthCard}}
 {{template "health_cards" .HealthCards}}

@@ -67,6 +67,8 @@ type Config struct {
 	// only for the send log (the journal-milter fails open).
 	OpenDKIMSocket string
 	JournalSocket  string
+	// SenderSocket is the sender check's socket, attached strictly.
+	SenderSocket string
 	// SessionIdleDays is the sliding inactivity window after which a login
 	// session expires (env PANEL_SESSION_IDLE_DAYS, plan B.1). Non-positive
 	// falls back to the 7-day default.
@@ -138,6 +140,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		TLSCertFile:                cfg.TLSCertFile,
 		OpenDKIMSocket:             cfg.OpenDKIMSocket,
 		JournalSocket:              cfg.JournalSocket,
+		SenderSocket:               cfg.SenderSocket,
 		RateLimitMessagesPerIP:     cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds:     cfg.RateLimitWindowSeconds,
 		RetryPolicy:                cfg.RetryPolicy,

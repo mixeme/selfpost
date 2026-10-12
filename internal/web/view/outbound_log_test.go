@@ -22,7 +22,7 @@ func TestOutLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<th>Time, UTC</th>`, `09-21 14:01:52`,
 		`shop@<wbr>shop.example.org`, `m.keller@<wbr>gmx.de`, `title="[FIRING] disk usage above 90 % on db-2"`,
 		`<span class="tag is-success is-light">sent</span>`, `<span class="tag is-warning is-light">deferred</span>`,
-		`<span class="tag is-danger is-light">bounced</span>`, `<span class="tag is-light">rejected</span>`,
+		`<span class="tag is-danger is-light">bounced</span>`, `<span class="tag is-light">rate-limited</span>`, `<span class="tag is-danger is-light">wrong From</span>`,
 		`href="/outbound/log/184220">Details</a>`,
 		`Page 1 of 412`, `<a href="/outbound/log?p=2">Older →</a>`, `New rows appear on their own`,
 	)
@@ -114,7 +114,8 @@ func TestOutMessageShowsWhatTheJournalRecorded(t *testing.T) {
 }
 
 // A message without a subject is named for it, and a row with nothing to show
-// for a field shows a dash.
+// for a field shows a dash. A refused row has no queue id and says so; one
+// from before the reason was recorded is plainly "rejected".
 func TestOutMessageWithoutSubjectOrRecipient(t *testing.T) {
 	at := time.Date(2026, 9, 21, 13, 58, 7, 0, time.UTC)
 	p := NewOutMessage(admin(), MessageInput{ID: 9, Domain: "gone.example", App: "old", Status: "rejected", Accepted: at, Reported: at,
@@ -123,9 +124,40 @@ func TestOutMessageWithoutSubjectOrRecipient(t *testing.T) {
 	out := renderSignedIn(t, "out-message", p)
 	pageHas(t, "Message", out, `<h1 class="title is-4">(no subject)</h1>`, `<span>—</span><i class="ti ti-arrow-right sp-muted"></i><span>—</span>`,
 		`<span class="tag is-light">rejected</span>`, `href="/outbound/log?domain=gone.example&amp;p=2"`,
-		`<dd>gone.example</dd>`, `<dd class="sp-mono">old</dd>`, `<dd class="sp-mono">—</dd>`,
+		`<dd>gone.example</dd>`, `<dd class="sp-mono">old</dd>`, `<dt>Refused</dt>`, `<dd>none - never queued</dd>`,
 		`never reached the queue`)
-	pageLacks(t, "Message", out, `<pre`, `<a href="/outbound/domains/`)
+	pageLacks(t, "Message", out, `<pre`, `<a href="/outbound/domains/`, `Status reported`, `From: line`)
+}
+
+// A row refused for its From: line says so in its tag, shows what the line
+// said, and its History links to the topic that explains the rule.
+func TestOutMessageRefusedForItsFromLine(t *testing.T) {
+	at := time.Date(2026, 9, 21, 13, 40, 55, 0, time.UTC)
+	p := NewOutMessage(admin(), MessageInput{ID: 184231, Domain: "shop.example.org", App: "shop",
+		From: "shop@shop.example.org", To: "k.berg@web.de", Subject: "A message from the director",
+		Status: "rejected", Reason: "from", HeaderFrom: "director@example.org", Accepted: at, Reported: at}).
+		WithDeliveryLog(nil, "This message never reached the queue, so Postfix wrote no delivery lines for it.")
+	out := renderSignedIn(t, "out-message", p)
+	pageHas(t, "Message", out, `<span class="tag is-danger is-light">wrong From</span>`,
+		`<dt>From: line</dt><dd class="sp-mono sp-small">director@example.org</dd>`, `<dt>Refused</dt>`,
+		`<dd>none - never queued</dd>`, `href="/help#sender-check"`)
+}
+
+func TestSendLogTag(t *testing.T) {
+	for _, c := range []struct {
+		status, reason string
+		want           Tag
+	}{
+		{"sent", "", Tag{Status: "sent"}},
+		{"rejected", "", Tag{Status: "rejected"}},
+		{"rejected", "limit", Tag{Status: "rate-limited"}},
+		{"rejected", "from", Tag{Status: "reject", Label: "wrong From"}},
+		{"rejected", "client", Tag{Status: "reject", Label: "wrong client"}},
+	} {
+		if got := SendLogTag(c.status, c.reason); got != c.want {
+			t.Errorf("SendLogTag(%q, %q) = %+v, want %+v", c.status, c.reason, got, c.want)
+		}
+	}
 }
 
 func TestOutMessageEscapesWhatSendersWrote(t *testing.T) {

@@ -3,7 +3,9 @@ package health
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // supervisorConf is the supervisord configuration the panel's other control
@@ -83,6 +85,39 @@ func parseProcesses(out string) []Process {
 		})
 	}
 	return procs
+}
+
+// Uptime reads for how long a running program has been up from the detail
+// supervisord prints for it: "pid 41, uptime 0:03:12", or with days in front,
+// "pid 41, uptime 18 days, 3:02:11".
+func Uptime(detail string) (time.Duration, bool) {
+	_, rest, found := strings.Cut(detail, "uptime ")
+	if !found {
+		return 0, false
+	}
+	var days int
+	if d, clock, hasDays := strings.Cut(rest, ", "); hasDays {
+		n, _, _ := strings.Cut(d, " ")
+		v, err := strconv.Atoi(n)
+		if err != nil || v < 0 {
+			return 0, false
+		}
+		days, rest = v, clock
+	}
+	parts := strings.Split(strings.TrimSpace(rest), ":")
+	if len(parts) != 3 {
+		return 0, false
+	}
+	var hms [3]int
+	for i, p := range parts {
+		v, err := strconv.Atoi(p)
+		if err != nil || v < 0 {
+			return 0, false
+		}
+		hms[i] = v
+	}
+	return time.Duration(days)*24*time.Hour + time.Duration(hms[0])*time.Hour +
+		time.Duration(hms[1])*time.Minute + time.Duration(hms[2])*time.Second, true
 }
 
 // processStatus grades a supervisord state. A one-shot program that is not

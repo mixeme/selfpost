@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -158,47 +159,55 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 		`hx-get="/server/health/fragment"`,
 	)
 	pageLacks(t, "Health", out, `hx-swap-oob`, `/overview/fragment`)
-	if got := strings.Count(out, `class="columns"`); got != 3 {
-		t.Errorf("Health has %d rows of boxes, want 3", got)
+	if got := strings.Count(out, `class="columns sp-cards"`); got != 1 {
+		t.Errorf("Health has %d sets of cards, want 1", got)
 	}
-	// The Configuration box is outside the polled rows: a refresh must not re-render a control.
-	if strings.Index(out, `id="configuration"`) < strings.Index(out, `id="health-checks"`) ||
-		strings.Contains(out[strings.Index(out, `id="health-machine"`):strings.Index(out, `id="configuration"`)], `action="/server/health/reload"`) {
-		t.Error("the reload control is inside the polled rows")
+	// The boxes are numbered by importance and read in rows: the odd ones are
+	// the left stack, the even ones the right.
+	order := []string{`id="processes"`, `id="sender-check"`, `id="hostname"`, `id="machine"`,
+		`id="sockets"`, `id="certificate"`, `id="notification-mail"`, `id="configuration"`}
+	for i := 1; i < len(order); i++ {
+		if strings.Index(out, order[i-1]) < 0 || strings.Index(out, order[i]) < strings.Index(out, order[i-1]) {
+			t.Errorf("%s does not come after %s", order[i], order[i-1])
+		}
+	}
+	for no, title := range []string{"Processes", "Milter sockets", "Sender check", "TLS certificate",
+		"Hostname and reverse DNS", "Notification mail", "Machine", "Configuration"} {
+		if want := `<span class="sp-no">0` + strconv.Itoa(no+1) + `</span><h2>` + title + `</h2>`; !strings.Contains(out, want) {
+			t.Errorf("Health is missing %s", want)
+		}
+	}
+	pageHas(t, "Health", out, `<tr><td>Last 12 months</td><td>41 s</td><td>3</td></tr>`,
+		`Counted since <span class="sp-mono">2026-10-13</span>.`, `href="/help#sender-check"`)
+	// The Configuration box is outside the polled stack: a refresh must not re-render a control.
+	if strings.Contains(out[strings.Index(out, `id="health-stack"`):strings.Index(out, `id="sockets"`)], `action="/server/health/reload"`) {
+		t.Error("the reload control is inside the polled stack")
 	}
 }
 
-// The fragment is the polled part of the page and nothing else: the same rows,
-// the second one marked to be swapped in by its id, and the Notification mail
-// card, a column of the last row, swapped in the same way. No shell and no
-// actions.
-func TestHealthFragmentIsThePolledRows(t *testing.T) {
+// The fragment is the polled part of the page and nothing else: the left
+// stack as it is, and the three readings of the right stack, each marked to be
+// swapped in by its id. No shell and no actions.
+func TestHealthFragmentIsThePolledBoxes(t *testing.T) {
 	page := renderSignedIn(t, "health", healthFixture(false))
 	frag := renderFragment(t, "health_body", healthFixture(true))
 
-	const card = `<div class="column is-6" id="health-mail"`
-	// The part of s before the card, and the card itself up to what follows it
-	// on the page (the Configuration box).
-	rows := func(s string) string {
-		return s[strings.Index(s, `<div class="columns" id="health-machine"`):strings.Index(s, card)]
-	}
-	mail := func(s string) string {
-		a := strings.Index(s, card)
-		if b := strings.Index(s, `id="configuration"`); b > a {
-			return s[a:b]
+	// The polled boxes of s: from the left stack to the Configuration box, or
+	// to the end of a fragment. On the page the right stack's column opens
+	// between them; the fragment has no such line.
+	polled := func(s string) string {
+		s = s[strings.Index(s, `<div class="column is-6" id="health-stack"`):]
+		if b := strings.Index(s, `<div class="box" id="configuration"`); b > 0 {
+			s = s[:b]
 		}
-		return s[a:]
+		s = strings.ReplaceAll(s, ` hx-swap-oob="true"`, "")
+		return strings.Join(strings.Fields(strings.Replace(s, `<div class="column is-6">`, "", 1)), " ")
 	}
-	// Same markup, apart from the out-of-band marks and what follows the card on the page.
-	oob := func(s string) string { return strings.ReplaceAll(strings.TrimSpace(s), ` hx-swap-oob="true"`, "") }
-	if got, want := oob(rows(frag)), oob(rows(page)); !strings.HasPrefix(want, got) {
-		t.Errorf("the fragment is not the page's polled rows\nfragment: %.400s\npage:     %.400s", got, want)
+	if got, want := polled(frag), polled(page); got != want {
+		t.Errorf("the fragment is not the page's polled boxes\nfragment: %.600s\npage:     %.600s", got, want)
 	}
-	if got, want := oob(mail(frag)), oob(mail(page)); !strings.HasPrefix(want, got) {
-		t.Errorf("the fragment's Notification mail card is not the page's\nfragment: %.400s\npage:     %.400s", got, want)
-	}
-	pageHas(t, "fragment", frag, `id="health-machine" data-poll`, `id="health-checks" hx-swap-oob="true"`,
-		`id="health-mail" hx-swap-oob="true"`, `id="notification-mail"`)
+	pageHas(t, "fragment", frag, `id="health-stack" data-poll`, `id="sockets" hx-swap-oob="true"`,
+		`id="certificate" hx-swap-oob="true"`, `id="notification-mail" hx-swap-oob="true"`, `id="sender-check"`)
 	pageLacks(t, "fragment", frag, `<h1`, `navbar`, `action="/server/health/reload"`, `action="/server/health/recheck"`)
 }
 
@@ -257,7 +266,7 @@ func TestHealthStatesTheFixtureDoesNotDraw(t *testing.T) {
 		`<div class="notification is-success is-light">`, `DNS re-checked.`,
 	)
 	// the flash sits between the head and the first row, as the kit puts it
-	if strings.Index(out, `class="notification`) > strings.Index(out, `id="health-machine"`) ||
+	if strings.Index(out, `class="notification`) > strings.Index(out, `id="health-stack"`) ||
 		strings.Index(out, `class="notification`) < strings.Index(out, `class="sp-head"`) {
 		t.Error("the flash is not between page_head and the first box")
 	}

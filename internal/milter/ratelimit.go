@@ -85,14 +85,16 @@ func (s *session) releaseReservations() {
 }
 
 // recordRejected writes a send-log row for a message refused by a level-2
-// limit (guide § Rate limiting — refusals are recorded too), so the rejection
-// shows up in the monitoring screen. Only MAIL-stage fields are known; the
-// write is best-effort and never affects the response.
-func (s *session) recordRejected() {
+// limit (guide § Rate limiting — refusals are recorded too) or for its client
+// address, so the rejection shows up in the monitoring screen with its reason
+// (store.Reason*). Only MAIL-stage fields are known; the write is best-effort
+// and never affects the response.
+func (s *session) recordRejected(reason string) {
 	err := s.rec.InsertRejected(store.SendLogEntry{
 		Domain:   domainOf(s.from),
 		AppLogin: s.login,
 		From:     s.from,
+		Reason:   reason,
 	})
 	if err != nil {
 		log.Printf("journal-milter: record rejected %s: %v", s.from, err)

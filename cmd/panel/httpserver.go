@@ -114,6 +114,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		TLSCertFile:                cfg.tlsCertFile,
 		OpenDKIMSocket:             cfg.opendkimSocket,
 		JournalSocket:              cfg.journalSocket,
+		SenderSocket:               cfg.senderSocket,
 		SessionIdleDays:            cfg.sessionIdleDays,
 		DNSResolvers:               cfg.dnsResolvers,
 		RateLimitMessagesPerIP:     cfg.rateLimitMessagesPerIP,

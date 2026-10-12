@@ -1,29 +1,37 @@
 package view
 
+import (
+	"strconv"
+	"time"
+)
+
 // The data of Server › Health (templates/health.html, mockup health.html):
 // every check behind the cards of Overview, as tables, and the home of the two
 // server actions, Re-check DNS and Reload configuration.
 //
-// Two rows of the page are polled (templates/health_body.html): the handler
-// builds the same Health for the page and for its fragment, and the fragment
-// carries Refresh so that its second row is swapped in out of band.
+// The page is two stacks of boxes numbered by importance (the `cards` layout),
+// and all but the Configuration box are polled (templates/health_body.html):
+// the handler builds the same Health for the page and for its fragment, and
+// AsFragment marks what the fragment swaps in out of band.
 
 // Health is the data of the Health page.
 type Health struct {
 	Meta
-	Head  Head
-	Flash *Flash
-	// Refresh is set on the polled fragment only. The fragment answers with two
-	// sibling rows; the first replaces the element that polls, and the second
-	// is marked to be swapped into place by its id.
-	Refresh bool
-
-	Machine     Box
-	MachineRows []MachineRow
-
+	Head         Head
+	Flash        *Flash
 	Processes    Box
 	ProcessRows  []ProcessRow
 	ProcessError bool
+
+	// SenderCheck is what the strict check of the From: line has cost: for how
+	// long the panel did not answer while Postfix was running, and how many
+	// messages were deferred for it. SenderNote is the line under its table.
+	SenderCheck Box
+	SenderRows  []SenderCheckRow
+	SenderNote  Text
+
+	Machine     Box
+	MachineRows []MachineRow
 
 	Certificate Box
 	CertFacts   []Fact
@@ -37,14 +45,20 @@ type Health struct {
 
 	// NotifyMail is the card of the DNS records notifications are signed and
 	// authorised with (their values are under Server › Settings); NotifyNote
-	// is the line under its table. It is polled with the rest, so Refresh swaps
-	// it into place on its own.
+	// is the line under its table.
 	NotifyMail Box
 	NotifyRows []MailRow
 	NotifyNote Text
 
 	Configuration Box
 	Reload        Action
+}
+
+// SenderCheckRow is one period of the Sender check table.
+type SenderCheckRow struct {
+	Period   string
+	Down     string
+	Deferred string
 }
 
 // MachineRow is one line of the Machine table. A row that is a level (CPU,
@@ -122,14 +136,17 @@ func NewHealth(m Meta, flash string) *Health {
 			Lead:    Plain("Everything behind the cards on Overview. Refreshes automatically."),
 			Actions: []Action{{Label: "Re-check DNS", Icon: "ti-refresh", Post: "/server/health/recheck"}},
 		},
-		Machine:     Box{No: "01", Title: "Machine", ID: "machine", Help: topicLink(HelpChecks, "What these readings mean")},
-		Processes:   Box{No: "02", Title: "Processes", ID: "processes"},
-		Certificate: Box{No: "03", Title: "TLS certificate", ID: "certificate", Help: topicLink(HelpCertificate, "When it warns and what to do")},
-		Sockets:     Box{No: "04", Title: "Milter sockets", ID: "sockets"},
+		// Numbered by importance; the odd ones are the left stack.
+		Processes: Box{No: "01", Title: "Processes", ID: "processes"},
+		Sockets:   Box{No: "02", Title: "Milter sockets", ID: "sockets"},
+		SenderCheck: Box{No: "03", Title: "Sender check", ID: "sender-check",
+			Help: topicLink(HelpSenderCheck, "What is checked and what these numbers are for")},
+		Certificate: Box{No: "04", Title: "TLS certificate", ID: "certificate", Help: topicLink(HelpCertificate, "When it warns and what to do")},
 		Hostname:    Box{No: "05", Title: "Hostname and reverse DNS", ID: "hostname", Help: topicLink(HelpRDNS, "Forward and reverse DNS")},
 		NotifyMail: Box{No: "06", Title: "Notification mail", ID: "notification-mail",
 			Help: topicLink(HelpNotifications, "What the panel sends and what makes it arrive")},
-		Configuration: Box{No: "07", Title: "Configuration", ID: "configuration",
+		Machine: Box{No: "07", Title: "Machine", ID: "machine", Help: topicLink(HelpChecks, "What these readings mean")},
+		Configuration: Box{No: "08", Title: "Configuration", ID: "configuration",
 			End: Plain("Safe to run at any time")},
 		Reload: Action{Label: "Reload configuration", Icon: "ti-reload", Post: "/server/health/reload"},
 	}
@@ -148,6 +165,40 @@ func (h *Health) WithNotificationMail(from string, rows []MailRow, status string
 	h.NotifyNote = Rich("Sent from ", Mono(from), ". What to publish is under ",
 		Link("/server/settings#notification-mail", "Settings"), ".")
 	return h
+}
+
+// WithSenderCheck fills the Sender check card: its three periods, the first
+// day counted ("" before any was) and the card's verdict.
+func (h *Health) WithSenderCheck(rows []SenderCheckRow, since, status string) *Health {
+	h.SenderCheck.End = Verdict(status)
+	h.SenderRows = rows
+	h.SenderNote = Rich("The panel holds each message's ", Code("From:"),
+		" against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running.")
+	if since != "" {
+		h.SenderNote = append(h.SenderNote, Rich(" Counted since ", Mono(since), ".")...)
+	}
+	return h
+}
+
+// AsFragment makes the page its polled fragment: the left stack replaces the
+// element that polls, and the three readings of the right stack are marked to
+// be swapped into place by their ids.
+func (h *Health) AsFragment() *Health {
+	h.Sockets.OOB, h.Certificate.OOB, h.NotifyMail.OOB = true, true, true
+	return h
+}
+
+// Downtime prints a length of time the way the Sender check table does: whole
+// seconds while they say something, then minutes, then hours.
+func Downtime(d time.Duration) string {
+	secs := int64(d / time.Second)
+	switch {
+	case secs < 60:
+		return strconv.FormatInt(secs, 10) + " s"
+	case secs < 3600:
+		return strconv.FormatInt(secs/60, 10) + " min " + strconv.FormatInt(secs%60, 10) + " s"
+	}
+	return strconv.FormatInt(secs/3600, 10) + " h " + strconv.FormatInt(secs%3600/60, 10) + " min"
 }
 
 // Verdict puts a check's status in the end slot of its box, as the mockup does.

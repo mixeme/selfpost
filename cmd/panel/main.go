@@ -60,6 +60,8 @@ func main() {
 type config struct {
 	httpAddr      string
 	journalSocket string
+	// The sender check's socket; the default mirrors build/postfix-config.sh.
+	senderSocket  string
 	mailLog       string
 	retentionDays int
 
@@ -113,6 +115,7 @@ func loadConfig() config {
 	return config{
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
+		senderSocket:  envDefault("SENDER_CHECK_SOCKET", "/run/selfpost/sender.sock"),
 		// Postfix's delivery log, under /data so the lines that resolve a
 		// "queued" send-log row outlive the container. The default must match
 		// maillog_file in build/postfix-config.sh.
@@ -341,8 +344,8 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	// Room for every role to report a failure without blocking: six at most.
-	errc := make(chan error, 6)
+	// Room for every role to report a failure without blocking: seven at most.
+	errc := make(chan error, 7)
 
 	roles := []struct {
 		name string
@@ -350,6 +353,7 @@ func run() error {
 	}{
 		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg, st) }},
 		{"journal-milter", func(ctx context.Context) error { return serveJournal(ctx, cfg, st) }},
+		{"sender-check", func(ctx context.Context) error { return serveSenderCheck(ctx, cfg, st) }},
 		{"log-tailer", func(ctx context.Context) error {
 			return logtail.Run(ctx, cfg.mailLog, st, func() int {
 				days, err := st.GetSendLogRetentionDays(cfg.retentionDays)
@@ -358,7 +362,7 @@ func run() error {
 					return cfg.retentionDays
 				}
 				return days
-			}, inboundTail)
+			}, inboundTail, &logtail.SenderCheck{Store: st, Socket: cfg.senderSocket})
 		}},
 		{"rate-limit-recalc", func(ctx context.Context) error {
 			runAutoRateLimitRecalc(ctx, cfg, st)

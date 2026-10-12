@@ -84,10 +84,18 @@
      sp-credential (a secret shown once). A box foot, a table in its
      table-container, a run of records, a log or an empty state sit directly
      inside; anything else goes in body_open … body_close. */}}
-{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}{{if .DomainPick}} data-domain-pick{{end}}>
+{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .OOB}} hx-swap-oob="true"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}{{if .DomainPick}} data-domain-pick{{end}}>
 {{template "box_head" .}}
 {{end}}
 {{define "box_close"}}</div>{{end}}
+
+{{/* cards_open starts the `cards` layout and cards_close ends it: two
+     `column is-6` stacks of numbered boxes that are read in rows, the odd ones
+     on the left and the even ones on the right, each stack closed up so that a
+     short box leaves no gap beside a tall one. On a phone the stacks dissolve
+     and the boxes come in the order of their numbers (panel.css). */}}
+{{define "cards_open"}}<div class="columns sp-cards">{{end}}
+{{define "cards_close"}}</div>{{end}}
 
 {{/* body_open pads the content of a box (box_body); body_close ends it. */}}
 {{define "body_open"}}<div class="sp-box-body">{{end}}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -118,15 +119,13 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	h.view.Render(w, http.StatusOK, "health", h.healthView(r, statusFlash(r)))
 }
 
-// HandleHealthFragment is the polled part of Health: the same two rows of
-// boxes the page holds, read again.
+// HandleHealthFragment is the polled part of Health: the boxes the page holds,
+// all but Configuration, read again.
 func (h *Handlers) HandleHealthFragment(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	page := h.healthView(r, "")
-	page.Refresh = true
-	h.view.RenderFragment(w, http.StatusOK, "health_body", page)
+	h.view.RenderFragment(w, http.StatusOK, "health_body", h.healthView(r, "").AsFragment())
 }
 
 // HandleHealthRecheck re-runs the DNS checks of the server ignoring the cache.
@@ -144,7 +143,31 @@ func (h *Handlers) HandleHealthRecheck(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 	page := healthPage(h.shellMeta(r), h.healthChecks(), flash)
 	mail := h.serverMail(false)
-	return page.WithNotificationMail(notify.From(h.cfg.Hostname), mail.rows, mail.status)
+	page.WithNotificationMail(notify.From(h.cfg.Hostname), mail.rows, mail.status)
+	stats, err := h.store.SenderCheckStats(time.Now())
+	if err != nil {
+		logf("panel: health: sender check statistics: %v", err)
+	}
+	rows, since, status := senderCheckCard(stats, time.Now())
+	return page.WithSenderCheck(rows, since, status)
+}
+
+// senderCheckCard is the Sender check card from its statistics. It warns when
+// a message was deferred in the last 24 hours: that is mail an application had
+// to send again. Downtime that deferred nothing is only shown.
+func senderCheckCard(s store.SenderCheckStats, now time.Time) (rows []view.SenderCheckRow, since, status string) {
+	row := func(period string, t store.SenderCheckTotals) view.SenderCheckRow {
+		return view.SenderCheckRow{Period: period, Down: view.Downtime(t.Down), Deferred: strconv.FormatInt(t.Deferred, 10)}
+	}
+	rows = []view.SenderCheckRow{row("Today", s.Today), row("Last 30 days", s.Month), row("Last 12 months", s.Year)}
+	if !s.Since.IsZero() {
+		since = s.Since.Format("2006-01-02")
+	}
+	status = string(health.StatusOK)
+	if !s.DeferredAt.IsZero() && now.Sub(s.DeferredAt) < 24*time.Hour {
+		status = string(health.StatusWarn)
+	}
+	return rows, since, status
 }
 
 // healthPage turns one reading of the checks (healthChecks) into the Health
@@ -397,6 +420,7 @@ func (h *Handlers) healthChecks() map[string]any {
 	cert := health.CheckCertificate(h.cfg.TLSCertFile)
 	sockets := []health.Socket{
 		health.CheckSocket("OpenDKIM", h.cfg.OpenDKIMSocket, true),
+		health.CheckSocket("sender-check", h.cfg.SenderSocket, true),
 		health.CheckSocket("send-log", h.cfg.JournalSocket, false),
 	}
 	if on, milter, action := h.inboundFilter(); on {

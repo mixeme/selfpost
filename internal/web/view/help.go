@@ -41,12 +41,15 @@ const (
 	HelpCertificate = "certificate"
 	HelpRDNS        = "rdns"
 	// Outbound
-	HelpDNS    = "dns"
-	HelpApps   = "apps"
-	HelpLimits = "limits"
-	HelpLog    = "log"
-	HelpQueue  = "queue"
-	HelpDMARC  = "dmarc"
+	HelpDNS  = "dns"
+	HelpApps = "apps"
+	// HelpSenderCheck is what an application may write in From: and what the
+	// strict check costs; Health and a refused message's page link to it.
+	HelpSenderCheck = "sender-check"
+	HelpLimits      = "limits"
+	HelpLog         = "log"
+	HelpQueue       = "queue"
+	HelpDMARC       = "dmarc"
 	// Inbound
 	HelpInbound    = "inbound"
 	HelpUpstream   = "upstream"
@@ -103,6 +106,7 @@ func NewHelp(m Meta, inbound bool) *Help {
 		add("Outbound", outboundTopics, []MenuItem{
 			{Label: "DNS records", Icon: "ti-world-check", Href: "#" + HelpDNS},
 			{Label: "Applications", Icon: "ti-apps", Href: "#" + HelpApps},
+			{Label: "Sender check", Icon: "ti-shield-check", Href: "#" + HelpSenderCheck},
 			{Label: "Rate limits", Icon: "ti-gauge", Href: "#" + HelpLimits},
 			{Label: "Outbound log", Icon: "ti-list-details", Href: "#" + HelpLog},
 			{Label: "Queue and retries", Icon: "ti-stack-2", Href: "#" + HelpQueue},
@@ -161,11 +165,19 @@ var outboundTopics = []HelpTopic{
 	{ID: HelpApps, Title: "Applications", Body: []Text{
 		Plain("An application is one SASL login, unique across all domains. It may send as any address of its domain or only as listed addresses, and, with a list of client IPs set, only from those addresses. The password is shown once at creation or regeneration and is not stored in readable form."),
 	}},
+	{ID: HelpSenderCheck, Title: "Sender check", Body: []Text{
+		Rich("An application sends only as itself, and that holds for both senders a message has. The envelope sender is held against the login by Postfix. The ",
+			Code("From:"), " line, the one a mail program shows and the one the DKIM signature is chosen by, is held against it by the panel, under the same rule: an application set to any address of its domain may write any address of that domain, and one with a list of addresses only those. A message with any other ",
+			Code("From:"), " - another of your domains, the server's own name, an address somewhere else, or none at all - is refused for good with ",
+			Code("550 5.7.1"), ". It is a rejected row of the Outbound log, and its page says which address was refused. This is what keeps one application from getting mail signed with another domain's key.",
+			Br(), Br(),
+			"The check is strict. While the panel does not answer, Postfix does not accept mail unchecked: it replies with a temporary error and the application sends again later. Server › Health counts what that costs: for how long the panel did not answer while Postfix itself was running, and how many messages were deferred because of it. The card warns when a message was deferred in the last 24 hours. If the numbers stay at nothing, the check is where it should be; if they do not, it belongs in a process of its own."),
+	}},
 	{ID: HelpLimits, Title: "Rate limits", Body: []Text{
 		Rich("Level 1 is a per-IP ceiling set in ", Code(".env"), ". Level 2 is optional, per domain and per application, entered by hand or computed from the last 30 days of sending, and can never exceed level 1. An application's own limit replaces its domain's."),
 	}},
 	{ID: HelpLog, Title: "Outbound log", Body: []Text{
-		Rich("One row per message and recipient, with the status Postfix last reported: queued (accepted, nothing reported yet), sent (the receiving server took it; what the mailbox does next is not reported back), deferred (not taken yet, Postfix tries again), bounced (failed for good, or the queue lifetime ran out) and rejected (refused before queueing under a level-2 rate limit, so it never reached Postfix). A message's page lists these steps and the lines Postfix wrote about it in ",
+		Rich("One row per message and recipient, with the status Postfix last reported: queued (accepted, nothing reported yet), sent (the receiving server took it; what the mailbox does next is not reported back), deferred (not taken yet, Postfix tries again), bounced (failed for good, or the queue lifetime ran out) and rejected (refused before queueing, so it never reached the queue: under a level-2 rate limit, from a client address the application does not allow, or for a ", Code("From:"), " line that is not the application's - the message's page says which). A message's page lists these steps and the lines Postfix wrote about it in ",
 			Code("mail.log"), ", found by queue id. The lines are kept with the row: they stay on the page after that file has rotated, for as long as the row does. A message accepted before version 2.2.0 shows them only while they are still in the current file. Rows are deleted after the retention set in Server › Settings, 90 days by default, and their lines with them. A domain administrator sees only the rows of their own domains."),
 	}},
 	{ID: HelpQueue, Title: "Queue and retries", Body: []Text{

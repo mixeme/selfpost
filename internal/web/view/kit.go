@@ -80,6 +80,8 @@ func KitPage() *Kit {
 		LayoutFacts: []Fact{
 			{Label: "list", Value: Rich("page_head, then full-width boxes: the add form first, the table second. ", Link("/outbound/domains", "Example"))},
 			{Label: "detail", Value: Rich("page_head, then ", Code("columns"), ": ", Code("is-3"), " side menu + ", Code("is-9"), " boxes.")},
+			{Label: "cards", Value: Rich("page_head, then ", Code("columns sp-cards"), ": two ", Code("is-6"),
+				" stacks of numbered boxes read in rows, odd on the left and even on the right, each stack closed up. On a phone the boxes come in the order of their numbers. The two stacks under this box are laid out so.")},
 			{Label: "form", Value: Rich("page_head, then boxes in equal ", Code("columns"), ", one submit row under them.")},
 			{Label: "signed out", Value: Rich("The split brand / form screen, no navbar. ", Link("/login", "Example"))},
 		},

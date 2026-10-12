@@ -188,3 +188,21 @@ postfix                          FATAL     Exited too quickly
 		}
 	}
 }
+
+func TestUptime(t *testing.T) {
+	for detail, want := range map[string]time.Duration{
+		"pid 41, uptime 0:03:12":          3*time.Minute + 12*time.Second,
+		"pid 41, uptime 18 days, 3:02:11": 18*24*time.Hour + 3*time.Hour + 2*time.Minute + 11*time.Second,
+		"pid 41, uptime 1 day, 0:00:00":   24 * time.Hour,
+		"pid 7, uptime 127:00:01":         127*time.Hour + time.Second,
+	} {
+		if got, ok := Uptime(detail); !ok || got != want {
+			t.Errorf("Uptime(%q) = %s, %v; want %s", detail, got, ok, want)
+		}
+	}
+	for _, detail := range []string{"", "Not started", "Oct 12 04:00 PM", "pid 41, uptime soon", "pid 41, uptime x days, 0:00:01", "pid 41, uptime 0:00"} {
+		if got, ok := Uptime(detail); ok {
+			t.Errorf("Uptime(%q) = %s, want none", detail, got)
+		}
+	}
+}

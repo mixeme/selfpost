@@ -63,15 +63,15 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 		t.Fatalf("over the level-2 limit, two MAIL FROM on one connection were answered %v and %v, want both refused", errs[0], errs[1])
 	}
 
-	if err := waitFor("a rejected row for l2app in the send log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
+	if err := waitFor("a rate-limited row for l2app in the send log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
 		rows, err := sc.panel.sendLogRows(senderDomain, login)
 		if err != nil {
 			return false, err
 		}
-		if containsCell(rows, "rejected") {
+		if containsCell(rows, "rate-limited") {
 			return true, nil
 		}
-		return false, fmt.Errorf("no rejected row for l2app yet")
+		return false, fmt.Errorf("no rate-limited row for l2app yet")
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -124,46 +124,6 @@ func testForeignRelayRejected(t *testing.T, sc *scenario) {
 	}
 	if res.rcptErr == nil && res.mailErr == nil {
 		t.Fatalf("expected rejection at MAIL or RCPT, got: dial=%v auth=%v data=%v", res.dialErr, res.authErr, res.dataErr)
-	}
-}
-
-// testJournalMilterFailOpen is plan C.4 negative check 6: the journal-milter
-// is monitoring-only and fails open (architecture.md § Mail path) — stopping
-// the panel process (which owns the milter socket) must not block mail, and
-// must not crash the container (crashexit only fires on PROCESS_STATE_FATAL, a
-// clean supervisor stop is STOPPED, see build/crashexit.py).
-func testJournalMilterFailOpen(t *testing.T, sc *scenario) {
-	if _, err := h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "stop", "panel"); err != nil {
-		t.Fatalf("stop panel: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "start", "panel")
-	})
-
-	res := attemptSend(sendAttempt{
-		authLogin: sc.appLogin, authPassword: sc.appPassword,
-		from: "alerts@" + senderDomain, to: recipient,
-		subject: "e2e " + uniqueToken("failopen"), body: "must still be accepted",
-	})
-	if !res.ok() {
-		t.Fatalf("send with the journal-milter down was rejected, want fail-open accept: dial=%v auth=%v mail=%v rcpt=%v data=%v",
-			res.dialErr, res.authErr, res.mailErr, res.rcptErr, res.dataErr)
-	}
-
-	if err := checkContainerAlive(h); err != nil {
-		t.Fatalf("container did not survive the panel stopping: %v", err)
-	}
-
-	// Restart the panel (also undone by t.Cleanup, redundantly and harmlessly,
-	// in case a later step needs it sooner than cleanup order guarantees).
-	if _, err := h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "start", "panel"); err != nil {
-		t.Fatalf("restart panel: %v", err)
-	}
-	if err := waitFor("panel HTTP to answer again", 15*time.Second, 300*time.Millisecond, func() (bool, error) {
-		_, err := sc.panel.status()
-		return err == nil, err
-	}); err != nil {
-		t.Fatal(err)
 	}
 }
 

@@ -104,6 +104,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	in := view.MessageInput{
 		ID: row.ID, QueueID: row.QueueID, Domain: row.Domain, App: row.AppLogin,
 		From: row.From, To: row.To, Subject: row.Subject, Status: row.Status,
+		Reason: row.Reason, HeaderFrom: row.HeaderFrom,
 		Accepted: row.CreatedAt, Reported: row.UpdatedAt,
 		// Where the row came from, so the way back returns to the page and filters
 		// the operator was looking at rather than the top of an unfiltered log.
@@ -122,11 +123,29 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 	page := view.NewOutMessage(h.shellMeta(r), in).
-		WithHistory(deliveryEvents(row, h.cfg.RetryPolicy)).
+		WithHistory(deliveryEvents(row, h.cfg.RetryPolicy, h.sendsAs(row.AppLogin))).
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
 		WithDeliveryLog(logLines, logNote)
 	h.view.Render(w, http.StatusOK, "out-message", page)
+}
+
+// sendsAs says what an application may send as, in the words of a refusal:
+// any address of its domain, or the addresses of its list. Empty when the
+// login is no application's any more.
+func (h *Handlers) sendsAs(login string) view.Text {
+	a, err := h.store.GetApplicationByLogin(login)
+	if err != nil {
+		return nil
+	}
+	if a.AddressMode == store.AddressModeList {
+		return view.Plain("the addresses of its list")
+	}
+	d, err := h.store.GetDomain(a.DomainID)
+	if err != nil {
+		return nil
+	}
+	return view.Rich("any address of ", view.Mono(d.Name))
 }
 
 // deliveryEvents turns a row's two timestamps into the history the page shows.
@@ -137,7 +156,10 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 // six hours, then delivered" rather than as two dates in a list of fields.
 // policy supplies the human intervals for deferred and bounced copy, the same
 // strings the Mail queue card prints, so the two cannot drift.
-func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []view.Step {
+//
+// sendsAs is what the row's application may send as, for the step of a message
+// refused for its From: line; empty when the application is gone.
+func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy, sendsAs view.Text) []view.Step {
 	// step states what happened and when; outcome is ok, warn, error or "" for a
 	// step that reports nothing either way, and a zero time is a step that has
 	// not happened yet.
@@ -153,6 +175,22 @@ func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []view.Ste
 	// A rejected message has no second step, and its first one is not an
 	// acceptance: the journal-milter refused it, so Postfix never queued it.
 	if row.Status == store.StatusRejected {
+		switch row.Reason {
+		case store.ReasonFrom:
+			// The one step that names things: which line, whose, and what that
+			// application may write instead.
+			text := view.Rich(" — ", view.Code("From: "+row.HeaderFrom), " is not an address of application ", view.Mono(row.AppLogin))
+			if len(sendsAs) > 0 {
+				text = append(append(text, view.Inline{Text: ", which sends as "}), sendsAs...)
+			}
+			text = append(text, view.Rich(". The application was told ", view.Code("550 5.7.1"), " and will not try again.")...)
+			s := step(row.CreatedAt, "error", "Refused before queueing", "")
+			s.Text = text
+			return []view.Step{s}
+		case store.ReasonClient:
+			return []view.Step{step(row.CreatedAt, "error", "Refused before queueing",
+				"The application accepts mail only from its listed client addresses, and this message came from another. It was never queued, so there is no queue id and Postfix never attempted delivery.")}
+		}
 		return []view.Step{step(row.CreatedAt, "error", "Refused before queueing",
 			"The journal-milter refused the message under a rate limit. It was never queued, so there is no queue id and Postfix never attempted delivery.")}
 	}
@@ -336,7 +374,7 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	for i, row := range rows {
 		table[i] = view.OutLogRow{
 			Time: view.FormatLogTime(row.CreatedAt), From: row.From, To: row.To,
-			Subject: mailhdr.DecodeSubject(row.Subject), Status: view.Tag{Status: row.Status},
+			Subject: mailhdr.DecodeSubject(row.Subject), Status: view.SendLogTag(row.Status, row.Reason),
 			Href: out.DetailHref(row.ID, page),
 		}
 	}

@@ -281,6 +281,9 @@ type Box struct {
 	Help    *HelpLink
 	Variant string
 	Poll    string
+	// OOB marks the box to be swapped into the page by its ID when it comes
+	// in a polled fragment beside the element that asked for the fragment.
+	OOB bool
 	// DomainPick: see Box.
 	DomainPick bool
 }

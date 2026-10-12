@@ -27,13 +27,13 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | Program | User | Priority | Role |
 |---|---|---|---|
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
-| `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
-| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
+| `panel` | panel | 200 | HTTP UI + sender check + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
+| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily `postfix reload` for renewed TLS certs |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
-Start order: OpenDKIM → panel (opens journal-milter socket) → Postfix wrapper
+Start order: OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
 polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then
 `postfix start-fg`.
 
@@ -50,6 +50,7 @@ panel, and postfix are RUNNING; Docker `HEALTHCHECK` uses the same probe.
 ```
 Client ──TLS+SASL──► Postfix (465 smtps, optional 587 submission)
                          │
+                         ├─► sender check (From: against the login, tempfail on failure)
                          ├─► OpenDKIM milter (sign, tempfail on failure)
                          ├─► journal-milter (send log + L2 rate limits, fail-open)
                          └─► outbound MX delivery (port 25 client)
@@ -144,7 +145,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` and message size uses the greater of
   `INBOUND_MESSAGE_SIZE_LIMIT` and `DMARC_MESSAGE_SIZE_LIMIT`.
 - **No open relay** — `permit_sasl_authenticated`, `reject_unauth_destination`;
-  `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
+  `smtpd_sender_login_maps` + `reject_sender_login_mismatch`. That holds the
+  envelope sender; the `From:` header is held to the same table by the
+  panel's sender check (§ Panel roles).
 - **Level-1 rate limit** — `smtpd_client_message_rate_limit` /
   `anvil_rate_time_unit` from `RATE_LIMIT_*` env vars; independent of milter.
 - **Chroot disabled** for all services (DNS/TLS inside container).
@@ -183,7 +186,9 @@ One process, five roles (six with the inbound relay on):
    numbers; they never call `postconf` per request. If `postconf` is missing,
    the panel logs a warning and uses Postfix 3.x compiled-in defaults
    (`300s` / `4000s` / `5d` / `0`) with a muted note on the box.
-2. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
+2. **sender check** — unix socket `SENDER_CHECK_SOCKET`, first in the chain
+   and **strict** (`default_action=tempfail`): § Sender check below.
+3. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
    ceilings apply to every client IP; an application ceiling **overrides** the
@@ -195,20 +200,85 @@ One process, five roles (six with the inbound relay on):
    this process has admitted but not yet written (`internal/milter/inflight.go`),
    so concurrent sessions cannot each spend the same last slot; a reservation
    is released at end-of-message, on ABORT, or after a 10-minute TTL.
-3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
+4. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
    It also keeps the lines Postfix writes under a queue id, for the message's
-   page (§ Log tailer, *Stored lines*).
-4. **rate-limit recalc** — every six hours (and on demand from Domain settings and
+   page (§ Log tailer, *Stored lines*), and counts the mail Postfix deferred
+   because the sender check did not answer.
+5. **rate-limit recalc** — every six hours (and on demand from Domain settings and
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
-5. **notifier** — writes to the panel's users when something needs them
+6. **notifier** — writes to the panel's users when something needs them
    (§ Notifications below).
 
-Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
-Mail submitted locally with `sendmail(1)` — the notifier's — passes OpenDKIM
-alone (`non_smtpd_milters`): it is signed, and it is not an application's
-mail to be journalled or limited. Bounces Postfix generates pass no milter.
+Milter chain in Postfix: the sender check (tempfail), OpenDKIM (tempfail),
+then the journal (accept on failure). Mail submitted locally with
+`sendmail(1)` — the notifier's — passes OpenDKIM alone (`non_smtpd_milters`):
+it is signed, it is the panel's own and so needs no check of whose it is, and
+it is not an application's mail to be journalled or limited. Bounces Postfix
+generates pass no milter.
+
+### Sender check
+
+[internal/milter/sender.go](../internal/milter/sender.go) holds a message's
+`From:` header against the application that sends it
+([plans/from-header-binding.md](plans/from-header-binding.md)). Postfix holds
+the envelope sender against the SASL login, and OpenDKIM chooses the signing
+key by the header; until `2.4.0` nothing connected the two, and an
+application could have mail signed as another domain of the server or as the
+server itself.
+
+- **The rule is the envelope's.** The check reads the file Postfix reads for
+  `smtpd_sender_login_maps` and makes the same lookup: the address itself is
+  bound to the login, or `@domain` is. So an application set to any address of
+  its domain may write any address of that domain, and one with a list only
+  the listed ones; everything else is refused - another registered domain,
+  the server's name, a domain the server knows nothing of. One source for
+  both senders: the two cannot disagree.
+- **How the header is read.** Exactly one `From:` field (none, or more than
+  one, is refused), parsed as an address list that must hold exactly one
+  address. Then a cruder second look at the raw value: OpenDKIM finds the
+  address with a parser of its own, and wherever the two could read a line
+  differently - a display name, a comment, a quoted string - the other
+  address would have to be spelled out in it. So no `@name` may appear there
+  that is another name the server signs for; those names are read from
+  OpenDKIM's own `SigningTable`.
+- **The verdict** comes at the end of the headers: `550 5.7.1`, permanent,
+  naming the line, as a reply code of the milter's own. What the client wrote
+  is reduced to printable ASCII and cut before it is said back, logged or
+  stored. A message with no SASL login is refused as well; the submission
+  ports do not let one this far.
+- **Strict, and therefore small.** Postfix attaches the socket with
+  `default_action=tempfail`: while the panel does not answer on it within the
+  milter timeouts, mail is deferred, not accepted unchecked. The role
+  therefore reads no database. Its two inputs are files the panel rewrites by
+  rename and the mail path itself goes by; they are read again when their
+  time or size has changed, and a file that cannot be read defers mail - a
+  table from before would let a deleted application go on sending. The
+  send-log row of a refusal (`status=rejected`, `reason=from`,
+  `header_from`) is handed to another goroutine through a buffer and is not
+  waited for.
+- **What it costs is counted.** The role marks itself alive every two
+  seconds (the socket's path with `.alive`, under `/run`, so a new container
+  starts without one). At start the time since the mark is the check's
+  downtime - counted from Postfix's own start if that was later, and not at
+  all when supervisord says Postfix is not running, since mail was then
+  stopped for another reason. The log tailer counts the mail: Postfix
+  writes a warning naming the socket and then, from the same smtpd process,
+  `milter-reject: … 451 4.7.1 Service unavailable` from the connection on
+  (the client is told `454 4.3.0` at `AUTH` and leaves), so what is counted
+  is a connection turned away, once - a client brings a message when it
+  connects. The reject line does not name the milter and the journal milter's
+  level-2 refusal reads the same, hence the warning. Both go into
+  `sender_check_days`, a
+  row per UTC day kept a year, and Server › Health shows today, 30 days and
+  12 months. The second figure also sees a panel that is running and not
+  answering, which the mark does not. A log read twice after an unclean stop
+  can count a message twice.
+- **Why it is not a process of its own.** Decided with the owner: measure
+  first. The role has a socket of its own so that the journal stays
+  fail-open, and moving it out later changes where it is started and nothing
+  else.
 
 ### Notifications
 
@@ -229,7 +299,9 @@ is sent; the operator's view is guide § Notifications.
 - **A refused row is not believed whole.** Its domain is the one in
   `MAIL FROM`, which the client typed and Postfix has not yet held against
   the login when the milter refuses; the same status is written when an
-  application is refused for its client address. So refusals are counted by
+  application is refused for its client address or its `From:` line. Since
+  `2.4.0` a row says which (`send_log.reason`) and only a limit's rows are
+  taken; a row from before has no reason. So refusals are counted by
   the domain the login is registered under, only for logins that exist, and
   only while a level-2 limit is set on the login or its domain
   (`Store.LimitRefusalsSince`). One subject per sending domain, whichever of
@@ -808,7 +880,8 @@ unsupported rather than as a missing doc:
 - **Panel paths and tuning:** `SELFPOST_DATA_DIR` (`/data`), `SELFPOST_DB_PATH`
   (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
   (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
-  `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`), `MAIL_LOG`
+  `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`),
+  `SENDER_CHECK_SOCKET` (`/run/selfpost/sender.sock`), `MAIL_LOG`
   (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
   here has to be matched in `build/postfix-config.sh`),
   `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`

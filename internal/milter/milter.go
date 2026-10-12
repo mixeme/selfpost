@@ -102,11 +102,11 @@ func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, er
 	s.rcpts = nil
 	s.subject = ""
 	if !s.authIPAllowed() {
-		s.recordRejected()
+		s.recordRejected(store.ReasonClient)
 		return milter.RespTempFail, nil
 	}
 	if s.overLimit() {
-		s.recordRejected()
+		s.recordRejected(store.ReasonLimit)
 		return milter.RespTempFail, nil
 	}
 	return milter.RespContinue, nil

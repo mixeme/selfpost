@@ -25,7 +25,8 @@ func socketsServer(t *testing.T) *Handlers {
 	dir := t.TempDir()
 	h.cfg.OpenDKIMSocket = filepath.Join(dir, "opendkim.sock")
 	h.cfg.JournalSocket = filepath.Join(dir, "journal.sock")
-	for _, path := range []string{h.cfg.OpenDKIMSocket, h.cfg.JournalSocket} {
+	h.cfg.SenderSocket = filepath.Join(dir, "sender.sock")
+	for _, path := range []string{h.cfg.OpenDKIMSocket, h.cfg.SenderSocket, h.cfg.JournalSocket} {
 		l, err := net.Listen("unix", path)
 		if err != nil {
 			t.Skipf("unix sockets unavailable here: %v", err)
@@ -55,19 +56,19 @@ func TestFilterOffAddsNoSocket(t *testing.T) {
 	h := socketsServer(t)
 	h.cfg.InboundEnabled = true
 	h.cfg.InboundAntispamMilter = "" // no filter attached
-	if got := socketsOf(t, h); len(got) != 2 {
-		t.Fatalf("%d sockets with the filter off, want 2: %+v", len(got), got)
+	if got := socketsOf(t, h); len(got) != 3 {
+		t.Fatalf("%d sockets with the filter off, want 3: %+v", len(got), got)
 	}
 
 	// A milter address with the inbound relay off is not a filter either.
 	h.cfg.InboundEnabled = false
 	h.cfg.InboundAntispamMilter = "inet:127.0.0.1:1"
 	got := socketsOf(t, h)
-	if len(got) != 2 {
-		t.Fatalf("%d sockets with the inbound relay off, want 2: %+v", len(got), got)
+	if len(got) != 3 {
+		t.Fatalf("%d sockets with the inbound relay off, want 3: %+v", len(got), got)
 	}
 	card := socketCard(t, h)
-	if card.Value != "2 of 2 answering" || card.Sub != "OpenDKIM, send-log" || card.Level != "" {
+	if card.Value != "3 of 3 answering" || card.Sub != "OpenDKIM, sender-check, send-log" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 }
@@ -83,7 +84,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 	h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = "inet:"+l.Addr().String(), "tempfail"
 
 	got := socketsOf(t, h)
-	if len(got) != 3 || got[2].Name != "Spam filter" || got[2].Note != "inbound" || got[2].Path != "inet:"+l.Addr().String() {
+	if len(got) != 4 || got[3].Name != "Spam filter" || got[3].Note != "inbound" || got[3].Path != "inet:"+l.Addr().String() {
 		t.Fatalf("sockets = %+v", got)
 	}
 	for _, s := range got {
@@ -92,7 +93,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 		}
 	}
 	card := socketCard(t, h)
-	if card.Value != "3 of 3 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
+	if card.Value != "4 of 4 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 
@@ -132,10 +133,10 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 	} {
 		h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = dead, tt.action
 		got := socketsOf(t, h)
-		if len(got) != 3 {
-			t.Fatalf("action %q: %d sockets, want 3", tt.action, len(got))
+		if len(got) != 4 {
+			t.Fatalf("action %q: %d sockets, want 4", tt.action, len(got))
 		}
-		f := got[2]
+		f := got[3]
 		refused := "Connection to " + l.Addr().String() + " refused. " + tt.detail
 		if f.Present || f.Status != tt.status || f.Detail != refused {
 			t.Errorf("action %q: filter = %+v, want status %q, detail %q", tt.action, f, tt.status, refused)
@@ -146,7 +147,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 			t.Errorf("action %q: SocketStatus = %q, want %q", tt.action, c["SocketStatus"], tt.status)
 		}
 		card := socketCard(t, h)
-		if card.Value != "2 of 3 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
+		if card.Value != "3 of 4 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
 			t.Errorf("action %q: card = %+v", tt.action, card)
 		}
 
@@ -160,7 +161,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleOverviewFragment(rec, reqAs("/overview/fragment", globalPrincipal))
 		page := rec.Body.String()
-		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a> (2 of 3 answering)`} {
+		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a> (3 of 4 answering)`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("action %q: Overview is missing %q", tt.action, want)
 			}

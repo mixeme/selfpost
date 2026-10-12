@@ -188,6 +188,24 @@ operator can act on it.
 
 - **Not an open relay** — SASL only on 465/587; `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
+- **An application signs only as itself (`2.4.0`).** OpenDKIM chooses the
+  key by the `From:` header and Postfix holds only the envelope sender
+  against the login, so until `2.4.0` an application of one sending domain
+  could write another registered domain - or, since `2.3.0`, the server's
+  own name - into `From:` and have the message signed with that name's key
+  (found by the security review of panel-notifications, 2026-10-12). The
+  panel's sender check now holds the header to the table the envelope is
+  held to and refuses anything else with `550 5.7.1`, a domain the server
+  does not sign for included (the owner's rule: the header may say what the
+  envelope may, nothing more). It is the first milter of the chain and
+  strict: a message it could not judge is deferred, never passed on to the
+  signer. It reads the header as one field holding one address and then
+  looks at the raw value once more for any other name of OpenDKIM's
+  `SigningTable`, so that a line its parser and OpenDKIM's could read
+  differently is refused rather than argued about. What the client wrote
+  reaches the reply, the log and the send log only as printable ASCII, cut.
+  Mail the panel submits itself does not pass the check: only root,
+  `postfix` and the panel can submit locally. Architecture § Sender check.
 - **Inbound relay (optional, `INBOUND_RELAY_ENABLE`)** — port 25 is not an
   open relay either: SASL is off; `smtpd_relay_restrictions` /
   `smtpd_recipient_restrictions` are `reject_unauth_destination` and
@@ -353,11 +371,14 @@ deferred item from the roadmap.
   changes, rate limiting, alerting an operator into a config change).
 - **The application auth-IP allow-list is enforced fail-open.** The check runs
   in the journal milter (`internal/milter/authip.go`) with
-  `default_action=accept` and skips on store errors, so if the milter is down
-  the restriction is not applied; the SASL login itself always succeeds.
-  (While the milter is up the list holds for every message, and an unknown
-  client address is refused - see Mail path; what is accepted here is the
-  milter being down.) This
+  `default_action=accept` and skips on store errors, so if the journal milter
+  does not answer the restriction is not applied; the SASL login itself
+  always succeeds. (While the milter is up the list holds for every message,
+  and an unknown client address is refused - see Mail path; what is accepted
+  here is the milter not answering. Since `2.4.0` a panel that is down
+  altogether defers mail through the sender check, which shares its process;
+  what is left of this window is a journal milter that hangs or a database
+  that errs while the check beside it still answers.) This
   is documented in [guide.md](guide.md) as **not an authentication boundary** —
   it is a blast-radius limiter for a leaked application password, on the same
   fail-open path as level-2 rate limiting, and a milter outage already stops
@@ -436,21 +457,18 @@ deferred item from the roadmap.
   a dozen times a day at most by someone who flaps the zone; a domain's
   limits once a day; and no more than 60 messages leave in any hour whatever
   the rules arrive at.
-- **A notification can be forged by an application, signed as the server.**
-  OpenDKIM chooses the key by the `From:` header, and Postfix holds only the
-  envelope sender against the login. An authenticated application can
-  therefore send a message whose header says `From: postmaster@<hostname>` and
-  have it signed with the key of the server's own name - a message that
-  passes DMARC and looks like the panel's. The same has always let an
-  application of one sending domain write another registered domain into
-  `From:` and get that domain's signature; the server's name is one more name
-  it works for. Accepted for now: applications are the operator's own, and a
-  forged notification can ask for nothing the panel acts on - it carries no
-  link and the panel takes no mail. The fix is to hold the `From:` header
-  against the login in the journal milter, which refuses mail and is a
-  decision of its own ([roadmap](roadmap.md) § from-header-binding). Trigger
-  to revisit: applications handed to anyone the operator does not trust with
-  every domain of the instance.
+- **The sender check stops mail while the panel does not answer.** It is a
+  role of the panel process, attached with `default_action=tempfail`, so a
+  panel that is down or slower than the milter timeouts (15 s a command)
+  defers every submission: availability of sending now depends on the panel,
+  which it did not before `2.4.0`. Chosen by the owner over the alternative,
+  a check that is absent whenever the panel is - that one could be switched
+  off by whoever can make the panel slow. Supervisord restarts the panel at
+  once and takes the container down after three failed starts, so the
+  outage is seconds or the whole instance; Server › Health counts the
+  downtime and the mail deferred for it. Trigger to revisit: those numbers
+  not staying at nothing - then the check moves into a process of its own
+  ([plans/from-header-binding.md](plans/from-header-binding.md)).
 - **When the hostname is itself a sending domain,** the server's mail is
   signed with that domain's key. Whoever may export the domain has the key,
   and its applications may send as `postmaster@<hostname>` by right. The

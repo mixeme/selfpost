@@ -95,13 +95,13 @@ func TestHealthPageRendersEveryCheck(t *testing.T) {
 	if strings.Contains(out, "Listening") {
 		t.Error("a socket that answers repeats its detail beside the tag")
 	}
-	// The reload control stays outside the polled rows.
-	body, conf := strings.Index(out, `id="health-machine"`), strings.Index(out, `id="configuration"`)
-	if body < 0 || conf < body {
-		t.Fatal("polled rows or the Configuration box missing or out of order")
+	// The reload control stays outside the polled stack, in the other one.
+	body, right, conf := strings.Index(out, `id="health-stack"`), strings.Index(out, `id="sockets"`), strings.Index(out, `id="configuration"`)
+	if body < 0 || right < body || conf < right {
+		t.Fatal("the polled stack or the Configuration box missing or out of order")
 	}
-	if frag := out[body:conf]; strings.Contains(frag, `action="/server/health/reload"`) || !strings.Contains(frag, `id="hostname"`) {
-		t.Error("the hostname box is outside the polled rows, or the reload control inside them")
+	if frag := out[body:right]; strings.Contains(frag, `action="/server/health/reload"`) || !strings.Contains(frag, `id="hostname"`) || !strings.Contains(frag, `id="sender-check"`) {
+		t.Error("the hostname or sender check box is outside the polled stack, or the reload control inside it")
 	}
 }
 
@@ -163,8 +163,9 @@ func TestHealthFragmentCarriesTheSameRows(t *testing.T) {
 		t.Fatalf("GET /server/health/fragment = %d:\n%s", rec.Code, out)
 	}
 	for _, want := range []string{
-		`id="health-machine" data-poll`, `hx-get="/server/health/fragment"`,
-		`id="health-checks" hx-swap-oob="true"`, `id="machine"`, `id="processes"`, `id="certificate"`, `id="sockets"`, `id="hostname"`,
+		`id="health-stack" data-poll`, `hx-get="/server/health/fragment"`,
+		`id="sockets" hx-swap-oob="true"`, `id="certificate" hx-swap-oob="true"`, `id="notification-mail" hx-swap-oob="true"`,
+		`id="machine"`, `id="processes"`, `id="sender-check"`, `id="hostname"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("health fragment is missing %q", want)

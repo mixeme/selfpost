@@ -80,7 +80,8 @@ in the last 24 hours; downtime that deferred nothing warns of nothing.
 - **In the Outbound log:** a row with the reason in the status tag -
   `wrong From`, beside `rate-limited` and the tag of a refused client address.
   The built panel wrote `rejected` for all of them; it follows the mockup now.
-  The status filter keeps one entry, `rejected`.
+  (The mockup's status filter is not built - the log filters by domain and
+  application - so there is nothing to keep in step with the tags.)
 - **On the message's page:** a fact *From: line* with the address written in
   the header, and a History step that says which address was refused, for
   which application, what that application may write, and that it was told
@@ -101,7 +102,30 @@ the fourth was not.
   beside a tall one and the eye still goes 01, 02, 03. On a phone the boxes
   come in the order of their numbers.
 
-## To settle while building
+## Settled while building
+
+- **The header is read twice.** One `From:` field holding one address, by
+  Go's parser; then every `@name` of the raw value is held against OpenDKIM's
+  own `SigningTable`. The first build took the names for the second look from
+  the sender bindings, and the e2e stand let a line through that named a
+  domain with a key and no application yet: a domain is a signing name from
+  the moment it is added, not from its first application.
+- **What Postfix writes when the check does not answer** (seen on the stand):
+  a warning naming the socket, then `milter-reject: CONNECT … 451 4.7.1
+  Service unavailable` and the same for `EHLO`; the client is told `454 4.3.0
+  Try again later` at `AUTH` and leaves. No `MAIL` is ever offered, so what
+  is counted is the connection turned away, once. The journal milter's
+  level-2 refusal is written in the same words, which is why a reject line
+  counts only after the warning.
+- **When Postfix started** is asked of supervisord (`supervisorctl status`,
+  the uptime of `postfix`).
+- **The reply** is a milter reply code, `550 5.7.1 From: <line> - <why>`; what
+  the client wrote is reduced to printable ASCII and cut first.
+- **The Delivery log box stays on a refused message's page**, with the one
+  sentence it already had for a message that never reached the queue; the
+  picture shown to the owner had left the box out.
+
+## To settle while building (as first written)
 
 - How the header is read so that the check and OpenDKIM cannot disagree: one
   `From:` field, one address, and a cruder second look at the raw value.
@@ -116,11 +140,11 @@ the fourth was not.
 ## Implementation checklist
 
 - [x] Mockups: Health card and layout, the log row, help topic; accepted by the owner 2026-10-12 (`design:` commit)
-- [ ] Migration and store: refusal reason and header address, days of the sender check
-- [ ] The check: a role of the panel on its own socket, bindings read from Postfix's file; Postfix attaches it strictly; start order
-- [ ] Statistics: the alive mark and downtime, deferred mail from `mail.log`
-- [ ] Panel: Health (card, sockets row, layout), Outbound log tags, the message's page, help
-- [ ] guide.md, architecture.md, security.md (the accepted risk goes), schema-migrations.md
-- [ ] `go vet`, `go test`, e2e: refused for another domain's `From:`, for the hostname's and for an address off the list; accepted for its own
+- [x] Migration and store: refusal reason and header address, days of the sender check (`0006_sender_check.sql`)
+- [x] The check: a role of the panel on its own socket, bindings read from Postfix's file; Postfix attaches it strictly; start order
+- [x] Statistics: the alive mark and downtime, deferred mail from `mail.log`
+- [x] Panel: Health (card, sockets row, layout), Outbound log tags, the message's page, help
+- [x] guide.md, architecture.md, security.md (the accepted risk goes), schema-migrations.md
+- [x] `go vet`, `go test`, e2e: refused for another domain's `From:`, for the hostname's and for an address off the list; accepted for its own (on the test server: vet ok, 23 packages ok, e2e ok - `sender_check_holds_the_from_line`, `panel_down_defers_mail`)
 - [ ] Technical review — **Opus**
 - [ ] Security review — **Fable**

@@ -1,80 +1,83 @@
-{{/* The polled part of Health: two rows of boxes, in the page and in its
-     fragment (GET /server/health/fragment) alike. panel.js polls the first row
-     (data-poll, outerHTML) and htmx swaps the second into place by its id when
-     the fragment marks it out of band (.Refresh) — the two rows are siblings, and
-     a fragment can replace only the element that asked for it. The Notification
-     mail card is the third thing the fragment swaps in by id: it sits in a row of
-     the page with the static Configuration box, so it is a column of its own. */}}
-{{define "health_body"}}<div class="columns" id="health-machine" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
-  <div class="column is-6">
-    {{template "box_open" .Machine}}
-    <div class="table-container"><table class="table is-fullwidth">
-      <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
-      <tbody>{{range .MachineRows}}
-        <tr><td>{{.Resource}}</td><td>{{if .Gauge}}<progress class="progress is-small {{.Gauge.Bar}} mb-1" value="{{.Gauge.Percent}}" max="100"></progress>{{.Gauge.Text}}{{else if .Usage}}<span class="sp-nowrap">{{.Usage}}</span>{{else}}<span class="sp-muted">—</span>{{end}}</td><td class="sp-muted">{{range .Detail}}<div>{{.}}</div>{{end}}</td></tr>{{end}}
-      </tbody>
-    </table></div>
-    {{template "box_close"}}
-  </div>
-  <div class="column is-6">
-    {{template "box_open" .Processes}}
-    {{if .ProcessError}}
-    {{template "body_open"}}
-    <p class="has-text-danger">Could not ask supervisord for the process list.</p>
-    {{template "body_close"}}
-    {{else}}
-    <div class="table-container"><table class="table is-fullwidth">
-      <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
-      <tbody>{{range .ProcessRows}}
-        <tr><td>{{.Name}}</td><td>{{template "tag" .State}}</td><td class="sp-muted">{{.Detail}}</td></tr>{{end}}
-      </tbody>
-    </table></div>
-    {{end}}
-    {{template "box_close"}}
-  </div>
-</div>
+{{/* The polled part of Health, in the page and in its fragment
+     (GET /server/health/fragment) alike. The left stack is the element that
+     polls (data-poll, outerHTML): all four of its boxes are readings. The right
+     stack ends in the static Configuration box, so its three readings are
+     swapped into place one by one, each box by its own id, when the fragment
+     marks them out of band (Health.AsFragment) - a fragment can replace only
+     the element that asked for it. */}}
+{{define "health_body"}}{{template "health_stack" .}}
+{{template "health_sockets" .}}
+{{template "health_certificate" .}}
+{{template "health_mail" .}}{{end}}
 
-<div class="columns" id="health-checks"{{if .Refresh}} hx-swap-oob="true"{{end}}>
-  <div class="column is-4">
-    {{template "box_open" .Certificate}}
-    {{template "body_open"}}
-    {{if .CertFacts}}{{template "facts" .CertFacts}}{{end}}
-    <p class="mt-4 {{if .CertProblem}}has-text-danger{{else}}sp-muted{{end}}">{{.CertDetail}}</p>
-    {{template "body_close"}}
-    {{template "box_close"}}
-  </div>
-  <div class="column is-4">
-    {{template "box_open" .Sockets}}
-    <div class="table-container"><table class="table is-fullwidth">
-      <thead><tr><th>Milter</th><th>State</th></tr></thead>
-      <tbody>{{range .SocketRows}}
-        <tr><td>{{.Name}}{{if .Note}} <span class="sp-muted">· {{.Note}}</span>{{end}}<br><span class="sp-muted sp-mono sp-small">{{.Path}}</span>{{if .Detail}}<br><span class="sp-muted sp-small">{{.Detail}}</span>{{end}}</td><td>{{template "tag" .State}}</td></tr>{{end}}
-      </tbody>
-    </table></div>
-    {{template "box_close"}}
-  </div>
-  <div class="column is-4">
-    {{template "box_open" .Hostname}}
-    {{template "body_open"}}
-    {{template "facts" .HostFacts}}
-    {{template "body_close"}}
-    {{template "box_close"}}
-  </div>
-</div>{{if .Refresh}}
-{{template "health_mail" .}}{{end}}{{end}}
-
-{{/* health_mail is the Notification mail card (the page calls it inside its own
-     row; the fragment sends it out of band). */}}
-{{define "health_mail"}}<div class="column is-6" id="health-mail"{{if .Refresh}} hx-swap-oob="true"{{end}}>
-  {{template "box_open" .NotifyMail}}
+{{/* health_stack is the left stack: Processes, Sender check, Hostname and
+     reverse DNS, Machine. */}}
+{{define "health_stack"}}<div class="column is-6" id="health-stack" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
+  {{template "box_open" .Processes}}
+  {{if .ProcessError}}
+  {{template "body_open"}}
+  <p class="has-text-danger">Could not ask supervisord for the process list.</p>
+  {{template "body_close"}}
+  {{else}}
   <div class="table-container"><table class="table is-fullwidth">
-    <thead><tr><th>Record</th><th>State</th></tr></thead>
-    <tbody>{{range .NotifyRows}}
-      <tr><td>{{.Name}}<br><span class="sp-muted sp-mono sp-small">{{.Host}}</span></td><td>{{template "tag" .State}}</td></tr>{{end}}
+    <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
+    <tbody>{{range .ProcessRows}}
+      <tr><td>{{.Name}}</td><td>{{template "tag" .State}}</td><td class="sp-muted">{{.Detail}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{end}}
+  {{template "box_close"}}
+  {{template "box_open" .SenderCheck}}
+  <div class="table-container"><table class="table is-fullwidth">
+    <thead><tr><th>Period</th><th>Panel not answering</th><th>Messages deferred</th></tr></thead>
+    <tbody>{{range .SenderRows}}
+      <tr><td>{{.Period}}</td><td>{{.Down}}</td><td>{{.Deferred}}</td></tr>{{end}}
     </tbody>
   </table></div>
   {{template "body_open"}}
-  <p class="sp-muted">{{template "inline" .NotifyNote}}</p>
+  <p class="sp-muted">{{template "inline" .SenderNote}}</p>
   {{template "body_close"}}
   {{template "box_close"}}
+  {{template "box_open" .Hostname}}
+  {{template "body_open"}}
+  {{template "facts" .HostFacts}}
+  {{template "body_close"}}
+  {{template "box_close"}}
+  {{template "box_open" .Machine}}
+  <div class="table-container"><table class="table is-fullwidth">
+    <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
+    <tbody>{{range .MachineRows}}
+      <tr><td>{{.Resource}}</td><td>{{if .Gauge}}<progress class="progress is-small {{.Gauge.Bar}} mb-1" value="{{.Gauge.Percent}}" max="100"></progress>{{.Gauge.Text}}{{else if .Usage}}<span class="sp-nowrap">{{.Usage}}</span>{{else}}<span class="sp-muted">—</span>{{end}}</td><td class="sp-muted">{{range .Detail}}<div>{{.}}</div>{{end}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{template "box_close"}}
 </div>{{end}}
+
+{{define "health_sockets"}}{{template "box_open" .Sockets}}
+<div class="table-container"><table class="table is-fullwidth">
+  <thead><tr><th>Milter</th><th>State</th></tr></thead>
+  <tbody>{{range .SocketRows}}
+    <tr><td>{{.Name}}{{if .Note}} <span class="sp-muted">· {{.Note}}</span>{{end}}<br><span class="sp-muted sp-mono sp-small">{{.Path}}</span>{{if .Detail}}<br><span class="sp-muted sp-small">{{.Detail}}</span>{{end}}</td><td>{{template "tag" .State}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{template "box_close"}}{{end}}
+
+{{define "health_certificate"}}{{template "box_open" .Certificate}}
+{{template "body_open"}}
+{{if .CertFacts}}{{template "facts" .CertFacts}}{{end}}
+<p class="mt-4 {{if .CertProblem}}has-text-danger{{else}}sp-muted{{end}}">{{.CertDetail}}</p>
+{{template "body_close"}}
+{{template "box_close"}}{{end}}
+
+{{/* health_mail is the Notification mail card. */}}
+{{define "health_mail"}}{{template "box_open" .NotifyMail}}
+<div class="table-container"><table class="table is-fullwidth">
+  <thead><tr><th>Record</th><th>State</th></tr></thead>
+  <tbody>{{range .NotifyRows}}
+    <tr><td>{{.Name}}<br><span class="sp-muted sp-mono sp-small">{{.Host}}</span></td><td>{{template "tag" .State}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{template "body_open"}}
+<p class="sp-muted">{{template "inline" .NotifyNote}}</p>
+{{template "body_close"}}
+{{template "box_close"}}{{end}}

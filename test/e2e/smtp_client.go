@@ -15,10 +15,12 @@ const smtpsAddr = "127.0.0.1:20465"
 
 // sendAttempt is one SMTP transaction against the stand. An empty authLogin
 // means "connect without AUTH" (negative checks 1/3); from/to are full
-// mailbox addresses.
+// mailbox addresses. headerFrom is the From: line of the message when it is
+// not to be the envelope sender (the sender check holds the two to one rule).
 type sendAttempt struct {
 	authLogin, authPassword string
 	from, to                string
+	headerFrom              string
 	subject, body           string
 }
 
@@ -135,6 +137,9 @@ func waitForSMTPSReady(timeout time.Duration) error {
 // to carry a unique token so the harness can find this exact message in the
 // sink-MX's dump directory afterwards.
 func buildMessage(a sendAttempt) string {
+	if a.headerFrom != "" {
+		a.from = a.headerFrom
+	}
 	return fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n",
 		a.from, a.to, a.subject, time.Now().UTC().Format(time.RFC1123Z), a.body,

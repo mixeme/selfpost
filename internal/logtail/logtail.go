@@ -114,8 +114,10 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 // for the message's page, except those of mail that came in on port 25
 // (lines.go). With inbound set it also writes the
 // inbound journal's rows for refused mail and prunes that journal
-// (inbound.go). It returns nil on a clean shutdown.
-func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound) error {
+// (inbound.go), and with sender set it counts the mail Postfix deferred
+// because the sender check did not answer (sendercheck.go). It returns nil on
+// a clean shutdown.
+func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound, sender *SenderCheck) error {
 	go retentionLoop(ctx, st, retention)
 	var journal *inboundJournal
 	if inbound != nil {
@@ -129,6 +131,11 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	// end-of-file for the first time.
 	caughtUp := make(chan struct{})
 	go reconcileLoop(ctx, st, caughtUp)
+
+	var deferred *deferredCounter
+	if sender != nil {
+		deferred = newDeferredCounter(sender)
+	}
 
 	keeper := newLineKeeper(st)
 	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, keeper.flush, func(line string) {
@@ -144,6 +151,9 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		now := time.Now().UTC()
 		if journal != nil {
 			journal.handle(line, now, catchingUp)
+		}
+		if deferred != nil {
+			deferred.handle(line, now)
 		}
 		keeper.add(line, now, catchingUp)
 		queueID, recipient, status, ok := parseDelivery(line)
