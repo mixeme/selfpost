@@ -79,10 +79,29 @@
       </div>
     </div>
 
-    <div class="box" id="configuration">
-      <div class="sp-box-head"><span class="sp-no">06</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
-      <div class="sp-box-body">
-        <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
-        <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box" id="notification-mail">
+          <div class="sp-box-head"><span class="sp-no">06</span><h2>Notification mail</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div><a class="sp-help" href="help.html#notifications" title="What the panel sends and what makes it arrive"><i class="ti ti-help-circle"></i></a></div>
+          <div class="table-container"><table class="table is-fullwidth">
+            <thead><tr><th>Record</th><th>State</th></tr></thead>
+            <tbody>
+              <tr><td>DKIM<br><span class="sp-muted sp-mono sp-small">sp2026._domainkey.mail.example.org</span></td><td><span class="tag is-success is-light">published</span></td></tr>
+              <tr><td>SPF<br><span class="sp-muted sp-mono sp-small">mail.example.org</span></td><td><span class="tag is-warning is-light">missing</span></td></tr>
+            </tbody>
+          </table></div>
+          <div class="sp-box-body">
+            <p class="sp-muted">Sent from <span class="sp-mono">postmaster@mail.example.org</span>. What to publish is under <a href="settings.html#notification-mail">Settings</a>.</p>
+          </div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box" id="configuration">
+          <div class="sp-box-head"><span class="sp-no">07</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
+          <div class="sp-box-body">
+            <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+            <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
+          </div>
+        </div>
       </div>
     </div>

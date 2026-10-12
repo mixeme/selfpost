@@ -108,7 +108,20 @@
     }
    ]
   },
-  "box[Configuration]:body"
+  {
+   "columns": [
+    {
+     "is-6": [
+      "box[Notification mail]:table+body"
+     ]
+    },
+    {
+     "is-6": [
+      "box[Configuration]:body"
+     ]
+    }
+   ]
+  }
  ],
  "help": [
   "head",
@@ -124,7 +137,7 @@
       "box[Overview]:help×3",
       "box[Outbound]:help×6",
       "box[Inbound]:help×6",
-      "box[Server]:help×3",
+      "box[Server]:help×4",
       "box[Account]:help"
      ]
     }
@@ -406,12 +419,14 @@
      "columns": [
       {
        "is-6": [
-        "box[Log retention]:body"
+        "box[Log retention]:body",
+        "box[Sending rate limits]:body"
        ]
       },
       {
        "is-6": [
-        "box[Sending rate limits]:body"
+        "box[Notifications]:body",
+        "box[Notification mail]:record×2"
        ]
       }
      ]

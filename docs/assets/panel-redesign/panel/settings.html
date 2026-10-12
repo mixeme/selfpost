@@ -87,9 +87,7 @@
                 <p class="help">The inbound log also never holds more than 10 000 rows: refused mail is logged at the rate strangers knock on port 25.</p></div>
             </div>
           </div>
-        </div>
 
-        <div class="column is-6">
           <div class="box" id="rate-limits">
             <div class="sp-box-head"><span class="sp-no">02</span><h2>Sending rate limits</h2><div class="sp-end">Read-only</div><a class="sp-help" href="help.html#limits" title="Levels 1 and 2"><i class="ti ti-help-circle"></i></a></div>
             <div class="sp-box-body">
@@ -97,6 +95,43 @@
                 <div><dt>Level 1 · per client IP</dt><dd class="sp-big">600 / h</dd><dd class="sp-muted">Set in <code>.env</code>; restart to change. Nothing below may exceed it.</dd></div>
                 <div><dt>Level 2 · domain, application</dt><dd>Set on each <a href="out-domain-settings.html">domain</a> and <a href="out-app.html">application</a>.</dd></div>
               </dl>
+            </div>
+          </div>
+        </div>
+
+        <div class="column is-6">
+          <div class="box" id="notifications">
+            <div class="sp-box-head"><span class="sp-no">03</span><h2>Notifications</h2><a class="sp-help" href="help.html#notifications" title="What is sent and when"><i class="ti ti-help-circle"></i></a></div>
+            <div class="sp-box-body">
+              <div class="field"><label class="checkbox"><input type="checkbox" name="notify" checked> Send notification e-mails</label>
+                <p class="help">From <span class="sp-mono">postmaster@mail.example.org</span>, to every user who has an e-mail and has not turned them off under <a href="account.html">Account</a>.</p></div>
+            </div>
+          </div>
+
+          <div class="box" id="notification-mail">
+            <div class="sp-box-head"><span class="sp-no">04</span><h2>Notification mail</h2><div class="sp-end">DNS records of the server's own name</div><a class="sp-help" href="help.html#notifications" title="What the panel sends and what makes it arrive"><i class="ti ti-help-circle"></i></a></div>
+
+            <div class="sp-record">
+              <div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+              <div class="sp-row">
+                <div class="field"><label class="label">Host / name</label>
+                  <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="sp2026._domainkey.mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+                <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+              </div>
+              <div class="field"><label class="label">Value to publish</label>
+                <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="5" readonly>v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq7n2Lw0c5vXeR1dYt8uJb3mKs6pHf9aZoWg4iNy2TqCx0lVjE7rUh5sBk1dMa8fPz3oGc6yXw9tIe4nQv2uL…IDAQAB</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+            </div>
+
+            <div class="sp-record">
+              <div class="sp-record-head"><h3>SPF</h3><span class="tag is-warning is-light">missing</span><small>For the server's own name, not for your domains</small></div>
+              <div class="sp-row">
+                <div class="field"><label class="label">Host / name</label>
+                  <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+                <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+              </div>
+              <div class="field"><label class="label">Value to publish</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=spf1 a -all"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <p class="help">Notifications are sent without it, and a receiver may file them as spam.</p>
             </div>
           </div>
         </div>

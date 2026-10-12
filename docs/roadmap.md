@@ -35,7 +35,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
-| panel-notifications | E-mail notifications about important events | agreed | 0/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
+| panel-notifications | E-mail notifications about important events | in progress | 1/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
