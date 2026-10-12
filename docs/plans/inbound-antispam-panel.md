@@ -99,7 +99,9 @@ who decided, the verdict and symbols or the reply, and the subject whole
 (kept on the sheet at his word: the table clips it); a message Postfix itself
 refused offers no *Deny sender*. Inbound › Filter lists was redrawn at his word
 the same day - kind in a column of its own, the note on the entry's sheet,
-matches counted (§ Filter list usage) - and awaits his look at the result.
+matches counted (§ Filter list usage) - and **accepted by him on 2026-10-12**
+("Да"), after a deny entry he added in the panel refused a test message with
+the list's reply and the journal recorded it.
 
 ### Retention
 
@@ -307,8 +309,8 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] List CRUD + validation + atomic rspamd map sync — **Composer**
 - [x] Panel: Inbound › Log and Inbound › Filter lists from the kit partials, mockups `in-log` / `in-filter-lists` (add client IP and engine columns mockup-first), evidence pairs — **Composer**
 - [x] Backup includes `/data/antispam/` — **Composer** (it always did: a backup walks all of `/data`; now held by a test, and the guide says the `antispam/` fragment directory is not in it)
-- [ ] Unit + handler tests — **Composer**
-- [ ] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer**
-- [ ] `go vet`, `go test`, e2e if applicable — **Composer**
+- [x] Unit + handler tests — **Composer** (written with each step: store, milter, tailer, lists and their usage, view fixtures held to the outlines, handlers for both roles)
+- [x] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer** (kept up with each step; [security.md](../security.md) follows the security review)
+- [x] `go vet`, `go test`, e2e if applicable — **Composer** (on the test server for every step; last on `7192c38`: vet ok, 22 packages ok, e2e ok, which relays, refuses, reads the log page and edits a list through the panel)
 - [ ] Technical review of inbound antispam changes — **Opus**
 - [ ] Security review inbound antispam path — **Fable**
