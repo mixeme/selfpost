@@ -108,7 +108,7 @@ to the owner before any code ([panel-redesign.md](panel-redesign.md)
 ## Implementation checklist
 
 - [x] Mockups: Account checkbox, Settings switch and records, Health status card, help topic; accepted by the owner 2026-10-12 (`design:` commit)
-- [ ] Migration and store: user flag, instance switch, event state
+- [x] Migration and store: user flag, instance switch, event state
 - [ ] Sending: local submission from `postmaster@<hostname>`, message text
 - [ ] Background checker: DNS, certificate, queue; the rules of *When a message is sent*
 - [ ] Level-2 refusal event

@@ -43,12 +43,15 @@ type User struct {
 	// are then ignored.
 	AllDomains        bool
 	AllInboundDomains bool
-	CreatedAt         time.Time
-	DomainIDs         []int64
-	InboundDomainIDs  []int64
+	// Notify is the user's own switch for notification e-mails (Account). It
+	// is on for a new user and does nothing without an e-mail.
+	Notify           bool
+	CreatedAt        time.Time
+	DomainIDs        []int64
+	InboundDomainIDs []int64
 }
 
-const userColumns = "id, username, password_hash, role, email, all_domains, all_inbound_domains, created_at"
+const userColumns = "id, username, password_hash, role, email, all_domains, all_inbound_domains, notify, created_at"
 
 func scanUser(r scanRow) (User, error) {
 	var (
@@ -56,7 +59,7 @@ func scanUser(r scanRow) (User, error) {
 		createdAt string
 	)
 	err := r.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Email,
-		&u.AllDomains, &u.AllInboundDomains, &createdAt)
+		&u.AllDomains, &u.AllInboundDomains, &u.Notify, &createdAt)
 	if err != nil {
 		return User{}, err
 	}

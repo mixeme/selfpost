@@ -40,7 +40,7 @@ func TestBaselineSchema(t *testing.T) {
 	st := openTestStore(t)
 	want := map[string]string{
 		"settings":              "key value",
-		"users":                 "id username password_hash role email all_domains all_inbound_domains created_at",
+		"users":                 "id username password_hash role email all_domains all_inbound_domains created_at notify",
 		"sessions":              "token_hash user_id created_at expires_at",
 		"domains":               "id name dkim_selector dmarc_rua created_at",
 		"user_domains":          "user_id domain_id",
@@ -58,6 +58,7 @@ func TestBaselineSchema(t *testing.T) {
 		"inbound_spam_log":      "id inbound_domain client_ip from_addr to_addr subject decision engine detail created_at",
 		"inbound_spam_list":     "id list_type entry_type value note created_at",
 		"send_log_lines":        "id queue_id logged_at line",
+		"notify_state":          "key phase count mark since sent_at",
 	}
 	rows, err := st.db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -112,8 +113,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
-		t.Errorf("user_version = %d, %v; want 3", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 4 {
+		t.Errorf("user_version = %d, %v; want 4", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -189,13 +190,13 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 3 {
-		t.Errorf("user_version = %d, %v; want 3", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 4 {
+		t.Errorf("user_version = %d, %v; want 4", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)
 	}
-	for _, table := range []string{"inbound_spam_log", "inbound_spam_list", "send_log_lines"} {
+	for _, table := range []string{"inbound_spam_log", "inbound_spam_list", "send_log_lines", "notify_state"} {
 		if len(tableColumns(t, st, table)) == 0 {
 			t.Errorf("table %s was not created", table)
 		}

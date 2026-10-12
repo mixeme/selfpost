@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 3` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql` |
+| Chain head | `user_version = 4` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -63,7 +63,8 @@ again and no file is deleted, renamed or reordered — every 2.x database has
 already run it. `2.0.0` and `2.0.1` shipped with the baseline alone; the
 features after them add files, the first being `0002_inbound_spam_log.sql` of
 inbound-antispam-panel (`2.1.0`), then `0003_send_log_lines.sql` of
-delivery-log-storage (`2.2.0`).
+delivery-log-storage (`2.2.0`) and `0004_notifications.sql` of
+panel-notifications (`2.3.0`).
 
 ---
 
@@ -74,6 +75,7 @@ delivery-log-storage (`2.2.0`).
 | 1 | `0001_init.sql` | 2.0.0 | DDL | The whole 2.0 schema, below |
 | 2 | `0002_inbound_spam_log.sql` | 2.1.0 | DDL | `inbound_spam_log`, `inbound_spam_list` and two indexes; nothing existing changes |
 | 3 | `0003_send_log_lines.sql` | 2.2.0 | DDL | `send_log_lines` and one index; nothing existing changes |
+| 4 | `0004_notifications.sql` | 2.3.0 | DDL | `users.notify` (default 1: every user starts with notifications on) and `notify_state` |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.
@@ -85,7 +87,7 @@ for operators upgrading from older 2.x images.
 | Table | Role |
 |-------|------|
 | `settings` | Key/value settings of the instance — what is true whoever is signed in (send-log retention). Nothing that belongs to a user |
-| `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
+| `users` | Panel logins. `role` is `global` or `domain`; `email` is the user's own address; `notify` is the user's own switch for notification e-mails (v4); `all_domains` / `all_inbound_domains` widen a `domain` user to every domain of that direction |
 | `sessions` | Panel login sessions (token hash, owning user by id and deleted with them, sliding idle expiry) |
 | `domains` | Sending (outbound) domains. `dmarc_rua` is where aggregate reports go (`''` = no reports) |
 | `user_domains` | Outbound domains assigned to a `domain` user |
@@ -102,6 +104,7 @@ for operators upgrading from older 2.x images.
 | `dmarc_report_records` | Per-source rows inside a report |
 | `inbound_spam_log` | Inbound antispam journal: one row per recipient of a message offered on port 25, with the decision (`accept`, `reject`, `tempfail`, `quarantine`) and who made it (`rspamd`, `postfix`, `selfpost`). Metadata only (v2) |
 | `inbound_spam_list` | Allow / deny entries for the external filter (`address`, `domain`, `ip`), instance-wide; unique per list (v2) |
+| `notify_state` | What the panel has already written to its users about, one row per subject (`dns:<domain>`, `cert`, `queue`, `limit:<domain>:<login>`), so that each thing is said once and a restart says nothing again (v4) |
 | `send_log_lines` | The `mail.log` lines Postfix wrote under a queue id, with the line's own time; what a message's page shows once the log has rotated. No reference to `send_log`: a line belongs to a row by queue id and time, and goes when no row carries its id (v3) |
 
 `TestBaselineSchema` (`internal/store/schema_test.go`) pins every table, column

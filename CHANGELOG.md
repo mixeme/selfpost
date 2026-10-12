@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Schema for notifications** (migration `0004_notifications.sql`, DDL only):
+  a user's own switch, `users.notify`, on for everyone; `notify_state`, what
+  the panel has already written to its users about. The instance switch is a
+  settings key, on unless turned off
+  ([plans/panel-notifications.md](docs/plans/panel-notifications.md)). Nothing
+  is sent yet.
+
 ## [2.2.0] - 2026-10-12
 
 ### Added
