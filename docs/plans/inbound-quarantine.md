@@ -1,6 +1,6 @@
 # Plan: inbound-quarantine
 
-**Status:** candidate — design TBD; needs explicit agreement before any code  
+**Status:** an idea to think about, not on the roadmap (owner, 2026-10-12) — design TBD; needs explicit agreement before any code  
 **Version:** TBD (`1.x` MINOR if opt-in and backward-compatible; may warrant `2.x`
 if it changes inbound storage or backup contract).
 

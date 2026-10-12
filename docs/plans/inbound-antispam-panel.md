@@ -34,8 +34,8 @@ Lists let the operator correct false positives/negatives (e.g. always allow
 
 ## Quarantine
 
-**Not in this plan.** Held-mail review/release is tracked separately as roadmap
-candidate [inbound-quarantine](inbound-quarantine.md). The journal may still
+**Not in this plan.** Held-mail review/release is an idea kept outside the roadmap,
+[inbound-quarantine](inbound-quarantine.md). The journal may still
 record a `quarantine` **decision label** when the external filter reports it,
 without SelfPost storing the message.
 

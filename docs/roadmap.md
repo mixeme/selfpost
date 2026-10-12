@@ -31,7 +31,6 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | preflight | Installation check page (`/preflight`) | candidate | — | [plans/preflight.md](plans/preflight.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
-| inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
 | csrf-tokens | Per-session CSRF tokens on state-changing forms | candidate | — | — |
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
@@ -124,8 +123,8 @@ action) plus editable allow/deny lists that tune the external filter — without
 shipping rspamd or another engine inside the image.
 
 **Boundary:** metadata journal and list sync only; SelfPost does not run the
-filter ([product.md](product.md)). Quarantine:
-[inbound-quarantine](#inbound-quarantine). Design closed in
+filter ([product.md](product.md)). Quarantine is not on the roadmap
+([Ideas](#ideas-not-on-the-roadmap)). Design closed in
 [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) § Decisions.
 
 **Done when:** with inbound relay enabled, the operator sees journal rows
@@ -137,27 +136,6 @@ hook is set.
 journal PII; global-admin-only RBAC.
 
 **Version:** shipped `2.1.0` (2026-10-12), MINOR (was `1.10.0`; reordered after the redesign on 2026-10-09).
-
----
-
-## inbound-quarantine
-
-**Goal:** optional hold for suspicious inbound mail — review in the panel, then
-release to upstream, discard, or tune lists. Design not settled.
-
-**Boundary:** expands inbound from pure relay toward short-lived message
-storage; may conflict with "no mailboxes" in [product.md](product.md) until
-product explicitly agrees. Alternatives (rspamd-only quarantine vs SelfPost
-store) are listed in [plans/inbound-quarantine.md](plans/inbound-quarantine.md).
-
-**Done when:** TBD after open questions in the plan are answered.
-
-**Dependencies / risks:** inbound relay `[1.4.0]`; storage/retention/backup
-size; malware in held MIME; overlap with
-[inbound-antispam-panel](#inbound-antispam-panel). No implementation checklist
-yet.
-
-**Version:** TBD; `candidate` until explicitly agreed.
 
 ---
 
@@ -361,7 +339,7 @@ the kit's `log_pane`.
 **Goal:** the panel tells its administrators when something needs them instead
 of waiting to be opened: a DNS record stops matching, a domain or application
 hits its rate limit and mail is refused, an inbound upstream is unreachable,
-DMARC failures appear, mail is held in quarantine; for the global
+DMARC failures appear; for the global
 administrator also the TLS certificate nearing expiry, a process or milter
 socket down, a queue older than a day.
 
@@ -520,3 +498,18 @@ explicit major). Squashing the current short chain is not a reason to cut 2.x on
 its own. A missed gate leaves a mid-chain 1.x database silently stuck.
 **Version:** `2.x` major only; not a 1.x item.
 
+---
+
+## Ideas, not on the roadmap
+
+Thoughts kept so they are not lost. They are not candidates: nothing here is
+waiting for an OK, has a version or takes a place in the order above. An idea
+joins the index only when the owner says so.
+
+- **Inbound quarantine** (moved here by the owner on 2026-10-12: "an idea to
+  think about") - hold suspicious inbound mail, review it in the panel, then
+  release it to the upstream or discard it. It would take the relay from
+  passing mail on to storing it for a while, against "no mailboxes" in
+  [product.md](product.md). Notes and open questions:
+  [plans/inbound-quarantine.md](plans/inbound-quarantine.md); the screens
+  `in-quarantine` and `in-quarantine-message` are drawn and stay unbuilt.

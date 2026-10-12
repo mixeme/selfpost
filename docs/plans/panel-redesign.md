@@ -235,7 +235,7 @@ the first step of that feature's plan — not invented during implementation.
 | Roadmap item | Where it lands | Built from | Drawn |
 |---|---|---|---|
 | inbound-antispam-panel (agreed, `2.1.0`) | journal = **Inbound › Log** (add client IP and engine to the mockup's columns; `quarantine` joins the decisions); lists = new **Inbound › Filter lists**, global-only because the lists are instance-wide | list layout: add form + two tables, `status_tag`, filter form in `box_head`; the log links *Allow / Deny sender* to the lists | `in-log`, `in-filter-lists` |
-| inbound-quarantine (candidate) | new **Inbound › Quarantine**, list + detail with *Release* / *Discard* | list layout; detail like `out-message` with `facts`, `log_pane` for headers only, Release beside a `sp-danger-zone` Discard | `in-quarantine`, `in-quarantine-message` — the open questions of its plan (where mail lives, what release means, retention, RBAC) stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
+| inbound-quarantine (an idea, off the roadmap since 2026-10-12) | new **Inbound › Quarantine**, list + detail with *Release* / *Discard* | list layout; detail like `out-message` with `facts`, `log_pane` for headers only, Release beside a `sp-danger-zone` Discard | `in-quarantine`, `in-quarantine-message` — the open questions of its plan (where mail lives, what release means, retention, RBAC) stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
 | preflight (candidate) | new **Server › Preflight**, next to Health: Health is what runs now, Preflight is the deeper on-demand installation check with a test e-mail form | `postmark` verdict, a table of checks with `status_tag` and a *What to do* column, one form box for the test e-mail | `preflight` |
 | panel-notifications (candidate) | per-user event choice on **Account**; one switch under **Server › Settings** | checkboxes in a box, `help` | **no** — drawn once, taken out of `account` and `settings` on 2026-10-10 (owner): 2.0 ships no box for a feature that is not built; redrawn as the first step of its plan |
 | password-reset (candidate) | a link on sign-in, two signed-out screens (request, set new password) | the signed-out layout | **no** |
@@ -539,5 +539,5 @@ only when both are done. Every stage-2 step ends with the evidence of
 order suits development, preflight, delivery-log-storage, panel-notifications,
 password-reset (two screens to draw first), queue as a table with the inbound
 queue, csrf-tokens
-(one hidden field in the form partial once security.md is settled),
-inbound-quarantine after its open questions.
+(one hidden field in the form partial once security.md is settled).
+inbound-quarantine is an idea outside the roadmap.
