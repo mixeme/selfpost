@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-12
+
 ### Added
 
 - **Schema for notifications** (migration `0004_notifications.sql`, DDL only):

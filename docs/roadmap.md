@@ -35,7 +35,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
-| panel-notifications | E-mail notifications about important events | in progress | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
+| panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
@@ -47,8 +47,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
 **inbound-antispam-panel** as `2.1.0` (2026-10-12), built in the new component
 kit — styling its two screens once instead of twice. **delivery-log-storage**
-shipped as `2.2.0` the same day. Agreed after it: **panel-notifications**
-(`2.3.0`); every other remaining
+shipped as `2.2.0` the same day, and **panel-notifications** as `2.3.0`.
+Nothing is agreed after it: every remaining
 item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
@@ -365,7 +365,7 @@ restarts so a reboot does not re-announce everything. The screens are not
 drawn: the Notifications box was taken out of `account` and `settings` on
 2026-10-10 and is redrawn as the first step.
 
-**Version:** `2.3.0` MINOR; agreed 2026-10-12 - the design questions were closed
+**Version:** shipped `2.3.0` (2026-10-12), MINOR - the design questions were closed
 with the owner on 2026-10-12
 ([plans/panel-notifications.md](plans/panel-notifications.md)) and he took it into
 work the same day.

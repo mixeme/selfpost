@@ -1,6 +1,6 @@
 # Plan: panel-notifications
 
-**Status:** agreed 2026-10-12 - the design questions were closed with the owner and he took it into work ("Делаем")  
+**Status:** shipped in `2.3.0` (2026-10-12); agreed the same day - the design questions were closed with the owner and he took it into work ("Делаем")  
 **Date:** 2026-10-12  
 **Version:** `2.3.0` MINOR (one migration; opt-out by a switch).
 
