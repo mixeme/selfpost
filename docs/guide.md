@@ -392,7 +392,10 @@ readings, in the order of what stops mail first:
   panel did not answer while Postfix was running, and how many messages
   Postfix deferred because of it (see [Who an application may send
   as](#who-an-application-may-send-as)). A restart of the whole container is
-  not counted: mail was stopped for another reason then. The card warns when
+  not counted: mail was stopped for another reason then. What is counted as
+  a message is a connection Postfix turned away - it refuses before a
+  message is offered - so a monitor that only connects during an outage is
+  counted too. Days are UTC days. The card warns when
   a message was deferred in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
@@ -1097,8 +1100,13 @@ listed for it. Since `2.4.0` that rule covers both senders a message has:
 A message whose `From:` is anything else is refused with `550 5.7.1` and a
 text naming the line: another of your domains, the server's own name, an
 address at a domain that is not on this server, a line with two addresses,
-or no `From:` at all. A name this server signs for may not appear anywhere
-in the line besides the address itself, a display name included. The refusal
+or no `From:` at all. The line is read strictly, because two programs read
+it - the check and the signer - and must not be able to read it differently:
+outside a quoted display name it may hold one `@`, the address's own, and no
+other name this server signs for may follow an `@` anywhere in it, a quoted
+name included. A display name with a comma or brackets has to be quoted
+(`"Shop, Inc." <orders@…>`), as the mail standard asks and mail libraries
+do. The refusal
 is permanent, so the application does not send the message again; it is a
 row of the [Outbound log](#outbound-log) tagged `wrong From`, and the row's
 page shows what the line said.
@@ -1113,9 +1121,10 @@ What this stops working when you upgrade from an earlier version:
   `Reply-To:` and send from an address of your own, which is also what
   DMARC requires.
 
-The check is strict: while the panel does not answer, Postfix replies `451`
-and applications send again later; nothing is accepted unchecked. **Server ›
-Health** counts how often that happens.
+The check is strict: while the panel does not answer, Postfix answers with a
+temporary error (`451`, and `454` to the login) and applications send again
+later; nothing is accepted unchecked. **Server › Health** counts how often
+that happens.
 
 *Export domain* writes a single-domain file; *Import a domain* on *Server ›
 Backup* reads one back in (**global role only**) — see [Exporting and importing

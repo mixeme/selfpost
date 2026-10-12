@@ -3,7 +3,9 @@ package milter
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"mime"
 	"net"
 	"net/mail"
 	"net/textproto"
@@ -28,8 +30,10 @@ import (
 // (default_action=tempfail in build/postfix-config.sh): while it does not
 // answer, Postfix defers mail. It therefore depends on as little as it can.
 // It reads no database: what an application may send as comes from the file
-// of sender bindings Postfix itself reads for the envelope, so the two cannot
-// disagree. The send-log row of a refusal is written by another goroutine and
+// of sender bindings Postfix itself reads for the envelope, so the two go by
+// one table. Where the lookups differ the check is the stricter: Postfix
+// also tries an address without its "+extension" and compares logins without
+// regard to case. The send-log row of a refusal is written by another goroutine and
 // is not waited for.
 
 // tableFile is a table of the mail path that the panel rewrites and the check
@@ -183,8 +187,9 @@ type senderSession struct {
 	froms   []string // the value of every From: field of the message
 }
 
-// MailFrom starts a message. Like the journal milter it reads everything of a
-// message again here: the library replaces the session after a refusal.
+// MailFrom starts a message and forgets the one before it: a connection may
+// carry several, and after a temporary failure the library hands the
+// connection a new session.
 func (s *senderSession) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
@@ -249,9 +254,11 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	default:
 		return printable(strings.Join(s.froms, " | ")), "the message has more than one From: line", nil
 	}
-	raw := s.froms[0]
+	// Postfix hands a milter a header as it came, folded lines and all; the
+	// address parser reads one line.
+	raw := unfold(s.froms[0])
 	shown = printable(raw)
-	list, perr := mail.ParseAddressList(raw)
+	list, perr := fromParser.ParseList(raw)
 	if perr != nil || len(list) != 1 || list[0].Address == "" {
 		return shown, "it must be one address", nil
 	}
@@ -269,8 +276,12 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	// finds. Wherever the two could read the line differently - a display
 	// name, a comment, a quoted string - the other address would have to be
 	// spelled out in it, so no other name this server signs for may appear.
+	//
+	// The display name is looked at once more as a reader will see it: a mail
+	// program decodes an encoded word, and "=?utf-8?q?director=40example.org?="
+	// shows as an address of another sender though no "@" is written in it.
 	own := domainOf(addr)
-	for _, d := range mentionedDomains(raw) {
+	for _, d := range append(mentionedDomains(raw), mentionedDomains(list[0].Name)...) {
 		if d == own {
 			continue
 		}
@@ -282,35 +293,76 @@ func (s *senderSession) judge() (shown, why string, err error) {
 			return printable(raw), "it names another sender of this server, " + d, nil
 		}
 	}
+	// And one that needs to know nothing of OpenDKIM's parser: outside quoted
+	// strings the line has the one "@" of its address. A second one - in a
+	// comment, in an unquoted name - is where two parsers could part ways.
+	if strings.Count(unquoted(raw), "@") != 1 {
+		return printable(raw), "outside quotes it must have one @, the address's own", nil
+	}
 	return shown, "", nil
 }
 
-// record leaves a row per recipient for the Outbound log. It never waits: a
-// database that is slow must not make the check slow.
+// record leaves a row for the Outbound log. It never waits: a database that
+// is slow must not make the check slow. One row for the message, not one for
+// each recipient as an accepted message has: nothing was sent to anybody, and
+// a refused message with a thousand recipients would otherwise be a thousand
+// rows at the price of one.
 func (s *senderSession) record(shown string) {
 	if s.refused == nil {
 		return
 	}
-	rcpts := s.rcpts
-	if len(rcpts) == 0 {
-		rcpts = []string{""}
+	to := ""
+	if len(s.rcpts) > 0 {
+		to = s.rcpts[0]
 	}
-	for _, to := range rcpts {
-		e := store.SendLogEntry{
-			Domain:     domainOf(s.from),
-			AppLogin:   s.login,
-			From:       s.from,
-			To:         to,
-			Subject:    s.subject,
-			Reason:     store.ReasonFrom,
-			HeaderFrom: shown,
-		}
-		select {
-		case s.refused <- e:
-		default:
-			log.Printf("sender-check: the refusal of %s -> %s is not in the log: too many are waiting to be written", s.from, to)
+	if more := len(s.rcpts) - 1; more > 0 {
+		to += fmt.Sprintf(" and %d more", more)
+	}
+	e := store.SendLogEntry{
+		Domain:     domainOf(s.from),
+		AppLogin:   s.login,
+		From:       s.from,
+		To:         to,
+		Subject:    s.subject,
+		Reason:     store.ReasonFrom,
+		HeaderFrom: shown,
+	}
+	select {
+	case s.refused <- e:
+	default:
+		log.Printf("sender-check: the refusal of %s -> %s is not in the log: too many are waiting to be written", s.from, to)
+	}
+}
+
+// fromParser reads the From: line. A display name encoded in a charset Go
+// does not convert (windows-1251, koi8-r, ...) is still a display name: its
+// bytes are passed through unread, since only the address is judged.
+var fromParser = mail.AddressParser{WordDecoder: &mime.WordDecoder{
+	CharsetReader: func(charset string, input io.Reader) (io.Reader, error) { return input, nil },
+}}
+
+// unfold joins the lines of a folded header value (RFC 5322 2.2.3): a line
+// break is dropped, the white space that follows it stays.
+func unfold(v string) string {
+	return strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(v)
+}
+
+// unquoted returns v without its quoted strings, a backslash inside one
+// escaping the next character.
+func unquoted(v string) string {
+	var sb strings.Builder
+	in := false
+	for i := 0; i < len(v); i++ {
+		switch c := v[i]; {
+		case in && c == '\\':
+			i++
+		case c == '"':
+			in = !in
+		case !in:
+			sb.WriteByte(c)
 		}
 	}
+	return sb.String()
 }
 
 // mentionedDomains returns, lower-cased, what follows every "@" of v as far

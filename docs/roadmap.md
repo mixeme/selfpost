@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
-| from-header-binding | Hold a message's `From:` header against the application that sends it | in progress, for `2.4.0` | 7/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
+| from-header-binding | Hold a message's `From:` header against the application that sends it | built and reviewed, for `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 

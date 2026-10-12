@@ -149,6 +149,13 @@ func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 		logf("panel: health: sender check statistics: %v", err)
 	}
 	rows, since, status := senderCheckCard(stats, time.Now())
+	if err != nil {
+		// Zeros that were not read are not zeros.
+		for i := range rows {
+			rows[i].Down, rows[i].Deferred = "—", "—"
+		}
+		status = string(health.StatusUnknown)
+	}
 	return page.WithSenderCheck(rows, since, status)
 }
 

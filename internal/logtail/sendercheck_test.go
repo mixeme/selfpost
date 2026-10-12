@@ -17,9 +17,12 @@ func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64) error {
 	return nil
 }
 
-// The lines are Postfix 3.7's, as the e2e stand wrote them with the panel
-// stopped (2026-10-12), with the lines of two other things that use the same
-// words: a level-2 refusal of the journal milter and OpenDKIM not answering.
+// The lines of process 1183 and of cleanup are as the e2e stand wrote them
+// with the panel stopped and for a refused From: (2026-10-12; the stamps are
+// put in ISO form). Around them are the lines of two other things that use
+// the same words - a level-2 refusal of the journal milter, OpenDKIM not
+// answering - and, composed from Postfix's source rather than seen, a check
+// that stops answering in the middle of a message.
 func TestDeferredCounter(t *testing.T) {
 	st := &deferredStore{}
 	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
@@ -41,6 +44,12 @@ func TestDeferredCounter(t *testing.T) {
 		`2026-10-12T16:23:30.000000+00:00 mail postfix/smtpd[1183]: connect from unknown[10.77.0.1]`,
 		`2026-10-12T16:23:30.100000+00:00 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
 
+		// A client that writes the socket's name where Postfix will quote it
+		// in a warning, and then runs into a level-2 refusal: not counted.
+		`2026-10-12T16:23:40.000000+00:00 mail postfix/smtpd[1190]: connect from unknown[10.77.0.1]`,
+		`2026-10-12T16:23:40.100000+00:00 mail postfix/smtpd[1190]: warning: Illegal address syntax from unknown[10.77.0.1] in MAIL command: <warning: connect to Milter service unix:/run/selfpost/sender.sock: milter>`,
+		`2026-10-12T16:23:40.200000+00:00 mail postfix/smtpd[1190]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
+
 		// OpenDKIM does not answer: another socket, not counted.
 		`2026-10-12T16:24:00.000000+00:00 mail postfix/smtpd[1201]: connect from unknown[10.77.0.1]`,
 		`2026-10-12T16:24:00.100000+00:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/opendkim/opendkim.sock: Connection refused`,
@@ -49,7 +58,8 @@ func TestDeferredCounter(t *testing.T) {
 		// The check stops answering in the middle of a message, the next day.
 		`2026-10-13T00:00:05.000000+00:00 mail postfix/smtpd[1300]: connect from unknown[10.77.0.1]`,
 		`2026-10-13T00:00:21.000000+00:00 mail postfix/smtpd[1300]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_EOH reply packet header: Connection timed out`,
-		`2026-10-13T00:00:21.100000+00:00 mail postfix/smtpd[1300]: 4XcB7k2Jm9z1: milter-reject: END-OF-HEADER from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> to=<b@sink.e2e.test> proto=ESMTP helo=<x>`,
+		`2026-10-13T00:00:21.050000+00:00 mail postfix/smtpd[1300]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_BODYEOB reply packet header: Connection timed out`,
+		`2026-10-13T00:00:21.100000+00:00 mail postfix/cleanup[1195]: 4XcB7k2Jm9z1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> to=<b@sink.e2e.test> proto=ESMTP helo=<x>`,
 
 		// The check's own verdict is a refusal, not a deferral, and it is
 		// cleanup that writes it.

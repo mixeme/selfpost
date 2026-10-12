@@ -233,8 +233,10 @@ server itself.
   bound to the login, or `@domain` is. So an application set to any address of
   its domain may write any address of that domain, and one with a list only
   the listed ones; everything else is refused - another registered domain,
-  the server's name, a domain the server knows nothing of. One source for
-  both senders: the two cannot disagree.
+  the server's name, a domain the server knows nothing of. One table for
+  both senders. Where the lookups differ the check is the stricter one:
+  Postfix also tries an address without its `+extension` and compares logins
+  without regard to case.
 - **How the header is read.** Exactly one `From:` field (none, or more than
   one, is refused), parsed as an address list that must hold exactly one
   address. Then a cruder second look at the raw value: OpenDKIM finds the
@@ -242,7 +244,13 @@ server itself.
   differently - a display name, a comment, a quoted string - the other
   address would have to be spelled out in it. So no `@name` may appear there
   that is another name the server signs for; those names are read from
-  OpenDKIM's own `SigningTable`.
+  OpenDKIM's own `SigningTable`; the display name is looked at once more
+  as decoded, since a mail program shows `=?utf-8?q?director=40example.org?=`
+  as an address though no `@` is written in it. And, needing no knowledge of
+  that parser:
+  outside quoted strings the line has exactly one `@`. A folded line is
+  unfolded first, and a display name in a charset Go does not convert is
+  passed through unread - only the address is judged.
 - **The verdict** comes at the end of the headers: `550 5.7.1`, permanent,
   naming the line, as a reply code of the milter's own. What the client wrote
   is reduced to printable ASCII and cut before it is said back, logged or
@@ -257,7 +265,9 @@ server itself.
   table from before would let a deleted application go on sending. The
   send-log row of a refusal (`status=rejected`, `reason=from`,
   `header_from`) is handed to another goroutine through a buffer and is not
-  waited for.
+  waited for. It is one row for the message, naming the first recipient and
+  how many more there were: a row per recipient would let one refused message
+  write a thousand.
 - **What it costs is counted.** The role marks itself alive every two
   seconds (the socket's path with `.alive`, under `/run`, so a new container
   starts without one). At start the time since the mark is the check's

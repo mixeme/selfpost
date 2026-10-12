@@ -30,20 +30,23 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 	}
 	log.Printf("sender-check listening on %s", cfg.senderSocket)
 
-	// Statistics are the database's business and the check is not: none of
-	// this may keep the check from serving.
-	now := time.Now()
-	mark := cfg.senderSocket + ".alive"
-	if err := st.StartSenderCheckStats(now); err != nil {
-		log.Printf("sender-check: statistics: %v", err)
-	}
-	if down := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
-		log.Printf("sender-check: was not answering for %s while Postfix was running", down.Round(time.Second))
-		if err := st.AddSenderCheckDown(now, down); err != nil {
+	// Statistics are the database's business and supervisord's, and the check
+	// is neither: they are kept beside it, and nothing of them is waited for
+	// before it serves.
+	go func() {
+		now := time.Now()
+		mark := cfg.senderSocket + ".alive"
+		if err := st.StartSenderCheckStats(now); err != nil {
 			log.Printf("sender-check: statistics: %v", err)
 		}
-	}
-	go keepAlive(ctx, mark, st)
+		if down := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
+			log.Printf("sender-check: was not answering for %s while Postfix was running", down.Round(time.Second))
+			if err := st.AddSenderCheckDown(now, down); err != nil {
+				log.Printf("sender-check: statistics: %v", err)
+			}
+		}
+		keepAlive(ctx, mark, st)
+	}()
 
 	// The two tables the mail path itself goes by: whom Postfix lets send as
 	// what, and what OpenDKIM signs.
@@ -80,6 +83,8 @@ func senderCheckDowntime(path string, now time.Time, postfixStarted func() (time
 func postfixStarted() (time.Time, bool) {
 	procs, err := health.Processes()
 	if err != nil {
+		// Said aloud: the downtime of this start is then not counted.
+		log.Printf("sender-check: statistics: when Postfix started is not known: %v", err)
 		return time.Time{}, false
 	}
 	for _, p := range procs {

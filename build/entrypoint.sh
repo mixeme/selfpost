@@ -142,8 +142,8 @@ chmod 2750 /data/log
 find /data/log -type f -exec chmod 0640 {} +
 
 # Milter socket directories. Postfix (user `postfix`) must actually CONNECT to
-# both milter sockets — OpenDKIM's and the panel's journal-milter — not just
-# probe them at start-up. The sockets are created by the opendkim and panel
+# the milter sockets — OpenDKIM's and the panel's — not just probe them at
+# start-up. The sockets are created by the opendkim and panel
 # users respectively, so bridge them to `postfix` through the shared `selfpost`
 # group: group-owned + setgid dirs mean each socket created inside inherits
 # group `selfpost`, and group-traversable (2750) lets postfix reach it. Without
@@ -153,6 +153,11 @@ mkdir -p /run/opendkim /run/selfpost
 chown opendkim:selfpost /run/opendkim
 chown panel:selfpost /run/selfpost
 chmod 2750 /run/opendkim /run/selfpost
+# A container that was killed leaves its sockets behind, and a file nobody
+# listens on would satisfy postfix-wrapper.sh's wait: Postfix would start
+# before the sender check does and defer mail until it is there. The check's
+# alive mark stays - it is how the downtime of a restart is told.
+rm -f /run/opendkim/*.sock /run/selfpost/*.sock
 
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the

@@ -40,6 +40,9 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		{"own address", wildcard, "alerts@" + senderDomain, true},
 		{"another address of the domain, with a name", wildcard, `"The Shop" <orders@` + senderDomain + `>`, true},
 		{"the listed address", list, "billing@" + senderDomain, true},
+		// What a mail library does with a long display name: the line is
+		// folded, and Postfix hands the milter both of its lines.
+		{"a long name, folded onto a second line", wildcard, "\"The Shop, its orders and its returns desk\"\r\n <orders@" + senderDomain + ">", true},
 
 		{"another registered domain", wildcard, "director@" + otherDomain, false},
 		{"the server's own name", wildcard, "postmaster@" + selfpostHostname, false},

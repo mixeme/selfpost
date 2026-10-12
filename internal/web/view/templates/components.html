@@ -93,7 +93,9 @@
      `column is-6` stacks of numbered boxes that are read in rows, the odd ones
      on the left and the even ones on the right, each stack closed up so that a
      short box leaves no gap beside a tall one. On a phone the stacks dissolve
-     and the boxes come in the order of their numbers (panel.css). */}}
+     and the boxes come in the order of their numbers (panel.css) - which
+     knows four boxes to a stack and takes every child of a stack for a box:
+     a fifth, or a flash put between them, needs the rules extended first. */}}
 {{define "cards_open"}}<div class="columns sp-cards">{{end}}
 {{define "cards_close"}}</div>{{end}}
 

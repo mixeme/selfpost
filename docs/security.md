@@ -202,8 +202,14 @@ operator can act on it.
   signer. It reads the header as one field holding one address and then
   looks at the raw value once more for any other name of OpenDKIM's
   `SigningTable`, so that a line its parser and OpenDKIM's could read
-  differently is refused rather than argued about. What the client wrote
-  reaches the reply, the log and the send log only as printable ASCII, cut.
+  differently is refused rather than argued about; outside quoted strings
+  the line may hold one `@`. What this does not promise is what a display
+  name looks like to a person: a name of another sender written without an
+  `@` the scan can find (a full-width dot, a space inside the name) passes,
+  signed with the application's own key - a forged display name is as old
+  as mail, and no key of another's is involved. What the client wrote
+  reaches the reply, the log and the send log only as printable ASCII, cut,
+  and a refused message is one row of the log whatever its recipient count.
   Mail the panel submits itself does not pass the check: only root,
   `postfix` and the panel can submit locally. Architecture § Sender check.
 - **Inbound relay (optional, `INBOUND_RELAY_ENABLE`)** — port 25 is not an
@@ -459,8 +465,9 @@ deferred item from the roadmap.
   the rules arrive at.
 - **The sender check stops mail while the panel does not answer.** It is a
   role of the panel process, attached with `default_action=tempfail`, so a
-  panel that is down or slower than the milter timeouts (15 s a command)
-  defers every submission: availability of sending now depends on the panel,
+  panel that is down or slower than the milter timeouts (15 s to connect
+  and for a command, 30 s for the verdict at the end of the headers) defers
+  every submission: availability of sending now depends on the panel,
   which it did not before `2.4.0`. Chosen by the owner over the alternative,
   a check that is absent whenever the panel is - that one could be switched
   off by whoever can make the panel slow. Supervisord restarts the panel at

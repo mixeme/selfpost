@@ -97,6 +97,11 @@ func TestSenderCheck(t *testing.T) {
 		{"header name in another case", "shop", [][2]string{{"FROM", "a@shop.example.org"}}, true, ""},
 		{"its own name inside the display name", "shop", [][2]string{from(`"shop@shop.example.org" <a@shop.example.org>`)}, true, ""},
 		{"an encoded display name", "shop", [][2]string{from("=?utf-8?b?0JzQsNCz0LDQt9C40L0=?= <a@shop.example.org>")}, true, ""},
+		{"a folded line", "shop", [][2]string{from("\"A very long display name of the shop\"\r\n <a@shop.example.org>")}, true, ""},
+		{"an encoded name, folded", "shop", [][2]string{from("=?utf-8?b?0JzQsNCz0LDQt9C40L0=?=\n\t<a@shop.example.org>")}, true, ""},
+		{"a name in windows-1251", "shop", [][2]string{from("=?windows-1251?B?zODj4Ofo7Q==?= <a@shop.example.org>")}, true, ""},
+		{"a name in koi8-r, quoted-printable", "shop", [][2]string{from("=?koi8-r?Q?=ED=C1=C7=C1=DA=C9=CE?= <a@shop.example.org>")}, true, ""},
+		{"a comment after the address", "shop", [][2]string{from("a@shop.example.org (the shop)")}, true, ""},
 
 		{"another registered domain", "shop", [][2]string{from("director@example.org")}, false, "not an address this application sends as"},
 		{"the server's own name", "shop", [][2]string{from("postmaster@mail.example.org")}, false, "not an address this application sends as"},
@@ -112,6 +117,10 @@ func TestSenderCheck(t *testing.T) {
 		{"the server's name in a comment", "shop", [][2]string{from("a@shop.example.org (postmaster@mail.example.org)")}, false, "names another sender of this server"},
 		{"a domain with a key and no application, in the display name", "shop", [][2]string{from(`"x@empty.example.com" <a@shop.example.org>`)}, false, "names another sender of this server"},
 		{"a stranger's address in the display name", "shop", [][2]string{from(`"someone@gmail.example" <a@shop.example.org>`)}, true, ""},
+		{"another sender in an encoded display name", "shop", [][2]string{from("=?utf-8?q?director=40example=2Eorg?= <a@shop.example.org>")}, false, "names another sender of this server"},
+		{"a stranger's address in a comment", "shop", [][2]string{from("a@shop.example.org (someone@gmail.example)")}, false, "one @"},
+		{"another sender folded onto the next line", "shop", [][2]string{from("\"x\"\r\n <director@example.org>")}, false, "not an address this application sends as"},
+		{"a quote left open before another address", "shop", [][2]string{from(`"a@shop.example.org <director@example.org>`)}, false, "one address"},
 		{"no login", "", [][2]string{from("a@shop.example.org")}, false, "no authenticated application"},
 		{"an unknown login", "ghost", [][2]string{from("a@shop.example.org")}, false, "not an address this application sends as"},
 	}
@@ -222,5 +231,26 @@ func TestSenderCheckResetsBetweenMessages(t *testing.T) {
 		if passed := resp == milter.RespContinue; passed != (i == 1) {
 			t.Fatalf("message %d (From: %s): passed=%v", i, v, passed)
 		}
+	}
+}
+
+// A refused message is one row of the log however many recipients it had.
+func TestSenderCheckRefusalIsOneRow(t *testing.T) {
+	bind := NewBindings(writeMaps(t, senderMaps))
+	refused := make(chan store.SendLogEntry, 8)
+	s := &senderSession{bind: bind, signers: signers(t), refused: refused}
+	_, _ = s.MailFrom("shop@shop.example.org", mods(map[string]string{"{auth_authen}": "shop"}))
+	for _, r := range []string{"a@x.example", "b@x.example", "c@x.example"} {
+		_, _ = s.RcptTo(r, mods(nil))
+	}
+	_, _ = s.Header("From", "director@example.org", mods(nil))
+	_, _ = s.Headers(nil, mods(nil))
+	close(refused)
+	var rows []store.SendLogEntry
+	for e := range refused {
+		rows = append(rows, e)
+	}
+	if len(rows) != 1 || rows[0].To != "a@x.example and 2 more" {
+		t.Fatalf("rows = %+v", rows)
 	}
 }

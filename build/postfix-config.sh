@@ -93,8 +93,9 @@ fi
 RATE_MSGS="${RATE_LIMIT_MESSAGES_PER_IP:-100}"
 RATE_WINDOW="${RATE_LIMIT_WINDOW_SECONDS:-3600}"
 
-# Milter sockets: OpenDKIM (signing, strict) and the panel journal-milter
-# (monitoring, fail-open). Fixed container paths, matched by postfix-wrapper.sh.
+# Milter sockets: OpenDKIM (signing, strict), the panel's sender check
+# (strict) and its journal-milter (monitoring, fail-open). Fixed container
+# paths, matched by postfix-wrapper.sh.
 OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
 JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
 # The panel's sender check (the From: line against the login, strict).

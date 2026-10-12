@@ -9,8 +9,9 @@
 # timeout it exits non-zero WITHOUT starting Postfix, so supervisord/Docker see
 # an explicit startup failure instead of a relay running blind.
 #
-# This handles cold start only. Runtime milter failures after a successful start
-# are governed by fail-open (milter_default_action).
+# This handles cold start only. Once Postfix runs, a milter that does not
+# answer costs what its default_action says (build/postfix-config.sh): mail is
+# deferred for OpenDKIM and the sender check, and passes the journal-milter.
 set -eu
 
 OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
