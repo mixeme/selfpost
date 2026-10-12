@@ -53,7 +53,11 @@ type session struct {
 	// valid zero value (no in-flight accounting).
 	flight *inflight
 
-	clientIP string // captured once per connection
+	// clientIP is the client's address. Postfix gives it at Connect, once per
+	// connection, and again with every MAIL FROM as the {client_addr} macro
+	// (milter_mail_macros in build/postfix-config.sh). The second is the one
+	// that can be relied on: see MailFrom.
+	clientIP string
 
 	login    string
 	from     string
@@ -62,9 +66,8 @@ type session struct {
 	reserved []*reservation // level-2 slots held by the current message
 }
 
-// Connect captures the client IP, which comes from the addr parameter rather
-// than a macro (the {client_addr} macro was empty in testing). It is the
-// rate-limit key; here it is recorded for completeness.
+// Connect captures the client IP of a connection's first message. It is not
+// enough on its own - see MailFrom.
 func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milter.Modifier) (milter.Response, error) {
 	if addr != nil {
 		s.clientIP = addr.String()
@@ -79,8 +82,21 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 // limit is enforced here: over the limit, the message is refused with a 4xx
 // tempfail before recipients are even offered (guide § Rate limiting).
 // Enforcement is fail-open — see overLimit.
+//
+// The client address is read again here, from the {client_addr} macro. The
+// milter library replaces the session with a new one after every reply that is
+// not "continue" - a refusal, or the accept that used to end a message - and
+// Postfix does not send Connect again on the same connection. A session made
+// that way never saw the client, so every message of a connection after the
+// first, and every MAIL FROM after a refused one, used to be judged with no
+// client address: the level-2 limit and an application's client-address list
+// both let it through. (Found on 2026-10-12; test/e2e sends two MAIL FROM on
+// one connection.)
 func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.releaseReservations() // a previous transaction that ended without EOM/ABORT
+	if ip := clientAddr(m); ip != "" {
+		s.clientIP = ip
+	}
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
 	s.rcpts = nil
@@ -113,13 +129,15 @@ func (s *session) Header(name, value string, m *milter.Modifier) (milter.Respons
 
 // Body fires at end-of-message, when the queue-id macro {i} is set and the
 // message is about to be committed to the queue. This is where the "queued"
-// rows are written. We accept (this milter is done) without ever rejecting.
+// rows are written. The reply is "continue", which at end-of-message lets the
+// message through just as "accept" does - and, unlike it, leaves this session
+// in place for the connection's next message (see MailFrom).
 func (s *session) Body(m *milter.Modifier) (milter.Response, error) {
 	s.record(macro(m, "i"))
 	// The rows are in the send log now, so the stored count sees this message
 	// and its level-2 slots are no longer needed.
 	s.releaseReservations()
-	return milter.RespAccept, nil
+	return milter.RespContinue, nil
 }
 
 // Abort ends the current transaction without an end-of-message (client RSET, or
@@ -141,6 +159,21 @@ func macro(m *milter.Modifier, name string) string {
 		return v
 	}
 	return m.Macros["{"+name+"}"]
+}
+
+// clientAddr is the client's address from the {client_addr} macro, or "" when
+// Postfix did not send one that reads as an address. An IPv6 address may come
+// in Sendmail's form, with "IPv6:" in front.
+func clientAddr(m *milter.Modifier) string {
+	raw := strings.TrimSpace(macro(m, "client_addr"))
+	if len(raw) > 5 && strings.EqualFold(raw[:5], "IPv6:") {
+		raw = raw[5:]
+	}
+	ip := net.ParseIP(raw)
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
 }
 
 // record writes one send-log row per recipient. Failures are logged, never

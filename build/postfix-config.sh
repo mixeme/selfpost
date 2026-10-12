@@ -230,6 +230,14 @@ postconf -e \
 	"smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
 	"non_smtpd_milters="
 
+# What Postfix tells a milter with MAIL FROM: its defaults plus the client's
+# address. The panel's milters judge every message by that address (an
+# application's client-address list) and record it (the inbound journal), and
+# the address given once at connect is not there for a connection's later
+# messages - see MailFrom in internal/milter/milter.go.
+postconf -e \
+	"milter_mail_macros=i {auth_type} {auth_authen} {auth_author} {mail_addr} {mail_host} {mail_mailer} {client_addr}"
+
 # Bounded milter timeouts: a *hung* milter (socket accepts but never replies)
 # must fail open just like a crash, not stall mail acceptance until the Postfix
 # defaults (300s content) elapse. With default_action per milter, a
@@ -364,7 +372,14 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	# panel's inbound journal milter, or nothing at all.
 	INBOUND_MILTERS=""
 	if [ "${INBOUND_RELAY_ENABLE}" = "true" ] && [ -n "${INBOUND_ANTISPAM_MILTER}" ]; then
+		# A glob's "*" matches anything, so the shape alone would pass
+		# "inet:a:1},{unix:/elsewhere": characters outside the set are refused
+		# first, then the shape is checked.
 		case "${INBOUND_ANTISPAM_MILTER}" in
+			*[!A-Za-z0-9._:/-]*)
+				echo "FATAL: INBOUND_ANTISPAM_MILTER must be inet:host:port or unix:/path, got: ${INBOUND_ANTISPAM_MILTER}" >&2
+				exit 1
+				;;
 			inet:[A-Za-z0-9._-]*:[0-9]* | unix:/[A-Za-z0-9._/-]* ) ;;
 			*)
 				echo "FATAL: INBOUND_ANTISPAM_MILTER must be inet:host:port or unix:/path, got: ${INBOUND_ANTISPAM_MILTER}" >&2
@@ -388,6 +403,10 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		# it is down. A comma, not a space, between the two - see
 		# master_cf_set_smtp_inet_o.
 		case "${INBOUND_JOURNAL_SOCK}" in
+			*[!A-Za-z0-9._/-]*)
+				echo "FATAL: INBOUND_JOURNAL_MILTER_SOCKET must be an absolute path, got: ${INBOUND_JOURNAL_SOCK}" >&2
+				exit 1
+				;;
 			/[A-Za-z0-9._/-]*) ;;
 			*)
 				echo "FATAL: INBOUND_JOURNAL_MILTER_SOCKET must be an absolute path, got: ${INBOUND_JOURNAL_SOCK}" >&2

@@ -166,8 +166,10 @@ func TestBodyAcceptsEvenWhenRecorderFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Body returned error, must fail open: %v", err)
 	}
-	if resp != milter.RespAccept {
-		t.Fatalf("Body response = %v, want Accept", resp)
+	// "Continue" at end-of-message lets the message through, and keeps the
+	// session for the connection's next message.
+	if resp != milter.RespContinue {
+		t.Fatalf("Body response = %v, want Continue", resp)
 	}
 }
 
@@ -389,21 +391,77 @@ func TestRateLimitFailsOpenOnCountError(t *testing.T) {
 	}
 }
 
-func TestRateLimitNoIPKeyDoesNotApply(t *testing.T) {
+// A ceiling is on a domain or an application, not on an address: a message that
+// arrives with no client address is counted like any other. It used to be let
+// through, which is how the second MAIL FROM of a connection got past a limit.
+func TestRateLimitAppliesWithoutAClientIP(t *testing.T) {
 	rec := &fakeRecorder{
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
 		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 999},
 	}
-	// A session with no client IP (e.g. local submission) cannot be keyed.
 	s := &session{rec: rec}
 	resp, err := s.MailFrom("a@example.com", mods(map[string]string{"auth_authen": "app1"}))
 	if err != nil {
 		t.Fatalf("MailFrom: %v", err)
 	}
-	if resp != milter.RespContinue {
-		t.Fatalf("no-IP session = %v, want Continue", resp)
+	if resp != milter.RespTempFail {
+		t.Fatalf("over the limit with no client IP = %v, want TempFail", resp)
+	}
+}
+
+// The milter library hands the milter a fresh session after every reply that
+// is not "continue", and Postfix sends Connect once per connection. Such a
+// session knows the client only from the {client_addr} macro of MAIL FROM, and
+// that has to be enough for an application's client-address list.
+func TestAuthIPRestrictHoldsForASessionThatNeverSawConnect(t *testing.T) {
+	rec := &fakeRecorder{apps: map[string]store.Application{
+		"app1": {Login: "app1", AuthIPRestrict: true, AuthAllowedIPs: []string{"198.51.100.1"}},
+	}}
+	for name, c := range map[string]struct {
+		macros map[string]string
+		want   milter.Response
+	}{
+		"an unlisted address in the macro": {map[string]string{"auth_authen": "app1", "{client_addr}": limitIP}, milter.RespTempFail},
+		"the listed address in the macro":  {map[string]string{"auth_authen": "app1", "{client_addr}": "198.51.100.1"}, milter.RespContinue},
+		// No address at all is not a pass: a list an unknown address satisfies is no list.
+		"no client address": {map[string]string{"auth_authen": "app1"}, milter.RespTempFail},
+		"not an address":    {map[string]string{"auth_authen": "app1", "{client_addr}": "unknown"}, milter.RespTempFail},
+	} {
+		s := &session{rec: rec} // no Connect
+		resp, err := s.MailFrom("a@example.com", mods(c.macros))
+		if err != nil || resp != c.want {
+			t.Errorf("%s: %v, %v; want %v", name, resp, err, c.want)
+		}
+	}
+	// An application with no list is not held up by a missing address.
+	open := &fakeRecorder{apps: map[string]store.Application{"app1": {Login: "app1"}}}
+	s := &session{rec: open}
+	if resp, _ := s.MailFrom("a@example.com", mods(map[string]string{"auth_authen": "app1"})); resp != milter.RespContinue {
+		t.Errorf("no list, no address: %v, want Continue", resp)
+	}
+}
+
+// The macro wins over what Connect said, and reads both spellings of IPv6.
+func TestClientAddrFromTheMailMacro(t *testing.T) {
+	for raw, want := range map[string]string{
+		"203.0.113.7": "203.0.113.7", "2001:db8::1": "2001:db8::1", "IPv6:2001:DB8::1": "2001:db8::1",
+		"ipv6:::1": "::1", "": "", "unknown": "", "IPv6:": "",
+	} {
+		if got := clientAddr(mods(map[string]string{"{client_addr}": raw})); got != want {
+			t.Errorf("clientAddr(%q) = %q, want %q", raw, got, want)
+		}
+	}
+	s := &session{rec: &fakeRecorder{}}
+	_, _ = s.Connect("h", "tcp4", 0, net.ParseIP("192.0.2.1"), mods(nil))
+	_, _ = s.MailFrom("a@example.com", mods(map[string]string{"client_addr": "192.0.2.2"}))
+	if s.clientIP != "192.0.2.2" {
+		t.Errorf("clientIP = %q, want the macro's", s.clientIP)
+	}
+	_, _ = s.MailFrom("a@example.com", mods(nil))
+	if s.clientIP != "192.0.2.2" {
+		t.Errorf("clientIP = %q after a MAIL FROM with no macro, want it kept", s.clientIP)
 	}
 }
 

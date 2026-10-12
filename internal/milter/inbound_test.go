@@ -77,8 +77,8 @@ func TestInboundRecordsAcceptedMessage(t *testing.T) {
 	resp := message(t, s, "<sender@example.net> SIZE=1200",
 		[]string{"<a@in.example.com>", "b@IN.example.com"},
 		[][2]string{{"Subject", "=?utf-8?Q?Sch=C3=B6n?="}})
-	if resp != milter.RespAccept {
-		t.Errorf("end-of-message response = %v, want accept", resp)
+	if resp != milter.RespContinue {
+		t.Errorf("end-of-message response = %v, want continue", resp)
 	}
 	if len(rec.rows) != 2 {
 		t.Fatalf("rows = %+v, want one per recipient", rec.rows)
@@ -217,8 +217,8 @@ func TestInboundAcceptsWhenTheStoreFails(t *testing.T) {
 		"lookup": {lookupErr: errors.New("boom")},
 	} {
 		s := inboundSessionFor(t, rec, false)
-		if resp := message(t, s, "sender@example.net", []string{"a@in.example.com"}, nil); resp != milter.RespAccept {
-			t.Errorf("%s failure: response = %v, want accept", name, resp)
+		if resp := message(t, s, "sender@example.net", []string{"a@in.example.com"}, nil); resp != milter.RespContinue {
+			t.Errorf("%s failure: response = %v, want continue", name, resp)
 		}
 	}
 }
@@ -233,4 +233,47 @@ func TestRspamdVerdictKeepsTheListSymbols(t *testing.T) {
 	if detail != want {
 		t.Errorf("detail = %q\nwant     %q", detail, want)
 	}
+}
+
+// The client address of a connection's later messages comes from the MAIL
+// macro: a session the library made after a non-continue reply saw no Connect.
+func TestInboundClientAddressFromTheMailMacro(t *testing.T) {
+	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s := &inboundSession{rec: rec} // no Connect
+	if _, err := s.MailFrom("sender@example.net", mods(map[string]string{"{client_addr}": "IPv6:2001:db8::7"})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RcptTo("a@in.example.com", mods(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Body(mods(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.rows) != 1 || rec.rows[0].ClientIP != "2001:db8::7" {
+		t.Errorf("rows = %+v", rec.rows)
+	}
+}
+
+// No callback of the inbound milter answers anything but "continue": it must
+// never be the reason a message is held up, and a non-continue reply would
+// cost it its session.
+func TestInboundOnlyEverContinues(t *testing.T) {
+	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s := &inboundSession{rec: rec, filter: true}
+	check := func(stage string, resp milter.Response, err error) {
+		t.Helper()
+		if err != nil || resp != milter.RespContinue {
+			t.Errorf("%s: %v, %v", stage, resp, err)
+		}
+	}
+	resp, err := s.Connect("mx", "tcp4", 0, net.ParseIP("203.0.113.7"), mods(nil))
+	check("connect", resp, err)
+	resp, err = s.MailFrom("a@example.net", mods(nil))
+	check("mail", resp, err)
+	resp, err = s.RcptTo("a@in.example.com", mods(nil))
+	check("rcpt", resp, err)
+	resp, err = s.Header("X-Rspamd-Action", "reject", mods(nil))
+	check("header", resp, err)
+	resp, err = s.Body(mods(nil))
+	check("end of message", resp, err)
 }

@@ -27,8 +27,8 @@ type InboundStore interface {
 // of a message that reached end-of-message - that is, one the filter did not
 // refuse; refusals never get this far and are read from mail.log instead.
 //
-// Like the send-log milter it only watches: every callback continues or
-// accepts, and Postfix attaches the socket with default_action=accept, so
+// Like the send-log milter it only watches: every callback continues, and
+// Postfix attaches the socket with default_action=accept, so
 // neither an error here nor the panel being down holds up inbound mail.
 type inboundSession struct {
 	milter.NoOpMilter
@@ -38,7 +38,10 @@ type inboundSession struct {
 	// by the sender, and are not read.
 	filter bool
 
-	clientIP string // once per connection
+	// clientIP is taken at Connect and again from {client_addr} with every
+	// MAIL FROM: a session the library made after a non-continue reply never
+	// sees Connect (see session.MailFrom in milter.go).
+	clientIP string
 
 	from    string
 	rcpts   []string
@@ -58,6 +61,9 @@ func (s *inboundSession) Connect(host, family string, port uint16, addr net.IP, 
 // MailFrom starts a message: a connection may carry several.
 func (s *inboundSession) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.reset()
+	if ip := clientAddr(m); ip != "" {
+		s.clientIP = ip
+	}
 	s.from = cleanAddress(from)
 	return milter.RespContinue, nil
 }
@@ -90,11 +96,12 @@ func (s *inboundSession) Header(name, value string, m *milter.Modifier) (milter.
 }
 
 // Body fires at end-of-message: the message is about to be queued for its
-// upstream.
+// upstream. "Continue" lets it through as "accept" would, and keeps this
+// session for the connection's next message.
 func (s *inboundSession) Body(m *milter.Modifier) (milter.Response, error) {
 	s.record()
 	s.reset()
-	return milter.RespAccept, nil
+	return milter.RespContinue, nil
 }
 
 func (s *inboundSession) Abort(m *milter.Modifier) error {

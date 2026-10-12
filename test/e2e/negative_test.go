@@ -52,6 +52,17 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 			second.dialErr, second.authErr, second.rcptErr, second.dataErr)
 	}
 
+	// The limit holds for every message of a connection, not for its first
+	// only. The milter library hands the milter a fresh session after any reply
+	// that is not "continue" - the refusal above is one - and Postfix does not
+	// introduce the client again, so a second MAIL FROM on the same connection
+	// used to arrive with no client address and was let through (found by the
+	// technical review of 2026-10-12; the same hole let an application past its
+	// client-address list).
+	if errs := mailTwiceOnOneConnection(login, password, from); errs[0] == nil || errs[1] == nil {
+		t.Fatalf("over the level-2 limit, two MAIL FROM on one connection were answered %v and %v, want both refused", errs[0], errs[1])
+	}
+
 	if err := waitFor("a rejected row for l2app in the send log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
 		rows, err := sc.panel.sendLogRows(senderDomain, login)
 		if err != nil {

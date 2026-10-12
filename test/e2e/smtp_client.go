@@ -140,3 +140,35 @@ func buildMessage(a sendAttempt) string {
 		a.from, a.to, a.subject, time.Now().UTC().Format(time.RFC1123Z), a.body,
 	)
 }
+
+// mailTwiceOnOneConnection authenticates once and sends MAIL FROM twice on the
+// same connection, with a RSET between, and returns how each was answered. No
+// message is sent: this is about what the server says to the second
+// transaction of a connection whose first was refused.
+func mailTwiceOnOneConnection(login, password, from string) [2]error {
+	var out [2]error
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", smtpsAddr, &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         selfpostHostname,
+	})
+	if err != nil {
+		return [2]error{nil, nil}
+	}
+	c, err := smtp.NewClient(conn, selfpostHostname)
+	if err != nil {
+		_ = conn.Close()
+		return [2]error{nil, nil}
+	}
+	defer c.Close()
+	if err := c.Hello("e2e-client.e2e.test"); err != nil {
+		return [2]error{nil, nil}
+	}
+	if err := c.Auth(smtp.PlainAuth("", login, password, selfpostHostname)); err != nil {
+		return [2]error{nil, nil}
+	}
+	out[0] = c.Mail(from)
+	_ = c.Reset()
+	out[1] = c.Mail(from)
+	_ = c.Quit()
+	return out
+}

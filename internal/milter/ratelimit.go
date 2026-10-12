@@ -26,10 +26,9 @@ import (
 // reaches the send log (or is abandoned) — see inflight for why the stored
 // count alone is not enough.
 func (s *session) overLimit() bool {
-	if s.clientIP == "" {
-		return false // no client IP to key on; level-2 does not apply
-	}
-
+	// A ceiling is on a domain or an application, whatever address the mail
+	// comes from, so the client address is not asked for here. It used to be,
+	// and a message that arrived without one was let through uncounted.
 	if s.login != "" {
 		rl, ok, err := s.rec.RateLimit(store.RateLimitScopeApp, s.login)
 		if err != nil {
