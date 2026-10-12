@@ -5,6 +5,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-12
+
+### Security
+
+- **An application signs only as itself.** OpenDKIM chooses the key by the
+  `From:` header, and Postfix held only the envelope sender against the
+  login: an application of one sending domain could write another registered
+  domain, or the server's own name, into `From:` and have the message signed
+  with that name's key (security review of `2.3.0`, where it was recorded as
+  an accepted risk). The panel now holds the header to what the envelope is
+  held to - any address of the application's domain, or the addresses of its
+  list, with or without a `+extension` - and refuses anything else with
+  `550 5.7.1`, a domain this server does not sign for included
+  ([plans/from-header-binding.md](docs/plans/from-header-binding.md)).
+- **The check is strict.** It is the first milter of the chain, on a socket
+  of its own (`SENDER_CHECK_SOCKET`), attached with
+  `default_action=tempfail`: while the panel does not answer, Postfix defers
+  mail and accepts nothing unchecked. The journal milter keeps its socket and
+  stays fail-open.
+
+### Added
+
+- **Server › Health counts what the strict check costs** in a card of its
+  own, *Sender check*: for how long the panel did not answer while Postfix
+  was running, and how many submissions Postfix turned away because of it -
+  today, in the last 30 days and in the last 12 months (UTC days, kept a
+  year). The card warns when mail was deferred in the last 24 hours. The
+  numbers are there to decide whether the check needs a process of its own.
+- **A refused row of the Outbound log says why**, in its tag: `wrong From`,
+  `wrong client` (the application's client IP list) or `rate-limited`; a row
+  refused before this version says `rejected`. A message refused for its
+  `From:` line shows on its page what the line said and what the application
+  may send as. Help has a *Sender check* topic.
+- Migration `0006_sender_check.sql` (DDL only): `send_log.reason`,
+  `send_log.header_from`, `sender_check_days`.
+
+### Changed
+
+- **Mail with a `From:` the application is not bound to is refused.** What
+  stops working on upgrade: an application sending with the `From:` of
+  another of your domains (give that domain an application); an application
+  with a list whose envelope and `From:` addresses differ (add the second to
+  the list); a form that puts its visitor's address into `From:` (use
+  `Reply-To:`). The line is read strictly: one `From:` field, one address,
+  one `@` outside a quoted display name; a name with a comma or brackets has
+  to be quoted. Guide § Who an application may send as.
+- **With the panel down, mail is deferred, not accepted.** Until now a
+  stopped panel cost the send log and the level-2 limits and nothing else.
+- **Server › Health is laid out as two stacks of boxes numbered by
+  importance**, read left to right and top to bottom, each stack closed up:
+  Processes, Milter sockets, Sender check, TLS certificate, Hostname and
+  reverse DNS, Notification mail, Machine, Configuration. On a phone they
+  come in that order.
+- A refused message is one row of the log, naming its first recipient and
+  how many more there were.
+- `recipient_delimiter` is set to `+` by the image instead of being left to
+  the distribution's default; the start removes milter sockets a killed
+  container left behind.
+
 ## [2.3.0] - 2026-10-12
 
 ### Added

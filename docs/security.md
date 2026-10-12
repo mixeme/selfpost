@@ -476,6 +476,14 @@ deferred item from the roadmap.
   downtime and the mail deferred for it. Trigger to revisit: those numbers
   not staying at nothing - then the check moves into a process of its own
   ([plans/from-header-binding.md](plans/from-header-binding.md)).
+- **A malformed packet on a milter socket of the panel ends the panel.** The
+  milter library indexes into an empty packet and nobody recovers the panic,
+  so the process exits and supervisord starts it again. The sockets are
+  reachable only inside the container, by the group Postfix is in (mode
+  0660); the journal milter always had this, and since `2.4.0` the seconds
+  of the restart defer mail instead of passing it unjournalled (technical
+  review, 2026-10-12). Trigger to revisit: anything untrusted able to open
+  a Unix socket in the container.
 - **When the hostname is itself a sending domain,** the server's mail is
   signed with that domain's key. Whoever may export the domain has the key,
   and its applications may send as `postmaster@<hostname>` by right. The

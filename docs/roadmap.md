@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
-| from-header-binding | Hold a message's `From:` header against the application that sends it | built and reviewed, for `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
+| from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
@@ -47,7 +47,8 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
 **inbound-antispam-panel** as `2.1.0` (2026-10-12), built in the new component
 kit — styling its two screens once instead of twice. **delivery-log-storage**
-shipped as `2.2.0` the same day, and **panel-notifications** as `2.3.0`.
+shipped as `2.2.0` the same day, **panel-notifications** as `2.3.0` and
+**from-header-binding** as `2.4.0`.
 Nothing is agreed after it: every remaining
 item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
@@ -440,8 +441,9 @@ since 2.3.0, the server's own name - into `From:` and have the message signed
 with that name's key: mail that passes DMARC as a domain the application has
 no right to, or that looks like a notification of the panel.
 
-**Agreed with the owner on 2026-10-12** and taken into work
-([plans/from-header-binding.md](plans/from-header-binding.md)). The rule he
+**Agreed with the owner on 2026-10-12**, built and reviewed the same day
+([plans/from-header-binding.md](plans/from-header-binding.md); what is not
+done is listed there under *Not done*). The rule he
 chose is wider than the one first written here: `From:` is held to exactly
 what the envelope is held to - any address of the application's domain, or
 the addresses of its list - and anything else is refused, a stranger's domain
@@ -454,8 +456,9 @@ needs a process of its own.
 tenant's `From:`, for the hostname's and for an address off its list, and
 accepted for its own.
 
-**Version:** `2.4.0` MINOR; in progress. Until it ships:
-[security.md](security.md) § Accepted risks.
+**Version:** shipped `2.4.0` (2026-10-12), MINOR. What it costs - the
+panel's downtime is now mail's - is in [security.md](security.md) § Accepted
+risks.
 
 ---
 

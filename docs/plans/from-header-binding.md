@@ -1,6 +1,6 @@
 # Plan: from-header-binding
 
-**Status:** agreed 2026-10-12 - the design questions were closed with the owner one at a time and he took it into work  
+**Status:** shipped in `2.4.0` (2026-10-12); agreed the same day - the design questions were closed with the owner one at a time and he took it into work ("Да")  
 **Date:** 2026-10-12  
 **Version:** `2.4.0` MINOR (one migration; it refuses mail that was accepted before).
 
@@ -148,3 +148,87 @@ the fourth was not.
 - [x] `go vet`, `go test`, e2e: refused for another domain's `From:`, for the hostname's and for an address off the list; accepted for its own (on the test server: vet ok, 23 packages ok, e2e ok - `sender_check_holds_the_from_line`, `panel_down_defers_mail`)
 - [x] Technical review — **Opus** (2026-10-12; one Critical, fixed: a folded `From:` line - what a mail library makes of a long display name - was refused for good. Also fixed: a display name in a charset Go does not convert was refused; the statistics ran before the check served, and a hung `supervisorctl` would have kept it from serving; the count of deferred mail missed a check that stops answering in the middle of a message, and is now taken at Postfix's warning; a card whose figures could not be read said ok; a killed container's stale socket satisfied the wrapper's wait; outside quoted strings the line may now hold one `@` only. Three were first left as found and fixed the same evening at the owner's question: downtime is cut at the UTC midnights it crossed; the row of a message with the null envelope sender takes the domain the login is bound to; a log read again after an unclean stop does not count again what it counted before)
 - [x] Security review — **Fable** (2026-10-12; no Critical or High. The same folded line, as its one Medium. Fixed: another sender's name in an encoded display name passed the second look; a client could arm the deferred counter by writing the socket's name where Postfix quotes it in a warning; a refused message wrote a row per recipient, a thousand at most - now one. Recorded: what a display name looks like to a person is not promised. The review also found the check stricter than Postfix for an address with an extension (`invoices+x@`, allowed in the envelope and refused in the header); the owner asked for it to work, and the check now makes Postfix's second try, with `recipient_delimiter` set explicitly. Confirmed from the code: no path to the signer around the check, and every failure of the check defers)
+
+## Not done
+
+Written at the owner's word when he had the version cut ("Запиши все
+недоделки в план", 2026-10-12). Nothing here was promised and dropped in
+silence; each line says what is missing and what it would take.
+
+### Decided to wait
+
+- **A process of its own for the check.** The owner: measure first. Server ›
+  Health now has the numbers; the decision is his when they have had time to
+  say something. Moving the role out is a change of where it is started -
+  a subcommand of the panel binary and a `[program:]` in supervisord - and
+  the downtime figure then needs a new meaning.
+
+### Shown to the owner one way and built another
+
+- **The Delivery log box is on a refused message's page.** The picture he
+  approved had left it out; the built page keeps it, with one sentence. And
+  the sentence is less than the truth for a `From:` refusal: cleanup did
+  write a line about it under a queue id (`milter-reject: END-OF-MESSAGE …
+  5.7.1 From: …`), but the check answers before the queue id reaches it, so
+  the row keeps none and the page cannot show that line. To do: either drop
+  the box for a refused row, or have the tailer attach the line to the row.
+- **The Outbound log has no status filter.** The mockup draws one; the built
+  log filters by domain and application. With three kinds of refusal now
+  told apart by tag, a filter by status and reason would be worth having.
+- **"Messages deferred" counts connections Postfix turned away.** Postfix
+  refuses from the connection on, before a message is offered, so a monitor
+  that only connects during an outage is counted. The guide says so; the
+  card's column head and the help topic still say "messages".
+
+### Known and small
+
+- **"Today" on the card is the UTC day**, and the card does not say so.
+- **A deferral in the very second of the last one counted before an unclean
+  stop is passed over** at the restart: `mail.log` stamps whole seconds.
+  Chosen over counting a stretch of the log twice.
+- **Deferrals are lost when `mail.log` is rotated while the panel is down**:
+  the tailer starts on the new file.
+- **A start at which `supervisorctl` fails counts no downtime**; it is
+  logged.
+- **Logins are compared as written**, Postfix compares them without regard
+  to case. The panel writes logins one way, so nothing differs today.
+- **The phone order of the `cards` layout is written for four boxes to a
+  stack** and takes every child of a stack for a box (said at the partial).
+  The rule the technical review suggested instead - the order from the
+  box's own number - changes the component and would be drawn first.
+- **Health's socket check looks at the file, not at who listens**: a socket
+  nobody answers on would read "ok". The start now removes stale sockets,
+  which was the one way to get such a file.
+- **The kit page's table of status tags does not list the new ones**
+  (`wrong From`, `wrong client`, `rate-limited`), and `rate-limited` is grey
+  beside two red tags - as the mockup has it, not as a decision.
+- **Refusal rows still in the buffer when the panel stops are not written**;
+  the refusals themselves were answered.
+
+### Accepted, in security.md
+
+- **The panel's downtime is mail's.** The price of the strict check.
+- **What a display name looks like to a person is not promised.** A name of
+  another sender written without an `@` the scan can find passes, signed
+  with the application's own key.
+- **A malformed packet on the check's socket ends the panel** (the milter
+  library panics on an empty one). The socket is reachable only inside the
+  container, by the group Postfix is in; the journal milter always had this,
+  and what is new is that the price is deferred mail.
+
+### Not verified
+
+- **OpenDKIM's reading of a `From:` line** was reasoned about, not run: its
+  parser is not in this repository. The two rules that do not depend on it -
+  no other signing name after any `@`, one `@` outside quotes - are what the
+  claim rests on. A test that feeds the stand's OpenDKIM the lines the check
+  passes and reads which key it signs with would settle it.
+- **The pages were not looked at in a browser on the deployed panel**: I
+  cannot sign in there. They were rendered from the fixtures and
+  screenshotted, the polling and the phone order read from the code and
+  exercised by e2e only as far as the Health numbers.
+- **No refusal has been seen on the test server itself**, only on the e2e
+  stand: there is no application there I can send as.
+- **A check that stops answering in the middle of a message** is counted
+  from a warning composed from Postfix's source; the stand only produced the
+  case of nobody listening.
