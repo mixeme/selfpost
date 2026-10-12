@@ -127,6 +127,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 14 | DMARC ingest drops and bounds, full backup from the panel, no queue in a backup | `2.0.1` (PATCH) |
 | 15 | inbound-antispam-panel | `2.1.0` (was `1.10.0`, reordered 2026-10-09) |
 | 16 | delivery-log-storage | `2.2.0` |
+| 17 | panel-notifications | `2.3.0` |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.

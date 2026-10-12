@@ -1,6 +1,6 @@
 # Plan: panel-notifications
 
-**Status:** candidate - the design questions are closed with the owner (2026-10-12); taking it into work still needs his word  
+**Status:** agreed 2026-10-12 - the design questions were closed with the owner and he took it into work ("Делаем")  
 **Date:** 2026-10-12  
 **Version:** `2.3.0` MINOR (one migration; opt-out by a switch).
 
@@ -92,7 +92,7 @@ Server › Settings, the SPF check on Server › Health - is the first step, sho
 to the owner before any code ([panel-redesign.md](panel-redesign.md)
 § Enforcement).
 
-## Implementation checklist (draft; counted from the day the item is agreed)
+## Implementation checklist
 
 - [ ] Mockups: Account checkbox, Settings switch, Health SPF check, help topic; accepted by the owner (`design:` commit)
 - [ ] Migration and store: user flag, instance switch, event state
