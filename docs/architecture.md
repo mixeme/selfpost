@@ -156,9 +156,17 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
 Per-domain keys under `/data/opendkim/keys`; `KeyTable` / `SigningTable` maintained
 by the panel. Socket `/run/opendkim/opendkim.sock`.
 
+The server's own name (`SELFPOST_HOSTNAME`) has a key and a line in both
+tables too, without being a row of the registry
+(`domain.Service.SetServerName`): the panel's notifications are sent as
+`postmaster@` that name and signed with it. No application can send as it -
+the sender map is built from the registry. A sending domain of the same name
+shares its key and selector with the server, and deleting that domain leaves
+the key in place.
+
 ### Panel binary ([cmd/panel](../cmd/panel))
 
-One process, four roles:
+One process, five roles (six with the inbound relay on):
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
    proxy only. On start it runs `postconf -h` once for the deferred-mail retry
@@ -188,8 +196,51 @@ One process, four roles:
    page (§ Log tailer, *Stored lines*).
 4. **rate-limit recalc** — every six hours (and on demand from Domain settings and
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
+5. **notifier** — writes to the panel's users when something needs them
+   (§ Notifications below).
 
 Milter chain in Postfix: OpenDKIM (tempfail) then journal (accept on failure).
+Mail submitted locally with `sendmail(1)` — the notifier's — passes OpenDKIM
+alone (`non_smtpd_milters`): it is signed, and it is not an application's
+mail to be journalled or limited. Bounces Postfix generates pass no milter.
+
+### Notifications
+
+[internal/notify](../internal/notify/notify.go) reports four things to the
+users of the panel: a sending domain's DNS record that stopped matching, a
+level-2 rate limit that refused mail, the TLS certificate about to expire, a
+message more than three days in the queue. The rules of when a message goes
+out are the owner's and are written in
+[plans/panel-notifications.md](plans/panel-notifications.md) § When a message
+is sent; the operator's view is guide § Notifications.
+
+- **Readings.** Once an hour, starting three minutes after the process does:
+  every sending domain's records through a DNS checker of the notifier's own,
+  forced past the cache (`cmd/panel/notifier.go` builds the same query a
+  domain's page does); the certificate file; `postqueue -j` for the arrival
+  time of each queued message. Once a minute: the send log's `rejected` rows
+  of the last day, per domain and application.
+- **State** is a row per subject in `notify_state` (`dns:<domain>`, `cert`,
+  `queue`, `limit:<domain>:<login>`), which is what makes each thing be said
+  once and a restart say nothing again. A DNS subject goes *pending* on the
+  first bad check and *open*, with a message, on the second; back the same
+  way. The certificate's row remembers which threshold was said for which
+  expiry. A deleted domain's row goes with it.
+- **No information is not a finding.** A lookup that did not answer, a queue
+  that cannot be listed, a certificate that cannot be read move no state.
+- **Recipients** come from the store at the moment of sending: global users
+  for everything, domain users for subjects that are a domain's; only users
+  with an e-mail and their own switch on. One message per recipient, so users
+  do not see each other's addresses.
+- **The instance switch** (settings key `notifications`, on unless turned
+  off) stops the checks themselves, not only the mail: no state moves while
+  it is off.
+- **Sending** is `sendmail -i -f postmaster@<hostname> -- <address>` as the
+  unprivileged panel user, which is a member of `postdrop` and so can write
+  the maildrop directory without the setgid bit `no-new-privileges` forbids.
+  A message that could not be handed over leaves the state where it was and
+  is tried at the next check. The text names the page to open and has no
+  link: the panel does not know its own address.
 
 ### Log tailer and `mail.log` rotation
 

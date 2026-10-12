@@ -111,9 +111,9 @@ to the owner before any code ([panel-redesign.md](panel-redesign.md)
 - [x] Migration and store: user flag, instance switch, event state
 - [x] Sending: local submission from `postmaster@<hostname>`, message text (`sendmail` as the panel user; signed through `non_smtpd_milters` with a key of the server's own name; no link in the text - the panel does not know its own address)
 - [x] Background checker: DNS, certificate, queue; the rules of *When a message is sent*
-- [x] Level-2 refusal event (from the `rejected` rows of the send log, looked at every five minutes)
+- [x] Level-2 refusal event (from the `rejected` rows of the send log, looked at every minute)
 - [ ] Panel: Account, Settings, Health check, help
-- [ ] guide.md, architecture.md, security.md, schema-migrations.md
+- [x] guide.md, architecture.md, security.md, schema-migrations.md
 - [ ] `go vet`, `go test`, e2e: an event reaches a mailbox once and clears once
 - [ ] Technical review
 - [ ] Security review

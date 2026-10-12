@@ -76,7 +76,9 @@ RUN groupadd --system --gid 998 selfpost \
 # with `no-new-privileges`, which disables setgid transitions, so the panel
 # would always see "Permission denied". Making `panel` a real member of postdrop
 # grants the same access without relying on a setgid escalation the hardening
-# deliberately forbids. postdrop membership is read-side only: it does not let
+# deliberately forbids. The same membership is what lets the panel submit its
+# own notifications with sendmail(1) - postdrop, too, is setgid and would fail
+# to write the maildrop directory (internal/notify/mailer.go). It does not let
 # the panel bypass any Postfix restriction that a local user does not already
 # have through the world-executable sendmail.
 RUN usermod -aG postdrop panel

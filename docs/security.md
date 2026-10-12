@@ -412,6 +412,21 @@ deferred item from the roadmap.
   diagnostics. Since 2.2.0 the tailer copies the lines of queued outbound
   messages into the database for the message's page, and those are in a
   backup (§ Backup and domain export); mail offered on port 25 is not copied.
+- **The panel submits mail of its own.** Notifications leave through
+  `sendmail(1)` run by the unprivileged panel user: a fixed argument list, the
+  two addresses after `--`, no shell. The recipient is a panel user's account
+  e-mail, validated when it was saved and checked again before it reaches a
+  header or the command line; the subject and body are composed by the panel
+  from its own readings. Two of those readings can carry text from outside - a
+  DNS check's finding, and a queued message's sender address - and both are
+  reduced to printable ASCII and cut before they are printed, so a
+  notification's body can contain an address a stranger chose, as a few plain
+  characters and nothing else. The panel's
+  membership in `postdrop`, described in the image as read-side, is now what
+  lets it submit; any local user could already do that through the
+  world-executable `sendmail`. Notifications are signed with a key of the
+  server's own name and bypass the level-1 and level-2 limits: they are a few
+  messages a day at most, to addresses only a panel user can set.
 - **A message's page can show another message's log lines after a queue-id
   collision.** Postfix's short queue ids repeat: the id is the microsecond of
   arrival and the queue file's inode, and inodes come round within seconds.

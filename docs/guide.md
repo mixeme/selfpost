@@ -33,6 +33,7 @@ changed (see the CHANGELOG, *Removed*).
   - [Queue and System log](#queue-and-system-log)
   - [Account](#account)
   - [Settings](#settings)
+  - [Notifications](#notifications)
   - [Users](#users)
   - [Sessions](#sessions)
   - [Upgrading](#upgrading)
@@ -419,10 +420,11 @@ readings:
 **Account** (`/account`, every role) is the signed-in user's own: **Profile**
 (username and e-mail) and **Password**. Saving the profile does not ask for the
 password; changing the password asks for the current one and is rate-limited
-like a sign-in. The e-mail is the user's own address. Nothing is sent to it
-yet; it is what a domain's *Use my e-mail* button fills in (see [Domain-level
-DNS](#domain-level-dns-spf-dkim-dmarc)). Application SASL logins are separate
-and are not changed here.
+like a sign-in. The e-mail is the user's own address: it is where the panel
+sends [notifications](#notifications) while *Send me notifications* is ticked
+beside it, and what a domain's *Use my e-mail* button fills in (see
+[Domain-level DNS](#domain-level-dns-spf-dkim-dmarc)). Application SASL logins
+are separate and are not changed here.
 
 ### Settings
 
@@ -431,7 +433,53 @@ the whole instance: how many days the **Outbound log** keeps its rows before the
 background sweep deletes them (7–365 days; takes effect on the next six-hour
 prune cycle without a container restart), and, read-only, the level-1 rate
 limit that comes from `.env` ([Rate limiting — level 1](#rate-limiting--level-1-ip-backstop)).
-There is no panel-wide DMARC report address: each domain has its own.
+There is no panel-wide DMARC report address: each domain has its own. The page
+also has the switch for [notifications](#notifications) and the two DNS records
+that make them arrive.
+
+### Notifications
+
+The panel writes to its users when something needs them. Four things are
+reported, each once:
+
+| What | When a message is sent | A second message |
+|---|---|---|
+| A sending domain's DKIM, SPF or DMARC record stops matching | after two hourly checks in a row found it wrong. A resolver that did not answer is not a mismatch; a missing DMARC record is advice on the domain's page, not a notification | when two checks in a row find the records right again |
+| A level-2 rate limit refuses mail | within a minute of the first refusal | at most once a day for the same domain and application, while it goes on |
+| The TLS certificate is about to expire | 14 days before | 3 days before, if it is still the same certificate |
+| A message has waited in the queue for more than three days | at the next hourly check | when no message that old is left |
+
+A user with the **global** role is told all of it; a user with the **domain**
+role is told about the DNS records and rate limits of the outbound domains
+assigned to them. A message goes to the e-mail on the user's
+[Account](#account) page and only while *Send me notifications* is ticked
+there; a user without an e-mail gets none. **Server › Settings** has one switch
+that turns notifications off for everyone. With it off nothing is checked, so
+what is wrong when it is turned on again is reported then.
+
+Notifications are the panel's own mail. They are sent from
+`postmaster@<SELFPOST_HOSTNAME>`, one message per recipient, are not rows of
+the Outbound log and count against no rate limit. They name the page of the
+panel to open and carry no link: the panel does not know the address its
+reverse proxy serves it under.
+
+**Two DNS records make them arrive.** The server's own name is not one of your
+sending domains, so it needs records of its own, shown with the values to
+publish under **Server › Settings › Notification mail**:
+
+- a **DKIM** key for the hostname, which the panel generates and signs
+  notifications with (`<selector>._domainkey.<hostname>`, TXT);
+- an **SPF** record for the hostname: `v=spf1 a -all` (TXT).
+
+**Server › Health** shows whether each is in place in the *Notification mail*
+card. Without them notifications are still sent, and a receiver may file them
+as spam or, if the parent domain publishes a strict DMARC policy, refuse them.
+Mail of your sending domains depends on neither. If the hostname is itself one
+of your sending domains, the records are that domain's and are already
+published.
+
+A relay that cannot send cannot say so: none of the four is "the relay is
+down". Watch that from outside ([Container health](#container-health)).
 
 ### Users
 

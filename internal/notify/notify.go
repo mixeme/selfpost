@@ -29,8 +29,9 @@ const (
 	// at. A var-free constant: the rules below count in checks.
 	CheckInterval = time.Hour
 	// LimitInterval is how often refused mail is looked for. A refusal is
-	// reported at once rather than on the hour: it is mail not being sent now.
-	LimitInterval = 5 * time.Minute
+	// reported within the minute rather than on the hour: it is mail not being
+	// sent now. The look is one indexed query.
+	LimitInterval = time.Minute
 
 	// dnsChecks is how many checks in a row must agree before a DNS mismatch is
 	// reported, and before it is reported gone. One check is a resolver's bad

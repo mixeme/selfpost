@@ -35,6 +35,24 @@ func compose(hostname, subject string, paragraphs ...string) message {
 
 func stamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") }
 
+// plain makes text that came from outside fit for a message body: a queued
+// message's sender is whatever its sender wrote, and a DNS finding may quote a
+// name. What is not printable ASCII becomes "?", and it is cut to max bytes -
+// a notification is read by a person, and nothing in it is theirs to act on
+// but the panel's own words.
+func plain(s string, max int) string {
+	if len(s) > max {
+		s = s[:max]
+	}
+	b := []byte(s)
+	for i, c := range b {
+		if c < 0x20 || c > 0x7e {
+			b[i] = '?'
+		}
+	}
+	return string(b)
+}
+
 // days words a duration in whole days, the unit these messages count in.
 func days(d time.Duration) string {
 	n := int(d.Hours() / 24)
@@ -49,7 +67,7 @@ func dnsProblem(hostname, domain string, faults []dnsFault, since time.Time) mes
 	lines := make([]string, len(faults))
 	for i, f := range faults {
 		names[i] = f.Record
-		lines[i] = f.Record + ": " + f.Detail
+		lines[i] = f.Record + ": " + plain(f.Detail, 600)
 	}
 	return compose(hostname,
 		fmt.Sprintf("%s: %s no longer matches", domain, strings.Join(names, ", ")),
@@ -91,7 +109,7 @@ func queueStuck(hostname string, old []postfix.QueuedMessage, now time.Time) mes
 		if sender == "" {
 			sender = "(bounce)"
 		}
-		fmt.Fprintf(&b, "%s  from %s  waiting %s, since %s\n", m.ID, sender, days(now.Sub(m.Arrival)), stamp(m.Arrival))
+		fmt.Fprintf(&b, "%s  from %s  waiting %s, since %s\n", plain(m.ID, 24), plain(sender, 120), days(now.Sub(m.Arrival)), stamp(m.Arrival))
 	}
 	what := "A message has"
 	if len(old) > 1 {
