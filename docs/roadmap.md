@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
-| from-header-binding | Hold a message's `From:` header against the application that sends it | candidate | — | — |
+| from-header-binding | Hold a message's `From:` header against the application that sends it | in progress, for `2.4.0` | 1/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
@@ -440,26 +440,21 @@ since 2.3.0, the server's own name - into `From:` and have the message signed
 with that name's key: mail that passes DMARC as a domain the application has
 no right to, or that looks like a notification of the panel.
 
-**Goal:** a message whose `From:` names a domain this server signs for is
-accepted only from an application of that domain.
-
-**Boundary:** the journal milter reads `From:` (and `Sender:`) and refuses at
-end-of-headers when the header's domain is a signing name other than the
-login's own. Mail whose `From:` is a domain this server does not sign for is
-not touched - it goes out unsigned today and would after. The journal milter
-is fail-open, so with it down the hole is as it is now; whether that is
-enough or the check belongs somewhere stricter is part of the item.
+**Agreed with the owner on 2026-10-12** and taken into work
+([plans/from-header-binding.md](plans/from-header-binding.md)). The rule he
+chose is wider than the one first written here: `From:` is held to exactly
+what the envelope is held to - any address of the application's domain, or
+the addresses of its list - and anything else is refused, a stranger's domain
+included. The check is a role of the panel on a strict socket of its own:
+while the panel does not answer, mail is deferred, not accepted unchecked.
+Server › Health counts what that costs, to decide later whether the check
+needs a process of its own.
 
 **Done when:** the e2e stand shows an application refused for another
-tenant's `From:` and for the hostname's, and accepted for its own.
+tenant's `From:`, for the hostname's and for an address off its list, and
+accepted for its own.
 
-**Dependencies / risks:** it refuses mail - an application that today sends
-with a `From:` of another of the operator's domains stops working until it
-is given an application of that domain; parsing `From:` differently from
-OpenDKIM would leave a gap, so the check has to be the cruder one (does the
-header mention `@<signing name>`).
-
-**Version:** `2.x` MINOR; `candidate`. Until then:
+**Version:** `2.4.0` MINOR; in progress. Until it ships:
 [security.md](security.md) § Accepted risks.
 
 ---
