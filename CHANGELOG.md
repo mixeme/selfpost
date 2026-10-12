@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Schema: `send_log_lines`** (migration `0003_send_log_lines.sql`, DDL only).
+  The table that will hold what Postfix wrote about a message for as long as
+  its send-log row lives, with the store methods to write a line, to write it
+  once, to read the lines of a row and to prune
+  ([plans/delivery-log-storage.md](docs/plans/delivery-log-storage.md)). Nothing
+  writes or reads it yet.
+
 ## [2.1.0] - 2026-10-12
 
 ### Security
