@@ -868,8 +868,11 @@ recompute. The key is `data/antispam/filter.key`: SelfPost creates it on its
 first start with the inbound relay on, and the sidecar reads it from the
 directory it already mounts - there is nothing to configure. If Inbound › Log
 shows *selfpost* for mail the filter did judge, the sidecar is running without
-this file or started before the key existed: copy `antispam/rspamd/` again and
-restart the sidecar.
+this file: copy `antispam/rspamd/` again and restart the sidecar. Nothing of
+rspamd's needs clearing, then or after a change of the lists or of the key: it
+rereads the list files by itself and reads the key anew for every message. A
+restart is needed only for a change of its own configuration - the files of
+`antispam/rspamd/`.
 
 The same directory holds
 [multimap.conf](../deploy/antispam/rspamd/multimap.conf), the rules for the

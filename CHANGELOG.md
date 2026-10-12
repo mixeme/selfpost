@@ -96,8 +96,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   key SelfPost creates in `data/antispam/filter.key` - and the inbound log
   shows a verdict only next to a signature that fits. Nothing to configure,
   but the sidecar needs the new `antispam/rspamd/milter_headers.conf` and a
-  restart after SelfPost's first start; until then accepted mail is logged
-  as *selfpost*, with no verdict.
+  restart to read it; until then accepted mail is logged as *selfpost*, with
+  no verdict.
 - A full backup carries the inbound log, the filter lists and their files
   under `data/antispam/`. It does not carry the `antispam/` directory with the
   compose fragment and the rspamd configuration - copy that from
