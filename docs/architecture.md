@@ -184,6 +184,8 @@ One process, four roles:
 3. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
+   It also keeps the lines Postfix writes under a queue id, for the message's
+   page (§ Log tailer, *Stored lines*).
 4. **rate-limit recalc** — every six hours (and on demand from Domain settings and
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
 
@@ -234,15 +236,52 @@ leaves every row untouched rather than closing them all. Now that the log
 survives the container, reaching this path means the lines are gone for good —
 rotated past fourteen files while the panel was down, or deleted.
 
+**Stored lines** (`send_log_lines`, since 2.2.0;
+[internal/logtail/lines.go](../internal/logtail/lines.go)). A send-log row
+lives for the retention window, ninety days by default, and `mail.log` for a
+day before it is rotated; a message's page (`/outbound/log/{id}`) shows what
+Postfix wrote about it, so the tailer keeps those lines in the database as it
+reads them:
+
+- **What is kept:** every line headed by a queue id — after the timestamp, the
+  host name and `program[pid]:` — with that id, the line's own time and the
+  line as written, cut to 4096 bytes. The id is read from the head of the line
+  only: the tail is the far end's text. `NOQUEUE` and `warning` stand in the
+  same place and are not ids; the pattern accepts Postfix's short form
+  (capital hexadecimal) and its long form (no vowels).
+- **No check for a row at write time.** A message's first lines (`client=`,
+  `message-id=`) are logged before the journal milter writes its row at
+  end-of-message, so the tailer cannot ask whether the id is in the send log.
+  Lines of messages that never get a row — inbound relay mail, bounces Postfix
+  generates — are kept too, for a while.
+- **Retention is one rule:** a line older than an hour whose queue id no
+  send-log row carries is deleted (`PruneSendLogLines`), at start, after every
+  send-log sweep and hourly between. That removes the lines of rows the sweep
+  deleted and the lines that never had a row.
+- **Which lines are a row's.** Postfix reuses a queue id once the message has
+  left the queue, and a row outlives that by months. `SendLogLines` gives a row
+  the lines of its queue id dated from one hour before the row was written to
+  the queue lifetime (the larger of `maximal_queue_lifetime` and
+  `bounce_queue_lifetime`) plus a day after it. A message with several
+  recipients is several rows under one id, and each row's page shows all of
+  the message's lines.
+- **Read twice, stored once.** The read offset is saved every few seconds, so
+  after an unclean stop some lines are read again; while the tailer is
+  catching up at start it writes a line only if the same line is not there.
+- **Size:** six to ten lines of about 200 bytes per message — more than the row
+  itself. The table is in the database and therefore in a full backup, which
+  `log/` is not.
+
 **Two one-shot reads** sit beside the follow loop and are unrelated to it, both
 serving panel pages on request: `TailLines` (the last *n* lines, for
-`/server/log`) and `QueueLines` (the lines carrying one queue-id, for
-`/outbound/log/{id}`). `QueueLines` scans a bounded tail of the current file —
+`/server/log`) and `QueueLines` (the lines carrying one queue-id). `QueueLines`
+is what a message's page falls back to when no lines are stored for its row —
+a message accepted before 2.2.0. It scans a bounded tail of the current file —
 finding a message's lines means reading rather than seeking — and matches the id
 anchored on the character before it, since queue ids are hexadecimal runs and a
-shorter one is regularly the tail of a longer one. Send-log rows outlive the log
-(retention 90 days, rotation 14 files), so an empty result is the expected end
-state for an older message and the page reports it as such, not as a failure.
+shorter one is regularly the tail of a longer one. For such a message an empty
+result is the expected end state once the log has rotated, and the page reports
+it as such, not as a failure.
 
 ---
 
@@ -617,6 +656,7 @@ The tables that carry the panel's model:
   (send-log retention). Nothing that belongs to a user.
 - `applications` (with `auth_ip_restrict` / `auth_allowed_ips`),
   `application_addresses`, `rate_limits` (no `allowed_ips` column), `send_log`,
+  `send_log_lines` (what Postfix logged under a queue id — § Log tailer),
   `logtail_state`, `inbound_domains`, `inbound_transports`,
   `inbound_recipients`, `dmarc_reports`, `dmarc_report_records`.
 
@@ -624,7 +664,8 @@ The panel is the only writer; SQLite runs in WAL mode on one connection (see
 [Panel binary](#panel-binary-cmdpanel)), which is why a full backup snapshots
 with `VACUUM INTO` instead of copying the file.
 
-**Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90);
+**Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90), which
+the stored log lines follow;
 `mail.log` via logrotate (14 rotated files, check every 6h, rename +
 `postfix reload` in `postrotate` — see § Log tailer above).
 

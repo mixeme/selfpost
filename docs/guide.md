@@ -215,7 +215,7 @@ expected to set; defaults match the code exactly.
 | `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
-| `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows — the main driver of `/data` growth over time. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
+| `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. Behind the default Apache host-network setup this is typically the Docker bridge gateway, e.g. `172.18.0.1`. | *(empty — XFF ignored)* | `.env` |
@@ -1144,8 +1144,10 @@ backoff cap, queue lifetime), the same numbers the Outbound queue shows; users
 with the *domain* role see them here because they cannot open the queue. Under
 both sit the `mail.log` lines for its queue id: the connection to the
 receiving server, the server's reply, and the status that reply was filed
-as. Rows outlive `mail.log`, so an older message's lines may have rotated
-away; the page says so. Retention is set under **Server › Settings** (global
+as. The lines are kept in the database with the row, so they stay on the
+page after `mail.log` has rotated and are deleted together with the row; a
+message accepted before `2.2.0` shows them only while they are still in the
+current file, and the page says so when there are none. Retention is set under **Server › Settings** (global
 role); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial default until it
 is changed there.
 
