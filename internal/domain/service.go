@@ -83,6 +83,25 @@ func (s *Service) ServerMail() (ServerMail, error) {
 	return ServerMail{Name: s.serverName, Selector: selector, Record: rec}, nil
 }
 
+// EnsureServerSigned makes sure OpenDKIM's tables have the line for the
+// server's own name, rebuilding them if they do not. The tables are otherwise
+// rebuilt only when a domain is added or deleted, so an installation that was
+// upgraded to a version with notifications would go on sending them unsigned
+// until then. It reports whether it had to rebuild.
+func (s *Service) EnsureServerSigned() (bool, error) {
+	if s.serverName == "" {
+		return false, nil
+	}
+	signed, err := s.odk.signs(s.serverName)
+	if err != nil {
+		return false, err
+	}
+	if signed {
+		return false, nil
+	}
+	return true, s.resync()
+}
+
 // serverSelector is the selector the server's own name is signed with: that of
 // the sending domain of the same name if there is one, the default otherwise.
 func (s *Service) serverSelector() (string, error) {

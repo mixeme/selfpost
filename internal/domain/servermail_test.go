@@ -94,6 +94,43 @@ func TestServerNameThatIsAlsoADomain(t *testing.T) {
 	}
 }
 
+// An installation upgraded to a version that signs the server's own name has
+// tables without its line until something rebuilds them. The start does, once.
+func TestEnsureServerSignedRebuildsOnce(t *testing.T) {
+	svc, odk := newTestService(t, &fakeApps{})
+	if _, err := svc.Add("example.com"); err != nil {
+		t.Fatal(err)
+	}
+	reloads := 0
+	odk.reload = func() error { reloads++; return nil }
+
+	// The tables as the earlier version left them; now the name is known.
+	svc.SetServerName("mail.example.org")
+	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
+		t.Fatalf("first start: rebuilt = %v, %v; want a rebuild", rebuilt, err)
+	}
+	if _, st := readTables(t, odk); !strings.Contains(st, "*@mail.example.org mail.example.org\n") || !strings.Contains(st, "*@example.com ") {
+		t.Errorf("SigningTable after the rebuild:\n%s", st)
+	}
+	if rebuilt, err := svc.EnsureServerSigned(); err != nil || rebuilt {
+		t.Errorf("second start: rebuilt = %v, %v; want nothing to do", rebuilt, err)
+	}
+	if reloads != 1 {
+		t.Errorf("OpenDKIM was reloaded %d times, want once", reloads)
+	}
+
+	// A name that only begins like the server's is not it.
+	other, otherOdk := newTestService(t, &fakeApps{})
+	other.SetServerName("mail.example.org.evil.example")
+	if _, err := other.EnsureServerSigned(); err != nil {
+		t.Fatal(err)
+	}
+	other.SetServerName("mail.example.org")
+	if signed, err := otherOdk.signs("mail.example.org"); err != nil || signed {
+		t.Errorf("a longer name was taken for the server's: %v, %v", signed, err)
+	}
+}
+
 // Without a hostname nothing is added and nothing is signed for it.
 func TestNoServerName(t *testing.T) {
 	svc, odk := newTestService(t, &fakeApps{})

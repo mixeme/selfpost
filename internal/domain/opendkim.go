@@ -163,6 +163,24 @@ func (o *OpenDKIM) Rebuild(domains []SigningDomain) error {
 	return o.reload()
 }
 
+// signs reports whether the SigningTable on disk has a line for name. A table
+// that does not exist yet signs nothing.
+func (o *OpenDKIM) signs(name string) (bool, error) {
+	data, err := os.ReadFile(o.signingTablePath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read SigningTable: %w", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "*@"+name+" ") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // Reload asks OpenDKIM to re-read its tables without regenerating them. It
 // backs the panel's manual reload button (architecture.md § Panel HTTP
 // surface).

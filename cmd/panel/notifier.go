@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
@@ -18,6 +19,15 @@ import (
 func runNotifier(ctx context.Context, cfg config, st *store.Store) error {
 	ms := newMailStack(cfg, st)
 	dns := dnscheck.New(cfg.dnsResolvers)
+
+	// OpenDKIM's tables are rebuilt when a domain is added or deleted. On the
+	// first start of a version that signs the server's own name they do not
+	// have its line yet. A failure here costs the signature, not the message.
+	if rebuilt, err := ms.Domains.EnsureServerSigned(); err != nil {
+		log.Printf("notifier: sign as %s: %v", cfg.hostname, err)
+	} else if rebuilt {
+		log.Printf("notifier: OpenDKIM now signs mail of %s", cfg.hostname)
+	}
 
 	n := notify.New(st, notify.Checks{
 		Domain: func(d store.Domain) (dnscheck.Domain, error) {
