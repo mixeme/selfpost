@@ -130,8 +130,9 @@ func (p RetryPolicy) BackoffCap() string {
 }
 
 // LongestLifetime is how long Postfix may go on working on a message: the
-// larger of the queue lifetime for mail and for the bounces it generates. It
-// bounds which stored log lines can be about a send-log row (store.SendLogLines).
+// larger of the queue lifetime for ordinary mail and for mail from the null
+// sender, which an application may submit too. It bounds which stored log
+// lines can be about a send-log row (store.SendLogLines).
 func (p RetryPolicy) LongestLifetime() time.Duration {
 	if p.BounceQueueLifetime > p.MaximalQueueLifetime {
 		return p.BounceQueueLifetime

@@ -27,44 +27,122 @@ import (
 // "warning:" stand there too. A queue id is hexadecimal in capitals, or, with
 // enable_long_queue_ids, digits and letters without vowels; neither word is
 // either.
-var queueLineRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-F]{6,24}|[0-9B-DF-HJ-NP-TV-Zb-df-hj-np-tv-z]{10,24}): `)
+var queueLineRe = regexp.MustCompile(`^\S+ ([^\s\[]+)\[\d+\]: ([0-9A-F]{6,24}|[0-9B-DF-HJ-NP-TV-Zb-df-hj-np-tv-z]{10,24}): (.*)`)
 
-// lineGrace is how old a line must be before the prune asks whether a send-log
-// row carries its queue id. The first lines of a message are logged when it
-// arrives and its row is written at end-of-message; an hour is a message body
-// sent slowly.
-const lineGrace = time.Hour
+// smtpdProgramRe tells an smtpd from the other programs, whatever listener it
+// serves: "postfix/smtpd", "postfix/submission/smtpd", "postfix/inbound/smtpd".
+var smtpdProgramRe = regexp.MustCompile(`^postfix/(?:[a-z0-9-]+/)?smtpd$`)
 
-// linePruneInterval is how often lines without a row are removed between two
-// send-log sweeps. With the inbound relay on, most of what Postfix logs under
-// a queue id is mail that never gets a send-log row; it is not left to pile up
-// for six hours. A var so tests can shorten it.
-var linePruneInterval = time.Hour
+// port25Program is the smtpd of the inbound relay's listener, which
+// build/postfix-config.sh names so that its lines are told from those of the
+// submission ports.
+const port25Program = "postfix/inbound/smtpd"
 
-// storeLine keeps line if it is headed by a queue id. It does not ask whether
-// a send-log row exists for the id: for a message's first lines none does yet,
-// and the lines of messages that never get one are removed by pruneLines.
+const (
+	// lineGrace is how old a line must be before the prune asks whether a
+	// send-log row carries its queue id. The first lines of a message are
+	// logged when it arrives and its row is written at end-of-message; an hour
+	// is a message body sent slowly.
+	lineGrace = time.Hour
+
+	// lineBatch is how many lines are held before they are written without
+	// waiting for the end of the pass over the log. A pass is a second's worth
+	// of lines while following, and the whole backlog when the tailer starts.
+	lineBatch = 500
+
+	// port25IDs is how many queue ids opened on port 25 are remembered so that
+	// their lines are not kept. Beyond it the oldest knowledge is given up, and
+	// those messages' lines are kept until the prune finds them without a row.
+	port25IDs = 4096
+)
+
+// lineKeeper collects the lines headed by a queue id and writes them in
+// batches. It is used from the follow loop only, so it needs no locking.
+type lineKeeper struct {
+	st StatusStore
+	// buf holds the lines not yet written; once says they were read while
+	// catching up and may have been read before the last stop.
+	buf  []store.SendLogLine
+	once bool
+	// port25 holds the queue ids the port-25 smtpd opened: mail offered by
+	// strangers, which never gets a send-log row. Its lines are not kept - what
+	// a stranger can make Postfix log is not something to store on his say-so
+	// and prune later. An id leaves when qmgr removes the message or when
+	// another listener opens a message under it (Postfix reuses ids).
+	port25 map[string]struct{}
+}
+
+func newLineKeeper(st StatusStore) *lineKeeper {
+	return &lineKeeper{st: st, port25: make(map[string]struct{})}
+}
+
+// add takes one mail.log line and keeps it if it is headed by the queue id of
+// a message that did not come in on port 25. It does not ask whether a
+// send-log row exists for the id: for a message's first lines none does yet,
+// and the lines of messages that never get one - the bounces Postfix
+// generates, port-25 mail met in mid-flight after a restart - are removed by
+// pruneLines.
 //
 // catchingUp is as in inboundJournal.handle: the line may have been read
 // before the last stop, and is then written only if it is not there already.
 // The line is dated by its own stamp - after the panel was down, that and now
 // are hours apart, and a line is matched to its row by time.
-func storeLine(st StatusStore, line string, now time.Time, catchingUp bool) {
+func (k *lineKeeper) add(line string, now time.Time, catchingUp bool) {
 	at, rest := lineTime(line, now)
 	m := queueLineRe.FindStringSubmatch(rest)
 	if m == nil {
 		return
 	}
-	l := store.SendLogLine{QueueID: m[1], At: at, Line: line}
-	var err error
-	if catchingUp {
-		_, err = st.InsertSendLogLineOnce(l)
-	} else {
-		err = st.InsertSendLogLine(l)
+	program, queueID, text := m[1], m[2], m[3]
+
+	if smtpdProgramRe.MatchString(program) && len(text) >= 7 && text[:7] == "client=" {
+		if program == port25Program {
+			k.rememberPort25(queueID)
+		} else {
+			delete(k.port25, queueID)
+		}
 	}
-	if err != nil {
-		log.Printf("log-tailer: keep line of %s: %v", m[1], err)
+	if _, inbound := k.port25[queueID]; inbound {
+		if program == "postfix/qmgr" && text == "removed" {
+			delete(k.port25, queueID)
+		}
+		return
 	}
+
+	if catchingUp != k.once {
+		k.flush()
+		k.once = catchingUp
+	}
+	k.buf = append(k.buf, store.SendLogLine{QueueID: queueID, At: at, Line: line})
+	if len(k.buf) >= lineBatch {
+		k.flush()
+	}
+}
+
+func (k *lineKeeper) rememberPort25(queueID string) {
+	if len(k.port25) >= port25IDs {
+		// Which one goes does not matter: the cost of forgetting an id is its
+		// remaining lines kept until the prune.
+		for id := range k.port25 {
+			delete(k.port25, id)
+			break
+		}
+	}
+	k.port25[queueID] = struct{}{}
+}
+
+// flush writes the lines held. The follow loop calls it after every pass over
+// the log and before it saves its place, so the place saved is never ahead of
+// what was written. Lines that cannot be written are dropped and said so: the
+// tailer goes on, and a page without them falls back to the log file.
+func (k *lineKeeper) flush() {
+	if len(k.buf) == 0 {
+		return
+	}
+	if _, err := k.st.InsertSendLogLines(k.buf, k.once); err != nil {
+		log.Printf("log-tailer: keep %d log lines: %v", len(k.buf), err)
+	}
+	k.buf = k.buf[:0]
 }
 
 // pruneLines removes the stored lines no send-log row carries the queue id of:

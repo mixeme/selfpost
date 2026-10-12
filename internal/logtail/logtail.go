@@ -32,8 +32,7 @@ type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
-	InsertSendLogLine(l store.SendLogLine) error
-	InsertSendLogLineOnce(l store.SendLogLine) (bool, error)
+	InsertSendLogLines(lines []store.SendLogLine, once bool) (int, error)
 	PruneSendLogLines(cutoff time.Time) (int64, error)
 	LogtailState(path string) (store.LogtailState, bool, error)
 	SaveLogtailState(path string, st store.LogtailState) error
@@ -111,8 +110,9 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 // Run follows path and updates send-log statuses until ctx is cancelled, while
 // a background sweep prunes rows older than retention(). Reading resumes at
 // the offset the previous run persisted, so a restart parses the delivery lines
-// written while the panel was down. Every line headed by a queue id is kept
-// for the message's page (lines.go). With inbound set it also writes the
+// written while the panel was down. The lines headed by a queue id are kept
+// for the message's page, except those of mail that came in on port 25
+// (lines.go). With inbound set it also writes the
 // inbound journal's rows for refused mail and prunes that journal
 // (inbound.go). It returns nil on a clean shutdown.
 func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound) error {
@@ -130,7 +130,8 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	caughtUp := make(chan struct{})
 	go reconcileLoop(ctx, st, caughtUp)
 
-	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, func(line string) {
+	keeper := newLineKeeper(st)
+	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, keeper.flush, func(line string) {
 		// Until the first read reaches end-of-file the lines are those written
 		// while the panel was down - and, after an unclean stop, some it had
 		// read already.
@@ -144,7 +145,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		if journal != nil {
 			journal.handle(line, now, catchingUp)
 		}
-		storeLine(st, line, now, catchingUp)
+		keeper.add(line, now, catchingUp)
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return
@@ -225,8 +226,9 @@ func reconcile(st StatusStore, cutoff time.Time) {
 }
 
 // retentionLoop prunes expired send-log rows immediately and then periodically,
-// and after each sweep the stored log lines those rows leave behind. Lines
-// without a row are also removed on a shorter cadence of their own (lines.go).
+// and after each sweep the stored log lines no row carries the queue id of:
+// those the deleted rows leave behind, and those that never had a row
+// (lines.go).
 func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays) {
 	prune := func() {
 		retentionDays := retention()
@@ -248,16 +250,12 @@ func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays)
 	pruneLines(st)
 	t := time.NewTicker(retentionInterval)
 	defer t.Stop()
-	lines := time.NewTicker(linePruneInterval)
-	defer lines.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			prune()
-			pruneLines(st)
-		case <-lines.C:
 			pruneLines(st)
 		}
 	}
@@ -460,7 +458,11 @@ func SplitTimestamp(line string) (stamp, rest string) {
 // caughtUp is closed after the first read that reaches end-of-file, which is
 // the point where every line the panel missed while it was down has been
 // handled.
-func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{}, handle func(string)) error {
+//
+// flush is called at the end of every pass over the file, before the read
+// position is saved: a handler that gathers lines to write them together
+// writes them there, so the saved position is never ahead of what was written.
+func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{}, flush func(), handle func(string)) error {
 	var (
 		f       *os.File
 		r       *bufio.Reader
@@ -510,6 +512,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 	}()
 
 	drain := func() {
+		defer flush()
 		for {
 			line, err := r.ReadString('\n')
 			if err == io.EOF {

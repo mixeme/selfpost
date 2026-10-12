@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"time"
+	"unicode/utf8"
 )
 
 // SendLogLine is one mail.log line Postfix wrote under a queue id, kept so a
@@ -25,44 +26,62 @@ const SendLogLineMax = 4096
 // is accepted, and the message body can take its time after that.
 const sendLogLineBefore = time.Hour
 
+// cutSendLogLine cuts a line to SendLogLineMax bytes, and not through the
+// middle of a character.
 func cutSendLogLine(line string) string {
-	if len(line) > SendLogLineMax {
-		return line[:SendLogLineMax]
+	if len(line) <= SendLogLineMax {
+		return line
 	}
-	return line
+	end := SendLogLineMax
+	for end > 0 && !utf8.RuneStart(line[end]) {
+		end--
+	}
+	return line[:end]
 }
 
-// InsertSendLogLine stores one line. The tailer calls it for every line headed
-// by a queue id, whether or not a send-log row exists for it yet.
-func (s *Store) InsertSendLogLine(l SendLogLine) error {
-	_, err := s.db.Exec(
-		`INSERT INTO send_log_lines (queue_id, logged_at, line) VALUES (?, ?, ?)`,
-		l.QueueID, l.At.UTC().Format(time.RFC3339), cutSendLogLine(l.Line),
-	)
-	if err != nil {
-		return fmt.Errorf("insert send_log_lines: %w", err)
+// InsertSendLogLines stores lines in one transaction and returns how many it
+// wrote. The tailer calls it with what it read in one pass over the log,
+// whether or not send-log rows exist for the queue ids yet: a commit per line
+// would be a disk sync per line, on the one connection the journal milter
+// writes through.
+//
+// With once set, a line is written only if the same line is not there already
+// under its queue id. That is for the lines the tailer reads again after an
+// unclean stop; a line carries its time and its process id, so two that are
+// equal are one line read twice.
+func (s *Store) InsertSendLogLines(lines []SendLogLine, once bool) (int, error) {
+	if len(lines) == 0 {
+		return 0, nil
 	}
-	return nil
-}
-
-// InsertSendLogLineOnce stores a line unless the same one is already there,
-// and reports whether it wrote. It is for the lines the tailer reads again
-// after an unclean stop; a line carries its time and its process id, so two
-// that are equal are one line read twice.
-func (s *Store) InsertSendLogLineOnce(l SendLogLine) (bool, error) {
-	line := cutSendLogLine(l.Line)
-	res, err := s.db.Exec(
-		`INSERT INTO send_log_lines (queue_id, logged_at, line)
-		 SELECT ?, ?, ?
-		 WHERE NOT EXISTS (SELECT 1 FROM send_log_lines WHERE queue_id = ? AND line = ?)`,
-		l.QueueID, l.At.UTC().Format(time.RFC3339), line,
-		l.QueueID, line,
-	)
-	if err != nil {
-		return false, fmt.Errorf("insert send_log_lines once: %w", err)
+	query := `INSERT INTO send_log_lines (queue_id, logged_at, line) VALUES (?1, ?2, ?3)`
+	if once {
+		query = `INSERT INTO send_log_lines (queue_id, logged_at, line)
+			 SELECT ?1, ?2, ?3
+			 WHERE NOT EXISTS (SELECT 1 FROM send_log_lines WHERE queue_id = ?1 AND line = ?3)`
 	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("insert send_log_lines: %w", err)
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return 0, fmt.Errorf("insert send_log_lines: %w", err)
+	}
+	defer stmt.Close()
+	wrote := 0
+	for _, l := range lines {
+		res, err := stmt.Exec(l.QueueID, l.At.UTC().Format(time.RFC3339), cutSendLogLine(l.Line))
+		if err != nil {
+			return 0, fmt.Errorf("insert send_log_lines: %w", err)
+		}
+		n, _ := res.RowsAffected()
+		wrote += int(n)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("insert send_log_lines: %w", err)
+	}
+	return wrote, nil
 }
 
 // SendLogLines returns the stored lines of the message a send-log row is
@@ -110,14 +129,19 @@ func (s *Store) SendLogLines(row SendLogRow, lifetime time.Duration, n int) ([]S
 // PruneSendLogLines deletes the lines dated before cutoff whose queue id has
 // no send-log row, and returns how many went. That one rule is the whole of
 // the table's retention: it removes the lines of rows the send-log sweep has
-// deleted, and the lines of messages that never had a row - inbound relay
-// mail, the bounces Postfix generates. cutoff leaves alone the lines of a
-// message still being received, whose row the journal milter has yet to write.
+// deleted, and the lines of messages that never had a row - the bounces
+// Postfix generates. cutoff leaves alone the lines of a message still being
+// received, whose row the journal milter has yet to write.
+//
+// The send log is asked once per queue id, not once per line: the ids are read
+// off the index, and a message is several lines.
 func (s *Store) PruneSendLogLines(cutoff time.Time) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM send_log_lines
 		 WHERE logged_at < ?
-		   AND NOT EXISTS (SELECT 1 FROM send_log WHERE send_log.queue_id = send_log_lines.queue_id)`,
+		   AND queue_id IN (
+			SELECT q.queue_id FROM (SELECT DISTINCT queue_id FROM send_log_lines) AS q
+			WHERE NOT EXISTS (SELECT 1 FROM send_log WHERE send_log.queue_id = q.queue_id))`,
 		cutoff.UTC().Format(time.RFC3339),
 	)
 	if err != nil {

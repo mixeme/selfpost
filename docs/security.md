@@ -244,6 +244,11 @@ operator can act on it.
   private key from `certs/` when present; a domain export carries the DKIM key
   and **working** application passwords in the clear (otherwise a transfer
   without recreating credentials would be impossible).
+- Since 2.2.0 a full backup also carries, in the database, what Postfix logged
+  about each message still in the send log (`send_log_lines`): the submitting
+  client's address and SASL login, the message id, the receiving server and
+  its reply. `mail.log` itself stays out of a backup; these lines are state
+  the panel shows, kept for the send log's retention and no longer.
 - Both downloads are encrypted with a password unless the box on the form is
   unticked (it is ticked by default):
   scrypt (N=2¹⁵, r=8, p=1) → AES-256-GCM, streamed in 64 KiB chunks, each
@@ -404,7 +409,21 @@ deferred item from the roadmap.
   the file is inaccessible to others. The log holds envelope addresses and
   client IPs, but neither message bodies nor headers; it is excluded from
   backups (`log/` is skipped) so that a dump stays state rather than
-  diagnostics.
+  diagnostics. Since 2.2.0 the tailer copies the lines of queued outbound
+  messages into the database for the message's page, and those are in a
+  backup (§ Backup and domain export); mail offered on port 25 is not copied.
+- **A message's page can show another message's log lines after a queue-id
+  collision.** Postfix's short queue ids repeat: the id is the microsecond of
+  arrival and the queue file's inode, and inodes come round within seconds.
+  The page takes the stored lines of the row's queue id dated within the
+  row's own queue lifetime (about six days), so a second message has to get
+  the same microsecond on the same inode in that span - about one in a
+  million per reuse of the inode, and not something a sender can aim. When it
+  happens, a `domain` user could read the log lines of a message that is not
+  theirs. The search of the current `mail.log` that the page did before
+  2.2.0 had the same exposure over a day. Trigger to revisit: a report of
+  foreign lines on a page, or a reason to turn on `enable_long_queue_ids`,
+  which ends it.
 - **A `domain` user may point an inbound domain's upstream at any host and
   port.** The upstream form checks that the host is a well-formed name or IP
   and the port is 1–65535; loopback, private and link-local addresses are

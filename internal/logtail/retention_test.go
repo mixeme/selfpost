@@ -30,10 +30,8 @@ func (s *retentionProbeStore) DeleteSendLogBefore(cutoff time.Time) (int64, erro
 	return 0, nil
 }
 
-func (s *retentionProbeStore) InsertSendLogLine(store.SendLogLine) error { return nil }
-
-func (s *retentionProbeStore) InsertSendLogLineOnce(store.SendLogLine) (bool, error) {
-	return false, nil
+func (s *retentionProbeStore) InsertSendLogLines([]store.SendLogLine, bool) (int, error) {
+	return 0, nil
 }
 
 func (s *retentionProbeStore) PruneSendLogLines(time.Time) (int64, error) { return 0, nil }

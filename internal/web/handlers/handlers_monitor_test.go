@@ -197,15 +197,13 @@ func TestDeliveryPageShowsStoredLogLinesAfterRotation(t *testing.T) {
 	h, row := serverWithDelivery(t)
 	h.cfg.RetryPolicy = postfix.DefaultRetryPolicy()
 	h.cfg.MailLogPath = writeMailLog(t, "2026-08-04T00:00:01.000000+00:00 host postfix/qmgr[10]: 99999999: removed")
-	for _, l := range []store.SendLogLine{
+	if _, err := h.store.InsertSendLogLines([]store.SendLogLine{
 		{QueueID: row.QueueID, At: row.CreatedAt.AddDate(0, 0, -40), Line: "2026-06-24T05:00:00.000000+00:00 host postfix/qmgr[10]: 4A1B2C3D: an earlier message under the same id"},
 		{QueueID: row.QueueID, At: row.CreatedAt.Add(-time.Second), Line: "2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]"},
 		{QueueID: "99999999", At: row.CreatedAt, Line: "2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)"},
 		{QueueID: row.QueueID, At: row.CreatedAt.Add(11 * time.Second), Line: "2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)"},
-	} {
-		if err := h.store.InsertSendLogLine(l); err != nil {
-			t.Fatalf("InsertSendLogLine: %v", err)
-		}
+	}, false); err != nil {
+		t.Fatalf("InsertSendLogLines: %v", err)
 	}
 
 	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))

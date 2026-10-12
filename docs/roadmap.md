@@ -36,7 +36,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
-| delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | in progress | 6/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
+| delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | in progress | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |

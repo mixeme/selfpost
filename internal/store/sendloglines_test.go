@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func sendLogLineTexts(lines []SendLogLine) []string {
@@ -28,15 +29,13 @@ func countSendLogLines(t *testing.T, s *Store) int {
 func TestSendLogLinesOfOneMessage(t *testing.T) {
 	s := openTestStore(t)
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	for i, l := range []SendLogLine{
+	if n, err := s.InsertSendLogLines([]SendLogLine{
 		{QueueID: "41E862C00D9E", At: at, Line: "client=app"},
 		{QueueID: "5F00AA", At: at, Line: "someone else's"},
 		{QueueID: "41E862C00D9E", At: at.Add(time.Second), Line: "status=sent"},
 		{QueueID: "41E862C00D9E", At: at.Add(2 * time.Second), Line: "removed"},
-	} {
-		if err := s.InsertSendLogLine(l); err != nil {
-			t.Fatalf("insert line %d: %v", i, err)
-		}
+	}, false); err != nil || n != 4 {
+		t.Fatalf("insert: wrote %d, %v", n, err)
 	}
 	row := SendLogRow{QueueID: "41E862C00D9E", CreatedAt: at}
 
@@ -75,15 +74,13 @@ func TestSendLogLinesBoundedByTheRowsLifetime(t *testing.T) {
 	first := time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)
 	second := first.AddDate(0, 0, 30)
 	lifetime := 6 * 24 * time.Hour
-	for _, l := range []SendLogLine{
+	if _, err := s.InsertSendLogLines([]SendLogLine{
 		{QueueID: "ABC123", At: first.Add(-30 * time.Minute), Line: "first: client"},
 		{QueueID: "ABC123", At: first.Add(5 * 24 * time.Hour), Line: "first: expired"},
 		{QueueID: "ABC123", At: second.Add(-2 * time.Hour), Line: "between the two"},
 		{QueueID: "ABC123", At: second, Line: "second: sent"},
-	} {
-		if err := s.InsertSendLogLine(l); err != nil {
-			t.Fatalf("insert: %v", err)
-		}
+	}, false); err != nil {
+		t.Fatalf("insert: %v", err)
 	}
 
 	lines, err := s.SendLogLines(SendLogRow{QueueID: "ABC123", CreatedAt: first}, lifetime, 200)
@@ -103,45 +100,52 @@ func TestSendLogLinesBoundedByTheRowsLifetime(t *testing.T) {
 }
 
 // After an unclean stop the tailer reads some lines twice; the second reading
-// writes nothing. The same text under another queue id is another line.
-func TestInsertSendLogLineOnce(t *testing.T) {
+// writes nothing, also when the line comes twice in one batch. The same text
+// under another queue id is another line. Without once, what is given is
+// written.
+func TestInsertSendLogLinesOnce(t *testing.T) {
 	s := openTestStore(t)
 	l := SendLogLine{QueueID: "ABC123", At: time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC), Line: "Oct 12 09:00:00 mail postfix/qmgr[7]: ABC123: removed"}
-
-	for i, want := range []bool{true, false} {
-		wrote, err := s.InsertSendLogLineOnce(l)
-		if err != nil || wrote != want {
-			t.Errorf("reading %d: wrote = %v, %v; want %v", i+1, wrote, err, want)
-		}
-	}
 	other := l
 	other.QueueID = "DEF456"
-	if wrote, err := s.InsertSendLogLineOnce(other); err != nil || !wrote {
-		t.Errorf("another queue id: wrote = %v, %v", wrote, err)
+
+	if n, err := s.InsertSendLogLines([]SendLogLine{l, l, other}, true); err != nil || n != 2 {
+		t.Errorf("first reading wrote %d, %v; want 2", n, err)
+	}
+	if n, err := s.InsertSendLogLines([]SendLogLine{l, other}, true); err != nil || n != 0 {
+		t.Errorf("second reading wrote %d, %v; want 0", n, err)
 	}
 	if n := countSendLogLines(t, s); n != 2 {
 		t.Errorf("%d lines stored, want 2", n)
 	}
+	if n, err := s.InsertSendLogLines([]SendLogLine{l}, false); err != nil || n != 1 {
+		t.Errorf("a line as it is written: wrote %d, %v; want 1", n, err)
+	}
+	if n, err := s.InsertSendLogLines(nil, true); err != nil || n != 0 {
+		t.Errorf("nothing to write: %d, %v", n, err)
+	}
 }
 
 // The far end writes the reply a delivery line quotes; what is kept of a line
-// has a ceiling, and a line read twice is still recognised past it.
+// has a ceiling, not set through the middle of a character, and a line read
+// twice is still recognised past it.
 func TestSendLogLineIsCut(t *testing.T) {
 	s := openTestStore(t)
 	at := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
-	l := SendLogLine{QueueID: "ABC123", At: at, Line: strings.Repeat("x", SendLogLineMax+500)}
-	if err := s.InsertSendLogLine(l); err != nil {
+	// Two bytes a character, starting at an odd offset: the ceiling falls inside one.
+	l := SendLogLine{QueueID: "ABC123", At: at, Line: "x" + strings.Repeat("é", SendLogLineMax)}
+	if _, err := s.InsertSendLogLines([]SendLogLine{l}, false); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
-	if wrote, err := s.InsertSendLogLineOnce(l); err != nil || wrote {
-		t.Errorf("the same long line again: wrote = %v, %v", wrote, err)
+	if n, err := s.InsertSendLogLines([]SendLogLine{l}, true); err != nil || n != 0 {
+		t.Errorf("the same long line again: wrote %d, %v", n, err)
 	}
 	lines, err := s.SendLogLines(SendLogRow{QueueID: "ABC123", CreatedAt: at}, time.Hour, 10)
 	if err != nil || len(lines) != 1 {
 		t.Fatalf("lines = %d, %v", len(lines), err)
 	}
-	if len(lines[0].Line) != SendLogLineMax {
-		t.Errorf("kept %d bytes, want %d", len(lines[0].Line), SendLogLineMax)
+	if got := lines[0].Line; len(got) != SendLogLineMax-1 || !utf8.ValidString(got) {
+		t.Errorf("kept %d bytes (valid UTF-8: %v), want %d whole characters", len(got), utf8.ValidString(got), SendLogLineMax-1)
 	}
 }
 
@@ -156,14 +160,16 @@ func TestPruneSendLogLines(t *testing.T) {
 	if err := s.InsertQueued(SendLogEntry{QueueID: "KEPT01", Domain: "example.com", To: "a@example.net"}); err != nil {
 		t.Fatalf("insert row: %v", err)
 	}
-	for _, l := range []SendLogLine{
+	// A row the milter refused has no queue id; it keeps no line alive.
+	if err := s.InsertRejected(SendLogEntry{Domain: "example.com", From: "a@example.com"}); err != nil {
+		t.Fatalf("insert rejected row: %v", err)
+	}
+	if _, err := s.InsertSendLogLines([]SendLogLine{
 		{QueueID: "KEPT01", At: old, Line: "has a row"},
 		{QueueID: "INBOUND1", At: old, Line: "never had a row"},
 		{QueueID: "ARRIVING", At: now.Add(-time.Minute), Line: "its row is not written yet"},
-	} {
-		if err := s.InsertSendLogLine(l); err != nil {
-			t.Fatalf("insert: %v", err)
-		}
+	}, false); err != nil {
+		t.Fatalf("insert: %v", err)
 	}
 
 	n, err := s.PruneSendLogLines(now.Add(-time.Hour))

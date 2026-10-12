@@ -150,27 +150,31 @@ type captureStore struct {
 
 	// lines are the log lines kept for messages' pages; pruned is the cutoff of
 	// each PruneSendLogLines call.
-	lines  []store.SendLogLine
-	pruned []time.Time
+	lines   []store.SendLogLine
+	batches int
+	pruned  []time.Time
 }
 
-func (c *captureStore) InsertSendLogLine(l store.SendLogLine) error {
+// InsertSendLogLines keeps what the store would: with once, a line is not
+// kept a second time under its queue id. batches counts the calls.
+func (c *captureStore) InsertSendLogLines(lines []store.SendLogLine, once bool) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.lines = append(c.lines, l)
-	return nil
-}
-
-func (c *captureStore) InsertSendLogLineOnce(l store.SendLogLine) (bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, have := range c.lines {
-		if have.QueueID == l.QueueID && have.Line == l.Line {
-			return false, nil
+	c.batches++
+	wrote := 0
+next:
+	for _, l := range lines {
+		if once {
+			for _, have := range c.lines {
+				if have.QueueID == l.QueueID && have.Line == l.Line {
+					continue next
+				}
+			}
 		}
+		c.lines = append(c.lines, l)
+		wrote++
 	}
-	c.lines = append(c.lines, l)
-	return true, nil
+	return wrote, nil
 }
 
 func (c *captureStore) PruneSendLogLines(cutoff time.Time) (int64, error) {

@@ -12,12 +12,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   its send-log row lives, with the store methods to write a line, to write it
   once, to read the lines of a row and to prune
   ([plans/delivery-log-storage.md](docs/plans/delivery-log-storage.md)).
-- **The log tailer keeps what Postfix writes about queued messages.** Every
-  `mail.log` line headed by a queue id is stored with the line's own time, as
-  the tailer reads it; after an unclean stop a line read twice is stored once.
-  Lines whose queue id has no send-log row - the row was pruned, or the
-  message never had one (inbound relay mail, bounces) - are deleted once they
-  are an hour old, with every send-log sweep and hourly between.
+- **The log tailer keeps what Postfix writes about queued messages.** A
+  `mail.log` line headed by a queue id is stored with the line's own time, one
+  transaction per pass over the log; after an unclean stop a line read twice
+  is stored once. Mail that came in on port 25 is left out: a stranger's
+  message never has a send-log row, and what he can make Postfix log is not
+  written to the database. Lines whose queue id has no send-log row - the row
+  was pruned, or the message never had one (bounces) - are deleted once they
+  are an hour old, at start and with every six-hourly send-log sweep.
 
 ### Changed
 
@@ -30,6 +32,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   its own queue lifetime. A message accepted before this version shows its
   lines only while they are still in the current file, as before; the note
   shown when there are none and the *Outbound log* help topic say so.
+
+### Security
+
+- **A full backup now carries the log lines of messages in the send log** -
+  client addresses, SASL logins, message ids, receivers' replies - where
+  `mail.log` itself is not in a backup. Recorded in
+  [security.md](docs/security.md) with the accepted risk of a queue-id
+  collision showing one message's lines on another's page. Technical and
+  security reviews of 2026-10-12: no Critical or High finding.
 
 ## [2.1.0] - 2026-10-12
 

@@ -29,20 +29,31 @@ rotation, while the row itself lives for ninety days.
 
 ### What is stored
 
-Every `mail.log` line whose head is a queue id - after the timestamp, the host
+A `mail.log` line whose head is a queue id - after the timestamp, the host
 name and `program[pid]:` - goes into a new table with that id, the line's own
 time (`lineTime`, the same reading the inbound journal uses) and the line as
-written, cut to 4096 bytes. The head is matched from the start of the line:
-the tail is the far end's words. `NOQUEUE` and `warning` are not queue ids -
-the pattern takes Postfix's short form (hexadecimal) and its long form (no
-vowels) and nothing else.
+written, cut to 4096 bytes on a character boundary. The head is matched from
+the start of the line: the tail is the far end's words. `NOQUEUE` and
+`warning` are not queue ids - the pattern takes Postfix's short form
+(hexadecimal) and its long form (no vowels) and nothing else.
 
 The tailer does not ask whether the id belongs to a send-log row before it
 writes. The first lines of a message (`client=`, `message-id=`) are logged
 before the journal milter writes the row at end-of-message, so such a check
-would drop exactly them. Lines of messages that never get a row - inbound
-relay mail, bounces Postfix generates - are stored too and removed by the
-prune below within the hour or two.
+would drop exactly them.
+
+**Mail that came in on port 25 is left out** (security review, 2026-10-12). A
+queue id that `postfix/inbound/smtpd` opened is a stranger's message; it never
+gets a send-log row, and what a stranger can make Postfix log - his own
+`message-id`, up to the cut - is not stored to be pruned later. The tailer
+remembers such ids (4096 at most) until qmgr's `removed` or until another
+listener opens a message under the id. What is still stored without a row is
+little: the bounces Postfix generates, and port-25 mail met in mid-flight
+after a restart.
+
+Lines are written in one transaction per pass over the log, 500 at most
+(technical review): a commit per line is a disk sync per line on the one
+connection the journal milter writes through.
 
 ### Which lines are a row's
 
@@ -50,25 +61,42 @@ A line is shown on a row's page when the queue id is the same **and** the
 line's time lies between one hour before the row was written and the queue
 lifetime (the larger of `maximal_queue_lifetime` and `bounce_queue_lifetime`,
 as `postconf` reports them) plus a day after it. Postfix reuses a short queue
-id once the message has left the queue; a later message under the same id
-falls outside that window. This is the bound the roadmap item asked for.
+id once the message has left the queue - the id is the microsecond of arrival
+and the inode of the queue file - so a row that lives ninety days can meet a
+later message under its id. The window does not rule that out, it limits it
+to the days the row's own message could still be in the queue; this is the
+bound the roadmap item asked for. The search of the current file that the
+page did before had the same exposure for a day. `enable_long_queue_ids`
+would end it and is a change to the mail path, not part of this item.
 
 ### Retention
 
 Lines live as long as a send-log row with their queue id does. One rule covers
 both ends: a line older than an hour whose queue id has no send-log row is
 deleted. That removes the lines of a row the retention sweep has just deleted,
-and the lines of messages that never had a row. It runs with the send-log
-sweep and once an hour between.
+and the lines of messages that never had a row. It runs at start and after
+every send-log sweep, six-hourly. It asks the send log once per queue id; at a
+million lines that is still a scan of the table, of the order of a second,
+during which the one connection is taken.
 
-There is no cap of its own: the table is bounded by what Postfix logs about
-queued messages, which its own rate limits bound.
+There is no cap of its own: with port-25 mail left out, the table is bounded
+by what authenticated applications send, which level 1 and level 2 limit.
 
 ### After an unclean stop
 
 The tailer saves its place every few seconds, so after a crash it reads some
 lines twice. While it is catching up at start a line is written only if the
 same line is not there already - the rule the inbound journal follows.
+
+### What is not kept
+
+- Lines the tailer never reads are not stored: the tail of a file that was
+  rotated away while the panel was down, as with delivery statuses
+  (architecture.md § Log tailer).
+- A message in the queue across the upgrade to 2.2.0 has only its later lines
+  stored, and the page then shows those alone: the search of the file runs
+  only for a row with nothing stored. The only installation is the owner's
+  test server; no merge of the two sources is built for one moment of it.
 
 ### The page
 
@@ -119,9 +147,13 @@ rotation or to the Server › Mail log page.
   today from the file through the same escaping; storing them changes where
   they are read from, not what is shown or to whom. A domain administrator
   sees the lines of messages of their own domains, as now.
-- They now enter the database and so a full backup, which `log/` does not.
+- They now enter the database and so a full backup, which `log/` does not:
+  submitting clients' addresses and SASL logins, message ids, receivers'
+  replies. [security.md](../security.md) says so.
 - A line is matched from its head, so a reply cannot make itself a line of
-  another message; Postfix does not log raw line breaks.
+  another message; Postfix does not log raw line breaks, and `postlogd` is the
+  file's only writer.
+- A stranger on port 25 does not write to the table (above).
 
 ## Done when
 
@@ -143,10 +175,10 @@ Target version cut: **`2.2.0`** (MINOR). One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Migration `0003_send_log_lines.sql`, store methods (insert, insert once, lines of a row, prune) and their tests — **Opus**
-- [x] Log tailer: store queue-id lines, write once while catching up, prune with the send-log sweep and hourly — **Opus**
+- [x] Log tailer: store queue-id lines, write once while catching up, prune with the send-log sweep — **Opus** (hourly as first built; six-hourly after the reviews)
 - [x] The two texts, mockup first: the *Outbound log* help topic and the empty note (`design:` commit) — **Opus** (the help topic is in the mockups; the empty note is not drawn there - the `out-message` mockup shows a message with lines - and changes with the page)
 - [x] Message page reads the table, falls back to the current `mail.log`; help text in `help.go` — **Opus**
 - [x] [architecture.md](../architecture.md), [guide.md](../guide.md), [schema-migrations.md](../schema-migrations.md) — **Opus** (schema-migrations.md went in with the migration)
 - [x] `go vet`, `go test`, e2e: a message's page still lists its lines after a forced rotation — **Opus** (on the test server: vet ok, 22 packages ok, e2e ok with the new step `delivery_log_survives_rotation`)
-- [ ] Technical review — **Opus**
-- [ ] Security review — **Fable**
+- [x] Technical review — **Opus** (2026-10-12; no Critical or High. Fixed: one transaction per pass instead of a commit per line, the prune asks the send log once per queue id and runs six-hourly, the cut keeps characters whole, tests for what the comments claimed. Left as found and written down under *What is not kept*: lines the tailer never read, and a message in the queue across the upgrade)
+- [x] Security review — **Fable** (2026-10-12; no Critical or High. Fixed: port-25 mail is not stored, so a stranger cannot grow the table; [security.md](../security.md) states what a backup now carries. The window against queue-id reuse is described as the limit it is)

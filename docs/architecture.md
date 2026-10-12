@@ -243,34 +243,48 @@ day before it is rotated; a message's page (`/outbound/log/{id}`) shows what
 Postfix wrote about it, so the tailer keeps those lines in the database as it
 reads them:
 
-- **What is kept:** every line headed by a queue id — after the timestamp, the
+- **What is kept:** a line headed by a queue id — after the timestamp, the
   host name and `program[pid]:` — with that id, the line's own time and the
   line as written, cut to 4096 bytes. The id is read from the head of the line
   only: the tail is the far end's text. `NOQUEUE` and `warning` stand in the
   same place and are not ids; the pattern accepts Postfix's short form
   (capital hexadecimal) and its long form (no vowels).
+- **Port-25 mail is left out.** A queue id opened by `postfix/inbound/smtpd`
+  is a stranger's message and never gets a send-log row; none of its lines
+  are stored, up to qmgr's `removed` or until another listener opens a
+  message under the id (4096 such ids are remembered). What a stranger can
+  make Postfix log is therefore not written to the database at his rate.
 - **No check for a row at write time.** A message's first lines (`client=`,
   `message-id=`) are logged before the journal milter writes its row at
   end-of-message, so the tailer cannot ask whether the id is in the send log.
-  Lines of messages that never get a row — inbound relay mail, bounces Postfix
-  generates — are kept too, for a while.
+  Lines that never get a row — bounces Postfix generates, port-25 mail met in
+  mid-flight after a restart — are kept for a while.
+- **Written per pass, not per line:** the lines of one pass over the log go
+  in one transaction (`InsertSendLogLines`), 500 at most, before the read
+  offset is saved. A commit per line would be a disk sync per line on the
+  connection the journal milter shares.
 - **Retention is one rule:** a line older than an hour whose queue id no
-  send-log row carries is deleted (`PruneSendLogLines`), at start, after every
-  send-log sweep and hourly between. That removes the lines of rows the sweep
-  deleted and the lines that never had a row.
+  send-log row carries is deleted (`PruneSendLogLines`), at start and after
+  every six-hourly send-log sweep. That removes the lines of rows the sweep
+  deleted and the lines that never had a row. The send log is asked once per
+  queue id; the statement still walks the table, about a second per million
+  lines, with the connection taken meanwhile.
 - **Which lines are a row's.** Postfix reuses a queue id once the message has
   left the queue, and a row outlives that by months. `SendLogLines` gives a row
   the lines of its queue id dated from one hour before the row was written to
   the queue lifetime (the larger of `maximal_queue_lifetime` and
-  `bounce_queue_lifetime`) plus a day after it. A message with several
+  `bounce_queue_lifetime`) plus a day after it. That limits a chance reuse of
+  the id to those days; it does not exclude it. A message with several
   recipients is several rows under one id, and each row's page shows all of
   the message's lines.
 - **Read twice, stored once.** The read offset is saved every few seconds, so
   after an unclean stop some lines are read again; while the tailer is
   catching up at start it writes a line only if the same line is not there.
+- **Not stored:** what the tailer never read — the tail of a file rotated away
+  while the panel was down.
 - **Size:** six to ten lines of about 200 bytes per message — more than the row
   itself. The table is in the database and therefore in a full backup, which
-  `log/` is not.
+  `log/` is not ([security.md](security.md) § Backup and domain export).
 
 **Two one-shot reads** sit beside the follow loop and are unrelated to it, both
 serving panel pages on request: `TailLines` (the last *n* lines, for
