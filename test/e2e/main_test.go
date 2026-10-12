@@ -92,6 +92,8 @@ type scenario struct {
 	l2AppPassword   string
 	clientIP        string
 	zoneRecords     []txtRecord
+	// deliveryPage is the panel page of the first delivered message.
+	deliveryPage string
 }
 
 func TestE2E(t *testing.T) {
@@ -251,6 +253,14 @@ func TestE2E(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+
+		// The only row so far; its page is looked at again once the log has
+		// been rotated (delivery_log_survives_rotation).
+		page, err := firstDeliveryPage(sc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sc.deliveryPage = page
 	})
 
 	run("negative_level2_ratelimit_via_panel", func(t *testing.T) {
@@ -273,6 +283,11 @@ func TestE2E(t *testing.T) {
 	})
 	run("negative_level1_ratelimit", func(t *testing.T) {
 		testLevel1RateLimit(t, sc)
+	})
+	// Rotates mail.log, so it comes after the steps that read what they need
+	// from the current file.
+	run("delivery_log_survives_rotation", func(t *testing.T) {
+		testDeliveryLogSurvivesRotation(t, sc)
 	})
 
 	// From here on the installation is no longer the one the run started: it

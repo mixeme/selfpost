@@ -147,6 +147,6 @@ Target version cut: **`2.2.0`** (MINOR). One commit per step;
 - [x] The two texts, mockup first: the *Outbound log* help topic and the empty note (`design:` commit) — **Opus** (the help topic is in the mockups; the empty note is not drawn there - the `out-message` mockup shows a message with lines - and changes with the page)
 - [x] Message page reads the table, falls back to the current `mail.log`; help text in `help.go` — **Opus**
 - [x] [architecture.md](../architecture.md), [guide.md](../guide.md), [schema-migrations.md](../schema-migrations.md) — **Opus** (schema-migrations.md went in with the migration)
-- [ ] `go vet`, `go test`, e2e: a message's page still lists its lines after a forced rotation — **Opus**
+- [x] `go vet`, `go test`, e2e: a message's page still lists its lines after a forced rotation — **Opus** (on the test server: vet ok, 22 packages ok, e2e ok with the new step `delivery_log_survives_rotation`)
 - [ ] Technical review — **Opus**
 - [ ] Security review — **Fable**
