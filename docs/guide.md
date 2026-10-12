@@ -1097,6 +1097,10 @@ listed for it. Since `2.4.0` that rule covers both senders a message has:
 - the **`From:` line** of the message - the one a mail program shows and the
   one the DKIM signature is chosen by - which the panel checks.
 
+An address with an extension counts as the address: an application listed as
+`invoices@…` may also send as `invoices+march@…`, in the envelope and in
+`From:` alike.
+
 A message whose `From:` is anything else is refused with `550 5.7.1` and a
 text naming the line: another of your domains, the server's own name, an
 address at a domain that is not on this server, a line with two addresses,

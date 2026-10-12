@@ -94,6 +94,8 @@ func TestSenderCheck(t *testing.T) {
 		{"own domain, any address, with a name", "shop", [][2]string{from(`"The Shop" <Orders@Shop.Example.Org>`)}, true, ""},
 		{"second application of the domain", "shop2", [][2]string{from("x@shop.example.org")}, true, ""},
 		{"a listed address", "billing", [][2]string{from("Invoices <invoices@example.org>")}, true, ""},
+		{"a listed address with an extension", "billing", [][2]string{from("invoices+2026-march@example.org")}, true, ""},
+		{"an extension, any address of the domain", "shop", [][2]string{from("orders+48213@shop.example.org")}, true, ""},
 		{"header name in another case", "shop", [][2]string{{"FROM", "a@shop.example.org"}}, true, ""},
 		{"its own name inside the display name", "shop", [][2]string{from(`"shop@shop.example.org" <a@shop.example.org>`)}, true, ""},
 		{"an encoded display name", "shop", [][2]string{from("=?utf-8?b?0JzQsNCz0LDQt9C40L0=?= <a@shop.example.org>")}, true, ""},
@@ -107,6 +109,8 @@ func TestSenderCheck(t *testing.T) {
 		{"the server's own name", "shop", [][2]string{from("postmaster@mail.example.org")}, false, "not an address this application sends as"},
 		{"a stranger's domain", "shop", [][2]string{from("someone@gmail.example")}, false, "not an address this application sends as"},
 		{"an address off the list", "billing", [][2]string{from("director@example.org")}, false, "not an address this application sends as"},
+		{"an address off the list, with an extension", "billing", [][2]string{from("director+invoices@example.org")}, false, "not an address this application sends as"},
+		{"a listed name as the extension of another", "billing", [][2]string{from("+invoices@example.org")}, false, "not an address this application sends as"},
 		{"a subdomain of its own", "shop", [][2]string{from("a@sub.shop.example.org")}, false, "not an address this application sends as"},
 		{"no From: line", "shop", [][2]string{{"Subject", "hello"}}, false, "no From: line"},
 		{"two From: lines", "shop", [][2]string{from("a@shop.example.org"), from("director@example.org")}, false, "more than one From: line"},
@@ -252,5 +256,18 @@ func TestSenderCheckRefusalIsOneRow(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].To != "a@x.example and 2 more" {
 		t.Fatalf("rows = %+v", rows)
+	}
+}
+
+// A message with the null envelope sender - a bounce an application writes
+// itself - is judged like any other, and its row belongs to the domain the
+// login is bound to.
+func TestSenderCheckRefusalWithNullSenderHasItsDomain(t *testing.T) {
+	bind := NewBindings(writeMaps(t, senderMaps))
+	for login, want := range map[string]string{"shop": "shop.example.org", "billing": "example.org"} {
+		_, rows := offer(t, bind, login, "", [2]string{"From", "someone@gmail.example"})
+		if len(rows) != 1 || rows[0].Domain != want || rows[0].From != "" {
+			t.Errorf("%s: rows = %+v, want one of domain %s", login, rows, want)
+		}
 	}
 }

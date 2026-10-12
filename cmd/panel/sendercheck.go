@@ -41,8 +41,10 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 		}
 		if down := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
 			log.Printf("sender-check: was not answering for %s while Postfix was running", down.Round(time.Second))
-			if err := st.AddSenderCheckDown(now, down); err != nil {
-				log.Printf("sender-check: statistics: %v", err)
+			for _, part := range byDay(now.Add(-down), now) {
+				if err := st.AddSenderCheckDown(part.day, part.down); err != nil {
+					log.Printf("sender-check: statistics: %v", err)
+				}
 			}
 		}
 		keepAlive(ctx, mark, st)
@@ -77,6 +79,28 @@ func senderCheckDowntime(path string, now time.Time, postfixStarted func() (time
 		return d
 	}
 	return 0
+}
+
+// dayPart is the part of a stretch of downtime that fell on one UTC day.
+type dayPart struct {
+	day  time.Time
+	down time.Duration
+}
+
+// byDay cuts the time from 'from' to 'to' at the UTC midnights between them,
+// so that a night's outage is not all booked on the morning it ended.
+func byDay(from, to time.Time) []dayPart {
+	from, to = from.UTC(), to.UTC()
+	var parts []dayPart
+	for from.Before(to) {
+		next := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
+		if next.After(to) {
+			next = to
+		}
+		parts = append(parts, dayPart{day: from, down: next.Sub(from)})
+		from = next
+	}
+	return parts
 }
 
 // postfixStarted asks supervisord since when Postfix has been running.

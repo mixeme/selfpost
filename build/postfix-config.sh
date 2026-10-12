@@ -203,8 +203,14 @@ postconf -e \
 # Sender binding (the critical anti-spoofing control). texthash resolves the
 # full address first, then the "@domain" wildcard, so both address modes work
 # from the same map.
+#
+# recipient_delimiter is said here and not left to the distribution's main.cf:
+# it is what lets an application listed as invoices@ send as invoices+march@,
+# and the panel's sender check makes the same second try for the From: line
+# (extensionDelimiter in internal/milter/sender.go) - the two must agree.
 postconf -e \
 	"smtpd_sender_login_maps=texthash:${SENDER_LOGIN_MAPS}" \
+	"recipient_delimiter=+" \
 	"queue_directory=${QUEUE_DIR}"
 
 # Restrictions: authenticated clients only, no relay to foreign destinations,

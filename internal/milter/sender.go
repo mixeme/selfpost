@@ -31,9 +31,9 @@ import (
 // answer, Postfix defers mail. It therefore depends on as little as it can.
 // It reads no database: what an application may send as comes from the file
 // of sender bindings Postfix itself reads for the envelope, so the two go by
-// one table. Where the lookups differ the check is the stricter: Postfix
-// also tries an address without its "+extension" and compares logins without
-// regard to case. The send-log row of a refusal is written by another goroutine and
+// one table, by one lookup: the address, the address without its
+// "+extension", the domain. (Postfix compares logins without regard to case;
+// the check compares them as written, which is how the panel writes them.) The send-log row of a refusal is written by another goroutine and
 // is not waited for.
 
 // tableFile is a table of the mail path that the panel rewrites and the check
@@ -69,9 +69,10 @@ func (f *tableFile) changed() (lines []string, again bool, err error) {
 // sender - an address, or "@domain" for any address of a domain - with the
 // logins that may use it.
 type Bindings struct {
-	mu     sync.Mutex
-	file   tableFile
-	logins map[string]map[string]bool // sender -> logins
+	mu       sync.Mutex
+	file     tableFile
+	logins   map[string]map[string]bool // sender -> logins
+	domainOf map[string]string          // login -> the domain it sends as
 }
 
 // NewBindings reads the file at path on first use.
@@ -86,6 +87,7 @@ func (b *Bindings) fresh() error {
 		return err
 	}
 	logins := make(map[string]map[string]bool)
+	domains := make(map[string]string)
 	for _, line := range lines {
 		// texthash: <key><whitespace><value>, the value a comma-separated
 		// list of logins (internal/postfix renderSenderLoginMaps).
@@ -102,10 +104,13 @@ func (b *Bindings) fresh() error {
 		for _, l := range strings.Split(strings.Join(fields[1:], ""), ",") {
 			if l != "" {
 				set[l] = true
+				if _, known := domains[l]; !known {
+					domains[l] = domainOf(sender)
+				}
 			}
 		}
 	}
-	b.logins = logins
+	b.logins, b.domainOf = logins, domains
 	return nil
 }
 
@@ -122,10 +127,46 @@ func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	if b.logins[addr][login] {
 		return true, nil
 	}
+	// Postfix's second try: the address without its extension, so that an
+	// application listed as invoices@ may also send as invoices+march@
+	// (recipient_delimiter in build/postfix-config.sh).
+	if bare := withoutExtension(addr); bare != addr && b.logins[bare][login] {
+		return true, nil
+	}
 	if d := domainOf(addr); d != "" && b.logins["@"+d][login] {
 		return true, nil
 	}
 	return false, nil
+}
+
+// extensionDelimiter is Postfix's recipient_delimiter, which
+// build/postfix-config.sh sets to this.
+const extensionDelimiter = "+"
+
+// withoutExtension drops the extension of an address's local part: what
+// follows its first delimiter. "user+tag@example.org" is "user@example.org";
+// an address whose local part begins with the delimiter has no extension.
+func withoutExtension(addr string) string {
+	at := strings.LastIndexByte(addr, '@')
+	if at < 0 {
+		return addr
+	}
+	if i := strings.Index(addr[:at], extensionDelimiter); i > 0 {
+		return addr[:i] + addr[at:]
+	}
+	return addr
+}
+
+// DomainOf returns the domain login sends as, from the first of its bindings
+// in the file's order; "" for a login that has none. An application belongs
+// to one domain, so all of its bindings name the same one.
+func (b *Bindings) DomainOf(login string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.fresh() != nil {
+		return ""
+	}
+	return b.domainOf[login]
 }
 
 // Signers is OpenDKIM's SigningTable as the check reads it: the names this
@@ -319,7 +360,7 @@ func (s *senderSession) record(shown string) {
 		to += fmt.Sprintf(" and %d more", more)
 	}
 	e := store.SendLogEntry{
-		Domain:     domainOf(s.from),
+		Domain:     s.domain(),
 		AppLogin:   s.login,
 		From:       s.from,
 		To:         to,
@@ -363,6 +404,18 @@ func unquoted(v string) string {
 		}
 	}
 	return sb.String()
+}
+
+// domain is the sending domain of the refused message for its row in the
+// log: the envelope sender's, which Postfix has held against the login - or,
+// for the null sender of a bounce an application writes itself, which Postfix
+// holds against nobody, the domain the login is bound to. Without it the row
+// would belong to no domain and its administrator would never see it.
+func (s *senderSession) domain() string {
+	if d := domainOf(s.from); d != "" {
+		return d
+	}
+	return s.bind.DomainOf(s.login)
 }
 
 // mentionedDomains returns, lower-cased, what follows every "@" of v as far

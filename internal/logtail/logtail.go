@@ -153,7 +153,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 			journal.handle(line, now, catchingUp)
 		}
 		if deferred != nil {
-			deferred.handle(line, now)
+			deferred.handle(line, now, catchingUp)
 		}
 		keeper.add(line, now, catchingUp)
 		queueID, recipient, status, ok := parseDelivery(line)

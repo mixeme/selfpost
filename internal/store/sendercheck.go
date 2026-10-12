@@ -88,11 +88,24 @@ func (s *Store) AddSenderCheckDeferred(at time.Time, n int64) error {
 	if err != nil {
 		return err
 	}
-	stamp := at.UTC().Format(time.RFC3339)
+	// To the fraction of a second the log gives, and of a fixed width so that
+	// the strings compare as the times do.
+	stamp := at.UTC().Format("2006-01-02T15:04:05.000000Z")
 	if stamp > last {
 		return s.SetSetting(settingSenderCheckDeferredAt, stamp)
 	}
 	return nil
+}
+
+// SenderCheckDeferredAt is when a message was last counted as deferred; zero
+// if none was.
+func (s *Store) SenderCheckDeferredAt() (time.Time, error) {
+	v, err := s.GetSetting(settingSenderCheckDeferredAt)
+	if err != nil || v == "" {
+		return time.Time{}, err
+	}
+	at, _ := time.Parse(time.RFC3339Nano, v)
+	return at, nil
 }
 
 // SenderCheckStats sums the days up to now: today, the last 30 days and the

@@ -234,9 +234,10 @@ server itself.
   its domain may write any address of that domain, and one with a list only
   the listed ones; everything else is refused - another registered domain,
   the server's name, a domain the server knows nothing of. One table for
-  both senders. Where the lookups differ the check is the stricter one:
-  Postfix also tries an address without its `+extension` and compares logins
-  without regard to case.
+  both senders and one lookup: the address, the address without its
+  `+extension` (`recipient_delimiter`, which `build/postfix-config.sh` sets
+  for that reason), then the domain. Postfix compares logins without regard
+  to case and the check as written, which is how the panel writes them.
 - **How the header is read.** Exactly one `From:` field (none, or more than
   one, is refused), parsed as an address list that must hold exactly one
   address. Then a cruder second look at the raw value: OpenDKIM finds the
@@ -283,8 +284,10 @@ server itself.
   `sender_check_days`, a
   row per UTC day kept a year, and Server › Health shows today, 30 days and
   12 months. The second figure also sees a panel that is running and not
-  answering, which the mark does not. A log read twice after an unclean stop
-  can count a message twice.
+  answering, which the mark does not. Downtime is cut at the UTC midnights
+  it crossed. A log read again after an unclean stop does not count again:
+  while the tailer catches up, a warning no later than the last one counted
+  is passed over.
 - **Why it is not a process of its own.** Decided with the owner: measure
   first. The role has a socket of its own so that the journal stays
   fail-open, and moving it out later changes where it is started and nothing

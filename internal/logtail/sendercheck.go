@@ -33,9 +33,11 @@ import (
 // "milter unix:<socket>: can't read … reply packet header" (Postfix's
 // milter8.c; not seen on the stand).
 
-// SenderCheckStore is where the count goes. *store.Store satisfies it.
+// SenderCheckStore is where the count goes, and where the time of the last
+// counted line is kept. *store.Store satisfies it.
 type SenderCheckStore interface {
 	AddSenderCheckDeferred(at time.Time, n int64) error
+	SenderCheckDeferredAt() (time.Time, error)
 }
 
 // SenderCheck turns the counting on: the store and the socket Postfix was
@@ -60,10 +62,22 @@ type deferredCounter struct {
 	// listening, and a reply that did not come.
 	connect, broken string
 	failed          map[string]bool // smtpd pid -> its current client was counted already
+	// last is the time of the latest line counted, by this run or an earlier
+	// one. While the tailer catches up after a start it may be reading lines
+	// it had read before an unclean stop; a warning no later than this was
+	// counted then. mail.log's stamps are whole seconds, so a warning of the
+	// very second of the last one counted can be passed over - once, at a
+	// restart - which is the cheaper mistake than counting a stretch twice.
+	last time.Time
 }
 
 func newDeferredCounter(sc *SenderCheck) *deferredCounter {
+	last, err := sc.Store.SenderCheckDeferredAt()
+	if err != nil {
+		log.Printf("log-tailer: sender check statistics: %v", err)
+	}
 	return &deferredCounter{
+		last:    last,
 		st:      sc.Store,
 		connect: "warning: connect to Milter service unix:" + sc.Socket + ":",
 		broken:  "warning: milter unix:" + sc.Socket + ":",
@@ -71,8 +85,9 @@ func newDeferredCounter(sc *SenderCheck) *deferredCounter {
 	}
 }
 
-// handle looks at one mail.log line.
-func (c *deferredCounter) handle(line string, now time.Time) {
+// handle looks at one mail.log line. catchingUp is true until the tailer has
+// read to the end of the log for the first time.
+func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
 	at, rest := lineTime(line, now)
 	m := smtpdLineRe.FindStringSubmatch(rest)
 	if m == nil {
@@ -94,6 +109,12 @@ func (c *deferredCounter) handle(line string, now time.Time) {
 			c.failed = make(map[string]bool)
 		}
 		c.failed[pid] = true
+		if catchingUp && !at.After(c.last) {
+			return
+		}
+		if at.After(c.last) {
+			c.last = at
+		}
 		if err := c.st.AddSenderCheckDeferred(at, 1); err != nil {
 			log.Printf("log-tailer: sender check statistics: %v", err)
 		}

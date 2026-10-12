@@ -7,13 +7,19 @@ import (
 
 type deferredStore struct {
 	days map[string]int64
+	last time.Time
 }
+
+func (d *deferredStore) SenderCheckDeferredAt() (time.Time, error) { return d.last, nil }
 
 func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64) error {
 	if d.days == nil {
 		d.days = make(map[string]int64)
 	}
 	d.days[at.UTC().Format("2006-01-02")] += n
+	if at.After(d.last) {
+		d.last = at
+	}
 	return nil
 }
 
@@ -65,9 +71,41 @@ func TestDeferredCounter(t *testing.T) {
 		// cleanup that writes it.
 		`2026-10-13T00:01:00.000000+00:00 mail postfix/cleanup[1195]: B6B484831946: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: director@other.e2e.test - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`,
 	} {
-		c.handle(line, now)
+		c.handle(line, now, false)
 	}
 	if len(st.days) != 2 || st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 1 {
 		t.Fatalf("deferred per day = %v, want one on each of the two days", st.days)
+	}
+}
+
+// After an unclean stop the tailer reads again some lines it had read. What
+// was counted then is not counted now; what was written while the panel was
+// down - the very lines this count exists for - is.
+func TestDeferredCounterDoesNotCountALogReadAgain(t *testing.T) {
+	st := &deferredStore{}
+	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
+	outage := func(pid, at string) []string {
+		return []string{
+			at + `0+00:00 mail postfix/smtpd[` + pid + `]: connect from unknown[10.77.0.1]`,
+			at + `1+00:00 mail postfix/smtpd[` + pid + `]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+		}
+	}
+	first := append(outage("11", "2026-10-12T16:00:00.00000"), outage("12", "2026-10-12T16:00:05.00000")...)
+
+	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
+	for _, line := range first {
+		c.handle(line, now, false)
+	}
+	if st.days["2026-10-12"] != 2 {
+		t.Fatalf("first run counted %d, want 2", st.days["2026-10-12"])
+	}
+
+	// A new run: the same lines again, then what the outage added.
+	c = newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
+	for _, line := range append(first, outage("13", "2026-10-12T16:00:09.00000")...) {
+		c.handle(line, now, true)
+	}
+	if st.days["2026-10-12"] != 3 {
+		t.Fatalf("after the restart the day has %d, want 3", st.days["2026-10-12"])
 	}
 }
