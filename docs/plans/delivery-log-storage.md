@@ -1,6 +1,6 @@
 # Plan: delivery-log-storage
 
-**Status:** agreed 2026-10-12 (owner: option 1 of the roadmap item, "store the lines")  
+**Status:** shipped in `2.2.0` (2026-10-12); agreed the same day (owner: option 1 of the roadmap item, "store the lines")  
 **Date:** 2026-10-12  
 **Version:** `2.2.0` MINOR (one DDL migration; a 2.1.0 data directory boots unchanged).
 

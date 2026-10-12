@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-12
+
 ### Added
 
 - **Schema: `send_log_lines`** (migration `0003_send_log_lines.sql`, DDL only).
