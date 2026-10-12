@@ -118,8 +118,21 @@ var freemailDomains = map[string]struct{}{
 	"protonmail.com": {},
 }
 
+// AccountEmail checks a panel user's own address: where the panel writes to
+// them. Empty is allowed. It is the address check of Email without that
+// function's refusal of public mail hosts - a mailbox at one of those is a
+// perfectly good place to be notified, and for many administrators the only
+// one that does not depend on the server the notification is about.
+func AccountEmail(addr string) error {
+	return emailAddress(addr, true)
+}
+
 // Email checks a DMARC rua= mailbox. Empty is allowed (policy-only).
 func Email(addr string) error {
+	return emailAddress(addr, false)
+}
+
+func emailAddress(addr string, publicHosts bool) error {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
 		return nil
@@ -129,6 +142,11 @@ func Email(addr string) error {
 		return fmt.Errorf("enter a valid email address")
 	}
 	local := addr[:at]
+	// An address is handed to sendmail(1) as an argument; one that begins like
+	// an option is refused here, where the user can be told.
+	if strings.HasPrefix(local, "-") {
+		return fmt.Errorf("email address must not begin with '-'")
+	}
 	domain := NormalizeDomain(addr[at+1:])
 	if err := Domain(domain); err != nil {
 		return fmt.Errorf("email domain is invalid: %w", err)
@@ -141,7 +159,7 @@ func Email(addr string) error {
 			return fmt.Errorf("email address contains invalid characters")
 		}
 	}
-	if _, blocked := freemailDomains[domain]; blocked {
+	if _, blocked := freemailDomains[domain]; blocked && !publicHosts {
 		return fmt.Errorf("use an address on a domain you control; public mail hosts cannot receive authorised DMARC reports")
 	}
 	return nil

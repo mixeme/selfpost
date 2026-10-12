@@ -35,10 +35,11 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
-| panel-notifications | E-mail notifications about important events | in progress | 8/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
+| panel-notifications | E-mail notifications about important events | in progress | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
+| from-header-binding | Hold a message's `From:` header against the application that sends it | candidate | — | — |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
@@ -425,6 +426,41 @@ has one coherent layout, checked on a phone in "desktop site" mode and in a
 980 px window.
 
 **Version:** `2.x` PATCH or MINOR; `candidate`.
+
+---
+
+## from-header-binding
+
+**Problem (security review of panel-notifications, 2026-10-12):** Postfix
+holds the envelope sender against the SASL login
+(`reject_sender_login_mismatch`), and OpenDKIM chooses the signing key by the
+`From:` header. Nothing holds the header against the login. An application
+of one sending domain can therefore write another registered domain - or,
+since 2.3.0, the server's own name - into `From:` and have the message signed
+with that name's key: mail that passes DMARC as a domain the application has
+no right to, or that looks like a notification of the panel.
+
+**Goal:** a message whose `From:` names a domain this server signs for is
+accepted only from an application of that domain.
+
+**Boundary:** the journal milter reads `From:` (and `Sender:`) and refuses at
+end-of-headers when the header's domain is a signing name other than the
+login's own. Mail whose `From:` is a domain this server does not sign for is
+not touched - it goes out unsigned today and would after. The journal milter
+is fail-open, so with it down the hole is as it is now; whether that is
+enough or the check belongs somewhere stricter is part of the item.
+
+**Done when:** the e2e stand shows an application refused for another
+tenant's `From:` and for the hostname's, and accepted for its own.
+
+**Dependencies / risks:** it refuses mail - an application that today sends
+with a `From:` of another of the operator's domains stops working until it
+is given an application of that domain; parsing `From:` differently from
+OpenDKIM would leave a gap, so the check has to be the cruder one (does the
+header mention `@<signing name>`).
+
+**Version:** `2.x` MINOR; `candidate`. Until then:
+[security.md](security.md) § Accepted risks.
 
 ---
 

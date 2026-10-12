@@ -155,24 +155,40 @@ func (s *Store) ListNotifyStateKeys(prefix string) ([]string, error) {
 	return out, rows.Err()
 }
 
-// LimitRefusal is the mail one application was refused under a level-2 rate
-// limit in a span of time: how many messages and when the first.
+// LimitRefusal is the mail the applications of one sending domain were refused
+// under a level-2 rate limit in a span of time.
 type LimitRefusal struct {
-	Domain   string
-	AppLogin string
-	Count    int
-	First    time.Time
+	Domain string
+	// Apps are the logins that were refused, in order.
+	Apps  []string
+	Count int
+	First time.Time
 }
 
-// LimitRefusalsSince returns, per domain and application, the messages the
-// journal milter refused under a level-2 limit at or after since (send-log
-// rows with status "rejected").
+// LimitRefusalsSince returns, per sending domain, the messages the journal
+// milter refused under a level-2 limit at or after since.
+//
+// A refusal is a send-log row with status "rejected", and what such a row
+// says about itself is not to be believed whole. Its domain is the one in
+// MAIL FROM, which the client typed and Postfix has not yet held against the
+// login when the milter refuses; so the domain here is the one the login is
+// registered under, and a row whose login is no application's is not counted.
+// The same status is written when an application is refused for its client
+// address (applications.auth_ip_restrict), which is no limit at all; so a
+// login counts only while a level-2 limit is set on it or on its domain.
 func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
+	// The status is a literal so that the partial index of migration 0005
+	// answers the question.
 	rows, err := s.db.Query(
-		`SELECT COALESCE(domain, ''), COALESCE(app_login, ''), COUNT(*), MIN(created_at) FROM send_log
-		 WHERE status = ? AND created_at >= ?
-		 GROUP BY domain, app_login ORDER BY domain, app_login`,
-		StatusRejected, since.UTC().Format(time.RFC3339),
+		`SELECT d.name, a.login, COUNT(*), MIN(l.created_at)
+		 FROM send_log l
+		 JOIN applications a ON a.login = l.app_login
+		 JOIN domains d ON d.id = a.domain_id
+		 WHERE l.status = 'rejected' AND l.created_at >= ?
+		   AND (EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'application' AND r.ref_id = a.id)
+		     OR EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'domain' AND r.ref_id = d.id))
+		 GROUP BY d.name, a.login ORDER BY d.name, a.login`,
+		since.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("limit refusals: %w", err)
@@ -181,14 +197,22 @@ func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
 	var out []LimitRefusal
 	for rows.Next() {
 		var (
-			r     LimitRefusal
-			first string
+			domain, login, first string
+			count                int
 		)
-		if err := rows.Scan(&r.Domain, &r.AppLogin, &r.Count, &first); err != nil {
+		if err := rows.Scan(&domain, &login, &count, &first); err != nil {
 			return nil, fmt.Errorf("limit refusals scan: %w", err)
 		}
-		r.First, _ = time.Parse(time.RFC3339, first)
-		out = append(out, r)
+		at, _ := time.Parse(time.RFC3339, first)
+		if n := len(out); n > 0 && out[n-1].Domain == domain {
+			out[n-1].Apps = append(out[n-1].Apps, login)
+			out[n-1].Count += count
+			if at.Before(out[n-1].First) {
+				out[n-1].First = at
+			}
+			continue
+		}
+		out = append(out, LimitRefusal{Domain: domain, Apps: []string{login}, Count: count, First: at})
 	}
 	return out, rows.Err()
 }

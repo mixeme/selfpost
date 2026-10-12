@@ -42,6 +42,9 @@ func (f *fakeResolver) LookupTXT(_ context.Context, name string) ([]string, erro
 
 func (f *fakeResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAddr, error) {
 	f.lookups++
+	if f.fail[host] {
+		return nil, &net.DNSError{Err: "server misbehaving", Name: host, IsTemporary: true}
+	}
 	if v, ok := f.addr[host]; ok {
 		return v, nil
 	}

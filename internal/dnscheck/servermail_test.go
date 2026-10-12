@@ -80,3 +80,25 @@ func TestServerMailCacheIsItsOwn(t *testing.T) {
 		t.Error("the server's mail check was answered from the domain's cache entry")
 	}
 }
+
+// The address lookup behind an "a" mechanism did not answer: nothing was
+// learned, and the record is not called wrong for it. A name that answers
+// "no such host" is a finding, and the record is wrong.
+func TestSPFLookupThatDidNotAnswerIsNotAMismatch(t *testing.T) {
+	// The fake fails by name, so the mechanism names a host of its own: the
+	// TXT lookup of the server's name answers, the address lookup does not.
+	f := &fakeResolver{
+		txt:  map[string][]string{"mail.example.org": {"v=spf1 a:addr.example.org -all"}},
+		fail: map[string]bool{"addr.example.org": true},
+	}
+	c := newTestChecker(f)
+	q := serverMailQuery()
+	if got := c.ServerMail(q, true).SPF; got.Status != health.StatusWarn {
+		t.Errorf("the lookup did not answer: SPF is %s (%s), want a warning", got.Status, got.Detail)
+	}
+
+	f.fail = nil
+	if got := c.ServerMail(q, true).SPF; got.Status != health.StatusError {
+		t.Errorf("the name does not exist: SPF is %s (%s), want an error", got.Status, got.Detail)
+	}
+}

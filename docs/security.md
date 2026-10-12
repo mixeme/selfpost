@@ -421,12 +421,40 @@ deferred item from the roadmap.
   DNS check's finding, and a queued message's sender address - and both are
   reduced to printable ASCII and cut before they are printed, so a
   notification's body can contain an address a stranger chose, as a few plain
-  characters and nothing else. The panel's
-  membership in `postdrop`, described in the image as read-side, is now what
-  lets it submit; any local user could already do that through the
-  world-executable `sendmail`. Notifications are signed with a key of the
-  server's own name and bypass the level-1 and level-2 limits: they are a few
-  messages a day at most, to addresses only a panel user can set.
+  characters and nothing else. A refused-mail notification names the domain
+  and the applications from the registry, never the domain a client wrote in
+  `MAIL FROM`: that string is not yet held against the login when the milter
+  refuses, and the first build took it for the subject - an application over
+  its limit could have made the panel write a message per made-up domain, to
+  another tenant's users among others (security review, 2026-10-12; fixed
+  before release). The panel's membership in `postdrop` is what lets it
+  submit: under `no-new-privileges` the setgid bit of `postdrop` does not
+  take, so only root, `postfix` and the panel can. Notifications are signed
+  with a key of the server's own name and bypass the level-1 and level-2
+  limits. What bounds them: the subjects are the registered domains, the
+  certificate and the queue; a domain's DNS can be reported and cleared about
+  a dozen times a day at most by someone who flaps the zone; a domain's
+  limits once a day; and no more than 60 messages leave in any hour whatever
+  the rules arrive at.
+- **A notification can be forged by an application, signed as the server.**
+  OpenDKIM chooses the key by the `From:` header, and Postfix holds only the
+  envelope sender against the login. An authenticated application can
+  therefore send a message whose header says `From: postmaster@<hostname>` and
+  have it signed with the key of the server's own name - a message that
+  passes DMARC and looks like the panel's. The same has always let an
+  application of one sending domain write another registered domain into
+  `From:` and get that domain's signature; the server's name is one more name
+  it works for. Accepted for now: applications are the operator's own, and a
+  forged notification can ask for nothing the panel acts on - it carries no
+  link and the panel takes no mail. The fix is to hold the `From:` header
+  against the login in the journal milter, which refuses mail and is a
+  decision of its own ([roadmap](roadmap.md) § from-header-binding). Trigger
+  to revisit: applications handed to anyone the operator does not trust with
+  every domain of the instance.
+- **When the hostname is itself a sending domain,** the server's mail is
+  signed with that domain's key. Whoever may export the domain has the key,
+  and its applications may send as `postmaster@<hostname>` by right. The
+  guide says so; a hostname that is nobody's sending domain avoids it.
 - **A message's page can show another message's log lines after a queue-id
   collision.** Postfix's short queue ids repeat: the id is the microsecond of
   arrival and the queue file's inode, and inodes come round within seconds.
@@ -454,8 +482,13 @@ deferred item from the roadmap.
   field to the global role, is the fix.
 - **Account's profile (username, e-mail) is saved without the password.**
   Saving the profile does not ask for the current password, as changing the
-  password does. Today the e-mail is only the address the *Use my e-mail*
-  button fills in, so a stolen session gains nothing it did not have. It
+  password does. Since 2.3.0 the e-mail is where notifications go, so a stolen
+  session can turn them to another address: the thief then learns what they
+  say - which domain's DNS is wrong, which application is refused, when the
+  certificate expires, sender addresses of old queued mail - and the user
+  stops hearing it. Nothing in a notification gives access. A `domain` user
+  can likewise point signed mail of this server at a third party's address,
+  a dozen messages a day per assigned domain at most. It
   becomes a requirement to ask for the current password when changing
   `users.email` as soon as [password-reset](roadmap.md#password-reset) mails a
   link to it — from then on whoever can change the address could take the

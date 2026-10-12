@@ -163,22 +163,33 @@ func (o *OpenDKIM) Rebuild(domains []SigningDomain) error {
 	return o.reload()
 }
 
-// signs reports whether the SigningTable on disk has a line for name. A table
-// that does not exist yet signs nothing.
-func (o *OpenDKIM) signs(name string) (bool, error) {
-	data, err := os.ReadFile(o.signingTablePath)
-	if os.IsNotExist(err) {
+// signs reports whether the tables on disk sign name with the key of
+// selector: a line for the name in the SigningTable, and in the KeyTable the
+// line that gives it that selector. Tables that do not exist yet sign nothing.
+// The selector is part of the question because the panel shows and checks the
+// record of one key; tables that name another would have OpenDKIM sign with a
+// key whose record nobody is told to publish.
+func (o *OpenDKIM) signs(name, selector string) (bool, error) {
+	has := func(path, prefix string) (bool, error) {
+		data, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, fmt.Errorf("read %s: %w", filepath.Base(path), err)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, prefix) {
+				return true, nil
+			}
+		}
 		return false, nil
 	}
-	if err != nil {
-		return false, fmt.Errorf("read SigningTable: %w", err)
+	signed, err := has(o.signingTablePath, "*@"+name+" ")
+	if err != nil || !signed {
+		return false, err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "*@"+name+" ") {
-			return true, nil
-		}
-	}
-	return false, nil
+	return has(o.keyTablePath, name+" "+name+":"+selector+":")
 }
 
 // Reload asks OpenDKIM to re-read its tables without regenerating them. It

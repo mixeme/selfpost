@@ -2,6 +2,7 @@ package dnscheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -133,7 +134,14 @@ func (c *Checker) evaluateSPF(ctx context.Context, record, domainName string, ip
 				continue
 			}
 			budget--
-			if qualifier == '+' && c.resolvesTo(ctx, target, ips) {
+			match, failed := c.resolvesTo(ctx, target, ips)
+			if failed {
+				// Nothing was learned about this mechanism: "cannot tell",
+				// not "does not authorise".
+				note("a (the lookup did not answer)")
+				continue
+			}
+			if qualifier == '+' && match {
 				return term, unfollowed
 			}
 
@@ -151,7 +159,12 @@ func (c *Checker) evaluateSPF(ctx context.Context, record, domainName string, ip
 				continue
 			}
 			budget--
-			if qualifier == '+' && c.mxResolvesTo(ctx, target, ips, &budget) {
+			match, failed := c.mxResolvesTo(ctx, target, ips, &budget)
+			if failed {
+				note("mx (the lookup did not answer)")
+				continue
+			}
+			if qualifier == '+' && match {
 				return term, unfollowed
 			}
 
@@ -176,39 +189,49 @@ func (c *Checker) evaluateSPF(ctx context.Context, record, domainName string, ip
 	return "", unfollowed
 }
 
+// lookupUnanswered tells a lookup that failed from one that answered "no such
+// name": only the second is a finding.
+func lookupUnanswered(err error) bool {
+	var dnsErr *net.DNSError
+	return err != nil && !(errors.As(err, &dnsErr) && dnsErr.IsNotFound)
+}
+
 // resolvesTo reports whether name resolves to one of the server's addresses.
-func (c *Checker) resolvesTo(ctx context.Context, name string, ips []net.IP) bool {
+// failed is set when the lookup did not answer, which says nothing either way.
+func (c *Checker) resolvesTo(ctx context.Context, name string, ips []net.IP) (match, failed bool) {
 	addrs, err := c.resolver.LookupIPAddr(ctx, name)
 	if err != nil {
-		return false
+		return false, lookupUnanswered(err)
 	}
 	for _, a := range addrs {
 		for _, ip := range ips {
 			if a.IP.Equal(ip) {
-				return true
+				return true, false
 			}
 		}
 	}
-	return false
+	return false, false
 }
 
 // mxResolvesTo reports whether any of name's MX hosts resolves to one of the
 // server's addresses, spending at most the remaining lookup budget.
-func (c *Checker) mxResolvesTo(ctx context.Context, name string, ips []net.IP, budget *int) bool {
+func (c *Checker) mxResolvesTo(ctx context.Context, name string, ips []net.IP, budget *int) (match, failed bool) {
 	mxs, err := c.resolver.LookupMX(ctx, name)
 	if err != nil {
-		return false
+		return false, lookupUnanswered(err)
 	}
 	for _, mx := range mxs {
 		if *budget <= 0 {
-			return false
+			return false, failed
 		}
 		*budget--
-		if c.resolvesTo(ctx, strings.TrimSuffix(mx.Host, "."), ips) {
-			return true
+		m, f := c.resolvesTo(ctx, strings.TrimSuffix(mx.Host, "."), ips)
+		if m {
+			return true, false
 		}
+		failed = failed || f
 	}
-	return false
+	return false, failed
 }
 
 // coversAny reports whether an ip4:/ip6: value — a bare address or a CIDR —

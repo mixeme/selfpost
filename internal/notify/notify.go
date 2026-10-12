@@ -1,6 +1,6 @@
 // Package notify writes to the panel's users when something needs them
-// (architecture.md § Notifications): a sending domain's DNS record stops
-// matching, a level-2 rate limit refuses mail, the TLS certificate is about to
+// (architecture.md § Notifications): a sending domain's DNS record does not
+// match, a level-2 rate limit refuses mail, the TLS certificate is about to
 // expire, a message has waited in the queue for more than three days.
 //
 // Each subject has a row of state in the database, so a thing is said once and
@@ -12,7 +12,6 @@ package notify
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -26,17 +25,22 @@ import (
 
 const (
 	// CheckInterval is how often DNS, the certificate and the queue are looked
-	// at. A var-free constant: the rules below count in checks.
+	// at.
 	CheckInterval = time.Hour
 	// LimitInterval is how often refused mail is looked for. A refusal is
 	// reported within the minute rather than on the hour: it is mail not being
-	// sent now. The look is one indexed query.
+	// sent now. The look reads the refused rows through an index of their own
+	// (migration 0005).
 	LimitInterval = time.Minute
 
 	// dnsChecks is how many checks in a row must agree before a DNS mismatch is
-	// reported, and before it is reported gone. One check is a resolver's bad
-	// minute; two, an hour apart, is a record that is wrong.
+	// reported, and before it is reported gone; dnsApart is how far apart the
+	// first and the last of them must be. One check is a resolver's bad minute;
+	// two, an hour apart, is a record that is wrong. The time is asked for as
+	// well as the count because the first check after a start is minutes after
+	// the last one before it.
 	dnsChecks = 2
+	dnsApart  = 45 * time.Minute
 
 	// QueueAge is how long a message waits before the queue is reported. Postfix
 	// keeps a message for five days by default, so two are left to act in.
@@ -47,9 +51,15 @@ const (
 	certFirstDays = 14
 	certLastDays  = 3
 
-	// limitRepeat is the shortest time between two messages about the same
-	// level-2 limit.
+	// limitRepeat is the shortest time between two messages about the limits of
+	// the same domain.
 	limitRepeat = 24 * time.Hour
+
+	// hourlyCeiling is the most messages handed to Postfix in an hour, whatever
+	// the rules above arrive at. They bypass every rate limit, and the number of
+	// subjects grows with the number of domains; nothing here should ever come
+	// near it, and a fault that does is stopped by it.
+	hourlyCeiling = 60
 
 	phasePending = "pending" // seen wrong, not yet said
 	phaseOpen    = "open"    // said
@@ -90,17 +100,26 @@ type Notifier struct {
 	sender   Sender
 	hostname string
 	now      func() time.Time
+	// ctx ends a pass between two domains when the process is asked to stop.
+	ctx context.Context
+	// sentAt holds the times of the messages of the last hour, for the ceiling.
+	sentAt []time.Time
 }
 
 // New builds a notifier for the server named hostname.
 func New(st Store, checks Checks, sender Sender, hostname string) *Notifier {
-	return &Notifier{st: st, checks: checks, sender: sender, hostname: hostname, now: func() time.Time { return time.Now().UTC() }}
+	return &Notifier{
+		st: st, checks: checks, sender: sender, hostname: hostname,
+		now: func() time.Time { return time.Now().UTC() },
+		ctx: context.Background(),
+	}
 }
 
 // Run checks on both cadences until ctx is cancelled. The first hourly check
 // runs a few minutes after the start, not at it: a container that has just
 // come up is still starting Postfix and may have no network yet.
 func (n *Notifier) Run(ctx context.Context) error {
+	n.ctx = ctx
 	first := time.NewTimer(3 * time.Minute)
 	defer first.Stop()
 	hourly := time.NewTicker(CheckInterval)
@@ -144,31 +163,66 @@ func (n *Notifier) Check() {
 	n.checkQueue()
 }
 
+// outcome is what became of a message.
+type outcome int
+
+const (
+	// sent: at least one recipient's copy was handed to Postfix.
+	sent outcome = iota
+	// nobody: no user is to be told - none with an e-mail and the switch on.
+	nobody
+	// failed: there were recipients and none could be handed a copy.
+	failed
+)
+
 // send writes one message to every recipient of a subject, each in a message
-// of their own - users are not shown each other's addresses. It reports
-// whether the subject counts as said: nobody to tell is said, a message that
-// could not be handed over to anyone is not, and is tried at the next check.
-func (n *Notifier) send(domainName string, m message) bool {
+// of their own - users are not shown each other's addresses.
+//
+// What the caller makes of the outcome is the rule that keeps a thing from
+// being said never: a problem counts as said only when it was sent, so one
+// that arose while nobody could be told, or while the mail system was down, is
+// told at a later check. A recipient whose copy failed while another's went
+// out is not tried again: the subject is said.
+func (n *Notifier) send(domainName string, m message) outcome {
 	to, err := n.st.NotifyRecipients(domainName)
 	if err != nil {
 		log.Printf("notify: recipients: %v", err)
-		return false
+		return failed
 	}
 	if len(to) == 0 {
-		return true
+		return nobody
 	}
-	sent := 0
+	handed := 0
 	for _, addr := range to {
+		if !n.underCeiling() {
+			log.Printf("notify: more than %d messages in an hour; %q to %s is held back", hourlyCeiling, m.subject, addr)
+			continue
+		}
 		if err := n.sender.Send(addr, m.subject, m.body); err != nil {
 			log.Printf("notify: send %q to %s: %v", m.subject, addr, err)
 			continue
 		}
-		sent++
+		n.sentAt = append(n.sentAt, n.now())
+		handed++
 	}
-	if sent > 0 {
-		log.Printf("notify: %q sent to %d of %d", m.subject, sent, len(to))
+	if handed == 0 {
+		return failed
 	}
-	return sent > 0
+	log.Printf("notify: %q sent to %d of %d", m.subject, handed, len(to))
+	return sent
+}
+
+// underCeiling reports whether one more message may go out this hour.
+func (n *Notifier) underCeiling() bool {
+	cutoff := n.now().Add(-time.Hour)
+	keep := n.sentAt[:0]
+	for _, t := range n.sentAt {
+		if t.After(cutoff) {
+			keep = append(keep, t)
+		}
+	}
+	n.sentAt = keep
+	return len(n.sentAt) < hourlyCeiling
 }
 
 func (n *Notifier) save(st store.NotifyState) {
@@ -225,6 +279,13 @@ func (n *Notifier) checkDNS() {
 	names := make(map[string]bool, len(domains))
 	for _, d := range domains {
 		names[d.Name] = true
+	}
+	for _, d := range domains {
+		// A dead resolver costs seconds per domain; a process asked to stop
+		// does not wait for the rest of them.
+		if n.ctx.Err() != nil {
+			return
+		}
 		res, err := n.checks.Domain(d)
 		if err != nil {
 			log.Printf("notify: check %s: %v", d.Name, err)
@@ -246,6 +307,10 @@ func (n *Notifier) checkDNS() {
 }
 
 // dnsStep moves one domain's state by one check.
+//
+// A subject is "pending" from the first bad check, with Since the time of it,
+// and "open" from the message. While open, Count is the good checks in a row
+// and Mark the time of the first of them.
 func (n *Notifier) dnsStep(name string, res dnscheck.Domain) {
 	faults, known := dnsReading(res)
 	if !known {
@@ -269,23 +334,27 @@ func (n *Notifier) dnsStep(name string, res dnscheck.Domain) {
 		n.forget(key) // it was the resolver's bad minute
 	case st.Phase == phasePending && bad:
 		st.Count++
-		if st.Count >= dnsChecks {
-			if !n.send(name, dnsProblem(n.hostname, name, faults, st.Since)) {
-				n.save(st)
-				return
+		if st.Count >= dnsChecks && now.Sub(st.Since) >= dnsApart {
+			if n.send(name, dnsProblem(n.hostname, name, faults, st.Since)) == sent {
+				st.Phase, st.Count, st.Mark, st.SentAt = phaseOpen, 0, "", now
 			}
-			st.Phase, st.Count, st.SentAt = phaseOpen, 0, now
 		}
 		n.save(st)
 	case st.Phase == phaseOpen && bad:
 		if st.Count != 0 {
-			st.Count = 0 // it went right for a check and wrong again: still the same trouble
+			// It went right for a check and wrong again: still the same trouble.
+			st.Count, st.Mark = 0, ""
 			n.save(st)
 		}
 	case st.Phase == phaseOpen && !bad:
 		st.Count++
-		if st.Count >= dnsChecks {
-			if n.send(name, dnsCleared(n.hostname, name, st.Since)) {
+		if st.Count == 1 {
+			st.Mark = now.Format(time.RFC3339)
+		}
+		firstGood, _ := time.Parse(time.RFC3339, st.Mark)
+		if st.Count >= dnsChecks && now.Sub(firstGood) >= dnsApart {
+			// With nobody to tell any more, the trouble is over all the same.
+			if n.send(name, dnsCleared(n.hostname, name, st.Since)) != failed {
 				n.forget(key)
 				return
 			}
@@ -325,13 +394,31 @@ func (n *Notifier) checkCertificate() {
 	if level == "" || (have && (st.Phase == level || st.Phase == "last")) {
 		return
 	}
-	if !n.send("", certExpiring(n.hostname, c.NotAfter, left)) {
+	if n.send("", certExpiring(n.hostname, c.NotAfter, left)) != sent {
 		return
 	}
 	n.save(store.NotifyState{Key: key, Phase: level, Mark: mark, Since: n.now(), SentAt: n.now()})
 }
 
 // ---- queue
+
+// ownMail reports whether a queued message is the notifier's: a notification
+// that could not be delivered yet, or the bounce of one coming back to
+// postmaster@ this server, which receives no mail. Neither is the mail the
+// queue is watched for, and reporting them would have one dead mailbox
+// announce itself every three days.
+func (n *Notifier) ownMail(m postfix.QueuedMessage) bool {
+	own := From(n.hostname)
+	if strings.EqualFold(m.Sender, own) {
+		return true
+	}
+	for _, rcpt := range m.Recipients {
+		if strings.EqualFold(rcpt, own) {
+			return true
+		}
+	}
+	return false
+}
 
 func (n *Notifier) checkQueue() {
 	msgs, err := n.checks.Queue()
@@ -342,7 +429,7 @@ func (n *Notifier) checkQueue() {
 	now := n.now()
 	var old []postfix.QueuedMessage
 	for _, m := range msgs {
-		if now.Sub(m.Arrival) > QueueAge {
+		if now.Sub(m.Arrival) > QueueAge && !n.ownMail(m) {
 			old = append(old, m)
 		}
 	}
@@ -356,11 +443,11 @@ func (n *Notifier) checkQueue() {
 	}
 	switch {
 	case len(old) > 0 && !have:
-		if n.send("", queueStuck(n.hostname, old, now)) {
+		if n.send("", queueStuck(n.hostname, old, now)) == sent {
 			n.save(store.NotifyState{Key: key, Phase: phaseOpen, Since: now, SentAt: now})
 		}
 	case len(old) == 0 && have:
-		if n.send("", queueCleared(n.hostname, st.Since)) {
+		if n.send("", queueCleared(n.hostname, st.Since)) != failed {
 			n.forget(key)
 		}
 	}
@@ -369,7 +456,8 @@ func (n *Notifier) checkQueue() {
 // ---- level-2 limits
 
 // CheckLimits looks for mail refused under a level-2 rate limit and reports
-// each limit that refused, at most once in limitRepeat.
+// each sending domain whose applications were refused, at most once in
+// limitRepeat.
 func (n *Notifier) CheckLimits() {
 	if !n.enabled() {
 		return
@@ -381,10 +469,7 @@ func (n *Notifier) CheckLimits() {
 		return
 	}
 	for _, r := range refusals {
-		if r.Domain == "" {
-			continue
-		}
-		key := fmt.Sprintf("limit:%s:%s", r.Domain, r.AppLogin)
+		key := "limit:" + r.Domain
 		st, have, err := n.st.GetNotifyState(key)
 		if err != nil {
 			log.Printf("notify: %v", err)
@@ -396,12 +481,12 @@ func (n *Notifier) CheckLimits() {
 		if have && now.Sub(st.SentAt) < limitRepeat {
 			continue
 		}
-		if n.send(r.Domain, limitRefused(n.hostname, r)) {
+		if n.send(r.Domain, limitRefused(n.hostname, r)) == sent {
 			n.save(store.NotifyState{Key: key, Phase: phaseOpen, Since: r.First, SentAt: now})
 		}
 	}
 
-	// A limit nobody has hit for two days is not a subject any more.
+	// A domain nobody was refused under for two days is not a subject any more.
 	keys, err := n.st.ListNotifyStateKeys("limit:")
 	if err != nil {
 		log.Printf("notify: list limit state: %v", err)

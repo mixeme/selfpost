@@ -159,10 +159,16 @@ by the panel. Socket `/run/opendkim/opendkim.sock`.
 The server's own name (`SELFPOST_HOSTNAME`) has a key and a line in both
 tables too, without being a row of the registry
 (`domain.Service.SetServerName`): the panel's notifications are sent as
-`postmaster@` that name and signed with it. No application can send as it -
-the sender map is built from the registry. A sending domain of the same name
-shares its key and selector with the server, and deleting that domain leaves
-the key in place.
+`postmaster@` that name and signed with it. No application can use it as an
+envelope sender - the sender map is built from the registry - but the
+`From:` header is not held against the login, so an application can still
+have a message signed as the server ([security.md](security.md) § Accepted
+risks). A sending domain of the same name shares its key and selector with
+the server; deleting that domain leaves the server signed under the default
+selector, which is the same key only if that was the domain's. At its start
+the notifier makes sure the tables have the line and name the selector the
+panel shows (`EnsureServerSigned`): tables are otherwise rebuilt only when a
+domain is added or deleted.
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
@@ -219,13 +225,32 @@ is sent; the operator's view is guide § Notifications.
   forced past the cache (`cmd/panel/notifier.go` builds the same query a
   domain's page does); the certificate file; `postqueue -j` for the arrival
   time of each queued message. Once a minute: the send log's `rejected` rows
-  of the last day, per domain and application.
+  of the last day, through a partial index of their own.
+- **A refused row is not believed whole.** Its domain is the one in
+  `MAIL FROM`, which the client typed and Postfix has not yet held against
+  the login when the milter refuses; the same status is written when an
+  application is refused for its client address. So refusals are counted by
+  the domain the login is registered under, only for logins that exist, and
+  only while a level-2 limit is set on the login or its domain
+  (`Store.LimitRefusalsSince`). One subject per sending domain, whichever of
+  its applications are refused.
 - **State** is a row per subject in `notify_state` (`dns:<domain>`, `cert`,
-  `queue`, `limit:<domain>:<login>`), which is what makes each thing be said
+  `queue`, `limit:<domain>`), which is what makes each thing be said
   once and a restart say nothing again. A DNS subject goes *pending* on the
-  first bad check and *open*, with a message, on the second; back the same
-  way. The certificate's row remembers which threshold was said for which
-  expiry. A deleted domain's row goes with it.
+  first bad check and *open*, with a message, on a later one at least 45
+  minutes after it - a count alone would let the last check before a restart
+  and the first after it stand for "an hour apart"; back the same way. The
+  certificate's row remembers which threshold was said for which expiry. A
+  deleted domain's row goes with it.
+- **Said means sent.** A problem that arises while no user can be told, or
+  while Postfix does not take the message, stays unsaid and is told at a
+  later check. Its ending, with nobody left to tell, is simply over. If one
+  recipient's copy fails and another's goes out, the subject is said.
+- **The notifier's own mail is not a subject.** A notification waiting for a
+  mailbox that does not answer, or its bounce coming back to
+  `postmaster@<hostname>` - which receives no mail - is left out of the
+  queue check.
+- **A ceiling** of 60 messages an hour stands over all of it.
 - **No information is not a finding.** A lookup that did not answer, a queue
   that cannot be listed, a certificate that cannot be read move no state.
 - **Recipients** come from the store at the moment of sending: global users

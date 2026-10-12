@@ -187,7 +187,7 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}
-	if err := validate.Email(email); err != nil {
+	if err := validate.AccountEmail(email); err != nil {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}
@@ -261,7 +261,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}
-	if err := validate.Email(email); err != nil {
+	if err := validate.AccountEmail(email); err != nil {
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}

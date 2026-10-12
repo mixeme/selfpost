@@ -31,3 +31,23 @@ func TestValidateEmail(t *testing.T) {
 		t.Error("blocked freemail domain accepted")
 	}
 }
+
+// A user's own address is where the panel writes to them, and a mailbox at a
+// public host is a good place for that - the refusal of those hosts belongs to
+// DMARC report addresses alone. What cannot be an address is refused for both,
+// and so is one that would read as an option on sendmail's command line.
+func TestAccountEmail(t *testing.T) {
+	for _, ok := range []string{"", "me@gmail.com", "first.last+tag@proton.me", "admin@example.org"} {
+		if err := AccountEmail(ok); err != nil {
+			t.Errorf("AccountEmail(%q) = %v, want accepted", ok, err)
+		}
+	}
+	for _, bad := range []string{"no-at-sign", "@example.org", "me@", "a b@example.org", "me@exa mple.org", "-oQ/tmp@example.org", "\u00fc@example.org"} {
+		if err := AccountEmail(bad); err == nil {
+			t.Errorf("AccountEmail(%q) accepted", bad)
+		}
+	}
+	if err := Email("-x@example.org"); err == nil {
+		t.Error("Email accepted an address that begins like an option")
+	}
+}

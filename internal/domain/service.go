@@ -87,12 +87,18 @@ func (s *Service) ServerMail() (ServerMail, error) {
 // server's own name, rebuilding them if they do not. The tables are otherwise
 // rebuilt only when a domain is added or deleted, so an installation that was
 // upgraded to a version with notifications would go on sending them unsigned
-// until then. It reports whether it had to rebuild.
+// until then, and one whose DKIM_SELECTOR_DEFAULT was changed would go on
+// signing with the key of the old selector while the panel shows the record
+// of the new. It reports whether it had to rebuild.
 func (s *Service) EnsureServerSigned() (bool, error) {
 	if s.serverName == "" {
 		return false, nil
 	}
-	signed, err := s.odk.signs(s.serverName)
+	selector, err := s.serverSelector()
+	if err != nil {
+		return false, err
+	}
+	signed, err := s.odk.signs(s.serverName, selector)
 	if err != nil {
 		return false, err
 	}
@@ -203,8 +209,10 @@ func (s *Service) Delete(id int64) error {
 		return fmt.Errorf("rebuild sender map after deleting %s: %w", d.Name, err)
 	}
 	// A sending domain named like the server shared its key with the server's
-	// own mail, which goes on being signed with it (resync above kept the name
-	// in the tables).
+	// own mail. The resync above kept the name in the tables under the default
+	// selector: the same key if that was the domain's selector, a new one -
+	// with a new record to publish, which Settings shows - if it was not.
+	// Either way the directory holds the key now in use.
 	if d.Name == s.serverName {
 		return nil
 	}

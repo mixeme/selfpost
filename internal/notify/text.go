@@ -53,9 +53,11 @@ func plain(s string, max int) string {
 	return string(b)
 }
 
-// days words a duration in whole days, the unit these messages count in.
+// days words a duration in days, the unit these messages count in, rounded
+// to the nearest: a certificate found thirteen days and twenty-three hours
+// from its end has fourteen days, not thirteen.
 func days(d time.Duration) string {
-	n := int(d.Hours() / 24)
+	n := int((d + 12*time.Hour) / (24 * time.Hour))
 	if n == 1 {
 		return "1 day"
 	}
@@ -70,8 +72,8 @@ func dnsProblem(hostname, domain string, faults []dnsFault, since time.Time) mes
 		lines[i] = f.Record + ": " + plain(f.Detail, 600)
 	}
 	return compose(hostname,
-		fmt.Sprintf("%s: %s no longer matches", domain, strings.Join(names, ", ")),
-		fmt.Sprintf("The DNS records of %s do not match what this server sends with. Two checks an hour apart found the same, the first at %s.", domain, stamp(since)),
+		fmt.Sprintf("%s: %s does not match", domain, strings.Join(names, ", ")),
+		fmt.Sprintf("The DNS records of %s do not match what this server sends with. Checks about an hour apart found the same, the first at %s.", domain, stamp(since)),
 		strings.Join(lines, "\n\n"),
 		fmt.Sprintf("Until the records are right, receivers may refuse mail from %s or file it as spam. The records to publish are in the panel under Outbound > Domains > %s.", domain, domain),
 		"One more message follows when the records match again.",
@@ -81,7 +83,7 @@ func dnsProblem(hostname, domain string, faults []dnsFault, since time.Time) mes
 func dnsCleared(hostname, domain string, since time.Time) message {
 	return compose(hostname,
 		fmt.Sprintf("%s: DNS records match again", domain),
-		fmt.Sprintf("The DNS records of %s match what this server sends with again; two checks an hour apart agree. They had not since %s.", domain, stamp(since)),
+		fmt.Sprintf("The DNS records of %s match what this server sends with again; checks about an hour apart agree. They had not since %s.", domain, stamp(since)),
 	)
 }
 
@@ -132,9 +134,9 @@ func queueCleared(hostname string, since time.Time) message {
 }
 
 func limitRefused(hostname string, r store.LimitRefusal) message {
-	who := "the domain " + r.Domain
-	if r.AppLogin != "" {
-		who = fmt.Sprintf("the application %s of %s", r.AppLogin, r.Domain)
+	who := fmt.Sprintf("the application %s of %s", strings.Join(r.Apps, ", "), r.Domain)
+	if len(r.Apps) > 1 {
+		who = fmt.Sprintf("the applications %s of %s", strings.Join(r.Apps, ", "), r.Domain)
 	}
 	count := "1 message"
 	if r.Count != 1 {
@@ -144,6 +146,6 @@ func limitRefused(hostname string, r store.LimitRefusal) message {
 		fmt.Sprintf("%s: a rate limit is refusing mail", r.Domain),
 		fmt.Sprintf("In the last 24 hours this server refused %s from %s under a level-2 rate limit, the first at %s. Refused mail is not queued: the application has to send it again.", count, who, stamp(r.First)),
 		fmt.Sprintf("If the volume is expected, raise the limit in the panel: Outbound > Domains > %s, on the domain or on the application. If it is not, the application is sending more than it should.", r.Domain),
-		"This limit is reported at most once a day.",
+		"Refusals of this domain's mail are reported at most once a day.",
 	)
 }

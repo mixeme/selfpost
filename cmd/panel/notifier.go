@@ -35,7 +35,9 @@ func runNotifier(ctx context.Context, cfg config, st *store.Store) error {
 			if err != nil {
 				return dnscheck.Domain{}, err
 			}
-			srv := dns.Server(cfg.hostname, true)
+			// The server's own addresses are cached for a minute: one lookup
+			// for a pass over all the domains.
+			srv := dns.Server(cfg.hostname, false)
 			return dns.Domain(dnscheck.Query{
 				Name:             d.Name,
 				Selector:         d.DKIMSelector,

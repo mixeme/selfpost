@@ -42,6 +42,8 @@ func (m *Mailer) Send(to, subject, body string) error {
 	// a header and onto a command line all the same, so what cannot be part of
 	// an address is refused here as well (security.md).
 	if to == "" || strings.ContainsAny(to, " \t\r\n<>,;\"") || strings.HasPrefix(to, "-") || !strings.Contains(to, "@") {
+		// (validate.AccountEmail refuses the same, so a user is told at the
+		// form and not here, once a minute, in the log.)
 		return fmt.Errorf("not an address a notification can go to: %q", to)
 	}
 	from := From(m.hostname)
@@ -88,6 +90,9 @@ func sendmail(from, to string, msg []byte) error {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sendmailPath, "-i", "-f", from, "--", to)
 	cmd.Stdin = bytes.NewReader(msg)
+	// sendmail hands the message to postdrop; if that child outlives the
+	// timeout holding the output pipe, do not wait for it for ever.
+	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("sendmail timed out after %s", sendmailTimeout)

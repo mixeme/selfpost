@@ -126,8 +126,32 @@ func TestEnsureServerSignedRebuildsOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	other.SetServerName("mail.example.org")
-	if signed, err := otherOdk.signs("mail.example.org"); err != nil || signed {
+	if signed, err := otherOdk.signs("mail.example.org", "selfpost"); err != nil || signed {
 		t.Errorf("a longer name was taken for the server's: %v, %v", signed, err)
+	}
+}
+
+// Tables that sign the server's name with the key of another selector - the
+// default selector was changed - are rebuilt: OpenDKIM must sign with the key
+// whose record the panel shows.
+func TestEnsureServerSignedFollowsTheSelector(t *testing.T) {
+	svc, odk := newTestService(t, &fakeApps{})
+	svc.SetServerName("mail.example.org")
+	if _, err := svc.EnsureServerSigned(); err != nil {
+		t.Fatal(err)
+	}
+
+	svc.selector = "sp2027"
+	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
+		t.Fatalf("after the selector changed: rebuilt = %v, %v; want a rebuild", rebuilt, err)
+	}
+	kt, _ := readTables(t, odk)
+	if !strings.Contains(kt, "mail.example.org mail.example.org:sp2027:") || strings.Contains(kt, ":selfpost:") {
+		t.Errorf("KeyTable after the rebuild:\n%s", kt)
+	}
+	mail, err := svc.ServerMail()
+	if err != nil || mail.Selector != "sp2027" {
+		t.Errorf("the panel shows selector %q (%v), the tables sign with sp2027", mail.Selector, err)
 	}
 }
 

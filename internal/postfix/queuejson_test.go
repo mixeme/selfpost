@@ -14,7 +14,10 @@ not json at all
 {"queue_name": "deferred", "queue_id": "", "arrival_time": 1791250000}
 {"queue_name": "deferred", "queue_id": "6C00BB34", "arrival_time": 17912`)
 
-	got := parseQueueJSON(out)
+	got, err := parseQueueJSON(out)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
 	if len(got) != 2 {
 		t.Fatalf("parsed %d messages, want 2: %+v", len(got), got)
 	}
@@ -22,11 +25,20 @@ not json at all
 		!got[0].Arrival.Equal(time.Unix(1791000000, 0)) {
 		t.Errorf("first message = %+v", got[0])
 	}
+	if len(got[0].Recipients) != 1 || got[0].Recipients[0] != "a@example.net" {
+		t.Errorf("first message's recipients = %v", got[0].Recipients)
+	}
 	if got[1].ID != "5F00AA12" || got[1].Queue != "active" {
 		t.Errorf("second message = %+v", got[1])
 	}
-	if len(parseQueueJSON(nil)) != 0 {
-		t.Error("an empty queue is not empty")
+	if empty, err := parseQueueJSON(nil); err != nil || len(empty) != 0 {
+		t.Errorf("an empty queue: %v, %v", empty, err)
+	}
+	// A line the reader cannot hold ends the listing with an error: what
+	// follows it is unknown, and "nothing old is left" must not be concluded.
+	long := append([]byte(`{"queue_id": "A", "arrival_time": 1, "sender": "`), make([]byte, 2<<20)...)
+	if _, err := parseQueueJSON(long); err == nil {
+		t.Error("a line longer than the reader's limit was not an error")
 	}
 }
 

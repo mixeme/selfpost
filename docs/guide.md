@@ -445,7 +445,7 @@ reported, each once:
 | What | When a message is sent | A second message |
 |---|---|---|
 | A sending domain's DKIM, SPF or DMARC record stops matching | after two hourly checks in a row found it wrong. A resolver that did not answer is not a mismatch; a missing DMARC record is advice on the domain's page, not a notification | when two checks in a row find the records right again |
-| A level-2 rate limit refuses mail | within a minute of the first refusal | at most once a day for the same domain and application, while it goes on |
+| A level-2 rate limit refuses mail of a sending domain's applications | within a minute of the first refusal | at most once a day for the same domain, while it goes on |
 | The TLS certificate is about to expire | 14 days before | 3 days before, if it is still the same certificate |
 | A message has waited in the queue for more than three days | at the next hourly check | when no message that old is left |
 
@@ -475,8 +475,13 @@ publish under **Server › Settings › Notification mail**:
 card. Without them notifications are still sent, and a receiver may file them
 as spam or, if the parent domain publishes a strict DMARC policy, refuse them.
 Mail of your sending domains depends on neither. If the hostname is itself one
-of your sending domains, the records are that domain's and are already
-published.
+of your sending domains, the DKIM record is that domain's and is already
+published - and whoever administers that domain can then send mail that
+looks like the panel's; a hostname that is nobody's sending domain is the
+better choice.
+
+The e-mail on Account may be at a public mail host (Gmail and the like); only
+a domain's DMARC report address may not.
 
 A relay that cannot send cannot say so: none of the four is "the relay is
 down". Watch that from outside ([Container health](#container-health)).

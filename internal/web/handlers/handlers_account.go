@@ -102,7 +102,7 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-	if err := validate.Email(f.Email); err != nil {
+	if err := validate.AccountEmail(f.Email); err != nil {
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}

@@ -54,7 +54,10 @@ func (h *Handlers) renderServerSettings(w http.ResponseWriter, r *http.Request, 
 	page := view.NewSettings(h.shellMeta(r), strconv.Itoa(form.outbound), view.FormatRate(h.l1Messages(), h.l1Window()))
 	on, err := h.store.NotificationsEnabled()
 	if err != nil {
+		// Shown as on: the form saves what it shows, and a failed read must not
+		// become "off" at the next Save.
 		logf("panel: settings: read the notifications switch: %v", err)
+		on = true
 	}
 	page.WithNotifications(on, notify.From(h.cfg.Hostname))
 	page.WithMail(h.serverMail(false).records)

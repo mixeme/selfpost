@@ -130,26 +130,60 @@ func TestNotifyStateRoundTrip(t *testing.T) {
 	}
 }
 
-// Refused mail is counted per domain and application from a point in time;
-// delivered mail and older refusals are not.
+// Refused mail is counted per sending domain from a point in time - and only
+// what was refused under a limit. The row's own domain is what the client
+// typed in MAIL FROM; the login's registered domain is what counts. A login
+// that is nobody's is not counted, nor is one refused with no limit set (its
+// client address was not on its list).
 func TestLimitRefusalsSince(t *testing.T) {
 	s := openTestStore(t)
+	d, err := s.AddDomain("example.com", "sp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.AddDomain("other.example", "sp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := func(domainID int64, login string) int64 {
+		t.Helper()
+		a, err := s.AddApplication(domainID, login, AddressModeWildcard, nil)
+		if err != nil {
+			t.Fatalf("add %s: %v", login, err)
+		}
+		return a.ID
+	}
+	limit := func(scope string, id int64) {
+		t.Helper()
+		if err := s.SetRateLimit(RateLimit{Scope: scope, RefID: id, MaxMessages: 1, WindowSeconds: 3600}); err != nil {
+			t.Fatalf("set limit: %v", err)
+		}
+	}
+	limit(RateLimitScopeApp, app(d.ID, "app1"))
+	limit(RateLimitScopeApp, app(d.ID, "app2"))
+	app(d.ID, "nolimit")         // refused for its client address
+	app(other.ID, "byitsdomain") // limited through its domain
+	limit(RateLimitScopeDomain, other.ID)
+
 	for _, e := range []SendLogEntry{
 		{Domain: "example.com", AppLogin: "app1", From: "a@example.com"},
-		{Domain: "example.com", AppLogin: "app1", From: "a@example.com"},
-		{Domain: "example.com", AppLogin: "app2", From: "b@example.com"},
+		{Domain: "victim.example", AppLogin: "app1", From: "a@victim.example"}, // a domain the client made up
+		{Domain: "other.example", AppLogin: "app2", From: "b@other.example"},   // another tenant's name
+		{Domain: "example.com", AppLogin: "nolimit", From: "c@example.com"},
+		{Domain: "example.com", AppLogin: "ghost", From: "d@example.com"},
+		{Domain: "other.example", AppLogin: "byitsdomain", From: "e@other.example"},
 	} {
 		if err := s.InsertRejected(e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.InsertQueued(SendLogEntry{QueueID: "ABC123", Domain: "example.com", AppLogin: "app3", To: "x@example.net"}); err != nil {
+	if err := s.InsertQueued(SendLogEntry{QueueID: "ABC123", Domain: "example.com", AppLogin: "app1", To: "x@example.net"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.InsertRejected(SendLogEntry{Domain: "old.example.com", AppLogin: "old"}); err != nil {
+	if err := s.InsertRejected(SendLogEntry{Domain: "example.com", AppLogin: "app2", From: "old@example.com"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`UPDATE send_log SET created_at = '2026-01-01T00:00:00Z' WHERE app_login = 'old'`); err != nil {
+	if _, err := s.db.Exec(`UPDATE send_log SET created_at = '2026-01-01T00:00:00Z' WHERE from_addr = 'old@example.com'`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -157,10 +191,32 @@ func TestLimitRefusalsSince(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].AppLogin != "app1" || got[0].Count != 2 || got[1].AppLogin != "app2" || got[1].Count != 1 {
-		t.Fatalf("refusals = %+v", got)
+	if len(got) != 2 {
+		t.Fatalf("refusals = %+v, want two domains", got)
 	}
-	if got[0].Domain != "example.com" || got[0].First.IsZero() {
-		t.Errorf("first refusal = %+v", got[0])
+	if g := got[0]; g.Domain != "example.com" || strings.Join(g.Apps, " ") != "app1 app2" || g.Count != 3 || g.First.IsZero() {
+		t.Errorf("example.com = %+v; want app1 (2, one under a made-up domain) and app2 (1, under another tenant's name)", g)
+	}
+	if g := got[1]; g.Domain != "other.example" || strings.Join(g.Apps, " ") != "byitsdomain" || g.Count != 1 {
+		t.Errorf("other.example = %+v", g)
+	}
+
+	// The question is answered from the index of the refused rows alone.
+	var plan []string
+	rows, err := s.db.Query(`EXPLAIN QUERY PLAN SELECT COUNT(*) FROM send_log l WHERE l.status = 'rejected' AND l.created_at >= '2026-10-01T00:00:00Z'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id, parent, notused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &notused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan = append(plan, detail)
+	}
+	rows.Close()
+	if !strings.Contains(strings.Join(plan, "; "), "idx_send_log_rejected") {
+		t.Errorf("refused rows are not found through their index: %v", plan)
 	}
 }

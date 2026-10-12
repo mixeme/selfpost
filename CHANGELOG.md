@@ -15,7 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The panel writes to its users when something needs them.** Four things,
   each said once: a sending domain's DKIM, SPF or DMARC record stops matching
   (after two hourly checks in a row, and once more when it matches again); a
-  level-2 rate limit refuses mail (at most once a day per limit); the TLS
+  level-2 rate limit refuses mail (at most once a day per sending domain); the TLS
   certificate is 14 days from expiry, and 3; a message has waited in the
   queue for more than three days (and once more when none has). Global users
   are told all of it, domain users about their own domains. Sent from
@@ -24,13 +24,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The server's own name is signed.** The panel generates a DKIM key for
   `SELFPOST_HOSTNAME` and OpenDKIM signs mail submitted locally as that name
   (`non_smtpd_milters`), so that notifications arrive. The name is not a
-  sending domain: no application can send as it.
+  sending domain: no application can use it as an envelope sender.
 - **Notifications in the panel.** Account has *Send me notifications* beside
   the e-mail; Server › Settings has the switch for everyone and the two DNS
   records of the server's own name, DKIM and SPF, with the values to publish;
   Server › Health has a *Notification mail* card with the state of each. Help
   has a Notifications topic. Every user starts with notifications on, and so
   does the instance.
+
+### Changed
+
+- **An account e-mail may be at a public mail host.** Account and Server ›
+  Users refused addresses at Gmail, Outlook, Proton and the like, a rule that
+  belongs to DMARC report addresses. A user's own address is now where the
+  panel writes to them.
+- **A lookup that does not answer is not an SPF mismatch.** When the address
+  lookup behind an `a` or `mx` mechanism timed out, a domain's SPF record was
+  shown as not authorising this server. It is now a warning that the check
+  could not tell.
+
+### Security
+
+- Technical and security reviews of 2026-10-12 of the notifications, before
+  release: no Critical finding. The notification about refused mail was built
+  on the domain a client writes in `MAIL FROM`; it is now built on the
+  registry. Recorded in [security.md](docs/security.md) as accepted, with a
+  roadmap candidate (from-header-binding): an application can have a message
+  signed as another registered domain, or as the server's own name, by
+  writing it into `From:` - the first part of which has always been so.
 
 ## [2.2.0] - 2026-10-12
 

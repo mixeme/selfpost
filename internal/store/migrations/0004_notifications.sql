@@ -12,12 +12,13 @@ ALTER TABLE users ADD COLUMN notify INTEGER NOT NULL DEFAULT 1 CHECK (notify IN 
 --   dns:<domain>            a sending domain's records
 --   cert                    the TLS certificate
 --   queue                   a message older than three days
---   limit:<domain>:<login>  a level-2 limit that refused mail
+--   limit:<domain>          level-2 limits that refused mail of the domain
 -- phase is where the subject stands ("pending": seen wrong, not yet said;
 -- "open": said; for the certificate, the threshold last said). count is the
 -- checks in a row that agree with the phase's direction, mark what the phase
--- refers to (the certificate's expiry), since when it began, sent_at when the
--- last message about it went out.
+-- refers to (the certificate's expiry; for DNS, when the records were first
+-- seen right again), since when it began, sent_at when the last message about
+-- it went out.
 CREATE TABLE notify_state (
     key     TEXT PRIMARY KEY,
     phase   TEXT NOT NULL,

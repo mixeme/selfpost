@@ -131,7 +131,7 @@ func TestDNSMismatchIsSaidOnceAndClearedOnce(t *testing.T) {
 	b.dns["example.com"] = badDKIM()
 
 	want(t, "first bad check", b.hour())
-	problem := "[SelfPost] example.com: DKIM no longer matches"
+	problem := "[SelfPost] example.com: DKIM does not match"
 	want(t, "second bad check", b.hour(), "mine@example.org|"+problem, "root@example.org|"+problem)
 	want(t, "third bad check", b.hour())
 
@@ -279,13 +279,30 @@ func TestQueueIsSaidOnceAndClearedOnce(t *testing.T) {
 	want(t, "after", b.hour())
 }
 
-// A limit that refuses mail is said to the domain's users, at most once a day.
+// A limit that refuses mail is said to the domain's users, at most once a day
+// for the domain, whichever of its applications are refused.
 func TestLimitRefusalIsSaidOnceADay(t *testing.T) {
 	b := newBench(t)
 	b.now = time.Now().UTC() // refusals are dated by the store's clock
-	refuse := func() {
+	domains, _ := b.st.ListDomains()
+	var domainID int64
+	for _, d := range domains {
+		if d.Name == "example.com" {
+			domainID = d.ID
+		}
+	}
+	for _, login := range []string{"app1", "app2"} {
+		a, err := b.st.AddApplication(domainID, login, store.AddressModeWildcard, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := b.st.SetRateLimit(store.RateLimit{Scope: store.RateLimitScopeApp, RefID: a.ID, MaxMessages: 1, WindowSeconds: 3600}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refuse := func(login, mailFromDomain string) {
 		t.Helper()
-		if err := b.st.InsertRejected(store.SendLogEntry{Domain: "example.com", AppLogin: "app1", From: "a@example.com"}); err != nil {
+		if err := b.st.InsertRejected(store.SendLogEntry{Domain: mailFromDomain, AppLogin: login, From: "a@" + mailFromDomain}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -293,20 +310,28 @@ func TestLimitRefusalIsSaidOnceADay(t *testing.T) {
 	b.n.CheckLimits()
 	want(t, "nothing refused", b.out.take())
 
-	refuse()
+	refuse("app1", "example.com")
 	b.n.CheckLimits()
 	subject := "[SelfPost] example.com: a rate limit is refusing mail"
 	want(t, "first refusal", b.out.take(), "mine@example.org|"+subject, "root@example.org|"+subject)
 
-	refuse()
+	// The second application of the domain is refused, and the first goes on
+	// under domains it makes up in MAIL FROM - another tenant's among them.
+	// It is all the same subject: example.com, told today.
+	refuse("app2", "example.com")
+	refuse("app1", "other.example")
+	refuse("app1", "made-up.example")
 	b.now = b.now.Add(2 * time.Hour)
 	b.n.CheckLimits()
 	want(t, "more of it two hours later", b.out.take())
+	if keys, _ := b.st.ListNotifyStateKeys("limit:"); strings.Join(keys, " ") != "limit:example.com" {
+		t.Errorf("limit subjects = %v, want the one registered domain", keys)
+	}
 
 	// A day after it was said, mail is still being refused: said again. The
 	// refusals are dated by the store's clock, so it is the telling that is
 	// moved back, not the clock forward.
-	st, have, err := b.st.GetNotifyState("limit:example.com:app1")
+	st, have, err := b.st.GetNotifyState("limit:example.com")
 	if err != nil || !have {
 		t.Fatalf("no state for the limit: %v, %v", have, err)
 	}
@@ -316,24 +341,157 @@ func TestLimitRefusalIsSaidOnceADay(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.n.CheckLimits()
-	want(t, "a day later, still refusing", b.out.take(), "mine@example.org|"+subject, "root@example.org|"+subject)
-	if body := limitRefused("mail.example.org", store.LimitRefusal{Domain: "example.com", AppLogin: "app1", Count: 3, First: b.now}).body; !strings.Contains(body, "3 messages from the application app1 of example.com") {
-		t.Errorf("the message does not say who was refused how much:\n%s", body)
+	if len(b.out.sent) != 2 || !strings.Contains(b.out.body[0], "4 messages from the applications app1, app2 of example.com") {
+		t.Fatalf("a day later, still refusing: %v\n%s", b.out.sent, strings.Join(b.out.body, "\n---\n"))
 	}
+	b.out.take()
 
-	// Nobody has hit the limit for two days: it is not a subject any more.
+	// Nobody was refused for two days: it is not a subject any more.
 	st.SentAt = b.now.Add(-49 * time.Hour)
 	if err := b.st.SetNotifyState(st); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := b.st.LimitRefusalsSince(b.now); err != nil {
 		t.Fatal(err)
 	}
 	b.now = b.now.Add(25 * time.Hour) // past the window the refusals lie in
 	b.n.CheckLimits()
 	want(t, "long quiet", b.out.take())
-	if _, have, _ := b.st.GetNotifyState("limit:example.com:app1"); have {
+	if _, have, _ := b.st.GetNotifyState("limit:example.com"); have {
 		t.Error("a limit nobody hits kept its state")
+	}
+}
+
+// Two checks minutes apart - the last before a restart and the first after it
+// - are not "an hour apart": the mismatch is said when a check finds it again
+// with the time passed.
+func TestDNSChecksMustBeApart(t *testing.T) {
+	b := newBench(t)
+	b.dns["example.com"] = badDKIM()
+
+	b.n.Check()
+	b.now = b.now.Add(3 * time.Minute) // the process restarted
+	b.n.Check()
+	want(t, "two checks three minutes apart", b.out.take())
+	b.now = b.now.Add(time.Hour)
+	b.n.Check()
+	if got := b.out.take(); len(got) != 2 {
+		t.Fatalf("an hour later: %v, want the two messages", got)
+	}
+
+	// The same for its going: two good checks minutes apart do not end it.
+	b.dns["example.com"] = good()
+	b.now = b.now.Add(time.Hour)
+	b.n.Check()
+	b.now = b.now.Add(3 * time.Minute)
+	b.n.Check()
+	want(t, "two good checks three minutes apart", b.out.take())
+	b.now = b.now.Add(time.Hour)
+	b.n.Check()
+	if got := b.out.take(); len(got) != 2 || !strings.Contains(got[0], "match again") {
+		t.Errorf("an hour later: %v, want the two messages that it is over", got)
+	}
+}
+
+// What arises while there is nobody to tell is told when there is somebody:
+// a thing is said only when it was sent. Its going, with nobody left to tell,
+// is simply over.
+func TestNobodyToTellIsNotSaid(t *testing.T) {
+	b := newBench(t)
+	users, _ := b.st.ListUsers()
+	for _, u := range users {
+		if err := b.st.SetUserNotify(u.ID, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expiry := b.now.Add(10 * 24 * time.Hour)
+	b.cert = health.Certificate{NotAfter: expiry}
+	b.dns["example.com"] = badDKIM()
+	b.q = []postfix.QueuedMessage{{ID: "OLD00001", Sender: "app@example.com", Arrival: b.now.Add(-5 * 24 * time.Hour)}}
+
+	want(t, "nobody listens", b.hour())
+	want(t, "nobody listens", b.hour())
+
+	for _, u := range users {
+		if u.Username == "root" {
+			if err := b.st.SetUserNotify(u.ID, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	got := b.hour()
+	if len(got) != 3 {
+		t.Fatalf("somebody listens now: %v, want the DNS mismatch, the certificate and the queue", got)
+	}
+
+	// Everything is put right while nobody listens again: no state is left to
+	// announce an ending later.
+	for _, u := range users {
+		if err := b.st.SetUserNotify(u.ID, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b.dns["example.com"] = good()
+	b.q = nil
+	want(t, "put right", b.hour())
+	want(t, "put right", b.hour())
+	for _, key := range []string{"dns:example.com", "queue"} {
+		if _, have, _ := b.st.GetNotifyState(key); have {
+			t.Errorf("state %s left behind", key)
+		}
+	}
+}
+
+// The notifier's own mail in the queue - a notification to a mailbox that does
+// not answer, or its bounce coming back to this server's postmaster - is not
+// the mail the queue is watched for.
+func TestQueueLeavesOutTheNotifiersOwnMail(t *testing.T) {
+	b := newBench(t)
+	old := b.now.Add(-4 * 24 * time.Hour)
+	b.q = []postfix.QueuedMessage{
+		{ID: "NOTE0001", Sender: "postmaster@mail.example.org", Recipients: []string{"gone@example.net"}, Arrival: old},
+		{ID: "BOUNCE01", Sender: "", Recipients: []string{"Postmaster@Mail.Example.Org"}, Arrival: old},
+	}
+	want(t, "only its own mail is old", b.hour())
+
+	b.q = append(b.q, postfix.QueuedMessage{ID: "APP00001", Sender: "", Recipients: []string{"app@example.com"}, Arrival: old})
+	if got := b.hour(); len(got) != 1 {
+		t.Errorf("an application's bounce is old too: %v, want one message", got)
+	}
+}
+
+// Whatever the rules arrive at, no more than the ceiling leaves in an hour:
+// these messages bypass every rate limit.
+func TestHourlyCeiling(t *testing.T) {
+	b := newBench(t)
+	for i := 0; i < hourlyCeiling+5; i++ {
+		b.n.send("", message{subject: "s", body: "b"})
+	}
+	if got := len(b.out.take()); got != hourlyCeiling {
+		t.Errorf("%d messages left in one hour, ceiling is %d", got, hourlyCeiling)
+	}
+	if b.n.send("", message{subject: "s", body: "b"}) != failed {
+		t.Error("a message over the ceiling was counted as said")
+	}
+	b.now = b.now.Add(61 * time.Minute)
+	if b.n.send("", message{subject: "s", body: "b"}) != sent {
+		t.Error("the ceiling did not lift after an hour")
+	}
+}
+
+// The subject of a certificate message counts in days as a person would:
+// found an hour past the threshold it still has "14 days".
+func TestCertificateSubjectRoundsDays(t *testing.T) {
+	for _, c := range []struct {
+		left time.Duration
+		want string
+	}{
+		{14*24*time.Hour - time.Hour, "expires in 14 days"},
+		{3*24*time.Hour - 20*time.Minute, "expires in 3 days"},
+		{30 * time.Hour, "expires in 1 day"},
+		{-time.Hour, "has expired"},
+	} {
+		m := certExpiring("mail.example.org", time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), c.left)
+		if !strings.Contains(m.subject, c.want) {
+			t.Errorf("%v left: subject %q, want %q", c.left, m.subject, c.want)
+		}
 	}
 }
 
