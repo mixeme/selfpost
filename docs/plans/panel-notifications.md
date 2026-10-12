@@ -1,0 +1,106 @@
+# Plan: panel-notifications
+
+**Status:** candidate - the design questions are closed with the owner (2026-10-12); taking it into work still needs his word  
+**Date:** 2026-10-12  
+**Version:** `2.3.0` MINOR (one migration; opt-out by a switch).
+
+---
+
+## Goal
+
+The panel writes to its administrators when something needs them, instead of
+waiting to be opened.
+
+## Decisions (owner, 2026-10-12)
+
+### Events of the first version
+
+Four, each of them something the panel can already tell and a person has to
+act on:
+
+| Event | Who is told |
+|---|---|
+| A sending domain's DNS record stopped matching (SPF, DKIM, DMARC) | global users, and `domain` users the domain is assigned to |
+| A level-2 rate limit refused mail | the same, for the domain of the limit |
+| The TLS certificate is about to expire | global users |
+| A message has been in the queue for more than **three days** | global users |
+
+Three days, not one (owner: "one day is not that much"): Postfix keeps a
+message five, so two are left to act before it bounces. The threshold is a
+constant, not a setting.
+
+Left for later: a process or milter socket down (a relay in that state often
+cannot send), an inbound upstream unreachable, DMARC failures appearing
+(noisy). Mail held in quarantine is not an event: quarantine is an idea
+outside the roadmap.
+
+### Sender and path
+
+From `postmaster@<SELFPOST_HOSTNAME>`, submitted locally. Not from one of the
+sending domains (owner): with several domains the choice is arbitrary, and a
+message about the certificate has no business coming from a domain.
+
+The server's name usually has no DKIM key. One DNS record is enough for such
+mail to pass SPF and DMARC on the name itself: `v=spf1 a -all` for the
+hostname. Server › Health gains that check next to reverse DNS, and the guide
+describes it. Without the record notifications are still sent.
+
+Notifications are the panel's own mail: they are not rows of the Outbound log
+and count against no level-2 limit.
+
+A relay that cannot send cannot say so; none of the four events is "the relay
+is down", and that is why.
+
+### Who chooses what
+
+- One switch for the instance under **Server › Settings**.
+- One checkbox per user under **Account**, "send me notifications" - on when
+  the profile has an e-mail. No choice per event: four events, none of them
+  noise. Per-event choice comes when there are more and some are.
+- A user without an e-mail gets nothing.
+
+### When a message is sent
+
+A background check once an hour for DNS, certificate and queue.
+
+| Event | Sent | "Cleared" message |
+|---|---|---|
+| DNS mismatch | after two checks in a row found it (it has held for an hour). A resolver that did not answer is not a mismatch | after two good checks in a row |
+| Certificate | 14 days before expiry, and again 3 days before if it is still the same certificate | none |
+| Level-2 limit refused mail | at the first refusal for a domain or application, then at most once a day for the same limit | none |
+| Queue older than three days | when such a message appears | one, when none is left |
+
+Event state is kept in the database, so a restart announces nothing a second
+time.
+
+## To settle while building
+
+- How the panel submits: `sendmail` as the unprivileged panel user, and what
+  that needs of the image.
+- Whether a notification carries a link to the panel - there is no setting
+  for the panel's own address.
+- Where the refusal of a level-2 limit is noticed: in the journal milter as
+  it refuses, or from the `rejected` rows of the send log on the hourly check.
+- Schema: the user's checkbox, the instance switch, the event state table.
+
+## Screens
+
+Not drawn. The Notifications box was taken out of the `account` and
+`settings` mockups on 2026-10-10 (owner: 2.0 ships no box for a feature that
+is not built). Drawing them again - one checkbox on Account, one switch on
+Server › Settings, the SPF check on Server › Health - is the first step, shown
+to the owner before any code ([panel-redesign.md](panel-redesign.md)
+§ Enforcement).
+
+## Implementation checklist (draft; counted from the day the item is agreed)
+
+- [ ] Mockups: Account checkbox, Settings switch, Health SPF check, help topic; accepted by the owner (`design:` commit)
+- [ ] Migration and store: user flag, instance switch, event state
+- [ ] Sending: local submission from `postmaster@<hostname>`, message text
+- [ ] Background checker: DNS, certificate, queue; the rules of *When a message is sent*
+- [ ] Level-2 refusal event
+- [ ] Panel: Account, Settings, Health check, help
+- [ ] guide.md, architecture.md, security.md, schema-migrations.md
+- [ ] `go vet`, `go test`, e2e: an event reaches a mailbox once and clears once
+- [ ] Technical review
+- [ ] Security review

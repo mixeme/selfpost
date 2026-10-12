@@ -35,7 +35,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
-| panel-notifications | E-mail notifications about important events | candidate | — | — |
+| panel-notifications | E-mail notifications about important events | candidate, design closed | — | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
@@ -338,30 +338,35 @@ checklist: [plans/delivery-log-storage.md](plans/delivery-log-storage.md).
 ## panel-notifications
 
 **Goal:** the panel tells its administrators when something needs them instead
-of waiting to be opened: a DNS record stops matching, a domain or application
-hits its rate limit and mail is refused, an inbound upstream is unreachable,
-DMARC failures appear; for the global
-administrator also the TLS certificate nearing expiry, a process or milter
-socket down, a queue older than a day.
+of waiting to be opened. First version, four events: a sending domain's DNS
+record stops matching, a level-2 rate limit refuses mail, the TLS certificate
+is about to expire, a message has been in the queue for more than three days.
 
-**Boundary:** e-mail only, sent through the relay itself from
-`postmaster@<hostname>`. Each user picks events under **Account**; a domain
-administrator hears only about assigned domains. One message when a problem
-starts and one when it clears — no streams, no digests in v1. One instance
-switch under **Server › Settings**. No webhooks, no chat integrations.
+**Boundary:** e-mail only, from `postmaster@<hostname>`, submitted locally -
+not from one of the sending domains. One checkbox per user under **Account**
+(no choice per event), one instance switch under **Server › Settings**; a
+domain administrator hears only about assigned domains. No streams, no
+digests, no webhooks, no chat integrations. Not in the first version: a
+process or milter down, an inbound upstream unreachable, DMARC failures.
 
-**Done when:** an event from the list reaches the account e-mail of every user
-who chose it and may see its subject, once on start and once on clear; a user
-without an e-mail gets nothing; the switch turns it all off.
+**Done when:** each of the four events reaches the account e-mail of every
+user who has notifications on and may see its subject, by the rules of the
+plan (a "cleared" message for DNS and the queue only); a user without an
+e-mail gets nothing; the switch turns it all off.
 
 **Dependencies / risks:** the account e-mail (2.0 baseline, see
 [plans/panel-redesign.md](plans/panel-redesign.md) § Account e-mail); a relay
-that cannot send cannot report that it cannot send — server events need the
-direct-to-MX path or stay panel-only; event state must survive restarts so a
-reboot does not re-announce everything. Screens are drawn: `account`,
-`settings`.
+that cannot send cannot report that it cannot send - none of the four events
+is "the relay is down"; mail from the bare hostname needs an SPF record for
+it to be believed, which Server › Health will check; event state must survive
+restarts so a reboot does not re-announce everything. The screens are not
+drawn: the Notifications box was taken out of `account` and `settings` on
+2026-10-10 and is redrawn as the first step.
 
-**Version:** `2.x` MINOR; `candidate`.
+**Version:** `2.3.0` MINOR; `candidate` - the design questions were closed
+with the owner on 2026-10-12
+([plans/panel-notifications.md](plans/panel-notifications.md)); taking it into
+work still needs his word.
 
 ---
 
