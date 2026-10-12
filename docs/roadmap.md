@@ -36,7 +36,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | structured-logging | `log/slog` with levels and fields | candidate | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
 | panel-notifications | E-mail notifications about important events | candidate | — | — |
-| delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | candidate | — | — |
+| delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | agreed | 0/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | candidate | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
@@ -45,8 +45,9 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
 **inbound-antispam-panel** as `2.1.0` (2026-10-12), built in the new component
-kit — styling its two screens once instead of twice. Nothing is agreed after
-it: every remaining item is a candidate. panel-docs shipped in
+kit — styling its two screens once instead of twice. After it the owner
+agreed **delivery-log-storage** (2026-10-12, `2.2.0`); every other remaining
+item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
 [security.md](security.md)); domain-stats-auto-ratelimit in
@@ -329,8 +330,8 @@ time to final status plus the queue lifetime), not to the id alone; the table
 grows with the send log (small — a few hundred bytes per message) and is
 covered by the same retention.
 
-**Version:** `2.x` MINOR; `candidate`. Fits after the redesign, built against
-the kit's `log_pane`.
+**Version:** `2.2.0` MINOR; agreed 2026-10-12, option 1. Decisions and
+checklist: [plans/delivery-log-storage.md](plans/delivery-log-storage.md).
 
 ---
 
