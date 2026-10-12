@@ -183,25 +183,46 @@ func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy) []view.Ste
 	}
 }
 
-// deliveryLog reads the mail.log lines Postfix wrote about one message and
-// splits each into the time and the text the page shows it in. The second
-// return value is what to say when there are none: every reason for an empty
-// result here is an ordinary one — the message never reached the queue, or its
-// lines have aged out of the log — so none of them is an error on the page. Only
-// a log that cannot be read at all is reported as a fault, and that one is
-// logged for the operator as well.
+// deliveryLogMargin is added to the queue lifetime when asking which stored
+// lines are a row's: Postfix expires a message on a queue run after the
+// lifetime has passed, not at the second it does, and logs the bounce after
+// that.
+const deliveryLogMargin = 24 * time.Hour
+
+// deliveryLog returns the mail.log lines Postfix wrote about one message, each
+// split into the time and the text the page shows it in. They come from the
+// database, where the log tailer keeps them for as long as the row lives
+// (architecture.md § Log tailer). A row with none stored is searched for in
+// the current mail.log, as every row was before 2.2.0: that is what shows a
+// message accepted before the lines were kept.
+//
+// The second return value is what to say when there are none: every reason for
+// an empty result here is an ordinary one — the message never reached the
+// queue, or it predates the stored lines and the log has rotated — so none of
+// them is an error on the page. Only lines that cannot be read at all are
+// reported as a fault, and that one is logged for the operator as well.
 func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 	if row.QueueID == "" {
 		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
 	}
-	lines, err := logtail.QueueLines(h.cfg.MailLogPath, row.QueueID, deliveryLogLines)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	stored, err := h.store.SendLogLines(row, h.cfg.RetryPolicy.LongestLifetime()+deliveryLogMargin, deliveryLogLines)
+	if err != nil {
 		logf("panel: delivery log %s: %v", row.QueueID, err)
-		return nil, "Could not read the mail log."
+		return nil, "Could not read the stored delivery log."
+	}
+	lines := make([]string, len(stored))
+	for i, l := range stored {
+		lines[i] = l.Line
 	}
 	if len(lines) == 0 {
-		days := h.sendLogRetentionDays()
-		return nil, fmt.Sprintf("Nothing for this queue id in the current mail log. Its lines have most likely been rotated away (send-log rows are kept for %d days).", days)
+		lines, err = logtail.QueueLines(h.cfg.MailLogPath, row.QueueID, deliveryLogLines)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			logf("panel: delivery log %s: %v", row.QueueID, err)
+			return nil, "Could not read the mail log."
+		}
+	}
+	if len(lines) == 0 {
+		return nil, "Nothing is stored for this queue id and nothing is in the current mail log. Lines are kept with the row since version 2.2.0; a message accepted before that had them only in mail.log, which has since rotated."
 	}
 	out := make([]view.LogLine, len(lines))
 	for i, line := range lines {

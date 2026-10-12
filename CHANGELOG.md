@@ -17,8 +17,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the tailer reads it; after an unclean stop a line read twice is stored once.
   Lines whose queue id has no send-log row - the row was pruned, or the
   message never had one (inbound relay mail, bounces) - are deleted once they
-  are an hour old, with every send-log sweep and hourly between. No page reads
-  them yet.
+  are an hour old, with every send-log sweep and hourly between.
+
+### Changed
+
+- **A message's page keeps its delivery log after `mail.log` rotates.** The
+  *Delivery log* box on Outbound › Log › a message was filled by searching
+  the current `mail.log`, which is rotated daily, so it was empty for anything
+  not sent today while the row itself lives for ninety days. The page now
+  reads the lines the tailer stored: they are there for as long as the row
+  is. Postfix reuses queue ids, so a row is given only the lines dated within
+  its own queue lifetime. A message accepted before this version shows its
+  lines only while they are still in the current file, as before; the note
+  shown when there are none and the *Outbound log* help topic say so.
 
 ## [2.1.0] - 2026-10-12
 

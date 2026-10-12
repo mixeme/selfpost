@@ -188,22 +188,52 @@ func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
 	}
 }
 
-// Rows outlive mail.log, and a message the milter refused never reached the
-// queue at all. Neither is a fault, so neither may render as an error.
+// The lines are kept in the database as the tailer reads them, so a message's
+// page shows them when mail.log no longer holds any - the ordinary case for
+// anything sent before the last daily rotation, and the reason they are kept.
+// Only this message's lines: another queue id's are not, nor those of an
+// earlier message that had the same queue id.
+func TestDeliveryPageShowsStoredLogLinesAfterRotation(t *testing.T) {
+	h, row := serverWithDelivery(t)
+	h.cfg.RetryPolicy = postfix.DefaultRetryPolicy()
+	h.cfg.MailLogPath = writeMailLog(t, "2026-08-04T00:00:01.000000+00:00 host postfix/qmgr[10]: 99999999: removed")
+	for _, l := range []store.SendLogLine{
+		{QueueID: row.QueueID, At: row.CreatedAt.AddDate(0, 0, -40), Line: "2026-06-24T05:00:00.000000+00:00 host postfix/qmgr[10]: 4A1B2C3D: an earlier message under the same id"},
+		{QueueID: row.QueueID, At: row.CreatedAt.Add(-time.Second), Line: "2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]"},
+		{QueueID: "99999999", At: row.CreatedAt, Line: "2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)"},
+		{QueueID: row.QueueID, At: row.CreatedAt.Add(11 * time.Second), Line: "2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)"},
+	} {
+		if err := h.store.InsertSendLogLine(l); err != nil {
+			t.Fatalf("InsertSendLogLine: %v", err)
+		}
+	}
+
+	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
+	for _, want := range []string{
+		`<span class="sp-d">2026-08-03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
+		`<span class="sp-d">2026-08-03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("delivery log is missing %q:\n%s", want, out)
+		}
+	}
+	for _, not := range []string{"99999999", "an earlier message"} {
+		if strings.Contains(out, not) {
+			t.Errorf("delivery page shows a line that is not this message's (%q):\n%s", not, out)
+		}
+	}
+}
+
+// A message accepted before the lines were kept has them only in mail.log, and
+// a message the milter refused never reached the queue at all. Neither is a
+// fault, so neither may render as an error.
 func TestDeliveryPageExplainsAnEmptyDeliveryLog(t *testing.T) {
 	h, row := serverWithDelivery(t)
-	h.cfg.SendLogRetentionEnvDefault = 60
-	if err := h.store.SetSendLogRetentionDays(60); err != nil {
-		t.Fatalf("SetSendLogRetentionDays: %v", err)
-	}
 	h.cfg.MailLogPath = filepath.Join(t.TempDir(), "mail.log") // never created
 
 	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
-	if !strings.Contains(out, "rotated away") {
+	if !strings.Contains(out, "Nothing is stored for this queue id") || !strings.Contains(out, "since version 2.2.0") {
 		t.Errorf("delivery page does not explain the empty delivery log:\n%s", out)
-	}
-	if !strings.Contains(out, "kept for 60 days") {
-		t.Errorf("delivery page does not show configured retention:\n%s", out)
 	}
 	if strings.Contains(out, `class="error"`) || strings.Contains(out, "Could not read the mail log") {
 		t.Errorf("an aged-out delivery log is reported as a failure:\n%s", out)

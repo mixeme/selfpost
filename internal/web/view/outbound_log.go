@@ -189,7 +189,7 @@ type OutMessage struct {
 	Delivery Box
 	LogLines []LogLine
 	// LogEmpty says why there are no lines: a message that never reached the
-	// queue, or whose lines have been rotated away, is an ordinary outcome.
+	// queue, or that predates the stored lines, is an ordinary outcome.
 	LogEmpty EmptyState
 }
 
