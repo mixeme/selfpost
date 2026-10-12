@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-12
+
 ### Security
 
 - **The level-2 rate limit and an application's client IP list held only for

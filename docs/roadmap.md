@@ -30,7 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 |---|---|---|---|---|
 | preflight | Installation check page (`/preflight`) | candidate | — | [plans/preflight.md](plans/preflight.md) |
 | contributing | `CONTRIBUTING.md` | candidate | — | — |
-| inbound-antispam-panel | Inbound antispam journal + allow/deny lists | in progress | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
+| inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | inbound-quarantine | Inbound spam quarantine (hold / review / release) | candidate | — | [plans/inbound-quarantine.md](plans/inbound-quarantine.md) |
 | csrf-tokens | Per-session CSRF tokens on state-changing forms | candidate | — | — |
 | template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
@@ -44,9 +44,10 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
-development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11); the next stage is
-**inbound-antispam-panel** (`2.1.0`), built in the new component kit —
-styling its two screens once instead of twice. panel-docs shipped in
+development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
+**inbound-antispam-panel** as `2.1.0` (2026-10-12), built in the new component
+kit — styling its two screens once instead of twice. Nothing is agreed after
+it: every remaining item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
 [security.md](security.md)); domain-stats-auto-ratelimit in
@@ -135,7 +136,7 @@ hook is set.
 **Dependencies / risks:** inbound relay `[1.4.0]`; rspamd map/header coupling;
 journal PII; global-admin-only RBAC.
 
-**Version:** `2.1.0` MINOR (was `1.10.0`; reordered after the redesign on 2026-10-09); **agreed**.
+**Version:** shipped `2.1.0` (2026-10-12), MINOR (was `1.10.0`; reordered after the redesign on 2026-10-09).
 
 ---
 

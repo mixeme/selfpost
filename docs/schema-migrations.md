@@ -71,7 +71,7 @@ inbound-antispam-panel (`2.1.0`).
 | Ver | File | Shipped | Kind | Summary |
 |-----|------|---------|------|---------|
 | 1 | `0001_init.sql` | 2.0.0 | DDL | The whole 2.0 schema, below |
-| 2 | `0002_inbound_spam_log.sql` | 2.1.0 (unreleased) | DDL | `inbound_spam_log`, `inbound_spam_list` and two indexes; nothing existing changes |
+| 2 | `0002_inbound_spam_log.sql` | 2.1.0 | DDL | `inbound_spam_log`, `inbound_spam_list` and two indexes; nothing existing changes |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.

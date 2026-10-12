@@ -1,6 +1,6 @@
 # Plan: inbound-antispam-panel
 
-**Status:** agreed  
+**Status:** shipped in `2.1.0` (2026-10-12)  
 **Date:** 2026-08-19  
 **Version:** `2.1.0` MINOR (opt-in; no change to outbound-only or inbound-without-filter paths). Was `1.10.0`; on 2026-10-09 the owner put the panel redesign first, so this ships on the 2.0 baseline and its screens are built from the redesign's component kit ([panel-redesign.md](panel-redesign.md) § Component kit).
 
