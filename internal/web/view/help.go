@@ -201,7 +201,7 @@ var inboundTopics = []HelpTopic{
 			", so its row has no subject, and a message refused after its text was sent is one row however many recipients it had. A refusal to relay for a domain that is not an inbound one is every scanner on the internet and is not recorded. Rows are kept for the number of days set in Settings, and never more than 10 000."),
 	}},
 	{ID: HelpFilterLists, Title: "Filter lists", Body: []Text{
-		Rich("Two lists for the whole server that correct the spam filter by hand. An entry is a sender address, a sender domain — that domain, not its subdomains — or a client address or network in CIDR form. A sender on the Deny list is refused outright. A sender on the Allow list is given a weight no spam score outweighs, so the filter lets it through. When entries of both lists match one message, ",
+		Rich("Two lists for the whole server that correct the spam filter by hand. An entry is a sender address, a sender domain — that domain, not its subdomains — or a client address or network in CIDR form. A sender on the Deny list is refused outright. A sender on the Allow list is given a weight no spam score outweighs, so the filter lets it through. The sender's address is whatever the sending server says it is - anyone can claim to be a sender you allow - so allow a client address or network where you can, and a sender address only for mail you would rather receive forged than lose. When entries of both lists match one message, ",
 			Strong("Deny wins"), ".",
 			Br(), Br(),
 			"SelfPost does not apply the lists itself: it writes them as files under ", Code("/data/antispam/"),

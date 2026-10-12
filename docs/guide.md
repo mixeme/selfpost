@@ -870,7 +870,11 @@ seconds of a change - no restart. An entry is a sender address, a sender
 domain (that domain, not its subdomains) or a client address or network. A
 denied sender is refused outright. An allowed one is given a weight that no
 spam score outweighs, so it is accepted - unless a deny entry matches the same
-message: **deny wins**, whichever entries they are. The files are readable by
+message: **deny wins**, whichever entries they are. **A sender address or
+domain on the allow list is not proof of anything**: it is the envelope
+sender, which the sending server states and nobody checks, so whoever knows an
+allowed address can send as it. Allow a client address or network where you
+can. The files are readable by
 anyone on the host; they hold addresses, not secrets.
 
 In the panel the lists are **Inbound › Filter lists** (global role), and what

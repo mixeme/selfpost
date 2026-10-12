@@ -33,7 +33,21 @@ Critical or High finding; a report's size was bounded only as bytes (now 5 000
 records, 255 bytes a field), the retention cap was one for the whole server
 (now per domain), the delivery command could run a hundred at once (now one),
 and the reason logged for a dropped message carried the sender's bytes as they
-came (now cut and reduced to printable ASCII).
+came (now cut and reduced to printable ASCII). The 2026-10-12 reviews of
+inbound-antispam-panel (`2.1.0`: the inbound journal milter, refusals read from
+`mail.log`, the filter lists and their pages) were two, by different models
+over the same diff. The technical one (Opus) found, outside the feature and
+there since `1.9.0`, that **the level-2 rate limit and an application's
+client-address list held only for the first message of a connection** - see
+[Mail path](#mail-path-security-relevant) - which was reproduced on the test
+stand and fixed. The security one (Fable) found no Critical or High: a client's
+HELO name could supply the sender, recipient and reply of a journal row and so
+make a refusal look like the deny list's (the reply now ends at Postfix's own
+`; from=<`); the journal's row cap was applied only every six hours, between
+which refusals were written at whatever rate a stranger sent recipients (the
+tailer now cuts to the cap every 500 rows); and three behaviours are recorded
+under Accepted risks (verdict headers while the filter is down, the allow list
+keyed on an address anyone can claim, the list files readable by anyone).
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -120,6 +134,8 @@ assigned outbound domains and inbound domains **separately**, each list with
 | Outbound: domain page, applications, Domain settings (report address, rate limit, export), log | every domain | assigned outbound domains |
 | Outbound › DMARC reports | every report, with the server's ingest statistics | reports of assigned domains, without the ingest box |
 | Inbound: domain page, upstream, recipients | every inbound domain | assigned inbound domains |
+| Inbound › Log | every row, including those of a domain deleted since | rows of assigned inbound domains (by name), without the links into the filter lists |
+| Inbound › Filter lists; the inbound log's retention | yes | no — 404 |
 | Add or delete a domain, either direction; import a domain | yes | no |
 | Account, Help | yes | yes |
 
@@ -178,6 +194,32 @@ operator can act on it.
   refuse unknown addresses at RCPT (no backscatter). OpenDKIM is not attached
   on inbound. An optional antispam milter is inbound-only; default action is
   fail-open (`accept`).
+- **The panel's milters judge every message of a connection.** Postfix
+  introduces a client to a milter once per connection, and the milter library
+  replaces the milter's session after any reply that is not "continue". Until
+  `2.1.0` the journal milter knew the client's address only from that
+  introduction, and both of its checks passed a message that came without one:
+  a second `MAIL FROM` after a refused one, or any message after the first on
+  one connection, got past the level-2 limit and past an application's
+  client-address list. Now the address comes with every `MAIL FROM`
+  (`milter_mail_macros` carries `{client_addr}`), the level-2 limit does not
+  ask for it at all, an application with a client-address list is refused when
+  no address is known, and neither milter replies anything but "continue" to a
+  message it lets through. `test/e2e` sends two `MAIL FROM` on one connection.
+- **The inbound journal is written from what strangers send.** The inbound
+  journal milter is the last on port 25, read-only and attached fail-open; it
+  keeps of the filter's verdict only what its patterns recognise. Refusals are
+  parsed from `mail.log` from the head of the line, with the reply ending at
+  Postfix's own `; from=<` so that the HELO name after it - the client's text,
+  logged as written - cannot stand in for the sender, the recipient or the
+  reply; an address with a quote, a bracket or a space in it is not kept.
+  Only a recipient at an inbound domain makes a row. The journal is cut to
+  10 000 rows every 500 rows the tailer writes, and by age every six hours.
+- **Filter lists** reach another container as files: values are whitelisted on
+  the way in (address, domain, canonical IP or network; no `/0`, no
+  IPv4-mapped network), the writer refuses a stored value with whitespace, a
+  newline or `#`, and a change of the table and the rewrite of the six files
+  are one step under a lock.
 - TLS is mandatory before credentials are transmitted (465 wrapper / 587
   `encrypt`).
 - `TRUSTED_PROXY_CIDR` — only explicitly trusted proxies may supply
@@ -295,13 +337,52 @@ deferred item from the roadmap.
 - **The application auth-IP allow-list is enforced fail-open.** The check runs
   in the journal milter (`internal/milter/authip.go`) with
   `default_action=accept` and skips on store errors, so if the milter is down
-  the restriction is not applied; the SASL login itself always succeeds. This
+  the restriction is not applied; the SASL login itself always succeeds.
+  (While the milter is up the list holds for every message, and an unknown
+  client address is refused - see Mail path; what is accepted here is the
+  milter being down.) This
   is documented in [guide.md](guide.md) as **not an authentication boundary** —
   it is a blast-radius limiter for a leaked application password, on the same
   fail-open path as level-2 rate limiting, and a milter outage already stops
   the journal from recording sends at all. The trigger to revisit is a
   requirement for the allow-list to hold as a security boundary — at which
   point it must move to the SASL/smtpd layer and fail closed.
+- **With the spam filter down, a sender can write his own verdict into the
+  inbound journal.** The filter is attached fail-open by default, and the
+  inbound journal milter reads its verdict from two headers. Up, rspamd removes
+  headers of those names that a sender wrote and adds its own (seen on the
+  test server: a forged pair was replaced). Down, the sender's pair is all
+  there is: the row shows his action and score, a forged `quarantine` shows a
+  hold that never happened, and a forged allow symbol counts as a match of an
+  allow entry that fits him in Filter lists. Mail is not affected - the
+  journal decides nothing - and the page that says the filter is down is
+  Server › Health. Accepted because the alternative is a live check of the
+  filter on every message for the sake of a monitoring page. Trigger to
+  revisit: the journal or the match counts being used to decide something
+  (alerts, automatic removal of entries), or `INBOUND_ANTISPAM_MILTER_ACTION`
+  staying `accept` on an installation whose filter is often down.
+- **An allow entry for a sender address or domain trusts what the sending
+  server says.** The filter matches the envelope sender, which is not
+  authenticated: anyone who knows or guesses an allowed address can send as it
+  and is given the entry's weight, which no spam score outweighs. The page's
+  Help and the guide say so and recommend an entry for the client's address or
+  network instead. Deny entries have no such problem - claiming to be a denied
+  sender only gets mail refused - and deny wins over allow. Trigger to
+  revisit: allow entries being used as the main way to receive mail from a
+  sender, at which point the rule should also require the sender's SPF or
+  DKIM to pass.
+- **The filter lists are files readable by anyone on the host.**
+  `/data/antispam` is 0755 and its six files 0644, unlike the rest of `/data`:
+  the filter runs under another user in another container. They hold sender
+  addresses, domains and networks - who the operator blocks and whom he lets
+  through - but no message data. The inbound journal itself is in the
+  database, 0640. Trigger to revisit: a shared host, where the sidecar should
+  instead be given the files through a group it shares with the panel.
+- **A row of the inbound log belongs to a domain by name.** A `domain` user
+  sees the rows whose inbound domain has the name of one assigned to them, so
+  an inbound domain that is deleted and added again shows its earlier rows to
+  whoever it is assigned to next. Accepted: the journal is of a mail domain,
+  and the rows age out with the retention.
 - **Level-2 in-flight reservations can outlive a dropped SMTP session until TTL.**
   The journal milter cannot observe connection-close directly through
   go-milter, so if a client disconnects without an explicit `Abort`, its

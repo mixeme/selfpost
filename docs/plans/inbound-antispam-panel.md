@@ -74,7 +74,9 @@ antispam hook). Without an external filter:
 
 - **accept** rows — message relayed (engine `selfpost`, detail empty);
 - **reject** / **tempfail** rows — from the mail.log tailer (Postfix policy,
-  size limit, unknown recipient, etc.).
+  unknown recipient, a sender domain that does not exist. As built, a refusal
+  whose log line names no recipient - the size limit answered at MAIL FROM -
+  and the per-client rate limit, which Postfix logs as a warning, make no row).
 
 Panel copy explains that rspamd symbols appear only when the antispam milter is
 configured.
@@ -260,7 +262,9 @@ flowchart LR
 ## Security
 
 - Same validation whitelists as inbound relay ([security.md](../security.md)).
-- Journal rows contain PII — retention and global-admin-only access.
+- Journal rows contain PII — retention, and access by reach: the global role
+  reads all of it, a `domain` user the rows of assigned inbound domains (as
+  built; see § RBAC).
 - Inbound journal milter fail-open must not block mail (backup-MX role).
 - List map writes injection-safe; deny wins over allow.
 
@@ -312,5 +316,5 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] Unit + handler tests — **Composer** (written with each step: store, milter, tailer, lists and their usage, view fixtures held to the outlines, handlers for both roles)
 - [x] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer** (kept up with each step; [security.md](../security.md) follows the security review)
 - [x] `go vet`, `go test`, e2e if applicable — **Composer** (on the test server for every step; last on `7192c38`: vet ok, 22 packages ok, e2e ok, which relays, refuses, reads the log page and edits a list through the panel)
-- [ ] Technical review of inbound antispam changes — **Opus**
-- [ ] Security review inbound antispam path — **Fable**
+- [x] Technical review of inbound antispam changes — **Opus** (2026-10-12; findings fixed: client address of a connection's later messages, the lists' writer under a lock, the tailer's queue-id memory, hold rows written twice, the cap by time; and, outside the feature, the level-2 limit and client-address list skipped after a connection's first message)
+- [x] Security review inbound antispam path — **Fable** (2026-10-12; no Critical or High; HELO-forged journal rows and the six-hourly row cap fixed, three accepted risks recorded in [security.md](../security.md))

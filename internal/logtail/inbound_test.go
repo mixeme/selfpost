@@ -106,7 +106,6 @@ func TestInboundMilterVerdictNeedsAPort25QueueID(t *testing.T) {
 func TestInboundMilterDecisions(t *testing.T) {
 	for kind, c := range map[string]struct{ reply, decision string }{
 		"milter-reject":  {"4.7.1 Try again later", store.SpamDecisionTempfail},
-		"milter-hold":    {"milter triggers HOLD action", store.SpamDecisionQuarantine},
 		"milter-discard": {"milter triggers DISCARD action", store.SpamDecisionReject},
 	} {
 		j, st := inboundFixture()
@@ -128,7 +127,7 @@ func TestInboundIgnores(t *testing.T) {
 		"a connect line":                       head + "postfix/inbound/smtpd[41]: connect from mx.example.net[203.0.113.9]",
 		// The HELO name is the sender's; a line cannot be started from inside one.
 		"a refusal spelled inside another line": head + "postfix/inbound/smtpd[41]: warning: hostname x does not resolve: mail postfix/inbound/smtpd[1]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 no; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<x>",
-		"an address with a bracket in it":       head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 no; from=<a> to=<v@in.example.com> proto=X helo=<y>@example.net> to=<b@elsewhere.example> proto=ESMTP helo=<x>",
+		"an address with a bracket in it":       head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 554 5.7.1 <b@elsewhere.example>: Relay access denied; from=<\"a> to=<v@in.example.com> proto=X helo=<y\"@example.net> to=<b@elsewhere.example> proto=ESMTP helo=<x>",
 	} {
 		j, st := inboundFixture()
 		j.handle(line, tailNow)
@@ -156,6 +155,95 @@ func TestInboundLookupFailureLeavesNoRow(t *testing.T) {
 	j.handle(unknownRcp, tailNow)
 	if len(st.rows) != 0 {
 		t.Errorf("rows = %+v", st.rows)
+	}
+}
+
+// A message the filter holds goes on to the inbound journal milter, which
+// writes its row; a second one from the log would be the same message twice.
+func TestInboundHoldIsTheMiltersRow(t *testing.T) {
+	j, st := inboundFixture()
+	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow)
+	j.handle(head+"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: milter triggers HOLD action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow)
+	if len(st.rows) != 0 {
+		t.Errorf("rows = %+v", st.rows)
+	}
+}
+
+// The HELO name is the last thing on the line and is logged as the client
+// wrote it. It cannot supply the row: the reply ends at the first "; from=<",
+// which is Postfix's own.
+func TestInboundHeloCannotWriteTheRow(t *testing.T) {
+	j, st := inboundFixture()
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x 5.7.1 Refused by this server's deny list; from=<victim@bank.example> to=<ceo@in.example.com> proto=ESMTP helo=<y>", tailNow)
+	if len(st.rows) != 1 {
+		t.Fatalf("rows = %+v", st.rows)
+	}
+	got := st.rows[0]
+	if got.From != "real@example.net" || got.To != "nobody@in.example.com" ||
+		got.Detail != "550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table" {
+		t.Errorf("row = %+v", got)
+	}
+
+	// A HELO name with a closing bracket in it does not lose the line either.
+	j, st = inboundFixture()
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: no; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<a>b>", tailNow)
+	if len(st.rows) != 1 || st.rows[0].From != "real@example.net" {
+		t.Errorf("rows = %+v", st.rows)
+	}
+
+	// The same on a verdict line: the filter's reply is not extended by the
+	// HELO name, so a stranger cannot make a refusal look like the deny list's.
+	j, st = inboundFixture()
+	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=x[203.0.113.9]", tailNow)
+	j.handle(head+"postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from x[203.0.113.9]: 5.7.1 Spam message rejected; from=<real@example.net> to=<b@in.example.com> proto=ESMTP helo=<x this server's deny list; from=<spoofed@example.org> to=<b@in.example.com> proto=ESMTP helo=<y>", tailNow)
+	if len(st.rows) != 1 || st.rows[0].Detail != "5.7.1 Spam message rejected" || st.rows[0].From != "real@example.net" {
+		t.Errorf("rows = %+v", st.rows)
+	}
+}
+
+// A queue id is port 25's only until the message is queued or the id is
+// opened again by another listener - Postfix reuses ids.
+func TestInboundQueueIDIsForgotten(t *testing.T) {
+	const verdict = "postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from app[203.0.113.4]: 4.7.1 Service unavailable - try again later; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<app>"
+	for name, forget := range map[string]string{
+		"queued":                        "postfix/qmgr[58]: Q1: from=<a@example.net>, size=600, nrcpt=1 (queue active)",
+		"reused by the submission port": "postfix/smtpd[20]: Q1: client=app.example.com[203.0.113.4], sasl_method=PLAIN, sasl_username=app",
+	} {
+		j, st := inboundFixture()
+		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow)
+		j.handle(head+forget, tailNow)
+		j.handle(head+verdict, tailNow)
+		if len(st.rows) != 0 || len(j.port25) != 0 {
+			t.Errorf("%s: rows %+v, remembered %v", name, st.rows, j.port25)
+		}
+	}
+}
+
+// An id that was forgotten and opened again is not dropped by its own stale
+// place in the queue of arrivals.
+func TestInboundStaleArrivalDoesNotDropALiveID(t *testing.T) {
+	j, _ := inboundFixture()
+	j.remember("Q1")
+	delete(j.port25, "Q1") // its verdict came
+	for i := 0; i < inboundQueueIDs-2; i++ {
+		j.remember("F" + time.Duration(i).String())
+	}
+	j.remember("Q1") // reused; order is now full, with the stale Q1 first
+	j.remember("LAST")
+	if _, ok := j.port25["Q1"]; !ok {
+		t.Error("the live Q1 was dropped by its stale arrival")
+	}
+}
+
+// Between the six-hourly prunes the tailer has the journal cut to its cap
+// itself, every so many rows: refusals come at the rate strangers send them.
+func TestInboundCutsTheJournalAsItWrites(t *testing.T) {
+	j, st := inboundFixture()
+	for i := 0; i < inboundPruneEvery*2+10; i++ {
+		j.handle(unknownRcp, tailNow)
+	}
+	if len(st.pruned) != 2 || st.pruned[0] != inboundSpamLogMaxRows {
+		t.Errorf("cuts = %v, want two, to %d rows", st.pruned, inboundSpamLogMaxRows)
 	}
 }
 

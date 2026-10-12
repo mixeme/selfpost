@@ -146,7 +146,7 @@ func (p *InLog) NewRow(in InLogRowInput) InLogRow {
 		Time: FormatLogTime(in.At), From: orDash(in.From), Client: in.Client, To: in.To, Subject: in.Subject,
 		Why: Sheet{
 			ID: "why-" + strconv.FormatInt(in.ID, 10), Tag: Tag{Status: in.Decision}, Title: "Why",
-			Rows: whyRows(in.Engine, in.Detail, in.Subject),
+			Rows: whyRows(in.Decision, in.Engine, in.Detail, in.Subject),
 		},
 	}
 	if p.IsGlobal {
@@ -157,15 +157,15 @@ func (p *InLog) NewRow(in InLogRowInput) InLogRow {
 
 // whyRows is the content of a row's sheet: who decided, what they said, and
 // the subject whole, which the table clips. What was said has one of two
-// shapes, told apart by how it starts. The inbound journal milter writes the
-// filter's verdict on mail that passed - an action and a score, then the
-// symbols after a semicolon. The log tailer writes the reply a refusal was
-// given, which starts with its code.
-func whyRows(engine, detail, subject string) []SheetRow {
+// shapes, and the decision says which. Mail that passed was written by the
+// inbound journal milter with the filter's verdict - an action and a score,
+// then the symbols after a semicolon. Mail that was refused or put off was
+// read from mail.log by the tailer, with the reply it was given.
+func whyRows(decision, engine, detail, subject string) []SheetRow {
 	rows := []SheetRow{{Label: "Decided by", Lines: []string{engine}}}
 	switch {
 	case detail == "":
-	case detail[0] >= '0' && detail[0] <= '9':
+	case decision == "reject" || decision == "tempfail":
 		rows = append(rows, SheetRow{Label: "Reply", Lines: []string{detail}, Mono: true})
 	default:
 		verdict, symbols, _ := strings.Cut(detail, "; ")

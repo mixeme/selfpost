@@ -284,18 +284,20 @@ func TestWhyRows(t *testing.T) {
 		}
 		return strings.Join(out, "; ")
 	}
-	for _, c := range []struct{ engine, detail, subject, want string }{
-		{"selfpost", "", "", "Decided by=selfpost"},
-		{"selfpost", "", "Hello", "Decided by=selfpost; Subject=Hello"},
-		{"rspamd", "no action, score 0.40 / 15.00", "Hi", "Decided by=rspamd; Verdict=no action, score 0.40 / 15.00; Subject=Hi"},
-		{"rspamd", "add header, score 9.80 / 15.00; A(5.00) B(-0.10)", "", "Decided by=rspamd; Verdict=add header, score 9.80 / 15.00; Symbols=A(5.00)|B(-0.10)"},
+	for _, c := range []struct{ decision, engine, detail, subject, want string }{
+		{"accept", "selfpost", "", "", "Decided by=selfpost"},
+		{"accept", "selfpost", "", "Hello", "Decided by=selfpost; Subject=Hello"},
+		{"accept", "rspamd", "no action, score 0.40 / 15.00", "Hi", "Decided by=rspamd; Verdict=no action, score 0.40 / 15.00; Subject=Hi"},
+		{"accept", "rspamd", "add header, score 9.80 / 15.00; A(5.00) B(-0.10)", "", "Decided by=rspamd; Verdict=add header, score 9.80 / 15.00; Symbols=A(5.00)|B(-0.10)"},
 		// a verdict with symbols and no action or score
-		{"rspamd", "A(5.00)", "", "Decided by=rspamd; Verdict=A(5.00)"},
-		{"rspamd", "5.7.1 Spam message rejected", "", "Decided by=rspamd; Reply=5.7.1 Spam message rejected"},
-		{"postfix", "450 4.1.8 <a@nx.example>: Sender address rejected; see x", "", "Decided by=postfix; Reply=450 4.1.8 <a@nx.example>: Sender address rejected; see x"},
+		{"quarantine", "rspamd", "A(5.00)", "", "Decided by=rspamd; Verdict=A(5.00)"},
+		{"reject", "rspamd", "5.7.1 Spam message rejected", "", "Decided by=rspamd; Reply=5.7.1 Spam message rejected"},
+		{"tempfail", "postfix", "450 4.1.8 <a@nx.example>: Sender address rejected; see x", "", "Decided by=postfix; Reply=450 4.1.8 <a@nx.example>: Sender address rejected; see x"},
+		// a refusal's text is a reply whatever it starts with
+		{"reject", "rspamd", "milter triggers DISCARD action", "", "Decided by=rspamd; Reply=milter triggers DISCARD action"},
 	} {
-		if got := flat(whyRows(c.engine, c.detail, c.subject)); got != c.want {
-			t.Errorf("whyRows(%q, %q, %q)\n got: %s\nwant: %s", c.engine, c.detail, c.subject, got, c.want)
+		if got := flat(whyRows(c.decision, c.engine, c.detail, c.subject)); got != c.want {
+			t.Errorf("whyRows(%q, %q, %q, %q)\n got: %s\nwant: %s", c.decision, c.engine, c.detail, c.subject, got, c.want)
 		}
 	}
 }

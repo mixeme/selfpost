@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **The level-2 rate limit and an application's client IP list held only for
+  the first message of a connection.** After a refused `MAIL FROM`, a second
+  one on the same connection was accepted, and so was every message after the
+  first that a connection carried: an application over its limit could go on
+  sending, and one restricted to certain client addresses could send from any
+  other with a retry. In the code since `1.9.0` (the client IP list) and
+  earlier (the limit); found by the technical review of 2026-10-12 and
+  reproduced on the test stand. Postfix now gives the panel's milters the
+  client address with every message, the limit no longer depends on it, and an
+  application with a client IP list is refused when no address is known.
+- Reviews of the inbound antispam feature before its release (technical and
+  security, 2026-10-12; nothing Critical or High in the feature itself). Fixed:
+  a client's HELO name could supply the sender, recipient and reply of an
+  inbound log row; the log's row cap was applied only every six hours; rows of
+  a connection's later messages had no client address; two changes of the
+  filter lists at once could leave the filter's files behind the page; a held
+  message was logged twice. Recorded as accepted in
+  [docs/security.md](docs/security.md): the filter's verdict in the log is the
+  sender's own while the filter is down; an allow entry for a sender address
+  trusts an address anyone can claim; the list files are readable by anyone on
+  the host.
+- `INBOUND_ANTISPAM_MILTER` and `INBOUND_JOURNAL_MILTER_SOCKET` are checked
+  character by character at start; the check looked at their first characters
+  only.
+
 ### Changed
 
 - **Port 25 logs as `postfix/inbound`.** Its lines in the mail log (Server ›

@@ -284,3 +284,29 @@ func TestListSpamListHits(t *testing.T) {
 		t.Errorf("no marks: %v, %v", hits, err)
 	}
 }
+
+// The cap removes the oldest by when it happened. After the panel was down the
+// tailer writes old refusals with the newest ids, and they are not what stays.
+func TestPruneInboundSpamCapIsByTime(t *testing.T) {
+	st := openTestStore(t)
+	now := time.Now().UTC()
+	for _, r := range []struct {
+		to  string
+		age time.Duration
+	}{{"new-1", time.Minute}, {"new-2", 2 * time.Minute}, {"backdated-old", 5 * time.Hour}} {
+		err := st.InsertInboundSpam(InboundSpamEntry{
+			InboundDomain: "in.example.com", ClientIP: "203.0.113.7", To: r.to,
+			Decision: SpamDecisionReject, Engine: SpamEnginePostfix, At: now.Add(-r.age),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := st.PruneInboundSpam(time.Time{}, 2); err != nil || n != 1 {
+		t.Fatalf("prune = %d, %v", n, err)
+	}
+	rows, err := st.QueryInboundSpam(InboundSpamFilter{}, 10, 0)
+	if err != nil || len(rows) != 2 || rows[0].To != "new-1" || rows[1].To != "new-2" {
+		t.Errorf("left = %+v, %v; want the two newest by time", rows, err)
+	}
+}

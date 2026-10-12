@@ -21,7 +21,7 @@ const (
 // CHECK constraint of inbound_spam_log.
 const (
 	SpamEngineRspamd   = "rspamd"   // the external filter
-	SpamEnginePostfix  = "postfix"  // Postfix's own policy: unknown recipient, size, rate
+	SpamEnginePostfix  = "postfix"  // Postfix's own policy: an unknown recipient, a sender domain that does not exist
 	SpamEngineSelfPost = "selfpost" // nobody: relayed with no filter attached
 )
 
@@ -71,9 +71,11 @@ func (s *Store) PruneInboundSpam(cutoff time.Time, keep int) (int64, error) {
 		return 0, fmt.Errorf("prune inbound_spam_log by age: %w", err)
 	}
 	n, _ := res.RowsAffected()
+	// Oldest by when it happened, not by id: the tailer dates a refusal by its
+	// log line, so after the panel was down the newest ids are old rows.
 	res, err = s.db.Exec(
-		`DELETE FROM inbound_spam_log WHERE id <=
-			(SELECT id FROM inbound_spam_log ORDER BY id DESC LIMIT 1 OFFSET ?)`, keep)
+		`DELETE FROM inbound_spam_log WHERE id IN
+			(SELECT id FROM inbound_spam_log ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?)`, keep)
 	if err != nil {
 		return n, fmt.Errorf("prune inbound_spam_log by count: %w", err)
 	}

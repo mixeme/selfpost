@@ -34,6 +34,9 @@ type Inbound struct {
 //	postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<a@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<mx.example.net>
 //	postfix/cleanup[52]: 4A1B2C3D: milter-reject: END-OF-MESSAGE from mx.example.net[203.0.113.9]: 5.7.1 Spam message rejected; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>
 //
+// A message the filter holds (milter-hold) is not read here: it goes on to the
+// inbound journal milter, which writes its row with the subject.
+//
 // The first is Postfix's own policy, written by the port-25 smtpd, which
 // build/postfix-config.sh names postfix/inbound so that its lines are told
 // from those of the submission ports. The second is the filter's verdict at
@@ -45,9 +48,20 @@ type Inbound struct {
 // name: the tail of such a line is the sender's own words (HELO name,
 // addresses), and a pattern that could start anywhere would let him write
 // journal rows.
+//
+// For the same reason the reply is the shortest text before "; from=<", and
+// the HELO name - the last thing on the line, which Postfix logs as the client
+// wrote it, spaces and brackets included - is whatever is left. Taking the
+// longest reply instead would let a HELO name that itself spells
+// "; from=<…> to=<…> proto=…" supply the sender, the recipient and the reply
+// of the row (security review, 2026-10-12).
 var (
-	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-hold|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<[^>]*>)?$`)
+	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*?); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<.*>)?$`)
 	inboundClientRe = regexp.MustCompile(`^\S+ postfix/inbound/smtpd\[\d+\]: ([0-9A-Za-z]+): client=`)
+	// A queue id stops being port 25's when the message is queued (qmgr takes
+	// it: the filter let it through) or when another listener opens a message
+	// under the same id - Postfix reuses ids.
+	inboundForgetRe = regexp.MustCompile(`^\S+ postfix/(?:qmgr\[\d+\]: ([0-9A-Za-z]+): from=|(?:[a-z0-9-]+/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=)`)
 )
 
 // A row holds one line of reason; Postfix's reply text carries the far end's
@@ -55,21 +69,40 @@ var (
 const inboundDetailMax = 255
 
 // inboundQueueIDs is how many port-25 queue ids are remembered while waiting
-// for cleanup's verdict line on them. A message is in that state for the
-// seconds its DATA takes; the cap only bounds a flood.
+// for cleanup's verdict line on them. An id is forgotten when the verdict
+// comes, when the message is queued, or when another listener reuses it; the
+// cap bounds what is left - messages the client abandoned - and a flood.
 const inboundQueueIDs = 4096
+
+// inboundPruneEvery is how many rows the tailer writes before it has the
+// journal cut back to its row cap, without waiting for the six-hourly prune.
+// Refusals are written at the rate strangers send RCPT TO, which no limit of
+// Postfix's counts, so between two prunes the journal would otherwise grow as
+// fast as someone cared to make it.
+const inboundPruneEvery = 500
 
 // inboundJournal is the per-run state of the inbound half.
 type inboundJournal struct {
 	st InboundStore
-	// port25 holds the queue ids the port-25 smtpd opened and cleanup has not
-	// reported on yet; order is their arrival, for dropping the oldest.
-	port25 map[string]struct{}
-	order  []string
+	// port25 holds the queue ids the port-25 smtpd opened and nobody has
+	// accounted for yet, each with the number of its arrival; order is those
+	// arrivals, for dropping the oldest. An id that was forgotten and opened
+	// again is in order twice: the number tells the stale entry from the live
+	// one when the stale one comes up for dropping.
+	port25 map[string]uint64
+	order  []queued
+	seq    uint64
+	// written counts the rows since the journal was last cut to its cap.
+	written int
+}
+
+type queued struct {
+	id  string
+	seq uint64
 }
 
 func newInboundJournal(st InboundStore) *inboundJournal {
-	return &inboundJournal{st: st, port25: make(map[string]struct{})}
+	return &inboundJournal{st: st, port25: make(map[string]uint64)}
 }
 
 // handle looks at one mail.log line and writes a journal row when it is a
@@ -80,11 +113,23 @@ func (j *inboundJournal) handle(line string, now time.Time) {
 		j.remember(m[1])
 		return
 	}
+	if m := inboundForgetRe.FindStringSubmatch(rest); m != nil {
+		delete(j.port25, m[1]+m[2])
+		return
+	}
 	m := inboundRejectRe.FindStringSubmatch(rest)
 	if m == nil {
 		return
 	}
 	program, queueID, kind, clientIP, reason, from, to := m[1], m[2], m[3], m[4], m[5], m[6], m[7]
+	// The sender's address is his own text too, and with a quoted local part it
+	// may hold "> to=<…> proto=…" - which would end the sender early and supply
+	// the recipient. Such a line shows it: the sender is left with an unclosed
+	// quote. An address with a quote, a bracket or a space in it is not one the
+	// journal keeps.
+	if strings.ContainsAny(from, "\"<> ") || strings.ContainsAny(to, "\"<> ") {
+		return
+	}
 	if program == "cleanup" {
 		if _, ok := j.port25[queueID]; !ok {
 			return // a submission-port message, or one opened before this run
@@ -121,11 +166,8 @@ func (j *inboundJournal) handle(line string, now time.Time) {
 		Detail:        printable(reason, inboundDetailMax),
 		At:            at,
 	}
-	switch {
-	case kind == "reject":
+	if kind == "reject" {
 		e.Engine = store.SpamEnginePostfix
-	case kind == "milter-hold":
-		e.Decision = store.SpamDecisionQuarantine
 	}
 	// "450 4.7.1 …" from Postfix, "4.7.1 …" from a milter: either way a reply
 	// that starts with 4 asks the sender to come back.
@@ -134,6 +176,14 @@ func (j *inboundJournal) handle(line string, now time.Time) {
 	}
 	if err := j.st.InsertInboundSpam(e); err != nil {
 		log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
+		return
+	}
+	if j.written++; j.written >= inboundPruneEvery {
+		j.written = 0
+		// The zero time removes nothing by age: this is the cap alone.
+		if _, err := j.st.PruneInboundSpam(time.Time{}, inboundSpamLogMaxRows); err != nil {
+			log.Printf("log-tailer: inbound journal: cut to %d rows: %v", inboundSpamLogMaxRows, err)
+		}
 	}
 }
 
@@ -141,12 +191,16 @@ func (j *inboundJournal) remember(queueID string) {
 	if _, ok := j.port25[queueID]; ok {
 		return
 	}
-	if len(j.order) >= inboundQueueIDs {
-		delete(j.port25, j.order[0])
+	for len(j.order) >= inboundQueueIDs {
+		oldest := j.order[0]
 		j.order = j.order[1:]
+		if j.port25[oldest.id] == oldest.seq {
+			delete(j.port25, oldest.id)
+		}
 	}
-	j.port25[queueID] = struct{}{}
-	j.order = append(j.order, queueID)
+	j.seq++
+	j.port25[queueID] = j.seq
+	j.order = append(j.order, queued{queueID, j.seq})
 }
 
 // printable cuts s to max bytes and replaces everything outside printable

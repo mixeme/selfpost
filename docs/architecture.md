@@ -28,7 +28,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 |---|---|---|---|
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
 | `panel` | panel | 200 | HTTP UI + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
-| `postfix` | root (wrapper) | 300 | MTA — started only after both milter sockets exist |
+| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily `postfix reload` for renewed TLS certs |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
@@ -98,7 +98,8 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   ([internal/logtail/inbound.go](../internal/logtail/inbound.go)). A line
   names one recipient, so a message refused at end-of-message is one row
   whatever its recipient count, and a line read twice (the tailer saves its
-  place once a second; an unclean stop can lose that second) is two rows. The
+  place every five seconds; an unclean stop can lose those seconds) is two
+  rows. The
   journal is pruned every six hours: rows
   older than the `inbound_spam_log_retention_days` setting, then down to
   10 000.

@@ -20,8 +20,10 @@ const (
 	// which os.SameFile cannot answer across a restart.
 	fingerprintSize = 512
 	// persistInterval throttles the offset write. Losing up to this much
-	// progress on a crash only means re-parsing a few lines (UpdateStatus is
-	// idempotent), which is much cheaper than a database write per poll tick.
+	// progress on a crash means re-parsing a few lines, which is much cheaper
+	// than a database write per poll tick. For a delivery status that changes
+	// nothing (UpdateStatus is idempotent); a refusal in those lines gets a
+	// second row in the inbound journal.
 	persistInterval = 5 * time.Second
 )
 
@@ -46,8 +48,9 @@ type tracker struct {
 // state whose fingerprint still matches means continue from it, parsing the
 // tail written while the panel was down; anything else means the file is not
 // the one the offset referred to (rotated, recreated or truncated in the
-// meantime), so read it from the start. Re-parsing lines already seen is
-// harmless: UpdateStatus writes the same status onto the same row.
+// meantime), so read it from the start. Re-parsing lines already seen writes
+// the same status onto the same send-log row, and a second inbound journal
+// row for a refusal among them.
 func (t *tracker) resume(f *os.File) int64 {
 	size, err := fileSize(f)
 	if err != nil {

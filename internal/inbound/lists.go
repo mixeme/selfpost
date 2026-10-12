@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -33,6 +34,12 @@ type ListStore interface {
 type Lists struct {
 	store ListStore
 	dir   string
+	// mu makes a change of the table and the rewrite of the files one step.
+	// Two requests at once could otherwise write the files in the other order
+	// than they changed the table - the first to read the entries being the
+	// last to write them - and leave the filter with an entry the page no
+	// longer lists. One Lists serves the panel, so a mutex is enough.
+	mu sync.Mutex
 }
 
 // NewLists builds the filter lists over the store and the map directory
@@ -76,31 +83,63 @@ func (l *Lists) Add(list, kind, rawValue, rawNote string) (store.SpamListEntry, 
 	if err != nil {
 		return store.SpamListEntry{}, err
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	e, err := l.store.AddSpamListEntry(list, kind, value, note)
 	if err != nil {
 		return store.SpamListEntry{}, err
 	}
-	if err := l.Sync(); err != nil {
+	if err := l.sync(); err != nil {
 		// An entry the filter never got is worse than no entry: the page
-		// would show a rule that does nothing.
+		// would show a rule that does nothing. The files are written again
+		// after the row is taken back, since some of the six may already
+		// hold it; if that fails too, the next change or start puts it right.
 		_ = l.store.DeleteSpamListEntry(e.ID)
+		_ = l.sync()
 		return store.SpamListEntry{}, err
 	}
 	return e, nil
 }
 
-// Delete removes an entry and rewrites the maps.
+// Delete removes an entry and rewrites the maps. If the maps cannot be
+// written the entry is put back: an entry that is gone from the page and
+// still in the filter's file could not even be removed a second time.
 func (l *Lists) Delete(id int64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entries, err := l.store.ListSpamListEntries()
+	if err != nil {
+		return err
+	}
+	var gone *store.SpamListEntry
+	for i := range entries {
+		if entries[i].ID == id {
+			gone = &entries[i]
+		}
+	}
 	if err := l.store.DeleteSpamListEntry(id); err != nil {
 		return err
 	}
-	return l.Sync()
+	if err := l.sync(); err != nil {
+		if gone != nil {
+			_, _ = l.store.AddSpamListEntry(gone.List, gone.Kind, gone.Value, gone.Note)
+		}
+		return err
+	}
+	return nil
 }
 
 // Sync writes all six map files from SQLite, each atomically, so the filter
 // reads a whole old file or a whole new one. Every file is written even when
 // empty: the filter's configuration names all six.
 func (l *Lists) Sync() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.sync()
+}
+
+// sync is Sync for a caller that holds mu.
+func (l *Lists) sync() error {
 	entries, err := l.store.ListSpamListEntries()
 	if err != nil {
 		return err
