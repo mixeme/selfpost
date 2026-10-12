@@ -26,6 +26,7 @@ type accountForm struct {
 	Err      string
 	Username string
 	Email    string
+	Notify   bool
 }
 
 func (h *Handlers) accountUser(w http.ResponseWriter, r *http.Request) (store.User, bool) {
@@ -44,7 +45,7 @@ func (h *Handlers) accountUser(w http.ResponseWriter, r *http.Request) (store.Us
 }
 
 func formOf(u store.User) accountForm {
-	return accountForm{Username: u.Username, Email: u.Email}
+	return accountForm{Username: u.Username, Email: u.Email, Notify: u.Notify}
 }
 
 // HandleAccount shows the Account page.
@@ -58,7 +59,7 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, u store.User, f accountForm) {
 	page := view.NewAccount(h.shellMeta(r), string(u.Role))
-	page.Username, page.Email = f.Username, f.Email
+	page.Username, page.Email, page.Notify = f.Username, f.Email, f.Notify
 	page.WithResult(accountFlash(r), f.Err)
 	h.view.Render(w, status, "account", page)
 }
@@ -90,6 +91,8 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 	}
 	f.Username = strings.TrimSpace(r.PostFormValue("username"))
 	f.Email = strings.TrimSpace(r.PostFormValue("email"))
+	// An unticked checkbox is not sent at all: absent is off.
+	f.Notify = r.PostFormValue("notify") != ""
 	if f.Username == "" {
 		f.Username = u.Username
 	}
@@ -112,7 +115,14 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
 		return
 	}
-	logf("panel: user %d profile updated (username: %t, e-mail: %t)", u.ID, f.Username != u.Username, f.Email != u.Email)
+	if f.Notify != u.Notify {
+		if err := h.store.SetUserNotify(u.ID, f.Notify); err != nil {
+			logf("panel: account: set notifications of user %d: %v", u.ID, err)
+			fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
+			return
+		}
+	}
+	logf("panel: user %d profile updated (username: %t, e-mail: %t, notifications: %t)", u.ID, f.Username != u.Username, f.Email != u.Email, f.Notify)
 	http.Redirect(w, r, "/account?done=profile", http.StatusSeeOther)
 }
 

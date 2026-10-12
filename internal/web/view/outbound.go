@@ -178,6 +178,41 @@ func SPFRecord(domain, value string, c DNSCheck) Record {
 	return r
 }
 
+// mailTag is the tag of a record of the server's own name. The records are not
+// needed for notifications to be sent, only for them to arrive, so a record
+// that is missing, wrong or weak is a warning here and never the red a
+// sending domain's would be; published and not checked keep their meaning.
+func mailTag(c DNSCheck) Tag {
+	t := DNSStatusTag(c.Status, len(c.Found) > 0)
+	if tagLevel(t.Status) == LevelFail {
+		t.Status = "warn"
+	}
+	return t
+}
+
+// ServerMailDKIM is the DKIM record of the server's own name, which the panel
+// signs its notifications with: a domain's DKIM record in every other respect.
+func ServerMailDKIM(selector, host, value string, c DNSCheck) Record {
+	r := DKIMRecord(selector, host, value, c)
+	r.Status = mailTag(c)
+	return r
+}
+
+// ServerMailSPF is the SPF record of the server's own name. Without it
+// notifications are still sent, which is said under the value while it is not
+// in place.
+func ServerMailSPF(host, value string, c DNSCheck) Record {
+	r := Record{Name: "SPF", Note: Plain("For the server's own name, not for your domains"),
+		Host: host, Type: "TXT", Value: value}
+	var standing Text
+	if c.Status != "ok" {
+		standing = Plain("Notifications are sent without it, and a receiver may file them as spam.")
+	}
+	applyCheck(&r, c, standing, nil)
+	r.Status = mailTag(c)
+	return r
+}
+
 // DMARCRecordInput is what a DMARC record needs besides its check: where the
 // reports go in words (Source: the address, or "no reports") and the page that changes it,
 // the page of the reports themselves ("" when the panel has none), and whether

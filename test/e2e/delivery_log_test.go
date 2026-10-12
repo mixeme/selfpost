@@ -53,6 +53,16 @@ func testDeliveryLogSurvivesRotation(t *testing.T, sc *scenario) {
 		t.Fatal(err)
 	}
 
+	// The rotation ends with `postfix reload`, which fails while Postfix is
+	// still starting - and this step follows one that restarts the container.
+	if err := waitFor("Postfix to be running", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		if _, err := h.execIn("selfpost", "postfix", "status"); err != nil {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := h.execIn("selfpost", "logrotate", "-f", "/etc/logrotate.d/mail"); err != nil {
 		t.Fatalf("logrotate -f: %v", err)
 	}

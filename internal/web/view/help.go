@@ -59,6 +59,9 @@ const (
 	HelpBackup   = "backup"
 	HelpUsers    = "users"
 	HelpSettings = "settings"
+	// HelpNotifications is what the panel writes to its users and what makes
+	// that mail arrive; Account, Settings and Health link to it.
+	HelpNotifications = "notifications"
 	// Account
 	HelpAccount = "account"
 )
@@ -121,6 +124,7 @@ func NewHelp(m Meta, inbound bool) *Help {
 			{Label: "Backup and moving a domain", Icon: "ti-archive", Href: "#" + HelpBackup},
 			{Label: "Users and roles", Icon: "ti-users", Href: "#" + HelpUsers},
 			{Label: "Settings", Icon: "ti-settings", Href: "#" + HelpSettings},
+			{Label: "Notifications", Icon: "ti-mail", Href: "#" + HelpNotifications},
 		})
 	}
 	add("Account", accountTopics, []MenuItem{
@@ -233,12 +237,19 @@ var serverTopics = []HelpTopic{
 		Rich("Settings holds what is true of the whole instance. Log retention is how many days the Outbound log keeps its rows, from 7 to 365 and 90 by default; a sweep every six hours deletes older ones, and it is the main driver of how fast ",
 			Code("/data"), " grows. With the inbound relay on there is a second number, for the Inbound log, with the same range. It does not change the rotation of ", Code("mail.log"),
 			", which is daily with about two weeks kept. The sending rate limit shown under it is level 1, the per-client-IP ceiling set in ",
-			Code(".env"), ": changing it needs a restart, and no level-2 limit can exceed it."),
+			Code(".env"), ": changing it needs a restart, and no level-2 limit can exceed it. Notifications are turned on or off here for everyone."),
+	}},
+	{ID: HelpNotifications, Title: "Notifications", Body: []Text{
+		Rich("The panel writes to its users when something needs them, from ", Code("postmaster@"), " the server's hostname. Four things are reported. A sending domain's SPF, DKIM or DMARC record stops matching: sent once two hourly checks in a row have found it so, and once more when the record matches again. A level-2 rate limit refuses mail: sent at the first refusal, then at most once a day for the same limit. The TLS certificate is 14 days from expiry, and again at 3 days if it is still the same certificate. A message has waited in the queue for more than three days, with one more message when none is left. A global user is told all of it; a domain administrator is told about the DNS records and limits of their own domains.",
+			Br(), Br(),
+			"Each user turns notifications on or off under Account and needs an e-mail there; Server › Settings turns them off for everyone. They are the panel's own mail: not rows of the Outbound log, and not counted against any limit.",
+			Br(), Br(),
+			"For that mail to arrive, the server's own name needs two DNS records of its own, as each of your domains does: a DKIM key, which the panel generates and signs notifications with, and an SPF record, ", Code("v=spf1 a -all"), ". Server › Settings gives both with the values to publish, and Server › Health shows whether they are in place. Without them notifications are still sent, and a receiver may file them as spam. Mail of your domains does not depend on either."),
 	}},
 }
 
 var accountTopics = []HelpTopic{
 	{ID: HelpAccount, Title: "Your account", Body: []Text{
-		Plain("Account is your own, whatever your role: your username and e-mail, and your password. Changing the password signs out every other session of this account and keeps the one you are using; applications have their own logins and are not affected."),
+		Plain("Account is your own, whatever your role: your username and e-mail, whether the panel sends you notifications, and your password. Changing the password signs out every other session of this account and keeps the one you are using; applications have their own logins and are not affected."),
 	}},
 }

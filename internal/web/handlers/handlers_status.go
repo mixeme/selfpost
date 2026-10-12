@@ -10,6 +10,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
@@ -114,7 +115,7 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	h.view.Render(w, http.StatusOK, "health", healthPage(h.shellMeta(r), h.healthChecks(), statusFlash(r)))
+	h.view.Render(w, http.StatusOK, "health", h.healthView(r, statusFlash(r)))
 }
 
 // HandleHealthFragment is the polled part of Health: the same two rows of
@@ -123,7 +124,7 @@ func (h *Handlers) HandleHealthFragment(w http.ResponseWriter, r *http.Request) 
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	page := healthPage(h.shellMeta(r), h.healthChecks(), "")
+	page := h.healthView(r, "")
 	page.Refresh = true
 	h.view.RenderFragment(w, http.StatusOK, "health_body", page)
 }
@@ -134,7 +135,16 @@ func (h *Handlers) HandleHealthRecheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.dns.Server(h.cfg.Hostname, true)
+	h.serverMail(true)
 	http.Redirect(w, r, "/server/health?rechecked=1", http.StatusSeeOther)
+}
+
+// healthView is the Health page for the request: the checks behind the cards
+// of Overview and the Notification mail card, which only Health shows.
+func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
+	page := healthPage(h.shellMeta(r), h.healthChecks(), flash)
+	mail := h.serverMail(false)
+	return page.WithNotificationMail(notify.From(h.cfg.Hostname), mail.rows, mail.status)
 }
 
 // healthPage turns one reading of the checks (healthChecks) into the Health

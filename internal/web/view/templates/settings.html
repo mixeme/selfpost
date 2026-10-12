@@ -1,6 +1,8 @@
 {{/* Server > Settings (mockup settings.html): what holds for the whole instance.
-     One form, one Save button; the rate limits are read-only facts. A user's own
-     name, e-mail, password and DMARC address are on Account (account.html). */}}
+     One form, one Save button; the rate limits are read-only facts, and the
+     records of the server's own name are the ones notifications are signed and
+     authorised with. A user's own name, e-mail, password and DMARC address are on
+     Account (account.html). */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 {{if .Flash}}{{template "flash" .Flash}}{{end}}
@@ -19,14 +21,25 @@
       {{end}}
       {{template "body_close"}}
       {{template "box_close"}}
-    </div>
 
-    <div class="column is-6">
       {{template "box_open" .RateLimits}}
       {{template "body_open"}}
       {{template "facts" .RateFacts}}
       {{template "body_close"}}
       {{template "box_close"}}
+    </div>
+
+    <div class="column is-6">
+      {{template "box_open" .Notifications}}
+      {{template "body_open"}}
+      <div class="field"><label class="checkbox"><input type="checkbox" name="notify"{{if .Notify}} checked{{end}}> Send notification e-mails</label>
+        <p class="help">{{template "inline" .NotifyNote}}</p></div>
+      {{template "body_close"}}
+      {{template "box_close"}}
+
+      {{template "box_open" .Mail}}
+      {{range .MailRecords}}{{template "dns_record" .}}
+      {{end}}{{template "box_close"}}
     </div>
   </div>
   <div class="buttons"><button type="submit" class="button is-primary">Save settings</button></div>

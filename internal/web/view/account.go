@@ -19,6 +19,9 @@ type Account struct {
 	Profile  Box
 	Username string
 	Email    string
+	// Notify is whether the panel writes to this user: the checkbox under the
+	// e-mail.
+	Notify bool
 
 	Password Box
 }
@@ -63,6 +66,18 @@ type Settings struct {
 
 	RateLimits Box
 	RateFacts  []Fact
+
+	// Notifications is the instance switch for notification e-mails; Notify is
+	// its state and NotifyNote the line under it, which says from where and to
+	// whom.
+	Notifications Box
+	Notify        bool
+	NotifyNote    Text
+
+	// Mail holds the DNS records of the server's own name, which notifications
+	// are signed and authorised with, drawn like a domain's.
+	Mail        Box
+	MailRecords []Record
 }
 
 // NewSettings builds the page. retention is what the field shows (the stored
@@ -87,7 +102,26 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 			{Label: "Level 2 · domain, application",
 				Value: Rich("Set on each ", Link("/outbound/domains", "domain"), " and on each application of a domain.")},
 		},
+		Notifications: Box{No: "03", Title: "Notifications", ID: "notifications", Help: topicLink(HelpNotifications, "What is sent and when")},
+		Mail: Box{No: "04", Title: "Notification mail", ID: "notification-mail", End: Plain("DNS records of the server's own name"),
+			Help: topicLink(HelpNotifications, "What the panel sends and what makes it arrive")},
 	}
+}
+
+// WithNotifications sets the instance switch: on is whether notification
+// e-mails are sent at all, from is the address they come from.
+func (s *Settings) WithNotifications(on bool, from string) *Settings {
+	s.Notify = on
+	s.NotifyNote = Rich("From ", Mono(from), ", to every user who has an e-mail and has not turned them off under ",
+		Link("/account", "Account"), ".")
+	return s
+}
+
+// WithMail sets the records of the server's own name, in the order they are
+// shown (ServerMailDKIM, ServerMailSPF).
+func (s *Settings) WithMail(records []Record) *Settings {
+	s.MailRecords = records
+	return s
 }
 
 // WithInbound adds the retention of the Inbound log to the Log retention box.

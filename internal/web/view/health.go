@@ -30,10 +30,19 @@ type Health struct {
 	CertDetail  string
 	CertProblem bool
 
-	Sockets       Box
-	SocketRows    []SocketRow
-	Hostname      Box
-	HostFacts     []Fact
+	Sockets    Box
+	SocketRows []SocketRow
+	Hostname   Box
+	HostFacts  []Fact
+
+	// NotifyMail is the card of the DNS records notifications are signed and
+	// authorised with (their values are under Server › Settings); NotifyNote
+	// is the line under its table. It is polled with the rest, so Refresh swaps
+	// it into place on its own.
+	NotifyMail Box
+	NotifyRows []MailRow
+	NotifyNote Text
+
 	Configuration Box
 	Reload        Action
 }
@@ -87,6 +96,20 @@ type SocketRow struct {
 	Detail string
 }
 
+// MailRow is one record of the Notification mail table: its name, the host it
+// is published at and its state as a tag.
+type MailRow struct {
+	Name  string
+	Host  string
+	State Tag
+}
+
+// NewMailRow is the row of one record of the server's own name, from what the
+// DNS check found. A record that is not in place is a warning, as on Settings.
+func NewMailRow(name, host string, c DNSCheck) MailRow {
+	return MailRow{Name: name, Host: host, State: mailTag(c)}
+}
+
 // NewHealth builds the page around its content. The handler fills the tables;
 // the boxes, the head and the reload action are the page's own.
 func NewHealth(m Meta, flash string) *Health {
@@ -104,13 +127,26 @@ func NewHealth(m Meta, flash string) *Health {
 		Certificate: Box{No: "03", Title: "TLS certificate", ID: "certificate", Help: topicLink(HelpCertificate, "When it warns and what to do")},
 		Sockets:     Box{No: "04", Title: "Milter sockets", ID: "sockets"},
 		Hostname:    Box{No: "05", Title: "Hostname and reverse DNS", ID: "hostname", Help: topicLink(HelpRDNS, "Forward and reverse DNS")},
-		Configuration: Box{No: "06", Title: "Configuration", ID: "configuration",
+		NotifyMail: Box{No: "06", Title: "Notification mail", ID: "notification-mail",
+			Help: topicLink(HelpNotifications, "What the panel sends and what makes it arrive")},
+		Configuration: Box{No: "07", Title: "Configuration", ID: "configuration",
 			End: Plain("Safe to run at any time")},
 		Reload: Action{Label: "Reload configuration", Icon: "ti-reload", Post: "/server/health/reload"},
 	}
 	if flash != "" {
 		h.Flash = &Flash{Text: Plain(flash)}
 	}
+	return h
+}
+
+// WithNotificationMail fills the Notification mail card: from is the address
+// notifications come from, rows the state of each record, and status the
+// card's verdict for its head.
+func (h *Health) WithNotificationMail(from string, rows []MailRow, status string) *Health {
+	h.NotifyMail.End = Verdict(status)
+	h.NotifyRows = rows
+	h.NotifyNote = Rich("Sent from ", Mono(from), ". What to publish is under ",
+		Link("/server/settings#notification-mail", "Settings"), ".")
 	return h
 }
 

@@ -2,6 +2,7 @@ package view
 
 import (
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -119,6 +120,10 @@ func healthFixture(refresh bool) *Health {
 		{Label: "Hostname", Value: Plain("mail.example.org"), Mono: true},
 		{Label: "Lookup", Value: Rich("→ 203.0.113.25", Br(), "← mail.example.org"), Mono: true},
 	}
+	h.WithNotificationMail("postmaster@mail.example.org", []MailRow{
+		NewMailRow("DKIM", mailFixtureDKIMHost, DNSCheck{Status: "ok"}),
+		NewMailRow("SPF", "mail.example.org", DNSCheck{Status: "error"}),
+	}, "warn")
 	return h
 }
 
@@ -126,14 +131,25 @@ func healthFixture(refresh bool) *Health {
 // and e-mail.
 func accountFixture() *Account {
 	a := NewAccount(admin(), "global")
-	a.Username, a.Email = "admin", "mix@example.org"
+	a.Username, a.Email, a.Notify = "admin", "mix@example.org", true
 	return a
 }
 
+// mailFixtureDKIMHost is where the mockup publishes the DKIM key of the server's
+// own name.
+const mailFixtureDKIMHost = "sp2026._domainkey.mail.example.org"
+
 // settingsFixture is the mockup's Settings: thirty days of log, a limit of 600
-// messages an hour.
+// messages an hour, notifications on, and the records of the server's own name
+// with the DKIM one published and the SPF one missing.
 func settingsFixture() *Settings {
-	return NewSettings(admin(), "30", FormatRate(600, 3600)).WithInbound("90")
+	key := "v=DKIM1; k=rsa; p=" + strings.Repeat("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A", 10) + "IDAQAB"
+	return NewSettings(admin(), "30", FormatRate(600, 3600)).WithInbound("90").
+		WithNotifications(true, "postmaster@mail.example.org").
+		WithMail([]Record{
+			ServerMailDKIM("sp2026", mailFixtureDKIMHost, key, DNSCheck{Status: "ok"}),
+			ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "error", Detail: "No SPF record is published for mail.example.org."}),
+		})
 }
 
 // outDomainsFixture is the mockup's Outbound domains: three domains, the first

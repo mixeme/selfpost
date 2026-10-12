@@ -14,6 +14,8 @@
       <div class="field"><label class="label" for="username">Username</label><div class="control has-icons-left"><input class="input" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required><span class="icon is-left"><i class="ti ti-user"></i></span></div></div>
       <div class="field"><label class="label" for="email">E-mail</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="email" autocapitalize="none" spellcheck="false"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
         <p class="help">Your own address. A domain's report address can be filled with it from Domain settings.</p></div>
+      <div class="field"><label class="checkbox"><input type="checkbox" name="notify"{{if .Notify}} checked{{end}}> Send me notifications</label>
+        <p class="help">To this address, when something needs you: a DNS record of a domain stops matching, a rate limit refuses mail, the TLS certificate is about to expire, a message has waited in the queue for three days. <a href="/help#notifications">What is sent and when</a></p></div>
       <button type="submit" class="button is-primary">Save profile</button>
     </form>
     {{template "body_close"}}

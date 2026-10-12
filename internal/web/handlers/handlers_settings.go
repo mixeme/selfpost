@@ -5,13 +5,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // Server › Settings holds what is true of the whole instance, whoever is
 // signed in: log retention (the outbound log's, and the inbound log's while the
-// inbound relay is on) and the read-only view of the rate limits. A
+// inbound relay is on), the read-only view of the rate limits, the switch for
+// notification e-mails and the DNS records of the server's own name those are
+// sent from. A
 // user's own name, e-mail, password and DMARC default are on Account
 // (handlers_account.go). Before placing a setting here, ask whose it is.
 
@@ -47,6 +52,12 @@ func (h *Handlers) currentRetentions() retentions {
 
 func (h *Handlers) renderServerSettings(w http.ResponseWriter, r *http.Request, status int, formErr string, form retentions) {
 	page := view.NewSettings(h.shellMeta(r), strconv.Itoa(form.outbound), view.FormatRate(h.l1Messages(), h.l1Window()))
+	on, err := h.store.NotificationsEnabled()
+	if err != nil {
+		logf("panel: settings: read the notifications switch: %v", err)
+	}
+	page.WithNotifications(on, notify.From(h.cfg.Hostname))
+	page.WithMail(h.serverMail(false).records)
 	// The inbound field exists while there is an inbound journal to keep.
 	if h.cfg.InboundEnabled {
 		page.WithInbound(strconv.Itoa(form.inbound))
@@ -87,10 +98,18 @@ func (h *Handlers) submitServerSettings(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	// An unticked checkbox is not sent at all: absent is off.
+	notifications := r.PostFormValue("notify") != ""
 	if err := h.store.SetSendLogRetentionDays(days); err != nil {
 		logf("panel: settings: set send-log retention failed: %v", err)
 		h.renderServerSettings(w, r, http.StatusInternalServerError,
 			"Could not save send log retention. Please check the logs and try again.", form)
+		return
+	}
+	if err := h.store.SetNotificationsEnabled(notifications); err != nil {
+		logf("panel: settings: set the notifications switch failed: %v", err)
+		h.renderServerSettings(w, r, http.StatusInternalServerError,
+			"Could not save the notifications switch. Please check the logs and try again.", form)
 		return
 	}
 	if h.cfg.InboundEnabled {
@@ -100,9 +119,9 @@ func (h *Handlers) submitServerSettings(w http.ResponseWriter, r *http.Request) 
 				"Could not save inbound log retention. Please check the logs and try again.", form)
 			return
 		}
-		logf("panel: instance settings updated (send-log retention: %d days, inbound-log retention: %d days)", days, form.inbound)
+		logf("panel: instance settings updated (send-log retention: %d days, inbound-log retention: %d days, notifications: %t)", days, form.inbound, notifications)
 	} else {
-		logf("panel: instance settings updated (send-log retention: %d days)", days)
+		logf("panel: instance settings updated (send-log retention: %d days, notifications: %t)", days, notifications)
 	}
 	http.Redirect(w, r, "/server/settings?saved=1", http.StatusSeeOther)
 }
@@ -118,4 +137,49 @@ func (h *Handlers) sendLogRetentionDays() int {
 		return store.SendLogRetentionDaysDefault
 	}
 	return days
+}
+
+// serverMailState is the server's own name as a sender of notifications: the
+// records to publish for it, as Settings draws them, and their state, as
+// Health lists it.
+type serverMailState struct {
+	records []view.Record
+	rows    []view.MailRow
+	// status is the verdict of Health's card: ok, warn or unknown. A record
+	// that is not in place is a warning, never an error: without them the
+	// notifications are still sent.
+	status string
+}
+
+// serverMail reads the records of the server's own name and checks them in DNS
+// (cached like a domain's; force skips the cache, for Re-check DNS). When the
+// DKIM key cannot be read the page is still shown: the DKIM record is left out,
+// the SPF record is shown unchecked, and the card does not claim it is fine.
+func (h *Handlers) serverMail(force bool) serverMailState {
+	host := h.cfg.Hostname
+	spfOf := func(c view.DNSCheck) (view.Record, view.MailRow) {
+		return view.ServerMailSPF(host, dnscheck.ServerMailSPF, c), view.NewMailRow("SPF", host, c)
+	}
+	mail, err := h.domains.ServerMail()
+	if err != nil {
+		logf("panel: server mail: %v", err)
+		rec, row := spfOf(view.DNSCheck{Status: string(health.StatusUnknown)})
+		return serverMailState{records: []view.Record{rec}, rows: []view.MailRow{row}, status: string(health.StatusUnknown)}
+	}
+	srv := h.dns.Server(host, false)
+	check := h.dns.ServerMail(dnscheck.Query{
+		Name: host, Selector: mail.Selector, ExpectedDKIM: mail.Record.Value,
+		Hostname: srv.Hostname, ServerIPs: srv.IPs,
+	}, force)
+	dkim := dnsCheck(check.DKIM)
+	spfRec, spfRow := spfOf(dnsCheck(check.SPF))
+	status := check.Overall
+	if status == health.StatusError {
+		status = health.StatusWarn
+	}
+	return serverMailState{
+		records: []view.Record{view.ServerMailDKIM(mail.Selector, mail.Record.Name, mail.Record.Value, dkim), spfRec},
+		rows:    []view.MailRow{view.NewMailRow("DKIM", mail.Record.Name, dkim), spfRow},
+		status:  string(status),
+	}
 }

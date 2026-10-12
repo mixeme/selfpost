@@ -2,7 +2,9 @@
      fragment (GET /server/health/fragment) alike. panel.js polls the first row
      (data-poll, outerHTML) and htmx swaps the second into place by its id when
      the fragment marks it out of band (.Refresh) — the two rows are siblings, and
-     a fragment can replace only the element that asked for it. */}}
+     a fragment can replace only the element that asked for it. The Notification
+     mail card is the third thing the fragment swaps in by id: it sits in a row of
+     the page with the static Configuration box, so it is a column of its own. */}}
 {{define "health_body"}}<div class="columns" id="health-machine" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
   <div class="column is-6">
     {{template "box_open" .Machine}}
@@ -58,4 +60,21 @@
     {{template "body_close"}}
     {{template "box_close"}}
   </div>
+</div>{{if .Refresh}}
+{{template "health_mail" .}}{{end}}{{end}}
+
+{{/* health_mail is the Notification mail card (the page calls it inside its own
+     row; the fragment sends it out of band). */}}
+{{define "health_mail"}}<div class="column is-6" id="health-mail"{{if .Refresh}} hx-swap-oob="true"{{end}}>
+  {{template "box_open" .NotifyMail}}
+  <div class="table-container"><table class="table is-fullwidth">
+    <thead><tr><th>Record</th><th>State</th></tr></thead>
+    <tbody>{{range .NotifyRows}}
+      <tr><td>{{.Name}}<br><span class="sp-muted sp-mono sp-small">{{.Host}}</span></td><td>{{template "tag" .State}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{template "body_open"}}
+  <p class="sp-muted">{{template "inline" .NotifyNote}}</p>
+  {{template "body_close"}}
+  {{template "box_close"}}
 </div>{{end}}

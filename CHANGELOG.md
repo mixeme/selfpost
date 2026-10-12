@@ -25,6 +25,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `SELFPOST_HOSTNAME` and OpenDKIM signs mail submitted locally as that name
   (`non_smtpd_milters`), so that notifications arrive. The name is not a
   sending domain: no application can send as it.
+- **Notifications in the panel.** Account has *Send me notifications* beside
+  the e-mail; Server › Settings has the switch for everyone and the two DNS
+  records of the server's own name, DKIM and SPF, with the values to publish;
+  Server › Health has a *Notification mail* card with the state of each. Help
+  has a Notifications topic. Every user starts with notifications on, and so
+  does the instance.
 
 ## [2.2.0] - 2026-10-12
 

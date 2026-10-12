@@ -263,8 +263,14 @@ func TestE2E(t *testing.T) {
 		sc.deliveryPage = page
 	})
 
+	run("notifications_set_up", func(t *testing.T) {
+		testNotificationsSetUp(t, sc)
+	})
 	run("negative_level2_ratelimit_via_panel", func(t *testing.T) {
 		testLevel2RateLimit(t, sc)
+	})
+	run("rate_limit_refusal_is_notified", func(t *testing.T) {
+		testRateLimitRefusalIsNotified(t, sc)
 	})
 	run("negative_sender_login_mismatch", func(t *testing.T) {
 		testSenderLoginMismatch(t, sc)

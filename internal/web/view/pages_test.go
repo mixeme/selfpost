@@ -148,7 +148,7 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 		// the two actions: Re-check DNS in the head, Reload configuration under the tables
 		`action="/server/health/recheck"`, `action="/server/health/reload"`,
 		// the anchors the Overview cards lead to
-		`id="machine"`, `id="processes"`, `id="certificate"`, `id="sockets"`, `id="hostname"`, `id="configuration"`,
+		`id="machine"`, `id="processes"`, `id="certificate"`, `id="sockets"`, `id="hostname"`, `id="notification-mail"`, `id="configuration"`,
 		// the machine card: bars carry their reading in an attribute (the CSP rules out sizing them with a style)
 		`<progress class="progress is-small is-success mb-1" value="12" max="100">`, `value="41"`,
 		`↓ 18.0 KiB/s`, `eth0: 2.1 GiB in, 6.4 GiB out`,
@@ -158,8 +158,8 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 		`hx-get="/server/health/fragment"`,
 	)
 	pageLacks(t, "Health", out, `hx-swap-oob`, `/overview/fragment`)
-	if got := strings.Count(out, `class="columns"`); got != 2 {
-		t.Errorf("Health has %d rows of boxes, want 2", got)
+	if got := strings.Count(out, `class="columns"`); got != 3 {
+		t.Errorf("Health has %d rows of boxes, want 3", got)
 	}
 	// The Configuration box is outside the polled rows: a refresh must not re-render a control.
 	if strings.Index(out, `id="configuration"`) < strings.Index(out, `id="health-checks"`) ||
@@ -169,27 +169,52 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 }
 
 // The fragment is the polled part of the page and nothing else: the same rows,
-// the second one marked to be swapped in by its id, no shell and no actions.
+// the second one marked to be swapped in by its id, and the Notification mail
+// card, a column of the last row, swapped in the same way. No shell and no
+// actions.
 func TestHealthFragmentIsThePolledRows(t *testing.T) {
 	page := renderSignedIn(t, "health", healthFixture(false))
 	frag := renderFragment(t, "health_body", healthFixture(true))
 
+	const card = `<div class="column is-6" id="health-mail"`
+	// The part of s before the card, and the card itself up to what follows it
+	// on the page (the Configuration box).
 	rows := func(s string) string {
-		a := strings.Index(s, `<div class="columns" id="health-machine"`)
-		b := strings.Index(s, `id="configuration"`)
-		if b < 0 {
-			b = len(s)
-		}
-		return s[a:b]
+		return s[strings.Index(s, `<div class="columns" id="health-machine"`):strings.Index(s, card)]
 	}
-	// Same markup, apart from the out-of-band mark and what follows the rows on the page.
-	got := strings.Replace(strings.TrimSpace(frag), ` hx-swap-oob="true"`, "", 1)
-	want := strings.TrimSpace(rows(page))
-	if !strings.HasPrefix(want, got) {
+	mail := func(s string) string {
+		a := strings.Index(s, card)
+		if b := strings.Index(s, `id="configuration"`); b > a {
+			return s[a:b]
+		}
+		return s[a:]
+	}
+	// Same markup, apart from the out-of-band marks and what follows the card on the page.
+	oob := func(s string) string { return strings.ReplaceAll(strings.TrimSpace(s), ` hx-swap-oob="true"`, "") }
+	if got, want := oob(rows(frag)), oob(rows(page)); !strings.HasPrefix(want, got) {
 		t.Errorf("the fragment is not the page's polled rows\nfragment: %.400s\npage:     %.400s", got, want)
 	}
-	pageHas(t, "fragment", frag, `id="health-machine" data-poll`, `id="health-checks" hx-swap-oob="true"`)
+	if got, want := oob(mail(frag)), oob(mail(page)); !strings.HasPrefix(want, got) {
+		t.Errorf("the fragment's Notification mail card is not the page's\nfragment: %.400s\npage:     %.400s", got, want)
+	}
+	pageHas(t, "fragment", frag, `id="health-machine" data-poll`, `id="health-checks" hx-swap-oob="true"`,
+		`id="health-mail" hx-swap-oob="true"`, `id="notification-mail"`)
 	pageLacks(t, "fragment", frag, `<h1`, `navbar`, `action="/server/health/reload"`, `action="/server/health/recheck"`)
+}
+
+// The Notification mail card says which record is in place and which is not,
+// with the host each is published at; a missing record is a warning, since
+// notifications are sent without it. The way to the values is a link.
+func TestHealthNotificationMailCard(t *testing.T) {
+	out := renderSignedIn(t, "health", healthFixture(false))
+	pageHas(t, "Health", out,
+		`<h2>Notification mail</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div>`,
+		`href="/help#notifications"`,
+		`DKIM<br><span class="sp-muted sp-mono sp-small">sp2026._domainkey.mail.example.org</span></td><td><span class="tag is-success is-light">published</span>`,
+		`SPF<br><span class="sp-muted sp-mono sp-small">mail.example.org</span></td><td><span class="tag is-warning is-light">missing</span>`,
+		`Sent from <span class="sp-mono">postmaster@mail.example.org</span>`,
+		`href="/server/settings#notification-mail"`,
+	)
 }
 
 // A machine whose counters could not be read keeps its rows: the figure becomes
@@ -289,15 +314,17 @@ func TestAccountEscapesTheFormValues(t *testing.T) {
 	pageLacks(t, "Account", out, `<script>1`, `"onfocus="x`)
 }
 
-// Event notifications are not built (roadmap: panel-notifications), and a page
-// carries no box for a feature that does not exist.
-func TestAccountAndSettingsHaveNoNotificationsBox(t *testing.T) {
-	for name, out := range map[string]string{
-		"Account":  renderSignedIn(t, "account", accountFixture()),
-		"Settings": renderSignedIn(t, "settings", settingsFixture()),
-	} {
-		pageLacks(t, name, out, `<h2>Notifications</h2>`, `type="checkbox"`, `/account/notifications`, `name="notify"`)
-	}
+// The checkbox under the e-mail is the user's own switch for notifications: it
+// shows what is stored, and an unchecked box is the absence of the attribute.
+func TestAccountShowsTheNotifyCheckbox(t *testing.T) {
+	a := accountFixture()
+	out := renderSignedIn(t, "account", a)
+	pageHas(t, "Account", out, `<input type="checkbox" name="notify" checked> Send me notifications`, `href="/help#notifications"`)
+
+	a.Notify = false
+	out = renderSignedIn(t, "account", a)
+	pageHas(t, "Account", out, `<input type="checkbox" name="notify"> Send me notifications`)
+	pageLacks(t, "Account", out, `name="notify" checked`)
 }
 
 // ---- Settings
@@ -308,6 +335,54 @@ func TestSettingsIsOneFormWithOneSaveButton(t *testing.T) {
 		t.Errorf("Settings has %d forms, want 1", got)
 	}
 	pageHas(t, "Settings", out, `Save settings`, `<h1 class="title is-3">Settings</h1>`, `href="/account"`)
+}
+
+// Notifications are one switch for the instance, saved with the rest of the
+// page, and the records of the server's own name are drawn like a domain's.
+func TestSettingsNotificationsSwitchAndRecords(t *testing.T) {
+	s := settingsFixture()
+	out := renderSignedIn(t, "settings", s)
+	pageHas(t, "Settings", out,
+		`<input type="checkbox" name="notify" checked> Send notification e-mails`,
+		`From <span class="sp-mono">postmaster@mail.example.org</span>, to every user who has an e-mail and has not turned them off under <a href="/account">Account</a>.`,
+		`id="notification-mail"`, `href="/help#notifications"`,
+		// DKIM is published; SPF is not, and says what that costs.
+		`<h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small>`,
+		`<h3>SPF</h3><span class="tag is-warning is-light">missing</span><small>For the server&#39;s own name, not for your domains</small>`,
+		`value="sp2026._domainkey.mail.example.org"`, `value="v=spf1 a -all"`,
+		`Notifications are sent without it, and a receiver may file them as spam.`,
+	)
+
+	// Switched off, and both records in place: the box is unchecked and the
+	// warning under SPF is gone.
+	s.Notify = false
+	s.WithMail([]Record{
+		ServerMailDKIM("sp2026", mailFixtureDKIMHost, "v=DKIM1; k=rsa; p=AAAA", DNSCheck{Status: "ok"}),
+		ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "ok"}),
+	})
+	out = renderSignedIn(t, "settings", s)
+	pageHas(t, "Settings", out, `<input type="checkbox" name="notify"> Send notification e-mails`,
+		`<h3>SPF</h3><span class="tag is-success is-light">published</span>`)
+	pageLacks(t, "Settings", out, `name="notify" checked`, `a receiver may file them as spam`)
+}
+
+// A record of the server's own name that is wrong or missing is a warning, never
+// the red of a sending domain's: notifications are sent without it.
+func TestMailRecordsAreWarningsNotErrors(t *testing.T) {
+	for _, c := range []struct {
+		check DNSCheck
+		want  Tag
+	}{
+		{DNSCheck{Status: "ok"}, Tag{Status: "published", Label: "published"}},
+		{DNSCheck{Status: "error"}, Tag{Status: "warn", Label: "missing"}},
+		{DNSCheck{Status: "error", Found: []string{"v=spf1 -all"}}, Tag{Status: "warn", Label: "mismatch"}},
+		{DNSCheck{Status: "warn"}, Tag{Status: "warn", Label: "weak"}},
+		{DNSCheck{Status: "unknown"}, Tag{Status: "unknown", Label: "not checked"}},
+	} {
+		if got := NewMailRow("SPF", "mail.example.org", c.check).State; got != c.want {
+			t.Errorf("a record that checked as %+v is %+v, want %+v", c.check, got, c.want)
+		}
+	}
 }
 
 func TestSettingsShowsTheRefusalAndKeepsWhatWasTyped(t *testing.T) {

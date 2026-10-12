@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"golang.org/x/crypto/bcrypt"
@@ -120,6 +121,10 @@ func settingsServerAt(t *testing.T, dbPath string) (*Handlers, string) {
 		view:  v,
 		auth:  a,
 		dns:   dnscheck.New(nil),
-		cfg:   Config{SendLogRetentionEnvDefault: 90},
+		// A domain service that does not know the server's own name, so that
+		// the records of Settings and Health come out as "cannot be read";
+		// the tests of those records use serverMailStand.
+		domains: domain.NewService(st, domain.NewOpenDKIM(t.TempDir()), nil, "selfpost"),
+		cfg:     Config{SendLogRetentionEnvDefault: 90},
 	}, password
 }
