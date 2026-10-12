@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-10-12
+
+Documentation only; no product code changes.
+
+### Added
+
+- **A full-tree code audit** at `2.4.0`, with its plan of work:
+  [docs/audit-2026-10-12.md](docs/audit-2026-10-12.md). Six zones read file
+  by file against what `architecture.md` promises; what the readers could not
+  settle from source was settled on the test server. Four high findings - the
+  published release images are stamped `VERSION=e2e` because the e2e gate
+  rebuilds the image it is about to push, so the backup version check has
+  never checked anything; a renewed TLS certificate is not picked up while
+  the container runs; the queue-reconcile sweep can mark delivered mail
+  `bounced` while the log tailer is blind; application logins are
+  case-sensitive to the panel and case-insensitive to Postfix - twenty-one
+  medium, thirty-four low, the doc drift and the test gaps, and what was
+  checked and found sound. The plan is six stages, each a cut of its own;
+  nothing in it is agreed yet. The published `1.x` tags and images stay as
+  they are (owner, 2026-10-12): fixes go forward only.
+
 ## [2.4.0] - 2026-10-12
 
 ### Security
