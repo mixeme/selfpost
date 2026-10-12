@@ -2,6 +2,9 @@ package milter
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"log"
 	"net"
 	"net/textproto"
@@ -33,10 +36,12 @@ type InboundStore interface {
 type inboundSession struct {
 	milter.NoOpMilter
 	rec InboundStore
-	// filter says whether an external filter is attached in front of this
-	// milter. Without one the verdict headers below can only have been written
-	// by the sender, and are not read.
-	filter bool
+	// key is what the filter signs each message with (FilterSignature), or
+	// empty when no filter is attached. A verdict is read only next to a
+	// signature that fits: the filter is attached so that mail flows when it is
+	// down, and then the verdict headers of a message are whatever its sender
+	// wrote.
+	key string
 
 	// clientIP is taken at Connect and again from {client_addr} with every
 	// MAIL FROM: a session the library made after a non-continue reply never
@@ -49,6 +54,7 @@ type inboundSession struct {
 	action  string // X-Rspamd-Action
 	result  string // X-Spamd-Result
 	seen    bool   // any verdict header of the filter
+	sig     string // X-SelfPost-Filter
 }
 
 func (s *inboundSession) Connect(host, family string, port uint16, addr net.IP, m *milter.Modifier) (milter.Response, error) {
@@ -73,10 +79,12 @@ func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Respons
 	return milter.RespContinue, nil
 }
 
-// Header keeps the first Subject and the filter's verdict. Postfix hands the
-// message to its milters one after another at end-of-message, each seeing what
-// the one before added, which is how the filter's headers arrive here. The
-// filter replaces headers of these names, so the last one read is its own.
+// Header keeps the first Subject, the filter's verdict and its signature.
+// Postfix hands the message to its milters one after another at
+// end-of-message, each seeing what the one before added, which is how the
+// filter's headers arrive here. The filter replaces headers of these names, so
+// the last one read is its own - when it is up. Whether it was is decided at
+// end-of-message, by the signature.
 func (s *inboundSession) Header(name, value string, m *milter.Modifier) (milter.Response, error) {
 	switch textproto.CanonicalMIMEHeaderKey(name) {
 	case "Subject":
@@ -84,21 +92,50 @@ func (s *inboundSession) Header(name, value string, m *milter.Modifier) (milter.
 			s.subject = mailhdr.DecodeSubject(value)
 		}
 	case "X-Rspamd-Action":
-		if s.filter {
-			s.action, s.seen = value, true
-		}
+		s.action, s.seen = value, true
 	case "X-Spamd-Result":
-		if s.filter {
-			s.result, s.seen = value, true
-		}
+		s.result, s.seen = value, true
+	case signatureHeader:
+		s.sig = strings.TrimSpace(value)
 	}
 	return milter.RespContinue, nil
+}
+
+// SignatureHeader is the header the filter signs a message in
+// (deploy/antispam/rspamd/milter_headers.conf writes it).
+const SignatureHeader = "X-SelfPost-Filter"
+
+var signatureHeader = textproto.CanonicalMIMEHeaderKey(SignatureHeader)
+
+// FilterSignature is what the filter writes into SignatureHeader for a message:
+// the HMAC-SHA256 of its queue id under the key SelfPost shares with the
+// filter, in hex. The key is used as the text it is stored as. A signature
+// fits one queue id, so the header going on to the upstream with the mail
+// gives nothing to whoever reads it there.
+func FilterSignature(key, queueID string) string {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(queueID))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// signed reports whether the message carries the filter's signature for its
+// queue id. No key, no queue id or no signature is "no".
+func (s *inboundSession) signed(queueID string) bool {
+	if s.key == "" || queueID == "" || s.sig == "" {
+		return false
+	}
+	return hmac.Equal([]byte(strings.ToLower(s.sig)), []byte(FilterSignature(s.key, queueID)))
 }
 
 // Body fires at end-of-message: the message is about to be queued for its
 // upstream. "Continue" lets it through as "accept" would, and keeps this
 // session for the connection's next message.
 func (s *inboundSession) Body(m *milter.Modifier) (milter.Response, error) {
+	// The queue id is known only now, and with it whether the verdict headers
+	// read on the way here are the filter's.
+	if !s.signed(macro(m, "i")) {
+		s.seen = false
+	}
 	s.record()
 	s.reset()
 	return milter.RespContinue, nil
@@ -111,7 +148,7 @@ func (s *inboundSession) Abort(m *milter.Modifier) error {
 
 func (s *inboundSession) reset() {
 	s.from, s.rcpts, s.subject = "", nil, ""
-	s.action, s.result, s.seen = "", "", false
+	s.action, s.result, s.seen, s.sig = "", "", false, ""
 }
 
 // record writes one row per recipient at an inbound domain. Other recipients
@@ -169,9 +206,8 @@ var (
 // rspamdVerdict reduces the filter's headers to an action and a one-line
 // summary: the action, the score against the threshold, and the first few
 // symbols that carried weight. It reads only what it recognises - the headers
-// are the filter's when it is up, but the sender's own when it is not (it is
-// attached fail-open), so nothing of them is kept verbatim except through
-// these patterns.
+// are read only next to the filter's signature, and even so nothing of them is
+// kept verbatim except through these patterns.
 func rspamdVerdict(actionHeader, resultHeader string) (action, detail string) {
 	action = strings.ToLower(strings.TrimSpace(actionHeader))
 	for _, r := range action {
@@ -229,11 +265,12 @@ func rspamdVerdict(actionHeader, resultHeader string) (action, detail string) {
 }
 
 // ServeInbound runs the inbound journal milter on ln until ctx is cancelled.
-// filter says whether an external filter is attached in front of it
-// (INBOUND_ANTISPAM_MILTER). It returns nil on a clean shutdown.
-func ServeInbound(ctx context.Context, ln net.Listener, rec InboundStore, filter bool) error {
+// key is what the external filter in front of it signs messages with, or
+// empty when none is attached (INBOUND_ANTISPAM_MILTER): no verdict is then
+// read at all. It returns nil on a clean shutdown.
+func ServeInbound(ctx context.Context, ln net.Listener, rec InboundStore, key string) error {
 	srv := &milter.Server{
-		NewMilter: func() milter.Milter { return &inboundSession{rec: rec, filter: filter} },
+		NewMilter: func() milter.Milter { return &inboundSession{rec: rec, key: key} },
 		Actions:   0,                // read-only
 		Protocol:  milter.OptNoBody, // headers and end-of-message, not the body
 	}

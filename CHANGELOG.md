@@ -24,9 +24,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   a connection's later messages had no client address; two changes of the
   filter lists at once could leave the filter's files behind the page; a held
   message was logged twice; after an unclean stop of the panel the refusals of
-  its last seconds were logged twice. Recorded as accepted in
-  [docs/security.md](docs/security.md): the filter's verdict in the log is the
-  sender's own while the filter is down; an allow entry for a sender address
+  its last seconds were logged twice; with the spam filter down, a sender's
+  own verdict headers were recorded as the filter's. Recorded as accepted in
+  [docs/security.md](docs/security.md): an allow entry for a sender address
   trusts an address anyone can claim; the list files are readable by anyone on
   the host.
 - `INBOUND_ANTISPAM_MILTER` and `INBOUND_JOURNAL_MILTER_SOCKET` are checked
@@ -91,6 +91,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   relay on.
 - Help: *Inbound log* and *Filter lists*.
 - New setting `ANTISPAM_DIR` (default `/data/antispam`).
+- **The spam filter signs what it judged.** rspamd adds `X-SelfPost-Filter` to
+  every message it lets through - an HMAC of the message's queue id under a
+  key SelfPost creates in `data/antispam/filter.key` - and the inbound log
+  shows a verdict only next to a signature that fits. Nothing to configure,
+  but the sidecar needs the new `antispam/rspamd/milter_headers.conf` and a
+  restart after SelfPost's first start; until then accepted mail is logged
+  as *selfpost*, with no verdict.
 - A full backup carries the inbound log, the filter lists and their files
   under `data/antispam/`. It does not carry the `antispam/` directory with the
   compose fragment and the rspamd configuration - copy that from

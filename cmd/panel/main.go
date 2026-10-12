@@ -312,6 +312,13 @@ func run() error {
 			log.Printf("filter lists bootstrap: %v", err)
 		}
 	}
+	// The key the filter signs with has to be in the shared directory before
+	// the filter reads it, whether or not a filter is attached yet.
+	if cfg.inboundEnabled {
+		if _, err := inbound.FilterKey(cfg.antispamDir); err != nil {
+			log.Printf("filter key bootstrap: %v", err)
+		}
+	}
 
 	if err := st.EnsureSendLogRetentionDays(cfg.retentionDays); err != nil {
 		return fmt.Errorf("bootstrap send-log retention: %w", err)

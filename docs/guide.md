@@ -860,6 +860,17 @@ with the message, and the upstream receives them with the mail. Copy the
 `antispam/rspamd/` directory next to the fragment; without the file accepted
 mail is still recorded, with no verdict.
 
+The same file makes rspamd **sign** each message, in a third header,
+`X-SelfPost-Filter`. The filter is attached so that mail still flows when it
+is down, and then a sender could write a verdict of his own into those
+headers; SelfPost therefore records a verdict only next to a signature it can
+recompute. The key is `data/antispam/filter.key`: SelfPost creates it on its
+first start with the inbound relay on, and the sidecar reads it from the
+directory it already mounts - there is nothing to configure. If Inbound › Log
+shows *selfpost* for mail the filter did judge, the sidecar is running without
+this file or started before the key existed: copy `antispam/rspamd/` again and
+restart the sidecar.
+
 The same directory holds
 [multimap.conf](../deploy/antispam/rspamd/multimap.conf), the rules for the
 **allow and deny lists** kept in the panel. SelfPost does not apply the lists

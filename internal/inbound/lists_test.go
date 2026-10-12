@@ -395,3 +395,46 @@ func TestListable(t *testing.T) {
 		}
 	}
 }
+
+// The key the filter signs with is made once and then read, and is readable by
+// the filter, which is another user in another container.
+func TestFilterKey(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "antispam")
+	key, err := FilterKey(dir)
+	if err != nil || len(key) != 64 || strings.Trim(key, "0123456789abcdef") != "" {
+		t.Fatalf("FilterKey = %q, %v", key, err)
+	}
+	again, err := FilterKey(dir)
+	if err != nil || again != key {
+		t.Errorf("a second call = %q, %v; want the same key", again, err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, FilterKeyFile))
+	if err != nil || string(raw) != key+"\n" {
+		t.Errorf("file = %q, %v", raw, err)
+	}
+	if info, _ := os.Stat(filepath.Join(dir, FilterKeyFile)); os.PathSeparator == '/' && info.Mode().Perm() != 0o644 {
+		t.Errorf("mode = %o", info.Mode().Perm())
+	}
+
+	// A file that is not a key is replaced, not signed with.
+	if err := os.WriteFile(filepath.Join(dir, FilterKeyFile), []byte("short\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := FilterKey(dir)
+	if err != nil || len(fresh) != 64 || fresh == key {
+		t.Errorf("after a damaged file: %q, %v", fresh, err)
+	}
+
+	// The lists leave it alone.
+	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := NewLists(st, dir).Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if kept, _ := FilterKey(dir); kept != fresh {
+		t.Errorf("the key changed when the lists were written")
+	}
+}

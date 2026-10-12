@@ -60,9 +60,18 @@ func message(t *testing.T, s *inboundSession, from string, rcpts []string, heade
 	return resp
 }
 
+// testKey is the key the tests' filter signs with; the messages they replay
+// have the queue id ABC123.
+const testKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+var testSig = [2]string{SignatureHeader, FilterSignature(testKey, "ABC123")}
+
 func inboundSessionFor(t *testing.T, rec InboundStore, filter bool) *inboundSession {
 	t.Helper()
-	s := &inboundSession{rec: rec, filter: filter}
+	s := &inboundSession{rec: rec}
+	if filter {
+		s.key = testKey
+	}
 	if _, err := s.Connect("mx.example.net", "tcp4", 0, net.ParseIP("203.0.113.7"), mods(nil)); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -116,6 +125,7 @@ func TestInboundReadsTheFiltersVerdict(t *testing.T) {
 		{"Subject", "Cheap pills"},
 		{"X-Rspamd-Action", "add header"},
 		{"X-Spamd-Result", spamdResult},
+		testSig,
 	})
 	if len(rec.rows) != 1 {
 		t.Fatalf("rows = %+v", rec.rows)
@@ -133,7 +143,7 @@ func TestInboundQuarantineAction(t *testing.T) {
 	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
 	s := inboundSessionFor(t, rec, true)
 	message(t, s, "sender@example.net", []string{"a@in.example.com"},
-		[][2]string{{"x-rspamd-action", "quarantine"}})
+		[][2]string{{"x-rspamd-action", "quarantine"}, {"x-selfpost-filter", strings.ToUpper(testSig[1])}})
 	if len(rec.rows) != 1 || rec.rows[0].Decision != store.SpamDecisionQuarantine || rec.rows[0].Detail != "quarantine" {
 		t.Errorf("rows = %+v", rec.rows)
 	}
@@ -180,7 +190,7 @@ func TestInboundResetsBetweenMessages(t *testing.T) {
 	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
 	s := inboundSessionFor(t, rec, true)
 	message(t, s, "one@example.net", []string{"a@in.example.com"}, [][2]string{
-		{"Subject", "First"}, {"X-Rspamd-Action", "add header"},
+		{"Subject", "First"}, {"X-Rspamd-Action", "add header"}, testSig,
 	})
 	message(t, s, "two@example.net", []string{"b@in.example.com"}, nil)
 	if len(rec.rows) != 2 {
@@ -259,7 +269,7 @@ func TestInboundClientAddressFromTheMailMacro(t *testing.T) {
 // cost it its session.
 func TestInboundOnlyEverContinues(t *testing.T) {
 	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
-	s := &inboundSession{rec: rec, filter: true}
+	s := &inboundSession{rec: rec, key: testKey}
 	check := func(stage string, resp milter.Response, err error) {
 		t.Helper()
 		if err != nil || resp != milter.RespContinue {
@@ -276,4 +286,65 @@ func TestInboundOnlyEverContinues(t *testing.T) {
 	check("header", resp, err)
 	resp, err = s.Body(mods(nil))
 	check("end of message", resp, err)
+}
+
+// The filter is attached so that mail flows when it is down, and then the
+// verdict headers of a message are its sender's own. A verdict is recorded only
+// next to the filter's signature for this message's queue id.
+func TestInboundReadsAVerdictOnlyWithTheFiltersSignature(t *testing.T) {
+	verdict := [][2]string{{"X-Rspamd-Action", "quarantine"}, {"X-Spamd-Result", spamdResult}}
+	for name, c := range map[string]struct {
+		extra  [][2]string
+		signed bool
+	}{
+		"signed":                            {[][2]string{testSig}, true},
+		"no signature":                      {nil, false},
+		"a made-up signature":               {[][2]string{{SignatureHeader, strings.Repeat("ab", 32)}}, false},
+		"another message's signature":       {[][2]string{{SignatureHeader, FilterSignature(testKey, "OTHER1")}}, false},
+		"a signature under another key":     {[][2]string{{SignatureHeader, FilterSignature(strings.Repeat("f", 64), "ABC123")}}, false},
+		"the sender's first, then the real": {[][2]string{{SignatureHeader, "forged"}, testSig}, true},
+	} {
+		rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+		s := inboundSessionFor(t, rec, true)
+		message(t, s, "sender@example.net", []string{"a@in.example.com"}, append(append([][2]string{}, verdict...), c.extra...))
+		if len(rec.rows) != 1 {
+			t.Fatalf("%s: rows = %+v", name, rec.rows)
+		}
+		got := rec.rows[0]
+		if c.signed && (got.Engine != store.SpamEngineRspamd || got.Decision != store.SpamDecisionQuarantine) {
+			t.Errorf("%s: a signed verdict was not read: %+v", name, got)
+		}
+		if !c.signed && (got.Engine != store.SpamEngineSelfPost || got.Decision != store.SpamDecisionAccept || got.Detail != "") {
+			t.Errorf("%s: an unsigned verdict was recorded: %+v", name, got)
+		}
+	}
+
+	// A signature is of no use to the next message on the connection.
+	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s := inboundSessionFor(t, rec, true)
+	message(t, s, "one@example.net", []string{"a@in.example.com"}, append(append([][2]string{}, verdict...), testSig))
+	message(t, s, "two@example.net", []string{"a@in.example.com"}, verdict)
+	if len(rec.rows) != 2 || rec.rows[1].Engine != store.SpamEngineSelfPost {
+		t.Errorf("rows = %+v", rec.rows)
+	}
+
+	// With no queue id nothing can be checked, so nothing is trusted.
+	rec = &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s = inboundSessionFor(t, rec, true)
+	_, _ = s.MailFrom("sender@example.net", mods(nil))
+	_, _ = s.RcptTo("a@in.example.com", mods(nil))
+	_, _ = s.Header("X-Rspamd-Action", "reject", mods(nil))
+	_, _ = s.Header(SignatureHeader, FilterSignature(testKey, ""), mods(nil))
+	_, _ = s.Body(mods(nil))
+	if len(rec.rows) != 1 || rec.rows[0].Engine != store.SpamEngineSelfPost {
+		t.Errorf("no queue id: rows = %+v", rec.rows)
+	}
+}
+
+// What rspamd 3.11 wrote for this key and queue id in a throwaway container
+// (dev trial, 2026-10-12): the two ends must compute the same thing.
+func TestFilterSignatureIsWhatTheFilterWrites(t *testing.T) {
+	if got := FilterSignature(testKey, "4A1B2C3D5E"); got != "2aa1ca6dd1545d3f16c8c0c29ba59bfc28c050224ac2c5c953bd2617f73b6de2" {
+		t.Errorf("FilterSignature = %s", got)
+	}
 }

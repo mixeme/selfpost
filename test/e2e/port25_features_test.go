@@ -283,6 +283,13 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	}
 
 	// The inbound journal milter saw it go through, and the Inbound log shows it.
+	// Beside the maps, the key the filter signs each message with: there from
+	// the first start with the relay on, whether or not a filter is attached
+	// yet, one line of 64 hex characters, readable by the filter.
+	if key, err := h.execIn("selfpost", "stat", "-c", "%a %s", "/data/antispam/filter.key"); err != nil || strings.TrimSpace(key) != "644 65" {
+		t.Fatalf("/data/antispam/filter.key: %q, %v; want mode 644 and 65 bytes", key, err)
+	}
+
 	// No filter is attached on the stand: the row is an accept by nobody, so its
 	// reason is the engine alone.
 	logRows := func(want string) []string {

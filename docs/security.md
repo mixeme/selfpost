@@ -45,9 +45,12 @@ HELO name could supply the sender, recipient and reply of a journal row and so
 make a refusal look like the deny list's (the reply now ends at Postfix's own
 `; from=<`); the journal's row cap was applied only every six hours, between
 which refusals were written at whatever rate a stranger sent recipients (the
-tailer now cuts to the cap every 500 rows); and three behaviours are recorded
-under Accepted risks (verdict headers while the filter is down, the allow list
-keyed on an address anyone can claim, the list files readable by anyone).
+tailer now cuts to the cap every 500 rows); and two behaviours are recorded
+under Accepted risks (the allow list keyed on an address anyone can claim, the
+list files readable by anyone). A third it named - with the filter down, a
+sender's own verdict headers were recorded as the filter's - was closed the
+same day at the owner's suggestion: the filter signs each message and a
+verdict is read only next to its signature.
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -208,7 +211,16 @@ operator can act on it.
   message it lets through. `test/e2e` sends two `MAIL FROM` on one connection.
 - **The inbound journal is written from what strangers send.** The inbound
   journal milter is the last on port 25, read-only and attached fail-open; it
-  keeps of the filter's verdict only what its patterns recognise. Refusals are
+  keeps of the filter's verdict only what its patterns recognise. **A verdict
+  is read only next to the filter's signature.** The filter is attached so
+  that mail flows when it is down, and then nothing removes verdict headers a
+  sender wrote himself. So rspamd adds a third header, `X-SelfPost-Filter`:
+  the HMAC-SHA256 of the message's queue id under a key SelfPost generates
+  (`data/antispam/filter.key`) and the sidecar reads from the directory it
+  mounts. The journal milter recomputes it at end-of-message; with no
+  signature, or one that does not fit, the row is that of mail nobody judged.
+  The signature goes on to the upstream with the mail and is of no use there:
+  it fits one queue id. Refusals are
   parsed from `mail.log` from the head of the line, with the reply ending at
   Postfix's own `; from=<` so that the HELO name after it - the client's text,
   logged as written - cannot stand in for the sender, the recipient or the
@@ -347,20 +359,14 @@ deferred item from the roadmap.
   the journal from recording sends at all. The trigger to revisit is a
   requirement for the allow-list to hold as a security boundary — at which
   point it must move to the SASL/smtpd layer and fail closed.
-- **With the spam filter down, a sender can write his own verdict into the
-  inbound journal.** The filter is attached fail-open by default, and the
-  inbound journal milter reads its verdict from two headers. Up, rspamd removes
-  headers of those names that a sender wrote and adds its own (seen on the
-  test server: a forged pair was replaced). Down, the sender's pair is all
-  there is: the row shows his action and score, a forged `quarantine` shows a
-  hold that never happened, and a forged allow symbol counts as a match of an
-  allow entry that fits him in Filter lists. Mail is not affected - the
-  journal decides nothing - and the page that says the filter is down is
-  Server › Health. Accepted because the alternative is a live check of the
-  filter on every message for the sake of a monitoring page. Trigger to
-  revisit: the journal or the match counts being used to decide something
-  (alerts, automatic removal of entries), or `INBOUND_ANTISPAM_MILTER_ACTION`
-  staying `accept` on an installation whose filter is often down.
+- **The key the spam filter signs with is readable by anyone on the host.**
+  The inbound journal reads the filter's verdict only next to the filter's
+  signature (see Mail path), and the key for it, `data/antispam/filter.key`,
+  is 0644 like the list files beside it: the filter is another user in another
+  container. Someone with a shell on the host could therefore sign a verdict
+  of his own - into a monitoring page, on a host where he could do far more.
+  Senders on the internet, whom the signature is for, cannot read it. Trigger
+  to revisit: the same as for the list files - a shared host.
 - **An allow entry for a sender address or domain trusts what the sending
   server says.** The filter matches the envelope sender, which is not
   authenticated: anyone who knows or guesses an allowed address can send as it

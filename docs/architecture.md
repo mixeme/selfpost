@@ -88,7 +88,14 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `inbound_spam_log` row per recipient at an inbound domain - a DMARC report
   address is not one - and never refuses anything
   ([internal/milter/inbound.go](../internal/milter/inbound.go)). The headers
-  are read only while a filter is attached; refused mail never reaches it.
+  are read only while a filter is attached, and only next to the filter's
+  signature: a third header, `X-SelfPost-Filter`, the HMAC-SHA256 of the
+  message's queue id under the key in `/data/antispam/filter.key`
+  (`inbound.FilterKey` makes it on first start; rspamd reads it through the
+  mounted directory and signs in a custom routine of `milter_headers.conf`).
+  With the filter down - it is attached fail-open - a sender's own verdict
+  headers carry no signature and the row is that of mail nobody judged.
+  Refused mail never reaches this milter.
   Refusals come from `mail.log`: this listener logs as `postfix/inbound`
   (`syslog_name`), and the log tailer turns a `reject:` line of
   `postfix/inbound/smtpd` (Postfix's own policy) and a `milter-reject` /

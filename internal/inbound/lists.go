@@ -1,6 +1,8 @@
 package inbound
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/netip"
 	"os"
@@ -400,4 +402,46 @@ func (l *Lists) Usage() (map[int64]Usage, error) {
 		}
 	}
 	return out, nil
+}
+
+// FilterKeyFile is the file, beside the list files, that holds the key the
+// spam filter signs messages with.
+const FilterKeyFile = "filter.key"
+
+// FilterKey returns the key the spam filter signs each message with, creating
+// it on first use: 32 random bytes as 64 hex characters on one line, in the
+// directory the filter's container mounts.
+//
+// The filter is attached so that mail flows when it is down. Then nothing
+// removes verdict headers a sender wrote himself, and the inbound journal
+// would record his verdict as the filter's. So the filter signs each message
+// with this key and the journal reads a verdict only next to a signature it
+// can recompute (internal/milter, FilterSignature).
+//
+// The file is readable by anyone on the host, like the list files and for the
+// same reason: the filter is another user in another container. What the key
+// protects is the truth of a monitoring page, against senders on the internet;
+// someone with a shell on the host is not who it is kept from.
+func FilterKey(dir string) (string, error) {
+	path := filepath.Join(dir, FilterKeyFile)
+	if raw, err := os.ReadFile(path); err == nil {
+		if key := strings.TrimSpace(string(raw)); len(key) >= 32 && !strings.ContainsAny(key, " \t\r\n") {
+			return key, nil
+		}
+		// Empty or cut short: not a key anyone should sign with. Replaced below.
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create %s: %w", dir, err)
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate the filter key: %w", err)
+	}
+	key := hex.EncodeToString(buf)
+	if err := atomicfile.Write(path, []byte(key+"\n"), 0o644); err != nil {
+		return "", err
+	}
+	return key, nil
 }

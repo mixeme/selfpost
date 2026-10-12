@@ -59,7 +59,12 @@ smtpd_milters = { antispam, inbound-journal }
 Antispam runs first; inbound-journal runs at end-of-message on the **accept**
 path and reads rspamd-added headers (`X-Rspamd-Action`, and `X-Spamd-Result`
 for the score and symbols - rspamd has no `X-Rspamd-Score`; the sidecar adds
-both through `deploy/antispam/rspamd/milter_headers.conf`).
+both through `deploy/antispam/rspamd/milter_headers.conf`). As built they are
+read only next to rspamd's signature of the message, `X-SelfPost-Filter`
+(owner, 2026-10-12: "А rspamd не может дописывать какой-то заголовок, по
+которому мы будем знать, что это заголовки нашего спам фильтра?") - an HMAC
+of the queue id, since a fixed mark could be written by a sender as easily as
+the verdict itself.
 
 **Antispam rejects** do not reach end-of-message on the journal milter. v1 also
 tails `mail.log` for inbound `postfix/smtpd` **`milter-reject`** / **`reject`**
@@ -317,4 +322,4 @@ Target version cut: **`2.1.0`** (MINOR), after `2.0.0`. One commit per step;
 - [x] [guide.md](../guide.md), [architecture.md](../architecture.md) — **Composer** (kept up with each step; [security.md](../security.md) follows the security review)
 - [x] `go vet`, `go test`, e2e if applicable — **Composer** (on the test server for every step; last on `7192c38`: vet ok, 22 packages ok, e2e ok, which relays, refuses, reads the log page and edits a list through the panel)
 - [x] Technical review of inbound antispam changes — **Opus** (2026-10-12; findings fixed: client address of a connection's later messages, the lists' writer under a lock, the tailer's queue-id memory, hold rows written twice, the cap by time; and, outside the feature, the level-2 limit and client-address list skipped after a connection's first message)
-- [x] Security review inbound antispam path — **Fable** (2026-10-12; no Critical or High; HELO-forged journal rows and the six-hourly row cap fixed, three accepted risks recorded in [security.md](../security.md))
+- [x] Security review inbound antispam path — **Fable** (2026-10-12; no Critical or High; HELO-forged journal rows and the six-hourly row cap fixed; a sender's own verdict while the filter is down closed by the filter's signature, the owner's idea; accepted risks recorded in [security.md](../security.md))

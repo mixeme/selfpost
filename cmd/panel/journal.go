@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/milter"
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -33,8 +34,18 @@ func serveInboundJournal(ctx context.Context, cfg config, st *store.Store) error
 	if err != nil {
 		return err
 	}
+	// With a filter attached, the key it signs with. Without the key no
+	// verdict can be told from a sender's own, so none is read: the journal
+	// still records the mail, and the log says why it shows no verdicts.
+	key := ""
+	if cfg.inboundAntispamMilter != "" {
+		if key, err = inbound.FilterKey(cfg.antispamDir); err != nil {
+			log.Printf("inbound-journal-milter: no key for the filter's signature, verdicts will not be recorded: %v", err)
+			key = ""
+		}
+	}
 	log.Printf("inbound-journal-milter listening on %s", cfg.inboundJournalSocket)
-	return milter.ServeInbound(ctx, ln, st, cfg.inboundAntispamMilter != "")
+	return milter.ServeInbound(ctx, ln, st, key)
 }
 
 // listenMilter opens a milter's Unix socket where Postfix can reach it.
