@@ -147,6 +147,54 @@ type captureStore struct {
 	// queued is what ListQueuedOlderThan returns, for the reconcile sweep.
 	queued    []store.QueuedDelivery
 	queuedErr error
+
+	// lines are the log lines kept for messages' pages; pruned is the cutoff of
+	// each PruneSendLogLines call.
+	lines  []store.SendLogLine
+	pruned []time.Time
+}
+
+func (c *captureStore) InsertSendLogLine(l store.SendLogLine) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lines = append(c.lines, l)
+	return nil
+}
+
+func (c *captureStore) InsertSendLogLineOnce(l store.SendLogLine) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, have := range c.lines {
+		if have.QueueID == l.QueueID && have.Line == l.Line {
+			return false, nil
+		}
+	}
+	c.lines = append(c.lines, l)
+	return true, nil
+}
+
+func (c *captureStore) PruneSendLogLines(cutoff time.Time) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pruned = append(c.pruned, cutoff)
+	return 0, nil
+}
+
+// kept returns the stored lines as "queue-id|line".
+func (c *captureStore) kept() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]string, len(c.lines))
+	for i, l := range c.lines {
+		out[i] = l.QueueID + "|" + l.Line
+	}
+	return out
+}
+
+func (c *captureStore) prunes() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.pruned)
 }
 
 func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, error) {

@@ -4,7 +4,8 @@
 // Postfix only decides sent / deferred / bounced later, per recipient, and
 // reports it in mail.log. This package parses those lines by queue-id +
 // recipient and advances the matching rows, and prunes rows past the retention
-// window.
+// window. It also keeps every line Postfix wrote under a queue id, so that a
+// message's page can show them after the log has rotated (lines.go).
 package logtail
 
 import (
@@ -25,12 +26,15 @@ import (
 
 // StatusStore is the slice of the store the log-tailer needs: advancing
 // delivery statuses, finding the rows still waiting for one, pruning the
-// retention window, and remembering how far into mail.log it has read.
-// *store.Store satisfies it.
+// retention window, keeping the lines of queued messages, and remembering how
+// far into mail.log it has read. *store.Store satisfies it.
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
+	InsertSendLogLine(l store.SendLogLine) error
+	InsertSendLogLineOnce(l store.SendLogLine) (bool, error)
+	PruneSendLogLines(cutoff time.Time) (int64, error)
 	LogtailState(path string) (store.LogtailState, bool, error)
 	SaveLogtailState(path string, st store.LogtailState) error
 }
@@ -107,7 +111,8 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 // Run follows path and updates send-log statuses until ctx is cancelled, while
 // a background sweep prunes rows older than retention(). Reading resumes at
 // the offset the previous run persisted, so a restart parses the delivery lines
-// written while the panel was down. With inbound set it also writes the
+// written while the panel was down. Every line headed by a queue id is kept
+// for the message's page (lines.go). With inbound set it also writes the
 // inbound journal's rows for refused mail and prunes that journal
 // (inbound.go). It returns nil on a clean shutdown.
 func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound) error {
@@ -126,15 +131,20 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	go reconcileLoop(ctx, st, caughtUp)
 
 	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, func(line string) {
-		if journal != nil {
-			catchingUp := true
-			select {
-			case <-caughtUp:
-				catchingUp = false
-			default:
-			}
-			journal.handle(line, time.Now().UTC(), catchingUp)
+		// Until the first read reaches end-of-file the lines are those written
+		// while the panel was down - and, after an unclean stop, some it had
+		// read already.
+		catchingUp := true
+		select {
+		case <-caughtUp:
+			catchingUp = false
+		default:
 		}
+		now := time.Now().UTC()
+		if journal != nil {
+			journal.handle(line, now, catchingUp)
+		}
+		storeLine(st, line, now, catchingUp)
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return
@@ -214,7 +224,9 @@ func reconcile(st StatusStore, cutoff time.Time) {
 	}
 }
 
-// retentionLoop prunes expired send-log rows immediately and then periodically.
+// retentionLoop prunes expired send-log rows immediately and then periodically,
+// and after each sweep the stored log lines those rows leave behind. Lines
+// without a row are also removed on a shorter cadence of their own (lines.go).
 func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays) {
 	prune := func() {
 		retentionDays := retention()
@@ -233,14 +245,20 @@ func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays)
 	}
 
 	prune()
+	pruneLines(st)
 	t := time.NewTicker(retentionInterval)
 	defer t.Stop()
+	lines := time.NewTicker(linePruneInterval)
+	defer lines.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			prune()
+			pruneLines(st)
+		case <-lines.C:
+			pruneLines(st)
 		}
 	}
 }

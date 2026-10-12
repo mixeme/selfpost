@@ -143,7 +143,7 @@ Target version cut: **`2.2.0`** (MINOR). One commit per step;
 [development.md](../development.md) § Plan checklists.
 
 - [x] Migration `0003_send_log_lines.sql`, store methods (insert, insert once, lines of a row, prune) and their tests — **Opus**
-- [ ] Log tailer: store queue-id lines, write once while catching up, prune with the send-log sweep and hourly — **Opus**
+- [x] Log tailer: store queue-id lines, write once while catching up, prune with the send-log sweep and hourly — **Opus**
 - [ ] The two texts, mockup first: the *Outbound log* help topic and the empty note (`design:` commit) — **Opus**
 - [ ] Message page reads the table, falls back to the current `mail.log`; help text in `help.go` — **Opus**
 - [ ] [architecture.md](../architecture.md), [guide.md](../guide.md), [schema-migrations.md](../schema-migrations.md) — **Opus**

@@ -11,8 +11,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   The table that will hold what Postfix wrote about a message for as long as
   its send-log row lives, with the store methods to write a line, to write it
   once, to read the lines of a row and to prune
-  ([plans/delivery-log-storage.md](docs/plans/delivery-log-storage.md)). Nothing
-  writes or reads it yet.
+  ([plans/delivery-log-storage.md](docs/plans/delivery-log-storage.md)).
+- **The log tailer keeps what Postfix writes about queued messages.** Every
+  `mail.log` line headed by a queue id is stored with the line's own time, as
+  the tailer reads it; after an unclean stop a line read twice is stored once.
+  Lines whose queue id has no send-log row - the row was pruned, or the
+  message never had one (inbound relay mail, bounces) - are deleted once they
+  are an hour old, with every send-log sweep and hourly between. No page reads
+  them yet.
 
 ## [2.1.0] - 2026-10-12
 
