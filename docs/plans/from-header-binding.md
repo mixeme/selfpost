@@ -168,13 +168,18 @@ silence; each line says what is missing and what it would take.
 - **The Delivery log box is on a refused message's page.** The picture he
   approved had left it out; the built page keeps it, with one sentence. And
   the sentence is less than the truth for a `From:` refusal: cleanup did
-  write a line about it under a queue id (`milter-reject: END-OF-MESSAGE …
-  5.7.1 From: …`), but the check answers before the queue id reaches it, so
-  the row keeps none and the page cannot show that line. To do: either drop
-  the box for a refused row, or have the tailer attach the line to the row.
+  write a line about it under a queue id (`milter-reject: END-OF-MESSAGE ...
+  5.7.1 From: ...`), but the check answers before the queue id reaches it, so
+  the row keeps none and the page cannot show that line. **Decided
+  2026-10-13 (owner):** the box is required - he had overlooked its absence
+  from the picture, it was never a decision to drop it. The tailer attaches
+  the line to the row, for all three kinds of refusal; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 1.
 - **The Outbound log has no status filter.** The mockup draws one; the built
   log filters by domain and application. With three kinds of refusal now
   told apart by tag, a filter by status and reason would be worth having.
+  **Decided 2026-10-13 (owner):** a filter by status, without the split by
+  reason, and a filter by day as the Inbound log has; a step of [audit-2026-10-12](../audit-2026-10-12.md) stage 4.
 - **"Messages deferred" counts connections Postfix turned away.** Postfix
   refuses from the connection on, before a message is offered, so a monitor
   that only connects during an outage is counted. The guide says so; the

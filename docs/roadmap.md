@@ -28,21 +28,20 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| preflight | Installation check page (`/preflight`) | candidate | — | [plans/preflight.md](plans/preflight.md) |
-| contributing | `CONTRIBUTING.md` | candidate | — | — |
+| health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | agreed (2026-10-13) | — | — |
+| test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
-| csrf-tokens | Per-session CSRF tokens on state-changing forms | candidate | — | — |
-| template-data-typing | Typed structs for template data instead of `map[string]any` | candidate | — | — |
-| structured-logging | `log/slog` with levels and fields | candidate | — | — |
+| origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | agreed (2026-10-13) | — | — |
+| backup-reauth | Ask for the account password before a backup or a domain export is downloaded | agreed (2026-10-13) | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
-| password-reset | Password reset by e-mail | candidate | — | — |
-| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | candidate | — | — |
+| password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
+| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, six stages | agreed (2026-10-12: stage 0 first, then 1+2; the rest after) | 0/45 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, six stages | agreed (2026-10-12: stage 0 first, then 1+2; the rest after) | 0/48 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
@@ -60,9 +59,12 @@ queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
 `[1.3.0]`. Candidates need explicit agreement before they join the queue.
 
 The 2026-08-19 full-tree code review is closed except for four items, all
-listed above and none of them urgent: [csrf-tokens](#csrf-tokens),
-[template-data-typing](#template-data-typing),
-[structured-logging](#structured-logging) and
+listed above and none of them urgent: [origin-strict](#origin-strict) (its
+"add CSRF tokens", decided otherwise on 2026-10-13),
+template-data-typing (done by `2.0.0`; its last map is a step of
+[audit-2026-10-12](audit-2026-10-12.md) stage 4),
+structured-logging ([dropped](#dropped-with-the-condition-for-return) on
+2026-10-13) and
 [review-2026-08-followups](#review-2026-08-followups). What that review
 produced is in [CHANGELOG.md](../CHANGELOG.md) `[1.9.2]`; its own document
 was removed once these four items carried everything still open, and stays in
@@ -72,24 +74,6 @@ After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
 is `done/total` checklist steps in that plan ([development.md](development.md)
 § Plan checklists).
-
----
-
-## contributing
-
-**Goal:** `CONTRIBUTING.md` in the root — the dev loop, the checks to run
-before a PR, the commit protocol; [development.md](development.md) links to it
-rather than repeating it.
-
-**Boundary:** process documentation; worth writing once there is an external
-flow of PRs.
-
-**Done when:** the file is in the root and development.md does not duplicate
-it.
-
-**Dependencies / risks:** with a single developer and no PRs, this is low
-priority.
-**Version:** no bearing on semver.
 
 ---
 
@@ -144,105 +128,122 @@ journal PII; global-admin-only RBAC.
 
 ---
 
-## preflight
+## health-setup-checks
 
-**Goal:** a `/preflight` page (global-admin only) that verifies instance-level
-infrastructure: rDNS/PTR, TLS certificate + hostname match, port 25/465/587
-reachability, HELO banner correctness, reverse-proxy headers, DKIM milter
-socket, and a test-email sender. Each check shows an actionable fix
-recommendation on failure.
+**Decided by the owner on 2026-10-13**, in place of the former candidate
+*preflight* (a page of its own, Server › Preflight, planned in August before
+Server › Health existed). Of that plan's eight checks Health already makes
+three (reverse DNS, certificate validity, the DKIM socket); five were missing.
+Three of the five go into Health, one becomes [test-email](#test-email), one
+is not built ([Dropped](#dropped-with-the-condition-for-return)). No second
+page of checks.
 
-**Boundary:** instance infrastructure only; per-domain DNS checks remain on
-domain detail pages. Does not track test-email delivery beyond local MTA
-acceptance.
+**Goal:** three more lines on Server › Health, in the cards that are there:
 
-**Done when:** the page loads, all checks run with traffic-light results and
-recommendations, and the test-email form successfully submits a message through
-Postfix.
+- **The certificate is for this server**: its names include
+  `SELFPOST_HOSTNAME` (TLS certificate card). Today a certificate for another
+  name is "valid".
+- **Postfix greets with the hostname**: the 220 line on port 25 names
+  `SELFPOST_HOSTNAME`, not `localhost` or a container id (Hostname card).
+- **The trusted proxy**: the address the panel sees this request from, and
+  whether it took it from `X-Forwarded-For`. With `TRUSTED_PROXY_CIDR` wrong
+  or empty behind a proxy the header is ignored
+  ([internal/web/auth/auth.go](../internal/web/auth/auth.go)), every client
+  has the proxy's address and the sign-in limiter is shared by all of them -
+  silently.
 
-**Dependencies / risks:** port-connectivity check may not reflect external
-reachability behind NAT without hairpin; test email needs at least one domain or
-falls back to `postmaster@SELFPOST_HOSTNAME`.
+**Boundary:** lines in existing cards, each with what to do when it fails;
+no new card unless the mockup shows the lines do not fit. Mockup-first
+([plans/panel-redesign.md](plans/panel-redesign.md) § Enforcement). The
+mockup `preflight` stays drawn and unbuilt.
 
-**Version:** `1.x` MINOR; `candidate`.
+**Done when:** each line is shown wrong on the e2e stand or in a test with a
+wrong certificate name, a wrong greeting and an untrusted proxy, and right on
+the test server.
 
----
-
-## csrf-tokens
-
-**Goal:** a per-session CSRF token on every state-changing form, checked
-server-side in addition to the `Sec-Fetch-Site` / `Origin` check the panel
-relies on today (`originAllowed` in
-[internal/web/security.go](../internal/web/security.go)).
-
-**Boundary:** defence in depth, not a replacement — the header check stays and
-keeps covering requests that carry no form. The token is bound to the existing
-session record; no new session model, no cookie changes.
-
-**Done when:** every POST form and htmx fragment that changes state carries a
-token, a missing or mismatched token is refused with a test that proves it, and
-[security.md](security.md) describes the layered model in one place instead of
-two.
-
-**Dependencies / risks:** [security.md](security.md) currently records the
-opposite decision — origin checking without tokens, with the accepted risk and
-its revisit triggers written out in the ADR § *CSRF via origin checking*. The
-2026-08-19 review recorded "add tokens" without turning it into a task, which is
-why this item exists. Settle which decision stands before writing code; both
-outcomes are honest, and "keep headers" means deleting this item rather than
-leaving the contradiction standing. The work itself is a hidden field in roughly
-two dozen forms plus the htmx swap paths.
-
-**Version:** `1.x` MINOR; `candidate`.
+**Version:** `2.x` MINOR; `agreed`.
 
 ---
 
-## template-data-typing
+## test-email
 
-**Goal:** replace the `map[string]any` template payloads in
-`internal/web/handlers` with typed structs (`DomainDetailData`, `SettingsData`,
-...), so a renamed or mistyped key is a compile error instead of a silently
-empty page section.
+**Decided by the owner on 2026-10-13**, taken out of the former *preflight*.
 
-**Boundary:** handler-to-template plumbing only; no template redesign, no route
-or behaviour change. `renderDomainDetail`
-([handlers_apps.go](../internal/web/handlers/handlers_apps.go)) sets around
-forty keys on one map and is the case that motivates the item; roughly ten
-render sites still pass maps.
+**Goal:** a global administrator sends a test message from the panel to an
+address they type, and sees whether Postfix took it; the message then appears
+in Outbound › Log like any other. Today nobody can send through the server
+without setting up an application first.
 
-**Done when:** the page handlers pass structs, the shared footer/base fields
-(`Version`, `Copyright`, `SourceURL`) still arrive on every page, and the
-template guard tests pass unchanged.
+**Boundary:** global role only; from `postmaster@SELFPOST_HOSTNAME`, the
+sender notifications use, or from a sending domain the administrator picks -
+settled at the mockup. It does not follow the message further than the log
+does. Where the form lives (Health, or a sending domain's page) is settled at
+the mockup; mockup-first.
 
-**Dependencies / risks:** mechanical but wide — it touches every
-`handlers_*.go` and every template that reads those keys, and a missed key is
-invisible unless a test renders that page. Worth pairing with the handler tests
-in [review-2026-08-followups](#review-2026-08-followups) so the pages are
-covered before they are rewired. Reviewer's estimate: 2–3 hours.
+**Done when:** the form sends, the row appears in the log, the form is
+rate-limited and refuses a recipient list, and it passes a security review -
+a form that sends mail is a new surface.
 
-**Version:** no bearing on semver; `candidate`.
+**Version:** `2.x` MINOR; `agreed`.
 
 ---
 
-## structured-logging
+## origin-strict
 
-**Goal:** move from `log.Printf` to `log/slog` — levels, structured fields, and
-one logger injected through constructors, instead of the package-level
-`logf = log.Printf` alias repeated in five packages.
+**Decided by the owner on 2026-10-13**, in place of the former candidate
+*csrf-tokens* (per-session tokens on every form, recorded by the 2026-08-19
+review): no tokens; the origin check is made strict instead.
 
-**Boundary:** internal logging only. The destination stays stdout/stderr under
-supervisord; no log shipping, no new dependency. Lines the panel's own Status
-page and log tailer depend on must keep parsing.
+**Goal:** `originAllowed`
+([internal/web/security.go](../internal/web/security.go)) refuses a
+state-changing request that carries neither `Sec-Fetch-Site` nor `Origin`.
+Today such a request is let through, which leaves a client that sends neither
+header open to a request forged by any site
+([security.md](security.md) § Accepted risks).
 
-**Done when:** packages take a `*slog.Logger`, the per-package `logf` aliases
-are gone, and levels are used deliberately (an error is not an info).
+**Boundary:** one branch of one function, its test, and the documents. No
+template changes, no hidden fields. Before the change, find what posts to the
+panel without a browser (the e2e stand, scripts) and make it send `Origin`.
 
-**Dependencies / risks:** the log tailer reads Postfix's log rather than the
-panel's, so the blast radius is small — but anything that greps the panel's
-output (e2e assertions, operator habits) sees a new format. Reviewer's
-estimate: 3–4 hours.
+**Done when:** a `POST` with neither header is refused with a test that proves
+it, the e2e stand passes, the accepted risk about header-less requests is
+struck from [security.md](security.md) and its ADR states the strict rule.
 
-**Version:** no bearing on semver; `candidate`.
+**Dependencies / risks:** a browser that sends neither header can no longer
+save anything in the panel - accepted, the panel's users pick their own
+browsers. Tokens stay a recorded alternative, not a task: the conditions under
+which they are built are in [security.md](security.md), ADR § *CSRF via origin
+checking* (**Revisit if**).
+
+**Version:** `2.x` PATCH; `agreed`.
+
+---
+
+## backup-reauth
+
+**Agreed with the owner on 2026-10-13**, out of
+[review-2026-08-followups](#review-2026-08-followups).
+
+**Problem:** Server › Backup hands the full backup and a domain export to any
+live session of a global administrator
+([handlers_backup.go](../internal/web/handlers/handlers_backup.go)). The
+archive holds the whole database - panel password hashes, application (SASL)
+passwords, DKIM keys - so a stolen session cookie, or a panel left open, is a
+quiet copy of the server. *Encrypt with a password* does not help: the thief
+chooses that password.
+
+**Goal:** both downloads ask for the current account password, checked the
+way a password change checks it and under the same limiter.
+
+**Boundary:** one field in each of the two forms (mockup-first); import is
+not touched; the `selfpost-backup` CLI is not touched - it runs inside the
+container.
+
+**Done when:** a download without the password or with a wrong one is refused
+with a test that proves it, attempts are limited, and
+[security.md](security.md) § Backup says so.
+
+**Version:** `2.x` MINOR; `agreed`.
 
 ---
 
@@ -255,7 +256,7 @@ is in the table below; the rest of it shipped in
 
 | Area | Item |
 |---|---|
-| Security | Re-authenticate (ask for the current password) before a backup download — [handlers_backup.go](../internal/web/handlers/handlers_backup.go) hands the archive to any signed-in session |
+| Security | ~~Re-authenticate (ask for the current password) before a backup download~~ — struck: agreed on 2026-10-13 as an item of its own, [backup-reauth](#backup-reauth) |
 | Tests | The `internal/dmarc` service layer (`service.go`, `addresses.go`) has no tests |
 | Tests | No direct tests for the apps / domains / users / dmarc handlers; `authz_test` covers them only indirectly |
 | Tests | Nothing covers error page templates, a corrupted backup archive, malformed or oversized DMARC XML, delivery-log pagination edges, concurrent store operations, or zero-traffic `store` stats |
@@ -273,9 +274,7 @@ becomes its own roadmap item instead.
 
 **Done when:** each row is either implemented or struck with a written reason.
 
-**Dependencies / risks:** the test rows overlap
-[template-data-typing](#template-data-typing) — write the handler tests first if
-both are taken up. One finding of that review was **declined** and is
+**Dependencies / risks:** One finding of that review was **declined** and is
 deliberately absent: `//go:build linux` for the `/proc` reader in
 [internal/health/machine.go](../internal/health/machine.go). That code is
 parameterised by root directory, calls nothing platform-specific, already
@@ -383,8 +382,22 @@ account e-mail instead of asking the global administrator to set a new one.
 same answer whether or not the username exists. The only global administrator
 without a working e-mail still recovers from the container (today's path).
 
+**The e-mail must be confirmed (owner, 2026-10-13).** A reset link goes only
+to an address its owner has confirmed; an account whose e-mail is not
+confirmed has no reset, and recovers as today (the global administrator sets
+a password, or the container). The panel does not confirm addresses today -
+`users.email` is whatever was typed - so the item builds that first: saving
+an e-mail under Account mails a one-time link to it, opening the link marks
+the address confirmed (a migration: the mark on `users`), changing the
+address clears the mark, and Account shows which it is. An address typed for
+a user by the global administrator is unconfirmed until that user opens the
+link. To settle at the mockup: whether notifications (2.3.0) keep going to an
+unconfirmed address.
+
 **Done when:** the flow works end to end, tokens expire and cannot be reused,
-requests are rate-limited, and it passes a security review.
+requests are rate-limited, an account with an unconfirmed e-mail gets no
+link and the sign-in page answers the same for it, and it passes a security
+review.
 
 **Dependencies / risks:** the account e-mail; an account-takeover surface where
 there was none — security review is part of the item, not an afterthought.
@@ -392,7 +405,10 @@ Not drawn yet. Changing the account e-mail must then require the current
 password (2.0 security review), because the e-mail becomes where a reset link
 goes and today Account saves it without the password.
 
-**Version:** `2.x` MINOR; `candidate`.
+**Version:** `2.x` MINOR; `agreed` (owner, 2026-10-13: domain administrators
+to come need it - they are not the owner and should not have to ask him for
+a new password). Mockup-first; changing the account e-mail asks for the
+current password in the same cut.
 
 ---
 
@@ -427,7 +443,9 @@ expected there. A design change is mockup-first
 has one coherent layout, checked on a phone in "desktop site" mode and in a
 980 px window.
 
-**Version:** `2.x` PATCH or MINOR; `candidate`.
+**Version:** `2.x` PATCH or MINOR; `agreed` (owner, 2026-10-13), taken up
+after stages 1 and 2 of [audit-2026-10-12](audit-2026-10-12.md) - mail shown
+wrong and the tenant boundary come before layout.
 
 ---
 
@@ -539,6 +557,46 @@ gate" risk below. See [schema-migrations.md](schema-migrations.md).
 explicit major). Squashing the current short chain is not a reason to cut 2.x on
 its own. A missed gate leaves a mid-chain 1.x database silently stuck.
 **Version:** `2.x` major only; not a 1.x item.
+
+---
+
+## Dropped, with the condition for return
+
+Items the owner took off the roadmap. Each names what would bring it back;
+without that it is not offered again.
+
+- **structured-logging** (dropped 2026-10-13) - move the panel from
+  `log.Printf` to `log/slog` with levels and fields, one logger passed through
+  constructors. Dropped because the panel's log has one reader, the owner, by
+  eye in `docker logs`; the change is wide (some 225 call sites), changes no
+  behaviour, and gives a new format to everything that reads the output.
+  **Returns if:** the log goes to an outside collector, or it has to be
+  filtered by level.
+- **contributing** (dropped 2026-10-13) - a `CONTRIBUTING.md` in the root:
+  the dev loop, the checks before a PR, the commit protocol. Dropped because
+  there is one developer and no PRs, and everything the file would say is in
+  [development.md](development.md); a second file is a second copy to keep
+  in step. **Returns if:** the first outside PR arrives, or the owner decides
+  to invite contributors.
+- **A check that ports 25, 465 and 587 are reachable** (dropped 2026-10-13,
+  from the former *preflight*). The panel can only dial its own public
+  address from inside the container: behind NAT without hairpin that shows an
+  open port as closed, and with hairpin it shows as open a port the provider
+  blocks from outside. A card that is wrong both ways is worse than none, and
+  an honest check needs a probe outside the server, which is outside the
+  product ([product.md](product.md)). The administrator's browser cannot do
+  it either: 25, 465 and 587 are on the Fetch standard's list of blocked
+  ports. Two substitutes were offered and declined the same day: a Health
+  line "last connection from outside on each port", read from `mail.log`, and
+  a command in the help to run from one's own machine. **Returns if:** the
+  owner accepts an outside probe, or asks for one of the two substitutes.
+- **preflight as a page of its own** (dropped 2026-10-13): see
+  [health-setup-checks](#health-setup-checks). Its plan,
+  `plans/preflight.md`, was removed and stays in git history.
+- **csrf-tokens** (decided 2026-10-13) - session-bound tokens on every form.
+  Replaced by [origin-strict](#origin-strict); the conditions for building
+  tokens after all are in [security.md](security.md), ADR § *CSRF via origin
+  checking*.
 
 ---
 

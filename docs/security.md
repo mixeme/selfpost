@@ -165,7 +165,7 @@ assigned outbound domains and inbound domains **separately**, each list with
   (`originAllowed`, [internal/web/security.go](../internal/web/security.go)):
   `Sec-Fetch-Site` must be `same-origin`, or `Origin` must name the panel's own
   host; the session cookie is `SameSite` as well.
-- There are **no CSRF tokens yet**. The decision, its price and the conditions
+- There are **no CSRF tokens**. The decision, its price and the conditions
   for revisiting it are in the accepted risks and the ADR below.
 
 ### Errors shown to users
@@ -306,7 +306,9 @@ deferred item from the roadmap.
   against, and a strict mode would not "protect" such a client, it would
   simply break the panel in it. Tightening is one line in `originAllowed`
   ([internal/web/security.go](../internal/web/security.go)): return `false`
-  instead of `true` in the "neither header present" branch.
+  instead of `true` in the "neither header present" branch. That tightening
+  is agreed (owner, 2026-10-13) as
+  [origin-strict](roadmap.md#origin-strict); this bullet goes when it ships.
 - **Session-bound CSRF tokens are not implemented.** The origin check closes the
   neighbouring-subdomain case but depends on browser behaviour; a token does
   not. The price is a hidden field in roughly two dozen forms. The trigger to
@@ -315,10 +317,12 @@ deferred item from the roadmap.
   (see the ADR below). A token would not save the panel from XSS inside it
   either: code executing in the panel's origin sends the request itself —
   against that, `html/template` auto-escaping and CSP do the work, which is why
-  templates must contain no inline scripts and no inline styles. Tracked as
-  [csrf-tokens](roadmap.md#csrf-tokens): implementing that item replaces this
-  bullet and the ADR below, and dropping it leaves them as the single record of
-  the decision. The two must not disagree.
+  templates must contain no inline scripts and no inline styles. Decided by
+  the owner on 2026-10-13: no tokens; the roadmap item that asked for them is
+  dropped and the origin check is made strict instead
+  ([origin-strict](roadmap.md#origin-strict)). This bullet and the ADR below
+  are the single record of the decision, and the ADR's **Revisit if** says
+  when tokens are built after all.
 - **Destructive-action confirmation (`data-confirm`) is JavaScript-only.**
   Delete, regenerate-password, and clear-rate-limit forms carry a
   `data-confirm` prompt handled entirely in
@@ -572,6 +576,16 @@ example, if a future release lets a `global` user invite `domain` users
 whose browsers/devices are not vetted) — at that point cross-role request
 forgery inside the panel would need its own analysis, separate from the
 external-site case this ADR covers.
+
+**Decision of 2026-10-13 (owner).** Asked to choose between this ADR, tokens,
+and a strict origin check, the owner chose the ADR with the strict check
+([origin-strict](roadmap.md#origin-strict)) and no tokens. Session-bound tokens
+are the answer to return to - a hidden field in every state-changing form and
+htmx path, checked against the session, on top of the origin check - when
+either condition above comes true, and also when: a browser the panel must
+support is found to send neither header or to send them wrongly; the panel
+gains a state-changing request that a browser sends without these headers; or
+an outside review requires a defence that the server alone holds.
 
 ## How this list grows
 
