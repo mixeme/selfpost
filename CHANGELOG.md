@@ -23,6 +23,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   now say so and show how to build the image locally under the pinned name,
   which Compose and `docker run` then use without pulling (audit 2026-10-12,
   M6). The pin stays: the next publication makes it true.
+- **Dependencies raised**: `modernc.org/sqlite` 1.53.0 → 1.60.1 (with
+  `modernc.org/libc` 1.77.1), `golang.org/x/crypto` 0.54.0 → 0.58.0,
+  `golang.org/x/sys` 0.47.0 → 0.49.0. The three published `x/crypto` fixes
+  were in code SelfPost does not call (audit 2026-10-12). development.md says
+  the image is rebuilt after each Go patch release, which is where the
+  standard library's security fixes come from.
 - **The e2e module is compiled on every push** (`test.yml`: `go vet` and
   `go test -c` in `test/e2e`), so a type error there no longer first shows
   up in `release.yml` after a release is published (audit 2026-10-12, M20).

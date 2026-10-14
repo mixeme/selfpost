@@ -144,7 +144,7 @@ commit rule but **no** version cut until the next product stage ships.
 | **SQLite** | `modernc.org/sqlite` (pure Go, no cgo) |
 | **Build** | [Makefile](../Makefile): primary targets `vet`, `test`, `build`, `e2e` (also `all`, `clean`) |
 | **Container** | Docker + Compose v2 on the dev host and in CI |
-| **Image (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile) |
+| **Image (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile). The tag floats to the newest 1.26 patch release, and most standard-library security fixes (`net/http`, `html/template`, …) arrive only that way: rebuild the image after each Go patch release, no edit needed. Dependencies are raised by hand (`go get …@latest`, `go mod tidy`), at least at each audit |
 | **Image (runtime)** | `debian:bookworm-slim` + Postfix, OpenDKIM, supervisord, SASL, logrotate |
 | **CI** | GitHub Actions — [.github/workflows/](../.github/workflows/) |
 | **Image registry** | `ghcr.io/mixeme/selfpost` |
