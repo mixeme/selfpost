@@ -8,6 +8,12 @@ lingering "alive" with a dead Postfix/OpenDKIM/panel.
 
 Communication with supervisord uses the event listener protocol over stdin and
 stdout, so stdout must carry only protocol tokens.
+
+supervisor 4.2.5, docs/events.rst, "Event Listener Notification Protocol": the
+listener writes READY\\n, reads one header line of key:value tokens whose len
+is the payload's length, reads the payload, and answers "RESULT 2\\nOK".
+supervisord starts the listener as its own child, and on SIGTERM it shuts down
+(docs/running.rst, "Signals"); it is PID 1 here (build/entrypoint.sh, exec).
 """
 import os
 import signal

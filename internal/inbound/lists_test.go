@@ -314,6 +314,9 @@ func TestListsUsage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// The rows below are composed by hand. Their replies and verdicts follow
+	// rspamd 3.11.1's forms: "Spam message rejected" is the proxy's default
+	// reject_message (conf/worker-proxy.inc).
 	// hour 1: the address and its domain are both on the deny list, and both fit.
 	row("Spammer@Evil.Example", "192.0.2.9", store.SpamDecisionReject, store.SpamEngineRspamd, denied)
 	// hour 2: another address of the domain.

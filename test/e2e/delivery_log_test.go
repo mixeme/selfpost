@@ -55,6 +55,8 @@ func testDeliveryLogSurvivesRotation(t *testing.T, sc *scenario) {
 
 	// The rotation ends with `postfix reload`, which fails while Postfix is
 	// still starting - and this step follows one that restarts the container.
+	// (Postfix 3.7.11, conf/postfix-script: "reload" and "status" both test
+	// "master -t" and exit 1 while master does not hold its pid lock.)
 	if err := waitFor("Postfix to be running", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
 		if _, err := h.execIn("selfpost", "postfix", "status"); err != nil {
 			return false, err

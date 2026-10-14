@@ -116,6 +116,13 @@ services:
     # FOWNER/FSETID are required by build/entrypoint.sh's permission
     # self-healing; without them chmod fails with EPERM and the container
     # crash-loops on start.
+    # Each capability above as capabilities(7) defines it (man7.org,
+    # "Capabilities list"); SETUID/SETGID are also what pipe(8) uses to become
+    # user=panel for dmarc-ingest. Not listed, so dropped: SYS_CHROOT, which
+    # chroot(2) needs - build/postfix-config.sh turns Postfix's chroot off.
+    # no-new-privileges only changes execve() (Linux,
+    # Documentation/userspace-api/no_new_privs.rst): root may still call
+    # setuid()/setgid() with these capabilities.
     security_opt:
       - no-new-privileges:true
     cap_drop:

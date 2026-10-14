@@ -88,7 +88,9 @@ type Params struct {
 // copy taken then can hold a message twice or not at all, so what it would
 // bring back is not the queue. Nor could the panel read it - Postfix keeps
 // every queue file readable by its own user alone, which is why the panel's
-// backup failed outright from 1.3.0 to 2.0.0. What is not carried over is mail
+// backup failed outright from 1.3.0 to 2.0.0 (date not recorded; Postfix
+// 3.7.11, conf/postfix-files: active, deferred, incoming and the other queue
+// directories are $mail_owner 700). What is not carried over is mail
 // still waiting for delivery; a start without a queue directory builds an
 // empty one. Whoever needs the queue stops the instance and archives the
 // project directory (guide § Taking a full backup).
@@ -380,7 +382,11 @@ func writeTarFile(tw *tar.Writer, name string, mode fs.FileMode, srcPath string)
 // snapshotDB produces a consistent copy of the SQLite database at dbPath using
 // VACUUM INTO, so the backup captures a coherent point-in-time image even while
 // the panel is writing to the live file under WAL. It returns the snapshot path
-// and a cleanup function the caller must defer.
+// and a cleanup function the caller must defer. (sqlite.org/lang_vacuum.html,
+// "VACUUM INTO": "transactional in the sense that the generated output
+// database is a consistent snapshot"; modernc.org/sqlite v1.60.1, sqlite.go,
+// applyQueryParams(): each _pragma is run as "pragma <value>" on connect,
+// busy_timeout first.)
 func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
 	dir, err := os.MkdirTemp("", "selfpost-backup-")
 	if err != nil {

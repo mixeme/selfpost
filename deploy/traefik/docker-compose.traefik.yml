@@ -6,7 +6,9 @@
 #
 # Merge with the base file — run this from the deploy/ directory (Compose
 # resolves every relative path in both files against the directory of the
-# FIRST -f file, i.e. deploy/, which is why paths below are ./traefik/...):
+# FIRST -f file, i.e. deploy/, which is why paths below are ./traefik/... -
+# docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
+# evaluated relative to the base file"):
 #
 #   docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
 
@@ -25,7 +27,10 @@ services:
       # Traefik only proxies the panel; it never sees the mail ports.
       # These live on the selfpost service (not traefik's) because the
       # docker provider reads routing labels off the container being routed
-      # to, not off traefik itself.
+      # to, not off traefik itself. (doc.traefik.io/traefik/v3.1/providers/
+      # docker/, "Routing Configuration": "Traefik uses container labels";
+      # with exposedByDefault=false only containers labelled
+      # traefik.enable=true.)
       - traefik.enable=true
       - traefik.http.routers.selfpost.rule=Host(`mail.example.com`)
       - traefik.http.routers.selfpost.entrypoints=websecure

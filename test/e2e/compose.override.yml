@@ -13,6 +13,9 @@
 # replace the base file's list rather than concatenate with it (the default
 # merge behaviour for sequences) — otherwise the real 465/587/8080 would stay
 # published here too and collide with a prod container on the same host.
+# (docs.docker.com/reference/compose-file/merge/, "!override": "fully replace
+# an attribute, bypassing the standard merge rules". The page names no
+# minimum Compose version; the stand's own Compose is what each run uses.)
 
 services:
   selfpost:

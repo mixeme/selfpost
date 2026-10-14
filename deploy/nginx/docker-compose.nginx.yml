@@ -8,7 +8,9 @@
 # takes over 80/443 and proxies to the panel over the compose network
 # instead). Merge it with the base file — run this from the deploy/ directory
 # (Compose resolves every relative path in both files against the directory of
-# the FIRST -f file, i.e. deploy/, which is why paths below are ./nginx/...):
+# the FIRST -f file, i.e. deploy/, which is why paths below are ./nginx/... -
+# docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
+# evaluated relative to the base file"):
 #
 #   docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
 #
@@ -54,4 +56,7 @@ services:
       - ./nginx/certbot-www:/var/www/certbot
     # Renewal twice a day is certbot's own recommended cadence; it no-ops
     # until a certificate is within its renewal window.
+    # (eff-certbot.readthedocs.io, User Guide, "Automated Renewals": the
+    # sample cron runs "certbot renew" at 0 and 12 h; renew acts only on a
+    # certificate near expiry.)
     entrypoint: sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'

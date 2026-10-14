@@ -52,7 +52,10 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		{"the listed address", list, "billing@" + senderDomain, true},
 		{"the listed address with an extension, in envelope and header", who{listLogin, listPassword, "billing+march@" + senderDomain}, "billing+march@" + senderDomain, true},
 		// What a mail library does with a long display name: the line is
-		// folded, and Postfix hands the milter both of its lines.
+		// folded, and Postfix hands the milter both of its lines (Postfix
+		// 3.7.11, src/milter/milter8.c, milter8_header(): the value is the
+		// whole header as cleanup's MIME state machine collected it,
+		// continuation line included).
 		{"a long name, folded onto a second line", wildcard, "\"The Shop, its orders and its returns desk\"\r\n <orders@" + senderDomain + ">", true},
 
 		{"another registered domain", wildcard, "director@" + otherDomain, false},
@@ -113,7 +116,8 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 // testPanelDownDefersMail: the sender check is the panel's and Postfix
 // attaches it strictly, so with the panel stopped mail is deferred - a
 // temporary error, nothing accepted unchecked - and the container stays up
-// (crashexit fires on PROCESS_STATE_FATAL only; a supervisor stop is STOPPED).
+// (crashexit fires on PROCESS_STATE_FATAL only; a supervisor stop is STOPPED -
+// supervisor 4.2.5, supervisor/process.py, Subprocess.finish()).
 // Once the panel is back it has counted both what that cost: the time it did
 // not answer under a running Postfix, and the message that was deferred.
 //
@@ -221,8 +225,9 @@ func senderCheckDeferredToday(sc *scenario) (int, error) {
 // message is deferred, and the count on Health sees it. Past the DATA
 // command Postfix's cleanup, not smtpd, talks to the milters, so the warning
 // that names the socket is cleanup's (audit 2026-10-12, M13: the counter read
-// smtpd's lines only). The panel is frozen with SIGSTOP once DATA is
-// answered, and thawed after the client has its reply.
+// smtpd's lines only; Postfix 3.7.11, src/smtpd/smtpd.c, milter_send() to
+// cleanup, src/cleanup/cleanup_milter.c). The panel is frozen with SIGSTOP
+// once DATA is answered, and thawed after the client has its reply.
 func testPanelHungMidMessage(t *testing.T, sc *scenario) {
 	before, err := senderCheckDeferredToday(sc)
 	if err != nil {

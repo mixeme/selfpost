@@ -6,6 +6,13 @@
 # by SelfPost/Postfix.
 #
 # Requires jq. Usage: ./extract-cert.sh <acme.json path> <domain> <output dir>
+#
+# The layout is not documented (doc.traefik.io/traefik/v3.1/https/acme/ says
+# only "JSON file"); read in Traefik v3.1.0: pkg/provider/acme/local_store.go
+# keeps map[resolver name]*StoredData, store.go StoredData{Account,
+# Certificates}, provider.go Certificate{domain, certificate, key} with the PEM
+# as []byte - base64 in JSON (Go encoding/json). "le" is the resolver
+# docker-compose.traefik.yml names.
 set -eu
 
 ACME_JSON="${1:?path to acme.json}"

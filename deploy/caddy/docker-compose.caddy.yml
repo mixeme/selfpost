@@ -11,10 +11,18 @@
 # storage detail, not a documented public API — VERIFY the exact path against
 # the Caddy version you deploy (`docker compose exec caddy find /data/caddy/certificates -name '*.crt'`)
 # before wiring it into the volume mount below.
+# Read in the source (caddyserver/certmagic, storage.go, KeyBuilder.SiteCert():
+# certificates/<issuer key>/<domain>/<domain>.crt; acmeissuer.go, issuerKey():
+# the CA URL's host and path, "acme-v02.api.letsencrypt.org-directory" for Let's
+# Encrypt). caddy/modules/caddytls/automation.go, DefaultIssuers(): ZeroSSL is a
+# second issuer only when an email is configured, and the Caddyfile below sets
+# none. Read at the projects' master of 2026-10-14: `caddy:2` is a moving tag.
 #
 # Merge with the base file — run this from the deploy/ directory (Compose
 # resolves every relative path in both files against the directory of the
-# FIRST -f file, i.e. deploy/, which is why paths below are ./caddy/...):
+# FIRST -f file, i.e. deploy/, which is why paths below are ./caddy/... -
+# docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
+# evaluated relative to the base file"):
 #
 #   docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
 

@@ -39,4 +39,8 @@ for sock in $SOCKS; do
 done
 
 echo "postfix-wrapper: milter sockets ready, starting postfix"
+# Postfix 3.7.11: postfix(1) execs conf/postfix-script (src/postfix/postfix.c),
+# whose "start-fg" execs master only as PID 1 and otherwise runs "master -s" as
+# its child; master then makes itself a session leader (src/master/master.c,
+# setsid()). The process supervisord watches is that shell, not master.
 exec postfix start-fg

@@ -33,7 +33,8 @@ type port25Case struct {
 // ingestService is the dmarc-ingest service as Postfix must read it back.
 // flags=, user= and argv= are arguments of pipe(8); set as -o parameters they
 // are dropped, and a bare "pipe" dies on every report with "fatal: missing
-// user= command-line attribute" - the state of 1.7.0 through 1.9.5.
+// user= command-line attribute" - the state of 1.7.0 through 1.9.5 (date not
+// recorded; Postfix 3.7.11, src/pipe/pipe.c, get_service_attr()).
 const ingestService = "dmarc-ingest unix - n n - 1 pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}"
 
 var port25Cases = []port25Case{
@@ -145,7 +146,9 @@ func checkPort25ConfigCombinations(s *stack) error {
 			// a service line on whitespace, so a value with a space in it is
 			// cut at the space and the rest becomes a stray smtpd argument
 			// ("fatal: unexpected command-line argument", port 25 dead while
-			// `postfix check` stays silent). Ask Postfix itself.
+			// `postfix check` stays silent). Ask Postfix itself. (Seen in 1.9.1,
+			// date not recorded; Postfix 3.7.11, man/man5/master.5, "-o
+			// name=value (short form)", NOTE 2.)
 			seen, err := s.execIn("selfpost", "postconf", "-Ph", "smtp/inet/"+c.param)
 			if err != nil {
 				return fmt.Errorf("%s: postconf -P smtp/inet/%s: %v\n%s", tc.name, c.param, err, seen)

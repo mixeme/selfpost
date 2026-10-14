@@ -69,6 +69,8 @@ func verifyDKIM(raw []byte, domain string) error {
 // observed for a just-made connection (needed to configure a level-2 rate
 // limit's allowed-IPs list — the address a host-published port is seen as
 // inside the container depends on Docker's NAT and isn't worth hard-coding).
+// Postfix 3.7.11, src/smtpd/smtpd.c, smtpd_service(): msg_info("connect from
+// %s", namaddr), namaddr being "name[addr]".
 var connectFromPattern = regexp.MustCompile(`connect from [^\[]*\[([0-9a-fA-F.:]+)\]`)
 
 // lastSMTPClientIP reads mail.log inside the selfpost container and returns

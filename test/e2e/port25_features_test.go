@@ -58,6 +58,7 @@ func testEnablePort25Features(t *testing.T, sc *scenario) {
 const reportReporter = "reporter.e2e.test"
 
 // aggregateXML is a DMARC aggregate report on domain, as a receiver sends it.
+// Composed by hand in the shape of RFC 7489, Appendix C; no report was copied.
 func aggregateXML(domain, reportID string) string {
 	return `<?xml version="1.0"?>
 <feedback>
@@ -88,7 +89,9 @@ func aggregateXML(domain, reportID string) string {
 }
 
 // reportMessage is the mail a receiver sends a report in: one gzip attachment,
-// base64 in 76-column lines.
+// base64 in 76-column lines. Composed by hand: RFC 7489 § 7.2.1.1
+// (application/gzip, a .xml.gz name), RFC 2045 § 6.8 (base64 lines of at most
+// 76 characters).
 func reportMessage(t *testing.T, to, xml string) string {
 	t.Helper()
 	var gz bytes.Buffer
@@ -344,6 +347,10 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("the Inbound log holds %d rows, want the relayed message alone:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
+	// Postfix 3.7.11, src/smtpd/smtpd_check.c: "User unknown in relay recipient
+	// table" (check_rcpt_maps(); unknown_relay_recipient_reject_code,
+	// DEF_RELAY_RCPT_CODE 550) and "Relay access denied"
+	// (reject_unauth_destination(); DEF_RELAY_CODE 554).
 	for _, c := range []struct {
 		to   string
 		code int

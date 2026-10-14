@@ -62,6 +62,8 @@ esac
 # trees under /data as other users. Go's testing.TempDir is 0700, and a bare
 # chown would leave that mode in place — opendkim then cannot read KeyTable and
 # the container crash-loops (e2e TestHostnameGate/valid_hostname_starts).
+# (Go: testing.TempDir uses os.MkdirTemp, src/os/tempfile.go: "created with
+# mode 0o700".)
 chown panel:panel /data
 chmod 755 /data
 # Restored backups or previously-created state may contain panel-owned files
@@ -76,7 +78,8 @@ find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log ! -name postfix -ex
 # tree on every start so it is correct whether /data is fresh, restarted, or
 # just restored from a backup:
 #   - group `selfpost` + setgid on directories so anything the panel creates
-#     inherits the shared group OpenDKIM traverses;
+#     inherits the shared group OpenDKIM traverses (inode(7), "The
+#     set-group-ID bit": files created in such a directory take its group);
 #   - private keys and tables group-readable (0640);
 #   - both table files present (empty is fine) BEFORE OpenDKIM starts, so the
 #     daemon comes up cleanly with no domains yet.
@@ -135,6 +138,11 @@ chmod 0640 /data/postfix/sender_login_maps
 # directory keeps the shared group on anything created inside it later, and
 # 2750 keeps it group-traversable but not group-writable — logrotate refuses to
 # rotate a log whose directory is writable by a non-root group.
+# Postfix 3.7.11: src/util/logwriter.c, logwriter_open_or_die(), creates the
+# file 0644, under master's umask(077) (src/master/master.c) - 0600. logrotate
+# 3.21.0, logrotate.c, findNeedRotating(): "skipping ... because parent
+# directory has insecure permissions" when the directory's group is not root
+# and has write permission.
 mkdir -p /data/log
 [ -e /data/log/mail.log ] || : > /data/log/mail.log
 chown -R postfix:selfpost /data/log
@@ -160,6 +168,7 @@ chmod 2750 /run/opendkim /run/selfpost
 # running container, and a restart of the whole container is not the check's
 # downtime (guide § Health) - a mark left from before would count the whole
 # outage when supervisord cannot say since when Postfix runs.
+# (test(1), -S: true for any socket file, whether or not anything listens.)
 rm -f /run/opendkim/*.sock /run/selfpost/*.sock /run/selfpost/*.alive
 
 # Generate the outbound-relay Postfix configuration from the environment (spec
@@ -184,6 +193,10 @@ chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
 # It would also leave the queue directory itself and pid/ owned by postfix.
 # Postfix keeps those two owned by root (master, which runs as root, is the only
 # writer) and logs "warning: not owned by root" for each at every start.
+# (Postfix 3.7.11, conf/postfix-files: $queue_directory root 755, maildrop
+# $setgid_group 730, public $setgid_group 710, pid root 755, the other queue
+# directories $mail_owner 700; conf/postfix-script, "check-warn": "not owned by
+# root".)
 chown root /data/postfix/queue /data/postfix/queue/pid
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

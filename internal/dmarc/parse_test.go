@@ -11,6 +11,9 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 )
 
+// sampleXML and the messages in this file are composed by hand, in the shape
+// RFC 7489 gives (Appendix C, the schema; § 7.2.1.1, application/gzip and the
+// .xml.gz name). The org name is any reporter's; no report was copied.
 const sampleXML = `<?xml version="1.0"?>
 <feedback>
   <report_metadata>

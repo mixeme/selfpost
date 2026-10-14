@@ -59,7 +59,8 @@ func deliverPort25(from, to, message string) sendResult {
 
 // waitForPort25Ready polls port 25 until Postfix greets on it. A bare connect
 // is not enough: Docker's proxy accepts on the published port whether or not
-// anything listens behind it.
+// anything listens behind it (seen on the stand, date not recorded - see
+// waitForSMTPSReady).
 func waitForPort25Ready(timeout time.Duration) error {
 	return waitFor("port 25 to greet", timeout, 500*time.Millisecond, func() (bool, error) {
 		conn, err := net.DialTimeout("tcp", port25Addr, 2*time.Second)

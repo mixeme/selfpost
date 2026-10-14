@@ -161,7 +161,8 @@ func attemptSend(a sendAttempt) sendResult {
 // waited for the panel could still race a not-yet-listening smtpd. A bare TCP
 // connect is not enough: Docker's port proxy accepts on the host side before
 // anything listens in the container and then resets the connection, which is
-// how the level-1 rate-limit case once took a reset for its limit.
+// how the level-1 rate-limit case once took a reset for its limit (seen on the
+// stand, date not recorded; Docker's documentation does not describe it).
 func waitForSMTPSReady(timeout time.Duration) error {
 	return waitFor("smtps port to greet", timeout, 300*time.Millisecond, func() (bool, error) {
 		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, "tcp", smtpsAddr, &tls.Config{
@@ -232,8 +233,12 @@ func mailTwiceOnOneConnection(login, password, from string) [2]error {
 // the panel has just created is written into the sender map and Postfix is
 // reloaded, and an smtpd that was idle from before the reload can still take
 // a connection in the second that follows and answer 553 "not owned by user"
-// (seen on the stand; two seconds after the save it no longer happened, at 0,
-// 10, 40 or 110 s of waiting). It goes as far as RCPT and then RSET, so no
+// (seen on the stand, date not recorded; two seconds after the save it no
+// longer happened, at 0, 10, 40 or 110 s of waiting). Postfix 3.7.11: an smtpd
+// reads the texthash map once, when it starts (html/DATABASE_README.html,
+// "texthash"), and one from before the reload exits only when it next sees
+// master's status pipe closed (src/master/multi_server.c,
+// multi_server_abort()). It goes as far as RCPT and then RSET, so no
 // message is sent and no row is written. Only that 553 is waited out, for 15
 // s at most; any other answer fails at once.
 func waitForSenderMap(login, password, from string) error {

@@ -49,7 +49,8 @@ func seedDataDir(t *testing.T) (dataDir, dbPath, deployRoot string) {
 	writeFile(t, filepath.Join(dataDir, "selfpost.db-wal"), "wal")
 	writeFile(t, filepath.Join(dataDir, "selfpost.db-shm"), "shm")
 	// Postfix's delivery log and its rotated files: diagnostic output, not
-	// state, and the bulkiest thing under /data.
+	// state, and the bulkiest thing under /data. The line is composed by hand;
+	// only its absence from the archive matters.
 	writeFile(t, filepath.Join(dataDir, "log", "mail.log"), "Aug  8 07:26:41 mail postfix/smtp[1]: ABC: to=<a@example.net>, status=sent (ok)")
 	writeFile(t, filepath.Join(dataDir, "log", "mail.log.1"), "older")
 	writeFile(t, filepath.Join(deployRoot, ComposeFileName), "services:\n  selfpost:\n    image: test\n")

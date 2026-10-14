@@ -154,6 +154,10 @@ func extractAggregatePayload(raw []byte) ([]byte, error) {
 	return readEncodedBody(textproto.MIMEHeader(msg.Header), msg.Body)
 }
 
+// looksLikeAggregate takes a part by its file name or Content-Type. RFC 7489
+// § 7.2.1.1: the report is "application/gzip" if compressed and "text/xml"
+// otherwise, its name ending ".xml" or ".xml.gz"; zip is outside the RFC and
+// is what some reporters send (see decompress).
 func looksLikeAggregate(name string) bool {
 	name = strings.ToLower(name)
 	return strings.Contains(name, "xml") || strings.Contains(name, "gzip") || strings.Contains(name, "zip")

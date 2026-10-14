@@ -33,6 +33,12 @@ type ListStore interface {
 // line, and the filter (rspamd, deploy/antispam/rspamd/multimap.conf) rereads
 // a file when it changes. Which list wins when both match is the filter's
 // configuration: deny.
+//
+// rspamd 3.11.1, src/libserver/maps/map.c: a file map is watched with libev's
+// ev_stat (inotify, or a stat poll every map_watch_interval x
+// map_file_watch_multiplier = 30 s, conf/options.inc), so a change takes
+// effect within that, not at once; docs.rspamd.com/configuration/maps asks
+// for the atomic rename atomicfile.Write does.
 type Lists struct {
 	store ListStore
 	dir   string
@@ -157,7 +163,10 @@ func (l *Lists) sync() error {
 		}
 		// Values were validated on the way in; this is the writer's own guard
 		// against a row that got into the table some other way. In a map file a
-		// newline ends the entry, whitespace starts its value and # a comment.
+		// newline ends the entry, whitespace starts its value and # a comment
+		// (rspamd 3.11.1, src/libserver/maps/map_helpers.c,
+		// rspamd_parse_kv_list()). An IP map takes bare v4 and v6 addresses and
+		// CIDR networks (docs.rspamd.com/configuration/maps, IP maps).
 		if err := configsafe.Token("filter list entry", e.Value, " \t\r\n#"); err != nil {
 			return err
 		}
@@ -165,6 +174,8 @@ func (l *Lists) sync() error {
 	}
 	// The filter runs under another user in another container: the directory
 	// and the files are readable by anyone. They hold addresses, not secrets.
+	// (The rspamd image runs as uid 11333: rspamd-docker v3.11.1+3,
+	// Dockerfile, USER 11333:11333.)
 	if err := os.MkdirAll(l.dir, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", l.dir, err)
 	}
@@ -297,6 +308,11 @@ func normalizeNote(raw string) (string, error) {
 // refuses with a message, which the log tailer files as the reply of a
 // rejected row. An allow rule adds a symbol named after the kind of entry,
 // which the journal milter keeps in the verdict of an accepted row.
+//
+// rspamd 3.11.1: the deny message reaches Postfix as the milter reply "554
+// 5.7.1 <message>" (src/libserver/milter.c, rspamd_milter_send_task_results());
+// src/plugins/lua/milter_headers.lua, routine x-spamd-result, writes each
+// symbol as "%s(%.2f)[%s]" - name, score, options.
 const (
 	denyReplyMark = "this server's deny list"
 	allowMark     = "SELFPOST_ALLOW_"

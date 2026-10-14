@@ -48,7 +48,9 @@ func writeZone(stageDir string, extra []txtRecord) error {
 	fmt.Fprintf(&b, "ns      IN A    10.77.0.10\n")
 	// The sink-MX: Postfix's outbound delivery for the recipient domain used by
 	// every positive-path send resolves here via the domain's implicit MX
-	// fallback to its own A record (RFC 5321) — no explicit MX record needed.
+	// fallback to its own A record (RFC 5321 § 5.1: with no MX records the
+	// domain is treated as having an implicit MX of itself) — no explicit MX
+	// record needed.
 	fmt.Fprintf(&b, "sink    IN A    10.77.0.11\n")
 	for _, r := range extra {
 		fmt.Fprintf(&b, "%s IN TXT %s\n", r.name, chunkTXT(r.value))
@@ -57,7 +59,8 @@ func writeZone(stageDir string, extra []txtRecord) error {
 }
 
 // chunkTXT splits a TXT value into <255-byte quoted strings (the DNS
-// <character-string> limit), which resolvers concatenate back into one value.
+// <character-string> limit, RFC 1035 § 3.3), which a DKIM verifier
+// concatenates back into one value (RFC 6376 § 3.6.2.2).
 // A DKIM RSA-2048 public key's base64 comfortably exceeds 255 bytes on its
 // own, so this is required, not defensive.
 func chunkTXT(value string) string {

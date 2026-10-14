@@ -17,6 +17,8 @@ server {
 
 server {
 	listen 443 ssl;
+	# nginx.org/en/docs/http/ngx_http_v2_module.html, "http2": "This directive
+	# appeared in version 1.25.1" (the fragment runs nginx:1.27).
 	http2 on;
 	server_name mail.example.com;
 

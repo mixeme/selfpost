@@ -47,7 +47,9 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 		authLogin: login, authPassword: password,
 		from: from, to: recipient, subject: "e2e " + uniqueToken("l2-second"), body: "should be rejected",
 	})
-	// The milter answers tempfail at MAIL FROM, which Postfix words as below.
+	// The milter answers tempfail at MAIL FROM, which Postfix words as below
+	// (Postfix 3.7.11, src/milter/milter8.c, milter8_event(), SMFIR_TEMPFAIL:
+	// "451 4.7.1 Service unavailable - try again later").
 	if err := second.refusedAt("MAIL", 451, "4.7.1 Service unavailable"); err != nil {
 		t.Fatalf("the second message over the level-2 limit: %v", err)
 	}
@@ -58,7 +60,8 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 	// introduce the client again, so a second MAIL FROM on the same connection
 	// used to arrive with no client address and was let through (found by the
 	// technical review of 2026-10-12; the same hole let an application past its
-	// client-address list).
+	// client-address list). Postfix's half: 3.7.11, src/smtpd/smtpd.c,
+	// smtpd_proto(), calls milter_conn_event() once per connection.
 	errs := mailTwiceOnOneConnection(login, password, from)
 	for i, err := range errs {
 		if err := replyIs(err, 451, "4.7.1 Service unavailable"); err != nil {
@@ -91,7 +94,10 @@ func testSenderLoginMismatch(t *testing.T, sc *scenario) {
 	})
 	// Postfix evaluates smtpd_sender_restrictions with smtpd_delay_reject=yes
 	// (the default): the mismatch is detected at MAIL FROM but the reject is
-	// only sent back at RCPT TO.
+	// only sent back at RCPT TO. (Postfix 3.7.11, src/global/mail_params.h,
+	// DEF_SMTPD_DELAY_REJECT 1; src/smtpd/smtpd_check.c,
+	// reject_auth_sender_login_mismatch(): 553 5.7.1 "Sender address rejected:
+	// not owned by user".)
 	if err := res.refusedAt("RCPT", 553, "5.7.1"); err != nil {
 		t.Fatalf("a sender the application does not own: %v", err)
 	}
@@ -103,6 +109,10 @@ func testSenderLoginMismatch(t *testing.T, sc *scenario) {
 // testNoAuthRejected is plan C.4 negative check 1: no SASL session, no mail.
 // The sender address used here belongs to no registered domain, so the
 // rejection is unambiguously about the missing AUTH and not sender ownership.
+// The reply: smtps's client restrictions end in "reject" (build/
+// postfix-config.sh), Postfix 3.7.11, src/smtpd/smtpd_check.c,
+// generic_checks(): var_reject_code (554) "<%s>: %s rejected: Access denied",
+// delayed to RCPT by smtpd_delay_reject.
 func testNoAuthRejected(t *testing.T, sc *scenario) {
 	res := attemptSend(sendAttempt{
 		from: "anyone@unregistered.e2e.test", to: recipient,
@@ -181,7 +191,9 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 // when the connection was reset because Postfix was still starting - and,
 // held to anvil's reply, it turned out the first message had always been
 // refused for another reason: the new login was not yet in the sender map an
-// smtpd from before the panel's reload held (waitForSenderMap).
+// smtpd from before the panel's reload held (waitForSenderMap). (An incident
+// on the stand, date not recorded.) Anvil's reply: Postfix 3.7.11,
+// src/smtpd/smtpd.c, mail_cmd(): "450 4.7.1 Error: too much mail from %s".
 func testLevel1RateLimit(t *testing.T, sc *scenario) {
 	login, password, err := sc.panel.addApplication(sc.domainID, "l1app", "wildcard", "")
 	if err != nil {

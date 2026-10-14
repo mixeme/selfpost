@@ -65,7 +65,10 @@ func parseSupervisorStatus(out string) map[string]string {
 
 // checkInboundRelayOff asserts the default image does not accept mail on
 // port 25: smtp/inet is absent from master.cf (Debian's stock listener is
-// removed when INBOUND_RELAY_ENABLE is not true).
+// removed when INBOUND_RELAY_ENABLE is not true). For an absent service
+// postconf -M prints nothing on stdout and "warning: unmatched request" on
+// stderr (Postfix 3.7.11, src/postconf/postconf_master.c,
+// pcf_show_master_entries()).
 func checkInboundRelayOff(s *stack) error {
 	out, err := s.execIn("selfpost", "postconf", "-M", "smtp/inet")
 	combined := out

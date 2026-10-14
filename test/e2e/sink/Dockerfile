@@ -21,6 +21,9 @@ WORKDIR /mail
 # smtp-sink refuses to run as root without an explicit -u to switch to after
 # binding — "-u root" satisfies that check while staying root throughout,
 # which is fine here: throwaway container, isolated e2e network, never
-# exposed.
+# exposed. (Postfix 3.7.11, src/smtpstone/smtp-sink.c: -d "Dump each mail
+# transaction to a single-message file" named by the template plus "a
+# pseudo-random hexadecimal number"; main(): "-u option is required if running
+# as root".)
 ENTRYPOINT ["/usr/sbin/smtp-sink"]
 CMD ["-u", "root", "-d", "/mail/%Y%m%d%H%M%S.", "0.0.0.0:25", "100"]

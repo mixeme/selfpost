@@ -40,6 +40,11 @@ type ParsedRecord struct {
 	HeaderFrom  string
 }
 
+// feedbackXML follows RFC 7489, Appendix C. The schema's targetNamespace is
+// "http://dmarc.org/dmarc-xml/0.1"; a tag without a namespace matches the
+// local name in any namespace (Go, src/encoding/xml/read.go: the namespace is
+// compared only when the tag names one), so a report that declares one is
+// read the same.
 type feedbackXML struct {
 	XMLName  xml.Name `xml:"feedback"`
 	Metadata struct {
@@ -160,6 +165,9 @@ func ParseAggregate(raw []byte) (ParsedReport, error) {
 	return out, nil
 }
 
+// dmarcRecordPasses: RFC 7489, Appendix C, PolicyEvaluatedType - dkim and spf
+// are "The DMARC-aligned authentication result"; § 4.2: DMARC passes when one
+// supported mechanism passes aligned.
 func dmarcRecordPasses(r ParsedRecord) bool {
 	return strings.EqualFold(r.SPFResult, "pass") || strings.EqualFold(r.DKIMResult, "pass")
 }
@@ -170,7 +178,8 @@ const maxAggregateXML = 8 << 20
 
 // decompress unwraps the container the reporter used. Both are seen in the
 // wild: most senders gzip the XML, some (notably several Microsoft and Yahoo
-// endpoints) ship it as a single-entry zip.
+// endpoints) ship it as a single-entry zip. (A sighting: where and when not
+// recorded. RFC 7489 § 7.2.1.1 names gzip only.)
 func decompress(raw []byte) ([]byte, error) {
 	switch {
 	case len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b:

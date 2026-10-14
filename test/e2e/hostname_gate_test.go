@@ -17,7 +17,8 @@ func runEntrypoint(t *testing.T, hostnameEnv string) (output string, exitedZero 
 	t.Helper()
 	dataDir := t.TempDir()
 	// Entrypoint also chmod 755 /data; mirror that here so a pre-fix image
-	// still gets a traversable bind mount under Go's 0700 TempDir.
+	// still gets a traversable bind mount under Go's 0700 TempDir (testing.TempDir
+	// uses os.MkdirTemp, src/os/tempfile.go: "created with mode 0o700").
 	if err := os.Chmod(dataDir, 0o755); err != nil {
 		t.Fatalf("chmod data dir: %v", err)
 	}

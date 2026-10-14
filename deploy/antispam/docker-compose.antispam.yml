@@ -24,6 +24,10 @@ services:
       - antispam
 
   antispam:
+    # The milter: rspamd 3.11.1, conf/worker-proxy.inc, "milter = yes" for the
+    # rspamd_proxy worker, which the image binds to *:11332 (rspamd-docker
+    # v3.11.1+3, patches/rspamd-docker-config.diff), and runs as uid 11333
+    # (its Dockerfile, USER 11333:11333).
     image: rspamd/rspamd:3.11
     restart: unless-stopped
     # No host ports: only SelfPost talks to the milter on the compose network.
