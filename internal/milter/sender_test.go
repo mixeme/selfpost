@@ -24,22 +24,6 @@ invoices@example.org billing
 billing@example.org billing
 `
 
-// signingTable is a SigningTable for the same server, composed by hand: the
-// three sending domains, one more that has no application yet, and the
-// server's own name. Its key-name column is not what internal/domain
-// renderTables writes (the domain name); the check reads only the pattern.
-const signingTable = `*@news.example.net selfpost._domainkey.news.example.net
-*@shop.example.org selfpost._domainkey.shop.example.org
-*@example.org selfpost._domainkey.example.org
-*@empty.example.com selfpost._domainkey.empty.example.com
-*@mail.example.org selfpost._domainkey.mail.example.org
-`
-
-func signers(t *testing.T) *Signers {
-	t.Helper()
-	return NewSigners(writeMaps(t, signingTable))
-}
-
 func writeMaps(t *testing.T, content string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "table")
@@ -54,7 +38,7 @@ func writeMaps(t *testing.T, content string) string {
 func offer(t *testing.T, bind *Bindings, login, envelope string, headers ...[2]string) (milter.Response, []store.SendLogEntry) {
 	t.Helper()
 	refused := make(chan store.SendLogEntry, 8)
-	s := &senderSession{bind: bind, signers: signers(t), refused: refused}
+	s := &senderSession{bind: bind, refused: refused}
 	if _, err := s.MailFrom(envelope, mods(map[string]string{"{auth_authen}": login})); err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +93,18 @@ func TestSenderCheck(t *testing.T) {
 		{"a name in windows-1251", "shop", [][2]string{from("=?windows-1251?B?zODj4Ofo7Q==?= <a@shop.example.org>")}, true, ""},
 		{"a name in koi8-r, quoted-printable", "shop", [][2]string{from("=?koi8-r?Q?=ED=C1=C7=C1=DA=C9=CE?= <a@shop.example.org>")}, true, ""},
 		{"a comment after the address", "shop", [][2]string{from("a@shop.example.org (the shop)")}, true, ""},
+		{"the leading space Postfix keeps for OpenDKIM", "shop", [][2]string{from(" a@shop.example.org")}, true, ""},
+		// Whatever the name, a comment or a quoted local part holds: OpenDKIM
+		// signs for the address it reads, and that is the one judged.
+		{"another sender in the display name", "shop", [][2]string{from(`"director@example.org" <a@shop.example.org>`)}, true, ""},
+		{"the server's name in a comment", "shop", [][2]string{from("a@shop.example.org (postmaster@mail.example.org)")}, true, ""},
+		{"a domain with a key and no application, in the display name", "shop", [][2]string{from(`"x@empty.example.com" <a@shop.example.org>`)}, true, ""},
+		{"a stranger's address in the display name", "shop", [][2]string{from(`"someone@gmail.example" <a@shop.example.org>`)}, true, ""},
+		{"another sender in an encoded display name", "shop", [][2]string{from("=?utf-8?q?director=40example=2Eorg?= <a@shop.example.org>")}, true, ""},
+		{"a stranger's address in a comment", "shop", [][2]string{from("a@shop.example.org (someone@gmail.example)")}, true, ""},
+		{"an unquoted address as the display name", "shop", [][2]string{from("director@example.org <a@shop.example.org>")}, true, ""},
+		{"another domain inside a quoted local part", "shop", [][2]string{from(`"director@example.org"@shop.example.org`)}, true, ""},
+		{"no local part: OpenDKIM takes the domain for it", "shop", [][2]string{from("@shop.example.org")}, true, ""},
 
 		{"another registered domain", "shop", [][2]string{from("director@example.org")}, false, "not an address this application sends as"},
 		{"the server's own name", "shop", [][2]string{from("postmaster@mail.example.org")}, false, "not an address this application sends as"},
@@ -120,16 +116,14 @@ func TestSenderCheck(t *testing.T) {
 		{"no From: line", "shop", [][2]string{{"Subject", "hello"}}, false, "no From: line"},
 		{"two From: lines", "shop", [][2]string{from("a@shop.example.org"), from("director@example.org")}, false, "more than one From: line"},
 		{"two addresses in one line", "shop", [][2]string{from("a@shop.example.org, director@example.org")}, false, "one address"},
-		{"not an address", "shop", [][2]string{from("the shop")}, false, "one address"},
+		{"not an address", "shop", [][2]string{from("the shop")}, false, "no address OpenDKIM can read"},
+		{"an address before a list comma, then another", "shop", [][2]string{from("director@example.org, <a@shop.example.org>")}, false, "one address"},
+		// Past 256 bytes OpenDKIM matches its SigningTable against a cut
+		// "user@domain" - which could end in another tenant's domain.
+		{"an address longer than OpenDKIM reads", "shop", [][2]string{from(`"` + strings.Repeat("a", 240) + `@example.org"@shop.example.org`)}, false, "longer than OpenDKIM reads whole"},
 		{"a group", "shop", [][2]string{from("friends: a@shop.example.org, b@shop.example.org;")}, false, "one address"},
-		{"another sender in the display name", "shop", [][2]string{from(`"director@example.org" <a@shop.example.org>`)}, false, "names another sender of this server"},
-		{"the server's name in a comment", "shop", [][2]string{from("a@shop.example.org (postmaster@mail.example.org)")}, false, "names another sender of this server"},
-		{"a domain with a key and no application, in the display name", "shop", [][2]string{from(`"x@empty.example.com" <a@shop.example.org>`)}, false, "names another sender of this server"},
-		{"a stranger's address in the display name", "shop", [][2]string{from(`"someone@gmail.example" <a@shop.example.org>`)}, true, ""},
-		{"another sender in an encoded display name", "shop", [][2]string{from("=?utf-8?q?director=40example=2Eorg?= <a@shop.example.org>")}, false, "names another sender of this server"},
-		{"a stranger's address in a comment", "shop", [][2]string{from("a@shop.example.org (someone@gmail.example)")}, false, "one @"},
 		{"another sender folded onto the next line", "shop", [][2]string{from("\"x\"\r\n <director@example.org>")}, false, "not an address this application sends as"},
-		{"a quote left open before another address", "shop", [][2]string{from(`"a@shop.example.org <director@example.org>`)}, false, "one address"},
+		{"a quote left open before another address", "shop", [][2]string{from(`"a@shop.example.org <director@example.org>`)}, false, "no address OpenDKIM can read"},
 		{"no login", "", [][2]string{from("a@shop.example.org")}, false, "no authenticated application"},
 		{"an unknown login", "ghost", [][2]string{from("a@shop.example.org")}, false, "not an address this application sends as"},
 	}
@@ -290,30 +284,10 @@ func TestBindingsDuplicateKeyBreaksTheTable(t *testing.T) {
 	}
 }
 
-// Without the signing table the second look cannot be taken, and a line it
-// would have to judge is deferred; a line that names nobody else is not held
-// up by it.
-func TestSenderCheckDefersWithoutSigningTable(t *testing.T) {
-	bind := NewBindings(writeMaps(t, senderMaps))
-	play := func(v string) milter.Response {
-		s := &senderSession{bind: bind, signers: NewSigners(filepath.Join(t.TempDir(), "absent"))}
-		_, _ = s.MailFrom("shop@shop.example.org", mods(map[string]string{"{auth_authen}": "shop"}))
-		_, _ = s.Header("From", v, mods(nil))
-		resp, _ := s.Headers(nil, mods(nil))
-		return resp
-	}
-	if resp := play(`"x@example.org" <a@shop.example.org>`); resp != milter.RespTempFail {
-		t.Fatalf("reply %s, want a temporary failure", replyText(resp))
-	}
-	if resp := play(`a@shop.example.org`); resp != milter.RespContinue {
-		t.Fatalf("a plain own address: %s", replyText(resp))
-	}
-}
-
 // A second message on the connection is judged by its own headers.
 func TestSenderCheckResetsBetweenMessages(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
-	s := &senderSession{bind: bind, signers: signers(t)}
+	s := &senderSession{bind: bind}
 	auth := mods(map[string]string{"{auth_authen}": "shop"})
 	for i, v := range []string{"director@example.org", "a@shop.example.org", "director@example.org"} {
 		_, _ = s.MailFrom("shop@shop.example.org", auth)
@@ -329,7 +303,7 @@ func TestSenderCheckResetsBetweenMessages(t *testing.T) {
 func TestSenderCheckRefusalIsOneRow(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
 	refused := make(chan store.SendLogEntry, 8)
-	s := &senderSession{bind: bind, signers: signers(t), refused: refused}
+	s := &senderSession{bind: bind, refused: refused}
 	_, _ = s.MailFrom("shop@shop.example.org", mods(map[string]string{"{auth_authen}": "shop"}))
 	for _, r := range []string{"a@x.example", "b@x.example", "c@x.example"} {
 		_, _ = s.RcptTo(r, mods(nil))
@@ -392,14 +366,18 @@ func fromLines(t *testing.T, file, domain, other string) []string {
 	return out
 }
 
-// Every line of the shared file of lines naming another sender is refused:
-// none may be passed to be signed with that sender's key.
-func TestSenderCheckRefusesTheSharedLinesNamingAnother(t *testing.T) {
+// No line of the shared file of lines naming another sender is passed to be
+// signed with that sender's key: a line the check passes is one OpenDKIM
+// reads the application's own address in (the e2e looks at the signature).
+func TestSenderCheckNeverPassesTheSharedLinesForAnother(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
 	for _, line := range fromLines(t, "from-lines-other.txt", "shop.example.org", "news.example.net") {
 		resp, _ := offer(t, bind, "shop", "shop@shop.example.org", [2]string{"From", line})
-		if resp == milter.RespContinue {
-			t.Errorf("From: %q passed", line)
+		if resp != milter.RespContinue {
+			continue
+		}
+		if r := dkimMailParse(line); asciiLower(r.domain) != "shop.example.org" {
+			t.Errorf("From: %q passed, and OpenDKIM reads the domain %q in it", line, r.domain)
 		}
 	}
 }

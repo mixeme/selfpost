@@ -1,10 +1,12 @@
 # From: lines that name another sender of this server, {other}, beside or in
 # place of the application's own address at {domain} (review of audit stage
-# 2). The check must refuse each: a line it read as the application's own and
-# OpenDKIM as {other}'s would be signed with {other}'s key. The unit test
-# (internal/milter/sender_test.go) wants each refused; the e2e
-# (test/e2e/dkim_from_test.go) sends each and wants nothing signed for
-# {other}. {OTHER} is {other} in capitals; {other_qp} is {other} with each
+# 2). None may be signed with {other}'s key. Since stage 2c the check reads a
+# line with OpenDKIM's own parser, so it passes those whose address OpenDKIM
+# reads at {domain} - {other} in a display name, a comment or a quoted local
+# part - and refuses the rest. The unit test
+# (internal/milter/sender_test.go) wants every line it passes read at
+# {domain}; the e2e (test/e2e/dkim_from_test.go) sends each and wants
+# nothing signed for {other}. {OTHER} is {other} in capitals; {other_qp} is {other} with each
 # dot escaped as a quoted pair. One Go-quoted string per line. The lines are
 # composed by hand; that OpenDKIM signs none for {other} is measured, by the
 # e2e on every run.

@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/milter"
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -67,8 +66,7 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 	// The two tables the mail path itself goes by: whom Postfix lets send as
 	// what, and what OpenDKIM signs.
 	bind := milter.NewBindings(postfix.New(cfg.postfixDir).SenderLoginMapsPath())
-	signers := milter.NewSigners(domain.NewOpenDKIM(cfg.opendkimDir).SigningTablePath())
-	return milter.ServeSender(ctx, ln, bind, signers, st)
+	return milter.ServeSender(ctx, ln, bind, st)
 }
 
 // postfixState is what supervisord said about Postfix: since when it runs, if

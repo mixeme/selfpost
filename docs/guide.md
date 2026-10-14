@@ -1204,13 +1204,13 @@ Postfix asks who owns the address before it asks who owns the domain.
 A message whose `From:` is anything else is refused with `550 5.7.1` and a
 text naming the line: another of your domains, the server's own name, an
 address at a domain that is not on this server, a line with two addresses,
-or no `From:` at all. The line is read strictly, because two programs read
-it - the check and the signer - and must not be able to read it differently:
-outside a quoted display name it may hold one `@`, the address's own, and no
-other name this server signs for may follow an `@` anywhere in it, a quoted
-name included. A display name with a comma or brackets has to be quoted
-(`"Shop, Inc." <orders@…>`), as the mail standard asks and mail libraries
-do. The refusal
+or no `From:` at all. The line is read the way the signer, OpenDKIM, reads
+it - the panel runs OpenDKIM's own parser - so only its address counts: what a
+display name or a comment around it says is not judged, and a line with more
+than one address is refused. A display name with a comma or brackets has to
+be quoted (`"Shop, Inc." <orders@…>`), as the mail standard asks and mail
+libraries do; unquoted, OpenDKIM may take a word of the name for the
+address. The refusal
 is permanent, so the application does not send the message again; it is a
 row of the [Outbound log](#outbound-log) tagged `wrong From`, and the row's
 page shows what the line said.

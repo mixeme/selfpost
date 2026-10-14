@@ -29,6 +29,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   case, owners may be separated by blanks or continue on the next line, and
   a key written twice makes the check defer, as it makes Postfix refuse the
   whole table (assumptions B-PS1, B-PS4).
+- **The sender check reads `From:` with OpenDKIM's own parser.** It used its
+  own parser and, to cover where the two could disagree, refused any line
+  naming another domain of the server in a display name or a comment - which
+  told an application, by refused or passed, which domains are hosted here
+  (audit 2026-10-12, L8, an accepted risk until now). It now runs OpenDKIM's
+  `dkim_mail_parse()`, ported line for line and tested against the C on two
+  hundred thousand lines, and judges the address OpenDKIM signs for. A display
+  name or a comment no longer matters - a line with another sender's address
+  only in its display name now passes, signed with the application's own
+  key; a line OpenDKIM finds no address in, or two addresses in, is refused,
+  and so is an address over 256 bytes, which OpenDKIM would match against its
+  signing table cut short - cut there, a quoted local part could end in
+  another domain's name.
 - **Over IPv6 every client looks the same to SelfPost** - documented, not
   changed. The compose network has no IPv6, so Docker's proxy carries an
   IPv6 connection and the container sees the network's gateway

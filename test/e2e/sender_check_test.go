@@ -66,7 +66,15 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		// app-list, so the wildcard application may not have it, in the
 		// header as in the envelope (assumptions B-PS1; the envelope below).
 		{"the address listed for another application", wildcard, "billing@" + senderDomain, false},
-		{"another sender in the display name", wildcard, `"director@` + otherDomain + `" <alerts@` + senderDomain + `>`, false},
+		// Since 2.5.2 the address OpenDKIM reads decides (OpenDKIM's parser,
+		// internal/milter/mailparse.go): another sender's name in the display
+		// name passes, and is signed for the application's own domain
+		// (passed_from_lines_signed_for_their_domain_only looks at the key).
+		{"another sender in the display name", wildcard, `"director@` + otherDomain + `" <alerts@` + senderDomain + `>`, true},
+		// Past 256 bytes OpenDKIM matches its SigningTable against the
+		// address cut short, which here would end in the other domain's
+		// name (opendkim.c, dkimf_apply_signtable(), MAXADDRESS).
+		{"an address longer than OpenDKIM reads", wildcard, `"` + strings.Repeat("a", 256-len("@"+otherDomain)-1) + `@` + otherDomain + `x"@` + senderDomain, false},
 	} {
 		token := uniqueToken("from")
 		res := attemptSend(sendAttempt{

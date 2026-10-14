@@ -89,9 +89,11 @@ func testSignedForItsDomainOnly(t *testing.T, sc *scenario) {
 	}
 }
 
-// testNeverSignedForAnother: the lines that name another sender of the server
-// are refused by the check; whatever happens to one, nothing arrives signed
-// with that sender's key (review of audit stage 2).
+// testNeverSignedForAnother: no line that names another sender of the server
+// arrives signed with that sender's key (review of audit stage 2). Since stage
+// 2c the check reads a line as OpenDKIM does: one whose address is the
+// application's passes, wherever the other sender's name is written, and must
+// arrive signed for the application's domain; the rest are refused.
 func testNeverSignedForAnother(t *testing.T, sc *scenario) {
 	lines, err := fromLines(h.repoRoot, "from-lines-other.txt", senderDomain, otherDomain)
 	if err != nil {
@@ -107,16 +109,25 @@ func testNeverSignedForAnother(t *testing.T, sc *scenario) {
 		if err := res.refusedAt("DATA", 550, "5.7.1 From:"); err == nil {
 			continue
 		}
-		t.Errorf("From: %q was not refused by the check: %v", line, res.firstErr())
+		if !res.ok() {
+			t.Errorf("From: %q: neither passed nor refused by the check: %v", line, res.firstErr())
+			continue
+		}
 		raw, err := findSinkMessage(h.stageDir, token, 15*time.Second)
 		if err != nil {
+			t.Errorf("From: %q passed and never arrived: %v", line, err)
 			continue
 		}
 		verifications, _ := dkim.VerifyWithOptions(bytes.NewReader(raw), &dkim.VerifyOptions{LookupTXT: lookupTXTFunc()})
+		own := false
 		for _, v := range verifications {
 			if v.Domain == otherDomain {
 				t.Errorf("From: %q arrived signed for %s", line, otherDomain)
 			}
+			own = own || (v.Domain == senderDomain && v.Err == nil)
+		}
+		if !own {
+			t.Errorf("From: %q passed and did not arrive signed for %s: %+v", line, senderDomain, verifications)
 		}
 	}
 }

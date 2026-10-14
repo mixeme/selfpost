@@ -215,28 +215,27 @@ operator can act on it.
   does not sign for included (the owner's rule: the header may say what the
   envelope may, nothing more). It is the first milter of the chain and
   strict: a message it could not judge is deferred, never passed on to the
-  signer. It reads the header as one field holding one address and then
-  looks at the raw value once more for any other name of OpenDKIM's
-  `SigningTable`, so that a line its parser and OpenDKIM's could read
-  differently is refused rather than argued about; outside quoted strings
-  the line may hold one `@`. That the two agree is tested, not only argued:
-  the e2e sends every `From:` line the check passes - a list it shares with
-  the check's unit test, `internal/milter/testdata/from-lines-passed.txt` -
-  and wants the message signed for the application's domain and no other;
-  and every line of a second list, lines that name another sender of the
-  server in a quoted string, a comment, a quoted pair, capitals or an encoded
-  word (`from-lines-other.txt`), must be refused and never arrive signed for
-  that sender. The reply to a refusal says that the line names another
-  sender of the server, not which. That a line naming a domain is refused
-  when the domain is a sender of this server, and passed when it is not,
-  still tells an application which domains are hosted here; the probe needs
-  an application of this server, and refusing every foreign address in a
-  display name would change the 2.4.0 rule - accepted by the owner
-  (accepted risks). What this does not promise is what a display
-  name looks like to a person: a name of another sender written without an
-  `@` the scan can find (a full-width dot, a space inside the name) passes,
-  signed with the application's own key - a forged display name is as old
-  as mail, and no key of another's is involved. What the client wrote
+  signer. Since `2.5.2` it reads the header with OpenDKIM's own parser,
+  `dkim_mail_parse()` ported line for line from the opendkim the image runs
+  (`internal/milter/mailparse.go`), and judges the address that parser
+  returns - the address OpenDKIM signs for - whatever a display name, a
+  comment or a quoted local part holds; one `From:` field and one address in
+  it stay required, and an address longer than the 256 bytes OpenDKIM
+  matches its `SigningTable` against is refused, since cut there it could end
+  in another domain's name (opendkim.c, `dkimf_apply_signtable()`,
+  `MAXADDRESS`). That the port is OpenDKIM's parser is tested against the C
+  itself, two hundred thousand lines and every result alike; that the signed
+  domain follows, by the e2e: it sends every `From:` line the check passes (a
+  list shared with the unit test,
+  `internal/milter/testdata/from-lines-passed.txt`) and wants it signed for
+  the application's domain and no other, and every
+  line of a second list naming another sender of the server in a quoted
+  string, a comment, a quoted pair, capitals or an encoded word
+  (`from-lines-other.txt`) must be refused or arrive signed for the
+  application's domain, never for that sender. What this does not promise is
+  what a display name looks like to a person: a name of another sender in
+  it passes, signed with the application's own key - a forged display name is
+  as old as mail, and no key of another's is involved. What the client wrote
   reaches the reply, the log and the send log only as printable ASCII, cut,
   and a refused message is one row of the log whatever its recipient count.
   Mail the panel submits itself does not pass the check: only root,
@@ -459,17 +458,13 @@ deferred item from the roadmap.
   through - but no message data. The inbound journal itself is in the
   database, 0640. Trigger to revisit: a shared host, where the sidecar should
   instead be given the files through a group it shares with the panel.
-- **An application can learn which domains are senders of this server.**
-  A `From:` whose display name or comment names an address at a domain this
-  server signs for is refused; one naming any other domain passes. The reply
-  no longer names the domain (audit 2026-10-12, L8), but refused or passed
-  answers the question for whoever sends the line. Accepted by the owner,
-  2026-10-14: it needs an application of this server - a trusted tenant
-  guessing names one at a time, as it already had to before L8, when the
-  reply only said in words what the line had named - and closing it means
-  refusing every foreign address in a display name, which would change his
-  2.4.0 rule (a stranger's address in the name passes). Trigger to revisit:
-  tenants who are not trusted, or a display-name rule decided anew.
+- ~~**An application can learn which domains are senders of this server.**~~
+  Struck in `2.5.2` (audit 2026-10-12, stage 2c; L8 closed): the sender
+  check reads a `From:` line with OpenDKIM's own parser, ported
+  (`internal/milter/mailparse.go`), and decides by the address OpenDKIM signs
+  for; what a display name, a comment or a quoted local part names no longer
+  matters, so refused or passed says nothing about other domains of the
+  server.
 - ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
   `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
   § Roles.

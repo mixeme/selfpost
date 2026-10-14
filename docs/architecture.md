@@ -286,19 +286,17 @@ server itself.
   `src/global/mail_addr_find.c`, `mail_addr_find_opt()`). A key written
   twice makes Postfix refuse the whole table, and the check defers then too.
 - **How the header is read.** Exactly one `From:` field (none, or more than
-  one, is refused), parsed as an address list that must hold exactly one
-  address. Then a cruder second look at the raw value: OpenDKIM finds the
-  address with a parser of its own, and wherever the two could read a line
-  differently - a display name, a comment, a quoted string - the other
-  address would have to be spelled out in it. So no `@name` may appear there
-  that is another name the server signs for; those names are read from
-  OpenDKIM's own `SigningTable`; the display name is looked at once more
-  as decoded, since a mail program shows `=?utf-8?q?director=40example.org?=`
-  as an address though no `@` is written in it. And, needing no knowledge of
-  that parser:
-  outside quoted strings the line has exactly one `@`. A folded line is
-  unfolded first, and a display name in a charset Go does not convert is
-  passed through unread - only the address is judged.
+  one, is refused), read with OpenDKIM's own parser: libopendkim's
+  `dkim_mail_parse()`, ported line for line from Debian's opendkim
+  2.11.0~beta2 (`internal/milter/mailparse.go`) and tested against the C on
+  two hundred thousand lines. The check asks Postfix for header values with
+  their leading space, as OpenDKIM does (`SMFIP_HDR_LEADSPC`), so both read the
+  same bytes. The address it returns is the one judged - the one OpenDKIM
+  signs for - whatever a display name, a comment or a quoted local part
+  holds; a parse failure, no address, or a second one after it is refused,
+  and so is an address over 256 bytes, which OpenDKIM would match its
+  `SigningTable` against cut short (`dkimf_apply_signtable()`,
+  `MAXADDRESS`). Encoded words are not decoded, by either.
 - **The verdict** comes at the end of the headers: `550 5.7.1`, permanent,
   naming the line, as a reply code of the milter's own. What the client wrote
   is reduced to printable ASCII and cut before it is said back, logged or
