@@ -33,6 +33,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the page shows it. A row refused before this says the line was not kept.
   A refusal's line is red for a permanent reply, amber for a temporary one
   (audit 2026-10-12, stage 2b).
+- **A message the panel closed itself says so.** The history of a `bounced`
+  row read "the receiving server refused the message permanently, or
+  Postfix gave up ... The reason is in the delivery log below" also for a
+  row the reconcile sweep closed, where neither is known and the log has
+  nothing. Such a row's step is now "Closed by the panel", with why.
 - **The Sender check card counts connections and messages apart.** What was
   one column, "Messages deferred", was two things: connections Postfix
   turned away while the panel did not answer - refused before any message

@@ -42,7 +42,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`; next stage 2b → `2.5.1`) | 28/62 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`; next stage 2b → `2.5.1`) | 29/62 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and

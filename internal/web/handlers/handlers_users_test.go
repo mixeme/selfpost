@@ -186,3 +186,21 @@ func TestARefusedMessageShowsPostfixsLine(t *testing.T) {
 		}
 	}
 }
+
+// A message the reconcile sweep closed does not say a receiving server
+// refused it: neither did (audit 2026-10-12, stage 2b).
+func TestAMessageTheSweepClosedSaysSo(t *testing.T) {
+	h, st := inboundHandlers(t)
+	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	if err := st.InsertQueued(store.SendLogEntry{QueueID: "GONEQ", Domain: "example.org", AppLogin: "a", To: "x@example.net", Subject: "lost"}); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := st.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
+	if _, err := st.CloseUnreported(rows[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	body := send(h.HandleDelivery, &root, "GET", "/outbound/log/"+idStr(rows[0].ID), map[string]string{"id": idStr(rows[0].ID)}, nil).Body.String()
+	if !strings.Contains(body, "Closed by the panel") || strings.Contains(body, "the receiving server refused") {
+		t.Fatalf("the page of a row the sweep closed:\n%s", body)
+	}
+}

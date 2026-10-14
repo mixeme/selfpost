@@ -211,6 +211,12 @@ func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy, sendsAs vi
 			fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
 				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime())))
 	case store.StatusBounced:
+		if row.Reason == store.ReasonReconcile {
+			// Neither the receiving server nor Postfix said so: the panel
+			// closed the row (audit 2026-10-12, stage 2b).
+			return append(events, step(row.UpdatedAt, "error", "Closed by the panel",
+				"Postfix no longer held the message and mail.log never said what became of it - the log rotated away while the panel was down, or could not be read. The panel closed it as a failure rather than show a delivery it cannot evidence."))
+		}
 		return append(events, step(row.UpdatedAt, "error", "Bounced",
 			fmt.Sprintf("Delivery failed for good: the receiving server refused the message permanently, or Postfix gave up after %s in the queue. The reason is in the delivery log below.",
 				policy.QueueLifetime())))
