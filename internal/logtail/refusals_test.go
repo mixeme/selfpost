@@ -29,6 +29,11 @@ func (r *refusalProbe) AttachRefusalLine(clientIP, from string, _ time.Time, lin
 	return true, nil
 }
 
+// The mail.log lines in this file are composed by hand, with the e2e stand's
+// names and addresses (smtpd.c check_milter_reply(), mail_open_stream();
+// cleanup_milter.c cleanup_milter_apply(), Postfix 3.7.11); their ISO stamp
+// is not a format Postfix writes (assumptions A-12).
+//
 // The NOQUEUE line of a refusal at MAIL FROM goes on its row; a line whose
 // row is not written yet waits and is tried again; port 25's and other
 // lines are not refusals of an application.

@@ -27,10 +27,21 @@ import (
 // "warning:" stand there too. A queue id is hexadecimal in capitals, or, with
 // enable_long_queue_ids, digits and letters without vowels; neither word is
 // either.
+//
+// Postfix 3.7.11, src/global/mail_queue.c, mail_queue_enter(), with
+// src/global/mail_queue.h MQID_*: a short id is "%05X" of the microseconds
+// and "%lX" of the inode (6 to 21 characters); a long one is the seconds (6+)
+// and microseconds (4) in src/global/safe_ultostr.c's vowel-less alphabet, 'z',
+// then the inode (12 to 23 characters). Program tag and "[pid]: ":
+// src/util/msg_logger.c, msg_logger_print().
 var queueLineRe = regexp.MustCompile(`^\S+ ([^\s\[]+)\[\d+\]: ([0-9A-F]{6,24}|[0-9B-DF-HJ-NP-TV-Zb-df-hj-np-tv-z]{10,24}): (.*)`)
 
 // smtpdProgramRe tells an smtpd from the other programs, whatever listener it
 // serves: "postfix/smtpd", "postfix/submission/smtpd", "postfix/inbound/smtpd".
+// Postfix 3.7.11, src/global/mail_task.c, mail_task(): the tag is
+// "<syslog_name>/<process name>"; a master.cf "-o syslog_name=" reaches it
+// through mail_params_init() (src/global/mail_params.c) before
+// single_server_main() calls maillog_client_init() again.
 var smtpdProgramRe = regexp.MustCompile(`^postfix/(?:[a-z0-9-]+/)?smtpd$`)
 
 // port25Program is the smtpd of the inbound relay's listener, which
@@ -42,7 +53,9 @@ const (
 	// lineGrace is how old a line must be before the prune asks whether a
 	// send-log row carries its queue id. The first lines of a message are
 	// logged when it arrives and its row is written at end-of-message; an hour
-	// is a message body sent slowly.
+	// is a message body sent slowly. Postfix sets no such bound: smtpd_timeout
+	// limits each read, not the message (postconf(5) smtpd_timeout,
+	// smtpd_per_request_deadline, Postfix 3.7.11) - assumptions A-34.
 	lineGrace = time.Hour
 
 	// lineBatch is how many lines are held before they are written without
@@ -69,6 +82,11 @@ type lineKeeper struct {
 	// a stranger can make Postfix log is not something to store on his say-so
 	// and prune later. An id leaves when qmgr removes the message or when
 	// another listener opens a message under it (Postfix reuses ids).
+	// Postfix 3.7.11: smtpd writes "<id>: client=..." when it opens the queue
+	// file (src/smtpd/smtpd.c, mail_open_stream()); qmgr writes "<id>: removed"
+	// when it deletes it (src/qmgr/qmgr_active.c, qmgr_active_done_3_generic());
+	// short ids repeat (postconf(5) enable_long_queue_ids: the long ones are
+	// the "non-repeating" kind).
 	port25 map[string]struct{}
 }
 

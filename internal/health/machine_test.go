@@ -9,7 +9,9 @@ import (
 
 // fakeProc writes a /proc-shaped directory the sampler can be pointed at, so
 // the parsing and the arithmetic are tested against known counters instead of
-// whatever the machine running the tests happens to be doing.
+// whatever the machine running the tests happens to be doing. The file
+// contents in this test are composed, in the layouts proc(5) gives for
+// /proc/stat, /proc/meminfo and /proc/net/dev.
 func fakeProc(t *testing.T, stat, meminfo, loadavg, netdev string) string {
 	t.Helper()
 	dir := t.TempDir()

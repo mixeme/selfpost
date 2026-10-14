@@ -14,6 +14,13 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 )
 
+// The mail.log lines in this file are composed by hand, after the formats the
+// code cites (Postfix 3.7.11, src/global/log_adhoc.c and the others), unless a
+// comment says where one was seen. Some are shapes Postfix does not write:
+// "to=..., status=expired" (qmgr logs expiry once per message as "from=<..>,
+// status=expired, returned to sender" - assumptions A-8), ISO stamps
+// (msg_logger.c writes "%b %d %H:%M:%S" - A-12), and opendkim lines in
+// mail.log (build/opendkim.conf has Syslog no).
 func TestParseDelivery(t *testing.T) {
 	cases := []struct {
 		name                       string
@@ -787,6 +794,8 @@ func TestSplitTimestamp(t *testing.T) {
 			// Copied off the live relay (Postfix 3.7, which has no
 			// maillog_file_format), so this is the shape the panel actually
 			// meets: zero-padded day, and the host is the container's name.
+			// Seen on the live relay, date not recorded. The other cases
+			// here are composed.
 			name:  "syslog's traditional format as the live relay writes it",
 			line:  "Aug 08 07:26:41 selfpost postfix/master[231]: daemon started -- version 3.7.11, configuration /etc/postfix",
 			stamp: "Aug 08 07:26:41",

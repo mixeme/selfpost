@@ -9,8 +9,9 @@ import (
 )
 
 // fileID names the file itself - its inode - which a rename keeps and a new
-// file does not share. It is part of the log's fingerprint, so two log files
-// whose first bytes happen to match are still told apart. The device number
+// file does not share (rename(2): the file is moved, other hard links to it
+// are unaffected; st_ino in stat(2)). It is part of the log's fingerprint, so
+// two log files whose first bytes happen to match are still told apart. The device number
 // is left out: it can change across a host's reboot (LVM, btrfs, network
 // file systems), and the same log would then pass for a rotated one (review
 // of stage 2b).

@@ -29,6 +29,17 @@ import (
 // The reject lines do not: the same words are written when OpenDKIM does not
 // answer and when the journal milter refuses under a level-2 limit.
 //
+// Postfix 3.7.11, src/milter/milter8.c: milter8_connect() warns "connect to
+// Milter service %s: %m" with the milter's configured name; then
+// milter8_comm_error() answers, for default_action=tempfail, "451 4.7.1
+// Service unavailable - try again later" - the very text milter8_event()
+// gives a milter's own SMFIR_TEMPFAIL. smtpd writes "connect from %s" as it
+// takes a client and only then connects to the milters, anew for each client
+// (src/smtpd/smtpd.c, smtpd_service(), setup_milters(); milter8_create()),
+// one client at a time (src/master/single_server.c); at AUTH a 4xx from the
+// milters becomes "454 4.3.0 Try again later" with no line of its own
+// (src/smtpd/smtpd_sasl_proto.c, smtpd_sasl_auth_cmd()).
+//
 // A check that is running and stops answering in the middle of a message -
 // its socket accepts, nothing replies - is met by cleanup, not smtpd: past the
 // DATA command it is cleanup that talks to the milters. Seen on the e2e stand
@@ -39,6 +50,10 @@ import (
 //
 // One cleanup process serves message after message and the first warning
 // ends the message, so each such warning is a message, counted on its own.
+// Postfix 3.7.11, src/milter/milter8.c, milter8_read_resp(): "milter %s:
+// can't read %s reply packet header: %m", then milter8_comm_error(), which
+// closes the milter's stream and leaves it in the error state for the rest of
+// that message.
 // Until 2.5.0 only smtpd's lines were read, and this case - the one that
 // tells a hung panel from a stopped one - was never counted (audit
 // 2026-10-12, M13).

@@ -99,7 +99,9 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	ms := newMailStack(cfg, st)
 	// postfix-config.sh has already run (entrypoint). postconf -h is the
 	// effective config, including a manual override; the panel keeps this
-	// snapshot for the process lifetime (architecture.md).
+	// snapshot for the process lifetime (architecture.md). Postfix 3.7.11,
+	// postconf(1): without -d or -n it shows main.cf's value or the default,
+	// and -h drops the "name = " label; values are not $-expanded without -x.
 	retryPolicy := postfix.LoadRetryPolicy()
 	return web.New(st, ms.Domains, ms.Apps, ms.Inbound, ms.Lists, ms.DMARC, web.Config{
 		Hostname:                   cfg.hostname,

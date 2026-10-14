@@ -9,13 +9,22 @@ import (
 )
 
 // certWarnDays is how close to expiry the certificate has to be before the
-// status page complains. Let's Encrypt renews at 30 days left, so two weeks is
+// status page complains. certbot renews a 90-day certificate at 30 days left
+// - a fixed 30 days before 4.0, a third of the lifetime from 4.0 (certbot
+// docs, certbot/docs/using.rst, "Renewing certificates") - so two weeks is
 // comfortably past the point where automatic renewal should have happened.
+// For a 45-day certificate a third is 15 days, one day ahead of this warning
+// (assumptions A-64).
 const certWarnDays = 14
 
 // Certificate is the state of the TLS certificate Postfix serves on 465/587
 // (guide § Environment variables: TLS_CERT_FILE). The panel only reads it —
 // the file is supplied by the reverse proxy through a read-only mount.
+// Postfix itself serves the copy build/postfix-config.sh makes in
+// /etc/postfix/tls-internal, refreshed by build/postfix-cert-reload.sh up to
+// TLS_RELOAD_INTERVAL_SECONDS later, and each smtpd loads it when it starts
+// (Postfix 3.7.11, src/smtpd/smtpd.c, pre_jail_init(), TLS_SERVER_INIT) - so
+// the mounted file can be newer than what is served (assumptions A-65).
 type Certificate struct {
 	Path     string
 	Subject  string

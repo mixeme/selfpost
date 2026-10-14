@@ -22,7 +22,12 @@ func runNotifier(ctx context.Context, cfg config, st *store.Store) error {
 
 	// OpenDKIM's tables are rebuilt when a domain is added or deleted. On the
 	// first start of a version that signs the server's own name they do not
-	// have its line yet. A failure here costs the signature, not the message.
+	// have its line yet. A failure here costs the signature, not the message:
+	// OpenDKIM 2.11.0~beta2, opendkim/opendkim.c, mlfi_eoh(): with no
+	// SigningTable match and Mode s (build/opendkim.conf) the message is
+	// accepted unsigned. A line whose key the KeyTable lacks or that does not
+	// load is another matter - dkimf_apply_signtable() < 0 there answers
+	// SMFIS_TEMPFAIL (assumptions A-47).
 	if rebuilt, err := ms.Domains.EnsureServerSigned(); err != nil {
 		log.Printf("notifier: sign as %s: %v", cfg.hostname, err)
 	} else if rebuilt {

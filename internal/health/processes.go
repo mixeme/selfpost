@@ -38,7 +38,9 @@ type Process struct {
 // The command takes fixed arguments and no user input, so it never goes through
 // a shell (security.md). `supervisorctl status` deliberately exits non-zero when
 // some program is not running, so the output is parsed first and the exit status
-// only matters when nothing could be parsed from it.
+// only matters when nothing could be parsed from it. supervisor 4.2.5,
+// supervisor/supervisorctl.py, do_status(): exit status 3 (NOT_RUNNING) when
+// any program is in STOPPED_STATES, 4 when supervisord does not answer.
 func Processes() ([]Process, error) {
 	cmd := exec.Command("supervisorctl", "-c", supervisorConf, "status")
 	out, err := cmd.CombinedOutput()
@@ -54,7 +56,8 @@ func Processes() ([]Process, error) {
 
 // supervisorStates are the state words supervisord prints. Lines whose second
 // field is not one of them are not status lines (banners, error text) and are
-// skipped, so unexpected output cannot masquerade as a process.
+// skipped, so unexpected output cannot masquerade as a process. supervisor
+// 4.2.5, supervisor/states.py, ProcessStates.
 var supervisorStates = map[string]bool{
 	"STOPPED":  true,
 	"STARTING": true,
@@ -68,6 +71,10 @@ var supervisorStates = map[string]bool{
 
 // parseProcesses turns supervisorctl's tabular output into Process values. Each
 // status line is "<name> <STATE> <detail...>", column-aligned with spaces.
+// supervisor 4.2.5, supervisor/supervisorctl.py, _show_statuses(): the
+// template is "%(namespec)-<maxlen+3>s%(state)-10s%(desc)s" (maxlen at least
+// 30, no state word longer than 8), and an unknown name prints
+// "<name>: ERROR (no such process)".
 func parseProcesses(out string) []Process {
 	var procs []Process
 	for _, line := range strings.Split(out, "\n") {
@@ -89,7 +96,9 @@ func parseProcesses(out string) []Process {
 
 // Uptime reads for how long a running program has been up from the detail
 // supervisord prints for it: "pid 41, uptime 0:03:12", or with days in front,
-// "pid 41, uptime 18 days, 3:02:11".
+// "pid 41, uptime 18 days, 3:02:11". supervisor 4.2.5,
+// supervisor/rpcinterface.py, _interpretProcessInfo(): 'pid %s, uptime %s'
+// with Python's str() of a timedelta from the spawn time ("1 day, ...").
 func Uptime(detail string) (time.Duration, bool) {
 	_, rest, found := strings.Cut(detail, "uptime ")
 	if !found {

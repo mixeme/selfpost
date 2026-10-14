@@ -34,7 +34,12 @@ func runDMARCIngestMode() error {
 		}
 		// Not a report this relay keeps. It is dropped: deferring would have
 		// Postfix try it again for days, and a bounce would go to an envelope
-		// sender anyone can write - the report addresses are public.
+		// sender anyone can write - the report addresses are public. Postfix
+		// 3.7.11: exit 0 is PIPE_STAT_OK, logged "status=sent (delivered via
+		// ... service ...)" (src/global/pipe_command.c, pipe_command();
+		// src/pipe/pipe.c, eval_command_status()); a 4.x.x status defers until
+		// maximal_queue_lifetime and a 5.x.x one bounces, either way a notice
+		// to the sender (src/qmgr/qmgr_active.c, src/global/bounce.c).
 		if incrErr := st.IncrDMARCParseFailures(); incrErr != nil {
 			log.Printf("dmarc ingest: record failure: %v", incrErr)
 		}
@@ -47,8 +52,13 @@ func runDMARCIngestMode() error {
 // what a delivery command wrote - about a hundred bytes - into its own line
 // for the message ("status=sent (delivered via dmarc-ingest service (...))"),
 // so the reason goes out first and bare: no prefix, no date, no recipient,
-// all of which that line already has. postlog is no use here: pipe(8) starts
-// the command without the group that may write to Postfix's log socket.
+// all of which that line already has. Postfix 3.7.11, src/pipe/pipe.c,
+// eval_command_status(): " (%.100s)" of the output, which
+// src/global/pipe_command.c takes from stdout and stderr together. postlog is
+// no use here: pipe(8) starts the command without the group that may write to
+// Postfix's log socket (src/util/set_ugid.c, set_ugid(): setgroups() to the
+// user's one group). Whether Debian's postlog is set-gid, which would bring
+// the group with it, is not recorded - assumptions A-43.
 func logRejected(reason error) {
 	fmt.Fprintln(os.Stderr, "dropped: "+logSafe(strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")))
 }
@@ -73,6 +83,9 @@ func logSafe(s string) string {
 // ingestRecipient is the report address the message was delivered to. Postfix's
 // pipe(8) hands it over as an argument (${recipient} in the service's argv,
 // build/postfix-config.sh) - it sets no RECIPIENT variable, that is local(8).
+// Postfix 3.7.11, src/pipe/pipe.c, deliver_message(): pipe_command() gets only
+// CA_PIPE_CMD_EXPORT(export_environment), no extra environment;
+// src/local/command.c sets "RECIPIENT".
 // Without it the check that a report came to its own domain's address is
 // skipped.
 func ingestRecipient(args []string) string {

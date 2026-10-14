@@ -18,9 +18,17 @@ type Socket struct {
 }
 
 // CheckSocket stats a milter socket. required distinguishes the two milters:
-// OpenDKIM runs with default_action=tempfail, so a missing socket stops mail
-// leaving the server, while the journal-milter fails open — mail still goes out,
-// only the send log stops being written.
+// Postfix attaches OpenDKIM with default_action=tempfail, so a missing socket
+// stops mail leaving the server, while the journal-milter is attached with
+// default_action=accept and fails open — mail still goes out, only the send
+// log stops being written (build/postfix-config.sh smtpd_milters; Postfix
+// 3.7.11, src/milter/milter8.c, milter8_comm_error(): tempfail answers "451
+// 4.7.1 Service unavailable - try again later", accept answers nothing).
+//
+// A socket file that is there is reported as listening. It is not proof of
+// it: a unix socket's file outlives the process that bound it unless that
+// process unlinks it (unix(7)), so a killed OpenDKIM or panel leaves one that
+// refuses every connection - assumptions A-38.
 func CheckSocket(name, path string, required bool) Socket {
 	s := Socket{Name: name, Path: path}
 	if path == "" {

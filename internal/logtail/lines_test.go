@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// The mail.log lines in this file are composed by hand. "postfix/submission/
+// smtpd" is a tag this image never writes (build/postfix-config.sh sets
+// syslog_name on port 25 only); it stands for any "-o syslog_name" listener.
+//
 // Which lines are kept for a message's page, and under which queue id: the id
 // at the head of the line and nothing the far end wrote further along it.
 func TestQueueLineHead(t *testing.T) {

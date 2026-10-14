@@ -54,7 +54,9 @@ func listenMilter(socketPath string) (net.Listener, error) {
 		return nil, err
 	}
 	// Clear a stale socket left behind by an unclean shutdown, otherwise the
-	// listen below fails with "address already in use".
+	// listen below fails with "address already in use" (unix(7): the socket
+	// file "must be deleted by the caller when it is no longer needed"; bind(2)
+	// EADDRINUSE).
 	if err := os.Remove(socketPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -67,6 +69,9 @@ func listenMilter(socketPath string) (net.Listener, error) {
 	// group access. The socket inherits group `selfpost` from the setgid parent
 	// dir entrypoint.sh prepares; make it group read/write so postfix can reach
 	// it (connecting to a Unix socket needs write permission on the node).
+	// unix(7): "connecting to a stream socket object requires write
+	// permission on that socket"; inode(7): a file made in a set-group-ID
+	// directory takes the directory's group.
 	if err := os.Chmod(socketPath, 0o660); err != nil {
 		ln.Close()
 		return nil, err

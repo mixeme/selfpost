@@ -33,11 +33,14 @@ const (
 // status page's answer to "is the server itself under strain", next to the
 // component checks that answer "is mail flowing".
 //
-// The numbers come from the kernel's /proc filesystem, which a container shares
-// with its host unless it was started with its own namespaces — so CPU and
-// memory describe the host, while /proc/net/dev describes whatever network
-// namespace the container is in (its own veth under the default bridge, the
-// host's interfaces under network_mode: host).
+// The numbers come from the kernel's /proc filesystem. /proc/stat and
+// /proc/meminfo are system-wide and no namespace changes them (proc(5):
+// "kernel/system statistics", "statistics about memory usage on the
+// system"), so CPU and memory describe the host, while /proc/net/dev
+// describes whatever network namespace the container is in
+// (network_namespaces(7) names /proc/net among what a network namespace
+// isolates) - its own veth under the default bridge, the host's interfaces
+// under network_mode: host.
 type Machine struct {
 	CPU     CPU
 	Memory  Memory
@@ -276,7 +279,9 @@ func (c CPU) contextText() string {
 // MemAvailable rather than MemFree: Linux spends every spare page on cache, so
 // MemFree on a healthy machine is near zero and would report a permanent
 // emergency. MemAvailable is the kernel's own estimate of what a new workload
-// could actually get.
+// could actually get (proc(5), /proc/meminfo, MemAvailable "since Linux
+// 3.14": "An estimate of how much memory is available for starting new
+// applications, without swapping").
 func readMemory(root string) Memory {
 	var m Memory
 	fields, err := readMeminfo(root)
@@ -398,11 +403,15 @@ func readCPUTimes(root string) (cpuTimes, int, error) {
 			continue
 		}
 		if fields[0] != "cpu" {
-			cores++ // cpu0, cpu1, … — one line per core
+			cores++ // cpu0, cpu1, … — one line per online logical CPU
 			continue
 		}
 		// user nice system idle iowait irq softirq steal (guest fields are
-		// already counted inside user/nice, so they are left out).
+		// already counted inside user/nice, so they are left out). Field
+		// order: proc(5), /proc/stat. That guest time is in user/nice too:
+		// Linux kernel/sched/cputime.c, account_guest_time() adds it to
+		// CPUTIME_USER (or CPUTIME_NICE) as well as CPUTIME_GUEST (torvalds/
+		// linux master read 2026-10-14; the kernel is the host's).
 		for i, f := range fields[1:] {
 			if i >= 8 {
 				break
@@ -428,7 +437,11 @@ func readCPUTimes(root string) (cpuTimes, int, error) {
 
 // readCPUTopology returns physical core and logical thread counts from
 // /proc/cpuinfo. Zeroes mean the file was missing or empty; the caller falls
-// back to the cpuN count from /proc/stat.
+// back to the cpuN count from /proc/stat. The keys are x86's: Linux
+// arch/x86/kernel/cpu/proc.c, show_cpuinfo() prints "processor" and, on SMP,
+// "physical id" and "core id" (show_cpuinfo_core(); torvalds/linux master
+// read 2026-10-14). proc(5) says only that the items are architecture
+// dependent; where they are missing each processor counts as a core.
 func readCPUTopology(root string) (cores, threads int) {
 	data, err := os.ReadFile(filepath.Join(root, "cpuinfo"))
 	if err != nil {
@@ -522,7 +535,9 @@ func isZeroLoad(load [3]float64) bool {
 }
 
 // readMeminfo returns the /proc/meminfo entries this package uses, in bytes.
-// The file reports kB (kibibytes, despite the label) for these fields.
+// The file reports kB (kibibytes, despite the label) for these fields: Linux
+// fs/proc/meminfo.c, show_val_kb() prints pages << (PAGE_SHIFT - 10)
+// (torvalds/linux master read 2026-10-14).
 func readMeminfo(root string) (map[string]uint64, error) {
 	data, err := os.ReadFile(filepath.Join(root, "meminfo"))
 	if err != nil {
@@ -557,7 +572,12 @@ func readMeminfo(root string) (map[string]uint64, error) {
 // readNetDev returns each interface's byte counters from /proc/net/dev, loopback
 // excluded. Each line is "  eth0: <rx bytes> <rx packets> … <tx bytes> …" — the
 // name is separated by a colon, which may or may not have a space after it, so
-// the split is on the colon and not on whitespace.
+// the split is on the colon and not on whitespace. proc(5), /proc/net/dev:
+// eight receive columns (bytes first), then the transmit ones (bytes first).
+// Linux net/core/net-procfs.c, dev_seq_printf_stats(): "%6s: %7llu ..." in
+// master read 2026-10-14; the host's kernel may be older, and the colon is
+// all this relies on (net/core/dev.c, dev_valid_name() refuses ':' in a
+// device name).
 func readNetDev(root string) (map[string]netCounters, error) {
 	data, err := os.ReadFile(filepath.Join(root, "net", "dev"))
 	if err != nil {

@@ -13,11 +13,18 @@ import (
 // Postfix's line about a message the journal milter refused at MAIL FROM - a
 // level-2 limit, a client address off the application's list - is put on the
 // row the milter wrote, so the message's page shows it (audit 2026-10-12,
-// stage 2b). The refusal has no queue id and the line no login; it is
-// matched to its row by client address, sender and time. As the stand writes
-// it:
+// stage 2b). The refusal has no queue id; it is matched to its row by client
+// address, sender and time. As the stand writes it (e2e stand, date not
+// recorded):
 //
 //	postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>
+//
+// Postfix 3.7.11, src/smtpd/smtpd.c, check_milter_reply(): "%s: %s: %s from
+// %s: %s;%s" with "NOQUEUE" before the queue file is opened, and
+// smtpd_whatsup() for the rest - " from=<..>" first. smtpd_whatsup() also
+// ends the line with " sasl_username=<login>" on an authenticated session,
+// which the quote above lacks and the regexp does not use (assumptions A-20,
+// A-21).
 //
 // Port 25's smtpd (postfix/inbound/smtpd) is a stranger's and has no such row.
 var refusalLineRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: NOQUEUE: milter-reject: MAIL from [^\[\s]*\[([^\]]+)\]: [45]\d\d .*?; from=<([^>]*)>`)
@@ -33,18 +40,25 @@ type RefusalStore interface {
 }
 
 // fromRefusalRe is cleanup's line about a message the sender check refused
-// for its From: line, as the stand writes it:
+// for its From: line, as the stand writes it (e2e stand, 2026-10-12; the
+// fixture in sendercheck_test.go):
 //
 //	postfix/cleanup[1339]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: director@other.e2e.test - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>
 //
 // The From: line as the check printed it runs to the last " - " before the
 // first semicolon; the reason after it holds neither, and the check prints no
 // ";" of the client's (sender.go printable), so that semicolon is Postfix's
-// and what follows it - the envelope - is Postfix's own text.
+// and what follows it - the envelope - is Postfix's own text. Postfix 3.7.11,
+// src/cleanup/cleanup_milter.c, cleanup_milter_apply(): "%s: %s: %s from
+// %s[%s]: %s;" with the reply from its fifth byte (the "550 " dropped), then
+// " from=<..>", " to=<..>" - the last recipient only (assumptions A-15).
 var fromRefusalRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?cleanup\[\d+\]: ([0-9A-Za-z]+): milter-reject: END-OF-MESSAGE from \S+: 5\.7\.1 From: ([^;]*) - ([^;]*); from=<([^>]*)> to=<([^>]*)>`)
 
 // clientLoginRe is smtpd's line naming the login a queue id was submitted
 // under: "<id>: client=host[addr], sasl_method=PLAIN, sasl_username=<login>".
+// Postfix 3.7.11, src/smtpd/smtpd.c, mail_open_stream(): ", sasl_sender=<..>"
+// follows when the client gave AUTH= on MAIL FROM, and "\S+" then takes
+// "login," with the comma (assumptions A-23).
 var clientLoginRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=.*?, sasl_username=(\S+)`)
 
 // refusalLogins bounds the queue ids whose login is remembered.

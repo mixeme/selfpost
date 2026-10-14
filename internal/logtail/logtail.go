@@ -61,7 +61,9 @@ func RetentionInterval() time.Duration {
 }
 
 // queueIDs lists the messages Postfix currently holds, for the reconcile sweep.
-// It is a var so tests can answer without a running Postfix.
+// It is a var so tests can answer without a running Postfix. Postfix 3.7.11,
+// src/showq/showq.c, showq_service(): the listing covers the maildrop,
+// active, incoming, deferred and hold queues.
 var queueIDs = postfix.QueueIDs
 
 // retryPolicy reads Postfix's queue lifetimes, for counting the rows left
@@ -87,8 +89,14 @@ type RetentionDays func() int
 //
 //	postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=…, dsn=2.0.0, status=sent (250 OK)
 //
-// The "<queue-id>: to=<addr>, …, status=<word>" shape is specific to the
-// delivery agents; qmgr/smtpd/cleanup lines do not match.
+// The "<queue-id>: to=<addr>, …, status=<word>" shape is the per-recipient
+// result line: Postfix 3.7.11, src/global/log_adhoc.c, log_adhoc() writes
+// "%s: to=<%s>", ", orig_to=<%s>" (only when the address was rewritten),
+// ", relay=%s", then ", dsn=%s, status=%s (%s)". It is called from sent(),
+// defer_append() and bounce_append() in whichever process decides - the
+// delivery agents, and qmgr too for recipients it defers or bounces itself
+// (src/qmgr/qmgr_defer.c, qmgr_bounce.c); smtpd's and cleanup's own lines
+// have no "to=<…>, relay=" after the id.
 //
 // The recipient runs to the ">, " that comes before relay= (and orig_to=,
 // when there is one): a quoted local part may hold a ">", and a recipient cut
@@ -105,7 +113,8 @@ type RetentionDays func() int
 // server's reply verbatim, so a greedy match would take the *last* status= on
 // the line — and that one can come from the reply text, which the far end
 // controls. A bounce whose reply quoted "status=sent" would then be filed as a
-// success. The real field is always the first one after to=<…>.
+// success. The real field is always the first one after to=<…>: in
+// log_adhoc() the reply is the "(%s)" after status=.
 var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(.*?)>, (?:orig_to=<.*?>, )?relay=.*?\bstatus=(\w+)`)
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
@@ -211,7 +220,12 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 	}
 
 	// A message Postfix still works on stays queued until its first retry after
-	// the queue lifetime, which can be a whole backoff later.
+	// the queue lifetime, which can be a whole backoff later. Postfix 3.7.11,
+	// src/qmgr/qmgr_active.c: expiry is decided when an attempt ends
+	// (qmgr_active_done_25_generic()), and a deferred message waits at most
+	// maximal_backoff_time (qmgr_active_done_3_generic()). The deferred queue
+	// is scanned only every queue_run_delay (src/qmgr/qmgr.c), which this
+	// bound leaves out - assumptions A-30.
 	policy := retryPolicy()
 	overLifetime := policy.LongestLifetime() + policy.MaximalBackoff
 
@@ -253,7 +267,11 @@ func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
 // message means it will never report anything more about it, so the row can
 // only be closed on an assumption; it is closed as a failure rather than a
 // success because a delivery the panel cannot evidence must not be shown as
-// one. Rows whose message is still in the queue, and every row when the queue
+// one. Postfix does leave a recipient without a result line in a few cases of
+// its own - postsuper -d (src/postsuper/postsuper.c logs only "removed"), a
+// recipient cleanup dropped as a duplicate (src/cleanup/
+// cleanup_out_recipient.c, been_here()), one a milter deleted - assumptions
+// A-31. Rows whose message is still in the queue, and every row when the queue
 // cannot be listed at all, are left exactly as they are.
 //
 // A closed row whose delivery line is in mail.log or mail.log.1 after all is
@@ -308,6 +326,9 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 // deliveryInLog says whether the current log or the one rotated last holds a
 // delivery line for row. Rows reach the sweep minutes after they were
 // written, so the end of those two files is where such a line would be.
+// logrotate 3.21.0, logrotate.c, prerotateSingleLog(): the first rotated
+// name is "<log>.1", without the compression suffix under delaycompress
+// (build/logrotate-mail.conf).
 func deliveryInLog(path string, row store.QueuedDelivery) bool {
 	if path == "" {
 		return false
@@ -496,7 +517,9 @@ func QueueLines(path, queueID string, n int) ([]string, error) {
 }
 
 // mentionsQueueID reports whether a mail.log line is about queueID. Postfix
-// writes the id followed by a colon ("… postfix/smtp[26]: 41E862C00D9E: to=…"),
+// writes the id followed by a colon ("… postfix/smtp[26]: 41E862C00D9E: to=…";
+// Postfix 3.7.11 "%s: ..." in log_adhoc(), smtpd's "%s: client=", qmgr's
+// "%s: removed"),
 // and the match is anchored on the character before it so a shorter id is not
 // found inside a longer one — queue ids are hexadecimal, and one being the tail
 // of another is ordinary, not unlikely.
@@ -520,19 +543,22 @@ func isQueueIDByte(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z'
 }
 
-// Timestamps at the head of a mail.log line, in the two formats postlogd
-// writes (maillog_file in build/postfix-config.sh).
+// Timestamps at the head of a mail.log line (maillog_file in
+// build/postfix-config.sh): the one format postlogd writes, and an ISO one.
 //
-// syslogStampRe is the one that matches in practice today: the format is
-// controlled by maillog_file_format, which arrived in Postfix 3.9, and the
-// image is built on Debian's 3.7 — where the parameter does not exist and the
-// only format is syslog's traditional one. It carries no year and no zone, so
-// the stamp shown is a wall clock and nothing more, which is all this column
-// claims to be.
+// syslogStampRe is the one that matches. Postfix 3.7.11,
+// src/util/msg_logger.c, msg_logger_print(): every record is stamped
+// strftime("%b %d %H:%M:%S ") in the logging process's local time (the day
+// zero-padded), then the first label of the host name, and postlogd writes it
+// as received (src/postlogd/postlogd.c, postlogd_service()). It carries no
+// year and no zone, so the stamp shown is a wall clock and nothing more,
+// which is all this column claims to be.
 //
-// isoStampRe is for the RFC 3339 format that same parameter selects once the
-// base image carries a Postfix new enough to offer it. Matching it first costs
-// one failed anchor per line and means the upgrade needs no change here.
+// isoStampRe was written for an RFC 3339 format said to come with a
+// maillog_file_format parameter of Postfix 3.9. No such parameter exists in
+// 3.7.11, nor in the 3.12 snapshot of 2026-09-25 (postconf.proto, and
+// msg_logger.c still uses the same strftime) - assumptions A-12. No line
+// Postfix writes matches it.
 var (
 	isoStampRe    = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s`)
 	syslogStampRe = regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})\s`)
@@ -563,6 +589,9 @@ func SplitTimestamp(line string) (stamp, rest string) {
 // start of a file that changed while the panel was down, or end-of-file on a
 // first ever run); it reopens the file when it is rotated (inode change from
 // logrotate's create, or truncation from copytruncate) so nothing is missed.
+// logrotate 3.21.0, logrotate.c, rotateSingleLog(): without copytruncate the
+// file is rename()d and, with create (build/logrotate-mail.conf), a new one
+// made by createOutputFile(); with copytruncate it is copied and truncated.
 //
 // caughtUp is closed after the first read that reaches end-of-file, which is
 // the point where every line the panel missed while it was down has been
@@ -685,6 +714,12 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 				// gained lines between the drain() above and this check, since
 				// Postfix keeps writing to it until it reloads. Drain it once
 				// more before switching so nothing in that gap is lost.
+				// Postfix 3.7.11, src/postlogd/postlogd.c, pre_jail_init():
+				// maillog_file is opened once per postlogd process, which ends
+				// at "postfix reload" (README_FILES/MAILLOG_README) or after
+				// max_idle without a record (src/master/dgram_server.c). Lines
+				// it writes to the old inode after this switch and before the
+				// reload are not read - assumptions A-33.
 				drain()
 				if err := openAt(0, io.SeekStart); err != nil {
 					log.Printf("log-tailer: reopen %s: %v", path, err)
@@ -707,7 +742,9 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 // lost to a restart and lands on the days it covered. A stretch shorter than
 // blindMin is not counted: a rotation leaves the name missing for a tick
 // between rename and create, and that loses nothing - the new file is read
-// from its start.
+// from its start. logrotate 3.21.0, logrotate.c, rotateSingleLog(): the
+// rename() and createOutputFile() follow each other in one pass, with no
+// script or wait between them (postrotate runs after).
 type blindness struct {
 	add   func(from time.Time, d time.Duration) error
 	since time.Time // start of the current stretch; zero when reading

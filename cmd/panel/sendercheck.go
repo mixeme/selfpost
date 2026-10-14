@@ -19,8 +19,11 @@ import (
 const aliveEvery = 2 * time.Second
 
 // serveSenderCheck runs the sender check (internal/milter/sender.go) on a
-// socket of its own. Postfix attaches that socket strictly, so while this
-// role is not serving, mail is deferred: what that costs is counted here and
+// socket of its own. Postfix attaches that socket strictly
+// (default_action=tempfail in build/postfix-config.sh; Postfix 3.7.11,
+// src/milter/milter8.c, milter8_comm_error(): "451 4.7.1 Service unavailable -
+// try again later"), so while this role is not serving, mail is deferred:
+// what that costs is counted here and
 // by the log tailer, and shown on Server > Health
 // (docs/plans/from-header-binding.md § Statistics).
 func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
@@ -131,7 +134,12 @@ func byDay(from, to time.Time) []dayPart {
 var postfixAskFor, postfixAskEvery = 30 * time.Second, 2 * time.Second
 
 // postfixStarted asks supervisord since when Postfix has been running, again
-// and again for postfixAskFor while it does not answer.
+// and again for postfixAskFor while it does not answer. supervisor 4.2.5,
+// supervisor/rpcinterface.py, _interpretProcessInfo(): the uptime runs from
+// the spawn of program "postfix", which is build/postfix-wrapper.sh; it waits
+// for the milter sockets (up to MILTER_WAIT_TIMEOUT) before it execs
+// "postfix start-fg", so the time given is up to that much early
+// (assumptions A-46).
 func postfixStarted() postfixState {
 	deadline := time.Now().Add(postfixAskFor)
 	for {

@@ -33,7 +33,10 @@ func TestWorstPicksMostSevere(t *testing.T) {
 }
 
 func TestParseProcesses(t *testing.T) {
-	// Real supervisorctl output: column-aligned, one line per program.
+	// Real supervisorctl output: column-aligned, one line per program. Where
+	// and when it was seen is not recorded; its columns are those of
+	// supervisor 4.2.5 supervisorctl.py _show_statuses() and its FATAL text
+	// supervisor/process.py's spawnerr.
 	out := `opendkim                         RUNNING   pid 21, uptime 0:04:10
 panel                            RUNNING   pid 22, uptime 0:04:09
 postfix                          FATAL     Exited too quickly (process log may have details)
@@ -165,6 +168,7 @@ func writeCert(t *testing.T, path, cn string, validFor time.Duration) {
 }
 
 func TestLivenessFromParsedProcesses(t *testing.T) {
+	// Composed, in the columns of TestParseProcesses.
 	allRunning := `opendkim                         RUNNING   pid 21, uptime 0:04:10
 panel                            RUNNING   pid 22, uptime 0:04:09
 postfix                          RUNNING   pid 23, uptime 0:04:08
@@ -189,6 +193,9 @@ postfix                          FATAL     Exited too quickly
 	}
 }
 
+// Composed, after supervisor 4.2.5 rpcinterface.py _interpretProcessInfo()
+// (str() of a timedelta). "127:00:01" is not a form supervisor prints - it
+// only shows that the parser takes hours past 24.
 func TestUptime(t *testing.T) {
 	for detail, want := range map[string]time.Duration{
 		"pid 41, uptime 0:03:12":          3*time.Minute + 12*time.Second,

@@ -52,6 +52,10 @@ func inboundFixture() (*inboundJournal, *fakeInboundStore) {
 
 var tailNow = time.Date(2026, 10, 11, 18, 0, 0, 0, time.UTC)
 
+// The mail.log lines in this file are composed by hand, after
+// src/smtpd/smtpd_check.c log_whatsup() and src/cleanup/cleanup_milter.c
+// cleanup_milter_apply() (Postfix 3.7.11). Their ISO stamp is not a format
+// Postfix writes (assumptions A-12); TestLineTime has the syslog one.
 const (
 	head       = "2026-10-11T12:00:05.123456+00:00 mail "
 	unknownRcp = head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<a@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<mx.example.net>"
