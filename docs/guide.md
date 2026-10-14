@@ -404,14 +404,16 @@ readings, in the order of what stops mail first:
   sockets** (OpenDKIM, the sender check and the journal-milter).
 - **Sender check** — what the strict check of the `From:` line has cost
   today, in the last 30 days and in the last 12 months: for how long the
-  panel did not answer while Postfix was running, and how many messages
-  Postfix deferred because of it (see [Who an application may send
+  panel did not answer while Postfix was running, how many connections
+  Postfix turned away because of it, and how many messages it deferred in
+  the middle (see [Who an application may send
   as](#who-an-application-may-send-as)). A restart of the whole container is
-  not counted: mail was stopped for another reason then. What is counted as
-  a message is a connection Postfix turned away - it refuses before a
-  message is offered - so a monitor that only connects during an outage is
-  counted too; and when the panel hangs instead of stopping, the message it
-  hung on. Days are UTC days. The card warns when
+  not counted: mail was stopped for another reason then. A connection turned
+  away is refused before a message is offered, so a monitor that only
+  connects during an outage is counted too; a message deferred in the middle
+  is one the panel stopped answering for after it had begun. A time marked ≈
+  is at most what it shows: at that start supervisord could not say since
+  when Postfix ran. Days are UTC days. The card warns when
   a message was deferred in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
@@ -1271,7 +1273,11 @@ refused row says why in its tag: `rate-limited` (a [level-2 rate
 limit](#rate-limiting--level-2-domain-and-application)), `wrong client` (the
 application's client IP list) or `wrong From` (see [Who an application may
 send as](#who-an-application-may-send-as)); a row refused before `2.4.0`
-says `rejected`;
+says `rejected`. A refused message's page shows what Postfix wrote about the
+refusal: for `wrong From` the lines of the queue id the message had, for the
+other two the one `NOQUEUE` line; a row refused before `2.5.1` says the line
+was not kept, and one the panel wrote from `mail.log` after a restart - it
+had stopped before writing the refusal itself - says so;
 *Details* opens that row's own page (`/outbound/log/{id}`). That page carries
 the sending domain, the application it was submitted under, the Postfix
 queue id and the journal id, beside the message's history — when it was

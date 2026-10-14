@@ -278,7 +278,10 @@ server itself.
   starts without one). At start the time since the mark is the check's
   downtime - counted from Postfix's own start if that was later, and not at
   all when supervisord says Postfix is not running, since mail was then
-  stopped for another reason. The log tailer counts the mail: Postfix
+  stopped for another reason. Supervisord is asked for half a minute; when it
+  does not answer, the time since the mark is taken as an upper bound and the
+  day is marked estimated (`sender_check_days.estimated`), which the card
+  shows as ≈. The log tailer counts the mail: Postfix
   writes a warning naming the socket and then, from the same smtpd process,
   `milter-reject: … 451 4.7.1 Service unavailable` from the connection on
   (the client is told `454 4.3.0` at `AUTH` and leaves), so what is counted
@@ -291,14 +294,17 @@ server itself.
   unix:<socket>: can't read SMFIC_HEADER reply packet header` and refuses the
   message with `4.7.1` (seen on the e2e stand with the panel frozen). One
   cleanup process serves message after message, so each such warning is
-  counted as a message. Both go into
-  `sender_check_days`, a
-  row per UTC day kept a year, and Server › Health shows today, 30 days and
-  12 months. The second figure also sees a panel that is running and not
-  answering, which the mark does not. Downtime is cut at the UTC midnights
-  it crossed. A log read again after an unclean stop does not count again:
-  while the tailer catches up, a warning no later than the last one counted
-  is passed over.
+  counted as a message. The two are counted apart (the owner, 2026-10-14):
+  connections turned away in `deferred`, messages deferred mid-message in
+  `messages` of `sender_check_days`, a row per UTC day kept a year, and
+  Server › Health shows today, 30 days and 12 months in a column each. The
+  counts also see a panel that is running and not answering, which the mark
+  does not. Downtime is cut at the UTC midnights it crossed. A log read again
+  after an unclean stop does not count again: the count and the place in the
+  log it reached (the file's fingerprint and the offset past the line) are
+  saved in one transaction, and while the tailer catches up a warning at or
+  before that place in the same file is passed over - a second warning of
+  the same second is not lost; in another file the time decides.
 - **Why it is not a process of its own.** Decided with the owner: measure
   first. The role has a socket of its own so that the journal stays
   fail-open, and moving it out later changes where it is started and nothing
@@ -396,13 +402,35 @@ name), and a pattern that could start there let a stranger's HELO name file a
 delivery (audit 2026-10-12, M12).
 
 **Read offset is persisted** (`logtail_state` table, in the baseline schema): the
-tailer stores its position plus a fingerprint of the log's first 512 bytes, and
-on start resumes from it, parsing the tail written while the panel was down. If
-the fingerprint no longer matches (rotated or recreated in the meantime) it reads
-the current file from the start; re-parsing lines is harmless because
-`UpdateStatus` writes the same status onto the same row. Only a first-ever start,
-with nothing stored, begins at end-of-file, so installing the panel does not
-replay a pre-existing log.
+tailer stores its position plus a fingerprint of the log - the hash of its first
+512 bytes and the file's device and inode, so two logs that begin alike are two
+files and a renamed file keeps its fingerprint - and on start resumes from it,
+parsing the tail written while the panel was down. If the fingerprint no longer
+matches, the log was rotated in the meantime: the tailer first opens
+`mail.log.1` (left plain by `delaycompress`), and if that is the file the saved
+place belongs to it reads it from there to its end, then the new file from its
+start - what Postfix wrote between the stop and the rotation is not lost. A
+`mail.log.1` that is another file (rotated twice) is logged with the time from
+which nothing was read. Re-parsing lines is harmless because `UpdateStatus`
+writes the same status onto the same row. Only a first-ever start, with nothing
+stored, begins at end-of-file, so installing the panel does not replay a
+pre-existing log.
+
+**A refusal's line, and a refusal the panel did not write.** A message refused
+for its `From:` line has a queue id (cleanup gives one before the headers are
+judged); the sender check writes it on the row, and the message's page shows
+the lines stored under it - only those of the minutes around the refusal, since
+Postfix frees the id at once. A message the journal milter refused at
+`MAIL FROM` has none: the tailer reads smtpd's `NOQUEUE: milter-reject: MAIL
+from …; from=<…>` and puts it on the newest refused row of that sender (and
+login, when the line names it) within two minutes (`send_log.refusal_line`),
+retrying for 30 s when the row is not written yet. The sender check writes its
+row through a buffer after answering 550; a panel stopped in between wrote
+none. The tailer remembers each queue id's login from smtpd's `client=` line,
+and 30 s after cleanup's `milter-reject: END-OF-MESSAGE … 5.7.1 From:` line it
+writes the row from the line if no refused row of that id exists
+(`send_log.recovered`, shown on the page). It reads from its saved offset, so
+a kill is covered as well as a clean stop.
 
 **Queue reconcile** is the backstop for what the log cannot explain at all: a
 row still `queued` more than two minutes after it was accepted, whose queue id
