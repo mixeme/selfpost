@@ -172,6 +172,9 @@ func TestDomainSettingsRefusalsStayOnTheSettingsPage(t *testing.T) {
 	lacks(t, "report address refusal", body, `<b>`)
 
 	code, body = post(s.h.HandleDomainDMARC, "reports", url.Values{"dmarc_rua_mode": {"custom"}})
+	if code != http.StatusBadRequest {
+		t.Fatalf("a custom mode without an address = %d", code)
+	}
 	has(t, "report address refusal", body, `Enter the report address or choose another option.`)
 
 	code, body = post(s.h.HandleDomainDMARC, "reports", url.Values{"dmarc_rua_mode": {"hosted"}})
@@ -192,6 +195,9 @@ func TestDomainSettingsRefusalsStayOnTheSettingsPage(t *testing.T) {
 	}
 	has(t, "export refusal", body, `The encryption password must be at least 12 characters.`, `<h1 class="title is-3">Domain settings</h1>`)
 	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"long-enough-password"}, "password_confirm": {"another-one-entirely"}})
+	if code != http.StatusBadRequest {
+		t.Fatalf("export passwords that differ = %d", code)
+	}
 	has(t, "export refusal", body, `The two passwords do not match.`)
 }
 

@@ -167,7 +167,7 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 	order := []string{`id="processes"`, `id="sender-check"`, `id="hostname"`, `id="machine"`,
 		`id="sockets"`, `id="certificate"`, `id="notification-mail"`, `id="configuration"`}
 	for i := 1; i < len(order); i++ {
-		if strings.Index(out, order[i-1]) < 0 || strings.Index(out, order[i]) < strings.Index(out, order[i-1]) {
+		if !strings.Contains(out, order[i-1]) || strings.Index(out, order[i]) < strings.Index(out, order[i-1]) {
 			t.Errorf("%s does not come after %s", order[i], order[i-1])
 		}
 	}

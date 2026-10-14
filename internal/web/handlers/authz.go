@@ -57,16 +57,3 @@ func domainNameSet(domains []store.Domain) map[string]bool {
 	}
 	return m
 }
-
-// domainIDSet is the set of sending domains a principal is limited to; nil
-// means no limit (the global role, or a domain user with All).
-func domainIDSet(p auth.Principal) map[int64]bool {
-	if p.IsGlobal() || p.AllDomains {
-		return nil
-	}
-	m := make(map[int64]bool, len(p.Domains))
-	for _, id := range p.Domains {
-		m[id] = true
-	}
-	return m
-}
