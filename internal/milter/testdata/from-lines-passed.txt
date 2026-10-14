@@ -8,6 +8,8 @@
 # is {domain} in capitals; {other} is another sender of the server, which a
 # line here names in a way the check's scan does not see (a space after the
 # @) - passed by design, and so signed for {domain} alone.
+# The lines are composed by hand; what OpenDKIM signs each with is measured,
+# by the e2e on every run.
 "a@{domain}"
 "<a@{domain}>"
 "\"The Shop\" <Orders@{domain}>"

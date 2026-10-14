@@ -33,6 +33,11 @@ type InboundStore interface {
 // Like the send-log milter it only watches: every callback continues, and
 // Postfix attaches the socket with default_action=accept, so
 // neither an error here nor the panel being down holds up inbound mail.
+//
+// Postfix 3.7.11, src/milter/milter.c, milter_message(): the milters are asked
+// in turn while the reply is null, so one that refuses is the last asked;
+// src/milter/milter8.c, milter8_comm_error(): default_action=accept gives no
+// reply when this milter cannot answer.
 type inboundSession struct {
 	milter.NoOpMilter
 	rec InboundStore
@@ -85,6 +90,17 @@ func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Respons
 // filter's headers arrive here. The filter replaces headers of these names, so
 // the last one read is its own - when it is up. Whether it was is decided at
 // end-of-message, by the signature.
+//
+// Postfix 3.7.11, src/milter/milter.c, milter_message(), hands each milter the
+// queue file from the start of the content; src/milter/milter8.c,
+// milter8_message(), reads it with rec_get(), which follows the pointer
+// records src/cleanup/cleanup_milter.c, cleanup_add_header(), leaves after
+// the last header for a header the milter before added.
+// rspamd 3.11.0, src/plugins/lua/milter_headers.lua, routines x-spamd-result
+// and x-rspamd-action: remove = 0, every instance
+// (src/libserver/milter.c, rspamd_milter_remove_header_safe()), and the new
+// one added at the end (order -1, ADDHEADER) - when skip_wanted() does not
+// skip the routine (skip_local, skip_authenticated).
 func (s *inboundSession) Header(name, value string, m *milter.Modifier) (milter.Response, error) {
 	switch textproto.CanonicalMIMEHeaderKey(name) {
 	case "Subject":
@@ -112,6 +128,10 @@ var signatureHeader = textproto.CanonicalMIMEHeaderKey(SignatureHeader)
 // filter, in hex. The key is used as the text it is stored as. A signature
 // fits one queue id, so the header going on to the upstream with the mail
 // gives nothing to whoever reads it there.
+//
+// Measured, not read: what rspamd 3.11 writes for a key and a queue id was
+// taken in a throwaway container on 2026-10-12
+// (TestFilterSignatureIsWhatTheFilterWrites).
 func FilterSignature(key, queueID string) string {
 	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write([]byte(queueID))
@@ -130,6 +150,10 @@ func (s *inboundSession) signed(queueID string) bool {
 // Body fires at end-of-message: the message is about to be queued for its
 // upstream. "Continue" lets it through as "accept" would, and keeps this
 // session for the connection's next message.
+//
+// The queue id: Postfix 3.7.11, src/global/mail_params.h, DEF_MILT_EOD_MACROS
+// "i", answered by src/cleanup/cleanup_milter.c, cleanup_milter_eval(). The
+// rest as session.Body in milter.go.
 func (s *inboundSession) Body(m *milter.Modifier) (milter.Response, error) {
 	// The queue id is known only now, and with it whether the verdict headers
 	// read on the way here are the filter's.
@@ -196,6 +220,9 @@ const (
 // (deploy/antispam/rspamd/multimap.conf): SELFPOST_ALLOW_IP, _FROM, _DOMAIN.
 const ListSymbolPrefix = "SELFPOST_"
 
+// rspamd 3.11.0, src/plugins/lua/milter_headers.lua, routine x-spamd-result:
+// string.format('default: %s [%.2f / %.2f]', ...), then one
+// '%s(%.2f)[%s]' per symbol, joined by '; '.
 var (
 	// "default: False [7.20 / 15.00]" - the score and the reject threshold.
 	rspamdScore = regexp.MustCompile(`\[(-?[0-9]+(?:\.[0-9]+)?) / (-?[0-9]+(?:\.[0-9]+)?)\]`)
@@ -267,7 +294,8 @@ func rspamdVerdict(actionHeader, resultHeader string) (action, detail string) {
 // ServeInbound runs the inbound journal milter on ln until ctx is cancelled.
 // key is what the external filter in front of it signs messages with, or
 // empty when none is attached (INBOUND_ANTISPAM_MILTER): no verdict is then
-// read at all. It returns nil on a clean shutdown.
+// read at all. It returns nil on a clean shutdown. What it relies on of
+// go-milter and Postfix is cited at Serve in milter.go.
 func ServeInbound(ctx context.Context, ln net.Listener, rec InboundStore, key string) error {
 	srv := &milter.Server{
 		NewMilter: func() milter.Milter { return &inboundSession{rec: rec, key: key} },

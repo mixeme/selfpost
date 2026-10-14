@@ -12,7 +12,8 @@ import (
 
 // TestFakePostqueue is not a test: it is the fake `postqueue -p` the tests
 // below run in place of the real one, writing SP_FAKE_POSTQUEUE_BYTES bytes of
-// queue entries.
+// queue entries composed by hand after the layout of Postfix 3.7.11's
+// src/postqueue/showq_compat.c.
 func TestFakePostqueue(t *testing.T) {
 	if os.Getenv("SP_FAKE_POSTQUEUE") != "1" {
 		t.Skip("helper process")
@@ -73,10 +74,12 @@ func TestQueueIDsReadsAListingUnderTheCap(t *testing.T) {
 }
 
 // The reconcile sweep decides whether a message is still Postfix's problem, so
-// the parser must pick queue ids out of a real listing and nothing else out of
-// it: not the header, not the byte-count trailer, and above all not a deferred
-// entry's reason line, which — unlike the recipient lines — starts at the left
-// margin just as an entry does.
+// the parser must pick queue ids out of a listing and nothing else out of it:
+// not the header, not the byte-count trailer, and above all not a deferred
+// entry's reason line. The listing is composed by hand. Postfix 3.7.11
+// (src/postqueue/showq_compat.c, showq_message()) right-aligns a reason to
+// column 76, so it reaches the left margin only when it is 76 characters or
+// longer; the one here is put at the margin as the hard case.
 func TestParseQueueIDs(t *testing.T) {
 	listing := `-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------
 3C5B04E6C1*     446 Fri Aug  8 10:12:31  app@example.com

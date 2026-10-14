@@ -29,6 +29,12 @@ type SASLDB struct {
 // NewSASLDB builds a manager for the sasldb2 at path with the given realm. The
 // realm should match SELFPOST_HOSTNAME so the account identity lines up with
 // Postfix's SASL configuration.
+//
+// Postfix 3.7.11, src/xsasl/xsasl_cyrus_server.c, xsasl_cyrus_server_create():
+// sasl_server_new() gets $myhostname and, with smtpd_sasl_local_domain empty,
+// no user realm; Cyrus SASL 2.1.28, plugins/sasldb.c,
+// sasldb_auxprop_lookup(), then looks a login without "@" up under the
+// server's name (common/plugin_common.c, _plug_parseuser()).
 func NewSASLDB(path, realm string) *SASLDB {
 	return &SASLDB{path: path, realm: realm, run: runSaslpasswd2, dump: dumpSASLDB}
 }
@@ -46,6 +52,11 @@ func (s *SASLDB) Set(login, password string) error {
 	if err := validateLogin(login); err != nil {
 		return err
 	}
+	// Cyrus SASL 2.1.28, utils/saslpasswd.c, main(): getopt(), which ends the
+	// options at "--"; -p reads the password with one read() and no prompt
+	// (read_password()); -c is SASL_SET_CREATE, which lib/server.c,
+	// sasl_setpass(), checks against nothing - an existing entry is written
+	// over (sasldb/db_berkeley.c, _sasldb_putdata(), put with no flags).
 	// -p: read the passphrase from stdin (pipe mode, no tty prompt).
 	// -c: create the account / set the password.
 	// -f: operate on our sasldb2 rather than the system default path.
@@ -62,6 +73,11 @@ func (s *SASLDB) Set(login, password string) error {
 
 // Delete removes an application's SASL account (product.md). A missing account
 // is not treated as an error, so deletion is idempotent and safe to retry.
+//
+// Cyrus SASL 2.1.28, plugins/sasldb.c, sasldb_auxprop_store(): "Deleting
+// something which is not there is not an error" - the SASL_NOUSER of
+// sasldb/db_berkeley.c, _sasldb_putdata(), becomes SASL_OK, so saslpasswd2 -d
+// on a missing login exits 0 (utils/saslpasswd.c, main()).
 func (s *SASLDB) Delete(login string) error {
 	if err := validateLogin(login); err != nil {
 		return err
@@ -110,6 +126,17 @@ func (s *SASLDB) Secret(login string) (string, error) {
 // parseSASLSecret scans db_dump's byte-value output for the userPassword entry
 // keyed by (login, realm). sasldb2 keys are NUL-separated tuples
 // "<login>\0<realm>\0<property>"; the matching value is the stored password.
+//
+// Cyrus SASL 2.1.28: sasldb/allockey.c, _sasldb_alloc_key(), builds the key
+// with no NUL at its end; plugins/sasldb.c, sasldb_auxprop_store(), stores the
+// value with strlen(); lib/server.c, sasl_setpass(), stores the plaintext
+// userPassword unless SASL_SET_NOPLAIN (saslpasswd2 -n, which Set does not
+// pass). Built against Berkeley DB (m4/sasldb.m4 auto_detect; debian/rules
+// records BDB_VERSION). Berkeley DB 5.3 Programmer's Reference, "Dump output
+// formats" (docs.oracle.com/cd/E17076_02/html/programmer_reference/
+// dumpload_format.html): header lines up to HEADER=END, then for a hash or
+// btree database key and data lines in turn, each a single space and hex,
+// and DATA=END.
 func parseSASLSecret(dump []byte, login, realm string) (string, bool, error) {
 	sc := bufio.NewScanner(bytes.NewReader(dump))
 	// sasldb2 records are tiny, but raise the line cap so a long hex line is

@@ -28,6 +28,10 @@ type RetryPolicy struct {
 // DefaultRetryPolicy is Postfix 3.x compiled-in values for the six parameters
 // build/postfix-config.sh does not set. Used when postconf is missing (unit
 // tests, a binary outside the container) so the panel still starts.
+//
+// Postfix 3.7.11, src/global/mail_params.h: DEF_QUEUE_RUN_DELAY "300s",
+// DEF_MIN_BACKOFF_TIME DEF_QUEUE_RUN_DELAY, DEF_MAX_BACKOFF_TIME "4000s",
+// DEF_MAX_QUEUE_TIME "5d", DEF_DSN_QUEUE_TIME "5d", DEF_DELAY_WARN_TIME "0h".
 func DefaultRetryPolicy() RetryPolicy {
 	return RetryPolicy{
 		QueueRunDelay:        300 * time.Second,
@@ -57,6 +61,9 @@ var readRetryConf = postconfRetryValues
 
 func postconfRetryValues() ([]string, error) {
 	// Fixed argv, no user input — same pattern as Queue (security.md).
+	// Postfix 3.7.11, src/postconf/postconf_main.c, pcf_show_parameters():
+	// named parameters are printed in argument order, with -h one "%s\n"
+	// value each, as written in main.cf (not expanded without -x).
 	cmd := exec.Command("postconf", "-h",
 		"queue_run_delay",
 		"minimal_backoff_time",
@@ -133,6 +140,10 @@ func (p RetryPolicy) BackoffCap() string {
 // larger of the queue lifetime for ordinary mail and for mail from the null
 // sender, which an application may submit too. It bounds which stored log
 // lines can be about a send-log row (store.SendLogLines).
+//
+// Postfix 3.7.11, src/qmgr/qmgr_active.c, qmgr_active_done(): a message
+// expires after var_max_queue_time, or var_dsn_queue_time when its sender is
+// null - whoever submitted it (qmgr.c caps the second at the first).
 func (p RetryPolicy) LongestLifetime() time.Duration {
 	if p.BounceQueueLifetime > p.MaximalQueueLifetime {
 		return p.BounceQueueLifetime

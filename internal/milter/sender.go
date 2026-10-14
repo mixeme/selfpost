@@ -35,6 +35,13 @@ import (
 // "+extension", the domain. (Postfix compares logins without regard to case;
 // the check compares them as written, which is how the panel writes them.) The send-log row of a refusal is written by another goroutine and
 // is not waited for.
+//
+// Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
+// the SASL login is compared with an owner by strcasecmp_utf8();
+// src/milter/milter8.c, milter8_comm_error(): default_action=tempfail answers
+// "451 4.7.1" for a milter that does not answer. OpenDKIM 2.11.0~beta2,
+// opendkim/opendkim.c, mlfi_eoh(): with SenderHeaders unset the signing
+// domain is that of the first From: field, as dkim_mail_parse() reads it.
 
 // tableFile is a table of the mail path that the panel rewrites and the check
 // reads: it is read again when it has changed. An unreadable file is an error
@@ -91,6 +98,11 @@ func (b *Bindings) fresh() error {
 	for _, line := range lines {
 		// texthash: <key><whitespace><value>, the value a comma-separated
 		// list of logins (internal/postfix renderSenderLoginMaps).
+		// Postfix 3.7.11, src/util/dict_thash.c, dict_thash_open(): the key
+		// ends at the first blank; src/util/readlline.c skips a line whose
+		// first non-blank is "#"; src/util/dict_ht.c folds the key to lower
+		// case (DICT_FLAG_FOLD_FIX, set for smtpd_sender_login_maps in
+		// src/smtpd/smtpd_check.c).
 		fields := strings.Fields(line)
 		if len(fields) < 2 || strings.HasPrefix(fields[0], "#") {
 			continue
@@ -146,6 +158,10 @@ const extensionDelimiter = "+"
 // withoutExtension drops the extension of an address's local part: what
 // follows its first delimiter. "user+tag@example.org" is "user@example.org";
 // an address whose local part begins with the delimiter has no extension.
+//
+// Postfix 3.7.11, src/global/strip_addr.c, strip_addr_internal(), and
+// split_addr.c, split_addr_internal(): the local part, up to the last "@", is
+// cut at its first delimiter, unless that is its first character.
 func withoutExtension(addr string) string {
 	at := strings.LastIndexByte(addr, '@')
 	if at < 0 {
@@ -184,6 +200,12 @@ func NewSigners(path string) *Signers {
 }
 
 // Signs reports whether mail whose From: is at domain gets a signature.
+//
+// OpenDKIM 2.11.0~beta2, opendkim/opendkim-db.c, dkimf_db_open(), case
+// DKIMF_DB_TYPE_REFILE: the pattern is a line up to its first blank, "#"
+// starts a comment; opendkim/util.c, dkimf_mkregexp(): "^" + the pattern
+// ("*" as ".*", "." escaped) + "$", compiled REG_ICASE (DKIMF_DB_FLAG_ICASE,
+// opendkim.c). So "*@d" signs user@d in any case, and no subdomain of d.
 func (s *Signers) Signs(domain string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -231,6 +253,11 @@ type senderSession struct {
 // MailFrom starts a message and forgets the one before it: a connection may
 // carry several, and after a temporary failure the library hands the
 // connection a new session.
+//
+// go-milter v0.4.1, session.go, HandleMilterCommands(): a new backend after a
+// reply whose Continue() is false - the tempfail of Headers; the "y" reply is
+// a CustomResponse whose Continue() is true (response.go), so it keeps this
+// one. {auth_authen}: see session.MailFrom in milter.go.
 func (s *senderSession) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
@@ -257,6 +284,13 @@ func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.R
 }
 
 // Headers is the end of the headers, where the message is judged.
+//
+// go-milter v0.4.1, session.go, case CodeEOH: Headers(). Postfix 3.7.11,
+// src/milter/milter8.c, milter8_event(), SMFIR_REPLYCODE: a "4"/"5" reply
+// whose enhanced code starts with the same digit is the message's reply;
+// src/cleanup/cleanup_milter.c, cleanup_milter_apply(): a "5" rejects the
+// message, and src/smtpd/smtpd.c, common_post_message_handling(), says that
+// reply to the client.
 func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milter.Response, error) {
 	shown, why, err := s.judge()
 	if err != nil {
@@ -271,6 +305,8 @@ func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (mil
 	// cleanup has given the message a queue id by the end of its headers
 	// (milter_end_of_header_macros has {i}); Postfix's lines about it - the
 	// refusal among them - are found by it on the message's page.
+	// Postfix 3.7.11, src/global/mail_params.h: DEF_MILT_EOH_MACROS "i",
+	// answered by src/cleanup/cleanup_milter.c, cleanup_milter_eval().
 	s.record(shown, macro(m, "i"))
 	// A reply code of its own, so that the application is told what is wrong
 	// and, the refusal being permanent, does not send the message again.
@@ -289,6 +325,10 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	if s.login == "" {
 		// Not reachable while the submission ports demand authentication; a
 		// message nobody answers for is not signed either way.
+		// Postfix 3.7.11, src/smtpd/smtpd_check.c, smtpd_check_rcpt(): with
+		// smtpd_delay_reject (default yes) smtpd_client_restrictions
+		// (permit_sasl_authenticated,reject on 465 and 587) refuse every RCPT;
+		// src/smtpd/smtpd.c, data_cmd(): no valid recipients, no message.
 		return "(none)", "no authenticated application", nil
 	}
 	switch len(s.froms) {
@@ -419,6 +459,10 @@ func unquoted(v string) string {
 // for the null sender of a bounce an application writes itself, which Postfix
 // holds against nobody, the domain the login is bound to. Without it the row
 // would belong to no domain and its administrator would never see it.
+//
+// Postfix 3.7.11, src/smtpd/smtpd_check.c, generic_checks():
+// reject_*_sender_login_mismatch run only "if (state->sender &&
+// *state->sender)".
 func (s *senderSession) domain() string {
 	if d := domainOf(s.from); d != "" {
 		return d
@@ -452,6 +496,11 @@ func isHostByte(c byte) bool {
 // printable reduces what a client wrote to printable ASCII without the
 // characters that mean something in an SMTP reply or a log line, and cuts it:
 // it is said back to the client, logged and stored.
+//
+// Postfix 3.7.11, src/milter/milter8.c, milter8_event(), SMFIR_REPLYCODE:
+// "%%" becomes "%" and a single "%" is dropped; src/cleanup/cleanup_milter.c,
+// cleanup_milter_apply(), logs "<id>: milter-reject: END-OF-MESSAGE from
+// <client>: <text>; from=<...> to=<...> ...".
 func printable(v string) string {
 	const max = 120
 	var sb strings.Builder
@@ -476,7 +525,8 @@ func printable(v string) string {
 }
 
 // ServeSender runs the sender check on ln until ctx is cancelled. rec may be
-// nil: refusals are then not logged.
+// nil: refusals are then not logged. What it relies on of go-milter and
+// Postfix is cited at Serve in milter.go.
 func ServeSender(ctx context.Context, ln net.Listener, bind *Bindings, signers *Signers, rec Refusals) error {
 	var refused chan store.SendLogEntry
 	if rec != nil {

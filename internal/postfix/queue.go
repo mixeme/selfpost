@@ -50,6 +50,11 @@ var postqueueP = func(ctx context.Context) *exec.Cmd {
 
 // listQueue runs `postqueue -p` and keeps at most maxQueueOutput bytes of it;
 // truncated says whether there was more.
+//
+// Postfix 3.7.11, src/postqueue/postqueue.c, show_queue(): any user passes
+// authorized_mailq_users (DEF_SHOWQ_ACL static:anyone), and a failure is
+// msg_fatal_status() - a non-zero exit with the reason on stderr;
+// src/postqueue/showq_compat.c, showq_compat(): "Mail queue is empty".
 func listQueue() (text string, truncated bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), postqueueTimeout)
 	defer cancel()
@@ -101,6 +106,9 @@ func Queue() (string, error) {
 // queue. A listing cut at the size cap is such an error: the messages past the
 // cut are still in the queue, and a backlog that large is the outage the sweep
 // exists for (audit 2026-10-12, H3). QueueMessages treats its cap the same way.
+//
+// Postfix 3.7.11, src/showq/showq.c, showq_service(): maildrop, active,
+// incoming, deferred and hold are the queues it lists.
 func QueueIDs() (map[string]struct{}, error) {
 	out, truncated, err := listQueue()
 	if err != nil {

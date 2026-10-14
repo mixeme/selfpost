@@ -31,6 +31,9 @@ func invalid(format string, args ...any) error {
 // applications to the panel. The store refuses such a pair as well
 // (idx_applications_login_nocase); a login imported from another instance is
 // not folded, since its SASL account and its client use it as it is.
+//
+// Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
+// the SASL login is compared with each owner by strcasecmp_utf8().
 func foldLogin(login string) string {
 	return strings.ToLower(login)
 }
@@ -38,7 +41,9 @@ func foldLogin(login string) string {
 // validateLogin enforces a strict server-side whitelist for the SASL login
 // (security.md). It intentionally excludes '@': the login is stored in sasldb2,
 // where '@' separates the user from the realm, so allowing it would change the
-// account's identity. Client validation is never trusted.
+// account's identity. Client validation is never trusted. (Cyrus SASL 2.1.28,
+// common/plugin_common.c, _plug_parseuser(): a login is split into user and
+// realm at its first "@", for saslpasswd2's store and for the lookup alike.)
 //
 // The login is the one piece of user input that is passed to saslpasswd2 as a
 // command argument (never through a shell, security.md); this whitelist is what

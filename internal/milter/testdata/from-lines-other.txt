@@ -5,7 +5,9 @@
 # (internal/milter/sender_test.go) wants each refused; the e2e
 # (test/e2e/dkim_from_test.go) sends each and wants nothing signed for
 # {other}. {OTHER} is {other} in capitals; {other_qp} is {other} with each
-# dot escaped as a quoted pair. One Go-quoted string per line.
+# dot escaped as a quoted pair. One Go-quoted string per line. The lines are
+# composed by hand; that OpenDKIM signs none for {other} is measured, by the
+# e2e on every run.
 "b@{other}"
 "<b@{other}>"
 "\"a@{domain}\"@{other}"

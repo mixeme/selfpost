@@ -12,6 +12,10 @@ import (
 // against the limit forever — a fail-closed drift this milter must not have.
 // The TTL is generously longer than any realistic DATA transfer, so a message
 // still being received is never dropped from the count.
+//
+// go-milter v0.4.1, server.go, type Milter: no callback for the end of a
+// connection; session.go, HandleMilterCommands(), returns on SMFIC_QUIT or a
+// read error without calling the backend.
 const reservationTTL = 10 * time.Minute
 
 // reservation is one message that passed the level-2 check and has not been

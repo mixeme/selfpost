@@ -37,6 +37,12 @@ func generateDKIMKey() (*rsa.PrivateKey, error) {
 // and entrypoint.sh); the parent directory carries setgid so the group is
 // inherited. The write is atomic (temp file + rename) so OpenDKIM never observes
 // a half-written key.
+//
+// OpenDKIM 2.11.0~beta2, libopendkim/dkim.c, dkim_privkey_load(): a key that
+// starts as PEM goes to OpenSSL's PEM_read_bio_PrivateKey(), which takes this
+// PKCS#1 form; opendkim/opendkim.c, dkimf_add_signrequest(): a key file
+// dkimf_securefile() finds insecure is only logged while RequireSafeKeys is no
+// (build/opendkim.conf).
 func writePrivateKeyPEM(path string, key *rsa.PrivateKey) error {
 	block := &pem.Block{
 		Type:  "RSA PRIVATE KEY",

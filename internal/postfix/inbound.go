@@ -55,6 +55,13 @@ func (p *Postfix) RebuildInboundMaps(routes []InboundRoute) error {
 	return p.reload()
 }
 
+// Postfix 3.7.11, man/man5/postconf.5: a relay_domains table "is matched when
+// a (parent) domain appears as lookup key", the value unused; relay_recipient_maps
+// is used as a list, "@domain" its wild-card (src/global/mail_addr_find.c,
+// MA_FIND_AT_DOMAIN, the exact domain only). man/man5/transport.5: "domain
+// transport:nexthop" for that domain. README_FILES/TLS_README: the
+// smtp_tls_policy_maps key is the verbatim next-hop; src/tls/tls_level.c names
+// the levels none, may and encrypt.
 func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tlsPolicy []byte, err error) {
 	sort.Slice(routes, func(i, j int) bool { return routes[i].Domain < routes[j].Domain })
 
@@ -87,6 +94,11 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 // inboundNexthop is the Postfix next-hop [host]:port form. The brackets are
 // what disable the MX lookup, so the operator's explicit upstream is used as
 // given; they also delimit a bare IPv6 address.
+//
+// Postfix 3.7.11, src/smtp/smtp_connect.c: no MX lookup for a destination that
+// starts with "["; src/util/host_port.c, host_port(): "[host]:port", the host
+// a name or an address ("ipv6:" in front is optional), checked by
+// valid_hostaddr().
 func inboundNexthop(host string, port int) string {
 	return "[" + host + "]:" + strconv.Itoa(port)
 }

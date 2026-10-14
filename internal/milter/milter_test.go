@@ -197,9 +197,11 @@ func TestSessionResetsBetweenMessages(t *testing.T) {
 	}
 }
 
-// Postfix sends multi-character macro names wrapped in braces ({auth_authen},
-// {i} for some versions), so the milter must resolve those too — this is the
-// case the SASL-less spike missed and that produced empty app_login at first.
+// Postfix sends each macro name as milter_*_macros spells it (src/milter/
+// milter.c, milter_macro_lookup()): {auth_authen} in braces, and {i} too where
+// a configuration spells it so; the macros here are composed. The milter must
+// resolve those too — this is the case the SASL-less spike missed and that
+// produced empty app_login at first.
 func TestBracedMacros(t *testing.T) {
 	rec := &fakeRecorder{}
 	s := &session{rec: rec}

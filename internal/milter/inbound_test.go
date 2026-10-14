@@ -34,7 +34,9 @@ func (f *fakeInbound) IsInboundDomain(name string) (bool, error) {
 	return f.domains[name], nil
 }
 
-// A header of the kind the documented rspamd sidecar adds.
+// A header in the format of the documented rspamd sidecar, composed by hand:
+// rspamd 3.11's milter_headers.lua writes the same fields, but sorts the
+// symbols by absolute weight (sort_by = 'score'), which this order is not.
 const spamdResult = "default: False [7.20 / 15.00];\n\tBAYES_SPAM(5.10)[100.00%];\n\tMIME_GOOD(-0.10)[text/plain];\n\tARC_NA(0.00)[];\n\tRCVD_COUNT_ZERO(0.00)[0];\n\tR_DKIM_NA(2.20)[]"
 
 // message replays one message through s: envelope, headers in order, end.
@@ -233,9 +235,11 @@ func TestInboundAcceptsWhenTheStoreFails(t *testing.T) {
 	}
 }
 
-// rspamd writes symbols heaviest first, so an allow entry's -100 comes last.
-// Filter lists counts an entry's matches by finding that symbol in the journal:
-// it is kept whatever else there is.
+// A composed header with the allow entry's -100 behind six others. rspamd
+// 3.11 itself sorts by absolute weight and would put it first
+// (milter_headers.lua, x-spamd-result, sort_by = 'score'); the order here is
+// the hard case for the reader. Filter lists counts an entry's matches by
+// finding that symbol in the journal: it is kept whatever else there is.
 func TestRspamdVerdictKeepsTheListSymbols(t *testing.T) {
 	result := "default: False [-91.00 / 15.00]; SYM_A(3.00)[]; SYM_B(2.00)[]; SYM_C(1.50)[]; SYM_D(1.00)[]; SYM_E(0.80)[]; SYM_F(0.50)[]; SYM_G(0.20)[]; ARC_NA(0.00)[]; SELFPOST_ALLOW_FROM(-100.00)[billing@vendor.example]"
 	_, detail := rspamdVerdict("no action", result)

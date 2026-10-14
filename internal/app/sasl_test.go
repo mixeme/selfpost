@@ -66,8 +66,10 @@ func TestSASLDeleteArgs(t *testing.T) {
 	}
 }
 
-// makeDump builds a db_dump byte-value document from key/value byte pairs, the
-// same shape `db_dump <sasldb2>` emits.
+// makeDump builds a db_dump byte-value document from key/value byte pairs. It
+// is composed by hand in the shape the Berkeley DB 5.3 "Dump output formats"
+// page gives; a real dump may have more name=value header lines (the
+// db_load keywords) before HEADER=END, which the parser skips.
 func makeDump(pairs [][2][]byte) []byte {
 	var b strings.Builder
 	b.WriteString("VERSION=3\nformat=bytevalue\ntype=hash\nHEADER=END\n")

@@ -175,6 +175,10 @@ func (o *OpenDKIM) Rebuild(domains []SigningDomain) error {
 // The selector is part of the question because the panel shows and checks the
 // record of one key; tables that name another would have OpenDKIM sign with a
 // key whose record nobody is told to publish.
+//
+// OpenDKIM 2.11.0~beta2, opendkim/util.c, dkimf_mkregexp(): "*@name" is
+// matched as ^.*@name$ (case aside), so it signs name and none of its
+// subdomains (see Signers.Signs in internal/milter/sender.go).
 func (o *OpenDKIM) signs(name, selector string) (bool, error) {
 	has := func(path, prefix string) (bool, error) {
 		data, err := os.ReadFile(path)
@@ -222,6 +226,13 @@ func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTab
 	sorted := append([]SigningDomain(nil), domains...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
+	// OpenDKIM 2.11.0~beta2: KeyTable is a file: table, the key up to the
+	// first blank (opendkim/opendkim-db.c, dkimf_db_open(), DKIMF_DB_TYPE_FILE);
+	// opendkim/opendkim.c, dkimf_add_signrequest(), reads domain, selector and
+	// key from its value, split at ":" (opendkim-db.c, dkimf_db_datasplit()),
+	// a key starting with "/" being a file. SigningTable is refile:, a pattern
+	// up to the first blank and the key name after it (dkimf_db_open(), case
+	// DKIMF_DB_TYPE_REFILE).
 	var kt, st strings.Builder
 	for _, d := range sorted {
 		if err := assertConfigSafe(d.Name, d.Selector); err != nil {
@@ -240,7 +251,9 @@ func renderTables(keysDir string, domains []SigningDomain) (keyTable, signingTab
 
 // opendkimForbidden is what may never appear in a KeyTable or SigningTable
 // value: whitespace and the newline that would end the line, and the colon and
-// path separators that carry meaning inside a table entry.
+// path separators that carry meaning inside a table entry. (OpenDKIM
+// 2.11.0~beta2, opendkim/opendkim-db.c, dkimf_db_datasplit(), splits a
+// KeyTable value at ":"; the domain and selector are also the key's path.)
 const opendkimForbidden = " \t\r\n:/\\"
 
 // assertConfigSafe rejects any domain/selector value that could break out of a
@@ -268,6 +281,14 @@ func assertConfigSafe(domainName, selector string) error {
 //
 // Arguments are fixed literals — no user input is interpolated into the command,
 // and it never goes through a shell (security.md).
+//
+// OpenDKIM 2.11.0~beta2, opendkim/opendkim.c, dkimf_reloader(): SIGUSR1 sets
+// reload when a configuration file was given (-x in build/supervisord.conf);
+// dkimf_config_reload(), from mlfi_negotiate() at the next milter connection,
+// loads the configuration and opens the tables again (opendkim.8, OPERATION).
+// supervisor 4.2.5, supervisor/rpcinterface.py, signalProcess(), and
+// process.py, signal(): kill() of the program's own pid - opendkim itself, run
+// with -f (not forked into the background) and exec'd with no shell.
 func reloadViaSupervisor() error {
 	return supervisor.Signal("USR1", "opendkim")
 }

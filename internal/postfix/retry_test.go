@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// The postconf values in these tests are composed by hand: values main.cf
+// could hold. Stock Postfix 3.7.11 prints "0h" for delay_warning_time
+// (src/global/mail_params.h, DEF_DELAY_WARN_TIME), not "0".
 func TestLoadRetryPolicyUsesPostconfValues(t *testing.T) {
 	old := readRetryConf
 	readRetryConf = func() ([]string, error) {

@@ -12,6 +12,12 @@ import (
 
 // QueuedMessage is one message Postfix is holding, as `postqueue -j` reports
 // it: where it is, and since when.
+//
+// Postfix 3.7.11, src/postqueue/showq_json.c, format_json(): one object and a
+// newline per message - "queue_name", "queue_id", "arrival_time" (seconds,
+// %ld), "message_size", "forced_expire", "sender", "recipients" [{"address",
+// "delay_reason"}]; the queue names are those of src/global/mail_queue.h that
+// src/showq/showq.c, showq_service(), scans.
 type QueuedMessage struct {
 	ID         string
 	Queue      string // "deferred", "active", "hold", "incoming", "maildrop"

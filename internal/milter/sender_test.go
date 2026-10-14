@@ -13,18 +13,21 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 )
 
-// senderMaps is a sender_login_maps file as internal/postfix writes it: shop
-// and news send as any address of their domains, billing only as two listed
-// addresses of example.org, and two applications share shop.example.org.
+// senderMaps is a sender_login_maps file composed by hand in the format
+// internal/postfix writes (key, blank, comma-separated logins), though not in
+// its order (renderSenderLoginMaps sorts the keys): shop and news send as any
+// address of their domains, billing only as two listed addresses of
+// example.org, and two applications share shop.example.org.
 const senderMaps = `@news.example.net news
 @shop.example.org shop,shop2
 invoices@example.org billing
 billing@example.org billing
 `
 
-// signingTable is OpenDKIM's SigningTable for the same server: the three
-// sending domains, one more that has no application yet, and the server's own
-// name.
+// signingTable is a SigningTable for the same server, composed by hand: the
+// three sending domains, one more that has no application yet, and the
+// server's own name. Its key-name column is not what internal/domain
+// renderTables writes (the domain name); the check reads only the pattern.
 const signingTable = `*@news.example.net selfpost._domainkey.news.example.net
 *@shop.example.org selfpost._domainkey.shop.example.org
 *@example.org selfpost._domainkey.example.org
