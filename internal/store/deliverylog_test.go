@@ -21,6 +21,7 @@ func TestDeliveryLogDays(t *testing.T) {
 	must(st.AddReconcileClosed(day1, 2))
 	must(st.AddReconcileClosed(day1, 3))
 	must(st.AddReconcileClosed(day1, 0))
+	must(st.AddReconcileMissed(day1, 2))
 	must(st.AddTailerBlind(day1, 1500*time.Millisecond))
 	must(st.AddTailerBlind(day1, 900*time.Millisecond)) // under a second: nothing
 	must(st.SetQueuedOverLifetime(day1, 4))
@@ -30,7 +31,7 @@ func TestDeliveryLogDays(t *testing.T) {
 	days, err := st.DeliveryLogDays()
 	must(err)
 	want := []DeliveryLogDay{
-		{Day: "2026-10-14", Closed: 5, BlindSeconds: 1, Stuck: 1},
+		{Day: "2026-10-14", Closed: 5, Missed: 2, BlindSeconds: 1, Stuck: 1},
 		{Day: "2026-10-15", BlindSeconds: 60},
 	}
 	if len(days) != len(want) {
@@ -47,6 +48,14 @@ func TestDeliveryLogDays(t *testing.T) {
 	must(err)
 	if len(days) != 1 || days[0].Day != "2026-10-15" {
 		t.Fatalf("after pruning a year and a day later: %+v, want 2026-10-15 alone", days)
+	}
+}
+
+// Only the counters may be added to by name.
+func TestAddDeliveryLogDayRefusesAnotherColumn(t *testing.T) {
+	st := openTestStore(t)
+	if err := st.addDeliveryLogDay(time.Now(), "day", 1); err == nil {
+		t.Fatal("addDeliveryLogDay took the column day")
 	}
 }
 

@@ -60,7 +60,7 @@ func TestBaselineSchema(t *testing.T) {
 		"send_log_lines":        "id queue_id logged_at line",
 		"notify_state":          "key phase count mark since sent_at",
 		"sender_check_days":     "day down_seconds deferred",
-		"delivery_log_days":     "day reconcile_closed reconcile_contradicted tailer_blind_seconds queued_over_lifetime",
+		"delivery_log_days":     "day reconcile_closed reconcile_missed reconcile_contradicted tailer_blind_seconds queued_over_lifetime",
 	}
 	rows, err := st.db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {

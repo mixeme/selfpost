@@ -20,6 +20,9 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatalf("add application: %v", err)
 	}
+	if err := waitForSenderMap(login, password, "billing@"+senderDomain); err != nil {
+		t.Fatal(err)
+	}
 	sc.l2AppLogin, sc.l2AppPassword = login, password
 
 	appID, err := sc.panel.applicationID(sc.domainID, login)
@@ -177,7 +180,8 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 // loop went through: the case once passed on "limit tripped on attempt 1/60"
 // when the connection was reset because Postfix was still starting - and,
 // held to anvil's reply, it turned out the first message had always been
-// refused for another reason (below).
+// refused for another reason: the new login was not yet in the sender map an
+// smtpd from before the panel's reload held (waitForSenderMap).
 func testLevel1RateLimit(t *testing.T, sc *scenario) {
 	login, password, err := sc.panel.addApplication(sc.domainID, "l1app", "wildcard", "")
 	if err != nil {
@@ -191,21 +195,11 @@ func testLevel1RateLimit(t *testing.T, sc *scenario) {
 		})
 	}
 
-	// The panel writes sender_login_maps and reloads Postfix, but an smtpd
-	// process that was idle before the reload can still take the next
-	// connection with the old map and answer 553 for the new login (seen on
-	// the stand: the process that greeted waitForSMTPSReady). Wait for the map
-	// to take effect; any other refusal fails at once.
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		res := send()
-		if res.ok() {
-			break
-		}
-		if res.refusedAt("RCPT", 553, "not owned by user "+login) != nil || time.Now().After(deadline) {
-			t.Fatalf("the first message of %s, before any limit could trip: %v", login, res.firstErr())
-		}
-		time.Sleep(300 * time.Millisecond)
+	if err := waitForSenderMap(login, password, "l1@"+senderDomain); err != nil {
+		t.Fatal(err)
+	}
+	if res := send(); !res.ok() {
+		t.Fatalf("the first message of %s, before any limit could trip: %v", login, res.firstErr())
 	}
 
 	const maxAttempts = 60

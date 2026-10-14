@@ -13,9 +13,15 @@ const (
 	ReasonFrom   = "from"   // the From: line is not the application's
 )
 
-// ReasonReconcile marks a "bounced" row the reconcile sweep closed (send_log.reason):
-// its message left Postfix's queue with no delivery line ever read for it.
-const ReasonReconcile = "reconcile"
+// Who decided a "bounced" row the log did not (send_log.reason).
+const (
+	// ReasonReconcile: the reconcile sweep closed the row - its message left
+	// Postfix's queue with no delivery line ever read for it.
+	ReasonReconcile = "reconcile"
+	// ReasonReconcileContradicted: the sweep closed it and a delivery line
+	// read afterwards gave the status the row now has.
+	ReasonReconcileContradicted = "reconcile-contradicted"
+)
 
 // Settings keys of the sender check's statistics.
 const (

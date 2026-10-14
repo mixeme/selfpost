@@ -417,27 +417,41 @@ guessing where it need not: it starts only after the tailer has read to
 end-of-file once (on a restart the log itself holds the answer); the two-minute
 grace covers messages merely in flight; a `postqueue` that cannot be read, or
 whose listing is over the 4 MiB cap, leaves every row untouched rather than
-closing them all or those past the cut; and the close is conditional on the
-row still being `queued`, so a status the log wrote in the meantime stands.
+closing them all or those past the cut; and the close, by the row's id, is
+conditional on the row still being `queued`, so a status the log wrote in the
+meantime stands. A delivery line updates only the newest row of its queue id
+and recipient: Postfix reuses a short queue id once the message has left the
+queue, and an old row must not be rewritten. `UpdateStatus`'s transaction
+starts with a write, so a commit by the `dmarc-ingest` process in between
+cannot fail it with `database is locked`.
 Now that the log survives the container, reaching this path should mean the
 lines are gone for good — rotated past fourteen files while the panel was down,
 or deleted — or that the tailer was not reading.
 
 Whether the sweep earns its place is measured, not argued (audit 2026-10-12,
 H3). `delivery_log_days` (migration `0007`) keeps, per UTC day for a year:
-`reconcile_closed`, the rows the sweep closed; `reconcile_contradicted`, those
-of them a delivery line later spoke of - the log's status replaces the sweep's
-and the reason is cleared, so a row counts once; `tailer_blind_seconds`, the
-time `follow()` could not read `mail.log` (the file gone, reopening it failing;
-stretches under three seconds - a rotation's tick between rename and create,
-which loses nothing - are not counted); and `queued_over_lifetime`, the rows
-still `queued` past the queue lifetime plus a maximal backoff, as the day's
-last sweep saw them. No page shows the table: it is read off a copy of the
-database. The rule, written before the data: `reconcile_closed = 0` for a month
-→ remove the sweep; closed but never contradicted → keep it; contradicted →
-each case explained by blind time means fix the tailer and keep the sweep,
-otherwise mark such rows `lost` or remove the sweep. Decided after thirty days,
-or sooner if `reconcile_contradicted` is ever non-zero.
+`reconcile_closed`, the rows the sweep closed; `reconcile_missed`, those of
+them whose delivery line was in `mail.log` or `mail.log.1` when the sweep
+closed them - the tailer did not read a line that was there, which is what a
+lost line looks like (it is never read late); `reconcile_contradicted`, those
+a delivery line read later gave a status - the log's status replaces the
+sweep's and the row's reason becomes `reconcile-contradicted`, so a row counts
+once and can be found; `tailer_blind_seconds`, the time `follow()` could not
+read `mail.log` (the file gone, reopening it failing; stretches under three
+seconds - a rotation's tick between rename and create, which loses nothing -
+are not counted); and `queued_over_lifetime`, the rows still `queued` past the
+queue lifetime plus a maximal backoff, as the day's last sweep saw them - rows
+stuck although the sweep runs (mail on hold, or a queue that could not be
+listed). What removing the sweep would leave queued is closed − missed −
+contradicted: the rows nothing in the log ever resolved. No page shows the
+table: it is read off a copy of the database. The rule, written before the
+data: `reconcile_closed = 0` for a month → remove the sweep; closed, but
+neither missed nor contradicted → keep it; missed or contradicted → the tailer
+loses or delays lines - fix the tailer (the two deferred steps: the rotation
+window, pausing the sweep while blind) and keep the sweep; if what remains
+after that is never resolved by the log, mark such rows `lost` or remove the
+sweep. Decided after thirty days, or sooner if `reconcile_missed` or
+`reconcile_contradicted` is ever non-zero.
 
 **Stored lines** (`send_log_lines`, since 2.2.0;
 [internal/logtail/lines.go](../internal/logtail/lines.go)). A send-log row

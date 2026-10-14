@@ -7,60 +7,76 @@
 # root with mode 0600, which a read-only bind mount owned by the host's user
 # cannot give. A renewal of the mounted files therefore reaches Postfix only
 # through a new copy. Every interval this compares the mounted files with the
-# copy; when they differ, and the certificate and the key belong together (a
-# renewer writes them one after the other), it replaces the copy - each file
-# written beside its target and renamed over it, with the owner and modes of
-# the start - and reloads Postfix. When nothing changed it does nothing.
+# copy; when they differ it copies both beside their targets, checks that the
+# copies - not the mounted files, which a renewer may be rewriting - are a
+# certificate and the key that belongs to it, renames both over the targets
+# and reloads Postfix. When nothing changed it does nothing.
 #
 # Runs under supervisord as root. It sleeps first: at container start the
 # wrapper is still bringing Postfix up. It never exits non-zero, so a failure
 # does not trip the crashexit listener; it is logged and tried again.
 set -u
+umask 077 # the key's copy is never readable by others, not even for an instant
 
 INTERVAL="${TLS_RELOAD_INTERVAL_SECONDS:-86400}"
 SRC_CERT="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
 SRC_KEY="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
 DIR=/etc/postfix/tls-internal
+CERT="$DIR/fullchain.pem"
+KEY="$DIR/privkey.pem"
+PENDING=0 # a copy was renewed and Postfix has not been reloaded since
 
 reload() {
 	if postfix reload; then
 		echo "cert-reload: postfix reloaded ($1)"
+		PENDING=0
 	else
-		echo "cert-reload: postfix reload failed, will retry after ${INTERVAL}s" >&2
+		echo "cert-reload: postfix reload failed, will try again after ${INTERVAL}s" >&2
 	fi
 }
 
-# same_pair says whether a certificate and a private key belong together.
+# same_pair says whether a certificate file and a private key file belong
+# together.
 same_pair() {
 	cert_pub=$(openssl x509 -noout -pubkey -in "$1" 2>/dev/null) || return 1
 	key_pub=$(openssl pkey -pubout -in "$2" 2>/dev/null) || return 1
 	[ -n "$cert_pub" ] && [ "$cert_pub" = "$key_pub" ]
 }
 
-# install_copy SRC DST MODE: DST becomes a root-owned copy of SRC in one rename.
-install_copy() {
-	cp -f "$1" "$2.new" && chown root:root "$2.new" && chmod "$3" "$2.new" && mv -f "$2.new" "$2"
-}
-
 refresh() {
-	if [ ! -f "$DIR/fullchain.pem" ]; then
-		# No copy: the mounted files were missing at start and Postfix was
-		# pointed at them as they are. A reload is what picks up a change there.
+	if [ "$PENDING" = 1 ]; then
+		reload "renewed certificate, earlier reload had failed"
+	fi
+	if [ "$(postconf -h smtpd_tls_cert_file 2>/dev/null)" != "$CERT" ]; then
+		# Postfix reads the mounted files themselves (they were missing at
+		# start, so no copy was made): a reload is what picks up a change.
 		reload "periodic TLS refresh"
 		return
 	fi
-	if cmp -s "$SRC_CERT" "$DIR/fullchain.pem" && cmp -s "$SRC_KEY" "$DIR/privkey.pem"; then
+	if [ ! -r "$SRC_CERT" ] || [ ! -r "$SRC_KEY" ]; then
+		echo "cert-reload: cannot read ${SRC_CERT} or ${SRC_KEY}; Postfix keeps the certificate it has" >&2
 		return
 	fi
-	if ! same_pair "$SRC_CERT" "$SRC_KEY"; then
+	if cmp -s "$SRC_CERT" "$CERT" && cmp -s "$SRC_KEY" "$KEY"; then
+		return
+	fi
+	rm -f "$CERT.new" "$KEY.new"
+	if ! cp "$SRC_CERT" "$CERT.new" || ! cp "$SRC_KEY" "$KEY.new"; then
+		rm -f "$CERT.new" "$KEY.new"
+		echo "cert-reload: copying the renewed certificate failed, will try again after ${INTERVAL}s" >&2
+		return
+	fi
+	if ! same_pair "$CERT.new" "$KEY.new"; then
+		rm -f "$CERT.new" "$KEY.new"
 		echo "cert-reload: the mounted certificate and key differ from Postfix's copy but do not belong together; will look again after ${INTERVAL}s" >&2
 		return
 	fi
-	if install_copy "$SRC_KEY" "$DIR/privkey.pem" 0600 && install_copy "$SRC_CERT" "$DIR/fullchain.pem" 0644; then
-		reload "renewed certificate"
-	else
-		echo "cert-reload: copying the renewed certificate failed, will retry after ${INTERVAL}s" >&2
-	fi
+	chown root:root "$CERT.new" "$KEY.new"
+	chmod 0644 "$CERT.new"
+	chmod 0600 "$KEY.new"
+	mv -f "$KEY.new" "$KEY" && mv -f "$CERT.new" "$CERT"
+	PENDING=1
+	reload "renewed certificate"
 }
 
 while true; do

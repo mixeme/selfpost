@@ -49,8 +49,8 @@ func fakePostqueue(t *testing.T, size int) {
 // The queue page still shows the cut listing, with the note.
 func TestQueueIDsRefusesATruncatedListing(t *testing.T) {
 	fakePostqueue(t, 5<<20)
-	if ids, err := QueueIDs(); err == nil {
-		t.Fatalf("QueueIDs on a 5 MiB listing = %d ids and no error, want an error", len(ids))
+	if ids, err := QueueIDs(); err == nil || !strings.Contains(err.Error(), "listing is larger than") {
+		t.Fatalf("QueueIDs on a 5 MiB listing = %d ids, %v; want the listing refused for its size", len(ids), err)
 	}
 	text, err := Queue()
 	if err != nil {

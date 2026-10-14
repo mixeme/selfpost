@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -68,7 +69,7 @@ func checkCertRenewalPickedUp(s *stack) error {
 	if want.Cmp(before) == 0 {
 		return fmt.Errorf("the renewed certificate has the old serial %s", before)
 	}
-	return waitFor("port 465 to present the renewed certificate", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+	if err := waitFor("port 465 to present the renewed certificate", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
 		got, err := servedSerial()
 		if err != nil {
 			return false, err
@@ -77,5 +78,19 @@ func checkCertRenewalPickedUp(s *stack) error {
 			return false, fmt.Errorf("serial %s served, want %s", got, want)
 		}
 		return true, nil
-	})
+	}); err != nil {
+		return err
+	}
+	// The path that was broken is the one taken: Postfix reads the copy, and
+	// the copy is the renewed file, the key private to root.
+	out, err := s.execIn("selfpost", "sh", "-c",
+		"postconf -h smtpd_tls_cert_file && cmp /etc/postfix/tls/fullchain.pem /etc/postfix/tls-internal/fullchain.pem && "+
+			"cmp /etc/postfix/tls/privkey.pem /etc/postfix/tls-internal/privkey.pem && stat -c '%a %U' /etc/postfix/tls-internal/privkey.pem")
+	if err != nil {
+		return fmt.Errorf("Postfix's copy of the certificate: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "/etc/postfix/tls-internal/fullchain.pem\n") || !strings.Contains(out, "600 root") {
+		return fmt.Errorf("Postfix's copy of the certificate: %q, want Postfix reading it and the key 600 root", out)
+	}
+	return nil
 }

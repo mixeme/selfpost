@@ -97,6 +97,16 @@ func TestUpdateStatusRecipientCaseInsensitive(t *testing.T) {
 	}
 }
 
+// rowID is the id of the newest send-log row of a queue id.
+func rowID(t *testing.T, st *Store, queueID string) int64 {
+	t.Helper()
+	var id int64
+	if err := st.db.QueryRow(`SELECT MAX(id) FROM send_log WHERE queue_id = ?`, queueID).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
 // The sweep closes only what is still queued, and says it was the sweep: a
 // status the log wrote stands, whatever the sweep believed when it listed the
 // row.
@@ -111,10 +121,10 @@ func TestCloseUnreportedClosesOnlyQueuedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if n, err := st.CloseUnreported("Q1", "lost@example.net"); err != nil || n != 1 {
+	if n, err := st.CloseUnreported(rowID(t, st, "Q1")); err != nil || n != 1 {
 		t.Fatalf("CloseUnreported of a queued row = %d, %v; want 1", n, err)
 	}
-	if n, err := st.CloseUnreported("Q2", "done@example.net"); err != nil || n != 0 {
+	if n, err := st.CloseUnreported(rowID(t, st, "Q2")); err != nil || n != 0 {
 		t.Fatalf("CloseUnreported of a sent row = %d, %v; want 0", n, err)
 	}
 
@@ -133,14 +143,15 @@ func TestCloseUnreportedClosesOnlyQueuedRows(t *testing.T) {
 }
 
 // A delivery line about a row the sweep closed proves the sweep guessed what
-// the log could have said: the log's status wins, the reason goes, and the day
-// counts one contradiction - once, however often the line is read again.
+// the log could have said: the log's status wins, the row is marked
+// reconcile-contradicted, and the day counts one contradiction - once,
+// however often the line is read again.
 func TestUpdateStatusCountsAContradictedSweep(t *testing.T) {
 	st := openTestStore(t)
 	if err := st.InsertQueued(SendLogEntry{QueueID: "Q1", To: "a@example.net"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.CloseUnreported("Q1", "a@example.net"); err != nil {
+	if _, err := st.CloseUnreported(rowID(t, st, "Q1")); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
@@ -152,8 +163,8 @@ func TestUpdateStatusCountsAContradictedSweep(t *testing.T) {
 	if err := st.db.QueryRow(`SELECT status, reason FROM send_log WHERE queue_id = 'Q1'`).Scan(&status, &reason); err != nil {
 		t.Fatal(err)
 	}
-	if status != StatusSent || reason != "" {
-		t.Fatalf("status %q reason %q, want sent and no reason", status, reason)
+	if status != StatusSent || reason != ReasonReconcileContradicted {
+		t.Fatalf("status %q reason %q, want sent and %s", status, reason, ReasonReconcileContradicted)
 	}
 	days, err := st.DeliveryLogDays()
 	if err != nil {
@@ -161,6 +172,32 @@ func TestUpdateStatusCountsAContradictedSweep(t *testing.T) {
 	}
 	if len(days) != 1 || days[0].Contradicted != 1 {
 		t.Fatalf("days = %+v, want one day with one contradiction", days)
+	}
+}
+
+// Postfix reuses a short queue id once its message has left the queue; a
+// line about the message of today rewrites today's row, not the months-old
+// one of the same id and recipient.
+func TestUpdateStatusRewritesOnlyTheNewestRow(t *testing.T) {
+	st := openTestStore(t)
+	for i := 0; i < 2; i++ {
+		if err := st.InsertQueued(SendLogEntry{QueueID: "REUSED", To: "a@example.net"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := rowID(t, st, "REUSED") - 1
+	if _, err := st.db.Exec(`UPDATE send_log SET status = ? WHERE id = ?`, StatusSent, old); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.UpdateStatus("REUSED", "a@example.net", StatusBounced); err != nil || n != 1 {
+		t.Fatalf("UpdateStatus = %d, %v; want 1 row", n, err)
+	}
+	var status string
+	if err := st.db.QueryRow(`SELECT status FROM send_log WHERE id = ?`, old).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSent {
+		t.Fatalf("the old row became %q, want it left sent", status)
 	}
 }
 
@@ -199,7 +236,7 @@ func TestListQueuedOlderThan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListQueuedOlderThan: %v", err)
 	}
-	if len(got) != 1 || got[0] != (QueuedDelivery{QueueID: "OLD1", To: "stale@example.net"}) {
+	if len(got) != 1 || got[0] != (QueuedDelivery{ID: got[0].ID, QueueID: "OLD1", To: "stale@example.net"}) {
 		t.Fatalf("got %+v, want only the stale queued row", got)
 	}
 }

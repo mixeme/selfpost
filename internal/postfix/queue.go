@@ -62,7 +62,13 @@ func listQueue() (text string, truncated bool, err error) {
 		return "", false, fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(out.buf.String()))
+		// stdout and stderr share the buffer: the end of it says why, and up
+		// to 4 MiB of listing does not belong in an error.
+		why := strings.TrimSpace(out.buf.String())
+		if len(why) > 512 {
+			why = "..." + why[len(why)-512:]
+		}
+		return "", false, fmt.Errorf("postqueue -p: %w: %s", err, why)
 	}
 	return out.buf.String(), out.truncated, nil
 }

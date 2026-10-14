@@ -176,7 +176,7 @@ func TestRunKeepsQueueLinesOnce(t *testing.T) {
 
 	const (
 		client = "host postfix/submission/smtpd[1]: 41E862C00D9E: client=unknown[203.0.113.7]"
-		sent   = "host postfix/smtp[1]: 41E862C00D9E: to=<a@example.net>, dsn=2.0.0, status=sent (ok)"
+		sent   = "host postfix/smtp[1]: 41E862C00D9E: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)"
 		later  = "host postfix/qmgr[1]: 41E862C00D9E: removed"
 	)
 

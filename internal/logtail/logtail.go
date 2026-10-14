@@ -31,9 +31,10 @@ import (
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
-	CloseUnreported(queueID, recipient string) (int64, error)
+	CloseUnreported(id int64) (int64, error)
 	// The counters of delivery_log_days (store/deliverylog.go).
 	AddReconcileClosed(at time.Time, n int64) error
+	AddReconcileMissed(at time.Time, n int64) error
 	AddTailerBlind(from time.Time, d time.Duration) error
 	CountQueuedOlderThan(cutoff time.Time) (int64, error)
 	SetQueuedOverLifetime(at time.Time, n int64) error
@@ -88,6 +89,10 @@ type RetentionDays func() int
 // The "<queue-id>: to=<addr>, …, status=<word>" shape is specific to the
 // delivery agents; qmgr/smtpd/cleanup lines do not match.
 //
+// The recipient runs to the ">, " that comes before relay= (and orig_to=,
+// when there is one): a quoted local part may hold a ">", and a recipient cut
+// there would match no row and leave it for the sweep (review of stage 1).
+//
 // It is matched at the head of the line - the host name, "program[pid]:",
 // then the queue id - after SplitTimestamp has taken the stamp off, like
 // queueLineRe and the inbound patterns. Anywhere else the text is a
@@ -100,7 +105,7 @@ type RetentionDays func() int
 // the line — and that one can come from the reply text, which the far end
 // controls. A bounce whose reply quoted "status=sent" would then be filed as a
 // success. The real field is always the first one after to=<…>.
-var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<([^>]*)>,.*?\bstatus=(\w+)`)
+var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(.*?)>, (?:orig_to=<.*?>, )?relay=.*?\bstatus=(\w+)`)
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
 // ok is false for lines that are not recognised delivery results.
@@ -149,7 +154,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	// the sweep would otherwise close. follow() closes this once it has read to
 	// end-of-file for the first time.
 	caughtUp := make(chan struct{})
-	go reconcileLoop(ctx, st, caughtUp)
+	go reconcileLoop(ctx, st, caughtUp, path)
 
 	var deferred *deferredCounter
 	if sender != nil {
@@ -190,7 +195,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 // up with the log, and then leaves the first sweep a full interval away, so a
 // restart resolves rows from the log — the accurate source — before the sweep
 // gets to guess at whatever the log could not explain.
-func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}) {
+func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}, path string) {
 	select {
 	case <-ctx.Done():
 		return
@@ -210,7 +215,7 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 			return
 		case <-t.C:
 			now := time.Now().UTC()
-			reconcile(st, now.Add(-reconcileGrace))
+			reconcile(st, now.Add(-reconcileGrace), path)
 			countStuck(st, now, overLifetime)
 		}
 	}
@@ -242,7 +247,12 @@ func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
 // success because a delivery the panel cannot evidence must not be shown as
 // one. Rows whose message is still in the queue, and every row when the queue
 // cannot be listed at all, are left exactly as they are.
-func reconcile(st StatusStore, cutoff time.Time) {
+//
+// A closed row whose delivery line is in mail.log or mail.log.1 after all is
+// counted as missed: the line was there and the tailer did not read it. That
+// is what tells a tailer that loses lines from a log that lost them, which
+// reconcile_contradicted cannot - a lost line is never read late.
+func reconcile(st StatusStore, cutoff time.Time, path string) {
 	rows, err := st.ListQueuedOlderThan(cutoff)
 	if err != nil {
 		log.Printf("log-tailer: reconcile: list queued rows: %v", err)
@@ -260,24 +270,52 @@ func reconcile(st StatusStore, cutoff time.Time) {
 		return
 	}
 
-	var closed int64
+	var closed, missed int64
 	for _, row := range rows {
 		if _, still := held[row.QueueID]; still {
 			continue
 		}
-		n, err := st.CloseUnreported(row.QueueID, row.To)
+		n, err := st.CloseUnreported(row.ID)
 		if err != nil {
 			log.Printf("log-tailer: reconcile: close %s/%s: %v", row.QueueID, row.To, err)
 			continue
 		}
 		closed += n
+		if n > 0 && deliveryInLog(path, row) {
+			log.Printf("log-tailer: reconcile: %s/%s had a delivery line in the log the tailer did not read", row.QueueID, row.To)
+			missed++
+		}
 	}
 	if closed > 0 {
 		log.Printf("log-tailer: reconcile: closed %d row(s) Postfix no longer holds and never reported", closed)
 		if err := st.AddReconcileClosed(time.Now(), closed); err != nil {
 			log.Printf("log-tailer: reconcile: count: %v", err)
 		}
+		if err := st.AddReconcileMissed(time.Now(), missed); err != nil {
+			log.Printf("log-tailer: reconcile: count: %v", err)
+		}
 	}
+}
+
+// deliveryInLog says whether the current log or the one rotated last holds a
+// delivery line for row. Rows reach the sweep minutes after they were
+// written, so the end of those two files is where such a line would be.
+func deliveryInLog(path string, row store.QueuedDelivery) bool {
+	if path == "" {
+		return false
+	}
+	for _, p := range []string{path, path + ".1"} {
+		lines, err := QueueLines(p, row.QueueID, 256)
+		if err != nil {
+			continue
+		}
+		for _, line := range lines {
+			if q, r, _, ok := parseDelivery(line); ok && q == row.QueueID && strings.EqualFold(r, row.To) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // retentionLoop prunes expired send-log rows immediately and then periodically,

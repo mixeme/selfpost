@@ -12,9 +12,17 @@ import (
 // deliveryLogKeepDays is how long a day of the counters is kept.
 const deliveryLogKeepDays = 366
 
-// addDeliveryLogDay adds n to one counter of the day of at. column is one of
-// the fixed names below, never anything a request carries.
+// deliveryLogCounters are the columns addDeliveryLogDay may add to: the
+// name is put into the statement, so nothing else may reach it.
+var deliveryLogCounters = map[string]bool{
+	"reconcile_closed": true, "reconcile_missed": true, "tailer_blind_seconds": true,
+}
+
+// addDeliveryLogDay adds n to one counter of the day of at.
 func (s *Store) addDeliveryLogDay(at time.Time, column string, n int64) error {
+	if !deliveryLogCounters[column] {
+		return fmt.Errorf("delivery log day: no counter %q", column)
+	}
 	if n <= 0 {
 		return nil
 	}
@@ -32,6 +40,12 @@ func (s *Store) addDeliveryLogDay(at time.Time, column string, n int64) error {
 // AddReconcileClosed counts n rows the reconcile sweep closed.
 func (s *Store) AddReconcileClosed(at time.Time, n int64) error {
 	return s.addDeliveryLogDay(at, "reconcile_closed", n)
+}
+
+// AddReconcileMissed counts n rows the sweep closed whose delivery line was
+// in mail.log all along: the tailer did not read it.
+func (s *Store) AddReconcileMissed(at time.Time, n int64) error {
+	return s.addDeliveryLogDay(at, "reconcile_missed", n)
 }
 
 // AddTailerBlind counts a stretch the log tailer could not read mail.log,
@@ -71,14 +85,14 @@ func (s *Store) CountQueuedOlderThan(cutoff time.Time) (int64, error) {
 
 // DeliveryLogDay is one day of the counters, for tests and for reading a copy.
 type DeliveryLogDay struct {
-	Day                                       string
-	Closed, Contradicted, BlindSeconds, Stuck int64
+	Day                                               string
+	Closed, Missed, Contradicted, BlindSeconds, Stuck int64
 }
 
 // DeliveryLogDays returns the counted days, oldest first.
 func (s *Store) DeliveryLogDays() ([]DeliveryLogDay, error) {
 	rows, err := s.db.Query(
-		`SELECT day, reconcile_closed, reconcile_contradicted, tailer_blind_seconds, queued_over_lifetime
+		`SELECT day, reconcile_closed, reconcile_missed, reconcile_contradicted, tailer_blind_seconds, queued_over_lifetime
 		 FROM delivery_log_days ORDER BY day`)
 	if err != nil {
 		return nil, fmt.Errorf("delivery log days: %w", err)
@@ -87,7 +101,7 @@ func (s *Store) DeliveryLogDays() ([]DeliveryLogDay, error) {
 	var out []DeliveryLogDay
 	for rows.Next() {
 		var d DeliveryLogDay
-		if err := rows.Scan(&d.Day, &d.Closed, &d.Contradicted, &d.BlindSeconds, &d.Stuck); err != nil {
+		if err := rows.Scan(&d.Day, &d.Closed, &d.Missed, &d.Contradicted, &d.BlindSeconds, &d.Stuck); err != nil {
 			return nil, fmt.Errorf("scan delivery log day: %w", err)
 		}
 		out = append(out, d)

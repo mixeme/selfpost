@@ -227,3 +227,59 @@ func mailTwiceOnOneConnection(login, password, from string) [2]error {
 	_ = c.Quit()
 	return out
 }
+
+// waitForSenderMap waits until Postfix lets login use from: an application
+// the panel has just created is written into the sender map and Postfix is
+// reloaded, and an smtpd that was idle from before the reload can still take
+// a connection in the second that follows and answer 553 "not owned by user"
+// (seen on the stand; two seconds after the save it no longer happened, at 0,
+// 10, 40 or 110 s of waiting). It goes as far as RCPT and then RSET, so no
+// message is sent and no row is written. Only that 553 is waited out, for 15
+// s at most; any other answer fails at once.
+func waitForSenderMap(login, password, from string) error {
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		err := probeSender(login, password, from)
+		if err == nil {
+			return nil
+		}
+		if replyIs(err, 553, "not owned by user "+login) != nil || time.Now().After(deadline) {
+			return fmt.Errorf("Postfix does not yet let %s send as %s: %w", login, from, err)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+// probeSender authenticates as login and offers MAIL FROM from and one RCPT,
+// then resets. It returns the first refusal, or nil.
+func probeSender(login, password, from string) error {
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", smtpsAddr, &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         selfpostHostname,
+	})
+	if err != nil {
+		return err
+	}
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	c, err := smtp.NewClient(conn, selfpostHostname)
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	defer c.Close()
+	if err := c.Hello("e2e-client.e2e.test"); err != nil {
+		return err
+	}
+	if err := c.Auth(smtp.PlainAuth("", login, password, selfpostHostname)); err != nil {
+		return err
+	}
+	if err := c.Mail(from); err != nil {
+		return err
+	}
+	if err := c.Rcpt(recipient); err != nil {
+		return err
+	}
+	_ = c.Reset()
+	_ = c.Quit()
+	return nil
+}

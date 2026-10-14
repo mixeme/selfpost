@@ -241,6 +241,9 @@ func TestE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("add application: %v", err)
 		}
+		if err := waitForSenderMap(login, password, "alerts@"+senderDomain); err != nil {
+			t.Fatal(err)
+		}
 		sc.appLogin, sc.appPassword = login, password
 	})
 

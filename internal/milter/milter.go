@@ -203,9 +203,30 @@ func (s *session) record(queueID string) {
 }
 
 // cleanAddress strips the angle brackets and any ESMTP parameters Postfix may
-// pass with an address, leaving the bare mailbox.
+// pass with an address, leaving the bare mailbox. A bracketed address ends at
+// the first ">" outside a quoted local part: a quoted local part may hold a
+// space or a ">", and an address cut there matched no delivery line, so its
+// row was left for the reconcile sweep to close as bounced (review of audit
+// stage 1).
 func cleanAddress(a string) string {
 	a = strings.TrimSpace(a)
+	if strings.HasPrefix(a, "<") {
+		quoted := false
+		for i := 1; i < len(a); i++ {
+			switch a[i] {
+			case '\\':
+				if quoted {
+					i++ // the escaped character is part of the local part
+				}
+			case '"':
+				quoted = !quoted
+			case '>':
+				if !quoted {
+					return a[1:i]
+				}
+			}
+		}
+	}
 	if i := strings.IndexByte(a, ' '); i >= 0 { // drop "addr SIZE=… BODY=…" params
 		a = a[:i]
 	}

@@ -84,10 +84,22 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 // number of rows updated so the caller can tell whether the line matched a
 // journal entry.
 //
+// Only the newest row of the pair is updated. Postfix reuses a short queue id
+// once the message has left the queue, and a row outlives that by months; a
+// line about today's message must not rewrite an old one (audit 2026-10-12,
+// review of stage 1).
+//
 // A row the reconcile sweep closed (reason "reconcile") that a delivery line
-// now speaks of was closed on a guess the log could have settled: the log
-// wins, the reason is cleared, and the day's reconcile_contradicted counts it
-// (delivery_log_days) - once, since the row no longer carries the reason.
+// now speaks of was closed on a guess the log could have settled: the log's
+// status wins, the reason becomes "reconcile-contradicted" - which row, and
+// updated_at says when - and the day's reconcile_contradicted counts it
+// (delivery_log_days), once, since the row no longer reads "reconcile".
+//
+// The transaction's first statement is a write. A transaction that reads
+// first and then writes fails at once with "database is locked" when another
+// connection - the dmarc-ingest process opens the same file - commits in
+// between, and the line would be lost; a write first takes the write lock,
+// and the busy timeout waits for it.
 func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	now := time.Now().UTC()
 	tx, err := s.db.Begin()
@@ -95,18 +107,18 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 		return 0, fmt.Errorf("update send_log status: %w", err)
 	}
 	defer tx.Rollback()
-	var contradicted int64
-	if err := tx.QueryRow(
-		`SELECT COUNT(*) FROM send_log WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE AND reason = ?`,
-		queueID, recipient, ReasonReconcile,
-	).Scan(&contradicted); err != nil {
+	const newest = `id = (SELECT MAX(id) FROM send_log WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE)`
+	marked, err := tx.Exec(
+		`UPDATE send_log SET reason = ? WHERE `+newest+` AND reason = ?`,
+		ReasonReconcileContradicted, queueID, recipient, ReasonReconcile,
+	)
+	if err != nil {
 		return 0, fmt.Errorf("update send_log status: %w", err)
 	}
+	contradicted, _ := marked.RowsAffected()
 	res, err := tx.Exec(
-		`UPDATE send_log SET status = ?, updated_at = ?,
-			reason = CASE WHEN reason = ? THEN '' ELSE reason END
-		 WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE`,
-		status, now.Format(time.RFC3339), ReasonReconcile, queueID, recipient,
+		`UPDATE send_log SET status = ?, updated_at = ? WHERE `+newest,
+		status, now.Format(time.RFC3339), queueID, recipient,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("update send_log status: %w", err)
@@ -127,17 +139,16 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	return n, nil
 }
 
-// CloseUnreported is the reconcile sweep's close of one row: "bounced", marked
-// reason "reconcile" so it is known who decided it (architecture.md § Log
-// tailer). Only a row still "queued" is closed - a result the log wrote an
-// instant earlier stands, and a months-old row of a reused queue id is not
-// rewritten (audit 2026-10-12, H3). It returns the number of rows closed.
-func (s *Store) CloseUnreported(queueID, recipient string) (int64, error) {
+// CloseUnreported is the reconcile sweep's close of one row, by its id:
+// "bounced", marked reason "reconcile" so it is known who decided it
+// (architecture.md § Log tailer). Only a row still "queued" is closed - a
+// result the log wrote an instant earlier stands (audit 2026-10-12, H3). It
+// returns the number of rows closed, 0 or 1.
+func (s *Store) CloseUnreported(id int64) (int64, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
-		`UPDATE send_log SET status = ?, reason = ?, updated_at = ?
-		 WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE AND status = ?`,
-		StatusBounced, ReasonReconcile, now, queueID, recipient, StatusQueued,
+		`UPDATE send_log SET status = ?, reason = ?, updated_at = ? WHERE id = ? AND status = ?`,
+		StatusBounced, ReasonReconcile, now, id, StatusQueued,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("close unreported send_log row: %w", err)
@@ -150,6 +161,7 @@ func (s *Store) CloseUnreported(queueID, recipient string) (int64, error) {
 // reduced to what the log-tailer's reconcile sweep needs to look it up in the
 // Postfix queue and, failing that, to close it (architecture.md § Log tailer).
 type QueuedDelivery struct {
+	ID      int64
 	QueueID string
 	To      string
 }
@@ -164,7 +176,7 @@ type QueuedDelivery struct {
 // format is chronologically correct.
 func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
 	rows, err := s.db.Query(
-		`SELECT queue_id, to_addr FROM send_log
+		`SELECT id, queue_id, to_addr FROM send_log
 		 WHERE status = ? AND queue_id <> '' AND created_at < ?
 		 ORDER BY id`,
 		StatusQueued, cutoff.UTC().Format(time.RFC3339),
@@ -177,7 +189,7 @@ func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) 
 	var out []QueuedDelivery
 	for rows.Next() {
 		var d QueuedDelivery
-		if err := rows.Scan(&d.QueueID, &d.To); err != nil {
+		if err := rows.Scan(&d.ID, &d.QueueID, &d.To); err != nil {
 			return nil, fmt.Errorf("scan queued send_log row: %w", err)
 		}
 		out = append(out, d)

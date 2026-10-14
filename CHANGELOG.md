@@ -18,9 +18,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The sweep closes only what is still queued, and says it did.** Its close
   was the tailer's plain status update, so a `sent` the log wrote an instant
   earlier could be overwritten with `bounced`, and a reused queue id could
-  rewrite an old row of the same recipient. The close is now conditional on
-  the row still being `queued`, and the row it closes carries the reason
-  `reconcile` (audit 2026-10-12, H3).
+  rewrite an old row of the same recipient. The sweep now closes a row by its
+  id and only while it is `queued`, and the row it closes carries the reason
+  `reconcile`; a delivery line updates only the newest row of its queue id
+  and recipient (audit 2026-10-12, H3).
+- **A recipient with a quoted local part is followed to its delivery.** The
+  journal cut `"a b"@example.net` at its space, and the log tailer cut
+  `"a>b"@example.net` at its `>`: the row matched no delivery line and the
+  sweep closed it as bounced. Both now take the whole address.
 - **A stranger's HELO name no longer reads as a delivery result.** The
   pattern that turns a `mail.log` line into a status matched anywhere in the
   line, so a port-25 client whose HELO name read
@@ -57,8 +62,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 - **The delivery log measures its own guesses** (migration `0007`). A table
   `delivery_log_days` counts, per UTC day, the rows the reconcile sweep
-  closed, those of them a delivery line later contradicted (the log's status
-  then replaces the sweep's), the seconds the log tailer could not read
+  closed, those of them whose delivery line was in `mail.log` all along (the
+  log tailer missed it), those a delivery line read later contradicted (the
+  log's status then replaces the sweep's, and the row is marked
+  `reconcile-contradicted`), the seconds the log tailer could not read
   `mail.log`, and the rows still queued past Postfix's queue lifetime. No page
   shows it: it is read off a copy of the database after a month, to decide
   by a rule written in the audit whether the sweep stays (audit 2026-10-12,

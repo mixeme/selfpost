@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 7` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql` |
+| Chain head | `user_version = 8` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -66,7 +66,8 @@ inbound-antispam-panel (`2.1.0`), then `0003_send_log_lines.sql` of
 delivery-log-storage (`2.2.0`), `0004_notifications.sql` and
 `0005_send_log_rejected_index.sql` of panel-notifications (`2.3.0`), and
 `0006_sender_check.sql` of from-header-binding (`2.4.0`), and
-`0007_delivery_log_days.sql` of the 2026-10-12 audit (`2.5.0`).
+`0007_delivery_log_days.sql` and `0008_tenant_boundary.sql` of the 2026-10-12
+audit (`2.5.0`).
 
 ---
 
@@ -80,7 +81,8 @@ delivery-log-storage (`2.2.0`), `0004_notifications.sql` and
 | 4 | `0004_notifications.sql` | 2.3.0 | DDL | `users.notify` (default 1: every user starts with notifications on) and `notify_state` |
 | 5 | `0005_send_log_rejected_index.sql` | 2.3.0 | DDL | `idx_send_log_rejected`, a partial index of the refused rows of `send_log` by time; a file of its own because the test installation had run 0004 before the review asked for it |
 | 6 | `0006_sender_check.sql` | 2.4.0 | DDL | `send_log.reason` and `send_log.header_from` (both default `''`: a row refused earlier keeps no reason), and `sender_check_days` |
-| 7 | `0007_delivery_log_days.sql` | 2.5.0 | DDL | `delivery_log_days`: what the reconcile sweep and the log tailer did, a row per UTC day, kept a year, shown nowhere - the measurement that decides the sweep's fate (audit 2026-10-12, stage 1). `send_log.reason` gains the value `reconcile` without a schema change |
+| 7 | `0007_delivery_log_days.sql` | 2.5.0 | DDL | `delivery_log_days`: what the reconcile sweep and the log tailer did, a row per UTC day, kept a year, shown nowhere - the measurement that decides the sweep's fate (audit 2026-10-12, stage 1). `send_log.reason` gains the values `reconcile` and `reconcile-contradicted` without a schema change |
+| 8 | `0008_tenant_boundary.sql` | 2.5.0 | DDL | `idx_applications_login_nocase`: an application login is unique without regard to case (audit 2026-10-12, H4) |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.

@@ -23,10 +23,11 @@ func (s *retentionProbeStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDeli
 	return nil, nil
 }
 
-func (s *retentionProbeStore) CloseUnreported(string, string) (int64, error) {
+func (s *retentionProbeStore) CloseUnreported(int64) (int64, error) {
 	return 0, nil
 }
 
+func (s *retentionProbeStore) AddReconcileMissed(time.Time, int64) error     { return nil }
 func (s *retentionProbeStore) AddReconcileClosed(time.Time, int64) error     { return nil }
 func (s *retentionProbeStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
 func (s *retentionProbeStore) CountQueuedOlderThan(time.Time) (int64, error) { return 0, nil }

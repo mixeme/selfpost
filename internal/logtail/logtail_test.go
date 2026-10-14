@@ -117,6 +117,16 @@ func TestParseDelivery(t *testing.T) {
 			wantOK: false,
 		},
 		{
+			// A quoted local part may hold ">": the recipient runs to the
+			// ">, " before relay=.
+			name:      "a recipient with > in a quoted local part",
+			line:      `host postfix/smtp[26]: C0FFEE: to=<"a>b"@example.net>, relay=mx[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)`,
+			wantOK:    true,
+			queueID:   "C0FFEE",
+			recipient: `"a>b"@example.net`,
+			status:    store.StatusSent,
+		},
+		{
 			// The stamp Postfix 3.7's postlogd writes, as on the stand.
 			name:      "syslog stamp",
 			line:      "Oct 14 11:05:51 mail postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (250 OK)",
@@ -178,6 +188,7 @@ type captureStore struct {
 	// closed sums AddReconcileClosed; stuckCount is what CountQueuedOlderThan
 	// answers and stuck what SetQueuedOverLifetime was given.
 	closed     int64
+	missed     int64
 	stuckCount int64
 	stuck      []int64
 
@@ -241,12 +252,18 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 	return 1, nil
 }
 
-// CloseUnreported records the sweep's close as "queue-id|recipient|reconcile".
-func (c *captureStore) CloseUnreported(queueID, recipient string) (int64, error) {
+// CloseUnreported records the sweep's close as "queue-id|recipient|reconcile",
+// finding the row by its id among queued.
+func (c *captureStore) CloseUnreported(id int64) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.calls = append(c.calls, queueID+"|"+recipient+"|"+store.ReasonReconcile)
-	return 1, nil
+	for _, q := range c.queued {
+		if q.ID == id {
+			c.calls = append(c.calls, q.QueueID+"|"+q.To+"|"+store.ReasonReconcile)
+			return 1, nil
+		}
+	}
+	return 0, nil
 }
 
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
@@ -257,6 +274,12 @@ func (c *captureStore) AddReconcileClosed(_ time.Time, n int64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed += n
+	return nil
+}
+func (c *captureStore) AddReconcileMissed(_ time.Time, n int64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.missed += n
 	return nil
 }
 func (c *captureStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
@@ -332,7 +355,7 @@ func TestFollowTailsAndRotates(t *testing.T) {
 	// Give follow() time to open at EOF (it seeks to end immediately on start,
 	// so the seed line above is ignored), then append a delivery line.
 	time.Sleep(50 * time.Millisecond)
-	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, dsn=2.0.0, status=sent (ok)")
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
 	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
 
 	// Rotate: move the current file aside and create a fresh one (logrotate
@@ -343,7 +366,7 @@ func TestFollowTailsAndRotates(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
 		t.Fatalf("recreate: %v", err)
 	}
-	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, dsn=5.1.1, status=bounced (nope)")
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=5.1.1, status=bounced (nope)")
 	waitFor(t, func() bool { return contains(cs.snapshot(), "Q2|b@example.net|bounced") })
 
 	cancel()
@@ -375,12 +398,12 @@ func TestFollowResumesAfterRestart(t *testing.T) {
 
 	cs := &captureStore{}
 	stop := startRun(t, path, cs)
-	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, dsn=2.0.0, status=sent (ok)")
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
 	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
 	stop() // persists the offset past Q1
 
 	// Down: Postfix keeps delivering.
-	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, dsn=2.0.0, status=sent (ok)")
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
 
 	cs.reset()
 	stop = startRun(t, path, cs)
@@ -394,7 +417,7 @@ func TestFollowResumesAfterRestart(t *testing.T) {
 	// The stored offset belongs to a file that no longer exists, so the new one
 	// must be read from the start.
 	if err := os.WriteFile(path, []byte(strings.Repeat("host postfix/qmgr[1]: fresh log after rotation\n", 20)+
-		"host postfix/smtp[1]: Q3: to=<c@example.net>, dsn=5.1.1, status=bounced (nope)\n"), 0o644); err != nil {
+		"host postfix/smtp[1]: Q3: to=<c@example.net>, relay=x, dsn=5.1.1, status=bounced (nope)\n"), 0o644); err != nil {
 		t.Fatalf("recreate log: %v", err)
 	}
 
@@ -490,17 +513,39 @@ func TestReconcileClosesOnlyWhatPostfixNoLongerHolds(t *testing.T) {
 	stubQueue(t, nil, "STILLQ")
 
 	cs := &captureStore{queued: []store.QueuedDelivery{
-		{QueueID: "STILLQ", To: "inflight@example.net"},
-		{QueueID: "GONEQ", To: "lost@example.net"},
+		{ID: 1, QueueID: "STILLQ", To: "inflight@example.net"},
+		{ID: 2, QueueID: "GONEQ", To: "lost@example.net"},
 	}}
-	reconcile(cs, time.Now().UTC())
+	reconcile(cs, time.Now().UTC(), "")
 
 	got := cs.snapshot()
 	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.ReasonReconcile {
 		t.Fatalf("got %v, want only the message Postfix dropped closed by the sweep", got)
 	}
-	if cs.closed != 1 {
-		t.Fatalf("the day counts %d closed row(s), want 1", cs.closed)
+	if cs.closed != 1 || cs.missed != 0 {
+		t.Fatalf("the day counts %d closed and %d missed, want 1 and 0", cs.closed, cs.missed)
+	}
+}
+
+// A closed row whose delivery line is in the log after all - here in the file
+// rotated last - is counted as missed: the tailer did not read it.
+func TestReconcileCountsALineTheTailerMissed(t *testing.T) {
+	stubQueue(t, nil)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	if err := os.WriteFile(path, []byte("Oct 14 11:00:00 mail postfix/qmgr[10]: OTHERQ: removed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".1", []byte("Oct 14 10:59:58 mail postfix/smtp[26]: SEENQ: to=<Seen@example.net>, relay=mx[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{ID: 1, QueueID: "SEENQ", To: "seen@example.net"},
+		{ID: 2, QueueID: "GONEQ", To: "lost@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC(), path)
+	if cs.closed != 2 || cs.missed != 1 {
+		t.Fatalf("closed %d, missed %d; want 2 and 1", cs.closed, cs.missed)
 	}
 }
 
@@ -560,9 +605,9 @@ func TestReconcileLeavesRowsAloneWhenTheQueueCannotBeRead(t *testing.T) {
 	stubQueue(t, errors.New("postqueue: Permission denied"))
 
 	cs := &captureStore{queued: []store.QueuedDelivery{
-		{QueueID: "GONEQ", To: "lost@example.net"},
+		{ID: 1, QueueID: "GONEQ", To: "lost@example.net"},
 	}}
-	reconcile(cs, time.Now().UTC())
+	reconcile(cs, time.Now().UTC(), "")
 
 	if got := cs.snapshot(); len(got) != 0 {
 		t.Fatalf("got %v, want no row touched", got)
@@ -574,7 +619,7 @@ func TestReconcileLeavesRowsAloneWhenTheQueueCannotBeRead(t *testing.T) {
 func TestReconcileSkipsTheQueueWhenNoRowIsStuck(t *testing.T) {
 	calls := stubQueue(t, nil)
 
-	reconcile(&captureStore{}, time.Now().UTC())
+	reconcile(&captureStore{}, time.Now().UTC(), "")
 
 	if *calls != 0 {
 		t.Fatalf("queue listed %d time(s), want none", *calls)

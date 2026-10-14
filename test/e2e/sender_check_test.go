@@ -28,6 +28,9 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		t.Fatalf("add the second domain: %v", err)
 	}
 	listLogin, listPassword, err := sc.panel.addApplication(sc.domainID, "app-list", "list", "billing@"+senderDomain)
+	if err == nil {
+		err = waitForSenderMap(listLogin, listPassword, "billing@"+senderDomain)
+	}
 	if err != nil {
 		t.Fatalf("add the application with a list: %v", err)
 	}
