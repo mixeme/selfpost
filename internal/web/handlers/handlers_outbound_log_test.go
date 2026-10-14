@@ -159,7 +159,7 @@ func TestMessagePageDrawsTheOutcomeAtItsLevel(t *testing.T) {
 	} {
 		h, row := serverWithDelivery(t)
 		h.cfg.MailLogPath = writeMailLog(t,
-			"2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status="+tc.status+" (reply)")
+			"Aug 03 05:16:03 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, status="+tc.status+" (reply)")
 		if _, err := h.store.UpdateStatus(row.QueueID, row.To, tc.status); err != nil {
 			t.Fatal(err)
 		}

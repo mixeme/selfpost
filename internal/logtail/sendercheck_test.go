@@ -46,47 +46,47 @@ func TestDeferredCounter(t *testing.T) {
 	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
 	for _, line := range []string{
 		// The journal milter's own temporary refusal: no warning, not counted.
-		`2026-10-12T16:22:13.100000+00:00 mail postfix/smtpd[1149]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:22:13.200000+00:00 mail postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>`,
+		`Oct 12 16:22:13 mail postfix/smtpd[1149]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:22:13 mail postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>`,
 
 		// The check does not answer: one connection, counted once.
-		`2026-10-12T16:22:57.000000+00:00 mail postfix/smtpd[1183]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:22:57.100000+00:00 mail postfix/smtpd[1183]: warning: connect to Milter service unix:/run/selfpost/sender.sock: No such file or directory`,
-		`2026-10-12T16:22:57.200000+00:00 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
-		`2026-10-12T16:22:57.300000+00:00 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: EHLO from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP helo=<e2e-client.e2e.test>`,
-		`2026-10-12T16:22:57.400000+00:00 mail postfix/smtpd[1183]: disconnect from unknown[10.77.0.1] ehlo=1 auth=0/1 quit=1 commands=2/3`,
+		`Oct 12 16:22:57 mail postfix/smtpd[1183]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:22:57 mail postfix/smtpd[1183]: warning: connect to Milter service unix:/run/selfpost/sender.sock: No such file or directory`,
+		`Oct 12 16:22:57 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
+		`Oct 12 16:22:57 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: EHLO from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP helo=<e2e-client.e2e.test>`,
+		`Oct 12 16:22:57 mail postfix/smtpd[1183]: disconnect from unknown[10.77.0.1] ehlo=1 auth=0/1 quit=1 commands=2/3`,
 
 		// The same process takes another client, and the check answers again:
 		// a level-2 refusal there is not the check's.
-		`2026-10-12T16:23:30.000000+00:00 mail postfix/smtpd[1183]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:23:30.100000+00:00 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
+		`Oct 12 16:23:30 mail postfix/smtpd[1183]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:23:30 mail postfix/smtpd[1183]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
 
 		// A client that writes the socket's name where Postfix will quote it
 		// in a warning, and then runs into a level-2 refusal: not counted.
-		`2026-10-12T16:23:40.000000+00:00 mail postfix/smtpd[1190]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:23:40.100000+00:00 mail postfix/smtpd[1190]: warning: Illegal address syntax from unknown[10.77.0.1] in MAIL command: <warning: connect to Milter service unix:/run/selfpost/sender.sock: milter>`,
-		`2026-10-12T16:23:40.200000+00:00 mail postfix/smtpd[1190]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
+		`Oct 12 16:23:40 mail postfix/smtpd[1190]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:23:40 mail postfix/smtpd[1190]: warning: Illegal address syntax from unknown[10.77.0.1] in MAIL command: <warning: connect to Milter service unix:/run/selfpost/sender.sock: milter>`,
+		`Oct 12 16:23:40 mail postfix/smtpd[1190]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
 
 		// OpenDKIM does not answer: another socket, not counted.
-		`2026-10-12T16:24:00.000000+00:00 mail postfix/smtpd[1201]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:24:00.100000+00:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/opendkim/opendkim.sock: Connection refused`,
-		`2026-10-12T16:24:00.200000+00:00 mail postfix/smtpd[1201]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
+		`Oct 12 16:24:00 mail postfix/smtpd[1201]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:24:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/opendkim/opendkim.sock: Connection refused`,
+		`Oct 12 16:24:00 mail postfix/smtpd[1201]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
 
 		// The check stops answering in the middle of a message, the next day:
 		// cleanup meets it. Two messages through the same cleanup process are
 		// two messages.
-		`2026-10-13T00:00:05.000000+00:00 mail postfix/smtpd[1300]: connect from unknown[10.77.0.1]`,
-		`2026-10-13T00:00:35.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
-		`2026-10-13T00:00:35.100000+00:00 mail postfix/cleanup[1339]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
-		`2026-10-13T00:01:20.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
-		`2026-10-13T00:01:20.100000+00:00 mail postfix/cleanup[1339]: 8C1D43C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
+		`Oct 13 00:00:05 mail postfix/smtpd[1300]: connect from unknown[10.77.0.1]`,
+		`Oct 13 00:00:35 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		`Oct 13 00:00:35 mail postfix/cleanup[1339]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
+		`Oct 13 00:01:20 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		`Oct 13 00:01:20 mail postfix/cleanup[1339]: 8C1D43C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
 
 		// OpenDKIM hung in the middle of a message: another socket.
-		`2026-10-13T00:01:30.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/opendkim/opendkim.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		`Oct 13 00:01:30 mail postfix/cleanup[1339]: warning: milter unix:/run/opendkim/opendkim.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
 
 		// The check's own verdict is a refusal, not a deferral, and it is
 		// cleanup that writes it.
-		`2026-10-13T00:01:00.000000+00:00 mail postfix/cleanup[1195]: B6B484831946: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: director@other.e2e.test - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`,
+		`Oct 13 00:01:00 mail postfix/cleanup[1195]: B6B484831946: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: director@other.e2e.test - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`,
 	} {
 		c.handle(line, now, false, Place{})
 	}
@@ -103,11 +103,11 @@ func TestDeferredCounterDoesNotCountALogReadAgain(t *testing.T) {
 	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
 	outage := func(pid, at string) []string {
 		return []string{
-			at + `0+00:00 mail postfix/smtpd[` + pid + `]: connect from unknown[10.77.0.1]`,
-			at + `1+00:00 mail postfix/smtpd[` + pid + `]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+			at + ` mail postfix/smtpd[` + pid + `]: connect from unknown[10.77.0.1]`,
+			at + ` mail postfix/smtpd[` + pid + `]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
 		}
 	}
-	first := append(outage("11", "2026-10-12T16:00:00.00000"), outage("12", "2026-10-12T16:00:05.00000")...)
+	first := append(outage("11", "Oct 12 16:00:00"), outage("12", "Oct 12 16:00:05")...)
 
 	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
 	for _, line := range first {
@@ -119,7 +119,7 @@ func TestDeferredCounterDoesNotCountALogReadAgain(t *testing.T) {
 
 	// A new run: the same lines again, then what the outage added.
 	c = newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
-	for _, line := range append(first, outage("13", "2026-10-12T16:00:09.00000")...) {
+	for _, line := range append(first, outage("13", "Oct 12 16:00:09")...) {
 		c.handle(line, now, true, Place{})
 	}
 	if st.days["2026-10-12"] != 3 {
@@ -135,10 +135,10 @@ func TestDeferredCounterRemembersAPlaceNotASecond(t *testing.T) {
 	st := &deferredStore{}
 	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
 	lines := []string{
-		`2026-10-12T16:00:00+00:00 mail postfix/smtpd[11]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[11]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
-		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[12]: connect from unknown[10.77.0.1]`,
-		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[12]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+		`Oct 12 16:00:00 mail postfix/smtpd[11]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:00:01 mail postfix/smtpd[11]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+		`Oct 12 16:00:01 mail postfix/smtpd[12]: connect from unknown[10.77.0.1]`,
+		`Oct 12 16:00:01 mail postfix/smtpd[12]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
 	}
 	// The place each line ends at, in one file.
 	places := make([]Place, len(lines))

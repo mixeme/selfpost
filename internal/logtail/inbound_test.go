@@ -54,10 +54,10 @@ var tailNow = time.Date(2026, 10, 11, 18, 0, 0, 0, time.UTC)
 
 // The mail.log lines in this file are composed by hand, after
 // src/smtpd/smtpd_check.c log_whatsup() and src/cleanup/cleanup_milter.c
-// cleanup_milter_apply() (Postfix 3.7.11). Their ISO stamp is not a format
-// Postfix writes (assumptions A-12); TestLineTime has the syslog one.
+// cleanup_milter_apply() (Postfix 3.7.11), with the stamp Postfix 3.7 writes
+// (src/util/msg_logger.c, "%b %d %H:%M:%S").
 const (
-	head       = "2026-10-11T12:00:05.123456+00:00 mail "
+	head       = "Oct 11 12:00:05 mail "
 	unknownRcp = head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<a@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<mx.example.net>"
 )
 
@@ -74,7 +74,7 @@ func TestInboundRejectByPostfix(t *testing.T) {
 		From: "a@example.net", To: "nobody@in.example.com",
 		Decision: store.SpamDecisionReject, Engine: store.SpamEnginePostfix,
 		Detail: "550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table",
-		At:     time.Date(2026, 10, 11, 12, 0, 5, 123456000, time.UTC),
+		At:     time.Date(2026, 10, 11, 12, 0, 5, 0, time.UTC),
 	}
 	if st.rows[0] != want {
 		t.Errorf("row = %+v\nwant  %+v", st.rows[0], want)
@@ -280,7 +280,7 @@ func TestLineTime(t *testing.T) {
 		want time.Time
 		rest string
 	}{
-		{"2026-01-02T09:00:00.5+03:00 mail postfix/x: y", time.Date(2026, 1, 2, 6, 0, 0, 500000000, time.UTC), "mail postfix/x: y"},
+		{"Jan 02 09:00:00 mail postfix/x: y", time.Date(2026, 1, 2, 9, 0, 0, 0, time.Local).UTC(), "mail postfix/x: y"},
 		{"Jan  2 09:30:00 mail postfix/x: y", time.Date(2026, 1, 2, 9, 30, 0, 0, time.Local).UTC(), "mail postfix/x: y"},
 		// December read in January is last year's.
 		{"Dec 31 23:59:00 mail postfix/x: y", time.Date(2025, 12, 31, 23, 59, 0, 0, time.Local).UTC(), "mail postfix/x: y"},

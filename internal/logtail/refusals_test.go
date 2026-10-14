@@ -31,8 +31,8 @@ func (r *refusalProbe) AttachRefusalLine(clientIP, login, from string, _ time.Ti
 
 // The mail.log lines in this file are composed by hand, with the e2e stand's
 // names and addresses (smtpd.c check_milter_reply(), mail_open_stream();
-// cleanup_milter.c cleanup_milter_apply(), Postfix 3.7.11); their ISO stamp
-// is not a format Postfix writes (assumptions A-12).
+// cleanup_milter.c cleanup_milter_apply(), Postfix 3.7.11), with the stamp
+// Postfix 3.7 writes (src/util/msg_logger.c, "%b %d %H:%M:%S").
 //
 // The NOQUEUE line of a refusal at MAIL FROM goes on its row; a line whose
 // row is not written yet waits and is tried again; port 25's and other
@@ -41,14 +41,14 @@ func TestRefusalLines(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	st := &refusalProbe{}
 	r := &refusalLines{st: st}
-	limit := `2026-10-14T12:00:00+00:00 mail postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>`
+	limit := `Oct 14 12:00:00 mail postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>`
 	for _, other := range []string{
-		`2026-10-14T12:00:00+00:00 mail postfix/inbound/smtpd[372]: NOQUEUE: milter-reject: MAIL from unknown[203.0.113.7]: 451 4.7.1 Service unavailable - try again later; from=<a@stranger.example> proto=ESMTP helo=<x>`,
-		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
-		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x>`,
+		`Oct 14 12:00:00 mail postfix/inbound/smtpd[372]: NOQUEUE: milter-reject: MAIL from unknown[203.0.113.7]: 451 4.7.1 Service unavailable - try again later; from=<a@stranger.example> proto=ESMTP helo=<x>`,
+		`Oct 14 12:00:00 mail postfix/smtpd[11]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
+		`Oct 14 12:00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x>`,
 		// No login: no application's refusal (the panel down refuses every
 		// session, an unauthenticated one too).
-		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[12]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<x>`,
+		`Oct 14 12:00:00 mail postfix/smtpd[12]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<x>`,
 	} {
 		r.handle(other, now, Place{})
 	}
@@ -81,8 +81,8 @@ func TestFromRefusalIsRecoveredAfterTheWait(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	st := &refusalProbe{}
 	r := &refusalLines{st: st}
-	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: E543D3C75DA0: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{})
-	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: "The - Shop" <director@other.e2e.test> - it names another sender of this server; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now, Place{})
+	r.handle(`Oct 14 12:00:00 mail postfix/smtpd[11]: E543D3C75DA0: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{})
+	r.handle(`Oct 14 12:00:01 mail postfix/cleanup[13]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: "The - Shop" <director@other.e2e.test> - it names another sender of this server; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now, Place{})
 	r.retry(now.Add(time.Second))
 	if len(st.recovered) != 0 {
 		t.Fatal("recovered before the panel had the time to write the row")
@@ -109,8 +109,8 @@ func TestWaitingLinesHoldTheSavedOffset(t *testing.T) {
 	if _, held := r.oldest("fp"); held {
 		t.Fatal("nothing waits, yet the offset is held")
 	}
-	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: Q1: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{FP: "fp", End: 100})
-	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: Q1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: d@other.example - not an address this application sends as; from=<a@sender.example> to=<r@x> proto=ESMTP helo=<x>`, now, Place{FP: "fp", End: 300})
+	r.handle(`Oct 14 12:00:00 mail postfix/smtpd[11]: Q1: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{FP: "fp", End: 100})
+	r.handle(`Oct 14 12:00:01 mail postfix/cleanup[13]: Q1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: d@other.example - not an address this application sends as; from=<a@sender.example> to=<r@x> proto=ESMTP helo=<x>`, now, Place{FP: "fp", End: 300})
 	if p, held := r.oldest("fp"); !held || p.End != 100 {
 		t.Fatalf("held at %+v %v, want the client= line at 100", p, held)
 	}

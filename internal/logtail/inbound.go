@@ -269,13 +269,6 @@ func printable(s string, max int) string {
 // process has the container's zone (TZ is in import_environment,
 // src/global/mail_params.h). A line with no readable stamp is dated now.
 func lineTime(line string, now time.Time) (time.Time, string) {
-	if m := isoStampRe.FindStringSubmatch(line); m != nil {
-		rest := strings.TrimSpace(line[len(m[0]):])
-		if t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(m[0])); err == nil {
-			return t.UTC(), rest
-		}
-		return now, rest
-	}
 	if m := syslogStampRe.FindStringSubmatch(line); m != nil {
 		rest := strings.TrimSpace(line[len(m[0]):])
 		stamp := strings.Join(strings.Fields(m[1]), " ")

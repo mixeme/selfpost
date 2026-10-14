@@ -153,9 +153,9 @@ func TestDeliveryPageMarksAQueuedMessageAsStillWaiting(t *testing.T) {
 func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 	h, row := serverWithDelivery(t)
 	h.cfg.MailLogPath = writeMailLog(t,
-		"2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]",
-		"2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)",
-		"2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)",
+		"Aug 03 05:15:52 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]",
+		"Aug 03 05:15:52 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)",
+		"Aug 03 05:16:03 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)",
 	)
 
 	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
@@ -163,8 +163,8 @@ func TestDeliveryPageShowsThisMessagesLogLines(t *testing.T) {
 		`<pre class="sp-log">`,
 		// The stamp is split off from the line, without the microseconds and the
 		// offset that make it the widest thing on it.
-		`<span class="sp-d">2026-08-03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
-		`<span class="sp-d">2026-08-03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
+		`<span class="sp-d">Aug 03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
+		`<span class="sp-d">Aug 03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
 		"status=sent (250 OK)",
 	} {
 		if !strings.Contains(out, want) {
@@ -196,20 +196,20 @@ func TestDeliveryPageKeepsAnUnstampedLogLineWhole(t *testing.T) {
 func TestDeliveryPageShowsStoredLogLinesAfterRotation(t *testing.T) {
 	h, row := serverWithDelivery(t)
 	h.cfg.RetryPolicy = postfix.DefaultRetryPolicy()
-	h.cfg.MailLogPath = writeMailLog(t, "2026-08-04T00:00:01.000000+00:00 host postfix/qmgr[10]: 99999999: removed")
+	h.cfg.MailLogPath = writeMailLog(t, "Aug 04 00:00:01 host postfix/qmgr[10]: 99999999: removed")
 	if _, err := h.store.InsertSendLogLines([]store.SendLogLine{
-		{QueueID: row.QueueID, At: row.CreatedAt.AddDate(0, 0, -40), Line: "2026-06-24T05:00:00.000000+00:00 host postfix/qmgr[10]: 4A1B2C3D: an earlier message under the same id"},
-		{QueueID: row.QueueID, At: row.CreatedAt.Add(-time.Second), Line: "2026-08-03T05:15:52.219218+00:00 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]"},
-		{QueueID: "99999999", At: row.CreatedAt, Line: "2026-08-03T05:15:52.300000+00:00 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)"},
-		{QueueID: row.QueueID, At: row.CreatedAt.Add(11 * time.Second), Line: "2026-08-03T05:16:03.884210+00:00 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)"},
+		{QueueID: row.QueueID, At: row.CreatedAt.AddDate(0, 0, -40), Line: "Jun 24 05:00:00 host postfix/qmgr[10]: 4A1B2C3D: an earlier message under the same id"},
+		{QueueID: row.QueueID, At: row.CreatedAt.Add(-time.Second), Line: "Aug 03 05:15:52 host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com[203.0.113.4]"},
+		{QueueID: "99999999", At: row.CreatedAt, Line: "Aug 03 05:15:52 host postfix/qmgr[10]: 99999999: from=<other@example.ru>, size=500, nrcpt=1 (queue active)"},
+		{QueueID: row.QueueID, At: row.CreatedAt.Add(11 * time.Second), Line: "Aug 03 05:16:03 host postfix/smtp[26]: 4A1B2C3D: to=<public@example.ru>, dsn=2.0.0, status=sent (250 OK)"},
 	}, false); err != nil {
 		t.Fatalf("InsertSendLogLines: %v", err)
 	}
 
 	out := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(row.ID))
 	for _, want := range []string{
-		`<span class="sp-d">2026-08-03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
-		`<span class="sp-d">2026-08-03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
+		`<span class="sp-d">Aug 03 05:15:52</span> host postfix/smtpd[20]: 4A1B2C3D: client=mail.example.com`,
+		`<span class="sp-d">Aug 03 05:16:03</span> host postfix/smtp[26]: 4A1B2C3D: to=&lt;public@example.ru&gt;`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("delivery log is missing %q:\n%s", want, out)

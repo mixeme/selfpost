@@ -581,41 +581,28 @@ func isQueueIDByte(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'A' && b <= 'Z' || b >= 'a' && b <= 'z'
 }
 
-// Timestamps at the head of a mail.log line (maillog_file in
-// build/postfix-config.sh): the one format postlogd writes, and an ISO one.
-//
-// syslogStampRe is the one that matches. Postfix 3.7.11,
+// syslogStampRe is the timestamp at the head of a mail.log line (maillog_file
+// in build/postfix-config.sh), the one format Postfix 3.7 writes. Postfix 3.7.11,
 // src/util/msg_logger.c, msg_logger_print(): every record is stamped
 // strftime("%b %d %H:%M:%S ") in the logging process's local time (the day
 // zero-padded), then the first label of the host name, and postlogd writes it
 // as received (src/postlogd/postlogd.c, postlogd_service()). It carries no
 // year and no zone, so the stamp shown is a wall clock and nothing more,
-// which is all this column claims to be.
-//
-// isoStampRe was written for an RFC 3339 format said to come with a
-// maillog_file_format parameter of Postfix 3.9. No such parameter exists in
-// 3.7.11, nor in the 3.12 snapshot of 2026-09-25 (postconf.proto, and
-// msg_logger.c still uses the same strftime) - assumptions A-12. No line
-// Postfix writes matches it.
-var (
-	isoStampRe    = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s`)
-	syslogStampRe = regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})\s`)
-)
+// which is all this column claims to be. An RFC 3339 stamp once matched
+// here too, for a maillog_file_format parameter said to arrive in Postfix
+// 3.9; there is none in 3.7.11, nor in the 3.12 snapshot of 2026-09-25
+// (proto/postconf.proto; msg_logger.c keeps the strftime) - assumptions A-12.
+var syslogStampRe = regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2} \d{2}:\d{2}:\d{2})\s`)
 
 // SplitTimestamp separates the timestamp at the head of a mail.log line from
 // the rest of it, so a page can put the two in their own columns. The stamp
-// comes back without its fractional seconds and zone offset — five decimal
-// places of microsecond are the widest part of the column and the least worth
-// reading — but is otherwise the log's own wall clock, not converted: what is
-// on the page is what is in the file.
+// is the log's own wall clock, not converted: what is on the page is what is
+// in the file.
 //
 // A line whose head is not a timestamp this recognises comes back whole, as
 // rest, with an empty stamp. Nothing is ever dropped: the point of showing the
 // log is that it says what it says.
 func SplitTimestamp(line string) (stamp, rest string) {
-	if m := isoStampRe.FindStringSubmatch(line); m != nil {
-		return m[1] + " " + m[2], strings.TrimSpace(line[len(m[0]):])
-	}
 	if m := syslogStampRe.FindStringSubmatch(line); m != nil {
 		return m[1], strings.TrimSpace(line[len(m[0]):])
 	}
@@ -647,6 +634,8 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		// consumed is the offset just past what the reader has handed over,
 		// pending included: where a complete line ends.
 		consumed int64
+		// old is the file rotated away, still read for rotatedGrace.
+		old *rotatedTail
 	)
 	openAt := func(offset int64, whence int) error {
 		nf, err := os.Open(path)
@@ -727,6 +716,39 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		return pos - int64(len(pending))
 	}
 
+	// drainOld reads what was written to the rotated file since the switch.
+	// Its lines take places in that file, which the tracker never saves as
+	// the place to resume from: on a restart the rotated file is read from
+	// the saved place in the new one onward only (readRotated).
+	drainOld := func(now time.Time) {
+		if old == nil {
+			return
+		}
+		defer flush()
+		for {
+			line, err := old.r.ReadString('\n')
+			old.consumed += int64(len(line))
+			if err != nil {
+				old.pending += line
+				break
+			}
+			full := old.pending + line
+			old.pending = ""
+			tr.line = Place{FP: old.fp, End: old.consumed}
+			tr.lineStart = old.consumed - int64(len(full))
+			handle(strings.TrimRight(full, "\r\n"))
+		}
+		if now.After(old.until) {
+			old.f.Close()
+			old = nil
+		}
+	}
+	defer func() {
+		if old != nil {
+			old.f.Close()
+		}
+	}()
+
 	var once sync.Once
 	blind := &blindness{add: tr.st.AddTailerBlind}
 
@@ -739,6 +761,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			tr.record(f, read(), true) // shutdown: the next start resumes here
 			return nil
 		case <-ticker.C:
+			drainOld(time.Now())
 			drain()
 			once.Do(func() { close(caughtUp) })
 			ni, err := os.Stat(path)
@@ -751,18 +774,32 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 				// Rotated away or truncated: the old (renamed) inode may have
 				// gained lines between the drain() above and this check, since
 				// Postfix keeps writing to it until it reloads. Drain it once
-				// more before switching so nothing in that gap is lost.
-				// Postfix 3.7.11, src/postlogd/postlogd.c, pre_jail_init():
-				// maillog_file is opened once per postlogd process, which ends
-				// at "postfix reload" (README_FILES/MAILLOG_README) or after
-				// max_idle without a record (src/master/dgram_server.c). Lines
-				// it writes to the old inode after this switch and before the
-				// reload are not read - assumptions A-33.
+				// more before switching, and - renamed, not truncated - go on
+				// reading it for rotatedGrace after the switch, for what
+				// postlogd writes there until the reload (assumptions A-33).
 				drain()
+				renamed := !os.SameFile(info, ni)
+				if old != nil {
+					drainOld(time.Time{}) // a second rotation within the grace
+					if old != nil {
+						old.f.Close()
+						old = nil
+					}
+				}
+				prev := &rotatedTail{f: f, r: r, pending: pending, consumed: consumed, fp: tr.fp, until: time.Now().Add(rotatedGrace)}
+				if renamed {
+					f = nil // openAt closes the file it replaces; this one is kept
+				}
 				if err := openAt(0, io.SeekStart); err != nil {
+					if renamed {
+						f, r = prev.f, prev.r
+					}
 					log.Printf("log-tailer: reopen %s: %v", path, err)
 					blind.see(time.Now(), true)
 					continue
+				}
+				if renamed {
+					old = prev
 				}
 				blind.see(time.Now(), false)
 				tr.adopt(f)
@@ -773,6 +810,29 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		}
 	}
 }
+
+// rotatedTail is mail.log just rotated away, still open: postlogd writes to
+// it until "postfix reload" makes it exit. Postfix 3.7.11,
+// src/postlogd/postlogd.c, pre_jail_init(): maillog_file is opened once per
+// postlogd process; src/master/master_service.c, master_restart_service(),
+// closes the service's status pipe at a reload (master_status_cleanup()),
+// and src/master/dgram_server.c, dgram_server_abort(), exits when it reads
+// its end - the next postlogd opens the new file. logrotate runs the reload
+// right after the rename and create (build/logrotate-mail.conf, postrotate;
+// logrotate 3.21.0, logrotate.c, rotateLogSet(): the postrotate script runs
+// right after rotateSingleLog() has renamed and created), so the gap is short;
+// rotatedGrace is far longer than it.
+type rotatedTail struct {
+	f        *os.File
+	r        *bufio.Reader
+	pending  string
+	consumed int64
+	fp       string
+	until    time.Time
+}
+
+// rotatedGrace is how long the rotated file is still read after the switch.
+const rotatedGrace = time.Minute
 
 // blindness measures the stretches in which follow cannot read mail.log - the
 // file gone, reopening it failing - for delivery_log_days. A stretch is

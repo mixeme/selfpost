@@ -16,9 +16,10 @@ import (
 
 // The mail.log lines in this file are composed by hand, after the formats the
 // code cites (Postfix 3.7.11, src/global/log_adhoc.c and the others), unless a
-// comment says where one was seen. Some are shapes Postfix does not write:
-// ISO stamps (msg_logger.c writes "%b %d %H:%M:%S" - A-12), and opendkim
-// lines in mail.log (build/opendkim.conf has Syslog no).
+// comment says where one was seen; some carry no stamp, which the parsers
+// take as they come. One shape Postfix does not write here: opendkim lines in
+// mail.log (build/opendkim.conf has Syslog no).
+
 // qmgr's expiry line, as Postfix 3.7.11 writes it (src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(): "%s: from=<%s>, status=%s, returned to
 // sender"); composed by hand after that format. The sender is the client's
@@ -89,7 +90,7 @@ func TestParseDelivery(t *testing.T) {
 	}{
 		{
 			name:      "sent",
-			line:      "2026-07-11T11:55:34 host postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=mx.example.net[203.0.113.9]:25, delay=0.5, dsn=2.0.0, status=sent (250 OK)",
+			line:      "Jul 11 11:55:34 host postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=mx.example.net[203.0.113.9]:25, delay=0.5, dsn=2.0.0, status=sent (250 OK)",
 			wantOK:    true,
 			queueID:   "41E862C00D9E",
 			recipient: "a@example.net",
@@ -460,6 +461,39 @@ func TestFollowTailsAndRotates(t *testing.T) {
 // would otherwise stay "queued" forever), without re-parsing what it already
 // read, and must fall back to reading the whole file when the log was rotated
 // or recreated in the meantime.
+// postlogd goes on writing to the renamed file until "postfix reload" ends
+// it; the tailer reads that file for a while after it switched to the new
+// one, so a line written there in that gap is not lost (assumptions A-33).
+// The rename of an open file is what logrotate does on Linux; like
+// TestFollowTailsAndRotates this runs on the server.
+func TestFollowReadsTheRotatedFileAfterTheSwitch(t *testing.T) {
+	old := pollInterval
+	pollInterval = 10 * time.Millisecond
+	t.Cleanup(func() { pollInterval = old })
+
+	path := filepath.Join(t.TempDir(), "mail.log")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := &captureStore{}
+	stop := startRun(t, path, cs)
+	defer stop()
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
+
+	if err := os.Rename(path, path+".1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q2|b@example.net|sent") })
+	// The switch is made; postlogd has not reloaded yet.
+	appendLine(t, path+".1", "host postfix/smtp[1]: Q3: to=<c@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q3|c@example.net|sent") })
+}
+
 func TestFollowResumesAfterRestart(t *testing.T) {
 	old := pollInterval
 	pollInterval = 10 * time.Millisecond
@@ -834,22 +868,12 @@ func TestSplitTimestamp(t *testing.T) {
 		stamp, rest string
 	}{
 		{
-			name:  "RFC 3339, which maillog_file_format selects on Postfix 3.9 and up",
-			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
-			stamp: "2026-08-03 05:15:52",
-			rest:  "mail postfix/smtp[26]: 4A1B2C3D: to=<a@example.net>, status=sent (250 OK)",
-		},
-		{
-			name:  "no fractional seconds, zone as Z",
-			line:  "2026-08-03T05:15:52Z mail postfix/qmgr[10]: 4A1B2C3D: removed",
-			stamp: "2026-08-03 05:15:52",
-			rest:  "mail postfix/qmgr[10]: 4A1B2C3D: removed",
-		},
-		{
-			name:  "no zone at all",
-			line:  "2026-08-03T05:15:52 mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
-			stamp: "2026-08-03 05:15:52",
-			rest:  "mail opendkim[30]: 4A1B2C3D: DKIM-Signature field added",
+			// An RFC 3339 stamp is not one Postfix 3.7 writes (assumptions
+			// A-12): it is not taken off.
+			name:  "RFC 3339 is not a stamp Postfix writes",
+			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/qmgr[10]: 4A1B2C3D: removed",
+			stamp: "",
+			rest:  "2026-08-03T05:15:52.219218+00:00 mail postfix/qmgr[10]: 4A1B2C3D: removed",
 		},
 		{
 			name:  "syslog's traditional format, space-padded day",

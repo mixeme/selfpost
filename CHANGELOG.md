@@ -43,6 +43,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   message forced to expire (`postsuper -e`, `#` in the queue listing) is
   still counted as held (audit 2026-10-12, stage 2c; assumptions A-8,
   B-PQ1).
+- **Lines Postfix writes while `mail.log` is being rotated are read.**
+  Postfix's log writer keeps the old file open until the reload that
+  follows the rotation; the log tailer switched to the new file at once,
+  so a delivery written in between never reached its row, which the sweep
+  later closed as `bounced`. The tailer now reads the rotated file for a
+  minute more (assumptions A-33).
 - **Postfix's time values are read as Postfix reads them.** A bare number
   took seconds, so `maximal_queue_lifetime = 3` was three seconds to the
   panel and three days to Postfix; `1h7m` was 67 minutes to the panel and
