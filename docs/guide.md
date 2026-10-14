@@ -184,7 +184,18 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `2.4.1`. Intermediate
+deliberately never `:latest`. The current pin is `2.4.1`. **No 2.x image is
+published on ghcr.io yet** (the newest there is `1.3.0`); until one is, build
+it from the checkout under the pinned name, and Compose uses the local image
+instead of pulling:
+
+```sh
+docker build -f build/Dockerfile --build-arg VERSION=2.4.1 \
+  -t ghcr.io/mixeme/selfpost:2.4.1 .
+```
+
+`VERSION` must equal the tag: it is the version the backup check compares
+(see below). Intermediate
 CHANGELOG sections (`0.2.0`…`0.6.0`) record development cuts from before that
 image was published. Pinning matters because of the backup version check (see
 [Full backup and restore](#full-backup-and-restore)): the panel binary's

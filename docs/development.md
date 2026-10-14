@@ -280,7 +280,11 @@ they are.)
 
 1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pinned
    tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
-   local-trial image references) in the **same** release commit.
+   local-trial image references) in the **same** release commit. While no
+   image of the current line is published, README, guide § Fixed image tag
+   and the compose file's header say so and show the local build under the
+   pinned name; bump the version there too. The first publication of the
+   line removes those notes.
 2. Create and push git tag `vX.Y.Z` on that commit.
 3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
 4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,

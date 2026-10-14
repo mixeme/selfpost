@@ -18,6 +18,8 @@
 # The image tag below is FIXED on purpose: backup restore compares the manifest
 # version against the running binary's version, so ":latest" would make that
 # check meaningless. Bump the tag deliberately when you want to upgrade.
+# The 2.x line is not on ghcr.io yet: build it locally under this exact name
+# (README, Quick start) and Compose will use it without pulling.
 
 services:
   selfpost:

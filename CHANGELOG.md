@@ -17,6 +17,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `selfpost-backup -version` against it, and `release.yml` checks the stamp
   again on the image right before pushing it. Images already published are
   left as they are.
+- **The documents no longer promise an image that is not there.** README,
+  the guide and the compose file pinned `ghcr.io/mixeme/selfpost:2.4.1`, but
+  no 2.x image has been published (ghcr.io holds `1.0.0` and `1.3.0`). They
+  now say so and show how to build the image locally under the pinned name,
+  which Compose and `docker run` then use without pulling (audit 2026-10-12,
+  M6). The pin stays: the next publication makes it true.
 - **The e2e module is compiled on every push** (`test.yml`: `go vet` and
   `go test -c` in `test/e2e`), so a type error there no longer first shows
   up in `release.yml` after a release is published (audit 2026-10-12, M20).
