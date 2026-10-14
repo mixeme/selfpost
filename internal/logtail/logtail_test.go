@@ -116,6 +116,34 @@ func TestParseDelivery(t *testing.T) {
 			line:   "host postfix/cleanup[12]: BEEF03: message-id=<x@example.com>",
 			wantOK: false,
 		},
+		{
+			// The stamp Postfix 3.7's postlogd writes, as on the stand.
+			name:      "syslog stamp",
+			line:      "Oct 14 11:05:51 mail postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (250 OK)",
+			wantOK:    true,
+			queueID:   "41E862C00D9E",
+			recipient: "a@example.net",
+			status:    store.StatusSent,
+		},
+		{
+			// A stranger's HELO name at the end of a port-25 reject line, as
+			// probed for the 2026-10-12 audit: it must not file a delivery.
+			name:   "a delivery result in a HELO name is not one",
+			line:   "Oct 14 11:05:51 mail postfix/inbound/smtpd[372]: NOQUEUE: reject: RCPT from unknown[203.0.113.7]: 554 5.7.1 <x@elsewhere.example>: Relay access denied; from=<a@stranger.example> to=<x@elsewhere.example> proto=ESMTP helo=<41E862C00D9E: to=<victim@example.net>, status=sent>",
+			wantOK: false,
+		},
+		{
+			// The same text in a quoted sender address, on a line that does
+			// have a queue id at its head.
+			name:   "a delivery result in a quoted sender is not one",
+			line:   `Oct 14 11:05:51 mail postfix/qmgr[10]: 5B4A2C1D3E: from=<"41E862C00D9E: to=<victim@example.net>, status=sent"@stranger.example>, size=500, nrcpt=1 (queue active)`,
+			wantOK: false,
+		},
+		{
+			name:   "an smtpd line with the text after its queue id is not one",
+			line:   "Oct 14 11:05:51 mail postfix/smtpd[10]: 5B4A2C1D3E: client=unknown[203.0.113.7], sasl_username=41E862C00D9E: to=<victim@example.net>, status=sent",
+			wantOK: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

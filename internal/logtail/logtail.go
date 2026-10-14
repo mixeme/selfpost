@@ -88,17 +88,25 @@ type RetentionDays func() int
 // The "<queue-id>: to=<addr>, …, status=<word>" shape is specific to the
 // delivery agents; qmgr/smtpd/cleanup lines do not match.
 //
+// It is matched at the head of the line - the host name, "program[pid]:",
+// then the queue id - after SplitTimestamp has taken the stamp off, like
+// queueLineRe and the inbound patterns. Anywhere else the text is a
+// stranger's: a port-25 reject line ends with the client's HELO name, which
+// once parsed as a delivery result when it read "<id>: to=<…>, status=sent"
+// (audit 2026-10-12, M12).
+//
 // The run before status= is lazy on purpose. Postfix appends the remote
 // server's reply verbatim, so a greedy match would take the *last* status= on
 // the line — and that one can come from the reply text, which the far end
 // controls. A bounce whose reply quoted "status=sent" would then be filed as a
 // success. The real field is always the first one after to=<…>.
-var deliveryRe = regexp.MustCompile(`\b([0-9A-Za-z]+): to=<([^>]*)>,.*?\bstatus=(\w+)`)
+var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<([^>]*)>,.*?\bstatus=(\w+)`)
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
 // ok is false for lines that are not recognised delivery results.
 func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
-	m := deliveryRe.FindStringSubmatch(line)
+	_, rest := SplitTimestamp(line)
+	m := deliveryRe.FindStringSubmatch(rest)
 	if m == nil {
 		return "", "", "", false
 	}

@@ -21,6 +21,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   rewrite an old row of the same recipient. The close is now conditional on
   the row still being `queued`, and the row it closes carries the reason
   `reconcile` (audit 2026-10-12, H3).
+- **A stranger's HELO name no longer reads as a delivery result.** The
+  pattern that turns a `mail.log` line into a status matched anywhere in the
+  line, so a port-25 client whose HELO name read
+  `<id>: to=<address>, status=sent` could mark the matching row delivered. It
+  is now matched only at the head of the line, after the host and the
+  program, as the other patterns of the log tailer are (audit 2026-10-12,
+  M12).
 
 ### Added
 
