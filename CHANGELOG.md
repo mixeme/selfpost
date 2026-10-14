@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A log rotated while the panel was down is read to its end.** On start,
+  a saved place in a file that had been rotated meant "start on the new
+  file", and what Postfix wrote between the panel's stop and the rotation -
+  deliveries, refusals, deferrals - was never read. The tailer now reads the
+  rotated file (`mail.log.1`) from the saved place to its end first; when
+  that file is not the one the place belongs to (rotated twice), it says so
+  in the log, with the time from which nothing was read. The log's
+  fingerprint now includes the file's inode, so two files that begin alike
+  are still told apart (audit 2026-10-12, stage 2b).
+
 ## [2.5.0] - 2026-10-14
 
 Stages 1 and 2 of the 2026-10-12 audit: mail the delivery log showed wrong,

@@ -815,3 +815,79 @@ func TestSplitTimestamp(t *testing.T) {
 		})
 	}
 }
+
+// A log rotated while the panel was down is read to its end before the new
+// one: what Postfix wrote between the stop and the rotation is in mail.log.1
+// (audit 2026-10-12, stage 2b). Both halves are read, once each.
+func TestALogRotatedWhileDownIsReadToItsEnd(t *testing.T) {
+	old := pollInterval
+	pollInterval = 10 * time.Millisecond
+	t.Cleanup(func() { pollInterval = old })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	seed := strings.Repeat("host postfix/qmgr[1]: seed line, not a delivery\n", 20)
+	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := &captureStore{}
+	stop := startRun(t, path, cs)
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
+	stop()
+
+	// Down: Postfix writes, then logrotate renames and creates, and Postfix
+	// goes on in the new file.
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	if err := os.Rename(path, path+".1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Repeat("host postfix/qmgr[1]: the new log\n", 20)+
+		"host postfix/smtp[1]: Q3: to=<c@example.net>, relay=x, dsn=5.1.1, status=bounced (nope)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cs.reset()
+	stop = startRun(t, path, cs)
+	waitFor(t, func() bool {
+		got := cs.snapshot()
+		return contains(got, "Q2|b@example.net|sent") && contains(got, "Q3|c@example.net|bounced")
+	})
+	stop()
+	n := 0
+	for _, c := range cs.snapshot() {
+		if strings.HasPrefix(c, "Q1|") {
+			t.Errorf("Q1 was read again: %s", c)
+		}
+		if strings.HasPrefix(c, "Q2|") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("Q2 read %d times, want once", n)
+	}
+}
+
+// A mail.log.1 that is not the file the saved place belongs to is not read
+// from that place: the new file is read from its start and the gap is said.
+func TestARotatedLogThatIsNotTheSavedOneIsNotRead(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	if err := os.WriteFile(path+".1", []byte(strings.Repeat("host postfix/qmgr[1]: another file altogether\n", 20)+
+		"host postfix/smtp[1]: QX: to=<x@example.net>, relay=x, dsn=2.0.0, status=sent (ok)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tr := &tracker{path: path, behind: true, prev: store.LogtailState{Fingerprint: "not-this-one", Offset: 10}}
+	var read []string
+	if tr.readRotated(func(l string) { read = append(read, l) }) || len(read) != 0 {
+		t.Fatalf("read %d lines of a rotated file that is not the saved one", len(read))
+	}
+}
+
+// A fingerprint saved before it carried the file's identity still matches the
+// file by its hash.
+func TestSameLogAcceptsAFingerprintOfBefore(t *testing.T) {
+	if !sameLog("abc", "abc:1.2") || !sameLog("abc:1.2", "abc:1.2") || sameLog("abc:1.2", "abc:1.3") || sameLog("", "abc") {
+		t.Fatal("sameLog")
+	}
+}

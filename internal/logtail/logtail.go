@@ -606,6 +606,10 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		log.Printf("log-tailer: seek %s: %v", path, err)
 	}
 	r.Reset(f) // the reader buffered from the pre-seek position
+	// Rotated while the panel was down: the end of the old file first.
+	if tr.readRotated(handle) {
+		flush()
+	}
 	defer func() {
 		if f != nil {
 			f.Close()

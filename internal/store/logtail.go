@@ -14,17 +14,23 @@ import (
 type LogtailState struct {
 	Fingerprint string
 	Offset      int64
+	// UpdatedAt is when the position was saved; read back only (zero on save).
+	UpdatedAt time.Time
 }
 
 // LogtailState returns the stored read position for path. ok is false the first
 // time a path is followed (nothing persisted yet), which the tailer treats as
 // "start at the end".
 func (s *Store) LogtailState(path string) (LogtailState, bool, error) {
-	var st LogtailState
+	var (
+		st      LogtailState
+		updated string
+	)
 	err := s.db.QueryRow(
-		`SELECT fingerprint, read_offset FROM logtail_state WHERE path = ?`,
+		`SELECT fingerprint, read_offset, updated_at FROM logtail_state WHERE path = ?`,
 		path,
-	).Scan(&st.Fingerprint, &st.Offset)
+	).Scan(&st.Fingerprint, &st.Offset, &updated)
+	st.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return LogtailState{}, false, nil
 	}
