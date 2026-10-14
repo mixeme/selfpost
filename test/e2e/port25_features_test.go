@@ -127,8 +127,8 @@ func testDMARCReportReachesThePanel(t *testing.T, sc *scenario) {
 
 	// An address nobody chose is refused before DATA, hosted form or not.
 	res := deliverPort25("noreply@"+reportReporter, "dmarc-reports+nobody.e2e.test@"+selfpostHostname, "Subject: x\r\n\r\nx\r\n")
-	if res.rcptErr == nil {
-		t.Fatalf("port 25 accepted a report address no domain uses (first error: %v)", res.firstErr())
+	if err := res.refusedAt("RCPT", 550, "5.1.1"); err != nil {
+		t.Fatalf("port 25, a report address no domain uses: %v", err)
 	}
 
 	res = deliverPort25("noreply@"+reportReporter, address, reportMessage(t, address, aggregateXML(senderDomain, "e2e-report-1")))
@@ -344,10 +344,17 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("the Inbound log holds %d rows, want the relayed message alone:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
-	for _, to := range []string{"nobody@" + inboundDomain, "someone@elsewhere.e2e.test"} {
-		res := deliverPort25("someone@stranger.e2e.test", to, message(to, uniqueToken("refused")))
-		if res.rcptErr == nil {
-			t.Fatalf("port 25 accepted the recipient %s (first error: %v)", to, res.firstErr())
+	for _, c := range []struct {
+		to   string
+		code int
+		text string
+	}{
+		{"nobody@" + inboundDomain, 550, "User unknown in relay recipient table"},
+		{"someone@elsewhere.e2e.test", 554, "Relay access denied"},
+	} {
+		res := deliverPort25("someone@stranger.e2e.test", c.to, message(c.to, uniqueToken("refused")))
+		if err := res.refusedAt("RCPT", c.code, c.text); err != nil {
+			t.Fatalf("port 25, the recipient %s: %v", c.to, err)
 		}
 	}
 

@@ -1,7 +1,9 @@
 package e2e
 
 import (
+	"errors"
 	"fmt"
+	"net/textproto"
 	"regexp"
 	"strconv"
 	"strings"
@@ -127,8 +129,9 @@ func testPanelDownDefersMail(t *testing.T, sc *scenario) {
 	// Temporary, and before any message is offered: Postfix answers 451 from
 	// the connection on, and "454 4.3.0 Try again later" at AUTH, which is
 	// where a client that authenticates gives up.
-	if err := res.firstErr(); err == nil || !strings.HasPrefix(fmt.Sprint(err), "4") {
-		t.Fatalf("want a temporary 4xx with the panel down, got %v", res.firstErr())
+	var reply *textproto.Error
+	if err := res.firstErr(); !errors.As(err, &reply) || reply.Code/100 != 4 {
+		t.Fatalf("want a temporary 4xx reply with the panel down, got %v", err)
 	}
 	if err := checkContainerAlive(h); err != nil {
 		t.Fatalf("container did not survive the panel stopping: %v", err)

@@ -44,12 +44,9 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 		authLogin: login, authPassword: password,
 		from: from, to: recipient, subject: "e2e " + uniqueToken("l2-second"), body: "should be rejected",
 	})
-	if second.ok() {
-		t.Fatal("second message exceeding the level-2 limit was accepted, want rejected")
-	}
-	if second.mailErr == nil {
-		t.Fatalf("expected the level-2 rejection at MAIL FROM, got: dial=%v auth=%v rcpt=%v data=%v",
-			second.dialErr, second.authErr, second.rcptErr, second.dataErr)
+	// The milter answers tempfail at MAIL FROM, which Postfix words as below.
+	if err := second.refusedAt("MAIL", 451, "4.7.1 Service unavailable"); err != nil {
+		t.Fatalf("the second message over the level-2 limit: %v", err)
 	}
 
 	// The limit holds for every message of a connection, not for its first
@@ -59,8 +56,11 @@ func testLevel2RateLimit(t *testing.T, sc *scenario) {
 	// used to arrive with no client address and was let through (found by the
 	// technical review of 2026-10-12; the same hole let an application past its
 	// client-address list).
-	if errs := mailTwiceOnOneConnection(login, password, from); errs[0] == nil || errs[1] == nil {
-		t.Fatalf("over the level-2 limit, two MAIL FROM on one connection were answered %v and %v, want both refused", errs[0], errs[1])
+	errs := mailTwiceOnOneConnection(login, password, from)
+	for i, err := range errs {
+		if err := replyIs(err, 451, "4.7.1 Service unavailable"); err != nil {
+			t.Fatalf("over the level-2 limit, MAIL FROM %d of one connection: %v", i+1, err)
+		}
 	}
 
 	if err := waitFor("a rate-limited row for l2app in the send log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
@@ -86,15 +86,14 @@ func testSenderLoginMismatch(t *testing.T, sc *scenario) {
 		from: "someone@not-" + senderDomain, to: recipient,
 		subject: "e2e " + uniqueToken("mismatch"), body: "should be rejected",
 	})
-	if res.ok() {
-		t.Fatal("send with a sender the application does not own was accepted, want rejected")
-	}
 	// Postfix evaluates smtpd_sender_restrictions with smtpd_delay_reject=yes
 	// (the default): the mismatch is detected at MAIL FROM but the reject is
-	// only sent back at RCPT TO, so the error can land on either call here.
-	if res.mailErr == nil && res.rcptErr == nil {
-		t.Fatalf("expected the mismatch rejected at MAIL or RCPT, got: dial=%v auth=%v data=%v",
-			res.dialErr, res.authErr, res.dataErr)
+	// only sent back at RCPT TO.
+	if err := res.refusedAt("RCPT", 553, "5.7.1"); err != nil {
+		t.Fatalf("a sender the application does not own: %v", err)
+	}
+	if err := replyIs(res.rcptErr, 553, "Sender address rejected: not owned by user"); err != nil {
+		t.Fatalf("a sender the application does not own: %v", err)
 	}
 }
 
@@ -106,24 +105,25 @@ func testNoAuthRejected(t *testing.T, sc *scenario) {
 		from: "anyone@unregistered.e2e.test", to: recipient,
 		subject: "e2e " + uniqueToken("noauth"), body: "should be rejected",
 	})
-	if res.ok() {
-		t.Fatal("unauthenticated send was accepted, want rejected")
+	if err := res.refusedAt("RCPT", 554, "Client host rejected: Access denied"); err != nil {
+		t.Fatalf("an unauthenticated send: %v", err)
 	}
 }
 
 // testForeignRelayRejected is plan C.4 negative check 3: a direct proof that
-// this is not an open relay — even the exact recipient the positive path just
-// delivered to is refused without AUTH (reject_unauth_destination).
+// the submission port is not an open relay — even the exact recipient the
+// positive path just delivered to is refused without AUTH. The refusal is
+// smtpd_client_restrictions (permit_sasl_authenticated, reject), which on 465
+// and 587 comes before reject_unauth_destination, so the reply is the same as
+// check 1's; reject_unauth_destination's own "Relay access denied" is held on
+// port 25 (testInboundRelay), where clients do not authenticate.
 func testForeignRelayRejected(t *testing.T, sc *scenario) {
 	res := attemptSend(sendAttempt{
 		from: "anyone@unregistered.e2e.test", to: recipient,
 		subject: "e2e " + uniqueToken("relay"), body: "should be rejected",
 	})
-	if res.ok() {
-		t.Fatal("unauthenticated relay to an external destination was accepted, want reject_unauth_destination")
-	}
-	if res.rcptErr == nil && res.mailErr == nil {
-		t.Fatalf("expected rejection at MAIL or RCPT, got: dial=%v auth=%v data=%v", res.dialErr, res.authErr, res.dataErr)
+	if err := res.refusedAt("RCPT", 554, "Client host rejected: Access denied"); err != nil {
+		t.Fatalf("an unauthenticated relay to an external destination: %v", err)
 	}
 }
 
@@ -172,23 +172,53 @@ func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
 // well past that count, so the result is unambiguous regardless of how much of
 // the shared per-IP budget earlier subtests already spent (they stay well
 // under 50 between them).
+//
+// Only anvil's own reply counts, and only after at least one message of the
+// loop went through: the case once passed on "limit tripped on attempt 1/60"
+// when the connection was reset because Postfix was still starting - and,
+// held to anvil's reply, it turned out the first message had always been
+// refused for another reason (below).
 func testLevel1RateLimit(t *testing.T, sc *scenario) {
 	login, password, err := sc.panel.addApplication(sc.domainID, "l1app", "wildcard", "")
 	if err != nil {
 		t.Fatalf("add application: %v", err)
 	}
-
-	const maxAttempts = 60
-	for i := 0; i < maxAttempts; i++ {
-		res := attemptSend(sendAttempt{
+	send := func() sendResult {
+		return attemptSend(sendAttempt{
 			authLogin: login, authPassword: password,
 			from: "l1@" + senderDomain, to: recipient,
 			subject: "e2e " + uniqueToken("l1"), body: "rate limit probe",
 		})
-		if !res.ok() {
-			t.Logf("level-1 limit tripped on attempt %d/%d: %v", i+1, maxAttempts, res.firstErr())
-			return
+	}
+
+	// The panel writes sender_login_maps and reloads Postfix, but an smtpd
+	// process that was idle before the reload can still take the next
+	// connection with the old map and answer 553 for the new login (seen on
+	// the stand: the process that greeted waitForSMTPSReady). Wait for the map
+	// to take effect; any other refusal fails at once.
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		res := send()
+		if res.ok() {
+			break
 		}
+		if res.refusedAt("RCPT", 553, "not owned by user "+login) != nil || time.Now().After(deadline) {
+			t.Fatalf("the first message of %s, before any limit could trip: %v", login, res.firstErr())
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	const maxAttempts = 60
+	for i := 1; i < maxAttempts; i++ {
+		res := send()
+		if res.ok() {
+			continue
+		}
+		if err := res.refusedAt("MAIL", 450, "4.7.1 Error: too much mail from"); err != nil {
+			t.Fatalf("attempt %d/%d: %v", i+1, maxAttempts, err)
+		}
+		t.Logf("level-1 limit tripped on attempt %d/%d: %v", i+1, maxAttempts, res.firstErr())
+		return
 	}
 	t.Fatalf("level-1 rate limit (RATE_LIMIT_MESSAGES_PER_IP=50) never tripped after %d sends", maxAttempts)
 }

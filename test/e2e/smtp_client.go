@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/smtp"
+	"net/textproto"
+	"strings"
 	"time"
 )
 
@@ -47,6 +50,40 @@ func (r sendResult) firstErr() error {
 		if e != nil {
 			return e
 		}
+	}
+	return nil
+}
+
+// refusedAt says nil only when the transaction was refused at stage
+// ("connect", "AUTH", "MAIL", "RCPT" or "DATA") with the server's reply code
+// and a reply text containing text. A negative case passes on its own refusal
+// and nothing else: a reset or a timeout while Postfix was still starting once
+// passed for the level-1 rate limit. Anything else is described for the
+// failure message - where it stopped and what came.
+func (r sendResult) refusedAt(stage string, code int, text string) error {
+	for _, s := range []struct {
+		name string
+		err  error
+	}{{"connect", r.dialErr}, {"AUTH", r.authErr}, {"MAIL", r.mailErr}, {"RCPT", r.rcptErr}, {"DATA", r.dataErr}} {
+		if s.err == nil {
+			continue
+		}
+		if s.name != stage {
+			return fmt.Errorf("stopped at %s, not at %s: %v", s.name, stage, s.err)
+		}
+		return replyIs(s.err, code, text)
+	}
+	return fmt.Errorf("accepted, want refused at %s with %d", stage, code)
+}
+
+// replyIs says nil when err is the server's reply code with text in it.
+func replyIs(err error, code int, text string) error {
+	var reply *textproto.Error
+	if !errors.As(err, &reply) {
+		return fmt.Errorf("no SMTP reply but %v, want %d ...%s", err, code, text)
+	}
+	if reply.Code != code || !strings.Contains(reply.Msg, text) {
+		return fmt.Errorf("reply %d %s, want %d ...%s", reply.Code, reply.Msg, code, text)
 	}
 	return nil
 }
@@ -117,18 +154,31 @@ func attemptSend(a sendAttempt) sendResult {
 	return res
 }
 
-// waitForSMTPSReady polls the implicit-TLS port until a bare TCP connect
-// succeeds. Used after a container (re)start: the panel's HTTP port and
-// Postfix's smtpd come up independently (postfix-wrapper.sh additionally
-// waits on both milter sockets before starting Postfix at all), so a caller
-// that only waited for the panel could still race a not-yet-listening smtpd.
+// waitForSMTPSReady polls the implicit-TLS port until Postfix greets over
+// TLS. Used after a container (re)start: the panel's HTTP port and Postfix's
+// smtpd come up independently (postfix-wrapper.sh additionally waits on both
+// milter sockets before starting Postfix at all), so a caller that only
+// waited for the panel could still race a not-yet-listening smtpd. A bare TCP
+// connect is not enough: Docker's port proxy accepts on the host side before
+// anything listens in the container and then resets the connection, which is
+// how the level-1 rate-limit case once took a reset for its limit.
 func waitForSMTPSReady(timeout time.Duration) error {
-	return waitFor("smtps port to accept connections", timeout, 300*time.Millisecond, func() (bool, error) {
-		conn, err := net.DialTimeout("tcp", smtpsAddr, 2*time.Second)
+	return waitFor("smtps port to greet", timeout, 300*time.Millisecond, func() (bool, error) {
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, "tcp", smtpsAddr, &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         selfpostHostname,
+		})
 		if err != nil {
 			return false, err
 		}
-		_ = conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+		c, err := smtp.NewClient(conn, selfpostHostname) // reads the 220 greeting
+		if err != nil {
+			_ = conn.Close()
+			return false, err
+		}
+		_ = c.Quit()
+		_ = c.Close()
 		return true, nil
 	})
 }
