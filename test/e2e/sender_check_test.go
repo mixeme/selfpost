@@ -177,7 +177,8 @@ func testPanelDownDefersMail(t *testing.T, sc *scenario) {
 	}
 
 	// Server > Health, "Sender check", today: some downtime, one message.
-	today := regexp.MustCompile(`<tr><td>Today</td><td>([^<]*)</td><td>(\d+)</td></tr>`)
+	// Today: downtime, connections turned away, messages deferred mid-message.
+	today := regexp.MustCompile(`<tr><td>Today</td><td>([^<]*)</td><td>(\d+)</td><td>(\d+)</td></tr>`)
 	if err := waitFor("Health to show the downtime and the deferred message", 20*time.Second, 500*time.Millisecond, func() (bool, error) {
 		_, body, err := sc.panel.get("/server/health")
 		if err != nil {
@@ -201,17 +202,18 @@ func testPanelDownDefersMail(t *testing.T, sc *scenario) {
 }
 
 // senderCheckDeferredToday reads Server > Health's "Sender check" row for
-// today: the messages deferred because the check did not answer.
+// today: the messages deferred in the middle because the check stopped
+// answering (the last column; connections turned away are the one before).
 func senderCheckDeferredToday(sc *scenario) (int, error) {
 	_, body, err := sc.panel.get("/server/health")
 	if err != nil {
 		return 0, err
 	}
-	m := regexp.MustCompile(`<tr><td>Today</td><td>([^<]*)</td><td>(\d+)</td></tr>`).FindStringSubmatch(body)
+	m := regexp.MustCompile(`<tr><td>Today</td><td>([^<]*)</td><td>(\d+)</td><td>(\d+)</td></tr>`).FindStringSubmatch(body)
 	if m == nil {
 		return 0, fmt.Errorf("no Sender check row for today on Health")
 	}
-	return strconv.Atoi(m[2])
+	return strconv.Atoi(m[3])
 }
 
 // testPanelHungMidMessage: a panel that is running and stops answering in the

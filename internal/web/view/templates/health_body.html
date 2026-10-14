@@ -29,9 +29,9 @@
   {{template "box_close"}}
   {{template "box_open" .SenderCheck}}
   <div class="table-container"><table class="table is-fullwidth">
-    <thead><tr><th>Period</th><th>Panel not answering</th><th>Messages deferred</th></tr></thead>
+    <thead><tr><th>Period</th><th>Panel not answering</th><th>Connections turned away</th><th>Messages deferred</th></tr></thead>
     <tbody>{{range .SenderRows}}
-      <tr><td>{{.Period}}</td><td>{{.Down}}</td><td>{{.Deferred}}</td></tr>{{end}}
+      <tr><td>{{.Period}}</td><td>{{.Down}}</td><td>{{.Deferred}}</td><td>{{.Messages}}</td></tr>{{end}}
     </tbody>
   </table></div>
   {{template "body_open"}}

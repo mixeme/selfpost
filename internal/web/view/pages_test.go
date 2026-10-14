@@ -177,7 +177,7 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 			t.Errorf("Health is missing %s", want)
 		}
 	}
-	pageHas(t, "Health", out, `<tr><td>Last 12 months</td><td>41 s</td><td>3</td></tr>`,
+	pageHas(t, "Health", out, `<tr><td>Last 12 months</td><td>≈ 41 s</td><td>3</td><td>1</td></tr>`,
 		`Counted since <span class="sp-mono">2026-10-13</span>.`, `href="/help#sender-check"`)
 	// The Configuration box is outside the polled stack: a refresh must not re-render a control.
 	if strings.Contains(out[strings.Index(out, `id="health-stack"`):strings.Index(out, `id="sockets"`)], `action="/server/health/reload"`) {

@@ -43,7 +43,11 @@ const dayLayout = "2006-01-02"
 // SenderCheckTotals is what the strict sender check has cost over a period.
 type SenderCheckTotals struct {
 	Down     time.Duration // the panel not answering while Postfix was running
-	Deferred int64         // messages Postfix deferred because of it
+	Deferred int64         // connections Postfix turned away because of it
+	Messages int64         // messages deferred in the middle because of it
+	// Estimated: a day of the period had its downtime taken from the alive
+	// mark alone - at most what it was.
+	Estimated bool
 }
 
 // SenderCheckStats is the card of Server > Health.
@@ -65,16 +69,18 @@ func (s *Store) StartSenderCheckStats(now time.Time) error {
 }
 
 // AddSenderCheckDown adds to the day of at the time the panel did not answer
-// while Postfix was running.
-func (s *Store) AddSenderCheckDown(at time.Time, d time.Duration) error {
+// while Postfix was running; estimated marks the day when that time is an
+// upper bound (supervisord could not say since when Postfix ran).
+func (s *Store) AddSenderCheckDown(at time.Time, d time.Duration, estimated bool) error {
 	secs := int64(d / time.Second)
 	if secs <= 0 {
 		return nil
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO sender_check_days (day, down_seconds) VALUES (?, ?)
-		 ON CONFLICT (day) DO UPDATE SET down_seconds = down_seconds + excluded.down_seconds`,
-		at.UTC().Format(dayLayout), secs,
+		`INSERT INTO sender_check_days (day, down_seconds, estimated) VALUES (?, ?, ?)
+		 ON CONFLICT (day) DO UPDATE SET down_seconds = down_seconds + excluded.down_seconds,
+			estimated = MAX(estimated, excluded.estimated)`,
+		at.UTC().Format(dayLayout), secs, estimated,
 	)
 	if err != nil {
 		return fmt.Errorf("sender check downtime: %w", err)
@@ -87,7 +93,10 @@ func (s *Store) AddSenderCheckDown(at time.Time, d time.Duration) error {
 // place - where in mail.log the counted line ends - in the same transaction:
 // a count without its place, or the other way round, would be counted again
 // or lost at the next start (audit 2026-10-12, stage 2b).
-func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string) error {
+//
+// message says which of the two it is: a message deferred in the middle
+// (cleanup's warning) rather than a connection turned away (smtpd's).
+func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string, message bool) error {
 	if n <= 0 {
 		return nil
 	}
@@ -96,9 +105,13 @@ func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string) erro
 		return fmt.Errorf("sender check deferred: %w", err)
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(
-		`INSERT INTO sender_check_days (day, deferred) VALUES (?, ?)
-		 ON CONFLICT (day) DO UPDATE SET deferred = deferred + excluded.deferred`,
+	column := "deferred"
+	if message {
+		column = "messages"
+	}
+	if _, err := tx.Exec(fmt.Sprintf(
+		`INSERT INTO sender_check_days (day, %[1]s) VALUES (?, ?)
+		 ON CONFLICT (day) DO UPDATE SET %[1]s = %[1]s + excluded.%[1]s`, column),
 		at.UTC().Format(dayLayout), n,
 	); err != nil {
 		return fmt.Errorf("sender check deferred: %w", err)
@@ -149,16 +162,18 @@ func (s *Store) SenderCheckStats(now time.Time) (SenderCheckStats, error) {
 	now = now.UTC()
 	var out SenderCheckStats
 	sum := func(days int) (SenderCheckTotals, error) {
-		var secs, deferred int64
+		var secs, deferred, messages, estimated int64
 		err := s.db.QueryRow(
-			`SELECT COALESCE(SUM(down_seconds), 0), COALESCE(SUM(deferred), 0)
+			`SELECT COALESCE(SUM(down_seconds), 0), COALESCE(SUM(deferred), 0), COALESCE(SUM(messages), 0),
+				COALESCE(MAX(estimated), 0)
 			 FROM sender_check_days WHERE day > ? AND day <= ?`,
 			now.AddDate(0, 0, -days).Format(dayLayout), now.Format(dayLayout),
-		).Scan(&secs, &deferred)
+		).Scan(&secs, &deferred, &messages, &estimated)
 		if err != nil {
 			return SenderCheckTotals{}, fmt.Errorf("sender check stats: %w", err)
 		}
-		return SenderCheckTotals{Down: time.Duration(secs) * time.Second, Deferred: deferred}, nil
+		return SenderCheckTotals{Down: time.Duration(secs) * time.Second, Deferred: deferred,
+			Messages: messages, Estimated: estimated > 0}, nil
 	}
 	var err error
 	if out.Today, err = sum(1); err != nil {

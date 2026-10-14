@@ -6,7 +6,8 @@ import (
 )
 
 type deferredStore struct {
-	days  map[string]int64
+	days  map[string]int64 // connections turned away
+	msgs  map[string]int64 // messages deferred in the middle
 	last  time.Time
 	place string
 }
@@ -15,12 +16,16 @@ func (d *deferredStore) SenderCheckDeferredAt() (time.Time, error) { return d.la
 
 func (d *deferredStore) SenderCheckCountedPlace() (string, error) { return d.place, nil }
 
-func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64, place string) error {
+func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64, place string, message bool) error {
 	d.place = place
 	if d.days == nil {
-		d.days = make(map[string]int64)
+		d.days, d.msgs = make(map[string]int64), make(map[string]int64)
 	}
-	d.days[at.UTC().Format("2006-01-02")] += n
+	if message {
+		d.msgs[at.UTC().Format("2006-01-02")] += n
+	} else {
+		d.days[at.UTC().Format("2006-01-02")] += n
+	}
 	if at.After(d.last) {
 		d.last = at
 	}
@@ -83,8 +88,8 @@ func TestDeferredCounter(t *testing.T) {
 	} {
 		c.handle(line, now, false, Place{})
 	}
-	if len(st.days) != 2 || st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 2 {
-		t.Fatalf("deferred per day = %v, want one on the first day and two on the second", st.days)
+	if st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 0 || st.msgs["2026-10-13"] != 2 || len(st.msgs) != 1 {
+		t.Fatalf("connections %v, messages %v; want one connection on the first day and two messages on the second", st.days, st.msgs)
 	}
 }
 

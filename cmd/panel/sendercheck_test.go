@@ -23,25 +23,31 @@ func TestSenderCheckDowntime(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	postfix := func(started time.Time, running bool) func() (time.Time, bool) {
-		return func() (time.Time, bool) { return started, running }
+	postfix := func(started time.Time, running bool) func() postfixState {
+		return func() postfixState { return postfixState{started: started, running: running, known: true} }
 	}
+	silent := func() postfixState { return postfixState{} }
+	down := func(ask func() postfixState) (time.Duration, bool) { return senderCheckDowntime(mark, now, ask) }
 
-	if d := senderCheckDowntime(mark, now, postfix(now.Add(-time.Hour), true)); d != 0 {
+	if d, _ := down(postfix(now.Add(-time.Hour), true)); d != 0 {
 		t.Errorf("no mark: %s", d)
 	}
 	set(now.Add(-40 * time.Second))
-	if d := senderCheckDowntime(mark, now, postfix(now.Add(-time.Hour), true)); d != 40*time.Second {
-		t.Errorf("Postfix up throughout: %s, want 40s", d)
+	if d, est := down(postfix(now.Add(-time.Hour), true)); d != 40*time.Second || est {
+		t.Errorf("Postfix up throughout: %s %v, want 40s, not estimated", d, est)
 	}
-	if d := senderCheckDowntime(mark, now, postfix(now.Add(-10*time.Second), true)); d != 10*time.Second {
+	if d, _ := down(postfix(now.Add(-10*time.Second), true)); d != 10*time.Second {
 		t.Errorf("Postfix started within the gap: %s, want 10s", d)
 	}
-	if d := senderCheckDowntime(mark, now, postfix(time.Time{}, false)); d != 0 {
+	if d, _ := down(postfix(time.Time{}, false)); d != 0 {
 		t.Errorf("Postfix not running: %s", d)
 	}
+	// supervisord did not answer: the time since the mark, an estimate.
+	if d, est := down(silent); d != 40*time.Second || !est {
+		t.Errorf("supervisord silent: %s %v, want 40s, estimated", d, est)
+	}
 	set(now.Add(time.Minute)) // a clock set back
-	if d := senderCheckDowntime(mark, now, postfix(now.Add(-time.Hour), true)); d != 0 {
+	if d, _ := down(postfix(now.Add(-time.Hour), true)); d != 0 {
 		t.Errorf("a mark in the future: %s", d)
 	}
 }

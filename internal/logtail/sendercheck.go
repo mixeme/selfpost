@@ -48,7 +48,7 @@ import (
 type SenderCheckStore interface {
 	// AddSenderCheckDeferred counts and saves the place in the log reached,
 	// in one transaction.
-	AddSenderCheckDeferred(at time.Time, n int64, place string) error
+	AddSenderCheckDeferred(at time.Time, n int64, place string, message bool) error
 	SenderCheckDeferredAt() (time.Time, error)
 	SenderCheckCountedPlace() (string, error)
 }
@@ -118,7 +118,7 @@ func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool, pl
 	if program == "cleanup" {
 		// A message cleanup could not finish because the check did not reply.
 		if strings.HasPrefix(text, c.broken) {
-			c.count(at, catchingUp, place)
+			c.count(at, catchingUp, place, true)
 		}
 		return
 	}
@@ -137,13 +137,14 @@ func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool, pl
 			c.failed = make(map[string]bool)
 		}
 		c.failed[pid] = true
-		c.count(at, catchingUp, place)
+		c.count(at, catchingUp, place, false)
 	}
 }
 
-// count adds one deferred message at at, the line ending at place, unless it
-// is a line read again.
-func (c *deferredCounter) count(at time.Time, catchingUp bool, place Place) {
+// count adds, at at, one connection turned away - or, with message, one
+// message deferred in the middle - the line ending at place, unless it is a
+// line read again.
+func (c *deferredCounter) count(at time.Time, catchingUp bool, place Place, message bool) {
 	if catchingUp && c.countedAlready(at, place) {
 		return
 	}
@@ -151,7 +152,7 @@ func (c *deferredCounter) count(at time.Time, catchingUp bool, place Place) {
 		c.last = at
 	}
 	c.counted = place
-	if err := c.st.AddSenderCheckDeferred(at, 1, place.String()); err != nil {
+	if err := c.st.AddSenderCheckDeferred(at, 1, place.String(), message); err != nil {
 		log.Printf("log-tailer: sender check statistics: %v", err)
 	}
 }

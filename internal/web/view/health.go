@@ -24,8 +24,9 @@ type Health struct {
 	ProcessError bool
 
 	// SenderCheck is what the strict check of the From: line has cost: for how
-	// long the panel did not answer while Postfix was running, and how many
-	// messages were deferred for it. SenderNote is the line under its table.
+	// long the panel did not answer while Postfix was running, how many
+	// connections Postfix turned away and how many messages it deferred in
+	// the middle for it. SenderNote is the line under its table.
 	SenderCheck Box
 	SenderRows  []SenderCheckRow
 	SenderNote  Text
@@ -57,8 +58,9 @@ type Health struct {
 // SenderCheckRow is one period of the Sender check table.
 type SenderCheckRow struct {
 	Period   string
-	Down     string
-	Deferred string
+	Down     string // with "≈ " in front when the period holds an estimate
+	Deferred string // connections turned away
+	Messages string // messages deferred in the middle
 }
 
 // MachineRow is one line of the Machine table. A row that is a level (CPU,
@@ -173,7 +175,7 @@ func (h *Health) WithSenderCheck(rows []SenderCheckRow, since, status string) *H
 	h.SenderCheck.End = Verdict(status)
 	h.SenderRows = rows
 	h.SenderNote = Rich("The panel holds each message's ", Code("From:"),
-		" against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running.")
+		" against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown.")
 	if since != "" {
 		h.SenderNote = append(h.SenderNote, Rich(" Counted since ", Mono(since), ".")...)
 	}

@@ -39,10 +39,14 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 		if err := st.StartSenderCheckStats(now); err != nil {
 			log.Printf("sender-check: statistics: %v", err)
 		}
-		if down := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
-			log.Printf("sender-check: was not answering for %s while Postfix was running", down.Round(time.Second))
+		if down, estimated := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
+			if estimated {
+				log.Printf("sender-check: was not answering for at most %s (supervisord did not say since when Postfix ran)", down.Round(time.Second))
+			} else {
+				log.Printf("sender-check: was not answering for %s while Postfix was running", down.Round(time.Second))
+			}
 			for _, part := range byDay(now.Add(-down), now) {
-				if err := st.AddSenderCheckDown(part.day, part.down); err != nil {
+				if err := st.AddSenderCheckDown(part.day, part.down, estimated); err != nil {
 					log.Printf("sender-check: statistics: %v", err)
 				}
 			}
@@ -57,28 +61,40 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 	return milter.ServeSender(ctx, ln, bind, signers, st)
 }
 
+// postfixState is what supervisord said about Postfix: since when it runs, if
+// it does; known is false when supervisord did not answer.
+type postfixState struct {
+	started        time.Time
+	running, known bool
+}
+
 // senderCheckDowntime is for how long the check was not serving before now
 // while Postfix was: the time since the mark at path was last set, or since
 // Postfix started if that was later. No mark means the container is new, and
 // a Postfix that is not running means mail was stopped for another reason -
-// a rollout, a reboot - and neither is the check's downtime.
-func senderCheckDowntime(path string, now time.Time, postfixStarted func() (time.Time, bool)) time.Duration {
+// a rollout, a reboot - and neither is the check's downtime. When supervisord
+// could not say, the time since the mark is taken and estimated is true: an
+// upper bound, since Postfix may not have been running all of it (audit
+// 2026-10-12, stage 2b - until then such a start counted nothing).
+func senderCheckDowntime(path string, now time.Time, ask func() postfixState) (down time.Duration, estimated bool) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return 0
+		return 0, false
 	}
 	from := fi.ModTime()
-	started, running := postfixStarted()
-	if !running {
-		return 0
-	}
-	if started.After(from) {
-		from = started
+	p := ask()
+	switch {
+	case !p.known:
+		estimated = true
+	case !p.running:
+		return 0, false
+	case p.started.After(from):
+		from = p.started
 	}
 	if d := now.Sub(from); d > 0 {
-		return d
+		return d, estimated
 	}
-	return 0
+	return 0, false
 }
 
 // dayPart is the part of a stretch of downtime that fell on one UTC day.
@@ -103,23 +119,34 @@ func byDay(from, to time.Time) []dayPart {
 	return parts
 }
 
-// postfixStarted asks supervisord since when Postfix has been running.
-func postfixStarted() (time.Time, bool) {
-	procs, err := health.Processes()
-	if err != nil {
-		// Said aloud: the downtime of this start is then not counted.
-		log.Printf("sender-check: statistics: when Postfix started is not known: %v", err)
-		return time.Time{}, false
-	}
-	for _, p := range procs {
-		if p.Name != "postfix" || p.State != "RUNNING" {
-			continue
+// postfixAskFor is how long postfixStarted keeps asking a supervisord that
+// does not answer - at the container's start it may not be listening yet.
+var postfixAskFor, postfixAskEvery = 30 * time.Second, 2 * time.Second
+
+// postfixStarted asks supervisord since when Postfix has been running, again
+// and again for postfixAskFor while it does not answer.
+func postfixStarted() postfixState {
+	deadline := time.Now().Add(postfixAskFor)
+	for {
+		procs, err := health.Processes()
+		if err == nil {
+			for _, p := range procs {
+				if p.Name != "postfix" || p.State != "RUNNING" {
+					continue
+				}
+				if up, ok := health.Uptime(p.Detail); ok {
+					return postfixState{started: time.Now().Add(-up), running: true, known: true}
+				}
+			}
+			return postfixState{known: true}
 		}
-		if up, ok := health.Uptime(p.Detail); ok {
-			return time.Now().Add(-up), true
+		if time.Now().After(deadline) {
+			// Said aloud: this start's downtime is then an estimate.
+			log.Printf("sender-check: statistics: when Postfix started is not known: %v", err)
+			return postfixState{}
 		}
+		time.Sleep(postfixAskEvery)
 	}
-	return time.Time{}, false
 }
 
 // keepAlive sets the mark until ctx ends, and once a day drops the days of

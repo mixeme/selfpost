@@ -39,16 +39,16 @@ func TestSenderCheckStats(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(st.AddSenderCheckDown(now, 3*time.Second))
-	must(st.AddSenderCheckDown(now, 1500*time.Millisecond)) // whole seconds: one
-	must(st.AddSenderCheckDown(now, 400*time.Millisecond))  // nothing
-	must(st.AddSenderCheckDeferred(now.Add(-time.Hour), 2, ""))
-	must(st.AddSenderCheckDown(day(10), 30*time.Second))
-	must(st.AddSenderCheckDeferred(day(10), 1, ""))
-	must(st.AddSenderCheckDown(day(29), time.Minute))
-	must(st.AddSenderCheckDown(day(30), time.Hour)) // the 31st day back: the year's only
-	must(st.AddSenderCheckDeferred(day(200), 5, ""))
-	must(st.AddSenderCheckDown(day(365), 24*time.Hour)) // a year and a day: nobody's
+	must(st.AddSenderCheckDown(now, 3*time.Second, false))
+	must(st.AddSenderCheckDown(now, 1500*time.Millisecond, false)) // whole seconds: one
+	must(st.AddSenderCheckDown(now, 400*time.Millisecond, false))  // nothing
+	must(st.AddSenderCheckDeferred(now.Add(-time.Hour), 2, "", false))
+	must(st.AddSenderCheckDown(day(10), 30*time.Second, false))
+	must(st.AddSenderCheckDeferred(day(10), 1, "", false))
+	must(st.AddSenderCheckDown(day(29), time.Minute, false))
+	must(st.AddSenderCheckDown(day(30), time.Hour, false)) // the 31st day back: the year's only
+	must(st.AddSenderCheckDeferred(day(200), 5, "", false))
+	must(st.AddSenderCheckDown(day(365), 24*time.Hour, false)) // a year and a day: nobody's
 
 	got, err = st.SenderCheckStats(now)
 	if err != nil {
@@ -118,10 +118,10 @@ func TestRefusedRowKeepsItsReason(t *testing.T) {
 func TestSenderCheckDeferredSavesItsPlace(t *testing.T) {
 	st := openTestStore(t)
 	later := time.Date(2026, 10, 14, 12, 0, 1, 0, time.UTC)
-	if err := st.AddSenderCheckDeferred(later, 1, "abc:1.2@100"); err != nil {
+	if err := st.AddSenderCheckDeferred(later, 1, "abc:1.2@100", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.AddSenderCheckDeferred(later.Add(-time.Hour), 1, "abc:1.2@200"); err != nil {
+	if err := st.AddSenderCheckDeferred(later.Add(-time.Hour), 1, "abc:1.2@200", false); err != nil {
 		t.Fatal(err)
 	}
 	if p, err := st.SenderCheckCountedPlace(); err != nil || p != "abc:1.2@200" {
@@ -129,5 +129,31 @@ func TestSenderCheckDeferredSavesItsPlace(t *testing.T) {
 	}
 	if at, err := st.SenderCheckDeferredAt(); err != nil || !at.Equal(later) {
 		t.Fatalf("last deferral = %s, %v; want %s", at, err, later)
+	}
+}
+
+// Connections turned away and messages deferred in the middle are counted
+// apart (the owner, 2026-10-14), and a period holding a day whose downtime is
+// an estimate says so.
+func TestSenderCheckCountsConnectionsAndMessagesApart(t *testing.T) {
+	st := openTestStore(t)
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(st.AddSenderCheckDeferred(now, 3, "", false))
+	must(st.AddSenderCheckDeferred(now, 1, "", true))
+	must(st.AddSenderCheckDown(now.AddDate(0, 0, -3), 20*time.Second, true))
+	must(st.AddSenderCheckDown(now.AddDate(0, 0, -3), 5*time.Second, false))
+	got, err := st.SenderCheckStats(now)
+	must(err)
+	if got.Today.Deferred != 3 || got.Today.Messages != 1 || got.Today.Estimated {
+		t.Errorf("today = %+v, want 3 connections, 1 message, not estimated", got.Today)
+	}
+	if got.Month.Down != 25*time.Second || !got.Month.Estimated {
+		t.Errorf("the month = %+v, want 25 s, estimated", got.Month)
 	}
 }

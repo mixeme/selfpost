@@ -96,9 +96,9 @@ func healthFixture(refresh bool) *Health {
 		h.AsFragment()
 	}
 	h.WithSenderCheck([]SenderCheckRow{
-		{Period: "Today", Down: "0 s", Deferred: "0"},
-		{Period: "Last 30 days", Down: "4 s", Deferred: "0"},
-		{Period: "Last 12 months", Down: "41 s", Deferred: "3"},
+		{Period: "Today", Down: "0 s", Deferred: "0", Messages: "0"},
+		{Period: "Last 30 days", Down: "4 s", Deferred: "0", Messages: "0"},
+		{Period: "Last 12 months", Down: "≈ 41 s", Deferred: "3", Messages: "1"},
 	}, "2026-10-13", "ok")
 	h.Machine.End = Verdict("ok")
 	h.MachineRows = []MachineRow{

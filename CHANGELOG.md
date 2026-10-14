@@ -33,6 +33,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the page shows it. A row refused before this says the line was not kept.
   A refusal's line is red for a permanent reply, amber for a temporary one
   (audit 2026-10-12, stage 2b).
+- **The Sender check card counts connections and messages apart.** What was
+  one column, "Messages deferred", was two things: connections Postfix
+  turned away while the panel did not answer - refused before any message
+  is offered, so a client trying three times is three - and messages
+  deferred in the middle, when the panel stopped answering after a message
+  had begun. The card now has a column for each (the owner's decision).
+- **A start at which supervisord does not answer still counts the downtime.**
+  The panel asks supervisord once at start since when Postfix runs; when it
+  did not answer, that start's downtime was not counted at all. It now asks
+  for half a minute, and then takes the time since its last sign of life -
+  an upper bound - and the card marks such a period with ≈.
 - **A refusal the panel did not get to write is written from the log.** The
   sender check answers 550 and writes the row a moment later; a panel that
   stopped in between - a rollout, a crash - left an application refused and

@@ -152,7 +152,7 @@ func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 	if err != nil {
 		// Zeros that were not read are not zeros.
 		for i := range rows {
-			rows[i].Down, rows[i].Deferred = "—", "—"
+			rows[i].Down, rows[i].Deferred, rows[i].Messages = "—", "—", "—"
 		}
 		status = string(health.StatusUnknown)
 	}
@@ -160,11 +160,17 @@ func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 }
 
 // senderCheckCard is the Sender check card from its statistics. It warns when
-// a message was deferred in the last 24 hours: that is mail an application had
-// to send again. Downtime that deferred nothing is only shown.
+// a connection was turned away or a message deferred in the last 24 hours:
+// that is mail an application had to send again. Downtime that deferred
+// nothing is only shown.
 func senderCheckCard(s store.SenderCheckStats, now time.Time) (rows []view.SenderCheckRow, since, status string) {
 	row := func(period string, t store.SenderCheckTotals) view.SenderCheckRow {
-		return view.SenderCheckRow{Period: period, Down: view.Downtime(t.Down), Deferred: strconv.FormatInt(t.Deferred, 10)}
+		down := view.Downtime(t.Down)
+		if t.Estimated {
+			down = "≈ " + down
+		}
+		return view.SenderCheckRow{Period: period, Down: down,
+			Deferred: strconv.FormatInt(t.Deferred, 10), Messages: strconv.FormatInt(t.Messages, 10)}
 	}
 	rows = []view.SenderCheckRow{row("Today", s.Today), row("Last 30 days", s.Month), row("Last 12 months", s.Year)}
 	if !s.Since.IsZero() {
