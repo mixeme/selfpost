@@ -16,6 +16,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   in the log, with the time from which nothing was read. The log's
   fingerprint now includes the file's inode, so two files that begin alike
   are still told apart (audit 2026-10-12, stage 2b).
+- **A second deferral of the same second is counted after a restart.** The
+  Sender check's count of deferred mail remembered the time of the last
+  line it counted, to pass over lines read again after an unclean stop;
+  `mail.log` stamps whole seconds, so a second warning of that second was
+  passed over too. It now remembers the place in the log, saved with the
+  count in one transaction (audit 2026-10-12, stage 2b).
 
 ## [2.5.0] - 2026-10-14
 

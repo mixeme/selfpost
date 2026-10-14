@@ -42,12 +42,12 @@ func TestSenderCheckStats(t *testing.T) {
 	must(st.AddSenderCheckDown(now, 3*time.Second))
 	must(st.AddSenderCheckDown(now, 1500*time.Millisecond)) // whole seconds: one
 	must(st.AddSenderCheckDown(now, 400*time.Millisecond))  // nothing
-	must(st.AddSenderCheckDeferred(now.Add(-time.Hour), 2))
+	must(st.AddSenderCheckDeferred(now.Add(-time.Hour), 2, ""))
 	must(st.AddSenderCheckDown(day(10), 30*time.Second))
-	must(st.AddSenderCheckDeferred(day(10), 1))
+	must(st.AddSenderCheckDeferred(day(10), 1, ""))
 	must(st.AddSenderCheckDown(day(29), time.Minute))
 	must(st.AddSenderCheckDown(day(30), time.Hour)) // the 31st day back: the year's only
-	must(st.AddSenderCheckDeferred(day(200), 5))
+	must(st.AddSenderCheckDeferred(day(200), 5, ""))
 	must(st.AddSenderCheckDown(day(365), 24*time.Hour)) // a year and a day: nobody's
 
 	got, err = st.SenderCheckStats(now)
@@ -110,5 +110,24 @@ func TestRefusedRowKeepsItsReason(t *testing.T) {
 	one, err := st.GetSendLog(refused.ID)
 	if err != nil || one.Reason != ReasonFrom || one.HeaderFrom != "director@example.org" {
 		t.Errorf("GetSendLog = %+v, %v", one, err)
+	}
+}
+
+// The place in the log is saved with the count, and the moment of the last
+// deferral does not move back when a log is read again.
+func TestSenderCheckDeferredSavesItsPlace(t *testing.T) {
+	st := openTestStore(t)
+	later := time.Date(2026, 10, 14, 12, 0, 1, 0, time.UTC)
+	if err := st.AddSenderCheckDeferred(later, 1, "abc:1.2@100"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddSenderCheckDeferred(later.Add(-time.Hour), 1, "abc:1.2@200"); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := st.SenderCheckCountedPlace(); err != nil || p != "abc:1.2@200" {
+		t.Fatalf("place = %q, %v", p, err)
+	}
+	if at, err := st.SenderCheckDeferredAt(); err != nil || !at.Equal(later) {
+		t.Fatalf("last deferral = %s, %v; want %s", at, err, later)
 	}
 }

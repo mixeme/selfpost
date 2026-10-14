@@ -46,6 +46,34 @@ type tracker struct {
 	// no longer the log - rotated while the panel was down; prev is that place.
 	behind bool
 	prev   store.LogtailState
+
+	// line is the place of the line being handled: set by follow and
+	// readRotated before each call of handle.
+	line Place
+}
+
+// Place is where a line of the log ends: the fingerprint of its file and the
+// byte offset just past it. A rotated file keeps its fingerprint (the inode
+// is part of it), so a place stays true across a rotation.
+type Place struct {
+	FP  string
+	End int64
+}
+
+// String is the place as it is saved: "<fingerprint>@<offset>".
+func (p Place) String() string { return fmt.Sprintf("%s@%d", p.FP, p.End) }
+
+// parsePlace reads a saved place; the zero Place for anything else.
+func parsePlace(s string) Place {
+	i := strings.LastIndexByte(s, '@')
+	if i < 0 {
+		return Place{}
+	}
+	var end int64
+	if _, err := fmt.Sscan(s[i+1:], &end); err != nil {
+		return Place{}
+	}
+	return Place{FP: s[:i], End: end}
 }
 
 // resume returns the byte offset the tailer should start reading f at, having
@@ -125,10 +153,14 @@ func (t *tracker) readRotated(handle func(string)) bool {
 		lost(fmt.Sprintf("seek %s: %v", rotated, err))
 		return false
 	}
+	fp := fingerprintOf(f)
+	end := t.prev.Offset
 	r := bufio.NewReader(f)
 	for {
 		line, err := r.ReadString('\n')
+		end += int64(len(line))
 		if line != "" {
+			t.line = Place{FP: fp, End: end}
 			handle(strings.TrimRight(line, "\r\n"))
 		}
 		if err != nil {

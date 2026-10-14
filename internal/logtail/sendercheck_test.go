@@ -6,13 +6,17 @@ import (
 )
 
 type deferredStore struct {
-	days map[string]int64
-	last time.Time
+	days  map[string]int64
+	last  time.Time
+	place string
 }
 
 func (d *deferredStore) SenderCheckDeferredAt() (time.Time, error) { return d.last, nil }
 
-func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64) error {
+func (d *deferredStore) SenderCheckCountedPlace() (string, error) { return d.place, nil }
+
+func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64, place string) error {
+	d.place = place
 	if d.days == nil {
 		d.days = make(map[string]int64)
 	}
@@ -77,7 +81,7 @@ func TestDeferredCounter(t *testing.T) {
 		// cleanup that writes it.
 		`2026-10-13T00:01:00.000000+00:00 mail postfix/cleanup[1195]: B6B484831946: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: director@other.e2e.test - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`,
 	} {
-		c.handle(line, now, false)
+		c.handle(line, now, false, Place{})
 	}
 	if len(st.days) != 2 || st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 2 {
 		t.Fatalf("deferred per day = %v, want one on the first day and two on the second", st.days)
@@ -100,7 +104,7 @@ func TestDeferredCounterDoesNotCountALogReadAgain(t *testing.T) {
 
 	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
 	for _, line := range first {
-		c.handle(line, now, false)
+		c.handle(line, now, false, Place{})
 	}
 	if st.days["2026-10-12"] != 2 {
 		t.Fatalf("first run counted %d, want 2", st.days["2026-10-12"])
@@ -109,9 +113,49 @@ func TestDeferredCounterDoesNotCountALogReadAgain(t *testing.T) {
 	// A new run: the same lines again, then what the outage added.
 	c = newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
 	for _, line := range append(first, outage("13", "2026-10-12T16:00:09.00000")...) {
-		c.handle(line, now, true)
+		c.handle(line, now, true, Place{})
 	}
 	if st.days["2026-10-12"] != 3 {
 		t.Fatalf("after the restart the day has %d, want 3", st.days["2026-10-12"])
+	}
+}
+
+// Two warnings of the same second, the panel stopped uncleanly between them:
+// the next start reads both again, and the place of the first - not its
+// second - tells them apart. Each is counted once (audit 2026-10-12, stage
+// 2b; a time alone passed the second over).
+func TestDeferredCounterRemembersAPlaceNotASecond(t *testing.T) {
+	st := &deferredStore{}
+	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
+	lines := []string{
+		`2026-10-12T16:00:00+00:00 mail postfix/smtpd[11]: connect from unknown[10.77.0.1]`,
+		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[11]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[12]: connect from unknown[10.77.0.1]`,
+		`2026-10-12T16:00:01+00:00 mail postfix/smtpd[12]: warning: connect to Milter service unix:/run/selfpost/sender.sock: Connection refused`,
+	}
+	// The place each line ends at, in one file.
+	places := make([]Place, len(lines))
+	end := int64(0)
+	for i, l := range lines {
+		end += int64(len(l)) + 1
+		places[i] = Place{FP: "abc:1.2", End: end}
+	}
+
+	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
+	for i := 0; i < 2; i++ { // stopped after the first warning
+		c.handle(lines[i], now, false, places[i])
+	}
+	if st.days["2026-10-12"] != 1 {
+		t.Fatalf("before the stop: %d, want 1", st.days["2026-10-12"])
+	}
+
+	// Started again: the saved offset was from before the stop, so all four
+	// lines are read again.
+	c = newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
+	for i, l := range lines {
+		c.handle(l, now, true, places[i])
+	}
+	if st.days["2026-10-12"] != 2 {
+		t.Fatalf("after the restart the day has %d, want 2", st.days["2026-10-12"])
 	}
 }

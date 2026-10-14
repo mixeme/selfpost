@@ -46,8 +46,11 @@ import (
 // SenderCheckStore is where the count goes, and where the time of the last
 // counted line is kept. *store.Store satisfies it.
 type SenderCheckStore interface {
-	AddSenderCheckDeferred(at time.Time, n int64) error
+	// AddSenderCheckDeferred counts and saves the place in the log reached,
+	// in one transaction.
+	AddSenderCheckDeferred(at time.Time, n int64, place string) error
 	SenderCheckDeferredAt() (time.Time, error)
+	SenderCheckCountedPlace() (string, error)
 }
 
 // SenderCheck turns the counting on: the store and the socket Postfix was
@@ -72,13 +75,16 @@ type deferredCounter struct {
 	// listening, and a reply that did not come.
 	connect, broken string
 	failed          map[string]bool // smtpd pid -> its current client was counted already
-	// last is the time of the latest line counted, by this run or an earlier
-	// one. While the tailer catches up after a start it may be reading lines
-	// it had read before an unclean stop; a warning no later than this was
-	// counted then. mail.log's stamps are whole seconds, so a warning of the
-	// very second of the last one counted can be passed over - once, at a
-	// restart - which is the cheaper mistake than counting a stretch twice.
-	last time.Time
+	// counted is the place in the log of the latest warning counted, by this
+	// run or an earlier one, saved with the count. While the tailer catches up
+	// after a start it may be reading lines it had read before an unclean
+	// stop; a warning at or before that place was counted then. Until 2.5.1
+	// this was a time, and mail.log's stamps are whole seconds: a second
+	// warning of the same second was passed over (audit 2026-10-12, stage
+	// 2b). A place in another file - read again from a rotated log - has no
+	// order to compare with, and last, its time, decides.
+	counted Place
+	last    time.Time
 }
 
 func newDeferredCounter(sc *SenderCheck) *deferredCounter {
@@ -86,8 +92,13 @@ func newDeferredCounter(sc *SenderCheck) *deferredCounter {
 	if err != nil {
 		log.Printf("log-tailer: sender check statistics: %v", err)
 	}
+	place, err := sc.Store.SenderCheckCountedPlace()
+	if err != nil {
+		log.Printf("log-tailer: sender check statistics: %v", err)
+	}
 	return &deferredCounter{
 		last:    last,
+		counted: parsePlace(place),
 		st:      sc.Store,
 		connect: "warning: connect to Milter service unix:" + sc.Socket + ":",
 		broken:  "warning: milter unix:" + sc.Socket + ":",
@@ -95,9 +106,9 @@ func newDeferredCounter(sc *SenderCheck) *deferredCounter {
 	}
 }
 
-// handle looks at one mail.log line. catchingUp is true until the tailer has
-// read to the end of the log for the first time.
-func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
+// handle looks at one mail.log line, which ends at place. catchingUp is true
+// until the tailer has read to the end of the log for the first time.
+func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool, place Place) {
 	at, rest := lineTime(line, now)
 	m := milterLineRe.FindStringSubmatch(rest)
 	if m == nil {
@@ -107,7 +118,7 @@ func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
 	if program == "cleanup" {
 		// A message cleanup could not finish because the check did not reply.
 		if strings.HasPrefix(text, c.broken) {
-			c.count(at, catchingUp)
+			c.count(at, catchingUp, place)
 		}
 		return
 	}
@@ -126,19 +137,31 @@ func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
 			c.failed = make(map[string]bool)
 		}
 		c.failed[pid] = true
-		c.count(at, catchingUp)
+		c.count(at, catchingUp, place)
 	}
 }
 
-// count adds one deferred message at at, unless it is a line read again.
-func (c *deferredCounter) count(at time.Time, catchingUp bool) {
-	if catchingUp && !at.After(c.last) {
+// count adds one deferred message at at, the line ending at place, unless it
+// is a line read again.
+func (c *deferredCounter) count(at time.Time, catchingUp bool, place Place) {
+	if catchingUp && c.countedAlready(at, place) {
 		return
 	}
 	if at.After(c.last) {
 		c.last = at
 	}
-	if err := c.st.AddSenderCheckDeferred(at, 1); err != nil {
+	c.counted = place
+	if err := c.st.AddSenderCheckDeferred(at, 1, place.String()); err != nil {
 		log.Printf("log-tailer: sender check statistics: %v", err)
 	}
+}
+
+// countedAlready says whether a warning read while catching up was counted
+// before: by its place when it is in the file of the last one counted, by its
+// time otherwise.
+func (c *deferredCounter) countedAlready(at time.Time, place Place) bool {
+	if place.FP != "" && place.FP == c.counted.FP {
+		return place.End <= c.counted.End
+	}
+	return !at.After(c.last)
 }

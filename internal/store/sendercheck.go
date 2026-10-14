@@ -30,6 +30,9 @@ const (
 	// settingSenderCheckDeferredAt is when a message was last deferred because
 	// the check did not answer (RFC3339 UTC).
 	settingSenderCheckDeferredAt = "sender_check_deferred_at"
+	// settingSenderCheckCountedPlace is the place in mail.log of the last
+	// warning counted ("<fingerprint>@<offset>"), saved with the count.
+	settingSenderCheckCountedPlace = "sender_check_counted_place"
 )
 
 // senderCheckKeepDays is how long a day of the statistics is kept.
@@ -80,31 +83,53 @@ func (s *Store) AddSenderCheckDown(at time.Time, d time.Duration) error {
 }
 
 // AddSenderCheckDeferred counts, on the day of at, n messages deferred because
-// the check did not answer, and remembers at as the last such moment.
-func (s *Store) AddSenderCheckDeferred(at time.Time, n int64) error {
+// the check did not answer, remembers at as the last such moment, and saves
+// place - where in mail.log the counted line ends - in the same transaction:
+// a count without its place, or the other way round, would be counted again
+// or lost at the next start (audit 2026-10-12, stage 2b).
+func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string) error {
 	if n <= 0 {
 		return nil
 	}
-	_, err := s.db.Exec(
-		`INSERT INTO sender_check_days (day, deferred) VALUES (?, ?)
-		 ON CONFLICT (day) DO UPDATE SET deferred = deferred + excluded.deferred`,
-		at.UTC().Format(dayLayout), n,
-	)
+	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("sender check deferred: %w", err)
 	}
-	// Lines are read in order, but a re-read log must not move the mark back.
-	last, err := s.GetSetting(settingSenderCheckDeferredAt)
-	if err != nil {
-		return err
+	defer tx.Rollback()
+	if _, err := tx.Exec(
+		`INSERT INTO sender_check_days (day, deferred) VALUES (?, ?)
+		 ON CONFLICT (day) DO UPDATE SET deferred = deferred + excluded.deferred`,
+		at.UTC().Format(dayLayout), n,
+	); err != nil {
+		return fmt.Errorf("sender check deferred: %w", err)
 	}
 	// To the fraction of a second the log gives, and of a fixed width so that
-	// the strings compare as the times do.
+	// the strings compare as the times do; a re-read log must not move the
+	// mark back.
 	stamp := at.UTC().Format("2006-01-02T15:04:05.000000Z")
-	if stamp > last {
-		return s.SetSetting(settingSenderCheckDeferredAt, stamp)
+	setting := func(key, value, cond string) error {
+		_, err := tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)
+			ON CONFLICT (key) DO UPDATE SET value = excluded.value`+cond, key, value)
+		return err
+	}
+	if err := setting(settingSenderCheckDeferredAt, stamp, " WHERE excluded.value > settings.value"); err != nil {
+		return fmt.Errorf("sender check deferred: %w", err)
+	}
+	if place != "" {
+		if err := setting(settingSenderCheckCountedPlace, place, ""); err != nil {
+			return fmt.Errorf("sender check deferred: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("sender check deferred: %w", err)
 	}
 	return nil
+}
+
+// SenderCheckCountedPlace is the place in mail.log of the last warning
+// counted; "" before any was.
+func (s *Store) SenderCheckCountedPlace() (string, error) {
+	return s.GetSetting(settingSenderCheckCountedPlace)
 }
 
 // SenderCheckDeferredAt is when a message was last counted as deferred; zero

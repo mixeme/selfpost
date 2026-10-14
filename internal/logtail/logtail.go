@@ -162,7 +162,8 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	}
 
 	keeper := newLineKeeper(st)
-	return follow(ctx, path, &tracker{st: st, path: path}, caughtUp, keeper.flush, func(line string) {
+	tr := &tracker{st: st, path: path}
+	return follow(ctx, path, tr, caughtUp, keeper.flush, func(line string) {
 		// Until the first read reaches end-of-file the lines are those written
 		// while the panel was down - and, after an unclean stop, some it had
 		// read already.
@@ -177,7 +178,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 			journal.handle(line, now, catchingUp)
 		}
 		if deferred != nil {
-			deferred.handle(line, now, catchingUp)
+			deferred.handle(line, now, catchingUp, tr.line)
 		}
 		keeper.add(line, now, catchingUp)
 		queueID, recipient, status, ok := parseDelivery(line)
@@ -569,6 +570,9 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		r       *bufio.Reader
 		info    os.FileInfo
 		pending string
+		// consumed is the offset just past what the reader has handed over,
+		// pending included: where a complete line ends.
+		consumed int64
 	)
 	openAt := func(offset int64, whence int) error {
 		nf, err := os.Open(path)
@@ -588,6 +592,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			f.Close()
 		}
 		f, r, info, pending = nf, bufio.NewReader(nf), ni, ""
+		consumed = offset
 		return nil
 	}
 
@@ -602,9 +607,12 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		case <-time.After(pollInterval):
 		}
 	}
-	if _, err := f.Seek(tr.resume(f), io.SeekStart); err != nil {
+	start := tr.resume(f)
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
 		log.Printf("log-tailer: seek %s: %v", path, err)
+		start = 0
 	}
+	consumed = start
 	r.Reset(f) // the reader buffered from the pre-seek position
 	// Rotated while the panel was down: the end of the old file first.
 	if tr.readRotated(handle) {
@@ -620,6 +628,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		defer flush()
 		for {
 			line, err := r.ReadString('\n')
+			consumed += int64(len(line))
 			if err == io.EOF {
 				pending += line // hold the partial line until it completes
 				return
@@ -630,6 +639,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			}
 			full := pending + line
 			pending = ""
+			tr.line = Place{FP: tr.fp, End: consumed}
 			handle(strings.TrimRight(full, "\r\n"))
 		}
 	}
