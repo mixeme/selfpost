@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `2.4.1`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `2.4.2`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -130,6 +130,12 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 17 | panel-notifications | `2.3.0` |
 | 18 | from-header-binding | `2.4.0` |
 | 19 | code audit 2026-10-12 and its plan (docs only, owner-requested cut) | `2.4.1` (PATCH) |
+| 20 | audit-2026-10-12 stage 0: release hygiene | `2.4.2` (PATCH) |
+| 21 | audit-2026-10-12 stages 1 and 2 | `2.5.0` |
+| 22 | audit-2026-10-12 stage 2b: the log tailer | `2.5.1` |
+| 23 | audit-2026-10-12 stage 3 | `2.5.2` |
+| 24 | audit-2026-10-12 stage 4 | `2.5.3` |
+| 25 | audit-2026-10-12 stage 5 | `2.6.0` |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.

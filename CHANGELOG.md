@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-10-14
+
+Release hygiene: stage 0 of the 2026-10-12 audit. Nothing the panel or the
+mail path does changes; the release workflow, the tests, the dependencies and
+the documents do.
+
 ### Fixed
 
 - **A release image says which release it is.** The e2e gate in
