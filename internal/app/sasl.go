@@ -4,22 +4,44 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // SASLDB manages the Cyrus SASL account database (sasldb2) the panel maintains
 // for application credentials (architecture.md § Mail path). The panel is the
 // only writer; Postfix reads it to authenticate SMTP clients. Accounts are
 // created and removed with the standard saslpasswd2 tool.
+//
+// saslpasswd2 is never pointed at the live file. Cyrus SASL 2.1.28 opens
+// sasldb2 with no Berkeley DB environment, so without locks
+// (sasldb/db_berkeley.c, berkeleydb_open(): db_create(mbdb, NULL, 0)), and a
+// write puts and deletes in the file itself (_sasldb_putdata()); smtpd opens
+// and closes it for every lookup (_sasldb_getdata()), and the backup reads it
+// whenever it runs. Either could read a page half written: a spurious 535 for
+// an application, or a torn sasldb2 in a backup whose restore breaks every
+// application's AUTH (assumptions C-S3, C-Q3). So each change is made to a
+// copy, which is then renamed over the file (replaceSASLDB): a reader opens
+// the old file or the new one, whole, and needs no lock. mu keeps the
+// panel's own changes from copying the same old file at once.
 type SASLDB struct {
 	path  string // sasldb2 file, under /data so it survives restarts
 	realm string // SASL realm, so lookups match what Postfix's SASL uses
 
+	mu sync.Mutex
+
 	// run executes saslpasswd2. It is a field so tests can substitute a fake;
 	// the default shells out to the real binary via runSaslpasswd2.
 	run func(args []string, stdin []byte) error
+
+	// replace makes a change to the database through a copy: edit gets the
+	// path to give saslpasswd2. The default is replaceSASLDB.
+	replace func(path string, edit func(path string) error) error
 
 	// dump reads the raw sasldb2 as db_dump key/value pairs (Berkeley DB). It is
 	// a field so tests can substitute a fake; the default runs db_dump.
@@ -36,12 +58,89 @@ type SASLDB struct {
 // sasldb_auxprop_lookup(), then looks a login without "@" up under the
 // server's name (common/plugin_common.c, _plug_parseuser()).
 func NewSASLDB(path, realm string) *SASLDB {
-	return &SASLDB{path: path, realm: realm, run: runSaslpasswd2, dump: dumpSASLDB}
+	return &SASLDB{path: path, realm: realm, run: runSaslpasswd2, dump: dumpSASLDB, replace: replaceSASLDB}
+}
+
+// change runs saslpasswd2 with args on a copy of the database and puts the
+// copy in its place; at in args stands for the path of the copy.
+func (s *SASLDB) change(args []string, at int, stdin []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.replace(s.path, func(path string) error {
+		a := append([]string(nil), args...)
+		a[at] = path
+		return s.run(a, stdin)
+	})
+}
+
+// replaceSASLDB copies the database at path to path+".new", lets edit change
+// the copy, and renames it over path. With no database yet, edit gets a path
+// where none exists, and saslpasswd2 creates one there (db_berkeley.c,
+// berkeleydb_open(): DB_CREATE for a writer). The copy is a byte copy of a
+// file no one else writes, which is a whole Berkeley DB file: smtpd and
+// db_dump only read it. The new file is 0640 in the setgid directory, group
+// selfpost, as build/entrypoint.sh sets the old one, so Postfix reads it.
+// A copy left by a panel killed mid-change is removed first.
+func replaceSASLDB(path string, edit func(path string) error) error {
+	tmp := path + ".new"
+	if err := os.Remove(tmp); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove %s: %w", tmp, err)
+	}
+	if err := copySASLDB(path, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := edit(tmp); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	// Read-write: fsync of a file opened read-only is refused on Windows.
+	f, err := os.OpenFile(tmp, os.O_RDWR, 0)
+	if err == nil {
+		err = f.Chmod(0o640)
+		if err == nil {
+			err = f.Sync()
+		}
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("finish %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("rename %s -> %s: %w", tmp, path, err)
+	}
+	return nil
+}
+
+// copySASLDB copies path to tmp; with no file at path it makes no copy.
+func copySASLDB(path, tmp string) error {
+	src, err := os.Open(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("open %s: %w", path, err)
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", tmp, err)
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		dst.Close()
+		return fmt.Errorf("copy %s: %w", path, err)
+	}
+	return dst.Close()
 }
 
 // Set creates or updates an application's SASL account with the given password
 // (architecture.md § Mail path). Used both at creation and when a password is
-// regenerated; saslpasswd2 overwrites an existing entry in place.
+// regenerated; saslpasswd2 overwrites an existing entry (in the copy, see
+// SASLDB).
 //
 // The password is passed to saslpasswd2 on stdin (never as an argument, so it
 // cannot leak through the process table or logs). The login is passed as a
@@ -65,7 +164,7 @@ func (s *SASLDB) Set(login, password string) error {
 	//     whitelist already forbids nothing that getopt would eat, but a login
 	//     starting with '-' is legal there — this keeps it an operand).
 	args := []string{"-p", "-c", "-f", s.path, "-u", s.realm, "--", login}
-	if err := s.run(args, []byte(password)); err != nil {
+	if err := s.change(args, 3, []byte(password)); err != nil {
 		return fmt.Errorf("saslpasswd2 set %q: %w", login, err)
 	}
 	return nil
@@ -84,7 +183,7 @@ func (s *SASLDB) Delete(login string) error {
 	}
 	// -d: delete the account. "--" as in Set: the login is always an operand.
 	args := []string{"-d", "-f", s.path, "-u", s.realm, "--", login}
-	if err := s.run(args, nil); err != nil {
+	if err := s.change(args, 2, nil); err != nil {
 		return fmt.Errorf("saslpasswd2 delete %q: %w", login, err)
 	}
 	return nil
@@ -213,8 +312,13 @@ func dumpSASLDB(path string) ([]byte, error) {
 
 // WithRunner replaces the command that runs saslpasswd2 and returns the same
 // manager. It exists for tests outside this package that need an application
-// service without the real binary; the panel never calls it.
+// service without the real binary; the panel never calls it. With no real
+// database either, the runner is given the database's own path, not a copy.
 func (s *SASLDB) WithRunner(run func(args []string, stdin []byte) error) *SASLDB {
 	s.run = run
+	s.replace = inPlace
 	return s
 }
+
+// inPlace hands edit the path itself: for tests whose runner touches no file.
+func inPlace(path string, edit func(path string) error) error { return edit(path) }

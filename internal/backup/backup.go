@@ -323,7 +323,13 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 			}
 			return tw.WriteHeader(hdr)
 		case info.Mode().IsRegular():
-			return writeTarFile(tw, name, info.Mode().Perm(), path)
+			err := writeTarFile(tw, name, info.Mode().Perm(), path)
+			if errors.Is(err, fs.ErrNotExist) {
+				// A writer's temporary file, renamed into place between
+				// the listing and the open: not part of /data's state.
+				return nil
+			}
+			return err
 		default:
 			return nil
 		}
@@ -349,6 +355,14 @@ func writeTarBytes(tw *tar.Writer, name string, mode int64, data []byte) error {
 }
 
 // writeTarFile streams a file from disk into the archive under name.
+//
+// The file is read through one descriptor, sized by that descriptor: the
+// panel's writers of what a backup carries put a new file in place by rename
+// (atomicfile.Write; sasldb2 through a copy, app.replaceSASLDB - the setup
+// token alone is written in place, and it is not carried; the database and
+// the queue are not walked), and a rename leaves the file open here as it
+// was: the archive holds the old file or the new one, whole (assumptions
+// C-Q3).
 func writeTarFile(tw *tar.Writer, name string, mode fs.FileMode, srcPath string) error {
 	f, err := os.Open(srcPath)
 	if err != nil {

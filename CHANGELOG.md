@@ -91,6 +91,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   sender was empty, so a bounce could be refused or allowed by an entry the
   Filter lists page never showed as used. They now look at the envelope
   sender only (assumptions C-R4).
+- **Stopping or restarting the container stops Postfix as Postfix means it
+  to be stopped.** Supervisord's stop signal reached only the shell that
+  started Postfix, never Postfix's master process: a restart of the program
+  found Postfix "already running", and a container stop cut Postfix off at
+  the end. The start wrapper now runs `postfix stop` (assumptions C-P42).
+- **Postfix that cannot start takes the container down instead of waiting
+  for ever.** When the milter sockets never appear, the wrapper gives up
+  after `MILTER_WAIT_TIMEOUT`; that exit was taken for an ordinary one and
+  the wrapper started again, endlessly. It now counts as a failed start,
+  and once supervisord's three retries are spent the container exits for
+  Docker to restart it. For `MILTER_WAIT_TIMEOUT` plus ten seconds after
+  each start, Server > Health shows Postfix as starting (assumptions C-V6).
+- **A logrotate configuration it would ignore ends in a fault shown on
+  Server > Health,** where logrotate was restarted every second for ever;
+  the container stays up, mail is not affected (assumptions C-V5).
+- **A failed Postfix reload is reported.** The panel took a reload as done
+  as soon as it was started, and a reload already running as its own. It now
+  waits for `postfix reload` to finish and shows its failure on the page that
+  saved; a reload while Postfix is still starting is left to the start
+  (assumptions B-U2).
+- **Changing an application's password no longer rewrites the live SASL
+  database.** `saslpasswd2` wrote into the file Postfix reads at every
+  `AUTH` and the backup copies, with no lock between them: an application
+  signing in at that moment could be refused, and a backup taken then could
+  carry a damaged database whose restore would refuse every application.
+  The change is now made to a copy that replaces the file whole (assumptions
+  C-S3, C-Q3).
 
 ### Changed
 

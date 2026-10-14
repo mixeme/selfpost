@@ -17,6 +17,7 @@ type fakeRun struct {
 func newFakeSASL() (*SASLDB, *fakeRun) {
 	fr := &fakeRun{}
 	s := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	s.replace = inPlace
 	s.run = func(args []string, stdin []byte) error {
 		fr.calls++
 		fr.args = args

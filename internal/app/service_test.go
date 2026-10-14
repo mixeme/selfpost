@@ -44,6 +44,7 @@ func newServiceHarness(t *testing.T) (*Service, *store.Store, *saslRecorder, *fa
 
 	rec := &saslRecorder{set: map[string]string{}}
 	sasl := NewSASLDB("/data/sasl/sasldb2", "mail.example.com")
+	sasl.replace = inPlace
 	sasl.run = func(args []string, stdin []byte) error {
 		if rec.failNext {
 			rec.failNext = false
