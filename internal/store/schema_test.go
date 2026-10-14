@@ -47,7 +47,7 @@ func TestBaselineSchema(t *testing.T) {
 		"applications":          "id domain_id login address_mode auth_ip_restrict auth_allowed_ips created_at",
 		"application_addresses": "id application_id address",
 		"rate_limits":           "id scope ref_id max_messages window_seconds mode auto_multiplier auto_updated_at",
-		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from domain_id",
+		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from domain_id refusal_line",
 		"logtail_state":         "path fingerprint read_offset updated_at",
 		"inbound_domains":       "id name recipient_mode created_at",
 		"inbound_transports":    "inbound_domain_id host port tls_mode",
@@ -115,8 +115,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 8 {
-		t.Errorf("user_version = %d, %v; want 8", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 9 {
+		t.Errorf("user_version = %d, %v; want 9", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -192,8 +192,8 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 8 {
-		t.Errorf("user_version = %d, %v; want 8", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 9 {
+		t.Errorf("user_version = %d, %v; want 9", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)

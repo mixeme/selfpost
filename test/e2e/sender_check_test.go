@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/smtp"
 	"net/textproto"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -309,5 +311,70 @@ func testPanelHungMidMessage(t *testing.T, sc *scenario) {
 		return true, nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// testRefusalsShowPostfixsLine: the page of each of the three refusals shows
+// what Postfix wrote about it (audit 2026-10-12, stage 2b) - for a message
+// refused for its From: line, cleanup's line under the queue id the message
+// had; for one refused at MAIL FROM under a level-2 limit or for its client
+// address, smtpd's NOQUEUE line the log tailer put on the row. The first two
+// refusals were made by earlier steps; the third is made here.
+func testRefusalsShowPostfixsLine(t *testing.T, sc *scenario) {
+	login, password, err := sc.panel.addApplication(sc.domainID, "clientapp", "wildcard", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := waitForSenderMap(login, password, "alerts@"+senderDomain); err != nil {
+		t.Fatal(err)
+	}
+	appID, err := sc.panel.applicationID(sc.domainID, login)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, body, err := sc.panel.postForm("/outbound/domains/"+sc.domainID+"/applications/"+appID, url.Values{
+		"mode": {"wildcard"}, "auth_ip_restrict": {"1"}, "auth_allowed_ips": {"192.0.2.1"},
+	})
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("restrict the client addresses: %v %d\n%.600s", err, resp.StatusCode, body)
+	}
+	res := attemptSend(sendAttempt{authLogin: login, authPassword: password,
+		from: "alerts@" + senderDomain, to: recipient, subject: "e2e " + uniqueToken("client"), body: "x"})
+	if err := res.refusedAt("MAIL", 451, "4.7.1"); err != nil {
+		t.Fatalf("a client off the list: %v", err)
+	}
+
+	rowRe := regexp.MustCompile(`(?s)<tr>.*?</tr>`)
+	tagRe := regexp.MustCompile(`<span class="tag[^"]*">(wrong From|rate-limited|wrong client)</span>`)
+	linkRe := regexp.MustCompile(`href="(/outbound/log/\d+)[^"]*"`)
+	want := map[string]string{
+		"wrong From":   "milter-reject: END-OF-MESSAGE",
+		"rate-limited": "NOQUEUE: milter-reject: MAIL from",
+		"wrong client": "NOQUEUE: milter-reject: MAIL from",
+	}
+	for tag, line := range want {
+		if err := waitFor("the page of a "+tag+" refusal to show Postfix's line", 30*time.Second, time.Second, func() (bool, error) {
+			rows, err := sc.panel.sendLogRows(senderDomain, "")
+			if err != nil {
+				return false, err
+			}
+			for _, row := range rowRe.FindAllString(rows, -1) {
+				m := tagRe.FindStringSubmatch(row)
+				l := linkRe.FindStringSubmatch(row)
+				if m == nil || m[1] != tag || l == nil {
+					continue
+				}
+				_, page, err := sc.panel.get(l[1])
+				if err != nil {
+					return false, err
+				}
+				if strings.Contains(page, line) {
+					return true, nil
+				}
+			}
+			return false, fmt.Errorf("no %s row whose page shows %q", tag, line)
+		}); err != nil {
+			t.Error(err)
+		}
 	}
 }

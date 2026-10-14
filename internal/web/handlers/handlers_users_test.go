@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -148,5 +149,40 @@ func TestADomainAddedAgainShowsItsAssigneeNothingOld(t *testing.T) {
 	body = send(h.HandleDeliveries, &root, "GET", "/outbound/log", nil, nil).Body.String()
 	if !strings.Contains(body, "old mail") || !strings.Contains(body, "new mail") {
 		t.Errorf("the global log is missing a row")
+	}
+}
+
+// A refused message's page shows what Postfix wrote about the refusal: the
+// NOQUEUE line put on the row of a refusal at MAIL FROM, or, for a row from
+// before that line was kept, a sentence that says so (audit 2026-10-12,
+// stage 2b).
+func TestARefusedMessageShowsPostfixsLine(t *testing.T) {
+	h, st := inboundHandlers(t)
+	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	d, _ := st.AddDomain("example.org", "mail")
+	st.AddApplication(d.ID, "alerts", store.AddressModeWildcard, nil)
+	for _, subject := range []string{"with its line", "from before"} {
+		if err := st.InsertRejected(store.SendLogEntry{Domain: "example.org", AppLogin: "alerts", From: "alerts@example.org", Subject: subject, Reason: store.ReasonLimit}); err != nil {
+			t.Fatal(err)
+		}
+		if subject == "with its line" {
+			line := time.Now().UTC().Format("2006-01-02T15:04:05Z") + " mail postfix/smtpd[2131]: NOQUEUE: milter-reject: MAIL from unknown[198.51.100.7]: 451 4.7.1 Service unavailable - try again later; from=<alerts@example.org> proto=ESMTP helo=<app>"
+			if ok, err := st.AttachRefusalLine("alerts", "alerts@example.org", time.Now(), line); err != nil || !ok {
+				t.Fatalf("attach = %v, %v", ok, err)
+			}
+		}
+	}
+	rows, _ := st.QuerySendLog(store.SendLogFilter{AllDomains: true}, 10, 0)
+	for _, r := range rows {
+		body := send(h.HandleDelivery, &root, "GET", "/outbound/log/"+idStr(r.ID), map[string]string{"id": idStr(r.ID)}, nil).Body.String()
+		if r.Subject == "with its line" {
+			if !strings.Contains(body, `<span class="sp-w">mail postfix/smtpd[2131]: NOQUEUE: milter-reject: MAIL from unknown[198.51.100.7]: 451 4.7.1`) {
+				t.Errorf("the page of a refusal with its line lacks it:\n%s", body)
+			}
+			continue
+		}
+		if !strings.Contains(body, "the message was refused before version 2.5.1, or the line was never read") {
+			t.Errorf("the page of a refusal without its line does not say why")
+		}
 	}
 }

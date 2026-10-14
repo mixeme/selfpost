@@ -12,6 +12,7 @@ package view
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -246,15 +247,23 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 		{Label: "Application", Value: value(in.App, in.AppHref), Mono: true},
 	}
 	history := Box{No: "02", Title: "History", Help: topicLink(HelpLog, "What the statuses mean")}
+	delivery := Box{No: "03", Title: "Delivery log", End: Rich("Lines from ", Code("mail.log"), " with this queue id")}
 	if in.Status == "rejected" {
 		// A refused message was never accepted and never queued: its one date
-		// is the refusal, and it has no queue id to look anything up by.
+		// is the refusal. One refused for its From: line was given a queue id
+		// before its headers were judged; one refused at MAIL FROM was not,
+		// and its box holds Postfix's one line about the refusal.
 		facts = append(facts, Fact{Label: "Refused", Value: Plain(formatStamp(in.Accepted))})
 		if in.Reason == "from" {
 			facts = append(facts, Fact{Label: "From: line", Value: Plain(orDash(in.HeaderFrom)), Mono: true, Small: true})
 			history.Help = topicLink(HelpSenderCheck, "What an application may write in From:")
 		}
-		facts = append(facts, Fact{Label: "Queue id", Value: Plain("none - never queued")})
+		if in.QueueID != "" {
+			facts = append(facts, Fact{Label: "Queue id", Value: Rich(Mono(in.QueueID), " — given, the message was not queued")})
+		} else {
+			facts = append(facts, Fact{Label: "Queue id", Value: Rich("none - refused at ", Mono("MAIL FROM"), ", before one is given")})
+			delivery.End = Rich("The line from ", Code("mail.log"), " for this refusal")
+		}
 	} else {
 		facts = append(facts,
 			Fact{Label: "Accepted", Value: Plain(formatStamp(in.Accepted))},
@@ -276,7 +285,7 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 		Message:  Box{No: "01", Title: "Message"},
 		Facts:    facts,
 		History:  history,
-		Delivery: Box{No: "03", Title: "Delivery log", End: Rich("Lines from ", Code("mail.log"), " with this queue id")},
+		Delivery: delivery,
 		LogEmpty: EmptyState{Icon: "ti-file-text"},
 	}
 }
@@ -330,5 +339,17 @@ func LogLineLevel(text string) string {
 	case strings.Contains(text, "status=deferred"), strings.Contains(text, " warning:"):
 		return "warn"
 	}
+	// A refusal is as permanent as its reply: "550"/"5.7.1" red, "451" amber.
+	if m := rejectCodeRe.FindStringSubmatch(text); m != nil {
+		if m[1] == "5" {
+			return "error"
+		}
+		return "warn"
+	}
 	return ""
 }
+
+// rejectCodeRe finds the reply of a refusal Postfix logged: the code or the
+// enhanced status after "reject: <stage> from <client>[<address>]:", from
+// smtpd ("reject:") and cleanup ("milter-reject:") alike.
+var rejectCodeRe = regexp.MustCompile(`reject: \S+ from [^\]]*\]: ([45])(?:\d\d|\.\d+\.\d+) `)

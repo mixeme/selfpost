@@ -93,9 +93,18 @@ func (s *Store) InsertSendLogLines(lines []SendLogLine, once bool) (int, error) 
 // A line is the row's when it is dated from shortly before the row was written
 // to lifetime after it; lifetime is how long Postfix may keep working on a
 // message, with a margin, and the caller's to state (postfix.RetryPolicy).
+//
+// A refused message - one refused for its From: line has a queue id, given
+// before the headers were judged - is over in a moment, and Postfix frees the
+// id at once: its lines are those of a few minutes around the refusal, so
+// that the next message to get the id lends it none of its own.
 func (s *Store) SendLogLines(row SendLogRow, lifetime time.Duration, n int) ([]SendLogLine, error) {
 	if row.QueueID == "" || n <= 0 {
 		return nil, nil
+	}
+	before := sendLogLineBefore
+	if row.Status == StatusRejected {
+		before, lifetime = refusedLinesBefore, refusedLinesAfter
 	}
 	rows, err := s.db.Query(
 		`SELECT logged_at, line FROM (
@@ -104,7 +113,7 @@ func (s *Store) SendLogLines(row SendLogRow, lifetime time.Duration, n int) ([]S
 			ORDER BY id DESC LIMIT ?)
 		 ORDER BY id`,
 		row.QueueID,
-		row.CreatedAt.Add(-sendLogLineBefore).UTC().Format(time.RFC3339),
+		row.CreatedAt.Add(-before).UTC().Format(time.RFC3339),
 		row.CreatedAt.Add(lifetime).UTC().Format(time.RFC3339),
 		n,
 	)
@@ -150,3 +159,10 @@ func (s *Store) PruneSendLogLines(cutoff time.Time) (int64, error) {
 	n, _ := res.RowsAffected()
 	return n, nil
 }
+
+// The lines of a refused message: from its connection - a slow client may
+// take minutes to reach the end of its headers - to just after the refusal.
+const (
+	refusedLinesBefore = 10 * time.Minute
+	refusedLinesAfter  = time.Minute
+)

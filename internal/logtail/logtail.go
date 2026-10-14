@@ -39,6 +39,7 @@ type StatusStore interface {
 	CountQueuedOlderThan(cutoff time.Time) (int64, error)
 	SetQueuedOverLifetime(at time.Time, n int64) error
 	PruneDeliveryLogDays(now time.Time) error
+	RefusalStore
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
 	InsertSendLogLines(lines []store.SendLogLine, once bool) (int, error)
 	PruneSendLogLines(cutoff time.Time) (int64, error)
@@ -162,8 +163,13 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	}
 
 	keeper := newLineKeeper(st)
+	refusals := &refusalLines{st: st}
+	flush := func() {
+		keeper.flush()
+		refusals.retry(time.Now().UTC())
+	}
 	tr := &tracker{st: st, path: path}
-	return follow(ctx, path, tr, caughtUp, keeper.flush, func(line string) {
+	return follow(ctx, path, tr, caughtUp, flush, func(line string) {
 		// Until the first read reaches end-of-file the lines are those written
 		// while the panel was down - and, after an unclean stop, some it had
 		// read already.
@@ -181,6 +187,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 			deferred.handle(line, now, catchingUp, tr.line)
 		}
 		keeper.add(line, now, catchingUp)
+		refusals.handle(line, now)
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return

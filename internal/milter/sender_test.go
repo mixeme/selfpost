@@ -63,7 +63,8 @@ func offer(t *testing.T, bind *Bindings, login, envelope string, headers ...[2]s
 			t.Fatal(err)
 		}
 	}
-	resp, err := s.Headers(nil, mods(nil))
+	// cleanup has given the message its queue id by the end of the headers.
+	resp, err := s.Headers(nil, mods(map[string]string{"i": "7BCAF3C75DA0"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +154,7 @@ func TestSenderCheck(t *testing.T) {
 					t.Fatalf("the reason %q names %s", reason, other)
 				}
 			}
-			if len(rows) != 1 || rows[0].Reason != store.ReasonFrom || rows[0].To != "someone@elsewhere.example" || rows[0].AppLogin != c.login {
+			if len(rows) != 1 || rows[0].Reason != store.ReasonFrom || rows[0].To != "someone@elsewhere.example" || rows[0].AppLogin != c.login || rows[0].QueueID != "7BCAF3C75DA0" {
 				t.Fatalf("log rows: %+v", rows)
 			}
 		})

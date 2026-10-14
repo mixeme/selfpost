@@ -241,6 +241,12 @@ const deliveryLogMargin = 24 * time.Hour
 // reported as a fault, and that one is logged for the operator as well.
 func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 	if row.QueueID == "" {
+		if row.RefusalLine != "" {
+			return logLines([]string{row.RefusalLine}), ""
+		}
+		if row.Status == store.StatusRejected {
+			return nil, "Postfix's line about this refusal is not stored: the message was refused before version 2.5.1, or the line was never read."
+		}
 		return nil, "This message never reached the queue, so Postfix wrote no delivery lines for it."
 	}
 	stored, err := h.store.SendLogLines(row, h.cfg.RetryPolicy.LongestLifetime()+deliveryLogMargin, deliveryLogLines)
@@ -252,7 +258,9 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 	for i, l := range stored {
 		lines[i] = l.Line
 	}
-	if len(lines) == 0 {
+	// A refused message's id was freed at once and may be another's by now:
+	// what was not stored with the row is not looked for in the log.
+	if len(lines) == 0 && row.Status != store.StatusRejected {
 		lines, err = logtail.QueueLines(h.cfg.MailLogPath, row.QueueID, deliveryLogLines)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			logf("panel: delivery log %s: %v", row.QueueID, err)
@@ -262,6 +270,11 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 	if len(lines) == 0 {
 		return nil, "Nothing is stored for this queue id and nothing is in the current mail log. Lines are kept with the row since version 2.2.0; a message accepted before that had them only in mail.log, which has since rotated."
 	}
+	return logLines(lines), ""
+}
+
+// logLines are lines of mail.log as the delivery log box shows them.
+func logLines(lines []string) []view.LogLine {
 	out := make([]view.LogLine, len(lines))
 	for i, line := range lines {
 		// A line whose head is not a timestamp the log format recognises keeps its
@@ -269,7 +282,7 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 		stamp, rest := logtail.SplitTimestamp(line)
 		out[i] = view.LogLine{Time: stamp, Text: rest, Level: view.LogLineLevel(rest)}
 	}
-	return out, ""
+	return out
 }
 
 // deliveriesBackURL rebuilds the delivery-log URL a detail page was opened

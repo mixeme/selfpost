@@ -22,6 +22,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `mail.log` stamps whole seconds, so a second warning of that second was
   passed over too. It now remembers the place in the log, saved with the
   count in one transaction (audit 2026-10-12, stage 2b).
+- **A refused message's page shows what Postfix wrote.** Its Delivery log
+  box said Postfix wrote nothing about it, which was untrue. A message
+  refused for its `From:` line had a queue id, given before its headers were
+  judged; the row now keeps it and the page shows the message's lines, the
+  refusal among them - only those of the minutes around the refusal, since
+  Postfix frees the id at once. A message refused at `MAIL FROM` (a level-2
+  limit, a client address off the list) has no queue id; the log tailer puts
+  Postfix's `NOQUEUE: milter-reject` line on its row (migration `0009`) and
+  the page shows it. A row refused before this says the line was not kept.
+  A refusal's line is red for a permanent reply, amber for a temporary one
+  (audit 2026-10-12, stage 2b).
 
 ## [2.5.0] - 2026-10-14
 

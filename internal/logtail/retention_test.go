@@ -98,3 +98,7 @@ func TestRetentionLoopUsesUpdatedValue(t *testing.T) {
 	age := time.Since(st.lastCutoff())
 	t.Fatalf("second prune cutoff age %v, want about 7 days", age)
 }
+
+func (s *retentionProbeStore) AttachRefusalLine(string, string, time.Time, string) (bool, error) {
+	return true, nil
+}

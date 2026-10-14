@@ -268,7 +268,10 @@ func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (mil
 		return milter.RespContinue, nil
 	}
 	log.Printf("sender-check: application %q refused: %s (From: %s)", s.login, why, shown)
-	s.record(shown)
+	// cleanup has given the message a queue id by the end of its headers
+	// (milter_end_of_header_macros has {i}); Postfix's lines about it - the
+	// refusal among them - are found by it on the message's page.
+	s.record(shown, macro(m, "i"))
 	// A reply code of its own, so that the application is told what is wrong
 	// and, the refusal being permanent, does not send the message again.
 	return milter.NewResponseStr('y', "550 5.7.1 From: "+shown+" - "+why), nil
@@ -352,7 +355,7 @@ func (s *senderSession) judge() (shown, why string, err error) {
 // each recipient as an accepted message has: nothing was sent to anybody, and
 // a refused message with a thousand recipients would otherwise be a thousand
 // rows at the price of one.
-func (s *senderSession) record(shown string) {
+func (s *senderSession) record(shown, queueID string) {
 	if s.refused == nil {
 		return
 	}
@@ -364,6 +367,7 @@ func (s *senderSession) record(shown string) {
 		to += fmt.Sprintf(" and %d more", more)
 	}
 	e := store.SendLogEntry{
+		QueueID:    queueID,
 		Domain:     s.domain(),
 		AppLogin:   s.login,
 		From:       s.from,

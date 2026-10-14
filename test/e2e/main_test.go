@@ -313,6 +313,9 @@ func TestE2E(t *testing.T) {
 	run("passed_from_lines_signed_for_their_domain_only", func(t *testing.T) {
 		testSignedForItsDomainOnly(t, sc)
 	})
+	run("refusals_show_postfixs_line", func(t *testing.T) {
+		testRefusalsShowPostfixsLine(t, sc)
+	})
 	run("lines_naming_another_sender_never_signed_for_it", func(t *testing.T) {
 		testNeverSignedForAnother(t, sc)
 	})

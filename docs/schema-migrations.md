@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 8` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql` |
+| Chain head | `user_version = 9` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -83,6 +83,7 @@ audit (`2.5.0`).
 | 6 | `0006_sender_check.sql` | 2.4.0 | DDL | `send_log.reason` and `send_log.header_from` (both default `''`: a row refused earlier keeps no reason), and `sender_check_days` |
 | 7 | `0007_delivery_log_days.sql` | 2.5.0 | DDL | `delivery_log_days`: what the reconcile sweep and the log tailer did, a row per UTC day, kept a year, shown nowhere - the measurement that decides the sweep's fate (audit 2026-10-12, stage 1). `send_log.reason` gains the values `reconcile` and `reconcile-contradicted` without a schema change |
 | 8 | `0008_tenant_boundary.sql` | 2.5.0 | DDL + data | `idx_applications_login_nocase`: an application login is unique without regard to case (audit 2026-10-12, H4). `send_log.domain_id` and `inbound_spam_log.inbound_domain_id` (`ON DELETE SET NULL`), each with an index, filled once by name from the registry as it was then: a row belongs to a domain by id, and a domain deleted and added again starts with an empty log (L12) |
+| 9 | `0009_refusal_line.sql` | 2.5.1 | DDL | `send_log.refusal_line`: Postfix's line about a refusal at MAIL FROM (a level-2 limit, a client address off the list), which has no queue id; the log tailer puts it on the row (audit 2026-10-12, stage 2b) |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.

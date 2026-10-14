@@ -221,11 +221,45 @@ type SendLogRow struct {
 	// Reason and HeaderFrom: see SendLogEntry.
 	Reason     string
 	HeaderFrom string
-	CreatedAt  time.Time
+	// RefusalLine is Postfix's line about a refusal that has no queue id
+	// (migration 0009); "" for every other row, and for one refused before.
+	RefusalLine string
+	CreatedAt   time.Time
 	// UpdatedAt is when the status last changed — the log-tailer's report of
 	// the delivery attempt. It equals CreatedAt while a row is still queued.
 	UpdatedAt time.Time
 }
+
+// AttachRefusalLine puts Postfix's line about a refusal at MAIL FROM on the
+// row the journal milter wrote for it (audit 2026-10-12, stage 2b). Such a
+// refusal has no queue id, so the row is found by what the line says: a
+// refused row of that sender - and login, when the line names one - without a
+// line yet, written within two minutes of the line's time; the newest when
+// there are several. It reports whether a row took the line.
+func (s *Store) AttachRefusalLine(login, from string, at time.Time, line string) (bool, error) {
+	res, err := s.db.Exec(
+		`UPDATE send_log SET refusal_line = ? WHERE id = (
+			SELECT id FROM send_log
+			WHERE status = ? AND queue_id = '' AND refusal_line = ''
+			  AND reason IN ('', ?, ?) AND from_addr = ? COLLATE NOCASE
+			  AND (? = '' OR app_login = ?)
+			  AND created_at BETWEEN ? AND ?
+			ORDER BY id DESC LIMIT 1)`,
+		line, StatusRejected, ReasonLimit, ReasonClient, from, login, login,
+		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339),
+		at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return false, fmt.Errorf("attach refusal line: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// refusalLineWindow is how far apart a refusal's row and its log line may be
+// dated: the milter writes the row at MAIL FROM, Postfix the line a moment
+// later, and the log's stamps are whole seconds.
+const refusalLineWindow = 2 * time.Minute
 
 // ErrSendLogNotFound is returned by GetSendLog for an id that no longer exists.
 // Send-log rows are pruned on the retention window, so a bookmarked delivery
@@ -240,10 +274,10 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(
-		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
+		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, refusal_line, created_at, updated_at
 		 FROM send_log WHERE id = ?`, id,
 	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.DomainID, &row.AppLogin, &row.From, &row.To,
-		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &createdAt, &updatedAt)
+		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &row.RefusalLine, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendLogRow{}, ErrSendLogNotFound
 	}

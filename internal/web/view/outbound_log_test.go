@@ -124,23 +124,28 @@ func TestOutMessageWithoutSubjectOrRecipient(t *testing.T) {
 	out := renderSignedIn(t, "out-message", p)
 	pageHas(t, "Message", out, `<h1 class="title is-4">(no subject)</h1>`, `<span>—</span><i class="ti ti-arrow-right sp-muted"></i><span>—</span>`,
 		`<span class="tag is-light">rejected</span>`, `href="/outbound/log?domain=gone.example&amp;p=2"`,
-		`<dd>gone.example</dd>`, `<dd class="sp-mono">old</dd>`, `<dt>Refused</dt>`, `<dd>none - never queued</dd>`,
-		`never reached the queue`)
+		`<dd>gone.example</dd>`, `<dd class="sp-mono">old</dd>`, `<dt>Refused</dt>`,
+		`<dd>none - refused at <span class="sp-mono">MAIL FROM</span>, before one is given</dd>`,
+		`The line from <code>mail.log</code> for this refusal`, `never reached the queue`)
 	pageLacks(t, "Message", out, `<pre`, `<a href="/outbound/domains/`, `Status reported`, `From: line`)
 }
 
 // A row refused for its From: line says so in its tag, shows what the line
-// said, and its History links to the topic that explains the rule.
+// said, and its History links to the topic that explains the rule. The
+// message had a queue id - cleanup gives one before the headers are judged -
+// and its box shows Postfix's lines by it, the refusal red.
 func TestOutMessageRefusedForItsFromLine(t *testing.T) {
 	at := time.Date(2026, 9, 21, 13, 40, 55, 0, time.UTC)
-	p := NewOutMessage(admin(), MessageInput{ID: 184231, Domain: "shop.example.org", App: "shop",
+	p := NewOutMessage(admin(), MessageInput{ID: 184231, QueueID: "7BCAF3C75DA0", Domain: "shop.example.org", App: "shop",
 		From: "shop@shop.example.org", To: "k.berg@web.de", Subject: "A message from the director",
 		Status: "rejected", Reason: "from", HeaderFrom: "director@example.org", Accepted: at, Reported: at}).
-		WithDeliveryLog(nil, "This message never reached the queue, so Postfix wrote no delivery lines for it.")
+		WithDeliveryLog([]LogLine{{Time: "13:40:55", Text: "postfix/cleanup[2120]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[198.51.100.7]: 5.7.1 From: director@example.org - not an address this application sends as",
+			Level: LogLineLevel("postfix/cleanup[2120]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[198.51.100.7]: 5.7.1 From: director@example.org - not an address this application sends as")}}, "")
 	out := renderSignedIn(t, "out-message", p)
 	pageHas(t, "Message", out, `<span class="tag is-danger is-light">wrong From</span>`,
 		`<dt>From: line</dt><dd class="sp-mono sp-small">director@example.org</dd>`, `<dt>Refused</dt>`,
-		`<dd>none - never queued</dd>`, `href="/help#sender-check"`)
+		`<span class="sp-mono">7BCAF3C75DA0</span> — given, the message was not queued`, `href="/help#sender-check"`,
+		`Lines from <code>mail.log</code> with this queue id`, `<span class="sp-e">postfix/cleanup[2120]: 7BCAF3C75DA0: milter-reject`)
 }
 
 func TestSendLogTag(t *testing.T) {
@@ -184,12 +189,15 @@ func TestStepLevelAndLogLineLevel(t *testing.T) {
 		}
 	}
 	for text, want := range map[string]string{
-		"postfix/smtp[1]: Q1: to=<a@b>, status=sent (250 OK)":          "",
-		"postfix/smtp[1]: Q1: to=<a@b>, status=deferred (try later)":   "warn",
-		"postfix/smtp[1]: Q1: to=<a@b>, status=bounced (no such user)": "error",
-		"postfix/qmgr[1]: Q1: status=expired, returned to sender":      "error",
-		"postfix/smtp[1]: warning: TLS library problem":                "warn",
-		"opendkim[1]: Q1: DKIM-Signature field added":                  "",
+		"postfix/smtp[1]: Q1: to=<a@b>, status=sent (250 OK)":                                                     "",
+		"postfix/smtp[1]: Q1: to=<a@b>, status=deferred (try later)":                                              "warn",
+		"postfix/smtp[1]: Q1: to=<a@b>, status=bounced (no such user)":                                            "error",
+		"postfix/qmgr[1]: Q1: status=expired, returned to sender":                                                 "error",
+		"postfix/smtp[1]: warning: TLS library problem":                                                           "warn",
+		"opendkim[1]: Q1: DKIM-Signature field added":                                                             "",
+		"postfix/cleanup[1]: Q1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: x - no":       "error",
+		"postfix/smtpd[1]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable":   "warn",
+		"postfix/smtpd[1]: NOQUEUE: reject: RCPT from unknown[2001:db8::1]: 554 5.7.1 <a@b>: Relay access denied": "error",
 	} {
 		if got := LogLineLevel(text); got != want {
 			t.Errorf("LogLineLevel(%q) = %q, want %q", text, got, want)
