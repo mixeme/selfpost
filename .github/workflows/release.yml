@@ -89,7 +89,26 @@ jobs:
           cache-dependency-path: test/e2e/go.sum
 
       - name: e2e (gates publishing — see docs/development.md)
+        # The e2e builds selfpost:e2e again through compose.override.yml, and
+        # that rebuild is the image pushed below. Without the version here it
+        # was stamped "e2e" (audit 2026-10-12, H1); the suite now checks the
+        # stamp against this variable.
+        env:
+          SELFPOST_E2E_VERSION: ${{ needs.prepare.outputs.version }}
         run: cd test/e2e && go test -v -timeout 20m ./...
+
+      - name: Check the version stamp of the image about to be pushed
+        env:
+          WANT: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          for bin in panel selfpost-backup; do
+            got=$(docker run --rm --entrypoint "$bin" selfpost:e2e -version)
+            if [ "$got" != "$WANT" ]; then
+              echo "::error::selfpost:e2e $bin -version = '$got', want '$WANT'; refusing to push"
+              exit 1
+            fi
+          done
 
       - name: Log in to ghcr.io
         uses: docker/login-action@v3

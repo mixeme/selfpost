@@ -130,6 +130,23 @@ func TestE2E(t *testing.T) {
 		}
 	})
 
+	// The image is pushed as the release, so it must say it is the release:
+	// the footer, -version and the backup/restore version check all read this
+	// stamp. Release images were once stamped "e2e" because this stand rebuilt
+	// them with its own VERSION (audit 2026-10-12, H1).
+	run("image_stamped_with_version", func(t *testing.T) {
+		want := expectedVersion()
+		for _, bin := range []string{"panel", "selfpost-backup"} {
+			out, err := h.execIn("selfpost", bin, "-version")
+			if err != nil {
+				t.Fatalf("%s -version: %v", bin, err)
+			}
+			if got := strings.TrimSpace(out); got != want {
+				t.Fatalf("%s -version = %q, want %q", bin, got, want)
+			}
+		}
+	})
+
 	run("setup_and_login", func(t *testing.T) {
 		token, err := readSetupToken(h)
 		if err != nil {

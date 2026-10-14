@@ -269,7 +269,12 @@ The release image is published **only** for a SemVer version `X.Y.Z`: a
 that supplies that version. Pushing a git tag alone does not publish. Ordinary
 commits, and a dispatch from `main` without a version input, do not publish.
 The version is the single source that drives the image tag and `-ldflags` in
-the binaries so they cannot drift apart.
+the binaries so they cannot drift apart. The e2e gate rebuilds the image it
+then pushes, so `release.yml` hands it the version as `SELFPOST_E2E_VERSION`;
+the suite's `image_stamped_with_version` and a check right before the push
+both compare `panel -version` and `selfpost-backup -version` with it. (Until
+`2.4.2` the rebuild stamped every published image `e2e`; those images stay as
+they are.)
 
 **Steps (on explicit request):**
 
@@ -395,7 +400,8 @@ make e2e
 [test/e2e/compose.override.yml](../test/e2e/compose.override.yml) — same
 `cap_drop`/`cap_add`/`no-new-privileges` as production. Override: high ports
 (`20465`/`20587`/`20080`), test hostname, self-signed TLS,
-`PANEL_COOKIE_SECURE=false`, isolated compose project. Mail is hermetic:
+`PANEL_COOKIE_SECURE=false`, isolated compose project, and the image's
+`VERSION` from `SELFPOST_E2E_VERSION` (unset locally: `e2e`). Mail is hermetic:
 CoreDNS (fake zone) + Postfix `smtp-sink` as sink-MX; DKIM TXT is scraped from
 the panel and published into the zone — the test verifies the records an
 operator would actually use.
@@ -440,7 +446,8 @@ release: published
 prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
       → docker build --load (VERSION from prepare)
-      → e2e (test/e2e)
+      → e2e (test/e2e; rebuilds selfpost:e2e with SELFPOST_E2E_VERSION=X.Y.Z)
+      → check panel / selfpost-backup -version = X.Y.Z
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z

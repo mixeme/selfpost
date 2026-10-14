@@ -89,6 +89,16 @@ func (s *stack) execIn(service string, args ...string) (string, error) {
 	return string(out), err
 }
 
+// expectedVersion is the version the stand's image is built with: the
+// release's X.Y.Z when release.yml runs the suite, "e2e" for a local run. Its
+// default must stay the default of VERSION in compose.override.yml.
+func expectedVersion() string {
+	if v := os.Getenv("SELFPOST_E2E_VERSION"); v != "" {
+		return v
+	}
+	return "e2e"
+}
+
 func (s *stack) build() error {
 	_, err := s.compose("build")
 	return err

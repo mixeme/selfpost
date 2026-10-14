@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A release image says which release it is.** The e2e gate in
+  `release.yml` rebuilt the image it was about to push with its own
+  `VERSION=e2e`, so every published image printed `e2e` for `-version` and in
+  the panel's footer, and the backup/restore version check compared a
+  backup's version with `e2e` - any backup restored into any release (audit
+  2026-10-12, H1). The gate now builds with the release's version
+  (`SELFPOST_E2E_VERSION`), the e2e checks `panel -version` and
+  `selfpost-backup -version` against it, and `release.yml` checks the stamp
+  again on the image right before pushing it. Images already published are
+  left as they are.
+
 ## [2.4.1] - 2026-10-12
 
 Documentation only; no product code changes.

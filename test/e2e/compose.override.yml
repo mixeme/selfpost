@@ -28,7 +28,11 @@ services:
       context: ../../..
       dockerfile: build/Dockerfile
       args:
-        VERSION: e2e
+        # release.yml sets SELFPOST_E2E_VERSION to the release's X.Y.Z, so the
+        # image this build tags selfpost:e2e - the one release.yml then pushes -
+        # carries the release's version, not "e2e". A local `make e2e` leaves it
+        # unset. The suite checks the stamp (image_stamped_with_version).
+        VERSION: ${SELFPOST_E2E_VERSION:-e2e}
     image: selfpost:e2e
     environment:
       SELFPOST_HOSTNAME: mail.e2e.test
