@@ -1,8 +1,11 @@
 package e2e
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
+	"net/smtp"
 	"net/textproto"
 	"regexp"
 	"strconv"
@@ -181,6 +184,120 @@ func testPanelDownDefersMail(t *testing.T, sc *scenario) {
 		}
 		if !strings.Contains(body, `<h2>Sender check</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span>`) {
 			return false, fmt.Errorf("the card does not warn about mail deferred a moment ago")
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// senderCheckDeferredToday reads Server > Health's "Sender check" row for
+// today: the messages deferred because the check did not answer.
+func senderCheckDeferredToday(sc *scenario) (int, error) {
+	_, body, err := sc.panel.get("/server/health")
+	if err != nil {
+		return 0, err
+	}
+	m := regexp.MustCompile(`<tr><td>Today</td><td>([^<]*)</td><td>(\d+)</td></tr>`).FindStringSubmatch(body)
+	if m == nil {
+		return 0, fmt.Errorf("no Sender check row for today on Health")
+	}
+	return strconv.Atoi(m[2])
+}
+
+// testPanelHungMidMessage: a panel that is running and stops answering in the
+// middle of a message - its socket still accepts, nothing replies. The
+// message is deferred, and the count on Health sees it. Past the DATA
+// command Postfix's cleanup, not smtpd, talks to the milters, so the warning
+// that names the socket is cleanup's (audit 2026-10-12, M13: the counter read
+// smtpd's lines only). The panel is frozen with SIGSTOP once DATA is
+// answered, and thawed after the client has its reply.
+func testPanelHungMidMessage(t *testing.T, sc *scenario) {
+	before, err := senderCheckDeferredToday(sc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pidOut, err := h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "pid", "panel")
+	if err != nil {
+		t.Fatalf("panel pid: %v (%s)", err, pidOut)
+	}
+	pid := strings.TrimSpace(pidOut)
+	if _, err := strconv.Atoi(pid); err != nil {
+		t.Fatalf("panel pid: %q", pidOut)
+	}
+	signal := func(sig string) error {
+		// kill is the shell's: the image has no kill(1).
+		_, err := h.execIn("selfpost", "sh", "-c", "kill -"+sig+" "+pid)
+		return err
+	}
+	thawed := false
+	thaw := func() {
+		if !thawed {
+			thawed = true
+			_ = signal("CONT")
+		}
+	}
+	t.Cleanup(thaw)
+
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", smtpsAddr, &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         selfpostHostname,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetDeadline(time.Now().Add(3 * time.Minute))
+	c, err := smtp.NewClient(conn, selfpostHostname)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	from := "alerts@" + senderDomain
+	if err := c.Hello("e2e-client.e2e.test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Auth(smtp.PlainAuth("", sc.appLogin, sc.appPassword, selfpostHostname)); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Mail(from); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Rcpt(recipient); err != nil {
+		t.Fatal(err)
+	}
+	w, err := c.Data()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := signal("STOP"); err != nil {
+		t.Fatalf("freeze the panel: %v", err)
+	}
+	started := time.Now()
+	_, err = w.Write([]byte(buildMessage(sendAttempt{from: from, to: recipient, subject: "e2e " + uniqueToken("panelhung"), body: "must be deferred"})))
+	if err == nil {
+		err = w.Close()
+	}
+	t.Logf("end of DATA answered after %s: %v", time.Since(started).Round(time.Second), err)
+	thaw()
+	var reply *textproto.Error
+	if !errors.As(err, &reply) || reply.Code/100 != 4 {
+		t.Fatalf("want a temporary 4xx at the end of DATA with the panel frozen, got %v", err)
+	}
+	_ = c.Quit()
+
+	// What Postfix wrote, so that the program and the wording are seen here
+	// and not assumed.
+	if out, err := h.execIn("selfpost", "sh", "-c", "grep -i 'milter' /data/log/mail.log | tail -n 8"); err == nil {
+		t.Logf("mail.log on the frozen panel:\n%s", out)
+	}
+
+	if err := waitFor("Health to count the message deferred mid-message", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		n, err := senderCheckDeferredToday(sc)
+		if err != nil {
+			return false, err
+		}
+		if n <= before {
+			return false, fmt.Errorf("messages deferred today: %d, as before", n)
 		}
 		return true, nil
 	}); err != nil {

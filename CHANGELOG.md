@@ -37,6 +37,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   key belong together, renews the copy and reloads Postfix; when nothing
   changed it no longer reloads (audit 2026-10-12, H2).
 
+- **Health counts mail deferred by a panel that hangs mid-message.** The
+  figure "messages deferred" on the Sender check card read only smtpd's
+  lines, but once a message's DATA has begun it is cleanup that talks to the
+  check, and its warning was never counted - the very case that tells a hung
+  panel from a stopped one. Seen on the e2e stand with the panel frozen, and
+  now counted, once per message (audit 2026-10-12, M13).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

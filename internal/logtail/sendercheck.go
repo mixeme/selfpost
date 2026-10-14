@@ -27,11 +27,21 @@ import (
 //
 // It is counted at the warning, which is the one line that names the socket.
 // The reject lines do not: the same words are written when OpenDKIM does not
-// answer and when the journal milter refuses under a level-2 limit, and for a
-// check that stops answering in the middle of a message they are written by
-// cleanup, another process, under a queue id. The warning for that case is
-// "milter unix:<socket>: can't read … reply packet header" (Postfix's
-// milter8.c; not seen on the stand).
+// answer and when the journal milter refuses under a level-2 limit.
+//
+// A check that is running and stops answering in the middle of a message -
+// its socket accepts, nothing replies - is met by cleanup, not smtpd: past the
+// DATA command it is cleanup that talks to the milters. Seen on the e2e stand
+// with the panel frozen (SIGSTOP) once DATA was answered (2026-10-14):
+//
+//	postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out
+//	postfix/cleanup[1339]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<…> to=<…> proto=ESMTP helo=<…>
+//
+// One cleanup process serves message after message and the first warning
+// ends the message, so each such warning is a message, counted on its own.
+// Until 2.5.0 only smtpd's lines were read, and this case - the one that
+// tells a hung panel from a stopped one - was never counted (audit
+// 2026-10-12, M13).
 
 // SenderCheckStore is where the count goes, and where the time of the last
 // counted line is kept. *store.Store satisfies it.
@@ -47,7 +57,7 @@ type SenderCheck struct {
 	Socket string
 }
 
-var smtpdLineRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?smtpd\[(\d+)\]: (.*)$`)
+var milterLineRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?(smtpd|cleanup)\[(\d+)\]: (.*)$`)
 
 const (
 	// senderCheckPids bounds the processes remembered; smtpd processes are a
@@ -89,11 +99,18 @@ func newDeferredCounter(sc *SenderCheck) *deferredCounter {
 // read to the end of the log for the first time.
 func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
 	at, rest := lineTime(line, now)
-	m := smtpdLineRe.FindStringSubmatch(rest)
+	m := milterLineRe.FindStringSubmatch(rest)
 	if m == nil {
 		return
 	}
-	pid, text := m[1], m[2]
+	program, pid, text := m[1], m[2], m[3]
+	if program == "cleanup" {
+		// A message cleanup could not finish because the check did not reply.
+		if strings.HasPrefix(text, c.broken) {
+			c.count(at, catchingUp)
+		}
+		return
+	}
 	switch {
 	case strings.HasPrefix(text, "connect from "):
 		delete(c.failed, pid)
@@ -109,14 +126,19 @@ func (c *deferredCounter) handle(line string, now time.Time, catchingUp bool) {
 			c.failed = make(map[string]bool)
 		}
 		c.failed[pid] = true
-		if catchingUp && !at.After(c.last) {
-			return
-		}
-		if at.After(c.last) {
-			c.last = at
-		}
-		if err := c.st.AddSenderCheckDeferred(at, 1); err != nil {
-			log.Printf("log-tailer: sender check statistics: %v", err)
-		}
+		c.count(at, catchingUp)
+	}
+}
+
+// count adds one deferred message at at, unless it is a line read again.
+func (c *deferredCounter) count(at time.Time, catchingUp bool) {
+	if catchingUp && !at.After(c.last) {
+		return
+	}
+	if at.After(c.last) {
+		c.last = at
+	}
+	if err := c.st.AddSenderCheckDeferred(at, 1); err != nil {
+		log.Printf("log-tailer: sender check statistics: %v", err)
 	}
 }

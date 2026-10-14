@@ -310,6 +310,9 @@ func TestE2E(t *testing.T) {
 	run("panel_down_defers_mail", func(t *testing.T) {
 		testPanelDownDefersMail(t, sc)
 	})
+	run("panel_hung_mid_message_is_counted", func(t *testing.T) {
+		testPanelHungMidMessage(t, sc)
+	})
 	run("session_survives_restart", func(t *testing.T) {
 		testSessionSurvivesRestart(t, sc)
 	})

@@ -24,11 +24,11 @@ func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64) error {
 }
 
 // The lines of process 1183 and of cleanup are as the e2e stand wrote them
-// with the panel stopped and for a refused From: (2026-10-12; the stamps are
-// put in ISO form). Around them are the lines of two other things that use
-// the same words - a level-2 refusal of the journal milter, OpenDKIM not
-// answering - and, composed from Postfix's source rather than seen, a check
-// that stops answering in the middle of a message.
+// with the panel stopped and for a refused From: (2026-10-12), and with the
+// panel frozen in the middle of a message (cleanup 1339, 2026-10-14); the
+// stamps are put in ISO form. Around them are the lines of two other things
+// that use the same words - a level-2 refusal of the journal milter, OpenDKIM
+// not answering.
 func TestDeferredCounter(t *testing.T) {
 	st := &deferredStore{}
 	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})
@@ -61,11 +61,17 @@ func TestDeferredCounter(t *testing.T) {
 		`2026-10-12T16:24:00.100000+00:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/opendkim/opendkim.sock: Connection refused`,
 		`2026-10-12T16:24:00.200000+00:00 mail postfix/smtpd[1201]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
 
-		// The check stops answering in the middle of a message, the next day.
+		// The check stops answering in the middle of a message, the next day:
+		// cleanup meets it. Two messages through the same cleanup process are
+		// two messages.
 		`2026-10-13T00:00:05.000000+00:00 mail postfix/smtpd[1300]: connect from unknown[10.77.0.1]`,
-		`2026-10-13T00:00:21.000000+00:00 mail postfix/smtpd[1300]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_EOH reply packet header: Connection timed out`,
-		`2026-10-13T00:00:21.050000+00:00 mail postfix/smtpd[1300]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_BODYEOB reply packet header: Connection timed out`,
-		`2026-10-13T00:00:21.100000+00:00 mail postfix/cleanup[1195]: 4XcB7k2Jm9z1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> to=<b@sink.e2e.test> proto=ESMTP helo=<x>`,
+		`2026-10-13T00:00:35.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		`2026-10-13T00:00:35.100000+00:00 mail postfix/cleanup[1339]: 7BCAF3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
+		`2026-10-13T00:01:20.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		`2026-10-13T00:01:20.100000+00:00 mail postfix/cleanup[1339]: 8C1D43C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
+
+		// OpenDKIM hung in the middle of a message: another socket.
+		`2026-10-13T00:01:30.000000+00:00 mail postfix/cleanup[1339]: warning: milter unix:/run/opendkim/opendkim.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
 
 		// The check's own verdict is a refusal, not a deferral, and it is
 		// cleanup that writes it.
@@ -73,8 +79,8 @@ func TestDeferredCounter(t *testing.T) {
 	} {
 		c.handle(line, now, false)
 	}
-	if len(st.days) != 2 || st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 1 {
-		t.Fatalf("deferred per day = %v, want one on each of the two days", st.days)
+	if len(st.days) != 2 || st.days["2026-10-12"] != 1 || st.days["2026-10-13"] != 2 {
+		t.Fatalf("deferred per day = %v, want one on the first day and two on the second", st.days)
 	}
 }
 
