@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-14
+
+Stages 1 and 2 of the 2026-10-12 audit: mail the delivery log showed wrong,
+and the boundary between tenants. Two migrations: `0007` adds the delivery
+log's own measurement, `0008` makes application logins unique without regard
+to case and ties every log row to its domain by id (filled once on upgrade).
+
 ### Fixed
 
 - **A queue too large to list no longer closes its own messages.** The
