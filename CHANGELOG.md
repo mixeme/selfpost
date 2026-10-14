@@ -44,6 +44,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   panel from a stopped one. Seen on the e2e stand with the panel frozen, and
   now counted, once per message (audit 2026-10-12, M13).
 
+- **Application logins are one name whatever their case.** Postfix compares
+  the SASL login with the sender map without regard to case, the panel did
+  not: `Ops` in one domain and `ops` in another were two applications to the
+  panel and one sender to Postfix, so a tenant could send with another
+  tenant's envelope sender. A new login is now stored in lower case, and
+  migration `0008` refuses two logins that differ only in case. A login
+  stored earlier, or imported from another instance, keeps its case, since
+  its client uses it (audit 2026-10-12, H4).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

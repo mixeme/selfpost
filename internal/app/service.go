@@ -55,6 +55,7 @@ func (s *Service) Get(id int64) (store.Application, error) {
 // the map rebuild fails, everything is rolled back so we never leave an
 // application the panel cannot fully account for.
 func (s *Service) Create(domainID int64, login, mode string, rawAddresses []string) (store.Application, string, error) {
+	login = foldLogin(login)
 	addresses, err := s.validateForDomain(domainID, login, mode, rawAddresses)
 	if err != nil {
 		return store.Application{}, "", err
@@ -313,7 +314,7 @@ func (s *Service) CreateWithSettings(domainID int64, login string, set Settings,
 	}
 	if err := s.applyAccess(a.ID, set, recalc); err != nil {
 		_ = s.ClearRateLimit(a.ID)
-		s.rollbackCreate(a.ID, login)
+		s.rollbackCreate(a.ID, a.Login) // the login as stored, folded
 		_ = s.Resync()
 		return store.Application{}, "", err
 	}

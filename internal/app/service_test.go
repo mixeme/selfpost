@@ -113,6 +113,40 @@ func TestServiceCreateListValidatesDomain(t *testing.T) {
 	}
 }
 
+// A new login is stored in lower case, and the sender map names it so: to
+// Postfix "Ops" and "ops" are one login (audit 2026-10-12, H4). A second
+// application that differs only in case is refused, created or imported,
+// whichever domain it is for.
+func TestServiceCreateFoldsTheLogin(t *testing.T) {
+	svc, st, rec, maps := newServiceHarness(t)
+	a1 := addDomain(t, st, "a.example")
+	b := addDomain(t, st, "b.example")
+
+	a, _, err := svc.Create(a1.ID, "Ops", store.AddressModeWildcard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Login != "ops" {
+		t.Fatalf("login stored as %q, want ops", a.Login)
+	}
+	if _, ok := rec.set["ops"]; !ok {
+		t.Fatalf("SASL account written as %v, want ops", rec.set)
+	}
+	if len(maps.last) != 1 || maps.last[0].Login != "ops" {
+		t.Fatalf("map bindings = %+v, want the login in lower case", maps.last)
+	}
+
+	if _, _, err := svc.Create(b.ID, "OPS", store.AddressModeWildcard, nil); !errors.Is(err, store.ErrLoginExists) {
+		t.Fatalf("OPS in another domain = %v, want ErrLoginExists", err)
+	}
+	if err := svc.ImportApplication(b.ID, "oPs", store.AddressModeWildcard, nil, "imported-password"); !errors.Is(err, store.ErrLoginExists) {
+		t.Fatalf("an imported oPs = %v, want ErrLoginExists", err)
+	}
+	if _, ok := rec.set["OPS"]; ok {
+		t.Fatal("the refused OPS got a SASL account")
+	}
+}
+
 func TestServiceCreateDuplicateLogin(t *testing.T) {
 	svc, st, _, _ := newServiceHarness(t)
 	d := addDomain(t, st, "example.com")

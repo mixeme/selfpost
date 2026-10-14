@@ -38,6 +38,20 @@ func TestAddApplicationWildcard(t *testing.T) {
 	}
 }
 
+// Logins are unique without regard to case, whatever the caller passed
+// (idx_applications_login_nocase, migration 0008).
+func TestAddApplicationRefusesALoginDifferingOnlyInCase(t *testing.T) {
+	st := openTestStore(t)
+	a := addTestDomain(t, st, "a.example")
+	b := addTestDomain(t, st, "b.example")
+	if _, err := st.AddApplication(a.ID, "Ops", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddApplication(b.ID, "ops", AddressModeWildcard, nil); !errors.Is(err, ErrLoginExists) {
+		t.Fatalf("ops beside Ops = %v, want ErrLoginExists", err)
+	}
+}
+
 func TestAddApplicationListStoresAddresses(t *testing.T) {
 	st := openTestStore(t)
 	d := addTestDomain(t, st, "example.com")

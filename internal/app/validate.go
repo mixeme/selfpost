@@ -24,6 +24,17 @@ func invalid(format string, args ...any) error {
 	return &ValidationError{msg: fmt.Sprintf(format, args...)}
 }
 
+// foldLogin is a new application's login as it is stored: in lower case
+// (audit 2026-10-12, H4; owner: fold, do not refuse). Postfix compares the
+// SASL login with the sender map's without regard to case, so two logins
+// that differ only in case would be one sender to Postfix and two
+// applications to the panel. The store refuses such a pair as well
+// (idx_applications_login_nocase); a login imported from another instance is
+// not folded, since its SASL account and its client use it as it is.
+func foldLogin(login string) string {
+	return strings.ToLower(login)
+}
+
 // validateLogin enforces a strict server-side whitelist for the SASL login
 // (security.md). It intentionally excludes '@': the login is stored in sasldb2,
 // where '@' separates the user from the realm, so allowing it would change the
