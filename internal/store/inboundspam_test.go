@@ -172,6 +172,14 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 			t.Fatalf("InsertInboundSpam: %v", err)
 		}
 	}
+	ids := map[string]int64{}
+	for _, name := range []string{"a.example", "b.example"} {
+		d, err := st.AddInboundDomain(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids[name] = d.ID
+	}
 	add("a.example", "1@a.example", SpamDecisionAccept, day(20, 23))
 	add("a.example", "2@a.example", SpamDecisionReject, day(21, 0))
 	add("b.example", "3@b.example", SpamDecisionAccept, day(21, 12))
@@ -227,13 +235,13 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 
 	// The scope: nil is everything, a set is its domains, an empty set nothing,
 	// and a chosen domain outside the set is nothing too.
-	if got := to(InboundSpamFilter{Domains: []string{"b.example"}}); got != "43" {
+	if got := to(InboundSpamFilter{DomainIDs: []int64{ids["b.example"]}}); got != "43" {
 		t.Errorf("scope = %q, want 43", got)
 	}
-	if got := to(InboundSpamFilter{Domains: []string{}}); got != "" {
+	if got := to(InboundSpamFilter{DomainIDs: []int64{}}); got != "" {
 		t.Errorf("empty scope = %q, want nothing", got)
 	}
-	if got := to(InboundSpamFilter{Domains: []string{"b.example"}, Domain: "a.example"}); got != "" {
+	if got := to(InboundSpamFilter{DomainIDs: []int64{ids["b.example"]}, Domain: "a.example"}); got != "" {
 		t.Errorf("a chosen domain outside the scope = %q, want nothing", got)
 	}
 

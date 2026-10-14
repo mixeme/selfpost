@@ -47,7 +47,7 @@ func TestBaselineSchema(t *testing.T) {
 		"applications":          "id domain_id login address_mode auth_ip_restrict auth_allowed_ips created_at",
 		"application_addresses": "id application_id address",
 		"rate_limits":           "id scope ref_id max_messages window_seconds mode auto_multiplier auto_updated_at",
-		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from",
+		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from domain_id",
 		"logtail_state":         "path fingerprint read_offset updated_at",
 		"inbound_domains":       "id name recipient_mode created_at",
 		"inbound_transports":    "inbound_domain_id host port tls_mode",
@@ -55,7 +55,7 @@ func TestBaselineSchema(t *testing.T) {
 		"user_inbound_domains":  "user_id inbound_domain_id",
 		"dmarc_reports":         "id domain reporter report_id period_begin period_end received_at contact_email policy_p policy_sp policy_pct policy_adkim policy_aspf pass_count fail_count recipient",
 		"dmarc_report_records":  "id report_row_id source_ip count disposition spf_result dkim_result header_from",
-		"inbound_spam_log":      "id inbound_domain client_ip from_addr to_addr subject decision engine detail created_at",
+		"inbound_spam_log":      "id inbound_domain client_ip from_addr to_addr subject decision engine detail created_at inbound_domain_id",
 		"inbound_spam_list":     "id list_type entry_type value note created_at",
 		"send_log_lines":        "id queue_id logged_at line",
 		"notify_state":          "key phase count mark since sent_at",
@@ -105,8 +105,8 @@ func TestBaselineSchema(t *testing.T) {
 	rows.Close()
 	wantIdx := []string{
 		"idx_applications_login_nocase", "idx_dmarc_report_records_report", "idx_dmarc_reports_domain", "idx_dmarc_reports_received",
-		"idx_inbound_spam_log_created_at", "idx_inbound_spam_log_domain_created_at",
-		"idx_send_log_app_login_created_at", "idx_send_log_created_at", "idx_send_log_domain", "idx_send_log_lines_queue_id", "idx_send_log_queue_id", "idx_send_log_rejected",
+		"idx_inbound_spam_log_created_at", "idx_inbound_spam_log_domain_created_at", "idx_inbound_spam_log_domain_id_created_at",
+		"idx_send_log_app_login_created_at", "idx_send_log_created_at", "idx_send_log_domain", "idx_send_log_domain_id_created_at", "idx_send_log_lines_queue_id", "idx_send_log_queue_id", "idx_send_log_rejected",
 		"idx_sessions_expires_at",
 	}
 	sort.Strings(wantIdx)

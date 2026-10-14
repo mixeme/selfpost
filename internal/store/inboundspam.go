@@ -42,6 +42,10 @@ type InboundSpamEntry struct {
 	At time.Time
 }
 
+// inboundDomainID is the inbound_domain_id a journal row is written with: the
+// inbound domain registered under the row's name now (audit 2026-10-12, L12).
+const inboundDomainID = `(SELECT d.id FROM inbound_domains d WHERE d.name = ?)`
+
 // InsertInboundSpam records one journal row. It is called from the inbound
 // journal milter's hot path and from the log tailer, so it returns any error
 // for the caller to log; neither of them may hold up mail over it.
@@ -52,10 +56,10 @@ func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 	}
 	_, err := s.db.Exec(
 		`INSERT INTO inbound_spam_log
-			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at, inbound_domain_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, `+inboundDomainID+`)`,
 		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail,
-		at.UTC().Format(time.RFC3339),
+		at.UTC().Format(time.RFC3339), e.InboundDomain,
 	)
 	if err != nil {
 		return fmt.Errorf("insert inbound_spam_log: %w", err)
@@ -73,13 +77,13 @@ func (s *Store) InsertInboundSpamOnce(e InboundSpamEntry) (bool, error) {
 	at := e.At.UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
 		`INSERT INTO inbound_spam_log
-			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at)
-		 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at, inbound_domain_id)
+		 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, `+inboundDomainID+`
 		 WHERE NOT EXISTS (
 			SELECT 1 FROM inbound_spam_log
 			WHERE created_at = ? AND client_ip = ? AND from_addr = ? AND to_addr = ?
 			  AND decision = ? AND engine = ? AND detail = ?)`,
-		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail, at,
+		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail, at, e.InboundDomain,
 		at, e.ClientIP, e.From, e.To, e.Decision, e.Engine, e.Detail,
 	)
 	if err != nil {
@@ -133,9 +137,10 @@ type InboundSpamRow struct {
 // the UI: an empty field matches everything. Since and Until are days, both
 // inclusive and read as UTC days whatever the time of day they carry.
 //
-// Domains is the authorization scope, which no query parameter may widen: the
-// exhaustive set of inbound domain names the caller may read, applied as an IN
-// constraint. nil lifts it (the global role reads the whole journal, including
+// DomainIDs is the authorization scope, which no query parameter may widen:
+// the exhaustive set of inbound domains the caller may read, by id - a row of
+// a domain deleted since is nobody's (audit 2026-10-12, L12) - applied as an
+// IN constraint. nil lifts it (the global role reads the whole journal, including
 // rows of a domain deleted since); an empty set is a caller who reaches
 // nothing and gets nothing. Unlike SendLogFilter, forgetting the scope is
 // therefore the permissive case - the caller states "all" by leaving it out -
@@ -145,7 +150,9 @@ type InboundSpamFilter struct {
 	Decision string
 	Since    time.Time
 	Until    time.Time
-	Domains  []string
+	// DomainIDs: the inbound domains the caller may read, by id; nil reads
+	// everything (the global role).
+	DomainIDs []int64
 }
 
 // QueryInboundSpam returns journal rows matching filter, newest first, for
@@ -197,16 +204,16 @@ func (s *Store) CountInboundSpam(filter InboundSpamFilter) (int64, error) {
 func inboundSpamWhere(f InboundSpamFilter) (string, []any) {
 	var clauses []string
 	var args []any
-	if f.Domains != nil {
-		if len(f.Domains) == 0 {
+	if f.DomainIDs != nil {
+		if len(f.DomainIDs) == 0 {
 			return " WHERE 1 = 0", nil
 		}
-		marks := make([]string, len(f.Domains))
-		for i, name := range f.Domains {
+		marks := make([]string, len(f.DomainIDs))
+		for i, id := range f.DomainIDs {
 			marks[i] = "?"
-			args = append(args, name)
+			args = append(args, id)
 		}
-		clauses = append(clauses, "inbound_domain IN ("+strings.Join(marks, ", ")+")")
+		clauses = append(clauses, "inbound_domain_id IN ("+strings.Join(marks, ", ")+")")
 	}
 	if f.Domain != "" {
 		clauses = append(clauses, "inbound_domain = ?")

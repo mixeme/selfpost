@@ -57,3 +57,13 @@ func domainNameSet(domains []store.Domain) map[string]bool {
 	}
 	return m
 }
+
+// domainIDSet is the set of the ids of domains; a send-log row's DomainID is
+// in it when the row belongs to one of them (0, a row of no domain, never is).
+func domainIDSet(domains []store.Domain) map[int64]bool {
+	m := make(map[int64]bool, len(domains))
+	for _, d := range domains {
+		m[d.ID] = true
+	}
+	return m
+}

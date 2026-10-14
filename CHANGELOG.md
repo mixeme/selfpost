@@ -78,6 +78,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the form's own message, naming the field and the application (audit
   2026-10-12, M10).
 
+- **A domain added again starts with an empty log.** Send-log rows belonged
+  to a domain by its name, so a domain deleted and added again showed its
+  earlier mail to whoever it was assigned to next, and its statistics and
+  level-2 count went on counting it. A row now belongs to the domain of the
+  application that sent it, by id (migration `0008`, filled once from the
+  registry); the rows of a deleted domain are the global role's alone. The
+  inbound log follows the same rule (audit 2026-10-12, L12).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

@@ -94,7 +94,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if !p.IsGlobal() && !domainNameSet(allowed)[row.Domain] {
+	if !p.IsGlobal() && !domainIDSet(allowed)[row.DomainID] {
 		http.NotFound(w, r)
 		return
 	}
@@ -113,7 +113,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	// The names link to their pages when there is a page to go to: a domain
 	// that was deleted since, or an application of another domain, is text.
 	for _, d := range allowed {
-		if d.Name != row.Domain {
+		if d.ID != row.DomainID {
 			continue
 		}
 		in.DomainHref = view.DomainHref(d.ID)
@@ -317,8 +317,10 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	allowedNames := domainNameSet(assigned)
 
 	domainNames := make([]string, 0, len(assigned))
+	domainIDs := make([]int64, 0, len(assigned))
 	for _, d := range assigned {
 		domainNames = append(domainNames, d.Name)
+		domainIDs = append(domainIDs, d.ID)
 	}
 
 	loginSet := make(map[string]bool)
@@ -341,8 +343,10 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		Domain:   q.Get("domain"),
 		AppLogin: q.Get("app"),
 		// A global administrator reads the whole journal, including rows left
-		// behind by a domain that has since been deleted.
-		Domains:    domainNames,
+		// behind by a domain that has since been deleted; anyone else the rows
+		// of the domains assigned to them, by id - not those an earlier domain
+		// of the same name left (audit 2026-10-12, L12).
+		DomainIDs:  domainIDs,
 		AllDomains: p.IsGlobal(),
 	}
 	if !p.IsGlobal() {

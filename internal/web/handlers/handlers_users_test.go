@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
 )
 
 // The users form's writes, driven through the handlers (audit 2026-10-12, M7
@@ -95,5 +96,57 @@ func TestUserFormCreatesWithEmailAndReach(t *testing.T) {
 	}
 	if u.Email != "fresh@example.com" || u.Role != store.RoleDomain || len(u.DomainIDs) != 1 {
 		t.Fatalf("created %+v", u)
+	}
+}
+
+// A domain deleted and added again under its old name starts with an empty
+// log for whoever it is assigned to; its earlier rows are the global role's
+// alone (audit 2026-10-12, L12).
+func TestADomainAddedAgainShowsItsAssigneeNothingOld(t *testing.T) {
+	h, st := inboundHandlers(t)
+	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	old, _ := st.AddDomain("shop.example", "mail")
+	st.AddApplication(old.ID, "shop", store.AddressModeWildcard, nil)
+	if err := st.InsertQueued(store.SendLogEntry{QueueID: "OLDQ", Domain: "shop.example", AppLogin: "shop", To: "a@example.net", Subject: "old mail"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteDomain(old.ID); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := st.AddDomain("shop.example", "mail")
+	st.AddApplication(again.ID, "shop", store.AddressModeWildcard, nil)
+	if err := st.InsertQueued(store.SendLogEntry{QueueID: "NEWQ", Domain: "shop.example", AppLogin: "shop", To: "a@example.net", Subject: "new mail"}); err != nil {
+		t.Fatal(err)
+	}
+	owner := userWith(t, st, "owner", store.RoleDomain, store.Reach{DomainIDs: []int64{again.ID}})
+	rows, _ := st.QuerySendLog(store.SendLogFilter{AllDomains: true}, 10, 0)
+	var oldID, newID int64
+	for _, r := range rows {
+		if r.QueueID == "OLDQ" {
+			oldID = r.ID
+		} else {
+			newID = r.ID
+		}
+	}
+
+	page := func(p *auth.Principal, id int64) int {
+		return send(h.HandleDelivery, p, "GET", "/outbound/log/"+idStr(id), map[string]string{"id": idStr(id)}, nil).Code
+	}
+	if code := page(&owner, oldID); code != http.StatusNotFound {
+		t.Errorf("the old row's page for the new assignee = %d, want 404", code)
+	}
+	if code := page(&owner, newID); code != http.StatusOK {
+		t.Errorf("the new row's page for its assignee = %d, want 200", code)
+	}
+	if code := page(&root, oldID); code != http.StatusOK {
+		t.Errorf("the old row's page for the global role = %d, want 200", code)
+	}
+	body := send(h.HandleDeliveries, &owner, "GET", "/outbound/log", nil, nil).Body.String()
+	if strings.Contains(body, "old mail") || !strings.Contains(body, "new mail") {
+		t.Errorf("the new assignee's log shows the old row or misses the new one")
+	}
+	body = send(h.HandleDeliveries, &root, "GET", "/outbound/log", nil, nil).Body.String()
+	if !strings.Contains(body, "old mail") || !strings.Contains(body, "new mail") {
+		t.Errorf("the global log is missing a row")
 	}
 }

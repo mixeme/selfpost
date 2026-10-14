@@ -84,6 +84,11 @@ func TestRateLimitByNameAndLogin(t *testing.T) {
 
 func TestCountMessagesDistinctAndWindowed(t *testing.T) {
 	st := openTestStore(t)
+	// A domain's messages are those of its applications (send_log.domain_id).
+	d, _ := st.AddDomain("example.com", "selfpost")
+	if _, err := st.AddApplication(d.ID, "app1", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	// Two recipients share a queue-id → one message. A second message → two.
 	for _, to := range []string{"a@x.net", "b@x.net"} {

@@ -274,7 +274,13 @@ func TestUpdateStatusNoMatch(t *testing.T) {
 // decided who is asking, and the safe answer to that is nothing.
 func TestSendLogScopeIsMandatory(t *testing.T) {
 	st := openTestStore(t)
+	ids := map[string]int64{}
 	for _, domain := range []string{"first.example.ru", "second.example.ru"} {
+		d := addTestDomain(t, st, domain)
+		ids[domain] = d.ID
+		if _, err := st.AddApplication(d.ID, "app-"+domain, AddressModeWildcard, nil); err != nil {
+			t.Fatal(err)
+		}
 		if err := st.InsertQueued(SendLogEntry{
 			QueueID: "Q-" + domain, Domain: domain, AppLogin: "app-" + domain,
 			From: "noreply@" + domain, To: "public@example.net", Subject: domain,
@@ -288,14 +294,14 @@ func TestSendLogScopeIsMandatory(t *testing.T) {
 		want   []string
 	}{
 		"no scope":           {SendLogFilter{}, nil},
-		"empty scope":        {SendLogFilter{Domains: []string{}}, nil},
+		"empty scope":        {SendLogFilter{DomainIDs: []int64{}}, nil},
 		"all domains":        {SendLogFilter{AllDomains: true}, []string{"first.example.ru", "second.example.ru"}},
-		"one domain":         {SendLogFilter{Domains: []string{"first.example.ru"}}, []string{"first.example.ru"}},
-		"two domains":        {SendLogFilter{Domains: []string{"first.example.ru", "second.example.ru"}}, []string{"first.example.ru", "second.example.ru"}},
-		"unknown domain":     {SendLogFilter{Domains: []string{"third.example.ru"}}, nil},
-		"filter within":      {SendLogFilter{Domain: "first.example.ru", Domains: []string{"first.example.ru", "second.example.ru"}}, []string{"first.example.ru"}},
-		"filter outside":     {SendLogFilter{Domain: "second.example.ru", Domains: []string{"first.example.ru"}}, nil},
-		"app filter outside": {SendLogFilter{AppLogin: "app-second.example.ru", Domains: []string{"first.example.ru"}}, nil},
+		"one domain":         {SendLogFilter{DomainIDs: []int64{ids["first.example.ru"]}}, []string{"first.example.ru"}},
+		"two domains":        {SendLogFilter{DomainIDs: []int64{ids["first.example.ru"], ids["second.example.ru"]}}, []string{"first.example.ru", "second.example.ru"}},
+		"unknown domain":     {SendLogFilter{DomainIDs: []int64{9999}}, nil},
+		"filter within":      {SendLogFilter{Domain: "first.example.ru", DomainIDs: []int64{ids["first.example.ru"], ids["second.example.ru"]}}, []string{"first.example.ru"}},
+		"filter outside":     {SendLogFilter{Domain: "second.example.ru", DomainIDs: []int64{ids["first.example.ru"]}}, nil},
+		"app filter outside": {SendLogFilter{AppLogin: "app-second.example.ru", DomainIDs: []int64{ids["first.example.ru"]}}, nil},
 	} {
 		rows, err := st.QuerySendLog(tc.filter, 50, 0)
 		if err != nil {
@@ -350,5 +356,48 @@ func TestDeleteSendLogBefore(t *testing.T) {
 	rows := readSendLog(t, st)
 	if len(rows) != 1 || rows[0].QueueID != "NEW" {
 		t.Fatalf("retention kept wrong rows: %+v", rows)
+	}
+}
+
+// A domain deleted and added again under its old name starts with an empty
+// log for whoever it is assigned to: its earlier rows belong to no domain and
+// only the global role reads them (audit 2026-10-12, L12). Statistics and the
+// level-2 count follow the same rule.
+func TestADomainAddedAgainStartsWithAnEmptyLog(t *testing.T) {
+	st := openTestStore(t)
+	old := addTestDomain(t, st, "shop.example")
+	if _, err := st.AddApplication(old.ID, "shop", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertQueued(SendLogEntry{QueueID: "OLD", Domain: "shop.example", AppLogin: "shop", To: "a@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteDomain(old.ID); err != nil {
+		t.Fatal(err)
+	}
+	again := addTestDomain(t, st, "shop.example")
+	if _, err := st.AddApplication(again.ID, "shop", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertQueued(SendLogEntry{QueueID: "NEW", Domain: "shop.example", AppLogin: "shop", To: "a@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := st.QuerySendLog(SendLogFilter{DomainIDs: []int64{again.ID}}, 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].QueueID != "NEW" || rows[0].DomainID != again.ID {
+		t.Fatalf("the new domain's log = %+v, want its own row alone", rows)
+	}
+	all, _ := st.QuerySendLog(SendLogFilter{AllDomains: true}, 10, 0)
+	if len(all) != 2 {
+		t.Fatalf("the global log has %d rows, want both", len(all))
+	}
+	if n, err := st.CountMessages(RateLimitScopeDomain, "shop.example", time.Now().Add(-time.Hour)); err != nil || n != 1 {
+		t.Fatalf("level-2 count = %d, %v; want the new domain's one message", n, err)
+	}
+	if stats, err := st.DomainSendStats("shop.example", 90, time.Now().Add(-time.Hour)); err != nil || stats.Total != 1 {
+		t.Fatalf("statistics = %+v, %v; want one message", stats, err)
 	}
 }

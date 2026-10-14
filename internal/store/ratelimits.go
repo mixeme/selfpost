@@ -170,13 +170,17 @@ func (s *Store) RateLimit(scope, ref string) (RateLimit, bool, error) {
 // semantics — and excludes rows that were themselves rejected by a limit (they
 // were never sent). It reuses the send log the journal already writes (README
 // § Rate limiting — the limiter reuses the send log).
+//
+// A domain's messages are the rows of the domain registered under ref now, by
+// id: rows a deleted domain of the same name left behind are not its (audit
+// 2026-10-12, L12).
 func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error) {
-	var column string
+	var match string
 	switch scope {
 	case RateLimitScopeDomain:
-		column = "domain"
+		match = domainByName
 	case RateLimitScopeApp:
-		column = "app_login"
+		match = "app_login = ?"
 	default:
 		return 0, fmt.Errorf("unknown rate-limit scope %q", scope)
 	}
@@ -185,7 +189,7 @@ func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error)
 	// same format is chronologically correct (as in DeleteSendLogBefore).
 	err := s.db.QueryRow(
 		`SELECT COUNT(DISTINCT queue_id) FROM send_log
-		 WHERE `+column+` = ? AND status != ? AND created_at >= ?`,
+		 WHERE `+match+` AND status != ? AND created_at >= ?`,
 		ref, StatusRejected, since.UTC().Format(time.RFC3339),
 	).Scan(&n)
 	if err != nil {

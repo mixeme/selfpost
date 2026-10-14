@@ -189,6 +189,10 @@ func TestOverviewPageShowsVerdictsAndDomains(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddDomain: %v", err)
 	}
+	// A row is the domain's through its application (send_log.domain_id).
+	if _, err := h.store.AddApplication(d.ID, "app", store.AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
 	if err := h.store.InsertQueued(store.SendLogEntry{QueueID: "Q1", Domain: d.Name, AppLogin: "app", From: "noreply@" + d.Name, To: "public@example.net", Subject: "Hello"}); err != nil {
 		t.Fatalf("InsertQueued: %v", err)
 	}

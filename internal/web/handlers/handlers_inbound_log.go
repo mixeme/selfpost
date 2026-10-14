@@ -39,9 +39,11 @@ func (h *Handlers) HandleInboundLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	names := make([]string, 0, len(assigned))
+	ids := make([]int64, 0, len(assigned))
 	offered := make(map[string]bool, len(assigned))
 	for _, d := range assigned {
 		names = append(names, d.Name)
+		ids = append(ids, d.ID)
 		offered[d.Name] = true
 	}
 
@@ -65,7 +67,7 @@ func (h *Handlers) HandleInboundLog(w http.ResponseWriter, r *http.Request) {
 	// behind by a domain that has since been deleted; anyone else only what is
 	// assigned to them, however empty that is.
 	if !p.IsGlobal() {
-		query.Domains = names
+		query.DomainIDs = ids
 	}
 
 	total, err := h.store.CountInboundSpam(query)

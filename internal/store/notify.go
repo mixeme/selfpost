@@ -185,8 +185,8 @@ func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
 	rows, err := s.db.Query(
 		`SELECT d.name, a.login, COUNT(*), MIN(l.created_at)
 		 FROM send_log l
-		 JOIN applications a ON a.login = l.app_login
-		 JOIN domains d ON d.id = a.domain_id
+		 JOIN domains d ON d.id = l.domain_id
+		 JOIN applications a ON a.login = l.app_login AND a.domain_id = d.id
 		 WHERE l.status = 'rejected' AND l.created_at >= ? AND l.reason IN ('', 'limit')
 		   AND (EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'application' AND r.ref_id = a.id)
 		     OR EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'domain' AND r.ref_id = d.id))

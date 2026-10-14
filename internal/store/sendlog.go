@@ -40,6 +40,12 @@ type SendLogEntry struct {
 	HeaderFrom string
 }
 
+// loginDomainID is the domain_id a row is written with: the domain of the
+// application whose login it is, NULL for a login that is no application's
+// (audit 2026-10-12, L12). The domain name of the row stays what the
+// envelope said.
+const loginDomainID = `(SELECT a.domain_id FROM applications a WHERE a.login = ?)`
+
 // InsertQueued records an accepted message in the send log with status
 // "queued". It is called from the journal-milter hot path, so it returns any
 // error for the caller to log rather than deciding policy here; the milter
@@ -48,9 +54,9 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
 		`INSERT INTO send_log
-			(queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusQueued, now, now,
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at, domain_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, `+loginDomainID+`)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusQueued, now, now, e.AppLogin,
 	)
 	if err != nil {
 		return fmt.Errorf("insert send_log: %w", err)
@@ -67,9 +73,9 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
 		`INSERT INTO send_log
-			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, e.Reason, e.HeaderFrom, now, now,
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at, domain_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, `+loginDomainID+`)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, e.Reason, e.HeaderFrom, now, now, e.AppLogin,
 	)
 	if err != nil {
 		return fmt.Errorf("insert rejected send_log: %w", err)
@@ -201,9 +207,12 @@ func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) 
 // Persistence): a SendLogEntry plus the fields that only exist once a row has
 // been written (id, current status, timestamps).
 type SendLogRow struct {
-	ID       int64
-	QueueID  string
-	Domain   string
+	ID      int64
+	QueueID string
+	Domain  string
+	// DomainID is the domain the row belongs to; 0 when it is nobody's but
+	// the global role's (its domain was deleted, or its login was none).
+	DomainID int64
 	AppLogin string
 	From     string
 	To       string
@@ -231,9 +240,9 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(
-		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
+		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
 		 FROM send_log WHERE id = ?`, id,
-	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin, &row.From, &row.To,
+	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.DomainID, &row.AppLogin, &row.From, &row.To,
 		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendLogRow{}, ErrSendLogNotFound
@@ -252,9 +261,10 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 // Domain and AppLogin are the operator's own filters, chosen in the UI: an
 // empty field matches everything.
 //
-// Domains and AllDomains are the authorization scope, which no query parameter
-// may widen. Domains is the exhaustive set of domain names the caller is
-// entitled to read, applied as an IN constraint; AllDomains lifts that
+// DomainIDs and AllDomains are the authorization scope, which no query
+// parameter may widen. DomainIDs is the exhaustive set of domains the caller
+// is entitled to read, by id - a row whose domain was deleted is nobody's
+// (audit 2026-10-12, L12) - applied as an IN constraint; AllDomains lifts that
 // restriction and is the only way to read the whole journal. A zero-valued
 // filter therefore matches *no* rows: a caller that forgets to state a scope
 // gets an empty log rather than every tenant's mail, which is the failure mode
@@ -262,7 +272,7 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 type SendLogFilter struct {
 	Domain     string
 	AppLogin   string
-	Domains    []string
+	DomainIDs  []int64
 	AllDomains bool
 }
 
@@ -273,7 +283,7 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
 	rows, err := s.db.Query(
-		`SELECT id, queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
+		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
 		 FROM send_log`+where+`
 		 ORDER BY id DESC
 		 LIMIT ? OFFSET ?`,
@@ -290,7 +300,7 @@ func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLog
 			row                  SendLogRow
 			createdAt, updatedAt string
 		)
-		if err := rows.Scan(&row.ID, &row.QueueID, &row.Domain, &row.AppLogin,
+		if err := rows.Scan(&row.ID, &row.QueueID, &row.Domain, &row.DomainID, &row.AppLogin,
 			&row.From, &row.To, &row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan send_log row: %w", err)
 		}
@@ -319,15 +329,15 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 		// No scope is not "no restriction": a domain administrator whose last
 		// assignment was deleted owns nothing in the journal and must see
 		// nothing, and the same clause catches a caller that never set a scope.
-		if len(f.Domains) == 0 {
+		if len(f.DomainIDs) == 0 {
 			return " WHERE 1 = 0", nil
 		}
-		marks := make([]string, len(f.Domains))
-		for i, name := range f.Domains {
+		marks := make([]string, len(f.DomainIDs))
+		for i, id := range f.DomainIDs {
 			marks[i] = "?"
-			args = append(args, name)
+			args = append(args, id)
 		}
-		clauses = append(clauses, "domain IN ("+strings.Join(marks, ", ")+")")
+		clauses = append(clauses, "domain_id IN ("+strings.Join(marks, ", ")+")")
 	}
 	if f.Domain != "" {
 		clauses = append(clauses, "domain = ?")
