@@ -132,6 +132,38 @@ func TestCloseUnreportedClosesOnlyQueuedRows(t *testing.T) {
 	}
 }
 
+// A delivery line about a row the sweep closed proves the sweep guessed what
+// the log could have said: the log's status wins, the reason goes, and the day
+// counts one contradiction - once, however often the line is read again.
+func TestUpdateStatusCountsAContradictedSweep(t *testing.T) {
+	st := openTestStore(t)
+	if err := st.InsertQueued(SendLogEntry{QueueID: "Q1", To: "a@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CloseUnreported("Q1", "a@example.net"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if n, err := st.UpdateStatus("Q1", "A@example.net", StatusSent); err != nil || n != 1 {
+			t.Fatalf("UpdateStatus = %d, %v", n, err)
+		}
+	}
+	var status, reason string
+	if err := st.db.QueryRow(`SELECT status, reason FROM send_log WHERE queue_id = 'Q1'`).Scan(&status, &reason); err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSent || reason != "" {
+		t.Fatalf("status %q reason %q, want sent and no reason", status, reason)
+	}
+	days, err := st.DeliveryLogDays()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(days) != 1 || days[0].Contradicted != 1 {
+		t.Fatalf("days = %+v, want one day with one contradiction", days)
+	}
+}
+
 // The reconcile sweep asks for the rows old enough that Postfix should have
 // reported on them by now. A message accepted moments ago is simply in flight,
 // and one the milter refused never reached the queue at all, so neither is the

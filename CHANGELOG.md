@@ -22,6 +22,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the row still being `queued`, and the row it closes carries the reason
   `reconcile` (audit 2026-10-12, H3).
 
+### Added
+
+- **The delivery log measures its own guesses** (migration `0007`). A table
+  `delivery_log_days` counts, per UTC day, the rows the reconcile sweep
+  closed, those of them a delivery line later contradicted (the log's status
+  then replaces the sweep's), the seconds the log tailer could not read
+  `mail.log`, and the rows still queued past Postfix's queue lifetime. No page
+  shows it: it is read off a copy of the database after a month, to decide
+  by a rule written in the audit whether the sweep stays (audit 2026-10-12,
+  H3).
+
 ## [2.4.2] - 2026-10-14
 
 Release hygiene: stage 0 of the 2026-10-12 audit. Nothing the panel or the

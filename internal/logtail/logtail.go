@@ -32,6 +32,12 @@ type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	CloseUnreported(queueID, recipient string) (int64, error)
+	// The counters of delivery_log_days (store/deliverylog.go).
+	AddReconcileClosed(at time.Time, n int64) error
+	AddTailerBlind(from time.Time, d time.Duration) error
+	CountQueuedOlderThan(cutoff time.Time) (int64, error)
+	SetQueuedOverLifetime(at time.Time, n int64) error
+	PruneDeliveryLogDays(now time.Time) error
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
 	InsertSendLogLines(lines []store.SendLogLine, once bool) (int, error)
 	PruneSendLogLines(cutoff time.Time) (int64, error)
@@ -55,6 +61,10 @@ func RetentionInterval() time.Duration {
 // queueIDs lists the messages Postfix currently holds, for the reconcile sweep.
 // It is a var so tests can answer without a running Postfix.
 var queueIDs = postfix.QueueIDs
+
+// retryPolicy reads Postfix's queue lifetimes, for counting the rows left
+// queued past them. A var for the same reason.
+var retryPolicy = postfix.LoadRetryPolicy
 
 const (
 	// reconcileInterval is how often the sweep compares stuck rows against the
@@ -179,6 +189,11 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 	case <-caughtUp:
 	}
 
+	// A message Postfix still works on stays queued until its first retry after
+	// the queue lifetime, which can be a whole backoff later.
+	policy := retryPolicy()
+	overLifetime := policy.LongestLifetime() + policy.MaximalBackoff
+
 	t := time.NewTicker(reconcileInterval)
 	defer t.Stop()
 	for {
@@ -186,8 +201,23 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			reconcile(st, time.Now().UTC().Add(-reconcileGrace))
+			now := time.Now().UTC()
+			reconcile(st, now.Add(-reconcileGrace))
+			countStuck(st, now, overLifetime)
 		}
+	}
+}
+
+// countStuck records how many rows are still queued past Postfix's queue
+// lifetime - what the log would leave unresolved if there were no sweep. Each
+// sweep overwrites the day's value, so a past day keeps its last sweep's.
+func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
+	n, err := st.CountQueuedOlderThan(now.Add(-overLifetime))
+	if err == nil {
+		err = st.SetQueuedOverLifetime(now, n)
+	}
+	if err != nil {
+		log.Printf("log-tailer: count rows queued past the queue lifetime: %v", err)
 	}
 }
 
@@ -236,6 +266,9 @@ func reconcile(st StatusStore, cutoff time.Time) {
 	}
 	if closed > 0 {
 		log.Printf("log-tailer: reconcile: closed %d row(s) Postfix no longer holds and never reported", closed)
+		if err := st.AddReconcileClosed(time.Now(), closed); err != nil {
+			log.Printf("log-tailer: reconcile: count: %v", err)
+		}
 	}
 }
 
@@ -260,8 +293,15 @@ func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays)
 		}
 	}
 
+	pruneDays := func() {
+		if err := st.PruneDeliveryLogDays(time.Now()); err != nil {
+			log.Printf("log-tailer: %v", err)
+		}
+	}
+
 	prune()
 	pruneLines(st)
+	pruneDays()
 	t := time.NewTicker(retentionInterval)
 	defer t.Stop()
 	for {
@@ -271,6 +311,7 @@ func retentionLoop(ctx context.Context, st StatusStore, retention RetentionDays)
 		case <-t.C:
 			prune()
 			pruneLines(st)
+			pruneDays()
 		}
 	}
 }
@@ -552,12 +593,14 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 	}
 
 	var once sync.Once
+	blind := &blindness{add: tr.st.AddTailerBlind}
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			blind.see(time.Now(), false)
 			tr.record(f, read(), true) // shutdown: the next start resumes here
 			return nil
 		case <-ticker.C:
@@ -565,6 +608,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			once.Do(func() { close(caughtUp) })
 			ni, err := os.Stat(path)
 			if err != nil {
+				blind.see(time.Now(), true)
 				continue // file briefly gone mid-rotation; try again next tick
 			}
 			pos, _ := f.Seek(0, io.SeekCurrent)
@@ -576,12 +620,57 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 				drain()
 				if err := openAt(0, io.SeekStart); err != nil {
 					log.Printf("log-tailer: reopen %s: %v", path, err)
+					blind.see(time.Now(), true)
 					continue
 				}
+				blind.see(time.Now(), false)
 				tr.adopt(f)
 				continue
 			}
+			blind.see(time.Now(), false)
 			tr.record(f, read(), false)
 		}
 	}
+}
+
+// blindness measures the stretches in which follow cannot read mail.log - the
+// file gone, reopening it failing - for delivery_log_days. A stretch is
+// stored when it ends, and every minute while it lasts, so a long one is not
+// lost to a restart and lands on the days it covered. A stretch shorter than
+// blindMin is not counted: a rotation leaves the name missing for a tick
+// between rename and create, and that loses nothing - the new file is read
+// from its start.
+type blindness struct {
+	add   func(from time.Time, d time.Duration) error
+	since time.Time // start of the current stretch; zero when reading
+	long  bool      // the current stretch has passed blindMin
+}
+
+const blindMin = 3 * time.Second
+
+func (b *blindness) see(now time.Time, blind bool) {
+	if blind && b.since.IsZero() {
+		b.since = now
+		return
+	}
+	if b.since.IsZero() {
+		return
+	}
+	d := now.Sub(b.since)
+	if d >= blindMin {
+		b.long = true
+	}
+	if blind && d < time.Minute {
+		return
+	}
+	if b.long {
+		if err := b.add(b.since, d); err != nil {
+			log.Printf("log-tailer: count the time mail.log could not be read: %v", err)
+		}
+	}
+	if blind {
+		b.since = now // the stretch goes on; the next part starts here
+		return
+	}
+	b.since, b.long = time.Time{}, false
 }

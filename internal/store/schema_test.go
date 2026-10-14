@@ -60,6 +60,7 @@ func TestBaselineSchema(t *testing.T) {
 		"send_log_lines":        "id queue_id logged_at line",
 		"notify_state":          "key phase count mark since sent_at",
 		"sender_check_days":     "day down_seconds deferred",
+		"delivery_log_days":     "day reconcile_closed reconcile_contradicted tailer_blind_seconds queued_over_lifetime",
 	}
 	rows, err := st.db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -114,8 +115,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 6 {
-		t.Errorf("user_version = %d, %v; want 6", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 7 {
+		t.Errorf("user_version = %d, %v; want 7", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -191,8 +192,8 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 6 {
-		t.Errorf("user_version = %d, %v; want 6", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 7 {
+		t.Errorf("user_version = %d, %v; want 7", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)

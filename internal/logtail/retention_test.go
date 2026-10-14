@@ -27,6 +27,12 @@ func (s *retentionProbeStore) CloseUnreported(string, string) (int64, error) {
 	return 0, nil
 }
 
+func (s *retentionProbeStore) AddReconcileClosed(time.Time, int64) error     { return nil }
+func (s *retentionProbeStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
+func (s *retentionProbeStore) CountQueuedOlderThan(time.Time) (int64, error) { return 0, nil }
+func (s *retentionProbeStore) SetQueuedOverLifetime(time.Time, int64) error  { return nil }
+func (s *retentionProbeStore) PruneDeliveryLogDays(time.Time) error          { return nil }
+
 func (s *retentionProbeStore) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	s.mu.Lock()
 	s.cutoff = cutoff

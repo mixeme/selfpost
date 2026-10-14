@@ -147,6 +147,11 @@ type captureStore struct {
 	// queued is what ListQueuedOlderThan returns, for the reconcile sweep.
 	queued    []store.QueuedDelivery
 	queuedErr error
+	// closed sums AddReconcileClosed; stuckCount is what CountQueuedOlderThan
+	// answers and stuck what SetQueuedOverLifetime was given.
+	closed     int64
+	stuckCount int64
+	stuck      []int64
 
 	// lines are the log lines kept for messages' pages; pruned is the cutoff of
 	// each PruneSendLogLines call.
@@ -217,6 +222,28 @@ func (c *captureStore) CloseUnreported(queueID, recipient string) (int64, error)
 }
 
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
+
+// The counters of delivery_log_days: closed and stuck are kept for the sweep's
+// tests, the rest is not looked at.
+func (c *captureStore) AddReconcileClosed(_ time.Time, n int64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.closed += n
+	return nil
+}
+func (c *captureStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
+func (c *captureStore) CountQueuedOlderThan(time.Time) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.stuckCount, nil
+}
+func (c *captureStore) SetQueuedOverLifetime(_ time.Time, n int64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.stuck = append(c.stuck, n)
+	return nil
+}
+func (c *captureStore) PruneDeliveryLogDays(time.Time) error { return nil }
 
 func (c *captureStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
 	c.mu.Lock()
@@ -443,6 +470,59 @@ func TestReconcileClosesOnlyWhatPostfixNoLongerHolds(t *testing.T) {
 	got := cs.snapshot()
 	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.ReasonReconcile {
 		t.Fatalf("got %v, want only the message Postfix dropped closed by the sweep", got)
+	}
+	if cs.closed != 1 {
+		t.Fatalf("the day counts %d closed row(s), want 1", cs.closed)
+	}
+}
+
+// Each sweep records how many rows are queued past the queue lifetime, as a
+// level for the day.
+func TestCountStuckRecordsTheLevel(t *testing.T) {
+	cs := &captureStore{stuckCount: 3}
+	countStuck(cs, time.Now(), time.Hour)
+	cs.stuckCount = 0
+	countStuck(cs, time.Now(), time.Hour)
+	if len(cs.stuck) != 2 || cs.stuck[0] != 3 || cs.stuck[1] != 0 {
+		t.Fatalf("levels recorded = %v, want [3 0]", cs.stuck)
+	}
+}
+
+// The tailer's blind time: a rotation's one-tick gap is not counted, a longer
+// stretch is, a stretch that lasts is stored a minute at a time from where the
+// last part ended, and reading again ends it.
+func TestBlindnessCountsStretchesThatMatter(t *testing.T) {
+	type part struct {
+		from time.Time
+		d    time.Duration
+	}
+	var got []part
+	b := &blindness{add: func(from time.Time, d time.Duration) error {
+		got = append(got, part{from, d})
+		return nil
+	}}
+	t0 := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	at := func(s int) time.Time { return t0.Add(time.Duration(s) * time.Second) }
+
+	b.see(at(0), true) // rotation: gone for a tick
+	b.see(at(1), false)
+	b.see(at(2), false)
+	if len(got) != 0 {
+		t.Fatalf("a one-second gap was counted: %v", got)
+	}
+
+	for s := 10; s <= 80; s++ { // blind for 75 s
+		b.see(at(s), true)
+	}
+	b.see(at(85), false)
+	want := []part{{at(10), 60 * time.Second}, {at(70), 15 * time.Second}}
+	if len(got) != len(want) {
+		t.Fatalf("parts = %v, want %v", got, want)
+	}
+	for i := range want {
+		if !got[i].from.Equal(want[i].from) || got[i].d != want[i].d {
+			t.Errorf("part %d = %v, want %v", i, got[i], want[i])
+		}
 	}
 }
 

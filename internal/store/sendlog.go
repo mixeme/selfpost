@@ -83,14 +83,44 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 // case between the milter (envelope) and the delivery log. It returns the
 // number of rows updated so the caller can tell whether the line matched a
 // journal entry.
+//
+// A row the reconcile sweep closed (reason "reconcile") that a delivery line
+// now speaks of was closed on a guess the log could have settled: the log
+// wins, the reason is cleared, and the day's reconcile_contradicted counts it
+// (delivery_log_days) - once, since the row no longer carries the reason.
 func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.db.Exec(
-		`UPDATE send_log SET status = ?, updated_at = ?
+	now := time.Now().UTC()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("update send_log status: %w", err)
+	}
+	defer tx.Rollback()
+	var contradicted int64
+	if err := tx.QueryRow(
+		`SELECT COUNT(*) FROM send_log WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE AND reason = ?`,
+		queueID, recipient, ReasonReconcile,
+	).Scan(&contradicted); err != nil {
+		return 0, fmt.Errorf("update send_log status: %w", err)
+	}
+	res, err := tx.Exec(
+		`UPDATE send_log SET status = ?, updated_at = ?,
+			reason = CASE WHEN reason = ? THEN '' ELSE reason END
 		 WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE`,
-		status, now, queueID, recipient,
+		status, now.Format(time.RFC3339), ReasonReconcile, queueID, recipient,
 	)
 	if err != nil {
+		return 0, fmt.Errorf("update send_log status: %w", err)
+	}
+	if contradicted > 0 {
+		if _, err := tx.Exec(
+			`INSERT INTO delivery_log_days (day, reconcile_contradicted) VALUES (?, ?)
+			 ON CONFLICT (day) DO UPDATE SET reconcile_contradicted = reconcile_contradicted + excluded.reconcile_contradicted`,
+			now.Format(dayLayout), contradicted,
+		); err != nil {
+			return 0, fmt.Errorf("update send_log status: count the contradicted sweep: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("update send_log status: %w", err)
 	}
 	n, _ := res.RowsAffected()
