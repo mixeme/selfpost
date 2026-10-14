@@ -400,7 +400,7 @@ func TestOutAppCreatedShowsLoginAndPasswordOnce(t *testing.T) {
 	pageHas(t, "New password", out,
 		`<h1 class="title is-3">New password for <span class="sp-mono">prod-server</span></h1>`,
 		`<div class="box sp-credential">`, `<h2>Shown once</h2>`, `Not stored — copy it now`, `ti-eye`,
-		`<input class="input" readonly value="prod-server">`, `<input class="input" readonly value="kT7v-Qm2x-Lp9d-Ue4s-Hn6b-Rz3w">`,
+		`<input class="input" readonly value="prod-server">`, `<input class="input" readonly value="kT7v-Qm2x-Lp9d-Ue4s-Hn6b-Rz3w" data-secret>`,
 		`The previous password stopped working when this one was generated.`,
 		`href="/outbound/domains/1">Done — back to example.org</a>`,
 		`<h2>Connect with</h2>`, `mail.example.org`, `465 SSL/TLS · 587 STARTTLS`, `*@example.org`,

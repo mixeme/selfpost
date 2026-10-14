@@ -270,7 +270,7 @@ func NewOutAppCreated(m Meta, domainID int64, domain, login, password string, fr
 			Title: "New password for", Code: login},
 		Credential: Box{Icon: "ti-eye", Title: "Shown once", End: Plain("Not stored — copy it now"), Variant: BoxCredential},
 		Login:      CopyField{Label: "Login", Value: login},
-		Password:   CopyField{Label: "Password", Value: password, Help: help},
+		Password:   CopyField{Label: "Password", Value: password, Help: help, Secret: true},
 		Done:       Foot{Button: &Action{Label: "Done — back to " + domain, Href: DomainHref(domainID), Primary: true}},
 		Connect:    Box{Icon: "ti-plug", Title: "Connect with"},
 		Facts: []Fact{

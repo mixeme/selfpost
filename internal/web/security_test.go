@@ -93,7 +93,7 @@ func TestSecurityHeaders(t *testing.T) {
 		"Content-Security-Policy":   contentSecurityPolicy,
 		"X-Content-Type-Options":    "nosniff",
 		"X-Frame-Options":           "DENY",
-		"Referrer-Policy":           "no-referrer",
+		"Referrer-Policy":           "same-origin",
 		"Strict-Transport-Security": strictTransportSecurity,
 	}
 	for name, value := range want {

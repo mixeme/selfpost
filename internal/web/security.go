@@ -65,10 +65,17 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		// CSP3 § 6.4.2.2: 'none' is DENY, and where frame-ancestors is
 		// enforced X-Frame-Options is ignored.
 		h.Set("X-Frame-Options", "DENY")
-		// The panel's behaviour never depends on the referrer, so the strictest
-		// value is free: panel URLs carry domain names and record identifiers
-		// that need not leak to anything the administrator clicks through to.
-		h.Set("Referrer-Policy", "no-referrer")
+		// Panel URLs carry domain names and record identifiers that need not
+		// leak to anything the administrator clicks through to: same-origin
+		// sends no referrer to another site. Not no-referrer, which the
+		// origin check below depends on: under it a browser sends a form
+		// POST - a navigation - with Origin: null, refused whenever
+		// Sec-Fetch-Site is absent (Safari before 16.4, any browser over
+		// plain HTTP at a name). Fetch Standard § 3.2 "append a request
+		// `Origin` header": "no-referrer" sets the serialised origin to null;
+		// "same-origin" does so only when the request is not same origin
+		// with its URL (assumptions D-B3).
+		h.Set("Referrer-Policy", "same-origin")
 		if s.cfg.CookieSecure {
 			h.Set("Strict-Transport-Security", strictTransportSecurity)
 		}
@@ -131,8 +138,9 @@ func originAllowed(r *http.Request) bool {
 	// Older browsers send only Origin, and so does a current one over plain
 	// HTTP at a name other than localhost: Fetch Metadata § 3 appends its
 	// headers only for a potentially trustworthy URL. Fetch Standard § 3.2: a
-	// request that is neither GET nor HEAD carries Origin. (Which value it
-	// carries under this panel's Referrer-Policy: assumptions-2026-10-14, D-B3.)
+	// request that is neither GET nor HEAD carries Origin, and under this
+	// panel's Referrer-Policy, same-origin, it is the page's own origin for a
+	// form of the panel (§ 3.2; assumptions-2026-10-14, D-B3).
 	// Compare hosts, not full origins: the panel speaks plain HTTP behind the
 	// proxy and does not know its own external scheme, while Origin will say
 	// https.
@@ -154,7 +162,8 @@ func originAllowed(r *http.Request) bool {
 		// Fetch Standard § 2.2.5 "serializing a request origin": "null" for a
 		// redirect-tainted request; HTML § 7.1.1: an opaque origin serialises
 		// to "null"; url.Parse("null") has no Host. (Fetch § 3.2 also sends
-		// "null" under Referrer-Policy no-referrer: D-B3 of the same register.)
+		// "null" under Referrer-Policy no-referrer, which this panel therefore
+		// does not set: D-B3 of the same register.)
 		return false
 	}
 	return u.Host == r.Host

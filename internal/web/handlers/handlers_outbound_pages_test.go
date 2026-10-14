@@ -314,11 +314,11 @@ func TestPasswordIsShownOnceAndNeverCached(t *testing.T) {
 	rec := postFormAs(s.h.HandleApplicationCreate, globalPrincipal, "/outbound/domains/1/applications/new", s.paths, url.Values{
 		"login": {"prod-server"}, "mode": {"list"}, "addresses": {"alerts@example.org"},
 	})
-	if rec.Code != http.StatusCreated || rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("Pragma") != "no-cache" {
+	if rec.Code != http.StatusCreated || rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("Pragma") != "" {
 		t.Fatalf("create = %d, Cache-Control %q", rec.Code, rec.Header().Get("Cache-Control"))
 	}
 	password := s.sasl["prod-server"]
-	has(t, "created", rec.Body.String(), `<h2>Shown once</h2>`, `value="`+password+`"`, `value="prod-server"`,
+	has(t, "created", rec.Body.String(), `<h2>Shown once</h2>`, `value="`+password+`" data-secret>`, `value="prod-server">`,
 		`If this one is lost, generate another from the application&#39;s page.`, `alerts@example.org`, `465 SSL/TLS · 587 STARTTLS`,
 		`href="/outbound/domains/1">Done — back to example.org</a>`)
 	lacks(t, "created", rec.Body.String(), `stopped working`)

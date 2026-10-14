@@ -264,7 +264,7 @@ func (c *panelClient) applicationID(domainID, login string) (string, error) {
 // before returning.
 func extractCodeRow(body, label string) (string, bool) {
 	pattern := `<label class="label">` + regexp.QuoteMeta(label) + `</label>\s*<div class="field has-addons"><div class="control is-expanded">` +
-		`(?:<input class="input" readonly value="([^"]*)">|<textarea class="textarea" rows="\d+" readonly>([^<]*)</textarea>)`
+		`(?:<input class="input" readonly value="([^"]*)"(?: data-secret)?>|<textarea class="textarea" rows="\d+" readonly(?: data-secret)?>([^<]*)</textarea>)`
 	m := regexp.MustCompile(pattern).FindStringSubmatch(body)
 	if m == nil {
 		return "", false

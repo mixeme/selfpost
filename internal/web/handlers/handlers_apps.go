@@ -393,14 +393,15 @@ func (h *Handlers) recalcApp(appID int64) error {
 	return h.recalcRateLimit(store.RateLimitScopeApp, appID)
 }
 
-// noStore keeps a page that shows a secret out of every cache and out of the
-// browser's history copy: the password on it is shown once.
-// RFC 9111 § 5.2.2.5: no-store keeps it out of every HTTP cache, private and
-// shared. The history part is not what it governs (§ 6), and Pragma has no
-// defined meaning in a response (§ 5.4): assumptions-2026-10-14, D-B13.
+// noStore keeps a page that shows a secret out of every HTTP cache, private
+// and shared (RFC 9111 § 5.2.2.5): the password on it is shown once. A
+// browser's history - the back/forward cache - is not what it governs: § 6,
+// a history mechanism "might honor" no-store. So the page's field is also
+// marked secret, and panel.js empties it when the page is left (pagehide).
+// No Pragma: in a response it "was never specified" (§ 5.4). Assumptions
+// D-B13.
 func noStore(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
 }
 
 // blankAppForm is the application form as it opens: any address of the domain,

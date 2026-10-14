@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,4 +137,42 @@ func writeCertWithoutItsKey(certPath string, notAfter time.Time) error {
 		return err
 	}
 	return os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o644)
+}
+
+// testFormPostWithTheBrowsersOrigin: a browser on a plain-HTTP panel at a
+// name sends no Sec-Fetch-Site (Fetch Metadata § 3: only for a potentially
+// trustworthy URL), and its form POST - a navigation - carries Origin by the
+// page's Referrer-Policy (Fetch Standard § 3.2): its own origin under the
+// panel's same-origin, which passes; "null" under no-referrer, which the
+// panel sent until 2.5.2 and which the origin check refuses (assumptions
+// D-B3). The client here is not a browser: it sends what one would.
+func testFormPostWithTheBrowsersOrigin(t *testing.T, sc *scenario) {
+	resp, _, err := sc.panel.get("/server/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Header.Get("Referrer-Policy"); got != "same-origin" {
+		t.Fatalf("Referrer-Policy %q, want same-origin", got)
+	}
+	post := func(origin string) int {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, panelBaseURL+"/server/health/recheck", strings.NewReader(""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", origin)
+		resp, err := sc.panel.http.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := post(panelBaseURL); code != http.StatusOK {
+		t.Fatalf("POST with the page's own Origin: status %d, want 200 after the redirect", code)
+	}
+	if code := post("null"); code != http.StatusForbidden {
+		t.Fatalf("POST with Origin: null: status %d, want 403", code)
+	}
 }

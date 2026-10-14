@@ -155,7 +155,7 @@
      CopyField): one line, or a textarea when Rows is set — a DKIM key. The
      button is wired by panel.js through data-copy. */}}
 {{define "copy_field"}}<div class="field"><label class="label">{{.Label}}</label>
-<div class="field has-addons"><div class="control is-expanded">{{if .Rows}}<textarea class="textarea" rows="{{.Rows}}" readonly>{{.Value}}</textarea>{{else}}<input class="input" readonly value="{{.Value}}">{{end}}</div><div class="control"><button type="button" class="button" data-copy><i class="ti ti-copy"></i>Copy</button></div></div>
+<div class="field has-addons"><div class="control is-expanded">{{if .Rows}}<textarea class="textarea" rows="{{.Rows}}" readonly{{if .Secret}} data-secret{{end}}>{{.Value}}</textarea>{{else}}<input class="input" readonly value="{{.Value}}"{{if .Secret}} data-secret{{end}}>{{end}}</div><div class="control"><button type="button" class="button" data-copy><i class="ti ti-copy"></i>Copy</button></div></div>
 {{if .Help}}<p class="help">{{template "inline" .Help}}</p>
 {{end}}</div>{{end}}
 

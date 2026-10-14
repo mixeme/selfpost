@@ -63,6 +63,22 @@
     input.focus();
   });
 
+  // --- Secrets shown once ------------------------------------------------
+  // A password shown once is in a field marked data-secret. Cache-Control:
+  // no-store keeps the page out of HTTP caches, but a browser may still keep
+  // the page in its back/forward cache and show it again on Back (RFC 9111
+  // § 6: a history mechanism "might honor" no-store). Emptying the field when
+  // the page is left means a restored page shows nothing to copy. HTML Living
+  // Standard, § 7.5.9 "Unloading documents", "unload a Document", step 10.2:
+  // pagehide is fired whether or not the document is kept for later history
+  // traversal (its salvageable state, the event's persisted).
+  window.addEventListener("pagehide", function () {
+    var secrets = document.querySelectorAll("[data-secret]");
+    for (var i = 0; i < secrets.length; i++) {
+      secrets[i].value = "";
+    }
+  });
+
   // --- Confirmation on destructive forms --------------------------------
   // Forms that delete something or invalidate a working credential carry a
   // data-confirm message. The prompt lives here rather than in an inline

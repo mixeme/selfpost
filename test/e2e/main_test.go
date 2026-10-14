@@ -174,6 +174,9 @@ func TestE2E(t *testing.T) {
 	run("health_shows_what_is_served", func(t *testing.T) {
 		testHealthShowsWhatIsServed(t, sc)
 	})
+	run("form_post_with_the_browsers_origin", func(t *testing.T) {
+		testFormPostWithTheBrowsersOrigin(t, sc)
+	})
 
 	run("inbound_ui_absent_when_disabled", func(t *testing.T) {
 		resp, body, err := sc.panel.get("/overview")

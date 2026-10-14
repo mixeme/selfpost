@@ -131,6 +131,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   copy, names a renewal waiting in the mount, and warns when it has waited
   longer than the daily check allows; the expiry notice is not sent while a
   renewal waits on time (assumptions A-65).
+- **The panel works in browsers that do not say where a request comes
+  from.** The panel's `Referrer-Policy: no-referrer` made a browser send a
+  form's `Origin` as `null`, which the panel refuses unless the browser also
+  sends `Sec-Fetch-Site`: in Safari before 16.4, or in any browser on a
+  panel served over plain HTTP at a name, every form - signing in
+  included - was refused. The policy is now `same-origin`, which still
+  sends nothing to other sites (assumptions D-B3).
+- **A password shown once is emptied when its page is left,** so a browser
+  that keeps the page for its Back button shows an empty field; the
+  meaningless `Pragma` header goes (assumptions D-B13).
 - **Words for what happens to mail match Postfix's.** A message refused with
   a temporary error while the panel or the spam filter does not answer was
   called deferred, which in Postfix's words is mail waiting in its queue;

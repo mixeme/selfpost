@@ -405,6 +405,10 @@ type CopyField struct {
 	Value string
 	Rows  int
 	Help  Text
+	// Secret marks a value shown once: panel.js empties the field when the
+	// page is left, so a page the browser restores from its back/forward
+	// cache does not show it again.
+	Secret bool
 }
 
 // Fact is the input of facts (as a slice): a label and its value. Mono sets the

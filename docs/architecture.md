@@ -776,7 +776,7 @@ are in [plans/panel-redesign.md](plans/panel-redesign.md) § Enforcement.
 on every response: `Content-Security-Policy: default-src 'self'; object-src
 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
 `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
-`Referrer-Policy: no-referrer`, and `Strict-Transport-Security` when the cookie
+`Referrer-Policy: same-origin`, and `Strict-Transport-Security` when the cookie
 is `Secure`. Because the policy has no exemptions, no template carries an
 inline `<script>`, an event-handler attribute or `style="…"` — the page's
 behaviour is `htmx.min.js` plus `panel.js` (copy and *fill* buttons, the
