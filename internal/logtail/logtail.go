@@ -30,13 +30,14 @@ import (
 // far into mail.log it has read. *store.Store satisfies it.
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
-	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
+	ExpireMessage(queueID string) (int64, error)
+	ListOpenOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	CloseUnreported(id int64) (int64, error)
 	// The counters of delivery_log_days (store/deliverylog.go).
 	AddReconcileClosed(at time.Time, n int64) error
 	AddReconcileMissed(at time.Time, n int64) error
 	AddTailerBlind(from time.Time, d time.Duration) error
-	CountQueuedOlderThan(cutoff time.Time) (int64, error)
+	CountOpenOlderThan(cutoff time.Time) (int64, error)
 	SetQueuedOverLifetime(at time.Time, n int64) error
 	PruneDeliveryLogDays(now time.Time) error
 	RefusalStore
@@ -132,13 +133,33 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 		status = store.StatusDeferred
 	case "bounced":
 		status = store.StatusBounced
-	case "expired":
-		// Postfix gave up after the queue lifetime; a final failure for us.
-		status = store.StatusBounced
 	default:
 		return "", "", "", false
 	}
 	return m[1], m[2], status, true
+}
+
+// expiryRe matches qmgr's line for a message it gave up on:
+//
+//	postfix/qmgr[93]: 41E862C00D9E: from=<app@example.org>, status=expired, returned to sender
+//
+// Postfix 3.7.11, src/qmgr/qmgr_active.c, qmgr_active_done_25_generic():
+// msg_info("%s: from=<%s>, status=%s, returned to sender") with "expired"
+// once the queue lifetime has passed, "force-expired" after postsuper -e.
+// It is the only line about the expiry, one per message, and no recipient is
+// named (assumptions A-8). The line must end there: the sender is the
+// client's text, and only qmgr writes this shape.
+var expiryRe = regexp.MustCompile(`^\S+ \S*/qmgr\[\d+\]: ([0-9A-Za-z]+): from=<.*>, status=(?:force-)?expired, returned to sender\s*$`)
+
+// parseExpiry returns the queue id of a message Postfix gave up on, from its
+// expiry line; ok is false for any other line.
+func parseExpiry(line string) (queueID string, ok bool) {
+	_, rest := SplitTimestamp(line)
+	m := expiryRe.FindStringSubmatch(rest)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
 }
 
 // Run follows path and updates send-log statuses until ctx is cancelled, while
@@ -199,6 +220,11 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		refusals.handle(line, now, Place{FP: tr.line.FP, End: tr.lineStart})
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
+			if queueID, ok := parseExpiry(line); ok {
+				if _, err := st.ExpireMessage(queueID); err != nil {
+					log.Printf("log-tailer: expire %s: %v", queueID, err)
+				}
+			}
 			return
 		}
 		if _, err := st.UpdateStatus(queueID, recipient, status); err != nil {
@@ -243,11 +269,11 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 	}
 }
 
-// countStuck records how many rows are still queued past Postfix's queue
+// countStuck records how many rows are still open past Postfix's queue
 // lifetime - what the log would leave unresolved if there were no sweep. Each
 // sweep overwrites the day's value, so a past day keeps its last sweep's.
 func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
-	n, err := st.CountQueuedOlderThan(now.Add(-overLifetime))
+	n, err := st.CountOpenOlderThan(now.Add(-overLifetime))
 	if err == nil {
 		err = st.SetQueuedOverLifetime(now, n)
 	}
@@ -256,10 +282,10 @@ func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
 	}
 }
 
-// reconcile marks as bounced every row still "queued" from before cutoff whose
-// message Postfix no longer holds, with reason "reconcile". The close itself
-// is conditional on the row still being queued, so a delivery line read
-// between the listing and the close wins.
+// reconcile marks as bounced every row still open ("queued" or "deferred")
+// from before cutoff whose message Postfix no longer holds, with reason
+// "reconcile". The close itself is conditional on the row still being open,
+// so a final delivery line read between the listing and the close wins.
 //
 // A row reaches this state only when its delivery lines are gone for good — the
 // log rotated past its fourteen files while the panel was down, or was deleted
@@ -279,9 +305,9 @@ func countStuck(st StatusStore, now time.Time, overLifetime time.Duration) {
 // is what tells a tailer that loses lines from a log that lost them, which
 // reconcile_contradicted cannot - a lost line is never read late.
 func reconcile(st StatusStore, cutoff time.Time, path string) {
-	rows, err := st.ListQueuedOlderThan(cutoff)
+	rows, err := st.ListOpenOlderThan(cutoff)
 	if err != nil {
-		log.Printf("log-tailer: reconcile: list queued rows: %v", err)
+		log.Printf("log-tailer: reconcile: list open rows: %v", err)
 		return
 	}
 	if len(rows) == 0 {
@@ -307,7 +333,7 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 			continue
 		}
 		closed += n
-		if n > 0 && deliveryInLog(path, row) {
+		if n > 0 && resultInLog(path, row) {
 			log.Printf("log-tailer: reconcile: %s/%s had a delivery line in the log the tailer did not read", row.QueueID, row.To)
 			missed++
 		}
@@ -323,13 +349,15 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 	}
 }
 
-// deliveryInLog says whether the current log or the one rotated last holds a
-// delivery line for row. Rows reach the sweep minutes after they were
-// written, so the end of those two files is where such a line would be.
+// resultInLog says whether the current log or the one rotated last holds a
+// final result for row - a delivery line that says sent or bounced, or the
+// message's expiry line. A deferred line is not one: a deferred row has one
+// by definition. Rows reach the sweep minutes after they were written, so
+// the end of those two files is where such a line would be.
 // logrotate 3.21.0, logrotate.c, prerotateSingleLog(): the first rotated
 // name is "<log>.1", without the compression suffix under delaycompress
 // (build/logrotate-mail.conf).
-func deliveryInLog(path string, row store.QueuedDelivery) bool {
+func resultInLog(path string, row store.QueuedDelivery) bool {
 	if path == "" {
 		return false
 	}
@@ -339,7 +367,10 @@ func deliveryInLog(path string, row store.QueuedDelivery) bool {
 			continue
 		}
 		for _, line := range lines {
-			if q, r, _, ok := parseDelivery(line); ok && q == row.QueueID && strings.EqualFold(r, row.To) {
+			if q, r, s, ok := parseDelivery(line); ok && q == row.QueueID && strings.EqualFold(r, row.To) && s != store.StatusDeferred {
+				return true
+			}
+			if q, ok := parseExpiry(line); ok && q == row.QueueID {
 				return true
 			}
 		}

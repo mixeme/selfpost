@@ -1268,8 +1268,10 @@ chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
 retrying), `bounced` (final failure), or refused before it was queued.
-`bounced` is usually Postfix's word; it is the panel's when Postfix no longer
-holds a message and `mail.log` never said what became of it (the log rotated
+`bounced` is usually Postfix's word - a message it gave up on at the end of
+its queue lifetime is `bounced` too, since Postfix returns it to the sender;
+it is the panel's when Postfix no longer holds a message and `mail.log` never
+said what became of it (the log rotated
 away while the panel was down, or was not readable) - the panel then closes
 the row as a failure rather than show a delivery it cannot evidence, and
 counts that it did. A

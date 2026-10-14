@@ -17,10 +17,69 @@ import (
 // The mail.log lines in this file are composed by hand, after the formats the
 // code cites (Postfix 3.7.11, src/global/log_adhoc.c and the others), unless a
 // comment says where one was seen. Some are shapes Postfix does not write:
-// "to=..., status=expired" (qmgr logs expiry once per message as "from=<..>,
-// status=expired, returned to sender" - assumptions A-8), ISO stamps
-// (msg_logger.c writes "%b %d %H:%M:%S" - A-12), and opendkim lines in
-// mail.log (build/opendkim.conf has Syslog no).
+// ISO stamps (msg_logger.c writes "%b %d %H:%M:%S" - A-12), and opendkim
+// lines in mail.log (build/opendkim.conf has Syslog no).
+// qmgr's expiry line, as Postfix 3.7.11 writes it (src/qmgr/qmgr_active.c,
+// qmgr_active_done_25_generic(): "%s: from=<%s>, status=%s, returned to
+// sender"); composed by hand after that format. The sender is the client's
+// text, so a line only resembles one when it ends as qmgr's does.
+func TestParseExpiry(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		id   string
+	}{
+		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: from=<app@example.org>, status=expired, returned to sender", "41E862C00D9E"},
+		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 3Fq1Lw0bZ8z9tN: from=<>, status=force-expired, returned to sender", "3Fq1Lw0bZ8z9tN"},
+		// Not qmgr.
+		{"Oct 14 09:01:02 relay postfix/smtp[26]: 41E862C00D9E: from=<app@example.org>, status=expired, returned to sender", ""},
+		// qmgr's ordinary from= line, whose sender carries the text.
+		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: from=<x>, status=expired, returned to sender>, size=500, nrcpt=1 (queue active)", ""},
+		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: removed", ""},
+	} {
+		id, ok := parseExpiry(c.line)
+		if ok != (c.id != "") || id != c.id {
+			t.Errorf("parseExpiry(%q) = %q, %v; want %q", c.line, id, ok, c.id)
+		}
+	}
+}
+
+// The tailer closes an expired message's rows when it reads qmgr's line.
+func TestExpiryLineClosesTheMessage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mail.log")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := &captureStore{}
+	stop := startRun(t, path, cs)
+	defer stop()
+	appendLine(t, path, "Oct 14 09:01:00 relay postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=none, delay=9, dsn=4.4.1, status=deferred (connect timed out)")
+	appendLine(t, path, "Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: from=<app@example.org>, status=expired, returned to sender")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "41E862C00D9E|*|expired") })
+	if !contains(cs.snapshot(), "41E862C00D9E|a@example.net|"+store.StatusDeferred) {
+		t.Fatalf("calls = %v, want the deferral before the expiry", cs.snapshot())
+	}
+}
+
+// A deferred row the sweep closes is not "missed" for its deferred line - it
+// has one by definition - but is for its message's expiry line.
+func TestReconcileMissedCountsOnlyFinalLines(t *testing.T) {
+	stubQueue(t, nil)
+	path := filepath.Join(t.TempDir(), "mail.log")
+	if err := os.WriteFile(path, []byte(
+		"Oct 14 10:59:58 mail postfix/smtp[26]: DEFQ: to=<late@example.net>, relay=none, delay=9, dsn=4.4.1, status=deferred (connect timed out)\n"+
+			"Oct 14 10:59:59 mail postfix/qmgr[10]: EXPQ: from=<app@example.org>, status=expired, returned to sender\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := &captureStore{queued: []store.QueuedDelivery{
+		{ID: 1, QueueID: "DEFQ", To: "late@example.net"},
+		{ID: 2, QueueID: "EXPQ", To: "gone@example.net"},
+	}}
+	reconcile(cs, time.Now().UTC(), path)
+	if cs.closed != 2 || cs.missed != 1 {
+		t.Fatalf("closed %d, missed %d; want 2 and 1", cs.closed, cs.missed)
+	}
+}
+
 func TestParseDelivery(t *testing.T) {
 	cases := []struct {
 		name                       string
@@ -53,12 +112,11 @@ func TestParseDelivery(t *testing.T) {
 			status:    store.StatusBounced,
 		},
 		{
-			name:      "expired maps to bounced",
-			line:      "host postfix/smtp[26]: DEF: to=<slow@example.net>, relay=none, status=expired (delivery temporarily suspended)",
-			wantOK:    true,
-			queueID:   "DEF",
-			recipient: "slow@example.net",
-			status:    store.StatusBounced,
+			// Expiry is not a delivery line (TestParseExpiry); qmgr's line
+			// for it names no recipient.
+			name:   "qmgr expiry line ignored",
+			line:   "host postfix/qmgr[10]: DEF: from=<app@example.org>, status=expired, returned to sender",
+			wantOK: false,
 		},
 		{
 			name:   "qmgr from-line ignored",
@@ -189,10 +247,10 @@ type captureStore struct {
 	haveState bool
 	stateErr  error
 
-	// queued is what ListQueuedOlderThan returns, for the reconcile sweep.
+	// queued is what ListOpenOlderThan returns, for the reconcile sweep.
 	queued    []store.QueuedDelivery
 	queuedErr error
-	// closed sums AddReconcileClosed; stuckCount is what CountQueuedOlderThan
+	// closed sums AddReconcileClosed; stuckCount is what CountOpenOlderThan
 	// answers and stuck what SetQueuedOverLifetime was given.
 	closed     int64
 	missed     int64
@@ -259,6 +317,14 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 	return 1, nil
 }
 
+// ExpireMessage records an expiry line's close as "queue-id|*|expired".
+func (c *captureStore) ExpireMessage(queueID string) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.calls = append(c.calls, queueID+"|*|expired")
+	return 1, nil
+}
+
 // CloseUnreported records the sweep's close as "queue-id|recipient|reconcile",
 // finding the row by its id among queued.
 func (c *captureStore) CloseUnreported(id int64) (int64, error) {
@@ -290,11 +356,11 @@ func (c *captureStore) AddReconcileMissed(_ time.Time, n int64) error {
 	return nil
 }
 func (c *captureStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
-func (c *captureStore) AttachRefusalLine(string, string, time.Time, string) (bool, error) {
+func (c *captureStore) AttachRefusalLine(string, string, string, time.Time, string) (bool, error) {
 	return true, nil
 }
 func (c *captureStore) RecoverRefusal(store.SendLogEntry, time.Time) (bool, error) { return false, nil }
-func (c *captureStore) CountQueuedOlderThan(time.Time) (int64, error) {
+func (c *captureStore) CountOpenOlderThan(time.Time) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.stuckCount, nil
@@ -307,7 +373,7 @@ func (c *captureStore) SetQueuedOverLifetime(_ time.Time, n int64) error {
 }
 func (c *captureStore) PruneDeliveryLogDays(time.Time) error { return nil }
 
-func (c *captureStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
+func (c *captureStore) ListOpenOlderThan(time.Time) ([]store.QueuedDelivery, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.queued, c.queuedErr

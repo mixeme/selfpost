@@ -32,6 +32,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- **A message Postfix gave up on no longer stays "deferred" for ever.**
+  Postfix records the end of a message's queue lifetime in one line for the
+  whole message, without the recipients; the panel waited for a line per
+  recipient that Postfix never writes, and the reconcile sweep closed only
+  `queued` rows, so such rows said `deferred` until they were pruned. The
+  log tailer now reads that line and closes the message's rows as
+  `bounced`; the sweep also closes a `deferred` row whose message Postfix no
+  longer holds (which covers the rows left so far, and `postsuper -d`); a
+  message forced to expire (`postsuper -e`, `#` in the queue listing) is
+  still counted as held (audit 2026-10-12, stage 2c; assumptions A-8,
+  B-PQ1).
+- **Postfix's time values are read as Postfix reads them.** A bare number
+  took seconds, so `maximal_queue_lifetime = 3` was three seconds to the
+  panel and three days to Postfix; `1h7m` was 67 minutes to the panel and
+  one hour to Postfix. A value now takes the parameter's own default unit
+  and one unit only; `$name` references are expanded; a
+  `bounce_queue_lifetime` longer than `maximal_queue_lifetime` is cut to it,
+  as Postfix's queue manager does (assumptions B-PQ10, B-PQ11).
+- **A refusal's line goes on the right application's row.** Postfix's line
+  about a refusal at `MAIL FROM` was matched to its row by client address,
+  sender and time; two applications behind one address sending as one
+  sender could take each other's line. The line carries the login after
+  all, and the match now uses it. A login read from smtpd's `client=` line
+  no longer keeps a trailing comma when the client also gave `AUTH=` on
+  `MAIL FROM`. A refusal written from `mail.log` after a restart says that
+  Postfix's line names the last recipient only (assumptions A-15, A-21,
+  A-23).
 - **A bounce is judged by the filter lists as the panel counts it.**
   rspamd's sender rules took a bounce's `From:` header when the envelope
   sender was empty, so a bounce could be refused or allowed by an entry the

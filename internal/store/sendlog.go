@@ -162,17 +162,41 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 
 // CloseUnreported is the reconcile sweep's close of one row, by its id:
 // "bounced", marked reason "reconcile" so it is known who decided it
-// (architecture.md § Log tailer). Only a row still "queued" is closed - a
-// result the log wrote an instant earlier stands (audit 2026-10-12, H3). It
-// returns the number of rows closed, 0 or 1.
+// (architecture.md § Log tailer). Only a row still open - "queued" or
+// "deferred" - is closed; a final result the log wrote an instant earlier
+// stands (audit 2026-10-12, H3). It returns the number of rows closed, 0 or 1.
 func (s *Store) CloseUnreported(id int64) (int64, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
-		`UPDATE send_log SET status = ?, reason = ?, updated_at = ? WHERE id = ? AND status = ?`,
-		StatusBounced, ReasonReconcile, now, id, StatusQueued,
+		`UPDATE send_log SET status = ?, reason = ?, updated_at = ? WHERE id = ? AND status IN (?, ?)`,
+		StatusBounced, ReasonReconcile, now, id, StatusQueued, StatusDeferred,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("close unreported send_log row: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// ExpireMessage closes the rows of a message Postfix gave up on at the end of
+// its queue lifetime: each recipient's newest row with that queue id, if it
+// is still open ("queued" or "deferred"), becomes "bounced" - Postfix returns
+// the message to its sender. Postfix 3.7.11, src/qmgr/qmgr_active.c,
+// qmgr_active_done_25_generic(), logs expiry once per message, "<id>:
+// from=<..>, status=expired, returned to sender", with no line per
+// recipient: the recipients' last lines say "deferred" (assumptions A-8). It
+// returns the number of rows closed.
+func (s *Store) ExpireMessage(queueID string) (int64, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`UPDATE send_log SET status = ?, updated_at = ?
+		 WHERE status IN (?, ?) AND id IN (
+		   SELECT MAX(id) FROM send_log WHERE queue_id = ? AND status <> 'rejected'
+		   GROUP BY to_addr COLLATE NOCASE)`,
+		StatusBounced, now, StatusQueued, StatusDeferred, queueID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("expire send_log rows of %s: %w", queueID, err)
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
@@ -187,22 +211,25 @@ type QueuedDelivery struct {
 	To      string
 }
 
-// ListQueuedOlderThan returns the rows still marked "queued" that were accepted
-// before cutoff — old enough that Postfix should long since have reported a
-// result for them. Rows without a queue-id are skipped: the milter refused
-// those before Postfix ever saw the message, so the queue has nothing to say
-// about them.
+// ListOpenOlderThan returns the rows still open - "queued", or "deferred"
+// and waiting for the next attempt - that were accepted before cutoff, old
+// enough that Postfix should long since have reported a result for them or
+// still hold the message. Rows without a queue-id are skipped: the milter
+// refused those before Postfix ever saw the message, so the queue has
+// nothing to say about them. A deferred row is among them because Postfix
+// can drop a deferred message without a line per recipient: at expiry (one
+// line per message, ExpireMessage) and by postsuper -d (only "removed").
 //
 // created_at is stored as RFC3339 UTC, so a lexical comparison against the same
 // format is chronologically correct. SQLite 3.53.4 compares TEXT with the
 // BINARY collation, memcmp() (https://sqlite.org/datatype3.html § 7), and
 // time.RFC3339 of a UTC time is fixed-width, YYYY-MM-DDTHH:MM:SSZ.
-func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
+func (s *Store) ListOpenOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
 	rows, err := s.db.Query(
 		`SELECT id, queue_id, to_addr FROM send_log
-		 WHERE status = ? AND queue_id <> '' AND created_at < ?
+		 WHERE status IN (?, ?) AND queue_id <> '' AND created_at < ?
 		 ORDER BY id`,
-		StatusQueued, cutoff.UTC().Format(time.RFC3339),
+		StatusQueued, StatusDeferred, cutoff.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list queued send_log rows: %w", err)
@@ -253,8 +280,10 @@ type SendLogRow struct {
 // AttachRefusalLine puts Postfix's line about a refusal at MAIL FROM on the
 // row the journal milter wrote for it (audit 2026-10-12, stage 2b). Such a
 // refusal has no queue id, and the line names no login, so the row is found
-// by what the line says: a refused row of that client and sender without a
-// line yet, written within two minutes of the line's time; the nearest in
+// by what the line says: a refused row of that client, login and sender
+// without a line yet - the login is smtpd's sasl_username= on the line, so
+// two applications behind one address sending as one sender are told apart
+// (assumptions A-21) - written within two minutes of the line's time; the nearest in
 // time, the oldest of equals, when there are several - lines are read in the
 // order the rows were written, so two refusals of one second take one line
 // each in turn (review of stage 2b). A line already on a row - read again
@@ -265,12 +294,13 @@ type SendLogRow struct {
 // reads YYYY-MM-DDTHH:MM:SSZ, the T and the Z included (lang_datefunc.html
 // § 2); NOCASE folds ASCII only (datatype3.html § 7.1); ?1 is bound once and
 // used twice (lang_expr.html § 4).
-func (s *Store) AttachRefusalLine(clientIP, from string, at time.Time, line string) (bool, error) {
+func (s *Store) AttachRefusalLine(clientIP, login, from string, at time.Time, line string) (bool, error) {
 	res, err := s.db.Exec(
 		`UPDATE send_log SET refusal_line = ?1 WHERE id = (
 			SELECT id FROM send_log
 			WHERE status = ?2 AND queue_id = '' AND refusal_line = ''
 			  AND reason IN ('', ?3, ?4) AND from_addr = ?5 COLLATE NOCASE AND client_ip = ?6
+			  AND app_login = ?10 COLLATE NOCASE
 			  AND created_at BETWEEN ?7 AND ?8
 			ORDER BY ABS(julianday(created_at) - julianday(?9)), id
 			LIMIT 1)
@@ -279,6 +309,7 @@ func (s *Store) AttachRefusalLine(clientIP, from string, at time.Time, line stri
 		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339),
 		at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
 		at.UTC().Format(time.RFC3339),
+		login,
 	)
 	if err != nil {
 		return false, fmt.Errorf("attach refusal line: %w", err)
@@ -452,7 +483,7 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 // implementing the configurable retention window (architecture.md §
 // Persistence, SEND_LOG_RETENTION_DAYS). It returns the number of rows pruned.
 // created_at is stored as RFC3339 UTC, so a lexical comparison against the
-// same format is chronologically correct (see ListQueuedOlderThan).
+// same format is chronologically correct (see ListOpenOlderThan).
 func (s *Store) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM send_log WHERE created_at < ?`,

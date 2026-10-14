@@ -78,3 +78,75 @@ func testDeliveryLogSurvivesRotation(t *testing.T, sc *scenario) {
 		t.Fatalf("after mail.log was rotated: %v", err)
 	}
 }
+
+// testExpiredMessageIsClosed: a message Postfix gives up on is closed as
+// bounced. Postfix logs expiry once per message, "<id>: from=<..>,
+// status=expired, returned to sender" (here "force-expired"), and no line per
+// recipient (Postfix 3.7.11, src/qmgr/qmgr_active.c,
+// qmgr_active_done_25_generic(); assumptions A-8). The queue lifetime cannot
+// be waited out, so the message is deferred by hand - defer_transports=smtp,
+// under which qmgr hands the recipient to the retry service, "4.3.2 deferred
+// transport" (src/qmgr/qmgr_message.c, qmgr_message_resolve()) - and then
+// forced to expire: postsuper -e marks it, postqueue -i has qmgr look at it
+// at once (man/man1/postsuper.1, postqueue.1).
+func testExpiredMessageIsClosed(t *testing.T, sc *scenario) {
+	exec := func(args ...string) {
+		t.Helper()
+		if out, err := h.execIn("selfpost", args...); err != nil {
+			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	exec("postconf", "-e", "defer_transports=smtp")
+	exec("postfix", "reload")
+	defer func() {
+		// The bounce to the sender waits behind the same setting.
+		h.execIn("selfpost", "postconf", "-e", "defer_transports=")
+		h.execIn("selfpost", "postfix", "reload")
+		h.execIn("selfpost", "postqueue", "-f")
+	}()
+
+	token := uniqueToken("expire")
+	if res := attemptSend(sendAttempt{
+		authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, headerFrom: "alerts@" + senderDomain, to: recipient,
+		subject: "e2e " + token, body: "deferred, then expired",
+	}); !res.ok() {
+		t.Fatalf("send: %v", res.firstErr())
+	}
+	row := func() (string, error) {
+		return asPanel(`import sqlite3,sys
+r=sqlite3.connect("/data/selfpost.db").execute("select queue_id, status from send_log where subject like ? order by id desc",("%"+sys.argv[1]+"%",)).fetchone()
+print("" if r is None else r[0]+" "+r[1])`, token)
+	}
+	var queueID string
+	if err := waitFor("the row to be deferred", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out, err := row()
+		if err != nil {
+			return false, err
+		}
+		if f := strings.Fields(out); len(f) == 2 && f[1] == "deferred" {
+			queueID = f[0]
+			return true, nil
+		}
+		return false, fmt.Errorf("row %q", out)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	exec("postsuper", "-e", queueID)
+	exec("postqueue", "-i", queueID)
+	if err := waitFor("the expired message's row to be bounced", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out, err := row()
+		if err != nil {
+			return false, err
+		}
+		return out == queueID+" bounced", fmt.Errorf("row %q", out)
+	}); err != nil {
+		out, _ := h.execIn("selfpost", "grep", queueID, "/data/log/mail.log")
+		t.Fatalf("%v\nmail.log:\n%s", err, out)
+	}
+	out, err := h.execIn("selfpost", "grep", queueID+": from=<alerts@"+senderDomain+">, status=force-expired, returned to sender", "/data/log/mail.log")
+	if err != nil {
+		t.Fatalf("no expiry line in mail.log: %v\n%s", err, out)
+	}
+}

@@ -14,20 +14,24 @@ import (
 // level-2 limit, a client address off the application's list - is put on the
 // row the milter wrote, so the message's page shows it (audit 2026-10-12,
 // stage 2b). The refusal has no queue id; it is matched to its row by client
-// address, sender and time. As the stand writes it (e2e stand, date not
-// recorded):
+// address, login, sender and time:
 //
-//	postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>
+//	postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>
 //
 // Postfix 3.7.11, src/smtpd/smtpd.c, check_milter_reply(): "%s: %s: %s from
 // %s: %s;%s" with "NOQUEUE" before the queue file is opened, and
-// smtpd_whatsup() for the rest - " from=<..>" first. smtpd_whatsup() also
-// ends the line with " sasl_username=<login>" on an authenticated session,
-// which the quote above lacks and the regexp does not use (assumptions A-20,
-// A-21).
+// smtpd_whatsup() for the rest: " from=<..>", " to=<..>", " proto=..",
+// " helo=<..>", then " sasl_username=<..>" when the session authenticated
+// (assumptions A-20, A-21). The login is read at the end of the line, where
+// Postfix puts it last; a line without one is no application's refusal - the
+// journal milter refuses at MAIL FROM only an authenticated session
+// (milter/ratelimit.go). The HELO name before it is the client's text and can
+// end in what looks like the field, but only in a session that has no login,
+// and so no refused row to take the line; a row must also be of the line's
+// client address and sender, within minutes.
 //
 // Port 25's smtpd (postfix/inbound/smtpd) is a stranger's and has no such row.
-var refusalLineRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: NOQUEUE: milter-reject: MAIL from [^\[\s]*\[([^\]]+)\]: [45]\d\d .*?; from=<([^>]*)>`)
+var refusalLineRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: NOQUEUE: milter-reject: MAIL from [^\[\s]*\[([^\]]+)\]: [45]\d\d .*?; from=<([^>]*)>(?:.* sasl_username=<([^<>]*)>|.*)$`)
 
 // refusalLineWait is how long a line waits for its row: the milter writes the
 // row when it refuses, which can be read a moment after the line.
@@ -35,7 +39,7 @@ const refusalLineWait = 30 * time.Second
 
 // RefusalStore is where the lines go. *store.Store satisfies it.
 type RefusalStore interface {
-	AttachRefusalLine(clientIP, from string, at time.Time, line string) (bool, error)
+	AttachRefusalLine(clientIP, login, from string, at time.Time, line string) (bool, error)
 	RecoverRefusal(e store.SendLogEntry, at time.Time) (bool, error)
 }
 
@@ -56,18 +60,19 @@ var fromRefusalRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?cleanup\[\d
 
 // clientLoginRe is smtpd's line naming the login a queue id was submitted
 // under: "<id>: client=host[addr], sasl_method=PLAIN, sasl_username=<login>".
-// Postfix 3.7.11, src/smtpd/smtpd.c, mail_open_stream(): ", sasl_sender=<..>"
-// follows when the client gave AUTH= on MAIL FROM, and "\S+" then takes
-// "login," with the comma (assumptions A-23).
-var clientLoginRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=.*?, sasl_username=(\S+)`)
+// Postfix 3.7.11, src/smtpd/smtpd.c, mail_open_stream(): ", sasl_sender=.."
+// follows when the client gave AUTH= on MAIL FROM, then ", orig_queue_id=.."
+// and ", orig_client=.." for XFORWARD; the login ends at the comma (a login
+// holds none - internal/postfix assertMapSafe; assumptions A-23).
+var clientLoginRe = regexp.MustCompile(`^\S+ postfix/(?:([a-z0-9-]+)/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=.*?, sasl_username=([^,\s]+)`)
 
 // refusalLogins bounds the queue ids whose login is remembered.
 const refusalLogins = 4096
 
 type pendingRefusal struct {
-	clientIP, from, line string
-	at, until            time.Time
-	start                Place // where the line starts in the log
+	clientIP, login, from, line string
+	at, until                   time.Time
+	start                       Place // where the line starts in the log
 }
 
 // pendingRecovery is a From: refusal whose row is looked for once the panel
@@ -139,14 +144,17 @@ func (r *refusalLines) handle(line string, now time.Time, start Place) {
 		return
 	}
 	m := refusalLineRe.FindStringSubmatch(rest)
-	if m == nil || m[1] == "inbound" {
+	if m == nil || m[1] == "inbound" || m[4] == "" {
 		return
 	}
-	ip := net.ParseIP(strings.TrimPrefix(m[2], "IPv6:"))
+	// The address in "name[addr]" is smtpd's state->addr, which has no
+	// "IPv6:" (Postfix 3.7.11, src/smtpd/smtpd_peer.c, smtpd_peer_init();
+	// assumptions A-24).
+	ip := net.ParseIP(m[2])
 	if ip == nil {
 		return
 	}
-	p := pendingRefusal{clientIP: ip.String(), from: m[3], line: line, at: at, until: now.Add(refusalLineWait), start: start}
+	p := pendingRefusal{clientIP: ip.String(), login: m[4], from: m[3], line: line, at: at, until: now.Add(refusalLineWait), start: start}
 	if !r.attach(p) {
 		r.pending = append(r.pending, p)
 	}
@@ -206,7 +214,7 @@ func domainOf(addr string) string {
 }
 
 func (r *refusalLines) attach(p pendingRefusal) bool {
-	ok, err := r.st.AttachRefusalLine(p.clientIP, p.from, p.at, p.line)
+	ok, err := r.st.AttachRefusalLine(p.clientIP, p.login, p.from, p.at, p.line)
 	if err != nil {
 		log.Printf("log-tailer: refusal line: %v", err)
 		return true // not retried: the store said no for its own reason

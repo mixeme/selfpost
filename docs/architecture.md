@@ -186,10 +186,15 @@ domain is added or deleted.
 One process, five roles (six with the inbound relay on):
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
-   proxy only. On start it runs `postconf -h` once for the deferred-mail retry
+   proxy only. On start it runs `postconf -h -x` once for the deferred-mail retry
    parameters (`queue_run_delay`, `minimal_backoff_time`,
    `maximal_backoff_time`, `maximal_queue_lifetime`, `bounce_queue_lifetime`,
-   `delay_warning_time`) and caches the snapshot on the handlers config. The
+   `delay_warning_time`), reads each as Postfix does - one number and one
+   unit, the parameter's own default unit when there is none (`5d` for the
+   lifetimes, so a bare `3` is three days), `bounce_queue_lifetime` capped at
+   `maximal_queue_lifetime` as qmgr caps it (Postfix 3.7.11,
+   `src/global/conv_time.c`, `src/qmgr/qmgr.c`) - and caches the snapshot on
+   the handlers config. The
    Outbound queue box and a delivery's `deferred` / `bounced` history print those
    numbers; they never call `postconf` per request. If `postconf` is missing,
    the panel logs a warning and uses Postfix 3.x compiled-in defaults
@@ -432,8 +437,11 @@ judged); the sender check writes it on the row, and the message's page shows
 the lines stored under it - only those of the minutes around the refusal, since
 Postfix frees the id at once. A message the journal milter refused at
 `MAIL FROM` has none: the tailer reads smtpd's `NOQUEUE: milter-reject: MAIL
-from <client>[<address>]: …; from=<…>` - it names no login - and puts it on
-the newest refused row of that client address and sender within two minutes
+from <client>[<address>]: …; from=<…> … sasl_username=<login>` - the login is
+Postfix's last field on an authenticated session (Postfix 3.7.11,
+`src/smtpd/smtpd.c`, `smtpd_whatsup()`), and a line without one is no
+application's - and puts it on the nearest refused row of that client
+address, login and sender within two minutes
 (`send_log.refusal_line`; the milter writes `send_log.client_ip`), retrying
 for 30 s when the row is not written yet; a line already on a row goes on no
 other. The sender check writes its
@@ -441,13 +449,23 @@ row through a buffer after answering 550; a panel stopped in between wrote
 none. The tailer remembers each queue id's login from smtpd's `client=` line,
 and 30 s after cleanup's `milter-reject: END-OF-MESSAGE … 5.7.1 From:` line it
 writes the row from the line if no refused row of that id exists
-(`send_log.recovered`, shown on the page). It reads from its saved offset, so
+(`send_log.recovered`, shown on the page). cleanup's line names one
+recipient, the message's last (`src/cleanup/cleanup_milter.c`), so a row
+written from it has that one, which its page says. It reads from its saved offset, so
 a kill is covered as well as a clean stop.
 
+**Expiry.** A message Postfix gives up on at the end of its queue lifetime has
+no line per recipient: qmgr writes one line for the message, `<id>:
+from=<...>, status=expired, returned to sender` (`force-expired` after
+`postsuper -e`; Postfix 3.7.11, `src/qmgr/qmgr_active.c`,
+`qmgr_active_done_25_generic()`), and the recipients' last lines say
+`deferred`. The tailer reads that line and closes the message's open rows -
+each recipient's newest, `queued` or `deferred` - as `bounced`.
+
 **Queue reconcile** is the backstop for what the log cannot explain at all: a
-row still `queued` more than two minutes after it was accepted, whose queue id
-`postqueue -p` no longer lists, is marked `bounced` with the reason
-`reconcile` (swept every five minutes,
+row still open - `queued`, or `deferred` and waiting - more than two minutes
+after it was accepted, whose queue id `postqueue -p` no longer lists, is
+marked `bounced` with the reason `reconcile` (swept every five minutes,
 [internal/logtail](../internal/logtail/logtail.go),
 [postfix.QueueIDs](../internal/postfix/queue.go)). Postfix having dropped the
 message means nothing more will ever be reported about it, so the row can only
@@ -458,8 +476,12 @@ end-of-file once (on a restart the log itself holds the answer); the two-minute
 grace covers messages merely in flight; a `postqueue` that cannot be read, or
 whose listing is over the 4 MiB cap, leaves every row untouched rather than
 closing them all or those past the cut; and the close, by the row's id, is
-conditional on the row still being `queued`, so a status the log wrote in the
-meantime stands. A delivery line updates only the newest row of its queue id
+conditional on the row still being open, so a final status the log wrote in
+the meantime stands. A deferred row is the sweep's too because Postfix can
+drop a deferred message without a final line for its recipients: at expiry
+before `2.5.2` read that line, and with `postsuper -d`, which logs only
+`removed`. The listing's `#` - a message forced to expire - is read as part
+of the id's flags (`src/postqueue/showq_compat.c`, `showq_message()`). A delivery line updates only the newest row of its queue id
 and recipient: Postfix reuses a short queue id once the message has left the
 queue, and an old row must not be rewritten. `UpdateStatus`'s transaction
 starts with a write, so a commit by the `dmarc-ingest` process in between
@@ -471,16 +493,18 @@ or deleted — or that the tailer was not reading.
 Whether the sweep earns its place is measured, not argued (audit 2026-10-12,
 H3). `delivery_log_days` (migration `0007`) keeps, per UTC day for a year:
 `reconcile_closed`, the rows the sweep closed; `reconcile_missed`, those of
-them whose delivery line was in `mail.log` or `mail.log.1` when the sweep
-closed them - the tailer did not read a line that was there, which is what a
-lost line looks like (it is never read late); `reconcile_contradicted`, those
+them whose final line - sent, bounced, or the message's expiry - was in
+`mail.log` or `mail.log.1` when the sweep closed them - the tailer did not
+read a line that was there, which is what a lost line looks like (it is never
+read late; a deferred line is not one, a deferred row has it by definition); `reconcile_contradicted`, those
 a delivery line read later gave a status - the log's status replaces the
 sweep's and the row's reason becomes `reconcile-contradicted`, so a row counts
 once and can be found; `tailer_blind_seconds`, the time `follow()` could not
 read `mail.log` (the file gone, reopening it failing; stretches under three
 seconds - a rotation's tick between rename and create, which loses nothing -
-are not counted); and `queued_over_lifetime`, the rows still `queued` past the
-queue lifetime plus a maximal backoff, as the day's last sweep saw them - rows
+are not counted); and `queued_over_lifetime`, the rows still open (`queued`
+or `deferred`; `queued` only before `2.5.2`) past the queue lifetime plus a
+maximal backoff, as the day's last sweep saw them - rows
 stuck although the sweep runs (mail on hold, or a queue that could not be
 listed). What removing the sweep would leave queued is closed − missed −
 contradicted: the rows nothing in the log ever resolved. No page shows the
@@ -529,8 +553,8 @@ reads them:
 - **Which lines are a row's.** Postfix reuses a queue id once the message has
   left the queue, and a row outlives that by months. `SendLogLines` gives a row
   the lines of its queue id dated from one hour before the row was written to
-  the queue lifetime (the larger of `maximal_queue_lifetime` and
-  `bounce_queue_lifetime`) plus a day after it. That limits a chance reuse of
+  the queue lifetime (`maximal_queue_lifetime`, which `bounce_queue_lifetime`
+  cannot exceed) plus a day after it. That limits a chance reuse of
   the id to those days; it does not exclude it. A message with several
   recipients is several rows under one id, and each row's page shows all of
   the message's lines.

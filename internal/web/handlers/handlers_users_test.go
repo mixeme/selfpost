@@ -167,7 +167,7 @@ func TestARefusedMessageShowsPostfixsLine(t *testing.T) {
 		}
 		if subject == "with its line" {
 			line := time.Now().UTC().Format("2006-01-02T15:04:05Z") + " mail postfix/smtpd[2131]: NOQUEUE: milter-reject: MAIL from unknown[198.51.100.7]: 451 4.7.1 Service unavailable - try again later; from=<alerts@example.org> proto=ESMTP helo=<app>"
-			if ok, err := st.AttachRefusalLine("198.51.100.7", "alerts@example.org", time.Now(), line); err != nil || !ok {
+			if ok, err := st.AttachRefusalLine("198.51.100.7", "alerts", "alerts@example.org", time.Now(), line); err != nil || !ok {
 				t.Fatalf("attach = %v, %v", ok, err)
 			}
 		}

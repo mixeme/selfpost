@@ -59,7 +59,7 @@ func TestAddDeliveryLogDayRefusesAnotherColumn(t *testing.T) {
 	}
 }
 
-func TestCountQueuedOlderThan(t *testing.T) {
+func TestCountOpenOlderThan(t *testing.T) {
 	st := openTestStore(t)
 	for _, e := range []SendLogEntry{{QueueID: "Q1", To: "a@example.net"}, {QueueID: "Q2", To: "b@example.net"}} {
 		if err := st.InsertQueued(e); err != nil {
@@ -69,10 +69,10 @@ func TestCountQueuedOlderThan(t *testing.T) {
 	if _, err := st.UpdateStatus("Q2", "b@example.net", StatusSent); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := st.CountQueuedOlderThan(time.Now().Add(time.Hour)); err != nil || n != 1 {
+	if n, err := st.CountOpenOlderThan(time.Now().Add(time.Hour)); err != nil || n != 1 {
 		t.Fatalf("queued rows before an hour from now = %d, %v; want 1", n, err)
 	}
-	if n, err := st.CountQueuedOlderThan(time.Now().Add(-time.Hour)); err != nil || n != 0 {
+	if n, err := st.CountOpenOlderThan(time.Now().Add(-time.Hour)); err != nil || n != 0 {
 		t.Fatalf("queued rows before an hour ago = %d, %v; want 0", n, err)
 	}
 }

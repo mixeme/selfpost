@@ -125,12 +125,15 @@ func QueueIDs() (map[string]struct{}, error) {
 //	3C5B04E6C1*     446 Thu Aug  7 10:12:31  app@example.com
 //
 // The id is at the start of the line, optionally flagged '*' (in the active
-// queue) or '!' (on hold), and is followed by the message size. Requiring the
+// queue) or '!' (on hold), then '#' when the message was forced to expire
+// (Postfix 3.7.11, src/postqueue/showq_compat.c, showq_message(): the flags
+// are appended to the id in that order; assumptions B-PQ1), and is followed
+// by the message size. Requiring the
 // size is what separates an entry from the listing's other left-margin lines:
 // the '-Queue ID-' header, the '-- 5 Kbytes in 2 Requests.' trailer, a deferred
 // entry's '(connect timed out)' reason, and 'Mail queue is empty'. Recipient
 // lines are indented and never match.
-var queueEntryRe = regexp.MustCompile(`^([0-9A-Za-z]+)[*!]?\s+\d+\s`)
+var queueEntryRe = regexp.MustCompile(`^([0-9A-Za-z]+)[*!]?#?\s+\d+\s`)
 
 func parseQueueIDs(listing string) map[string]struct{} {
 	ids := make(map[string]struct{})

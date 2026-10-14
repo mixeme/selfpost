@@ -5,39 +5,47 @@ import (
 	"time"
 )
 
-func TestParseDuration(t *testing.T) {
+// Postfix 3.7.11, src/global/conv_time.c, conv_time(): one number, one
+// lower-case unit, the default unit when there is none, the rest ignored.
+func TestParseTime(t *testing.T) {
 	cases := []struct {
 		in   string
+		unit byte
 		want time.Duration
 	}{
-		{"5d", 5 * 24 * time.Hour},
-		{"300s", 300 * time.Second},
-		{"4000s", 4000 * time.Second},
-		{"1h", time.Hour},
-		{"0", 0},
-		{"0s", 0},
-		{"300", 300 * time.Second},
-		{" 300s ", 300 * time.Second},
-		{"1h7m", time.Hour + 7*time.Minute},
-		{"1w", 7 * 24 * time.Hour},
-		{"2m", 2 * time.Minute},
+		{"5d", 's', 5 * 24 * time.Hour},
+		{"300s", 'd', 300 * time.Second},
+		{"4000s", 's', 4000 * time.Second},
+		{"1h", 's', time.Hour},
+		{"0", 's', 0},
+		{"0s", 's', 0},
+		{"300", 's', 300 * time.Second},
+		{"3", 'd', 3 * 24 * time.Hour}, // maximal_queue_lifetime = 3
+		{"2", 'h', 2 * time.Hour},      // delay_warning_time = 2
+		{" 300s ", 's', 300 * time.Second},
+		{"+5m", 's', 5 * time.Minute},
+		{"1h7m", 's', time.Hour}, // what follows the unit is ignored
+		{"1h 5x", 's', time.Hour},
+		{"1w", 's', 7 * 24 * time.Hour},
+		{"2m", 's', 2 * time.Minute},
+		{"s", 'd', 0}, // strtol() reads nothing and stops at the "s"
 	}
 	for _, tc := range cases {
-		got, err := ParseDuration(tc.in)
+		got, err := ParseTime(tc.in, tc.unit)
 		if err != nil {
-			t.Errorf("ParseDuration(%q): %v", tc.in, err)
+			t.Errorf("ParseTime(%q, %c): %v", tc.in, tc.unit, err)
 			continue
 		}
 		if got != tc.want {
-			t.Errorf("ParseDuration(%q) = %v, want %v", tc.in, got, tc.want)
+			t.Errorf("ParseTime(%q, %c) = %v, want %v", tc.in, tc.unit, got, tc.want)
 		}
 	}
 }
 
-func TestParseDurationRejectsInvalid(t *testing.T) {
-	for _, in := range []string{"", "foo", "5x", "-300s", "s", "1h 5x"} {
-		if _, err := ParseDuration(in); err == nil {
-			t.Errorf("ParseDuration(%q) = nil, want error", in)
+func TestParseTimeRejectsInvalid(t *testing.T) {
+	for _, in := range []string{"", "foo", "5x", "-300s", "5D", "1H", " s", "99999999999s", "400000w"} {
+		if _, err := ParseTime(in, 's'); err == nil {
+			t.Errorf("ParseTime(%q) = nil, want error", in)
 		}
 	}
 }

@@ -19,13 +19,13 @@ func (r *refusalProbe) RecoverRefusal(e store.SendLogEntry, _ time.Time) (bool, 
 	return true, nil
 }
 
-func (r *refusalProbe) AttachRefusalLine(clientIP, from string, _ time.Time, line string) (bool, error) {
+func (r *refusalProbe) AttachRefusalLine(clientIP, login, from string, _ time.Time, line string) (bool, error) {
 	if r.rows == 0 {
 		return false, nil
 	}
 	r.rows--
 	r.lines = append(r.lines, line)
-	r.who = append(r.who, clientIP+"|"+from)
+	r.who = append(r.who, clientIP+"|"+login+"|"+from)
 	return true, nil
 }
 
@@ -46,6 +46,9 @@ func TestRefusalLines(t *testing.T) {
 		`2026-10-14T12:00:00+00:00 mail postfix/inbound/smtpd[372]: NOQUEUE: milter-reject: MAIL from unknown[203.0.113.7]: 451 4.7.1 Service unavailable - try again later; from=<a@stranger.example> proto=ESMTP helo=<x>`,
 		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
 		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x>`,
+		// No login: no application's refusal (the panel down refuses every
+		// session, an unauthenticated one too).
+		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[12]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<x>`,
 	} {
 		r.handle(other, now, Place{})
 	}
@@ -59,7 +62,7 @@ func TestRefusalLines(t *testing.T) {
 	}
 	st.rows = 1 // the milter's row is written
 	r.retry(now.Add(time.Second))
-	if len(r.pending) != 0 || len(st.lines) != 1 || st.who[0] != "10.77.0.1|billing@sender.e2e.test" {
+	if len(r.pending) != 0 || len(st.lines) != 1 || st.who[0] != "10.77.0.1|l2app|billing@sender.e2e.test" {
 		t.Fatalf("after the retry: pending %d, attached %v", len(r.pending), st.who)
 	}
 

@@ -142,6 +142,72 @@ func TestCloseUnreportedClosesOnlyQueuedRows(t *testing.T) {
 	}
 }
 
+// Postfix's expiry line closes the message's open rows - each recipient's
+// newest, queued or deferred - and leaves a final result, a refusal and an
+// older message that had the same queue id alone (assumptions A-8).
+func TestExpireMessageClosesOnlyOpenRows(t *testing.T) {
+	st := openTestStore(t)
+	for _, e := range []SendLogEntry{
+		{QueueID: "OLDQ", To: "a@example.net"}, // an earlier message, same id
+		{QueueID: "Q1", To: "a@example.net"},
+		{QueueID: "Q1", To: "b@example.net"},
+		{QueueID: "Q1", To: "c@example.net"},
+	} {
+		if err := st.InsertQueued(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.db.Exec(`UPDATE send_log SET queue_id = 'Q1' WHERE queue_id = 'OLDQ'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateStatus("Q1", "a@example.net", StatusDeferred); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateStatus("Q1", "c@example.net", StatusSent); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.ExpireMessage("Q1"); err != nil || n != 2 {
+		t.Fatalf("ExpireMessage = %d, %v; want 2 (a deferred, b queued)", n, err)
+	}
+	rows, err := st.db.Query(`SELECT to_addr, status FROM send_log ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var to, status string
+		if err := rows.Scan(&to, &status); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, to+" "+status)
+	}
+	want := []string{
+		"a@example.net " + StatusQueued, // the earlier message's row
+		"a@example.net " + StatusBounced,
+		"b@example.net " + StatusBounced,
+		"c@example.net " + StatusSent,
+	}
+	if strings.Join(got, "; ") != strings.Join(want, "; ") {
+		t.Fatalf("rows = %v, want %v", got, want)
+	}
+}
+
+// The sweep closes a deferred row as it closes a queued one: Postfix can drop
+// a deferred message without a line per recipient.
+func TestCloseUnreportedClosesADeferredRow(t *testing.T) {
+	st := openTestStore(t)
+	if err := st.InsertQueued(SendLogEntry{QueueID: "Q1", To: "a@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateStatus("Q1", "a@example.net", StatusDeferred); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.CloseUnreported(rowID(t, st, "Q1")); err != nil || n != 1 {
+		t.Fatalf("CloseUnreported of a deferred row = %d, %v; want 1", n, err)
+	}
+}
+
 // A delivery line about a row the sweep closed proves the sweep guessed what
 // the log could have said: the log's status wins, the row is marked
 // reconcile-contradicted, and the day counts one contradiction - once,
@@ -205,7 +271,7 @@ func TestUpdateStatusRewritesOnlyTheNewestRow(t *testing.T) {
 // reported on them by now. A message accepted moments ago is simply in flight,
 // and one the milter refused never reached the queue at all, so neither is the
 // sweep's business.
-func TestListQueuedOlderThan(t *testing.T) {
+func TestListOpenOlderThan(t *testing.T) {
 	st := openTestStore(t)
 
 	for _, e := range []SendLogEntry{
@@ -232,9 +298,9 @@ func TestListQueuedOlderThan(t *testing.T) {
 	backdate(t, st, "OLD1", cutoff.Add(-time.Hour))
 	backdate(t, st, "DONE1", cutoff.Add(-time.Hour))
 
-	got, err := st.ListQueuedOlderThan(cutoff)
+	got, err := st.ListOpenOlderThan(cutoff)
 	if err != nil {
-		t.Fatalf("ListQueuedOlderThan: %v", err)
+		t.Fatalf("ListOpenOlderThan: %v", err)
 	}
 	if len(got) != 1 || got[0] != (QueuedDelivery{ID: got[0].ID, QueueID: "OLD1", To: "stale@example.net"}) {
 		t.Fatalf("got %+v, want only the stale queued row", got)

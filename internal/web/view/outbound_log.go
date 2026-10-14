@@ -262,7 +262,10 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 			history.Help = topicLink(HelpSenderCheck, "What an application may write in From:")
 		}
 		if in.Recovered {
-			facts = append(facts, Fact{Label: "Written", Value: Rich("from ", Code("mail.log"), " after a restart: the panel stopped before it wrote the refusal")})
+			// cleanup's line names the message's last recipient only (Postfix
+			// 3.7.11, src/cleanup/cleanup_milter.c, cleanup_milter_apply(),
+			// " to=<%s>" of state->recip; assumptions A-15).
+			facts = append(facts, Fact{Label: "Written", Value: Rich("from ", Code("mail.log"), " after a restart: the panel stopped before it wrote the refusal. Postfix's line names the last recipient only")})
 		}
 		if in.QueueID != "" {
 			facts = append(facts, Fact{Label: "Queue id", Value: Rich(Mono(in.QueueID), " - given, the message was not queued")})

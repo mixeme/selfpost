@@ -28,19 +28,23 @@ func TestAttachRefusalLine(t *testing.T) {
 	}
 	first := "Oct 14 12:00:00 mail postfix/smtpd[1]: NOQUEUE: milter-reject: MAIL from unknown[10.0.0.1]: 451 4.7.1 first"
 	second := "Oct 14 12:00:00 mail postfix/smtpd[2]: NOQUEUE: milter-reject: MAIL from unknown[10.0.0.1]: 451 4.7.1 second"
+	// Another application at the same client, as the same sender: not its.
+	if ok, _ := st.AttachRefusalLine("10.0.0.1", "other", "billing@example.com", now, "another login"); ok {
+		t.Fatal("a line of another login took a row")
+	}
 	for _, line := range []string{first, second} {
-		if ok, err := st.AttachRefusalLine("10.0.0.1", "Billing@example.com", now, line); err != nil || !ok {
+		if ok, err := st.AttachRefusalLine("10.0.0.1", "L2App", "Billing@example.com", now, line); err != nil || !ok {
 			t.Fatalf("attach %q = %v, %v", line, ok, err)
 		}
 	}
 	// Read again after a restart: no row takes it a second time.
-	if ok, _ := st.AttachRefusalLine("10.0.0.1", "billing@example.com", now, first); ok {
+	if ok, _ := st.AttachRefusalLine("10.0.0.1", "l2app", "billing@example.com", now, first); ok {
 		t.Fatal("a line already on a row took another")
 	}
-	if ok, _ := st.AttachRefusalLine("10.0.0.3", "billing@example.com", now, "a third"); ok {
+	if ok, _ := st.AttachRefusalLine("10.0.0.3", "l2app", "billing@example.com", now, "a third"); ok {
 		t.Fatal("a line of another client took a row")
 	}
-	if ok, _ := st.AttachRefusalLine("10.0.0.2", "billing@example.com", now.Add(-time.Hour), "an hour off"); ok {
+	if ok, _ := st.AttachRefusalLine("10.0.0.2", "other", "billing@example.com", now.Add(-time.Hour), "an hour off"); ok {
 		t.Fatal("a line an hour off took a row")
 	}
 	lines := map[string]string{}

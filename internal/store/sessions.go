@@ -103,7 +103,7 @@ func (s *Store) DeleteUserSessions(userID int64) error {
 // forever. It piggybacks on session creation rather than running as its own
 // background loop.
 // expires_at is RFC3339 UTC text, so < compares moments (see
-// ListQueuedOlderThan).
+// ListOpenOlderThan).
 func (s *Store) DeleteExpiredSessions(now time.Time) (int64, error) {
 	res, err := s.db.Exec(`DELETE FROM sessions WHERE expires_at < ?`, now.UTC().Format(time.RFC3339))
 	if err != nil {

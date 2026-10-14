@@ -29,11 +29,26 @@ func TestLoadRetryPolicyUsesPostconfValues(t *testing.T) {
 	if p.MaximalQueueLifetime != 2*24*time.Hour {
 		t.Errorf("MaximalQueueLifetime = %v, want 2d", p.MaximalQueueLifetime)
 	}
-	if p.BounceQueueLifetime != 5*24*time.Hour {
-		t.Errorf("BounceQueueLifetime = %v, want 5d", p.BounceQueueLifetime)
+	// 5d over a maximal 2d: qmgr uses 2d (Postfix 3.7.11, src/qmgr/qmgr.c,
+	// qmgr_post_init(), "adjusting bounce_queue_lifetime").
+	if p.BounceQueueLifetime != 2*24*time.Hour {
+		t.Errorf("BounceQueueLifetime = %v, want 2d", p.BounceQueueLifetime)
 	}
 	if p.DelayWarningTime != 0 {
 		t.Errorf("DelayWarningTime = %v, want 0", p.DelayWarningTime)
+	}
+}
+
+// A message lives at most maximal_queue_lifetime: qmgr caps
+// bounce_queue_lifetime at it (Postfix 3.7.11, src/qmgr/qmgr.c,
+// qmgr_post_init()), so a larger bounce lifetime does not lengthen it.
+func TestLongestLifetimeIsTheQueueLifetime(t *testing.T) {
+	p, err := parseRetryPolicy([]string{"300s", "300s", "4000s", "1d", "5d", "0h"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.LongestLifetime() != 24*time.Hour || p.BounceQueueLifetime != 24*time.Hour {
+		t.Fatalf("LongestLifetime %v, BounceQueueLifetime %v; want 24h both", p.LongestLifetime(), p.BounceQueueLifetime)
 	}
 }
 

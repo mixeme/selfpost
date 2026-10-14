@@ -19,9 +19,11 @@ func (s *retentionProbeStore) UpdateStatus(string, string, string) (int64, error
 	return 0, nil
 }
 
-func (s *retentionProbeStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
+func (s *retentionProbeStore) ListOpenOlderThan(time.Time) ([]store.QueuedDelivery, error) {
 	return nil, nil
 }
+
+func (s *retentionProbeStore) ExpireMessage(string) (int64, error) { return 0, nil }
 
 func (s *retentionProbeStore) CloseUnreported(int64) (int64, error) {
 	return 0, nil
@@ -30,7 +32,7 @@ func (s *retentionProbeStore) CloseUnreported(int64) (int64, error) {
 func (s *retentionProbeStore) AddReconcileMissed(time.Time, int64) error     { return nil }
 func (s *retentionProbeStore) AddReconcileClosed(time.Time, int64) error     { return nil }
 func (s *retentionProbeStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
-func (s *retentionProbeStore) CountQueuedOlderThan(time.Time) (int64, error) { return 0, nil }
+func (s *retentionProbeStore) CountOpenOlderThan(time.Time) (int64, error)   { return 0, nil }
 func (s *retentionProbeStore) SetQueuedOverLifetime(time.Time, int64) error  { return nil }
 func (s *retentionProbeStore) PruneDeliveryLogDays(time.Time) error          { return nil }
 
@@ -99,7 +101,7 @@ func TestRetentionLoopUsesUpdatedValue(t *testing.T) {
 	t.Fatalf("second prune cutoff age %v, want about 7 days", age)
 }
 
-func (s *retentionProbeStore) AttachRefusalLine(string, string, time.Time, string) (bool, error) {
+func (s *retentionProbeStore) AttachRefusalLine(string, string, string, time.Time, string) (bool, error) {
 	return true, nil
 }
 

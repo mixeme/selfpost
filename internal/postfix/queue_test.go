@@ -92,10 +92,16 @@ func TestParseQueueIDs(t *testing.T) {
 A1B2C3D4E5F!    891 Fri Aug  8 10:14:31  app@example.com
                                          held@example.net
 
--- 1 Kbytes in 3 Requests.
+6D7E8F9A0B*#    512 Fri Aug  8 10:15:31  app@example.com
+                                         expiring@example.net
+
+7E8F9A0B1C#     512 Fri Aug  8 10:16:31  app@example.com
+                                         expiring2@example.net
+
+-- 2 Kbytes in 5 Requests.
 `
 	ids := parseQueueIDs(listing)
-	want := []string{"3C5B04E6C1", "5B4A2C1D3E", "A1B2C3D4E5F"}
+	want := []string{"3C5B04E6C1", "5B4A2C1D3E", "A1B2C3D4E5F", "6D7E8F9A0B", "7E8F9A0B1C"}
 	for _, id := range want {
 		if _, ok := ids[id]; !ok {
 			t.Errorf("queue id %s not found in %v", id, ids)

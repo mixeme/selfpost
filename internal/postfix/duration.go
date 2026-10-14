@@ -2,85 +2,80 @@ package postfix
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 )
 
-// ParseDuration converts a Postfix time value to a duration. Units are those
-// postconf prints and accepts: s, m, h, d, w. A bare number is seconds. Values
-// may concatenate units (`1h7m`), matching Postfix's own conv_time.
-func ParseDuration(s string) (time.Duration, error) {
-	s = strings.TrimSpace(s)
+// ParseTime reads a Postfix time value as Postfix 3.7.11 reads it:
+// src/global/conv_time.c, conv_time(), called by get_mail_conf_time() in
+// src/global/mail_conf_time.c. One number - strtol(), so leading blanks and a
+// "+" are taken, a negative number or one past an int is invalid - followed
+// by one unit, w d h m or s in lower case; with no unit, defUnit, which
+// Postfix takes from the parameter's default value (get_def_time_unit(): "5d"
+// gives d, "300s" s, "0h" h). Whatever follows the unit is ignored, so "1h7m"
+// is one hour (assumptions B-PQ10, B-PQ11). A string with no digits is read as
+// 0 of the unit it starts with, as strtol() leaves it there.
+func ParseTime(s string, defUnit byte) (time.Duration, error) {
 	if s == "" {
 		return 0, fmt.Errorf("postfix: empty time value")
 	}
-	var total time.Duration
 	i := 0
-	for i < len(s) {
-		for i < len(s) && unicode.IsSpace(rune(s[i])) {
-			i++
-		}
-		if i >= len(s) {
-			break
-		}
-		if s[i] == '-' {
-			return 0, fmt.Errorf("postfix: negative time value %q", s)
-		}
-		if s[i] == '+' {
-			i++
-		}
-		start := i
-		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-			i++
-		}
-		if i == start {
-			return 0, fmt.Errorf("postfix: invalid time value %q", s)
-		}
-		n, err := strconv.ParseInt(s[start:i], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("postfix: invalid time value %q", s)
-		}
-		unit := byte('s')
-		if i < len(s) && isTimeUnit(s[i]) {
-			unit = s[i] | 0x20 // ASCII fold to lowercase
-			i++
-		}
-		part, err := durationForUnit(n, unit)
-		if err != nil {
-			return 0, err
-		}
-		total += part
+	for i < len(s) && isCSpace(s[i]) {
+		i++
 	}
-	return total, nil
-}
-
-func isTimeUnit(c byte) bool {
-	switch c | 0x20 {
-	case 's', 'm', 'h', 'd', 'w':
-		return true
+	neg := false
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		neg = s[i] == '-'
+		i++
 	}
-	return false
-}
-
-func durationForUnit(n int64, unit byte) (time.Duration, error) {
-	var unitDur time.Duration
+	start := i
+	var n int64
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		n = n*10 + int64(s[i]-'0')
+		if n > math.MaxInt32 {
+			return 0, fmt.Errorf("postfix: time value %q out of range", s)
+		}
+		i++
+	}
+	end := i
+	if i == start {
+		// strtol() converted nothing: the end is the start of the string.
+		end, n, neg = 0, 0, false
+	}
+	if neg && n > 0 {
+		return 0, fmt.Errorf("postfix: negative time value %q", s)
+	}
+	unit := defUnit
+	if end < len(s) {
+		unit = s[end]
+	}
+	var per int64
 	switch unit {
-	case 's':
-		unitDur = time.Second
-	case 'm':
-		unitDur = time.Minute
-	case 'h':
-		unitDur = time.Hour
-	case 'd':
-		unitDur = 24 * time.Hour
 	case 'w':
-		unitDur = 7 * 24 * time.Hour
+		per = 7 * 24 * 3600
+	case 'd':
+		per = 24 * 3600
+	case 'h':
+		per = 3600
+	case 'm':
+		per = 60
+	case 's':
+		per = 1
 	default:
-		return 0, fmt.Errorf("postfix: unknown time unit %q", string(unit))
+		return 0, fmt.Errorf("postfix: invalid time value %q", s)
 	}
-	return time.Duration(n) * unitDur, nil
+	// conv_time(): "if (intval < INT_MAX / WEEK)" and the like.
+	if per > 1 && n >= math.MaxInt32/per {
+		return 0, fmt.Errorf("postfix: time value %q out of range", s)
+	}
+	return time.Duration(n*per) * time.Second, nil
+}
+
+// isCSpace is C's isspace() in the "C" locale, which strtol() skips.
+func isCSpace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'
 }
 
 // FormatDuration renders a Postfix interval the way the Mail queue card and

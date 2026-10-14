@@ -55,6 +55,13 @@ var retryConfKeys = []string{
 	"delay_warning_time",
 }
 
+// retryConfUnits is each key's default unit: the last letter of its default
+// value (Postfix 3.7.11, src/global/mail_params.h, DEF_QUEUE_RUN_DELAY
+// "300s", DEF_MIN_BACKOFF_TIME, DEF_MAX_BACKOFF_TIME "4000s",
+// DEF_MAX_QUEUE_TIME "5d", DEF_DSN_QUEUE_TIME "5d", DEF_DELAY_WARN_TIME
+// "0h"; src/global/mail_conf_time.c, get_def_time_unit()).
+var retryConfUnits = []byte{'s', 's', 's', 'd', 'd', 'h'}
+
 // readRetryConf runs `postconf -h` for the retry-policy keys. Tests replace it
 // the same way logtail stubs queueIDs.
 var readRetryConf = postconfRetryValues
@@ -63,8 +70,9 @@ func postconfRetryValues() ([]string, error) {
 	// Fixed argv, no user input — same pattern as Queue (security.md).
 	// Postfix 3.7.11, src/postconf/postconf_main.c, pcf_show_parameters():
 	// named parameters are printed in argument order, with -h one "%s\n"
-	// value each, as written in main.cf (not expanded without -x).
-	cmd := exec.Command("postconf", "-h",
+	// value each; -x expands "$name" as Postfix itself does when it reads
+	// the value (mail_conf_eval()).
+	cmd := exec.Command("postconf", "-h", "-x",
 		"queue_run_delay",
 		"minimal_backoff_time",
 		"maximal_backoff_time",
@@ -109,11 +117,17 @@ func parseRetryPolicy(lines []string) (RetryPolicy, error) {
 	}
 	var durs [6]time.Duration
 	for i, line := range lines {
-		d, err := ParseDuration(line)
+		d, err := ParseTime(line, retryConfUnits[i])
 		if err != nil {
 			return RetryPolicy{}, fmt.Errorf("%s: %w", retryConfKeys[i], err)
 		}
 		durs[i] = d
+	}
+	// Postfix 3.7.11, src/qmgr/qmgr.c, qmgr_post_init(): "bounce_queue_lifetime
+	// is larger than maximal_queue_lifetime - adjusting" - qmgr uses the
+	// smaller.
+	if durs[4] > durs[3] {
+		durs[4] = durs[3]
 	}
 	return RetryPolicy{
 		QueueRunDelay:        durs[0],
@@ -141,13 +155,11 @@ func (p RetryPolicy) BackoffCap() string {
 // sender, which an application may submit too. It bounds which stored log
 // lines can be about a send-log row (store.SendLogLines).
 //
-// Postfix 3.7.11, src/qmgr/qmgr_active.c, qmgr_active_done(): a message
-// expires after var_max_queue_time, or var_dsn_queue_time when its sender is
-// null - whoever submitted it (qmgr.c caps the second at the first).
+// Postfix 3.7.11, src/qmgr/qmgr_active.c, qmgr_active_done_25_generic(): a
+// message expires after var_max_queue_time, or var_dsn_queue_time when its
+// sender is null - whoever submitted it; qmgr.c caps the second at the
+// first, and so does parseRetryPolicy, which leaves the first the longer.
 func (p RetryPolicy) LongestLifetime() time.Duration {
-	if p.BounceQueueLifetime > p.MaximalQueueLifetime {
-		return p.BounceQueueLifetime
-	}
 	return p.MaximalQueueLifetime
 }
 
