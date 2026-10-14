@@ -175,7 +175,7 @@ func (h *Health) WithSenderCheck(rows []SenderCheckRow, since, status string) *H
 	h.SenderCheck.End = Verdict(status)
 	h.SenderRows = rows
 	h.SenderNote = Rich("The panel holds each message's ", Code("From:"),
-		" against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown.")
+		" against the application that sends it. While the panel does not answer, Postfix answers the sending application with a temporary error instead of accepting mail unchecked, and the application tries again later. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown.")
 	if since != "" {
 		h.SenderNote = append(h.SenderNote, Rich(" Counted since ", Mono(since), ".")...)
 	}

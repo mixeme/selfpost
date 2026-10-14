@@ -114,6 +114,8 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		Version:                    buildinfo.Version,
 		TrustedProxyCIDRs:          cfg.trustedProxies,
 		TLSCertFile:                cfg.tlsCertFile,
+		TLSServedCertFile:          cfg.tlsServedCertFile,
+		TLSReloadInterval:          cfg.tlsReloadInterval,
 		OpenDKIMSocket:             cfg.opendkimSocket,
 		JournalSocket:              cfg.journalSocket,
 		SenderSocket:               cfg.senderSocket,

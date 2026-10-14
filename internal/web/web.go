@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dmarc"
@@ -57,12 +58,16 @@ type Config struct {
 	// honoured, so the header can't be spoofed by anyone but a trusted proxy.
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
-	// TLSCertFile is the certificate Postfix serves on 465/587 (guide §
-	// Environment variables), read read-only by the status page to report how
-	// much validity is left.
-	TLSCertFile string
+	// TLSCertFile is the mounted certificate (guide § Environment variables);
+	// TLSServedCertFile is Postfix's copy of it, the one served on 465/587,
+	// and TLSReloadInterval how often that copy is refreshed. Health reads
+	// the served one and names the mounted one while they differ
+	// (health.CheckServedCertificate).
+	TLSCertFile       string
+	TLSServedCertFile string
+	TLSReloadInterval time.Duration
 	// OpenDKIMSocket and JournalSocket are the two milter sockets Postfix
-	// connects to. The status page stats them: the first is required for mail
+	// connects to. The status page dials them: the first is required for mail
 	// to leave at all (OpenDKIM runs with default_action=tempfail), the second
 	// only for the send log (the journal-milter fails open).
 	OpenDKIMSocket string
@@ -138,6 +143,8 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		DeployRoot:                 cfg.DeployRoot,
 		Version:                    cfg.Version,
 		TLSCertFile:                cfg.TLSCertFile,
+		TLSServedCertFile:          cfg.TLSServedCertFile,
+		TLSReloadInterval:          cfg.TLSReloadInterval,
 		OpenDKIMSocket:             cfg.OpenDKIMSocket,
 		JournalSocket:              cfg.JournalSocket,
 		SenderSocket:               cfg.SenderSocket,

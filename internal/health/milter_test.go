@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -142,5 +143,35 @@ func TestCheckMilterInet6(t *testing.T) {
 	}
 	if got := CheckMilter("Spam filter", "inet:[::1]:"+port, true); got.Status != StatusOK {
 		t.Errorf("IPv6 listener: %+v", got)
+	}
+}
+
+// A socket file whose listener is gone - a killed OpenDKIM or panel leaves
+// one (unix(7)) - is not a listener, though the file is there (A-38).
+func TestStaleSocketFileIsNotListening(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a stale AF_UNIX file is a Linux matter here")
+	}
+	sock := filepath.Join(t.TempDir(), "stale.sock")
+	l, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Skipf("unix sockets unavailable here: %v", err)
+	}
+	l.(*net.UnixListener).SetUnlinkOnClose(false)
+	l.Close()
+	if _, err := os.Stat(sock); err != nil {
+		t.Fatalf("the socket file should outlive its listener: %v", err)
+	}
+
+	got := CheckSocket("OpenDKIM", sock, true)
+	if got.Present || got.Status != StatusError || !strings.HasPrefix(got.Detail, "Nothing listens on the OpenDKIM socket") {
+		t.Errorf("stale required socket: %+v", got)
+	}
+	if got := CheckSocket("send-log", sock, false); got.Status != StatusWarn {
+		t.Errorf("stale optional socket: status %q", got.Status)
+	}
+	got = CheckMilter("Spam filter", "unix:"+sock, true)
+	if got.Present || got.Status != StatusError || got.Detail != "Nothing listens on the socket: the filter that made it has stopped." {
+		t.Errorf("stale filter socket: %+v", got)
 	}
 }

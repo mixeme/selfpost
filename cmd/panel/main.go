@@ -19,10 +19,12 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/backup"
 	"github.com/mixeme/selfpost/internal/buildinfo"
 	"github.com/mixeme/selfpost/internal/dnscheck"
+	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/store"
@@ -89,6 +91,11 @@ type config struct {
 	// was configured with.
 	tlsCertFile    string
 	opendkimSocket string
+	// tlsServedCertFile is the certificate Postfix serves (its copy of
+	// tlsCertFile), read from postconf at the start; tlsReloadInterval is
+	// how often build/postfix-cert-reload.sh looks for a renewal.
+	tlsServedCertFile string
+	tlsReloadInterval time.Duration
 
 	opendkimDir     string
 	dkimSelectorDef string
@@ -158,8 +165,9 @@ func loadConfig() config {
 		rateLimitMessagesPerIP: envInt("RATE_LIMIT_MESSAGES_PER_IP", 100),
 		rateLimitWindowSeconds: envInt("RATE_LIMIT_WINDOW_SECONDS", 3600),
 
-		tlsCertFile:    envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
-		opendkimSocket: envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
+		tlsCertFile:       envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
+		tlsReloadInterval: time.Duration(envInt("TLS_RELOAD_INTERVAL_SECONDS", 86400)) * time.Second,
+		opendkimSocket:    envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
 
 		// Per-domain DKIM state (architecture.md § OpenDKIM). The directory layout
 		// matches what entrypoint.sh prepares (setgid, shared `selfpost` group).
@@ -280,6 +288,9 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 // Image and processes).
 func run() error {
 	cfg := loadConfig()
+	// postfix-config.sh has written main.cf before supervisord started the
+	// panel (build/entrypoint.sh), and nothing rewrites it after.
+	cfg.tlsServedCertFile = health.ServedCertPath()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

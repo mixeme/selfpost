@@ -370,6 +370,9 @@ func (n *Notifier) checkCertificate() {
 	if c.NotAfter.IsZero() {
 		return // no certificate configured, or one that cannot be read: Health says so
 	}
+	if c.Renewal != nil && !c.Renewal.Late {
+		return // a renewal is mounted and Postfix takes it up at its next check
+	}
 	const key = "cert"
 	mark := c.NotAfter.UTC().Format(time.RFC3339)
 	st, have, err := n.st.GetNotifyState(key)

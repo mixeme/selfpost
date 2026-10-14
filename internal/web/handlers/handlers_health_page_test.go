@@ -150,6 +150,31 @@ func TestHealthPageStatesOfTheOtherChecks(t *testing.T) {
 	}
 }
 
+// The certificate card names a renewal Postfix has not taken up yet: its
+// expiry and when it was mounted, beside the served one's (A-65).
+func TestHealthPageNamesARenewalWaiting(t *testing.T) {
+	h, _ := settingsServer(t)
+	c := healthReading()
+	cert := c["Cert"].(health.Certificate)
+	cert.Renewal = &health.Renewal{
+		NotAfter: time.Date(2027, 1, 31, 8, 2, 0, 0, time.UTC),
+		Mounted:  time.Date(2026, 10, 15, 3, 12, 0, 0, time.UTC),
+	}
+	cert.Detail = "Postfix still serves the certificate above. A renewed one is waiting in the mounted file."
+	c["Cert"] = cert
+	out := renderHealth(t, h, c, "")
+	for _, want := range []string{
+		"<dt>Expires</dt>", "2026-11-08 09:14 UTC",
+		"<dt>Renewal expires</dt>", "2027-01-31 08:02 UTC",
+		"<dt>Renewal mounted</dt>", "2026-10-15 03:12 UTC",
+		"Postfix still serves the certificate above.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("health page is missing %q", want)
+		}
+	}
+}
+
 // The fragment is what the page holds in its polled rows, read again.
 func TestHealthFragmentCarriesTheSameRows(t *testing.T) {
 	h, _ := settingsServer(t)

@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -210,6 +211,80 @@ func TestUptime(t *testing.T) {
 	for _, detail := range []string{"", "Not started", "Oct 12 04:00 PM", "pid 41, uptime soon", "pid 41, uptime x days, 0:00:01", "pid 41, uptime 0:00"} {
 		if got, ok := Uptime(detail); ok {
 			t.Errorf("Uptime(%q) = %s, want none", detail, got)
+		}
+	}
+}
+
+// The certificate shown is the one Postfix serves; a different mounted file is
+// a renewal waiting, a warning once it waited past cert-reload's interval
+// (assumptions A-65).
+func TestCheckServedCertificate(t *testing.T) {
+	dir := t.TempDir()
+	served := filepath.Join(dir, "served.pem")
+	mounted := filepath.Join(dir, "mounted.pem")
+	day := 24 * time.Hour
+
+	// The same file: nothing waits.
+	writeCert(t, served, "mail.example.com", 60*day)
+	b, _ := os.ReadFile(served)
+	if err := os.WriteFile(mounted, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := CheckServedCertificate(served, mounted, day, time.Now()); got.Status != StatusOK || got.Renewal != nil || got.Path != served {
+		t.Errorf("same certificate: %+v", got)
+	}
+
+	// Postfix's copy nears its end, a renewal was mounted an hour ago: no
+	// warning, the renewal named.
+	writeCert(t, served, "mail.example.com", 5*day)
+	writeCert(t, mounted, "mail.example.com", 90*day)
+	now := time.Now()
+	if err := os.Chtimes(mounted, now.Add(-time.Hour), now.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	got := CheckServedCertificate(served, mounted, day, now)
+	if got.Status != StatusOK || got.Renewal == nil || got.Renewal.Late || got.DaysLeft > 5 {
+		t.Fatalf("renewal waiting: %+v", got)
+	}
+	if !strings.Contains(got.Detail, "at most a day after it was mounted") {
+		t.Errorf("renewal waiting, detail: %q", got.Detail)
+	}
+	if d := got.Renewal.NotAfter.Sub(now); d < 89*day {
+		t.Errorf("the renewal's expiry is the mounted certificate's: %v", d)
+	}
+
+	// Waiting past the interval and an hour: a warning, cert-reload named.
+	if err := os.Chtimes(mounted, now.Add(-26*time.Hour), now.Add(-26*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	got = CheckServedCertificate(served, mounted, day, now)
+	if got.Status != StatusWarn || got.Renewal == nil || !got.Renewal.Late || !strings.Contains(got.Detail, "cert-reload") {
+		t.Errorf("renewal late: %+v", got)
+	}
+
+	// The served one expired: still an error, the renewal said to be coming.
+	writeCert(t, served, "mail.example.com", -day)
+	if err := os.Chtimes(mounted, now, now); err != nil {
+		t.Fatal(err)
+	}
+	got = CheckServedCertificate(served, mounted, day, now)
+	if got.Status != StatusError || got.Renewal == nil || !strings.Contains(got.Detail, "A renewed one is waiting") {
+		t.Errorf("expired, renewal waiting: %+v", got)
+	}
+
+	// No served path known: the mounted file, as before.
+	if got := CheckServedCertificate("", mounted, day, now); got.Path != mounted || got.Renewal != nil {
+		t.Errorf("served path unknown: %+v", got)
+	}
+}
+
+func TestIntervalText(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		24 * time.Hour: "a day", 48 * time.Hour: "2 days", time.Hour: "an hour",
+		6 * time.Hour: "6 hours", 2 * time.Second: "2 seconds", 90 * time.Minute: "90 minutes",
+	} {
+		if got := intervalText(d); got != want {
+			t.Errorf("intervalText(%v) = %q, want %q", d, got, want)
 		}
 	}
 }

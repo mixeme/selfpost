@@ -118,6 +118,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   carry a damaged database whose restore would refuse every application.
   The change is now made to a copy that replaces the file whole (assumptions
   C-S3, C-Q3).
+- **Server › Health connects to the milter sockets instead of finding their
+  files.** A socket's file outlives a killed OpenDKIM or panel and refuses
+  every connection; Health showed it as listening while Postfix answered
+  every sender with a temporary error. The panel now connects as Postfix
+  does and says when nothing listens (assumptions A-38).
+- **Server › Health shows the certificate Postfix serves.** Postfix serves
+  its own copy of the mounted certificate and refreshes it once a day; the
+  card read the mounted file, so a renewal showed as served up to a day
+  before it was, and a renewal Postfix never took up - a key that does not
+  belong to it, a failed reload - not at all. The card now shows Postfix's
+  copy, names a renewal waiting in the mount, and warns when it has waited
+  longer than the daily check allows; the expiry notice is not sent while a
+  renewal waits on time (assumptions A-65).
+- **Words for what happens to mail match Postfix's.** A message refused with
+  a temporary error while the panel or the spam filter does not answer was
+  called deferred, which in Postfix's words is mail waiting in its queue;
+  the Upstream help said Required TLS holds the mail until TLS works, but
+  an upstream that refuses STARTTLS with a permanent error bounces it
+  (assumptions D-P1, D-P3).
 
 ### Changed
 

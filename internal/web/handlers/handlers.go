@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"log"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/app"
 	"github.com/mixeme/selfpost/internal/dmarc"
@@ -26,6 +27,8 @@ type Config struct {
 	DeployRoot        string
 	Version           string
 	TLSCertFile       string
+	TLSServedCertFile string
+	TLSReloadInterval time.Duration
 	OpenDKIMSocket    string
 	JournalSocket     string
 	SenderSocket      string

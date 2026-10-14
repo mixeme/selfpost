@@ -207,6 +207,11 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 	if cert.Subject != "" {
 		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Names", Value: view.Plain(cert.Subject), Mono: true})
 	}
+	if r := cert.Renewal; r != nil {
+		page.CertFacts = append(page.CertFacts,
+			view.Fact{Label: "Renewal expires", Value: view.Plain(r.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true},
+			view.Fact{Label: "Renewal mounted", Value: view.Plain(r.Mounted.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
+	}
 	page.CertDetail, page.CertProblem = cert.Detail, cert.Status != health.StatusOK
 
 	page.Sockets.End = view.Verdict(string(c["SocketStatus"].(health.Status)))
@@ -430,7 +435,7 @@ func (h *Handlers) healthChecks() map[string]any {
 		queueStatus = health.StatusWarn
 	}
 
-	cert := health.CheckCertificate(h.cfg.TLSCertFile)
+	cert := health.CheckServedCertificate(h.cfg.TLSServedCertFile, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now())
 	sockets := []health.Socket{
 		health.CheckSocket("OpenDKIM", h.cfg.OpenDKIMSocket, true),
 		health.CheckSocket("sender-check", h.cfg.SenderSocket, true),

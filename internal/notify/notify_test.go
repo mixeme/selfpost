@@ -251,6 +251,18 @@ func TestCertificateIsSaidTwice(t *testing.T) {
 	want(t, "no certificate", b.hour())
 }
 
+// The certificate Postfix serves nears its end while a renewal waits in the
+// mount: nothing is said while Postfix's check for it is still to come, and
+// the usual notice once the renewal has waited past it (A-65).
+func TestCertificateWithARenewalWaiting(t *testing.T) {
+	b := newBench(t)
+	expiry := b.now.Add(10 * 24 * time.Hour)
+	b.cert = health.Certificate{NotAfter: expiry, Renewal: &health.Renewal{NotAfter: expiry.Add(80 * 24 * time.Hour)}}
+	want(t, "renewal waiting", b.hour())
+	b.cert.Renewal.Late = true
+	want(t, "renewal late", b.hour(), "root@example.org|[SelfPost] TLS certificate of mail.example.org expires in 10 days")
+}
+
 // A message older than three days is said once, and its going once; a queue
 // that cannot be listed says nothing.
 func TestQueueIsSaidOnceAndClearedOnce(t *testing.T) {

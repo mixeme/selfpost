@@ -54,6 +54,19 @@ func checkMilter(name, addr string, required bool, timeout time.Duration) Socket
 		case fi.Mode()&os.ModeSocket == 0:
 			return fail("The path exists but is not a socket.")
 		}
+		// Dialled as an inet address is: a socket file outlives the
+		// filter that made it (CheckSocket; assumptions A-38).
+		switch err := dialUnix(path); {
+		case err == nil:
+		case errors.Is(err, syscall.EACCES):
+			s.Status = StatusUnknown
+			s.Detail = "The panel may not connect to the socket, so whether the filter listens is not known."
+			return s
+		case errors.Is(err, syscall.ECONNREFUSED):
+			return fail("Nothing listens on the socket: the filter that made it has stopped.")
+		default:
+			return fail("The socket does not answer.")
+		}
 	case strings.HasPrefix(addr, "inet:"):
 		host, port, ok := splitInet(strings.TrimPrefix(addr, "inet:"))
 		if !ok {
