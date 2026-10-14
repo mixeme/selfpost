@@ -234,9 +234,29 @@ what it relies on and where that is written, for the version the image runs
 
 The Debian sources of the image's versions are fetched with `apt-get source`
 inside a `debian:bookworm` container (`postfix`, `opendkim`, `cyrus-sasl2`,
-`supervisor`, `logrotate`); `dev/upstream/` (not in git) is where they are
-kept for reading. Go modules are read in the module cache at the version
-`go.mod` pins.
+`supervisor`, `logrotate`, and `sendmail` for libmilter); `dev/upstream/`
+(not in git) is where they are kept for reading. Go modules are read in the
+module cache at the version `go.mod` pins.
+
+The image takes `debian:bookworm-slim` and installs without pinning (pinned
+Debian versions leave the mirrors), so a rebuild after a point or security
+release runs packages the citations were not read against. The versions
+read are these; the e2e stand compares them with `dpkg-query` in the image
+it built (`checkCitedPackageVersions`), and a difference fails the run -
+re-read what changed, update the citations, then this table:
+
+<!-- cited-package-versions -->
+| Package | Version read |
+|---|---|
+| `postfix` | `3.7.11-0+deb12u1` |
+| `opendkim` | `2.11.0~beta2-8+deb12u1` |
+| `libopendkim11` | `2.11.0~beta2-8+deb12u1` |
+| `libmilter1.0.1` | `8.17.1.9-2+deb12u2` |
+| `libsasl2-2` | `2.1.28+dfsg-10` |
+| `sasl2-bin` | `2.1.28+dfsg-10` |
+| `supervisor` | `4.2.5-1` |
+| `logrotate` | `3.21.0-1` |
+<!-- /cited-package-versions -->
 
 A document instead of source: its URL and section. Where neither answers the
 question, the comment says so and what was measured instead - "measured on

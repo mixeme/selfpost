@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -257,4 +258,27 @@ func gzipMessage(t *testing.T, xml string) string {
 		"Subject: Report\r\n" +
 		"Content-Type: application/gzip; name=\"report.xml.gz\"\r\n" +
 		"\r\n" + gz.String()
+}
+
+// pct is 100 when the report leaves it out (RFC 7489 § 6.3), and an explicit
+// 0 - a policy applied to no message - stays 0 (assumptions C-M7).
+func TestPolicyPct(t *testing.T) {
+	for _, c := range []struct {
+		pct  string
+		want int
+	}{
+		{"<pct>100</pct>", 100},
+		{"<pct>0</pct>", 0},
+		{"<pct>25</pct>", 25},
+		{"", 100},
+	} {
+		doc := strings.Replace(sampleXML, "<pct>100</pct>", c.pct, 1)
+		got, err := ParseAggregate([]byte(doc))
+		if err != nil {
+			t.Fatalf("%q: %v", c.pct, err)
+		}
+		if got.PolicyPct != c.want {
+			t.Errorf("%q: PolicyPct %d, want %d", c.pct, got.PolicyPct, c.want)
+		}
+	}
 }

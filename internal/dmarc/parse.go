@@ -60,7 +60,7 @@ type feedbackXML struct {
 		Domain string `xml:"domain"`
 		P      string `xml:"p"`
 		SP     string `xml:"sp"`
-		Pct    int    `xml:"pct"`
+		Pct    *int   `xml:"pct"`
 		ADKIM  string `xml:"adkim"`
 		ASPF   string `xml:"aspf"`
 	} `xml:"policy_published"`
@@ -132,12 +132,15 @@ func ParseAggregate(raw []byte) (ParsedReport, error) {
 		Domain:       strings.ToLower(field(doc.Policy.Domain)),
 		PolicyP:      field(doc.Policy.P),
 		PolicySP:     field(doc.Policy.SP),
-		PolicyPct:    doc.Policy.Pct,
 		PolicyADKIM:  field(doc.Policy.ADKIM),
 		PolicyASPF:   field(doc.Policy.ASPF),
 	}
-	if out.PolicyPct == 0 {
-		out.PolicyPct = 100
+	// RFC 7489 § 6.3: pct is "between 0 and 100, inclusive", 100 when absent.
+	// An explicit 0 is a policy applied to no message, and stays 0; only a
+	// report without the element gets the default (assumptions C-M7).
+	out.PolicyPct = 100
+	if doc.Policy.Pct != nil {
+		out.PolicyPct = *doc.Policy.Pct
 	}
 	for _, rec := range doc.Records {
 		row := ParsedRecord{

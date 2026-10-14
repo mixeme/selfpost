@@ -2,6 +2,9 @@ package e2e
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -80,6 +83,49 @@ func checkInboundRelayOff(s *stack) error {
 	}
 	if strings.Contains(combined, "smtpd") && !strings.Contains(combined, "warning:") && !strings.Contains(combined, "fatal:") {
 		return fmt.Errorf("inbound smtp/inet is present while INBOUND_RELAY_ENABLE is off:\n%s", out)
+	}
+	return nil
+}
+
+// checkCitedPackageVersions compares the Debian packages the image runs with
+// the versions their sources were read at (docs/development.md, the table
+// between the cited-package-versions markers). The image installs unpinned
+// from a moving bookworm, so a point release changes them on a rebuild
+// without anyone reading what changed (assumptions C-D1).
+func checkCitedPackageVersions(s *stack) error {
+	doc, err := os.ReadFile(filepath.Join(s.repoRoot, "docs", "development.md"))
+	if err != nil {
+		return err
+	}
+	text := string(doc)
+	start := strings.Index(text, "<!-- cited-package-versions -->")
+	end := strings.Index(text, "<!-- /cited-package-versions -->")
+	if start < 0 || end < start {
+		return fmt.Errorf("docs/development.md has no cited-package-versions table")
+	}
+	row := regexp.MustCompile("(?m)^[|] `([^`]+)` [|] `([^`]+)` [|]$")
+	want := map[string]string{}
+	var names []string
+	for _, m := range row.FindAllStringSubmatch(text[start:end], -1) {
+		want[m[1]] = m[2]
+		names = append(names, m[1])
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("the cited-package-versions table lists no package")
+	}
+	out, err := s.execIn("selfpost", append([]string{"dpkg-query", "-W", "-f", "${Package} ${Version}\n"}, names...)...)
+	if err != nil {
+		return fmt.Errorf("dpkg-query: %v\n%s", err, out)
+	}
+	var diffs []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) == 2 && want[f[0]] != f[1] {
+			diffs = append(diffs, fmt.Sprintf("%s: the image has %s, the citations were read at %s", f[0], f[1], want[f[0]]))
+		}
+	}
+	if len(diffs) > 0 {
+		return fmt.Errorf("packages changed under the citations - re-read them (docs/development.md):\n%s", strings.Join(diffs, "\n"))
 	}
 	return nil
 }

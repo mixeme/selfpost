@@ -45,7 +45,9 @@ that will not start, is an exit supervisord counts as too quick: once
 each start it is STARTING.
 
 `crashexit` event listener exits the container when a program of the mail path
-is FATAL, so Docker `restart: unless-stopped` starts it again. `logrotate`'s
+is FATAL, so Docker `restart: unless-stopped` starts it again - the same
+container, not a new one: the entrypoint clears what the last run left in
+`/run` (the milter sockets, the sender check's alive mark). `logrotate`'s
 FATAL (a config logrotate would ignore) stays on Server › Health instead.
 The panel runs `postfix-reload` through supervisord's XML-RPC interface and
 waits for its exit status (`internal/supervisor`, `RunOnce`); the program
@@ -106,6 +108,11 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   message's queue id under the key in `/data/antispam/filter.key`
   (`inbound.FilterKey` makes it on first start; rspamd reads it through the
   mounted directory and signs in a custom routine of `milter_headers.conf`).
+  rspamd removes a sender's own copies of the three headers and writes and
+  signs its own for every message it lets through: `skip_local` and
+  `skip_authenticated` are off in that file, so this holds whatever the
+  sender's address (rspamd 3.11.1, `src/plugins/lua/milter_headers.lua`,
+  `skip_wanted()`).
   With the filter down - it is attached fail-open - a sender's own verdict
   headers carry no signature and the row is that of mail nobody judged.
   Refused mail never reaches this milter.
@@ -116,8 +123,8 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   counted only for a queue id that listener opened) into a row, dated by the
   line, when the recipient is at an inbound domain
   ([internal/logtail/inbound.go](../internal/logtail/inbound.go)). A line
-  names one recipient, so a message refused at end-of-message is one row
-  whatever its recipient count. The tailer saves its place every five seconds,
+  names one recipient (the last), so a message refused at end-of-message is
+  one row whatever its recipient count. The tailer saves its place every five seconds,
   so after an unclean stop it reads some lines again; the lines it reads on
   start are written only if the same row is not there already. The
   journal is pruned every six hours: rows
@@ -131,7 +138,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   them. The sidecar mounts the directory and rspamd's multimap rules
   ([deploy/antispam/rspamd/multimap.conf](../deploy/antispam/rspamd/multimap.conf))
   read them: a deny entry's rule carries the action `reject`, which rspamd
-  sets as a pre-result, an allow entry is a symbol weighing -100. Allow is
+  sets as a pre-result (a passthrough result: the remaining filters are not
+  run and the action stands whatever the score), an allow entry is a symbol
+  weighing -100. Allow is
   deliberately not an `accept` action: with two pre-results rspamd keeps the
   one set first, and deny then won or lost by rule order (seen on rspamd
   3.11, date not recorded). A refusal by the deny list overrides any score,
@@ -153,8 +162,10 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   [internal/postfix/inbound.go](../internal/postfix/inbound.go). Domains with
   an empty upstream host are omitted from the maps. Optional
   `INBOUND_ANTISPAM_MILTER` only when inbound relay is enabled (not on
-  DMARC-only port 25); default `milter_default_action` is fail-open
-  (`accept`). **DMARC ingest** (`DMARC_REPORTS_ENABLE=true`): allow-listed
+  DMARC-only port 25); it is attached with its own `default_action`,
+  `INBOUND_ANTISPAM_MILTER_ACTION`, which is `accept` (fail-open) unless set
+  to `tempfail` (main.cf's `milter_default_action` is `tempfail`).
+  **DMARC ingest** (`DMARC_REPORTS_ENABLE=true`): allow-listed
   report addresses via `check_recipient_access` on `postfix/dmarc_recipients`;
   messages pipe to `dmarc-ingest` (symlink to `panel`). When both flags are
   on, one listener serves both paths; per-IP rate uses
@@ -168,8 +179,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `anvil_rate_time_unit` from `RATE_LIMIT_*` env vars; independent of milter.
 - **Chroot disabled** for all services (DNS/TLS inside container).
 - **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
-  at start into `/etc/postfix/tls-internal` (Postfix wants the key root-owned
-  and `0600`, which the mount cannot give), and Postfix reads the copy.
+  at start into `/etc/postfix/tls-internal`, owned by root and `0600` as
+  Postfix's TLS_README advises (Postfix itself reads the key as root and does
+  not check its mode), which the mount cannot give; Postfix reads the copy.
   `cert-reload` compares the mount with the copy daily; when they differ and
   the certificate and key belong together it renews the copy (each file
   renamed into place) and reloads Postfix.
@@ -301,8 +313,9 @@ server itself.
   how many more there were: a row per recipient would let one refused message
   write a thousand.
 - **What it costs is counted.** The role marks itself alive every two
-  seconds (the socket's path with `.alive`, under `/run`, so a new container
-  starts without one). At start the time since the mark is the check's
+  seconds (the socket's path with `.alive`, under `/run`; the entrypoint
+  removes it at every container start, so a restart begins without one). At
+  start the time since the mark is the check's
   downtime - counted from Postfix's own start if that was later, and not at
   all when supervisord says Postfix is not running, since mail was then
   stopped for another reason. Supervisord is asked for half a minute; when it
@@ -312,14 +325,16 @@ server itself.
   writes a warning naming the socket and then, from the same smtpd process,
   `milter-reject: … 451 4.7.1 Service unavailable` from the connection on
   (the client is told `454 4.3.0` at `AUTH` and leaves), so what is counted
-  is a connection turned away, once - a client brings a message when it
-  connects. The reject line does not name the milter and the journal milter's
+  is a connection turned away, once - how many messages it held back is not
+  known: a client may bring one or several, or come back for the same one.
+  The reject line does not name the milter and the journal milter's
   level-2 refusal reads the same, hence the warning. A panel that is running
   and stops answering in the middle of a message (its socket accepts, nothing
   replies) is met by cleanup, not smtpd: past `DATA` it is cleanup that talks
   to the milters, and after the content timeout it writes `warning: milter
   unix:<socket>: can't read SMFIC_HEADER reply packet header` and refuses the
-  message with `4.7.1` (seen on the e2e stand with the panel frozen). One
+  message with `4.7.1` (seen on the e2e stand with the panel frozen;
+  `panel_hung_mid_message_is_counted` checks it at every run). One
   cleanup process serves message after message, so each such warning is
   counted as a message. The two are counted apart (the owner, 2026-10-14):
   connections turned away in `deferred`, messages deferred mid-message in
@@ -412,14 +427,13 @@ Rotation uses rename + `postfix reload`
 ([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not `copytruncate` —
 the latter can drop `status=sent` lines and leave send-log rows stuck at
 `queued`. After rename, logrotate runs `create 0640 postfix selfpost` (postlogd
-recreates the file lazily on first write as mode `0600`, which the unprivileged
-panel user cannot read). `follow()` drains the old inode once more before
-switching descriptors; the panel treats a missing log file as an empty tail, not
-an error. That drain does not close the gap entirely: postlogd keeps writing to
-the renamed file until the reload reaches it, seconds later, and a line written
-there after the drain is not read. Keeping the old file open until it has
-stopped growing is the fix; it waits for the measurement below to say how
-much it matters.
+recreates the file on its first line after the reload, as root and mode
+`0600`, which the unprivileged panel user cannot read). `follow()` drains the
+old inode once more before switching descriptors, and keeps it open and reads
+it for a minute after: postlogd keeps writing to the renamed file until the
+reload makes it exit, seconds later (Postfix 3.7.11, src/postlogd/postlogd.c;
+src/master/dgram_server.c, `dgram_server_abort()`). The panel treats a missing
+log file as an empty tail, not an error.
 
 **Delivery lines are read at the head of the line.** The pattern that turns a
 line into a row's status (`deliveryRe`) is matched after the timestamp, the
@@ -786,8 +800,13 @@ with scripts off. htmx is told not to inject its indicator stylesheet
 (`htmx-config` meta), which the CSP would otherwise have to allow.
 
 State-changing requests (every non-`GET`/`HEAD`/`OPTIONS`) pass `originAllowed`
-first: `Sec-Fetch-Site` must say `same-origin`, or `Origin` must name the
-panel's host; a request with neither header is let through (an accepted risk).
+first: `Sec-Fetch-Site` must say `same-origin`, or, where the browser does not
+send it (an older one, or a current one over plain HTTP at a name other than
+`localhost`), `Origin` must name the panel's host - which a form of the panel
+carries under its `Referrer-Policy: same-origin`, the page's own origin (under
+`no-referrer` it would be `null` and refused); a request with neither header
+is let through (an accepted risk). A refusal logs the `Sec-Fetch-Site`,
+`Origin` and `Host` it compared.
 There are no CSRF tokens — see [security.md](security.md).
 
 ### Errors shown to users
@@ -977,9 +996,14 @@ The tables that carry the panel's model:
   `logtail_state`, `inbound_domains`, `inbound_transports`,
   `inbound_recipients`, `dmarc_reports`, `dmarc_report_records`.
 
-The panel is the only writer; SQLite runs in WAL mode on one connection (see
-[Panel binary](#panel-binary-cmdpanel)), which is why a full backup snapshots
-with `VACUUM INTO` instead of copying the file.
+Two processes write: the panel, on one connection, and `dmarc-ingest`, which
+Postfix starts per report. SQLite runs in WAL mode (see
+[Panel binary](#panel-binary-cmdpanel)) and allows one write transaction at a
+time; every transaction that may write takes the lock at its `BEGIN`
+(`_txlock=immediate`, internal/store), so the other process waits for it
+within `busy_timeout`, and a schema migration is read and applied under that
+lock, once. A full backup snapshots with `VACUUM INTO`, which gives a
+consistent copy of a live database, instead of copying the file.
 
 **Rotation:** send-log retention `SEND_LOG_RETENTION_DAYS` (default 90), which
 the stored log lines follow;

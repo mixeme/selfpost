@@ -6,12 +6,16 @@ import (
 )
 
 // reservationTTL bounds how long a message may stay reserved. A reservation is
-// released at end-of-message or on ABORT, but a client that simply drops the
-// connection after MAIL FROM produces neither callback (go-milter has no
-// connection-close hook), and a reservation that never expired would count
-// against the limit forever — a fail-closed drift this milter must not have.
-// The TTL is generously longer than any realistic DATA transfer, so a message
-// still being received is never dropped from the count.
+// released at end-of-message or on ABORT. A client that drops the connection
+// mid-transaction still produces ABORT: Postfix 3.7.11, src/smtpd/smtpd.c,
+// smtpd_proto() on a lost connection runs mail_reset(), which calls
+// milter_abort() (src/milter/milter8.c, milter8_abort(), SMFIC_ABORT)
+// (assumptions B-G7). What produces neither is smtpd itself dying, or the
+// milter connection breaking - and go-milter has no connection-close hook to
+// catch that - so a reservation that never expired would count against the
+// limit forever, a fail-closed drift this milter must not have. The TTL is
+// generously longer than any realistic DATA transfer, so a message still
+// being received is never dropped from the count.
 //
 // go-milter v0.4.1, server.go, type Milter: no callback for the end of a
 // connection; session.go, HandleMilterCommands(), returns on SMFIC_QUIT or a

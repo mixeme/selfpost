@@ -14,10 +14,15 @@
 #
 #   docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
 #
-# First-run certificate issuance (webroot method, before nginx has a cert to
-# serve — run once):
+# First-run certificate issuance, before nginx has a certificate to serve -
+# run once, with port 80 free (certbot answers the challenge itself;
+# --webroot would need nginx already serving /.well-known). --entrypoint is
+# needed: the service's own entrypoint is the renewal loop below, an
+# `sh -c` that ignores any arguments given to `run`
+# (docs.docker.com/reference/compose-file/services/#entrypoint; assumptions
+# D-guide:301):
 #   docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
-#     run --rm certbot certonly --webroot -w /var/www/certbot \
+#     run --rm -p 80:80 --entrypoint certbot certbot certonly --standalone \
 #     -d mail.example.com --email you@example.com --agree-tos --no-eff-email
 
 services:
@@ -61,5 +66,9 @@ services:
     # until a certificate is within its renewal window.
     # (eff-certbot.readthedocs.io, User Guide, "Automated Renewals": the
     # sample cron runs "certbot renew" at 0 and 12 h; renew acts only on a
-    # certificate near expiry.)
-    entrypoint: sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'
+    # certificate near expiry.) The first certificate was issued --standalone
+    # (see the top of this file), and certbot renews with the plugin it was
+    # issued with "unless you specify other plugins or options" (same page,
+    # "Renewing certificates") - by then nginx holds port 80 and serves the
+    # webroot, so renewal names it; a renewal that succeeds with it saves it.
+    entrypoint: sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done'

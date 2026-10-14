@@ -3,8 +3,10 @@
 # the panel nor Postfix ever needs to resolve anything outside this zone here.
 #
 # The `file` plugin's own `reload` sub-directive (NOT the top-level `reload`
-# plugin, which only watches the Corefile itself) polls db.zone's mtime/serial
-# and reloads with no signal needed, so the test harness can rewrite the zone
+# plugin, which only watches the Corefile itself) re-reads db.zone every
+# second and takes it when its SOA serial has grown - the serial, not the
+# mtime (CoreDNS v1.14.6, plugin/file/reload.go; dns_zone.go keeps it
+# growing) - with no signal needed, so the test harness can rewrite the zone
 # file (to publish a domain's DKIM record) and just poll until the new record
 # is visible — no container restart, no sleep.
 e2e.test {

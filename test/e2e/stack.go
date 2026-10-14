@@ -63,10 +63,11 @@ func (s *stack) compose(args ...string) ([]byte, error) {
 	}, args...)
 	cmd := exec.Command("docker", full...)
 	// deploy/docker-compose.yml interpolates ${SELFPOST_HOSTNAME:?...} at
-	// compose-file parse time, straight from the process environment — that
-	// happens before the override file's `environment:` mapping is even
-	// looked at (that mapping only reaches the container, not compose's own
-	// variable interpolation), so it has to be set here too.
+	// compose-file parse time, from the shell's environment or the project
+	// directory's .env, the shell first (docs.docker.com/compose/how-tos/
+	// environment-variables/variable-interpolation/; assumptions C-K9) - the
+	// override file's `environment:` mapping only reaches the container, not
+	// compose's own interpolation - so it is set here, where it wins.
 	cmd.Env = append(os.Environ(), "SELFPOST_HOSTNAME="+selfpostHostname)
 	cmd.Env = append(cmd.Env, s.env...)
 	var out bytes.Buffer

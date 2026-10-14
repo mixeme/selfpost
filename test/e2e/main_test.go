@@ -116,6 +116,9 @@ func TestE2E(t *testing.T) {
 		if err := checkInboundRelayOff(h); err != nil {
 			t.Fatal(err)
 		}
+		if err := checkCitedPackageVersions(h); err != nil {
+			t.Fatal(err)
+		}
 		if err := checkPort25ConfigCombinations(h); err != nil {
 			t.Fatal(err)
 		}

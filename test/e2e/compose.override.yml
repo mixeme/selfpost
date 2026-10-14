@@ -25,9 +25,11 @@ services:
     restart: "no"
     build:
       # Resolved relative to --project-directory (.stage), NOT this file's own
-      # directory — compose build.context paths follow the project directory,
-      # unlike bind-mount volume paths, which is the same reason ./data and
-      # ./certs above need no path here at all.
+      # directory: with --project-directory, build.context and bind-mount
+      # volume paths alike resolve against it - which is why ./data, ./certs
+      # and the ./dns-stage and ./mail-stage below land in .stage
+      # (docs.docker.com/compose/how-tos/multiple-compose-files/merge/, "Paths
+      # are evaluated relative to the base file"; assumptions C-K8).
       context: ../../..
       dockerfile: build/Dockerfile
       args:

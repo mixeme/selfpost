@@ -55,8 +55,11 @@ func prepareStage(s *stack) error {
 // writeDeployFiles puts docker-compose.yml and .env into the stage directory.
 // The stage directory is what the container sees as /selfpost-deploy, the
 // operator's project directory, and a full backup refuses to run unless both
-// files are there to be archived. compose reads neither: the stand names its
-// files with -f, and the .env repeats what compose is given anyway.
+// files are there to be archived. compose reads the .env too - without
+// --env-file it takes .env from --project-directory - but the shell's value
+// set by stack.compose takes precedence, and the two agree anyway
+// (docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/;
+// assumptions C-K9). The compose file itself is named with -f.
 func writeDeployFiles(s *stack) error {
 	compose, err := os.ReadFile(s.baseComposeFile)
 	if err != nil {

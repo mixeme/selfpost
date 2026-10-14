@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,12 +39,16 @@ type txtRecord struct {
 
 // writeZone (re)writes the whole authoritative db.zone for e2e.test: the fixed
 // records CoreDNS/sink need to be reachable, plus whatever TXT records the
-// test has published so far. CoreDNS's `reload 2s` (see dns/Corefile) picks up
-// the new mtime with no signal needed.
+// test has published so far. The file plugin's `reload 1s` (see dns/Corefile)
+// reloads the zone when its SOA serial has grown - not on a new mtime:
+// CoreDNS v1.14.6, plugin/file/reload.go, Reload() re-parses with the current
+// serial and file.go, Parse(), refuses a zone whose serial did not change
+// (coredns.io/plugins/file, "reload"; assumptions C-E2). So the serial only
+// ever grows, by one at least, even for two writes within a second.
 func writeZone(stageDir string, extra []txtRecord) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "$ORIGIN e2e.test.\n$TTL 300\n")
-	fmt.Fprintf(&b, "@       IN SOA  ns.e2e.test. admin.e2e.test. ( %d 3600 900 604800 300 )\n", time.Now().Unix())
+	fmt.Fprintf(&b, "@       IN SOA  ns.e2e.test. admin.e2e.test. ( %d 3600 900 604800 300 )\n", nextZoneSerial())
 	fmt.Fprintf(&b, "@       IN NS   ns.e2e.test.\n")
 	fmt.Fprintf(&b, "ns      IN A    10.77.0.10\n")
 	// The sink-MX: Postfix's outbound delivery for the recipient domain used by
@@ -56,6 +61,20 @@ func writeZone(stageDir string, extra []txtRecord) error {
 		fmt.Fprintf(&b, "%s IN TXT %s\n", r.name, chunkTXT(r.value))
 	}
 	return os.WriteFile(filepath.Join(stageDir, "dns-stage", "db.zone"), []byte(b.String()), 0o644)
+}
+
+var zoneSerial struct {
+	sync.Mutex
+	last int64
+}
+
+// nextZoneSerial is the time in seconds, or one more than the last serial
+// when that is not later.
+func nextZoneSerial() int64 {
+	zoneSerial.Lock()
+	defer zoneSerial.Unlock()
+	zoneSerial.last = max(zoneSerial.last+1, time.Now().Unix())
+	return zoneSerial.last
 }
 
 // chunkTXT splits a TXT value into <255-byte quoted strings (the DNS

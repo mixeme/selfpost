@@ -158,6 +158,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   A full backup follows links under `certs/` and carries the files; a link
   that leads nowhere stops it, named (assumptions C-A1, C-Q4). If you use
   certbot this way, follow the guide's new "Reverse proxy" steps.
+- **A DMARC report with `pct=0` says 0.** An explicit `<pct>0</pct>` - a
+  policy applied to no message - was shown as 100, the value for a report
+  that leaves `pct` out (assumptions C-M7).
+- **The nginx fragment's first certificate is issued, and renewed.** The
+  command it gave passed its arguments to the renewal loop, which ignored
+  them, and used the webroot nginx could not serve yet. It is now
+  `run --entrypoint certbot ... --standalone` with port 80 free, and the
+  renewal loop names nginx's webroot, which a standalone certificate would
+  otherwise not use (assumptions D-guide:301).
+- **The guide, architecture and security documents say what the code
+  does.** Some forty claims the sources contradict, or only partly bear out,
+  are corrected: what the rate limits count, what a backup restore message
+  looks like, how to pass the backup password, what the queue and Health
+  show, a backup MX's preference, the DMARC report address, what the
+  password store keeps, what the delivery log holds, and others
+  (assumptions, Answers E).
 - **Words for what happens to mail match Postfix's.** A message refused with
   a temporary error while the panel or the spam filter does not answer was
   called deferred, which in Postfix's words is mail waiting in its queue;

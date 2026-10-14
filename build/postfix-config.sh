@@ -89,10 +89,13 @@ HOSTNAME_VALUE="${SELFPOST_HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # request dropped ... TLS context initialization failed"); every new smtpd
 # process loads the files again in pre_jail_init().
 #
-# Postfix insists the private key is root-owned and mode 0600. The bind mount
-# is often :ro and owned by the host user (e2e TempDir / CI runner UID), so
-# copy into a writable internal dir and normalise ownership before postconf
-# and `postfix check`.
+# Postfix's TLS_README advises a private key owned by root and readable by no
+# other user; Postfix does not enforce it (smtpd loads the key as root in
+# pre_jail_init(), Postfix 3.7.11 src/smtpd/smtpd.c), but the mount cannot
+# give that mode - it is :ro and owned by the host's user, often readable by
+# group 998 for the panel's backup. So the pair is copied into a directory of
+# Postfix's own, the key root:root 0600, before postconf and `postfix check`
+# (assumptions D-arch:154).
 TLS_CERT_SRC="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
 TLS_KEY_SRC="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
 TLS_INTERNAL_DIR=/etc/postfix/tls-internal

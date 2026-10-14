@@ -216,21 +216,21 @@ expected to set; defaults match the code exactly.
 | `SELFPOST_HOSTNAME` | Mail-server identity: Postfix HELO/EHLO, SASL realm, certificate CN/SAN, and the hostname the PTR check expects. Bare FQDN only — no scheme or port. | *(required)* | `.env` |
 | `SUBMISSION_ENABLE` | When `true`, also listen on port 587 with STARTTLS (RFC 6409 submission) alongside the primary 465/smtps listener. | `false` | `.env` |
 | `INBOUND_RELAY_ENABLE` | When `true`, accept mail on port 25 for domains configured under *Inbound › Domains* in the panel and forward them to the upstream you set. Off by default — the outbound path is unchanged. See [Inbound relay](#inbound-relay). | `false` | `.env` |
-| `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip/XML, and show summaries under *Outbound › DMARC reports*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
+| `DMARC_REPORTS_ENABLE` | When `true`, accept DMARC aggregate reports on port 25 only for report addresses configured in the panel, parse gzip, zip or plain XML, and show summaries under *Outbound › DMARC reports*. Off by default. See [DMARC reports](#dmarc-reports). | `false` | `.env` |
 | `DMARC_RATE_LIMIT_MESSAGES_PER_IP` | Per-client-IP cap on port 25 when DMARC ingest is on. When inbound relay is also enabled, **`INBOUND_RATE_LIMIT_MESSAGES_PER_IP`** applies to the shared listener instead. | `20` | `.env` |
 | `DMARC_MESSAGE_SIZE_LIMIT` | Maximum report message size in bytes when DMARC ingest is on. | `5242880` (5 MiB) | `.env` |
 | `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. The panel reads it to report on the *Spam filter* box of the inbound pages and to check that the filter answers (Server › Health). | *(empty)* | `.env` |
-| `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (defer). The *Spam filter* box states which. | `accept` | `.env` |
+| `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (refuse with a temporary error). The *Spam filter* box states which. | `accept` | `.env` |
 | `INBOUND_SPAM_LOG_RETENTION_DAYS` | How long the inbound journal keeps a row, 7-365 days; it also never holds more than 10 000 rows. Seeds the setting on the first start with the inbound relay on. | `90` | `.env` |
 | `INBOUND_JOURNAL_MILTER_SOCKET` | Unix socket of the panel's inbound journal milter, the last milter on port 25 while the inbound relay is on. It records accepted inbound mail and never refuses any; there is no reason to change it. | `/run/selfpost/inbound-journal.sock` | compose |
-| `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on inbound smtpd (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
-| `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. | `26214400` (25 MiB) | `.env` |
-| `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: maximum messages one client IP may submit per window (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
+| `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on port 25: how many times one client IP may start a message (`MAIL FROM`) per window, accepted or not (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
+| `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. This is port 25's whole limit; 465 and 587 keep Postfix's own, 10 240 000 bytes. | `26214400` (25 MiB) | `.env` |
+| `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: how many times one client IP may start a message (`MAIL FROM`) on one listener per window, accepted or not; 465 and 587 count separately (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
-| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. Behind the default Apache host-network setup this is typically the Docker bridge gateway, e.g. `172.18.0.1`. | *(empty — XFF ignored)* | `.env` |
+| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it). | *(empty — XFF ignored)* | `.env` |
 
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
 [deploy/docker-compose.yml](../deploy/docker-compose.yml) to match the `./certs`
@@ -271,16 +271,18 @@ that's easy to get wrong lives in the service rather than in a config file
 somebody edits under pressure. There is exactly one thing the proxy must do:
 **pass the original `Host` header through**. All four fragments above already
 do (Apache `ProxyPreserveHost On`, nginx `proxy_set_header Host $host`, Caddy
-and Traefik by default). A proxy that rewrites `Host` instead makes the panel
-reject every form submission as cross-origin — the log says so explicitly,
-printing the `Origin` and `Host` it compared.
+and Traefik by default). A proxy that rewrites `Host` instead breaks the panel in a
+browser that does not send `Sec-Fetch-Site` (Safari before 16.4, or any
+browser on a panel served over plain HTTP at a name): there the panel compares
+`Origin` with `Host` and refuses every change as cross-origin - the log says
+so explicitly, printing the `Sec-Fetch-Site`, `Origin` and `Host` it compared.
 
 In every case the proxy terminates HTTPS for the panel; the resulting
 certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem` —
 the files, or links that lead to them inside the container.
 
-**Apache (recommended, on the host).** Install Apache with `ssl`, `proxy`, and
-`proxy_http` enabled. Copy
+**Apache (recommended, on the host).** Install Apache with `ssl`, `proxy`,
+`proxy_http` and `rewrite` enabled. Copy
 [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) into your
 vhost directory, replace `mail.example.com` with your hostname, enable the site,
 then issue a certificate:
@@ -315,23 +317,25 @@ sudo chgrp 998 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 sudo chmod 0640 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 ```
 
-**nginx (containerised).** From the `deploy/` directory, merge the nginx
-fragment and issue the first certificate before nginx can serve HTTPS:
+**nginx (containerised).** Edit
+[deploy/nginx/nginx.conf.example](../deploy/nginx/nginx.conf.example) and
+replace `mail.example.com` first. Then, from the `deploy/` directory, issue
+the first certificate - before nginx can serve HTTPS, so certbot answers the
+challenge itself (`--standalone`), and port 80 must be free while it runs.
+The `certbot` service's own entrypoint is its renewal loop, which ignores
+any arguments, hence `--entrypoint certbot`:
 
 ```sh
 docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
-  run --rm certbot certonly --webroot -w /var/www/certbot \
+  run --rm -p 80:80 --entrypoint certbot certbot certonly --standalone \
   -d mail.example.com --email you@example.com --agree-tos --no-eff-email
-
-docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
 ```
 
-Edit [deploy/nginx/nginx.conf.example](../deploy/nginx/nginx.conf.example) and
-replace `mail.example.com` first. The fragment mounts certbot's directory into
-both nginx and SelfPost, at `/etc/letsencrypt`; `./certs` holds two links to
+The fragment mounts certbot's directory into both nginx and SelfPost, at
+`/etc/letsencrypt`; `./certs` holds two links to
 `/etc/letsencrypt/live/mail.example.com/` — a path that exists inside the
 container, not on the host — and the panel reads the key through group 998,
-as in the Apache case:
+as in the Apache case. Then start everything:
 
 ```sh
 mkdir certs
@@ -340,7 +344,15 @@ ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 sudo chmod 0755 nginx/certbot-etc/live nginx/certbot-etc/archive
 sudo chgrp 998 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
 sudo chmod 0640 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
+
+docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
 ```
+
+Renewals cannot use the standalone method: nginx holds port 80 by then. The
+fragment's renewal loop runs `certbot renew --webroot -w /var/www/certbot`,
+the directory nginx serves the challenges from; certbot renews with the
+options it is given and keeps them for the certificate once a renewal with
+them succeeds (certbot's documentation, "Renewing certificates").
 
 **Caddy (containerised, automatic ACME).** Edit
 [deploy/caddy/Caddyfile](../deploy/caddy/Caddyfile) and the `<hostname>` placeholders
@@ -427,9 +439,10 @@ on, the inbound one. Each card leads to its table on **Server › Health**
 (`/server/health`) — the queue card to the Outbound queue — and Health has the
 readings, in the order of what stops mail first:
 
-- **Machine** — processor (core and thread counts), memory and swap, and
-  per-interface network throughput and totals, read from the kernel's
-  counters; CPU and throughput are measured between refreshes, so they appear
+- **Machine** — processor (core and thread counts), memory and swap of the
+  host (a memory limit set on the container is not reflected), and
+  per-interface network throughput and totals of the container's own network
+  interfaces, read from the kernel's counters; CPU and throughput are measured between refreshes, so they appear
   one refresh after the page opens. A fully busy processor or a machine out of
   memory is a warning, because both delay or kill the mail path; throughput is
   only reported.
@@ -438,16 +451,16 @@ readings, in the order of what stops mail first:
 - **Sender check** — what the strict check of the `From:` line has cost
   today, in the last 30 days and in the last 12 months: for how long the
   panel did not answer while Postfix was running, how many connections
-  Postfix turned away because of it, and how many messages it deferred in
-  the middle (see [Who an application may send
+  Postfix turned away because of it, and how many messages it refused with a
+  temporary error in the middle (see [Who an application may send
   as](#who-an-application-may-send-as)). A restart of the whole container is
   not counted: mail was stopped for another reason then. A connection turned
   away is refused before a message is offered, so a monitor that only
-  connects during an outage is counted too; a message deferred in the middle
+  connects during an outage is counted too; a message refused in the middle
   is one the panel stopped answering for after it had begun. A time marked ≈
   is at most what it shows: at that start supervisord could not say since
   when Postfix ran. Days are UTC days. The card warns when
-  a connection was turned away or a message deferred in the last 24 hours. If these numbers do not stay
+  a connection was turned away or a message refused in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
@@ -463,8 +476,8 @@ readings, in the order of what stops mail first:
 ### Queue and System log
 
 - **Outbound › Queue** (`/outbound/queue`, global role) — live view of
-  messages Postfix is still trying to deliver or deferring, as `postqueue -p`
-  lists them. It only shows: nothing there deletes or forces a message. A box
+  messages Postfix is still trying to deliver, deferring or holding, as
+  `postqueue -p` lists them. It only shows: nothing there deletes or forces a message. A box
   states this instance's retry policy — first retry delay, later backoff cap,
   how long a message stays in the queue — from `postconf -h`, read once when
   the panel starts. A `postconf -e` override inside the container is visible
@@ -608,8 +621,9 @@ left open will not keep a session alive forever.
 
 ### Upgrading
 
-Bump the pinned image tag in `docker-compose.yml` to the target release, then
-`docker compose up -d`. The backup version check requires the running image
+Bump the pinned image tag in `docker-compose.yml` to the target release, build
+that tag as under [Fixed image tag](#fixed-image-tag) while no 2.x image is
+published, then `docker compose up -d`. The backup version check requires the running image
 to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag).
 
@@ -654,8 +668,8 @@ Level 1 is always on, configured via `.env`:
 - `RATE_LIMIT_MESSAGES_PER_IP` → Postfix `smtpd_client_message_rate_limit`
 - `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
 
-This is an anvil limit per connecting client IP. It keeps working even if the
-journal-milter (level 2) is down. There is no per-IP bypass.
+This is an anvil limit per client IP and listener. It keeps working even if the
+journal-milter (level 2) is down. There is no per-IP bypass except the container's own loopback.
 
 ### Full backup and restore
 
@@ -818,18 +832,19 @@ A version mismatch at step 5 refuses to start and leaves `/data` untouched —
 the panel exits with a message naming the tag to use, e.g.:
 
 ```
-backup: this backup was created by SelfPost 1.2.3 but this image is 1.5.0 — restore into the matching image (selfpost:1.2.3)
+backup: this backup was created by SelfPost 2.5.0 but this image is 2.5.1 — restore into the matching image (selfpost:2.5.0)
 ```
 
-Fix the tag in `docker-compose.yml`, `docker compose pull && docker compose up
--d` again — the manifest is still there because the failed boot never got to
+Fix the tag in `docker-compose.yml` (build that tag as under [Fixed image
+tag](#fixed-image-tag) if it is not published), then `docker compose up -d`
+again — the manifest is still there because the failed boot never got to
 delete it.
 
 **Moving to a different host** is the same flow: create an empty project
 directory, unpack the backup there, edit `.env` (and `docker-compose.yml` if
 needed) for the new hostname or proxy, then `docker compose up -d`. The archive
-carries `certs/` from the old host — re-issue certificates when the hostname or
-IP changes. Set up the reverse-proxy vhost separately (not in the backup).
+carries `certs/` from the old host — re-issue certificates when the hostname
+changes; a new IP needs only DNS (the A record and the PTR). Set up the reverse-proxy vhost separately (not in the backup).
 
 The inbound log and the filter lists are in the database and so in the
 backup, and so are the list files under `data/antispam/`; the panel writes
@@ -911,10 +926,12 @@ docker exec -i <container> selfpost-backup -decrypt < backup.spbk > backup.tar.g
 
 The CLI also *writes* encrypted backups for scripted/cron use. The password
 comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>` (first line),
-never from a command-line argument, which would be visible in the process list:
+never from a command-line argument, which would be visible in the process list.
+`-e` with the name only takes the value from your shell's environment, so it is
+not written on the command line:
 
 ```sh
-docker exec -e SELFPOST_BACKUP_PASSWORD="$PW" <container> selfpost-backup > backup.spbk
+SELFPOST_BACKUP_PASSWORD="$PW" docker exec -e SELFPOST_BACKUP_PASSWORD <container> selfpost-backup > backup.spbk
 ```
 
 With no password set, the CLI keeps writing the plain `.tar.gz` it always has.
@@ -948,7 +965,9 @@ with nowhere to send it.
 points at `SELFPOST_HOSTNAME`. The domain page shows the value to publish
 (`10 <hostname>.`) and a check that succeeds when *any* MX host matches this
 server — other MX targets (a primary mail server) are fine; this is how
-backup-MX is meant to work. Use *Re-check DNS* after publishing.
+backup-MX is meant to work. When SelfPost is the backup of another MX, give it
+a larger number than the primary's: MX records of equal preference are tried
+in no fixed order, so the mail would be shared, not backed up. Use *Re-check DNS* after publishing.
 
 **Not an open relay.** The inbound smtpd offers no SASL. It accepts only
 domains in `relay_domains` and only listed recipients (`relay_recipient_maps`);
@@ -969,7 +988,7 @@ docker compose -f docker-compose.yml -f antispam/docker-compose.antispam.yml up 
 The milter sees the real client IP, HELO and PTR — unlike the upstream, which
 only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
 does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
-defer instead.
+refuse with a temporary error instead, so the sending server tries again.
 
 The fragment mounts one file into the sidecar,
 [deploy/antispam/rspamd/milter_headers.conf](../deploy/antispam/rspamd/milter_headers.conf):
@@ -998,8 +1017,8 @@ The same directory holds
 **allow and deny lists** kept in the panel. SelfPost does not apply the lists
 itself: it writes them as six files under `data/antispam/` (`allow_ip.map`,
 `allow_from.map`, `allow_domain.map` and the three `deny_` ones), the fragment
-mounts that directory into the sidecar, and rspamd rereads a file within
-seconds of a change - no restart. An entry is a sender address, a sender
+mounts that directory into the sidecar, and rspamd rereads a changed file within
+about a minute - no restart. An entry is a sender address, a sender
 domain (that domain, not its subdomains) or a client address or network. A
 denied sender is refused outright. An allowed one is given a weight that no
 spam score outweighs, so it is accepted - unless a deny entry matches the same
@@ -1007,7 +1026,8 @@ message: **deny wins**, whichever entries they are. **A sender address or
 domain on the allow list is not proof of anything**: it is the envelope
 sender, which the sending server states and nobody checks, so whoever knows an
 allowed address can send as it. Allow a client address or network where you
-can. The files are readable by
+can. Only the envelope sender is looked at: a bounce, whose envelope sender
+is empty, matches no sender entry, whatever its `From:` line says. The files are readable by
 anyone on the host; they hold addresses, not secrets.
 
 In the panel the lists are **Inbound › Filter lists** (global role), and what
@@ -1032,12 +1052,12 @@ so a user with the *domain* role sees the state without the server's internals.
 For the global role the filter is also one of the milter sockets on **Server ›
 Health** and in the Overview card: the panel connects to the address (one
 second at most, nothing is sent) and, if there is no answer, says whether
-inbound mail is being deferred (`tempfail`) or going through unfiltered
+inbound mail is being refused with a temporary error (`tempfail`) or going through unfiltered
 (`accept`).
 
 **Inbound mail is not in the Outbound log.** Port 25 runs its own milter chain:
 the optional anti-spam milter, and nothing else. OpenDKIM does not sign relayed
-mail (and a signing outage therefore cannot defer it), and the journal-milter
+mail (and a signing outage therefore cannot hold it up), and the journal-milter
 does not file it — the [Outbound log](#outbound-log) stays a record of what
 *you* sent.
 This also keeps a forged `From:` on inbound mail from counting against a
@@ -1082,8 +1102,9 @@ is no mailbox for the server as a whole.
 
 **DNS.** Publish the usual `_dmarc` TXT on each sending domain with
 `rua=mailto:…` pointing at the address the domain shows. Receivers deliver to the
-address domain — publish **MX** for `SELFPOST_HOSTNAME` (or the report
-address domain if different) so reports reach this server. If a hub domain
+address's domain: to its MX, or, without one, to its A record -
+`SELFPOST_HOSTNAME` has that already; a report address on another domain needs
+that domain's **MX** to point here. If a hub domain
 authorises external destinations, publish `_report._dmarc` there too; the panel
 checks it on the domain page.
 
@@ -1187,8 +1208,9 @@ What this stops working when you upgrade from an earlier version:
   DMARC requires.
 
 The check is strict: while the panel does not answer, Postfix answers with a
-temporary error (`451`, and `454` to the login) and applications send again
-later; nothing is accepted unchecked. **Server › Health** counts how often
+temporary error (`451`, and `454` to the login): an application that queues
+its mail sends it again later, one that sends directly gets an error to retry;
+nothing is accepted unchecked. **Server › Health** counts how often
 that happens.
 
 *Export domain* writes a single-domain file; *Import a domain* on *Server ›
@@ -1216,9 +1238,9 @@ records; see [Inbound relay](#inbound-relay).
   it. Public mail hosts (Gmail, Outlook, …) cannot be used as external
   report destinations.
 
-Skipping any of the three records is the single most common reason mail
-lands in spam even though SelfPost delivered it correctly — DKIM passing
-doesn't help if SPF/DMARC are absent. **Whenever you add a new domain in the
+Publish all three: receivers weigh SPF, DKIM and DMARC together, and large
+receivers require them for bulk senders - a domain without them is a common
+way for mail SelfPost delivered correctly to land in spam. **Whenever you add a new domain in the
 panel, add its DNS records at the same time**, not later.
 
 Each domain's page has a *DNS records* box comparing the published DKIM
@@ -1289,8 +1311,9 @@ journal-milter and is deliberately fail-open: if the rate-limit lookup hits
 a store error, or the connecting client's IP is not available to the
 milter, level 2 is skipped and the message is accepted rather than held up.
 The same applies if the journal-milter itself does not answer — Postfix is
-configured to accept rather than defer when it cannot reach it. (Since
-`2.4.0` a panel that is down altogether defers mail anyway, through the
+configured to accept rather than refuse it when it cannot reach it. (Since
+`2.4.0` a panel that is down altogether makes Postfix refuse mail with a
+temporary error anyway, through the
 [sender check](#who-an-application-may-send-as) of the same process.) Level 1
 is the backstop that keeps working even when level 2 cannot run, and it is
 the only one of the two that does not depend on the panel process.
@@ -1303,10 +1326,10 @@ rows of their domains. It refreshes its rows without resetting a filter being
 chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
-retrying), `bounced` (final failure), or refused before it was queued.
-`bounced` is usually Postfix's word - a message it gave up on at the end of
-its queue lifetime is `bounced` too, since Postfix returns it to the sender;
-it is the panel's when Postfix no longer holds a message and `mail.log` never
+retrying), `bounced` (final failure: refused for good by the receiving server, or given
+up when the queue lifetime ran out), or refused before it was queued.
+`bounced` is usually Postfix's word - it returns a message it gave up on to
+the sender, as it does one refused for good; it is the panel's when Postfix no longer holds a message and `mail.log` never
 said what became of it (the log rotated
 away while the panel was down, or was not readable) - the panel then closes
 the row as a failure rather than show a delivery it cannot evidence, and

@@ -41,10 +41,12 @@ there since `1.9.0`, that **the level-2 rate limit and an application's
 client-address list held only for the first message of a connection** - see
 [Mail path](#mail-path-security-relevant) - which was reproduced on the test
 stand and fixed. The security one (Fable) found no Critical or High: a client's
-HELO name could supply the sender, recipient and reply of a journal row and so
-make a refusal look like the deny list's (the reply now ends at Postfix's own
-`; from=<`); the journal's row cap was applied only every six hours, between
-which refusals were written at whatever rate a stranger sent recipients (the
+HELO name could supply the sender, recipient and reply of a journal row, as the
+parser then read the line, and so make a refusal look like the deny list's
+(Postfix itself logs a HELO name with a space, `<>()\";@` and non-printable
+characters turned into `?`; the reply now ends at Postfix's own `; from=<`);
+the journal's row cap was applied only every six hours, between which
+refusals were written at whatever rate a stranger sent recipients (the
 tailer now cuts to the cap every 500 rows); and two behaviours are recorded
 under Accepted risks (the allow list keyed on an address anyone can claim, the
 list files readable by anyone). A third it named - with the filter down, a
@@ -88,8 +90,10 @@ The panel is exposed to the internet — the items below are **not optional**.
 
 - The panel **generates** the password on creation or reissue and shows it
   **once**.
-- In `sasldb2` it is stored in the form SASL requires (not plaintext held by the
-  panel); a lost password can only be reissued.
+- In `sasldb2` it is stored in plaintext - Cyrus keeps `userPassword` as given
+  (Cyrus SASL 2.1.28, lib/server.c `sasl_setpass()`), and a domain export reads
+  it back from there. The panel never shows it again: a lost password is
+  reissued. `sasldb2` is as secret as the exports (§ Backup and domain export).
 
 ### Input and configuration
 
@@ -174,7 +178,9 @@ assigned outbound domains and inbound domains **separately**, each list with
 - Every non-read request first passes the origin check
   (`originAllowed`, [internal/web/security.go](../internal/web/security.go)):
   `Sec-Fetch-Site` must be `same-origin`, or `Origin` must name the panel's own
-  host; the session cookie is `SameSite` as well.
+  host (the panel's `Referrer-Policy` is `same-origin`, so a browser puts the
+  panel's own origin on a form post of the panel); the session cookie is
+  `SameSite` as well.
 - There are **no CSRF tokens**. The decision, its price and the conditions
   for revisiting it are in the accepted risks and the ADR below.
 
@@ -276,8 +282,9 @@ operator can act on it.
   it fits one queue id. Refusals are
   parsed from `mail.log` from the head of the line, with the reply ending at
   Postfix's own `; from=<` so that the HELO name after it - the client's text,
-  logged as written - cannot stand in for the sender, the recipient or the
-  reply; an address with a quote, a bracket or a space in it is not kept.
+  which Postfix logs with non-printable characters and ` <>()\";@` turned into
+  `?` (Postfix 3.7.11, src/smtpd/smtpd.c `helo_cmd()`) - cannot stand in for
+  the sender, the recipient or the reply; an address with a quote, a bracket or a space in it is not kept.
   Only a recipient at an inbound domain makes a row. The journal is cut to
   10 000 rows every 500 rows the tailer writes, and by age every six hours.
 - **Filter lists** reach another container as files: values are whitelisted on
@@ -464,10 +471,13 @@ deferred item from the roadmap.
 - ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
   `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
   § Roles.
-- **Level-2 in-flight reservations can outlive a dropped SMTP session until TTL.**
-  The journal milter cannot observe connection-close directly through
-  go-milter, so if a client disconnects without an explicit `Abort`, its
-  in-memory reservation is released by TTL expiry, not immediately. The map is
+- **Level-2 in-flight reservations can outlive a broken SMTP session until TTL.**
+  Postfix tells the milters ABORT when a client drops the connection
+  mid-transaction (Postfix 3.7.11, src/smtpd/smtpd.c `mail_reset()` ->
+  `milter_abort()`), and the journal milter releases the reservation then.
+  When that never arrives - smtpd killed, the milter connection lost - go-milter
+  has no close callback, and the in-memory reservation is released by TTL
+  expiry, not immediately. The map is
   bounded by key and TTL (currently 10 minutes), so the effect is temporary
   over-counting on that app/domain key under churn. Accepted deliberately:
   immediate cleanup would require protocol hooks the current milter interface
@@ -477,7 +487,9 @@ deferred item from the roadmap.
   directory is `2750 postfix:selfpost` and the file is `0640`: `postlogd` (user
   `postfix`) writes, the panel reads through the shared `selfpost` group, and
   the file is inaccessible to others. The log holds envelope addresses and
-  client IPs, but neither message bodies nor headers; it is excluded from
+  client IPs and SASL logins, the `Message-ID` of each message and the replies
+  given - for a refused `From:` line the reply quotes it (printable ASCII,
+  cut) - but no message bodies and no other headers; it is excluded from
   backups (`log/` is skipped) so that a dump stays state rather than
   diagnostics. Since 2.2.0 the tailer copies the lines of queued outbound
   messages into the database for the message's page, and those are in a
@@ -513,9 +525,11 @@ deferred item from the roadmap.
   every submission: availability of sending now depends on the panel,
   which it did not before `2.4.0`. Chosen by the owner over the alternative,
   a check that is absent whenever the panel is - that one could be switched
-  off by whoever can make the panel slow. Supervisord restarts the panel at
-  once and takes the container down after three failed starts, so the
-  outage is seconds or the whole instance; Server › Health counts the
+  off by whoever can make the panel slow. Supervisord starts a panel that
+  died again at once; one that dies within a second of starting is tried
+  four times in a few seconds, and then SelfPost's `crashexit` listener takes
+  the container down (supervisor 4.2.5, `startretries=3`), so the outage is
+  seconds or the whole instance; Server › Health counts the
   downtime and the mail deferred for it. Trigger to revisit: those numbers
   not staying at nothing - then the check moves into a process of its own
   ([plans/from-header-binding.md](plans/from-header-binding.md)).
