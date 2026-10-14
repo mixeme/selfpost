@@ -3,6 +3,7 @@ package milter
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,14 @@ func TestSenderCheck(t *testing.T) {
 			if !strings.HasPrefix(text, "y 550 5.7.1 From: ") || !strings.Contains(text, c.wantText) {
 				t.Fatalf("reply %q, want a 550 5.7.1 saying %q", text, c.wantText)
 			}
+			// The reason names no other domain of the server (audit L8); the
+			// From: line before it is what the client wrote itself.
+			reason := text[strings.LastIndex(text, " - ")+3:]
+			for _, other := range []string{"example.com", "mail.example.org", "example.org"} {
+				if strings.Contains(reason, other) {
+					t.Fatalf("the reason %q names %s", reason, other)
+				}
+			}
 			if len(rows) != 1 || rows[0].Reason != store.ReasonFrom || rows[0].To != "someone@elsewhere.example" || rows[0].AppLogin != c.login {
 				t.Fatalf("log rows: %+v", rows)
 			}
@@ -268,6 +277,40 @@ func TestSenderCheckRefusalWithNullSenderHasItsDomain(t *testing.T) {
 		_, rows := offer(t, bind, login, "", [2]string{"From", "someone@gmail.example"})
 		if len(rows) != 1 || rows[0].Domain != want || rows[0].From != "" {
 			t.Errorf("%s: rows = %+v, want one of domain %s", login, rows, want)
+		}
+	}
+}
+
+// passedFromLines reads testdata/from-lines-passed.txt with {domain} put in.
+func passedFromLines(t *testing.T, domain string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "from-lines-passed.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		s, err := strconv.Unquote(line)
+		if err != nil {
+			t.Fatalf("%s: %v", line, err)
+		}
+		out = append(out, strings.ReplaceAll(s, "{domain}", domain))
+	}
+	return out
+}
+
+// Every line of the shared file is passed for the domain's application; the
+// e2e then checks OpenDKIM signs each for that domain alone.
+func TestSenderCheckPassesTheSharedLines(t *testing.T) {
+	bind := NewBindings(writeMaps(t, senderMaps))
+	for _, line := range passedFromLines(t, "shop.example.org") {
+		resp, rows := offer(t, bind, "shop", "shop@shop.example.org", [2]string{"From", line})
+		if resp != milter.RespContinue || len(rows) != 0 {
+			t.Errorf("From: %q refused: %s", line, replyText(resp))
 		}
 	}
 }

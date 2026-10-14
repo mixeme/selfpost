@@ -83,6 +83,10 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		// DATA for the client; it is permanent and says what is wrong.
 		if e := fmt.Sprint(res.dataErr); res.dataErr == nil || !strings.HasPrefix(e, "550 ") || !strings.Contains(e, "5.7.1 From:") {
 			t.Errorf("%s: want 550 5.7.1 naming the From: line at the end of DATA, got %v", c.name, res.firstErr())
+		} else if reason := e[strings.LastIndex(e, " - ")+3:]; strings.Contains(reason, otherDomain) {
+			// What the client wrote is said back; that the other domain is
+			// a sender of this server is not (audit 2026-10-12, L8).
+			t.Errorf("%s: the reason %q names %s", c.name, reason, otherDomain)
 		}
 		if _, err := findSinkMessage(h.stageDir, token, 2*time.Second); err == nil {
 			t.Errorf("%s: the refused message reached the sink", c.name)

@@ -1,0 +1,22 @@
+# From: lines the sender check lets through for an application of {domain}
+# (audit 2026-10-12, stage 2: which key OpenDKIM signs with, seen and not
+# reasoned). One Go-quoted string per line; {domain} is the application's
+# domain. Two tests read this file: the check's unit test
+# (internal/milter/sender_test.go) wants each line passed, and the e2e
+# (test/e2e/dkim_from_test.go) sends each one and wants the message signed
+# for {domain} and nothing else. A line added here is run by both.
+"a@{domain}"
+"<a@{domain}>"
+"\"The Shop\" <Orders@{domain}>"
+"orders+48213@{domain}"
+"\"shop@{domain}\" <a@{domain}>"
+"\"Orders, returns\" <a@{domain}>"
+"\"The \\\"Shop\\\"\" <a@{domain}>"
+"\"someone@gmail.example\" <a@{domain}>"
+"=?utf-8?b?0JzQsNCz0LDQt9C40L0=?= <a@{domain}>"
+"=?windows-1251?B?zODj4Ofo7Q==?= <a@{domain}>"
+"=?koi8-r?Q?=ED=C1=C7=C1=DA=C9=CE?= <a@{domain}>"
+"\"A very long display name of the shop\"\r\n <a@{domain}>"
+"=?utf-8?b?0JzQsNCz0LDQt9C40L0=?=\r\n\t<a@{domain}>"
+"a@{domain} (the shop)"
+"a@{domain} (the (nested) shop)"

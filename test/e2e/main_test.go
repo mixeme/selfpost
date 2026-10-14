@@ -310,6 +310,9 @@ func TestE2E(t *testing.T) {
 	run("sender_check_holds_the_from_line", func(t *testing.T) {
 		testSenderCheck(t, sc)
 	})
+	run("passed_from_lines_signed_for_their_domain_only", func(t *testing.T) {
+		testSignedForItsDomainOnly(t, sc)
+	})
 	run("panel_down_defers_mail", func(t *testing.T) {
 		testPanelDownDefersMail(t, sc)
 	})

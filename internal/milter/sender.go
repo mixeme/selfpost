@@ -331,7 +331,11 @@ func (s *senderSession) judge() (shown, why string, err error) {
 			return shown, "", fmt.Errorf("signing table: %w", err)
 		}
 		if signs {
-			return printable(raw), "it names another sender of this server, " + d, nil
+			// Which one is not said: the reply would confirm to whoever
+			// tries names that another tenant sends from this server (audit
+			// 2026-10-12, L8). The line as written is in the reply and on
+			// the refused message's page.
+			return printable(raw), "it names another sender of this server", nil
 		}
 	}
 	// And one that needs to know nothing of OpenDKIM's parser: outside quoted

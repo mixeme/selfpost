@@ -86,6 +86,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   registry); the rows of a deleted domain are the global role's alone. The
   inbound log follows the same rule (audit 2026-10-12, L12).
 
+- **A refusal no longer says which other domain sends from this server.**
+  A `From:` line that named another sender of the server was refused with
+  that sender's domain in the reply, which confirmed to whoever tried names
+  that it is hosted here. The reply now stops at "it names another sender of
+  this server"; the line as written stays in the reply and on the refused
+  message's page (audit 2026-10-12, L8).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table
