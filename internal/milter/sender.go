@@ -31,10 +31,9 @@ import (
 // answer, Postfix defers mail. It therefore depends on as little as it can.
 // It reads no database: what an application may send as comes from the file
 // of sender bindings Postfix itself reads for the envelope, so the two go by
-// one table, by one lookup: the address, the address without its
-// "+extension", the domain. (Postfix compares logins without regard to case;
-// the check compares them as written, which is how the panel writes them.) The send-log row of a refusal is written by another goroutine and
-// is not waited for.
+// one table, read the way Postfix reads it and looked up the way Postfix looks
+// it up (Bindings). The send-log row of a refusal is written by another
+// goroutine and is not waited for.
 //
 // Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
 // the SASL login is compared with an owner by strcasecmp_utf8();
@@ -78,8 +77,9 @@ func (f *tableFile) changed() (lines []string, again bool, err error) {
 type Bindings struct {
 	mu       sync.Mutex
 	file     tableFile
-	logins   map[string]map[string]bool // sender -> logins
+	logins   map[string]map[string]bool // sender -> logins, both in lower case
 	domainOf map[string]string          // login -> the domain it sends as
+	broken   error                      // why Postfix would not use the table
 }
 
 // NewBindings reads the file at path on first use.
@@ -90,63 +90,136 @@ func NewBindings(path string) *Bindings {
 // fresh makes the table match the file.
 func (b *Bindings) fresh() error {
 	lines, again, err := b.file.changed()
-	if err != nil || !again {
+	if err != nil {
 		return err
 	}
-	logins := make(map[string]map[string]bool)
-	domains := make(map[string]string)
+	if again {
+		b.logins, b.domainOf, b.broken = parseSenderMap(lines)
+	}
+	return b.broken
+}
+
+// parseSenderMap reads the lines of a sender_login_maps file as Postfix 3.7.11
+// reads a texthash table (src/util/dict_thash.c, dict_thash_open(), over
+// src/util/readlline.c, readllines()):
+//   - a line that starts with a blank continues the one before; an empty
+//     line, or one whose first non-blank is "#", is skipped;
+//   - the key ends at the first blank outside double quotes, a backslash
+//     escaping the next character; a line with an unbalanced quote, or
+//     without a key or a value, is ignored (with a warning, in Postfix);
+//   - the key is folded to lower case (DICT_FLAG_FOLD_FIX, which
+//     src/smtpd/smtpd_check.c, pre_jail_init(), gives
+//     smtpd_sender_login_maps);
+//   - a key given twice makes the whole table unusable: no DICT_FLAG_DUP_*
+//     flag is given, so dict_thash_open() returns a surrogate that fails
+//     every lookup, and smtpd answers 451 (reject_server_error()). The check
+//     then defers mail as well.
+//
+// The owners are split on commas and blanks (smtpd_check.c,
+// reject_auth_sender_login_mismatch(), mystrtok(CHARS_COMMA_SP)).
+func parseSenderMap(lines []string) (logins map[string]map[string]bool, domains map[string]string, broken error) {
+	var logical []string
 	for _, line := range lines {
-		// texthash: <key><whitespace><value>, the value a comma-separated
-		// list of logins (internal/postfix renderSenderLoginMaps).
-		// Postfix 3.7.11, src/util/dict_thash.c, dict_thash_open(): the key
-		// ends at the first blank; src/util/readlline.c skips a line whose
-		// first non-blank is "#"; src/util/dict_ht.c folds the key to lower
-		// case (DICT_FLAG_FOLD_FIX, set for smtpd_sender_login_maps in
-		// src/smtpd/smtpd_check.c).
-		fields := strings.Fields(line)
-		if len(fields) < 2 || strings.HasPrefix(fields[0], "#") {
+		line = strings.TrimRight(line, "\r")
+		trimmed := strings.TrimLeft(line, " \t")
+		switch {
+		case trimmed == "" || trimmed[0] == '#':
+			continue
+		case len(trimmed) < len(line) && len(logical) > 0:
+			logical[len(logical)-1] += line
+		default:
+			logical = append(logical, trimmed)
+		}
+	}
+	logins = make(map[string]map[string]bool)
+	domains = make(map[string]string)
+	for _, line := range logical {
+		key, value, ok := splitTableLine(line)
+		if !ok {
 			continue
 		}
-		sender := strings.ToLower(fields[0])
-		set := logins[sender]
-		if set == nil {
-			set = make(map[string]bool)
-			logins[sender] = set
+		sender := strings.ToLower(key)
+		if _, dup := logins[sender]; dup {
+			return nil, nil, fmt.Errorf("sender map: duplicate entry %q, which Postfix refuses the whole table for", sender)
 		}
-		for _, l := range strings.Split(strings.Join(fields[1:], ""), ",") {
-			if l != "" {
-				set[l] = true
-				if _, known := domains[l]; !known {
-					domains[l] = domainOf(sender)
-				}
+		set := make(map[string]bool)
+		logins[sender] = set
+		for _, l := range strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\t' || r == '\r' || r == '\n'
+		}) {
+			l = strings.ToLower(l)
+			set[l] = true
+			if _, known := domains[l]; !known {
+				domains[l] = domainOf(sender)
 			}
 		}
 	}
-	b.logins, b.domainOf = logins, domains
-	return nil
+	return logins, domains, nil
 }
 
-// Allowed reports whether login may send as addr: the address itself is bound
-// to it, or its whole domain is. This is the lookup Postfix makes for the
-// envelope sender.
+// splitTableLine splits a logical texthash line into its key and its value,
+// as dict_thash_open() does: the key ends at the first blank outside double
+// quotes (a backslash escaping the character after it), and the value is the
+// rest without the blanks around it. ok is false where Postfix ignores the
+// line: an unbalanced quote, no key, or no value.
+func splitTableLine(line string) (key, value string, ok bool) {
+	inQuotes := false
+	i := 0
+	for ; i < len(line); i++ {
+		c := line[i]
+		if c == '\\' {
+			i++
+			continue
+		}
+		if c == '"' {
+			inQuotes = !inQuotes
+			continue
+		}
+		if (c == ' ' || c == '\t') && !inQuotes {
+			break
+		}
+	}
+	if inQuotes {
+		return "", "", false
+	}
+	if i > len(line) {
+		i = len(line)
+	}
+	key, value = line[:i], strings.Trim(line[i:], " \t")
+	return key, value, key != "" && value != ""
+}
+
+// Allowed reports whether login may send as addr - the lookup Postfix makes
+// for the envelope sender. Postfix 3.7.11, src/smtpd/smtpd_check.c,
+// reject_auth_sender_login_mismatch(), takes the owners of the first key
+// mail_addr_find() finds (src/global/mail_addr_find.c, mail_addr_find_opt()
+// with MA_FIND_DEFAULT): the address, then the address without its
+// "+extension", then "@domain" - each tried only when the one before is not
+// in the table - and compares the login with them by strcasecmp_utf8(). So
+// an address bound to one application is not open to another that holds its
+// whole domain (assumptions B-PS1). The bare local part MA_FIND_DEFAULT also
+// tries for a local domain is never a key here: every key the panel writes
+// has an "@" (internal/postfix renderSenderLoginMaps).
 func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if err := b.fresh(); err != nil {
 		return false, err
 	}
-	addr = strings.ToLower(addr)
-	if b.logins[addr][login] {
-		return true, nil
+	login, addr = strings.ToLower(login), strings.ToLower(addr)
+	keys := []string{addr}
+	// recipient_delimiter is "+" (build/postfix-config.sh), so an
+	// application listed as invoices@ may also send as invoices+march@.
+	if bare := withoutExtension(addr); bare != addr {
+		keys = append(keys, bare)
 	}
-	// Postfix's second try: the address without its extension, so that an
-	// application listed as invoices@ may also send as invoices+march@
-	// (recipient_delimiter in build/postfix-config.sh).
-	if bare := withoutExtension(addr); bare != addr && b.logins[bare][login] {
-		return true, nil
+	if d := domainOf(addr); d != "" {
+		keys = append(keys, "@"+d)
 	}
-	if d := domainOf(addr); d != "" && b.logins["@"+d][login] {
-		return true, nil
+	for _, k := range keys {
+		if owners, found := b.logins[k]; found {
+			return owners[login], nil
+		}
 	}
 	return false, nil
 }
@@ -182,7 +255,7 @@ func (b *Bindings) DomainOf(login string) string {
 	if b.fresh() != nil {
 		return ""
 	}
-	return b.domainOf[login]
+	return b.domainOf[strings.ToLower(login)]
 }
 
 // Signers is OpenDKIM's SigningTable as the check reads it: the names this

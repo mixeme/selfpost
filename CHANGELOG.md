@@ -17,6 +17,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   both exceptions off; tried against rspamd 3.11.1 before and after
   (audit 2026-10-12, stage 2c; assumptions C-R7). Copy the new
   `antispam/rspamd/` files next to your compose fragment.
+- **An address listed for one application could be put in `From:` by
+  another of its domain.** The sender check accepted a `From:` address when
+  any of its keys in the sender map - the address, the address without its
+  extension, the domain - named the application; Postfix takes the first
+  key it finds and asks only its owners. An application set to any address
+  of a domain could therefore write in `From:` an address listed for
+  another application of that domain - which Postfix refuses it in the
+  envelope - and have it signed. The check now reads the map as Postfix
+  does: the first key found decides, logins are compared without regard to
+  case, owners may be separated by blanks or continue on the next line, and
+  a key written twice makes the check defer, as it makes Postfix refuse the
+  whole table (assumptions B-PS1, B-PS4).
 
 ### Fixed
 

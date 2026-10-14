@@ -62,6 +62,10 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		{"the server's own name", wildcard, "postmaster@" + selfpostHostname, false},
 		{"a domain the server knows nothing of", wildcard, "someone@elsewhere.e2e.test", false},
 		{"an address off the list", list, "director@" + senderDomain, false},
+		// The first key Postfix finds decides: billing@ is listed for
+		// app-list, so the wildcard application may not have it, in the
+		// header as in the envelope (assumptions B-PS1; the envelope below).
+		{"the address listed for another application", wildcard, "billing@" + senderDomain, false},
 		{"another sender in the display name", wildcard, `"director@` + otherDomain + `" <alerts@` + senderDomain + `>`, false},
 	} {
 		token := uniqueToken("from")
@@ -98,14 +102,27 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		}
 	}
 
+	// What the header case above holds to: Postfix itself refuses the
+	// wildcard application billing@ as envelope sender, at RCPT, because the
+	// address's own key names app-list only (Postfix 3.7.11,
+	// src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch(): "553
+	// 5.7.1 <%s>: Sender address rejected: not owned by user %s").
+	if res := attemptSend(sendAttempt{
+		authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "billing@" + senderDomain, headerFrom: "alerts@" + senderDomain, to: recipient,
+		subject: "e2e " + uniqueToken("envelope"), body: "sender check: another application's address in the envelope",
+	}); res.refusedAt("RCPT", 553, "not owned by user") != nil {
+		t.Errorf("the address listed for another application, in the envelope: %v", res.refusedAt("RCPT", 553, "not owned by user"))
+	}
+
 	// A refusal is a row of the Outbound log whose tag says why.
 	if err := waitFor("the refusals to appear in the Outbound log", 15*time.Second, 500*time.Millisecond, func() (bool, error) {
 		rows, err := sc.panel.sendLogRows(senderDomain, "")
 		if err != nil {
 			return false, err
 		}
-		if n := strings.Count(rows, `">wrong From</span>`); n < 5 {
-			return false, fmt.Errorf("%d rows tagged wrong From, want 5", n)
+		if n := strings.Count(rows, `">wrong From</span>`); n < 6 {
+			return false, fmt.Errorf("%d rows tagged wrong From, want 6", n)
 		}
 		return true, nil
 	}); err != nil {

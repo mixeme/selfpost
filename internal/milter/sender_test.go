@@ -216,6 +216,80 @@ func TestBindingsFollowTheFile(t *testing.T) {
 	}
 }
 
+// The owners of the first key Postfix finds decide, not any key that lists
+// the login: an address bound to one application is not open to another that
+// holds its whole domain (Postfix 3.7.11, smtpd_check.c,
+// reject_auth_sender_login_mismatch(), over mail_addr_find(); assumptions
+// B-PS1). Composed by hand in internal/postfix's format.
+func TestBindingsFirstKeyWins(t *testing.T) {
+	bind := NewBindings(writeMaps(t, `@example.org shop
+billing@example.org billing
+invoices+march@example.org other
+`))
+	for _, c := range []struct {
+		login, addr string
+		want        bool
+	}{
+		{"shop", "a@example.org", true},
+		{"billing", "billing@example.org", true},
+		{"shop", "billing@example.org", false},        // the address's own key decides
+		{"billing", "billing+q3@example.org", true},   // without the extension
+		{"shop", "billing+q3@example.org", false},     // ... before @domain
+		{"shop", "invoices+march@example.org", false}, // the full key first
+		{"other", "invoices+march@example.org", true},
+		{"shop", "invoices+april@example.org", true}, // no key without "+": @domain
+		{"billing", "a@example.org", false},
+		{"SHOP", "A@Example.ORG", true}, // strcasecmp_utf8, a folded key
+	} {
+		if ok, err := bind.Allowed(c.login, c.addr); err != nil || ok != c.want {
+			t.Errorf("Allowed(%q, %q) = %v, %v; want %v", c.login, c.addr, ok, err, c.want)
+		}
+	}
+}
+
+// The table is read the way dict_thash_open() reads it: continuation lines,
+// owners split on blanks as well as commas, comments, lines Postfix ignores.
+// Composed by hand.
+func TestBindingsReadAsPostfixReadsThem(t *testing.T) {
+	bind := NewBindings(writeMaps(t, "# a comment\n"+
+		"@shop.example.org shop,\n"+
+		"  shop2 shop3\n"+
+		"\n"+
+		"\"a b\"@x.example.org quoted\n"+
+		"nokey-value-only\n"+
+		"\"open@x.example.org broken\n"+
+		"@news.example.net\tnews\r\n"))
+	for _, c := range []struct {
+		login, addr string
+		want        bool
+	}{
+		{"shop", "a@shop.example.org", true},
+		{"shop2", "a@shop.example.org", true},
+		{"shop3", "a@shop.example.org", true},
+		{"news", "a@news.example.net", true},
+		{"quoted", "\"a b\"@x.example.org", true},
+		{"broken", "\"open@x.example.org", false},
+	} {
+		if ok, err := bind.Allowed(c.login, c.addr); err != nil || ok != c.want {
+			t.Errorf("Allowed(%q, %q) = %v, %v; want %v", c.login, c.addr, ok, err, c.want)
+		}
+	}
+}
+
+// A key given twice - in any case, since Postfix folds keys - makes Postfix
+// refuse the whole table (dict_thash_open(), no DICT_FLAG_DUP_* flag), and
+// the check defers as smtpd does. Composed by hand.
+func TestBindingsDuplicateKeyBreaksTheTable(t *testing.T) {
+	bind := NewBindings(writeMaps(t, "@shop.example.org shop\nA@Shop.example.org other\n"))
+	if _, err := bind.Allowed("shop", "b@shop.example.org"); err != nil {
+		t.Fatalf("two different keys: %v", err)
+	}
+	bind = NewBindings(writeMaps(t, "@shop.example.org shop\n@SHOP.example.org other\n"))
+	if ok, err := bind.Allowed("shop", "b@shop.example.org"); err == nil || ok {
+		t.Fatalf("duplicate key: %v, %v; want an error", ok, err)
+	}
+}
+
 // Without the signing table the second look cannot be taken, and a line it
 // would have to judge is deferred; a line that names nobody else is not held
 // up by it.

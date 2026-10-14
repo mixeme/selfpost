@@ -1122,6 +1122,10 @@ An address with an extension counts as the address: an application listed as
 `invoices@…` may also send as `invoices+march@…`, in the envelope and in
 `From:` alike.
 
+An address listed for an application is that application's alone: another
+application of the same domain, set to any address, may not send as it -
+Postfix asks who owns the address before it asks who owns the domain.
+
 A message whose `From:` is anything else is refused with `550 5.7.1` and a
 text naming the line: another of your domains, the server's own name, an
 address at a domain that is not on this server, a line with two addresses,

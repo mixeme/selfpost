@@ -242,10 +242,16 @@ server itself.
   its domain may write any address of that domain, and one with a list only
   the listed ones; everything else is refused - another registered domain,
   the server's name, a domain the server knows nothing of. One table for
-  both senders and one lookup: the address, the address without its
-  `+extension` (`recipient_delimiter`, which `build/postfix-config.sh` sets
-  for that reason), then the domain. Postfix compares logins without regard
-  to case and the check as written, which is how the panel writes them.
+  both senders, read as Postfix reads a texthash table and looked up as
+  Postfix looks it up: the address, the address without its `+extension`
+  (`recipient_delimiter`, which `build/postfix-config.sh` sets for that
+  reason), then `@domain` - and the **first of these keys in the table
+  decides**, its owners alone: an address listed for one application is not
+  open to another that holds the whole domain. Logins are compared without
+  regard to case, as Postfix compares them (Postfix 3.7.11,
+  `src/smtpd/smtpd_check.c`, `reject_auth_sender_login_mismatch()`, over
+  `src/global/mail_addr_find.c`, `mail_addr_find_opt()`). A key written
+  twice makes Postfix refuse the whole table, and the check defers then too.
 - **How the header is read.** Exactly one `From:` field (none, or more than
   one, is refused), parsed as an address list that must hold exactly one
   address. Then a cruder second look at the raw value: OpenDKIM finds the

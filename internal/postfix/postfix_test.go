@@ -50,6 +50,22 @@ func TestRenderSenderLoginMapsDedupesLogin(t *testing.T) {
 	}
 }
 
+// Keys differing only in case are one key to Postfix, which folds them, and
+// two of them would make it refuse the whole table (dict_thash_open() with no
+// DICT_FLAG_DUP_* flag): they are written as one line.
+func TestRenderSenderLoginMapsFoldsKeys(t *testing.T) {
+	got, err := renderSenderLoginMaps([]Binding{
+		{"Billing@Example.org", "billing"},
+		{"billing@example.org", "billing2"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "billing@example.org billing,billing2\n" {
+		t.Errorf("map = %q, want one folded key", got)
+	}
+}
+
 func TestAssertMapSafeRejectsInjection(t *testing.T) {
 	bad := []struct{ addr, login string }{
 		{"@exa mple.com", "log"},

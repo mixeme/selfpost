@@ -100,10 +100,17 @@ func renderSenderLoginMaps(bindings []Binding) ([]byte, error) {
 		if err := assertMapSafe(b.Address, b.Login); err != nil {
 			return nil, err
 		}
-		if _, seen := byAddr[b.Address]; !seen {
-			order = append(order, b.Address)
+		// One line per key as Postfix folds it: smtpd opens the map with
+		// DICT_FLAG_FOLD_FIX and no DICT_FLAG_DUP_* flag, so two keys that
+		// differ only in case would make the whole table unusable (Postfix
+		// 3.7.11, src/util/dict_thash.c, dict_thash_open()). The panel stores
+		// addresses in lower case already; this keeps the file safe if a row
+		// ever is not.
+		addr := strings.ToLower(b.Address)
+		if _, seen := byAddr[addr]; !seen {
+			order = append(order, addr)
 		}
-		byAddr[b.Address] = appendUnique(byAddr[b.Address], b.Login)
+		byAddr[addr] = appendUnique(byAddr[addr], b.Login)
 	}
 	sort.Strings(order)
 
