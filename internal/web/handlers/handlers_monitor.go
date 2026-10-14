@@ -123,19 +123,19 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 	page := view.NewOutMessage(h.shellMeta(r), in).
-		WithHistory(deliveryEvents(row, h.cfg.RetryPolicy, h.sendsAs(row.AppLogin))).
+		WithHistory(deliveryEvents(row, h.cfg.RetryPolicy, h.sendsAs(row))).
 		// The mail.log lines for this message, and — when there are none — the
 		// reason, which is a normal outcome rather than a failure.
 		WithDeliveryLog(logLines, logNote)
 	h.view.Render(w, http.StatusOK, "out-message", page)
 }
 
-// sendsAs says what an application may send as, in the words of a refusal:
-// any address of its domain, or the addresses of its list. Empty when the
-// login is no application's any more.
-func (h *Handlers) sendsAs(login string) view.Text {
-	a, err := h.store.GetApplicationByLogin(login)
-	if err != nil {
+// sendsAs says what the row's application may send as, in the words of a
+// refusal: any address of its domain, or the addresses of its list. Empty when
+// the login is no application's any more, or is now another domain's.
+func (h *Handlers) sendsAs(row store.SendLogRow) view.Text {
+	a, err := h.store.GetApplicationByLogin(row.AppLogin)
+	if err != nil || a.DomainID != row.DomainID {
 		return nil
 	}
 	if a.AddressMode == store.AddressModeList {

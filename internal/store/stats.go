@@ -42,6 +42,11 @@ func StatsWindow(retentionDays int, entityCreated time.Time) (since time.Time, h
 	if hours < 1 {
 		hours = 1
 	}
+	// Nothing before the entity was created is its own: rows from then are a
+	// predecessor's of the same name or login (review of audit stage 2).
+	if c := entityCreated.UTC(); c.After(since) {
+		since = c
+	}
 	return since, hours, windowDays
 }
 
@@ -62,7 +67,7 @@ func (s *Store) DomainSendStats(name string, retentionDays int, createdAt time.T
 // AppSendStats returns send statistics for an application login.
 func (s *Store) AppSendStats(login string, retentionDays int, createdAt time.Time) (SendStats, error) {
 	since, hours, windowDays := StatsWindow(retentionDays, createdAt)
-	stats, err := s.sendStats("app_login = ?", login, since, hours)
+	stats, err := s.sendStats(appByLogin, login, since, hours)
 	if err != nil {
 		return SendStats{}, err
 	}
@@ -74,6 +79,13 @@ func (s *Store) AppSendStats(login string, retentionDays int, createdAt time.Tim
 // domainByName selects a domain's send-log rows by the id of the domain
 // registered under the name it is given.
 const domainByName = "domain_id = (SELECT d.id FROM domains d WHERE d.name = ?)"
+
+// appByLogin selects an application's send-log rows: its login's rows of its
+// domain. A login is unique while it exists, but a deleted application's
+// login can be taken again in another domain, and its numbers - statistics,
+// the level-2 count - must not start with the old one's (review of audit
+// stage 2). ?1 twice; a plain ? after it takes the next number.
+const appByLogin = "app_login = ?1 AND domain_id = (SELECT a.domain_id FROM applications a WHERE a.login = ?1)"
 
 // sendStats counts the rows that match, a condition with one placeholder
 // taking ref.

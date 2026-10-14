@@ -70,14 +70,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   with nothing assigned. Saving and creating a user are now one transaction
   each, the e-mail included (audit 2026-10-12, M9).
 
+- **The users form keeps a password changed meanwhile, and says when a
+  domain it offered is gone.** Saving a user wrote back the password hash
+  read when the form was opened, which undid a password the user changed on
+  Account in between; a domain deleted while the form was open ended in an
+  error page.
 - **A domain import is checked like the forms.** The import trusted the file
   for the report address, the rate limits and the client addresses: a limit
   with a window of no seconds counted nothing, and an address that was not
   one made the application refuse every client without a word. The file is
   now held to the forms' rules before anything is created, and refused with
-  the form's own message, naming the field and the application (audit
-  2026-10-12, M10).
+  the form's own message, naming the field and the application; the DKIM
+  selector is held to DNS labels; an auto limit's numbers are worked out on
+  this server right after the import rather than taken from the file
+  (audit 2026-10-12, M10).
 
+- **An application's numbers are its own.** Statistics, the level-2 count
+  and an auto limit's recalculation counted every row of the login, so an
+  application created with the login of a deleted one - in another domain,
+  even - started with the old one's traffic. They now count the login's rows
+  of its domain, from the application's creation on. A message with an empty
+  envelope sender (`MAIL FROM:<>`) is held to its domain's level-2 limit by
+  its login, like the application's other mail.
 - **A domain added again starts with an empty log.** Send-log rows belonged
   to a domain by its name, so a domain deleted and added again showed its
   earlier mail to whoever it was assigned to next, and its statistics and
@@ -86,12 +100,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   registry); the rows of a deleted domain are the global role's alone. The
   inbound log follows the same rule (audit 2026-10-12, L12).
 
-- **A refusal no longer says which other domain sends from this server.**
-  A `From:` line that named another sender of the server was refused with
-  that sender's domain in the reply, which confirmed to whoever tried names
-  that it is hosted here. The reply now stops at "it names another sender of
-  this server"; the line as written stays in the reply and on the refused
-  message's page (audit 2026-10-12, L8).
+- **A refusal no longer names the other domain.** A `From:` line that named
+  another sender of the server was refused with that sender's domain in the
+  reply. The reply now stops at "it names another sender of this server";
+  the line as written stays in the reply and on the refused message's page.
+  That such a line is refused at all still tells the sending application
+  that the domain is hosted here (security.md, accepted risks) (audit
+  2026-10-12, L8).
 
 ### Added
 

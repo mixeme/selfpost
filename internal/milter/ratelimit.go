@@ -39,6 +39,14 @@ func (s *session) overLimit() bool {
 	}
 
 	domain := domainOf(s.from)
+	if domain == "" && s.login != "" {
+		// MAIL FROM:<> has no domain to read; the login has one. A null
+		// sender is held to its application's domain like any other message
+		// of it (review of audit stage 2).
+		if a, err := s.rec.ApplicationByLogin(s.login); err == nil {
+			domain = a.DomainName
+		}
+	}
 	if domain == "" {
 		return false
 	}

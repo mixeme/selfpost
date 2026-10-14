@@ -283,8 +283,15 @@ func TestSenderCheckRefusalWithNullSenderHasItsDomain(t *testing.T) {
 
 // passedFromLines reads testdata/from-lines-passed.txt with {domain} put in.
 func passedFromLines(t *testing.T, domain string) []string {
+	return fromLines(t, "from-lines-passed.txt", domain, "news.example.net")
+}
+
+// fromLines reads one of the shared files of From: lines with the
+// placeholders put in: {domain}, {DOMAIN} (in capitals), {other}, {OTHER} and
+// {other_qp} (its dots as quoted pairs).
+func fromLines(t *testing.T, file, domain, other string) []string {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "from-lines-passed.txt"))
+	raw, err := os.ReadFile(filepath.Join("testdata", file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,9 +305,25 @@ func passedFromLines(t *testing.T, domain string) []string {
 		if err != nil {
 			t.Fatalf("%s: %v", line, err)
 		}
-		out = append(out, strings.ReplaceAll(s, "{domain}", domain))
+		out = append(out, strings.NewReplacer(
+			"{domain}", domain, "{DOMAIN}", strings.ToUpper(domain),
+			"{other_qp}", strings.ReplaceAll(other, ".", `\.`),
+			"{other}", other, "{OTHER}", strings.ToUpper(other),
+		).Replace(s))
 	}
 	return out
+}
+
+// Every line of the shared file of lines naming another sender is refused:
+// none may be passed to be signed with that sender's key.
+func TestSenderCheckRefusesTheSharedLinesNamingAnother(t *testing.T) {
+	bind := NewBindings(writeMaps(t, senderMaps))
+	for _, line := range fromLines(t, "from-lines-other.txt", "shop.example.org", "news.example.net") {
+		resp, _ := offer(t, bind, "shop", "shop@shop.example.org", [2]string{"From", line})
+		if resp == milter.RespContinue {
+			t.Errorf("From: %q passed", line)
+		}
+	}
 }
 
 // Every line of the shared file is passed for the domain's application; the

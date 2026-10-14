@@ -76,3 +76,18 @@ func TestCountQueuedOlderThan(t *testing.T) {
 		t.Fatalf("queued rows before an hour ago = %d, %v; want 0", n, err)
 	}
 }
+
+// Statistics start no earlier than the entity: what came before is a
+// predecessor's of the same name (review of audit stage 2).
+func TestStatsWindowStartsAtTheEntity(t *testing.T) {
+	created := time.Now().UTC().Add(-48 * time.Hour)
+	since, _, _ := StatsWindow(90, created)
+	if !since.Equal(created) {
+		t.Fatalf("since = %s, want the entity's creation %s", since, created)
+	}
+	old := time.Now().UTC().AddDate(-1, 0, 0)
+	since, _, _ = StatsWindow(90, old)
+	if since.Before(time.Now().UTC().AddDate(0, 0, -31)) {
+		t.Fatalf("since = %s, want within the 30-day window", since)
+	}
+}

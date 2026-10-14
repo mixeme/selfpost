@@ -216,10 +216,17 @@ operator can act on it.
   the line may hold one `@`. That the two agree is tested, not only argued:
   the e2e sends every `From:` line the check passes - a list it shares with
   the check's unit test, `internal/milter/testdata/from-lines-passed.txt` -
-  and wants the message signed for the application's domain and no other.
-  The reply to a refusal says that the line names another sender of the
-  server, not which: it would confirm to whoever tries names that a domain
-  is hosted here. What this does not promise is what a display
+  and wants the message signed for the application's domain and no other;
+  and every line of a second list, lines that name another sender of the
+  server in a quoted string, a comment, a quoted pair, capitals or an encoded
+  word (`from-lines-other.txt`), must be refused and never arrive signed for
+  that sender. The reply to a refusal says that the line names another
+  sender of the server, not which. That a line naming a domain is refused
+  when the domain is a sender of this server, and passed when it is not,
+  still tells an application which domains are hosted here; the probe needs
+  an application of this server, and refusing every foreign address in a
+  display name would change the 2.4.0 rule - the owner decides (accepted
+  risks). What this does not promise is what a display
   name looks like to a person: a name of another sender written without an
   `@` the scan can find (a full-width dot, a space inside the name) passes,
   signed with the application's own key - a forged display name is as old
@@ -436,6 +443,15 @@ deferred item from the roadmap.
   through - but no message data. The inbound journal itself is in the
   database, 0640. Trigger to revisit: a shared host, where the sidecar should
   instead be given the files through a group it shares with the panel.
+- **An application can learn which domains are senders of this server.**
+  A `From:` whose display name or comment names an address at a domain this
+  server signs for is refused; one naming any other domain passes. The reply
+  no longer names the domain (audit 2026-10-12, L8), but refused or passed
+  answers the question for whoever sends the line. Accepted for now: it needs
+  an application of this server, and closing it means refusing every
+  foreign address in a display name, which changes the owner's 2.4.0 rule
+  (a stranger's address in the name passes) - his decision, asked on
+  2026-10-14.
 - ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
   `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
   § Roles.

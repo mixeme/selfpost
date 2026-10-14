@@ -19,6 +19,10 @@ func TestSendStatsTotalPeakAvg(t *testing.T) {
 	now := time.Now().UTC()
 	hour := now.Format("2006-01-02T15")
 	prevHour := now.Add(-2 * time.Hour).Format("2006-01-02T15")
+	// Both were created before the messages below: statistics start at the
+	// entity's creation.
+	created := now.Add(-3 * time.Hour)
+	d.CreatedAt, a.CreatedAt = created, created
 
 	// Hour 1: two messages (Q1 two recipients + Q2).
 	for _, to := range []string{"a@x.net", "b@x.net"} {

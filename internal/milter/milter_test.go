@@ -700,3 +700,18 @@ func TestDomainOf(t *testing.T) {
 		}
 	}
 }
+
+// MAIL FROM:<> has no domain of its own; it is held to the limit of its
+// login's domain like the application's other mail (review of audit stage 2).
+func TestRateLimitHoldsTheNullSenderToItsLoginsDomain(t *testing.T) {
+	rec := &fakeRecorder{
+		apps: map[string]store.Application{"app1": {Login: "app1", DomainName: "example.com"}},
+		limits: map[string]store.RateLimit{
+			store.RateLimitScopeDomain + "|example.com": domainLimit(),
+		},
+		counts: map[string]int64{store.RateLimitScopeDomain + "|example.com": 5}, // == max
+	}
+	if resp := mailFrom(t, rec, limitIP, "<>", "app1"); resp != milter.RespTempFail {
+		t.Fatalf("a null sender over its domain's limit = %v, want TempFail (4xx)", resp)
+	}
+}

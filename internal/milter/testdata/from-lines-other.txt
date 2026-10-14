@@ -1,0 +1,22 @@
+# From: lines that name another sender of this server, {other}, beside or in
+# place of the application's own address at {domain} (review of audit stage
+# 2). The check must refuse each: a line it read as the application's own and
+# OpenDKIM as {other}'s would be signed with {other}'s key. The unit test
+# (internal/milter/sender_test.go) wants each refused; the e2e
+# (test/e2e/dkim_from_test.go) sends each and wants nothing signed for
+# {other}. {OTHER} is {other} in capitals; {other_qp} is {other} with each
+# dot escaped as a quoted pair. One Go-quoted string per line.
+"b@{other}"
+"<b@{other}>"
+"\"a@{domain}\"@{other}"
+"\"b@{other}\"@{domain}"
+"\"x\\\" <b@{other}>\" <a@{domain}>"
+"\"x\\\" <b@{other_qp}>\" <a@{domain}>"
+"\"b@{other}\" <a@{domain}>"
+"\"b@{OTHER}\" <a@{domain}>"
+"b@{other} <a@{domain}>"
+"a@{domain} (b@{other})"
+"<a@{domain}> (b@{other})"
+"(b@{other}) a@{domain}"
+"=?utf-8?q?b=40{other}?= <a@{domain}>"
+"\"x\" <b@{other}>, <a@{domain}>"

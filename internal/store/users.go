@@ -16,6 +16,10 @@ var ErrUserNotFound = errors.New("user not found")
 // ErrUserExists is returned when a username is already taken.
 var ErrUserExists = errors.New("username already taken")
 
+// ErrNoSuchDomain is returned when a user is assigned a domain that does not
+// exist - one deleted while the users form was open.
+var ErrNoSuchDomain = errors.New("an assigned domain does not exist")
+
 // ErrLastGlobal is returned when deleting or demoting the last global user.
 var ErrLastGlobal = errors.New("cannot remove last global administrator")
 
@@ -225,7 +229,8 @@ func (s *Store) CreateUser(username, passwordHash string, role Role, reach Reach
 }
 
 // UserChange is everything the users form sets on a user, written at once by
-// AddUser and SaveUser. ID is ignored by AddUser.
+// AddUser and SaveUser. ID is ignored by AddUser; SaveUser keeps the stored
+// password hash when PasswordHash is empty.
 type UserChange struct {
 	ID                            int64
 	Username, PasswordHash, Email string
@@ -238,6 +243,9 @@ type UserChange struct {
 // and a failure part way leaves no user rather than one without it (audit
 // 2026-10-12, M9).
 func (s *Store) AddUser(c UserChange) (int64, error) {
+	if err := knownRole(c.Role); err != nil {
+		return 0, err
+	}
 	if c.Role == RoleDomain && c.Reach.Empty() {
 		return 0, ErrEmptyReach
 	}
@@ -282,6 +290,9 @@ func (s *Store) AddUser(c UserChange) (int64, error) {
 // after the write, so two administrators demoting each other at once cannot
 // both succeed (M7).
 func (s *Store) SaveUser(c UserChange) error {
+	if err := knownRole(c.Role); err != nil {
+		return err
+	}
 	if c.Role == RoleDomain && c.Reach.Empty() {
 		return ErrEmptyReach
 	}
@@ -292,8 +303,10 @@ func (s *Store) SaveUser(c UserChange) error {
 	defer tx.Rollback()
 	// A write first: it takes the write lock, so what is counted below is
 	// what is committed.
+	// An empty hash keeps the stored one: the form read it when it was
+	// opened, and the user may have changed it on Account since.
 	res, err := tx.Exec(
-		"UPDATE users SET username = ?, password_hash = ?, email = ?, role = ? WHERE id = ?",
+		"UPDATE users SET username = ?, password_hash = COALESCE(NULLIF(?, ''), password_hash), email = ?, role = ? WHERE id = ?",
 		c.Username, c.PasswordHash, c.Email, c.Role, c.ID,
 	)
 	if err != nil {
@@ -317,6 +330,15 @@ func (s *Store) SaveUser(c UserChange) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("save user: %w", err)
+	}
+	return nil
+}
+
+// knownRole refuses a role that is neither global nor domain. The handlers
+// check the form first; this is the second line.
+func knownRole(r Role) error {
+	if r != RoleGlobal && r != RoleDomain {
+		return fmt.Errorf("unknown role %q", r)
 	}
 	return nil
 }
@@ -510,6 +532,9 @@ func writeUserReach(tx *sql.Tx, userID int64, reach Reach) error {
 	if !reach.AllDomains {
 		for _, id := range reach.DomainIDs {
 			if _, err := tx.Exec("INSERT INTO user_domains (user_id, domain_id) VALUES (?, ?)", userID, id); err != nil {
+				if isForeignKeyViolation(err) {
+					return ErrNoSuchDomain
+				}
 				return fmt.Errorf("set user reach insert: %w", err)
 			}
 		}
@@ -517,6 +542,9 @@ func writeUserReach(tx *sql.Tx, userID int64, reach Reach) error {
 	if !reach.AllInbound {
 		for _, id := range reach.InboundDomainIDs {
 			if _, err := tx.Exec("INSERT INTO user_inbound_domains (user_id, inbound_domain_id) VALUES (?, ?)", userID, id); err != nil {
+				if isForeignKeyViolation(err) {
+					return ErrNoSuchDomain
+				}
 				return fmt.Errorf("set user reach insert inbound: %w", err)
 			}
 		}

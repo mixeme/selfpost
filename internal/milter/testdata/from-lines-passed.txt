@@ -4,7 +4,10 @@
 # domain. Two tests read this file: the check's unit test
 # (internal/milter/sender_test.go) wants each line passed, and the e2e
 # (test/e2e/dkim_from_test.go) sends each one and wants the message signed
-# for {domain} and nothing else. A line added here is run by both.
+# for {domain} and nothing else. A line added here is run by both. {DOMAIN}
+# is {domain} in capitals; {other} is another sender of the server, which a
+# line here names in a way the check's scan does not see (a space after the
+# @) - passed by design, and so signed for {domain} alone.
 "a@{domain}"
 "<a@{domain}>"
 "\"The Shop\" <Orders@{domain}>"
@@ -20,3 +23,7 @@
 "=?utf-8?b?0JzQsNCz0LDQt9C40L0=?=\r\n\t<a@{domain}>"
 "a@{domain} (the shop)"
 "a@{domain} (the (nested) shop)"
+"a@{DOMAIN}"
+"<a@{domain}> (the shop)"
+"\"a@{domain}\"@{domain}"
+"\"b@ {other}\" <a@{domain}>"

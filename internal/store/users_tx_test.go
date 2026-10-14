@@ -149,3 +149,46 @@ func TestCreateGlobalUserOnlyOnce(t *testing.T) {
 		t.Fatalf("%d setups succeeded, %d global users; want 1 and 1", ok, n)
 	}
 }
+
+// The store refuses a role that is neither global nor domain.
+func TestTheStoreKnowsOnlyTwoRoles(t *testing.T) {
+	st := openTestStore(t)
+	if _, err := st.AddUser(UserChange{Username: "x", PasswordHash: "h", Role: "admin"}); err == nil {
+		t.Fatal("AddUser took the role admin")
+	}
+	id, err := st.CreateUser("y", "h", RoleGlobal, Reach{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveUser(UserChange{ID: id, Username: "y", PasswordHash: "h", Role: ""}); err == nil {
+		t.Fatal("SaveUser took an empty role")
+	}
+}
+
+// A save without a new password keeps the stored hash - one the user may have
+// changed on Account since the form was opened - and a reach naming a domain
+// deleted meanwhile is ErrNoSuchDomain (review of audit stage 2).
+func TestSaveUserKeepsTheHashAndNamesAMissingDomain(t *testing.T) {
+	st := openTestStore(t)
+	d := addTestDomain(t, st, "example.com")
+	if _, err := st.CreateUser("root", "hash", RoleGlobal, Reach{}); err != nil {
+		t.Fatal(err)
+	}
+	id, err := st.CreateUser("shop", "old", RoleDomain, Reach{DomainIDs: []int64{d.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateUser(id, "shop", "changed-on-account", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveUser(UserChange{ID: id, Username: "shop", Role: RoleDomain, Reach: Reach{DomainIDs: []int64{d.ID}}}); err != nil {
+		t.Fatal(err)
+	}
+	u, _ := st.GetUser(id)
+	if u.PasswordHash != "changed-on-account" {
+		t.Fatalf("the hash became %q", u.PasswordHash)
+	}
+	if err := st.SaveUser(UserChange{ID: id, Username: "shop", Role: RoleDomain, Reach: Reach{DomainIDs: []int64{9999}}}); !errors.Is(err, ErrNoSuchDomain) {
+		t.Fatalf("a reach to a deleted domain = %v, want ErrNoSuchDomain", err)
+	}
+}

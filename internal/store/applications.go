@@ -37,6 +37,8 @@ type Application struct {
 	Addresses      []string
 	AuthIPRestrict bool     // when true, only AuthAllowedIPs may submit as this login
 	AuthAllowedIPs []string // client IPs permitted when AuthIPRestrict is set
+	// DomainName is the name of DomainID, filled by ApplicationByLogin only.
+	DomainName string
 }
 
 // AllowsAuthFromIP reports whether a client at ip may submit mail authenticated
@@ -205,8 +207,16 @@ func (s *Store) GetApplicationByLogin(login string) (Application, error) {
 }
 
 // ApplicationByLogin is the milter-facing alias for GetApplicationByLogin.
+//
+// DomainName is filled too: the milter holds a message with an empty
+// envelope sender to the limit of its login's domain.
 func (s *Store) ApplicationByLogin(login string) (Application, error) {
-	return s.GetApplicationByLogin(login)
+	a, err := s.GetApplicationByLogin(login)
+	if err != nil {
+		return a, err
+	}
+	err = s.db.QueryRow("SELECT name FROM domains WHERE id = ?", a.DomainID).Scan(&a.DomainName)
+	return a, err
 }
 
 // ListApplicationsByDomain returns a domain's applications ordered by login,

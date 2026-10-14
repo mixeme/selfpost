@@ -217,6 +217,10 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 			return
 		}
+		if errors.Is(err, store.ErrNoSuchDomain) {
+			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "A domain chosen here has been deleted meanwhile. Choose again.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
+			return
+		}
 		logf("panel: create user: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Could not create user. Please check the logs."})
 		return
@@ -283,7 +287,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 
-	hash := u.PasswordHash
+	hash := "" // empty keeps the stored hash (SaveUser)
 	if password != "" {
 		if err := validate.AdminPassword(password); err != nil {
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
@@ -307,6 +311,9 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		return
 	case errors.Is(err, store.ErrLastGlobal):
 		lastGlobal()
+		return
+	case errors.Is(err, store.ErrNoSuchDomain):
+		h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "A domain chosen here has been deleted meanwhile. Choose again.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	case err != nil:
 		logf("panel: update user: %v", err)

@@ -161,6 +161,12 @@ func scanDomain(r scanRow) (Domain, error) {
 	return d, nil
 }
 
+// isForeignKeyViolation reports whether err is a SQLite FOREIGN KEY conflict.
+func isForeignKeyViolation(err error) bool {
+	var se *sqlite.Error
+	return errors.As(err, &se) && se.Code() == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY
+}
+
 // isUniqueViolation reports whether err is a SQLite UNIQUE/PRIMARY-KEY conflict,
 // so callers can turn a duplicate insert into a friendly domain-level error.
 func isUniqueViolation(err error) bool {

@@ -21,9 +21,10 @@ func TestDomainImportIsCheckedLikeTheForms(t *testing.T) {
 	h, _ := inboundHandlers(t)
 	good := func() domain.DomainExport {
 		return domain.DomainExport{
-			Domain:    "example.com",
-			DMARCRua:  "reports@example.com",
-			RateLimit: &domain.RateLimitExport{Mode: store.RateLimitModeManual, MaxMessages: 10, WindowSeconds: 3600},
+			Domain:       "example.com",
+			DKIMSelector: "mail.2026",
+			DMARCRua:     "reports@example.com",
+			RateLimit:    &domain.RateLimitExport{Mode: store.RateLimitModeManual, MaxMessages: 10, WindowSeconds: 3600},
 			Applications: []domain.AppExport{{
 				Login: "app1", AddressMode: store.AddressModeWildcard, Password: "imported-password",
 				AuthIPRestrict: true, AuthAllowedIPs: []string{"192.0.2.1", " 2001:DB8::1 "},
@@ -39,11 +40,26 @@ func TestDomainImportIsCheckedLikeTheForms(t *testing.T) {
 		t.Errorf("client addresses stored as %q, want as the form stores them", got)
 	}
 
+	// An auto limit's numbers are worked out here, not taken from the file,
+	// and its mode is stored trimmed.
+	exp = good()
+	exp.Applications[0].RateLimit = &domain.RateLimitExport{Mode: " auto ", MaxMessages: 1, WindowSeconds: 86400}
+	if msg := h.checkDomainImport(&exp); msg != "" {
+		t.Fatalf("an auto limit with numbers refused: %s", msg)
+	}
+	if rl := exp.Applications[0].RateLimit; rl.Mode != store.RateLimitModeAuto || rl.MaxMessages != 0 || rl.WindowSeconds != 0 {
+		t.Errorf("the auto limit kept %+v", rl)
+	}
+
 	for _, c := range []struct {
 		name   string
 		break_ func(*domain.DomainExport)
 		want   string
 	}{
+		{"selector", func(e *domain.DomainExport) { e.DKIMSelector = "mail;x=y" },
+			"Invalid DKIM selector in export file: selector: domain may contain only"},
+		{"long selector", func(e *domain.DomainExport) { e.DKIMSelector = strings.Repeat("a", 64) },
+			"Invalid DKIM selector in export file: selector must be at most 63 characters"},
 		{"report address", func(e *domain.DomainExport) { e.DMARCRua = "not an address" },
 			"Invalid report address in export file: "},
 		{"no window", func(e *domain.DomainExport) { e.RateLimit.WindowSeconds = 0 },

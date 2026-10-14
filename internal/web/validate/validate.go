@@ -82,6 +82,26 @@ func Domain(name string) error {
 	return nil
 }
 
+// Selector checks a DKIM selector: one or more DNS labels as Domain allows
+// them, at most 63 characters in all. The panel's own selector is fixed in
+// its configuration; this is for one read from a domain export file, which
+// goes into OpenDKIM's tables, a key file's name and every signature's s=
+// (review of audit stage 2).
+func Selector(s string) error {
+	if s == "" {
+		return fmt.Errorf("selector is required")
+	}
+	if len(s) > 63 {
+		return fmt.Errorf("selector must be at most 63 characters")
+	}
+	for _, label := range strings.Split(s, ".") {
+		if err := domainLabel(label); err != nil {
+			return fmt.Errorf("selector: %w", err)
+		}
+	}
+	return nil
+}
+
 func domainLabel(label string) error {
 	if len(label) == 0 {
 		return fmt.Errorf("domain must not contain an empty label")

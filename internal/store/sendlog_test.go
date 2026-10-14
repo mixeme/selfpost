@@ -401,3 +401,36 @@ func TestADomainAddedAgainStartsWithAnEmptyLog(t *testing.T) {
 		t.Fatalf("statistics = %+v, %v; want one message", stats, err)
 	}
 }
+
+// A deleted application's login taken again in another domain starts with
+// none of the old one's numbers (review of audit stage 2).
+func TestALoginTakenAgainStartsWithNoNumbers(t *testing.T) {
+	st := openTestStore(t)
+	a := addTestDomain(t, st, "a.example")
+	b := addTestDomain(t, st, "b.example")
+	old, err := st.AddApplication(a.ID, "news", AddressModeWildcard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.InsertQueued(SendLogEntry{QueueID: "OLD", Domain: "a.example", AppLogin: "news", To: "x@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DeleteApplication(old.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddApplication(b.ID, "news", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.CountMessages(RateLimitScopeApp, "news", time.Now().Add(-time.Hour)); err != nil || n != 0 {
+		t.Fatalf("level-2 count of the new news = %d, %v; want 0", n, err)
+	}
+	if stats, err := st.AppSendStats("news", 90, time.Now().Add(-time.Hour)); err != nil || stats.Total != 0 {
+		t.Fatalf("statistics of the new news = %+v, %v; want none", stats, err)
+	}
+	if err := st.InsertQueued(SendLogEntry{QueueID: "NEW", Domain: "b.example", AppLogin: "news", To: "x@example.net"}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := st.CountMessages(RateLimitScopeApp, "news", time.Now().Add(-time.Hour)); n != 1 {
+		t.Fatalf("level-2 count of the new news = %d, want its own one", n)
+	}
+}

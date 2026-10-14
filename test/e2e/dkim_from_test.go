@@ -13,10 +13,12 @@ import (
 	"github.com/emersion/go-msgauth/dkim"
 )
 
-// passedFromLines reads the From: lines the sender check passes, the file its
-// unit test reads too, with the application's domain put in.
-func passedFromLines(repoRoot, domain string) ([]string, error) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, "internal", "milter", "testdata", "from-lines-passed.txt"))
+// fromLines reads one of the files of From: lines the sender check's unit
+// test reads too, with the placeholders put in: {domain} the application's,
+// {other} another sender of the server, each also in capitals, and
+// {other_qp} with its dots as quoted pairs.
+func fromLines(repoRoot, file, domain, other string) ([]string, error) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot, "internal", "milter", "testdata", file))
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +32,11 @@ func passedFromLines(repoRoot, domain string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", line, err)
 		}
-		out = append(out, strings.ReplaceAll(s, "{domain}", domain))
+		out = append(out, strings.NewReplacer(
+			"{domain}", domain, "{DOMAIN}", strings.ToUpper(domain),
+			"{other_qp}", strings.ReplaceAll(other, ".", `\.`),
+			"{other}", other, "{OTHER}", strings.ToUpper(other),
+		).Replace(s))
 	}
 	return out, nil
 }
@@ -43,7 +49,7 @@ func passedFromLines(repoRoot, domain string) ([]string, error) {
 // application's own and OpenDKIM as another sender's would be signed with
 // that sender's key.
 func testSignedForItsDomainOnly(t *testing.T, sc *scenario) {
-	lines, err := passedFromLines(h.repoRoot, senderDomain)
+	lines, err := fromLines(h.repoRoot, "from-lines-passed.txt", senderDomain, otherDomain)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,5 +86,51 @@ func testSignedForItsDomainOnly(t *testing.T, sc *scenario) {
 		if !valid {
 			t.Errorf("From: %q has no valid signature for %s (%d signature(s))", line, senderDomain, len(verifications))
 		}
+	}
+}
+
+// testNeverSignedForAnother: the lines that name another sender of the server
+// are refused by the check; whatever happens to one, nothing arrives signed
+// with that sender's key (review of audit stage 2).
+func testNeverSignedForAnother(t *testing.T, sc *scenario) {
+	lines, err := fromLines(h.repoRoot, "from-lines-other.txt", senderDomain, otherDomain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range lines {
+		token := uniqueToken("dkimother")
+		res := attemptSend(sendAttempt{
+			authLogin: sc.appLogin, authPassword: sc.appPassword,
+			from: "alerts@" + senderDomain, headerFrom: line, to: recipient,
+			subject: "e2e " + token, body: "which key signs this",
+		})
+		if err := res.refusedAt("DATA", 550, "5.7.1 From:"); err == nil {
+			continue
+		}
+		t.Errorf("From: %q was not refused by the check: %v", line, res.firstErr())
+		raw, err := findSinkMessage(h.stageDir, token, 15*time.Second)
+		if err != nil {
+			continue
+		}
+		verifications, _ := dkim.VerifyWithOptions(bytes.NewReader(raw), &dkim.VerifyOptions{LookupTXT: lookupTXTFunc()})
+		for _, v := range verifications {
+			if v.Domain == otherDomain {
+				t.Errorf("From: %q arrived signed for %s", line, otherDomain)
+			}
+		}
+	}
+}
+
+// testLoginCaseMatters: SASL compares the login byte for byte, so an
+// application's login in other capitals does not authenticate. Every lookup on
+// the mail path is by the exact login and relies on that (review of audit
+// stage 2, F13).
+func testLoginCaseMatters(t *testing.T, sc *scenario) {
+	res := attemptSend(sendAttempt{
+		authLogin: strings.ToUpper(sc.appLogin), authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, to: recipient, subject: "e2e " + uniqueToken("case"), body: "x",
+	})
+	if err := res.refusedAt("AUTH", 535, ""); err != nil {
+		t.Fatalf("AUTH as %s: %v", strings.ToUpper(sc.appLogin), err)
 	}
 }

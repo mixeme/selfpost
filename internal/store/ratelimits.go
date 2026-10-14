@@ -180,7 +180,7 @@ func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error)
 	case RateLimitScopeDomain:
 		match = domainByName
 	case RateLimitScopeApp:
-		match = "app_login = ?"
+		match = appByLogin
 	default:
 		return 0, fmt.Errorf("unknown rate-limit scope %q", scope)
 	}

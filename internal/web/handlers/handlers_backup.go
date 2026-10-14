@@ -292,6 +292,7 @@ func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 	if exp.DMARCRua != "" {
 		h.resyncDMARC("domain import")
 	}
+	h.recalcImportedLimits(d, exp)
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?imported=1", d.ID), http.StatusSeeOther)
 }
 
@@ -384,6 +385,9 @@ func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
 	invalid := func(what string, err error) string {
 		return "Invalid " + what + " in export file: " + err.Error()
 	}
+	if err := validate.Selector(exp.DKIMSelector); err != nil {
+		return invalid("DKIM selector", err)
+	}
 	if exp.DMARCRua != "" {
 		if err := validate.Email(exp.DMARCRua); err != nil {
 			return invalid("report address", err)
@@ -397,7 +401,12 @@ func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
 		if err != nil {
 			return err
 		}
+		rl.Mode = mode // as the form stores it, trimmed
 		if mode == store.RateLimitModeAuto {
+			// An auto limit's numbers are this server's to work out from its
+			// own traffic, not the file's: they are dropped here and worked
+			// out right after the import (review of audit stage 2).
+			rl.MaxMessages, rl.WindowSeconds = 0, 0
 			if rl.AutoMultiplier == 0 {
 				return nil // as an empty field on the form: the default
 			}
@@ -433,4 +442,28 @@ func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
 		}
 	}
 	return ""
+}
+
+// recalcImportedLimits works out the numbers of the auto limits an import
+// brought, at once rather than at the next six-hourly pass: the file's own
+// numbers were dropped (checkDomainImport). A failure is logged; the pass
+// tries again.
+func (h *Handlers) recalcImportedLimits(d store.Domain, exp domain.DomainExport) {
+	if exp.RateLimit != nil && exp.RateLimit.Mode == store.RateLimitModeAuto {
+		if err := h.recalcRateLimit(store.RateLimitScopeDomain, d.ID); err != nil {
+			logf("panel: import domain %q: recalculate its auto limit: %v", d.Name, err)
+		}
+	}
+	for _, a := range exp.Applications {
+		if a.RateLimit == nil || a.RateLimit.Mode != store.RateLimitModeAuto {
+			continue
+		}
+		app, err := h.store.GetApplicationByLogin(a.Login)
+		if err == nil {
+			err = h.recalcRateLimit(store.RateLimitScopeApp, app.ID)
+		}
+		if err != nil {
+			logf("panel: import domain %q: recalculate the auto limit of %s: %v", d.Name, a.Login, err)
+		}
+	}
 }
