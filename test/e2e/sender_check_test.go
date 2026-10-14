@@ -349,10 +349,18 @@ func testRefusalsShowPostfixsLine(t *testing.T, sc *scenario) {
 	rowRe := regexp.MustCompile(`(?s)<tr>.*?</tr>`)
 	tagRe := regexp.MustCompile(`<span class="tag[^"]*">(wrong From|rate-limited|wrong client)</span>`)
 	linkRe := regexp.MustCompile(`href="(/outbound/log/\d+)[^"]*"`)
+	// Each with the refusal's own sender in Postfix's line: the line of one
+	// application's refusal must not land on another's row (review of
+	// stage 2b; the rate-limited refusals are l2app's, from billing@).
 	want := map[string]string{
 		"wrong From":   "milter-reject: END-OF-MESSAGE",
-		"rate-limited": "NOQUEUE: milter-reject: MAIL from",
-		"wrong client": "NOQUEUE: milter-reject: MAIL from",
+		"rate-limited": "NOQUEUE: milter-reject: MAIL from unknown[",
+		"wrong client": "NOQUEUE: milter-reject: MAIL from unknown[",
+	}
+	sender := map[string]string{
+		"wrong From":   "",
+		"rate-limited": "from=&lt;billing@" + senderDomain + "&gt;",
+		"wrong client": "from=&lt;alerts@" + senderDomain + "&gt;",
 	}
 	for tag, line := range want {
 		if err := waitFor("the page of a "+tag+" refusal to show Postfix's line", 30*time.Second, time.Second, func() (bool, error) {
@@ -370,7 +378,7 @@ func testRefusalsShowPostfixsLine(t *testing.T, sc *scenario) {
 				if err != nil {
 					return false, err
 				}
-				if strings.Contains(page, line) {
+				if strings.Contains(page, line) && strings.Contains(page, sender[tag]) {
 					return true, nil
 				}
 			}
@@ -397,6 +405,14 @@ func asPanel(code string, args ...string) (string, error) {
 // saved place moved back before the message's first line. Started again, the
 // panel writes the row from mail.log, marked, and once.
 func testRefusalRecoveredFromTheLog(t *testing.T, sc *scenario) {
+	// A refusal whose row the panel writes as usual: it must not get a second
+	// row from the log once the wait is over.
+	written := uniqueToken("written")
+	if res := attemptSend(sendAttempt{authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, headerFrom: "director@" + otherDomain, to: recipient,
+		subject: "e2e " + written, body: "refused, its row written"}); res.refusedAt("DATA", 550, "5.7.1 From:") != nil {
+		t.Fatalf("the written refusal: %v", res.firstErr())
+	}
 	token := uniqueToken("recover")
 	res := attemptSend(sendAttempt{authLogin: sc.appLogin, authPassword: sc.appPassword,
 		from: "alerts@" + senderDomain, headerFrom: "director@" + otherDomain, to: recipient,
@@ -454,9 +470,16 @@ print(sqlite3.connect("/data/selfpost.db").execute("select count(*), coalesce(su
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// Once: the next passes over the log write it no more.
-	time.Sleep(3 * time.Second)
+	// Once: past another wait of the tailer's (30 s), the passes over the log
+	// write it no more, and the refusal the panel wrote itself is still one
+	// row, not recovered.
+	time.Sleep(35 * time.Second)
 	if out, _ := count(); out != "(1, 1)" {
 		t.Fatalf("after more passes the rows are %s, want (1, 1)", out)
+	}
+	out, err := asPanel(`import sqlite3,sys
+print(sqlite3.connect("/data/selfpost.db").execute("select count(*), coalesce(sum(recovered),0) from send_log where subject like ?",("%"+sys.argv[1]+"%",)).fetchone())`, written)
+	if err != nil || out != "(1, 0)" {
+		t.Fatalf("the refusal the panel wrote: rows (count, recovered) = %s, %v; want (1, 0)", out, err)
 	}
 }

@@ -19,13 +19,13 @@ func (r *refusalProbe) RecoverRefusal(e store.SendLogEntry, _ time.Time) (bool, 
 	return true, nil
 }
 
-func (r *refusalProbe) AttachRefusalLine(login, from string, _ time.Time, line string) (bool, error) {
+func (r *refusalProbe) AttachRefusalLine(clientIP, from string, _ time.Time, line string) (bool, error) {
 	if r.rows == 0 {
 		return false, nil
 	}
 	r.rows--
 	r.lines = append(r.lines, line)
-	r.who = append(r.who, login+"|"+from)
+	r.who = append(r.who, clientIP+"|"+from)
 	return true, nil
 }
 
@@ -42,23 +42,23 @@ func TestRefusalLines(t *testing.T) {
 		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
 		`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x>`,
 	} {
-		r.handle(other, now)
+		r.handle(other, now, Place{})
 	}
 	if len(r.pending) != 0 {
 		t.Fatalf("lines that are not an application's refusal at MAIL wait: %+v", r.pending)
 	}
 
-	r.handle(limit, now) // its row is not there yet
+	r.handle(limit, now, Place{}) // its row is not there yet
 	if len(r.pending) != 1 {
 		t.Fatalf("pending %d, want the line waiting", len(r.pending))
 	}
 	st.rows = 1 // the milter's row is written
 	r.retry(now.Add(time.Second))
-	if len(r.pending) != 0 || len(st.lines) != 1 || st.who[0] != "l2app|billing@sender.e2e.test" {
+	if len(r.pending) != 0 || len(st.lines) != 1 || st.who[0] != "10.77.0.1|billing@sender.e2e.test" {
 		t.Fatalf("after the retry: pending %d, attached %v", len(r.pending), st.who)
 	}
 
-	r.handle(limit, now) // no row ever comes
+	r.handle(limit, now, Place{}) // no row ever comes
 	r.retry(now.Add(refusalLineWait + time.Second))
 	if len(r.pending) != 0 {
 		t.Fatal("a line kept waiting past its time")
@@ -73,8 +73,8 @@ func TestFromRefusalIsRecoveredAfterTheWait(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	st := &refusalProbe{}
 	r := &refusalLines{st: st}
-	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: E543D3C75DA0: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now)
-	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: "The - Shop" <director@other.e2e.test> - it names another sender of this server; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now)
+	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: E543D3C75DA0: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{})
+	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: "The - Shop" <director@other.e2e.test> - it names another sender of this server; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now, Place{})
 	r.retry(now.Add(time.Second))
 	if len(st.recovered) != 0 {
 		t.Fatal("recovered before the panel had the time to write the row")
@@ -88,5 +88,37 @@ func TestFromRefusalIsRecoveredAfterTheWait(t *testing.T) {
 		Domain: "sender.e2e.test", Reason: store.ReasonFrom, HeaderFrom: `"The - Shop" <director@other.e2e.test>`}
 	if e != want {
 		t.Fatalf("recovered %+v, want %+v", e, want)
+	}
+}
+
+// While a line or a recovery waits, the offset saved for its file stays at the
+// earliest line it needs - for a recovery the client= line that names its
+// login - so a stop before the wait is over reads them again (review of stage
+// 2b).
+func TestWaitingLinesHoldTheSavedOffset(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	r := &refusalLines{st: &refusalProbe{}}
+	if _, held := r.oldest("fp"); held {
+		t.Fatal("nothing waits, yet the offset is held")
+	}
+	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: Q1: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{FP: "fp", End: 100})
+	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: Q1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: d@other.example - not an address this application sends as; from=<a@sender.example> to=<r@x> proto=ESMTP helo=<x>`, now, Place{FP: "fp", End: 300})
+	if p, held := r.oldest("fp"); !held || p.End != 100 {
+		t.Fatalf("held at %+v %v, want the client= line at 100", p, held)
+	}
+	if _, held := r.oldest("another"); held {
+		t.Fatal("a place in another file holds this one")
+	}
+	r.retry(now.Add(refusalLineWait + time.Second))
+	if _, held := r.oldest("fp"); held {
+		t.Fatal("still held after the wait")
+	}
+
+	// The tracker clamps what it saves to the hold.
+	cs := &captureStore{}
+	tr := &tracker{st: cs, path: "x", fp: "fp", hold: func(string) (Place, bool) { return Place{FP: "fp", End: 50}, true }}
+	tr.record(nil, 400, true)
+	if cs.state.Offset != 50 {
+		t.Fatalf("saved %d, want the hold at 50", cs.state.Offset)
 	}
 }

@@ -463,6 +463,11 @@ func printable(v string) string {
 		switch {
 		case r == '%' || r < 0x20 || r > 0x7e:
 			sb.WriteByte('?')
+		case r == ';':
+			// Postfix logs the reply and then "; from=<...> to=<...>" of
+			// its own; a ";" of the client's would let its text pass for
+			// Postfix's where the log tailer reads that line.
+			sb.WriteByte(',')
 		default:
 			sb.WriteRune(r)
 		}

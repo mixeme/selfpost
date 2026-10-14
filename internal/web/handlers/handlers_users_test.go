@@ -162,12 +162,12 @@ func TestARefusedMessageShowsPostfixsLine(t *testing.T) {
 	d, _ := st.AddDomain("example.org", "mail")
 	st.AddApplication(d.ID, "alerts", store.AddressModeWildcard, nil)
 	for _, subject := range []string{"with its line", "from before"} {
-		if err := st.InsertRejected(store.SendLogEntry{Domain: "example.org", AppLogin: "alerts", From: "alerts@example.org", Subject: subject, Reason: store.ReasonLimit}); err != nil {
+		if err := st.InsertRejected(store.SendLogEntry{Domain: "example.org", AppLogin: "alerts", From: "alerts@example.org", Subject: subject, Reason: store.ReasonLimit, ClientIP: "198.51.100.7"}); err != nil {
 			t.Fatal(err)
 		}
 		if subject == "with its line" {
 			line := time.Now().UTC().Format("2006-01-02T15:04:05Z") + " mail postfix/smtpd[2131]: NOQUEUE: milter-reject: MAIL from unknown[198.51.100.7]: 451 4.7.1 Service unavailable - try again later; from=<alerts@example.org> proto=ESMTP helo=<app>"
-			if ok, err := st.AttachRefusalLine("alerts", "alerts@example.org", time.Now(), line); err != nil || !ok {
+			if ok, err := st.AttachRefusalLine("198.51.100.7", "alerts@example.org", time.Now(), line); err != nil || !ok {
 				t.Fatalf("attach = %v, %v", ok, err)
 			}
 		}

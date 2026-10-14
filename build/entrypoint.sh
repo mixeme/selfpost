@@ -156,8 +156,11 @@ chmod 2750 /run/opendkim /run/selfpost
 # A container that was killed leaves its sockets behind, and a file nobody
 # listens on would satisfy postfix-wrapper.sh's wait: Postfix would start
 # before the sender check does and defer mail until it is there. The check's
-# alive mark stays - it is how the downtime of a restart is told.
-rm -f /run/opendkim/*.sock /run/selfpost/*.sock
+# alive mark goes too: it tells the downtime of the panel restarting inside a
+# running container, and a restart of the whole container is not the check's
+# downtime (guide § Health) - a mark left from before would count the whole
+# outage when supervisord cannot say since when Postfix runs.
+rm -f /run/opendkim/*.sock /run/selfpost/*.sock /run/selfpost/*.alive
 
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the

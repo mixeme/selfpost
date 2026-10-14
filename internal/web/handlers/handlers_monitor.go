@@ -273,6 +273,9 @@ func (h *Handlers) deliveryLog(row store.SendLogRow) ([]view.LogLine, string) {
 			return nil, "Could not read the mail log."
 		}
 	}
+	if len(lines) == 0 && row.Status == store.StatusRejected {
+		return nil, "Postfix's lines about this refusal are not stored: the message was refused before version 2.5.1, or the lines were never read."
+	}
 	if len(lines) == 0 {
 		return nil, "Nothing is stored for this queue id and nothing is in the current mail log. Lines are kept with the row since version 2.2.0; a message accepted before that had them only in mail.log, which has since rotated."
 	}

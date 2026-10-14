@@ -33,13 +33,21 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 	// Statistics are the database's business and supervisord's, and the check
 	// is neither: they are kept beside it, and nothing of them is waited for
 	// before it serves.
+	now := time.Now()
+	mark := cfg.senderSocket + ".alive"
+	// The mark's age is read before the mark is kept again: asking supervisord
+	// may take half a minute, and the mark must not go stale meanwhile, or a
+	// restart in that half minute would count it as downtime.
+	var markAt time.Time
+	if fi, err := os.Stat(mark); err == nil {
+		markAt = fi.ModTime()
+	}
+	go keepAlive(ctx, mark, st)
 	go func() {
-		now := time.Now()
-		mark := cfg.senderSocket + ".alive"
 		if err := st.StartSenderCheckStats(now); err != nil {
 			log.Printf("sender-check: statistics: %v", err)
 		}
-		if down, estimated := senderCheckDowntime(mark, now, postfixStarted); down > 0 {
+		if down, estimated := senderCheckDowntime(markAt, now, postfixStarted); down > 0 {
 			if estimated {
 				log.Printf("sender-check: was not answering for at most %s (supervisord did not say since when Postfix ran)", down.Round(time.Second))
 			} else {
@@ -51,7 +59,6 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 				}
 			}
 		}
-		keepAlive(ctx, mark, st)
 	}()
 
 	// The two tables the mail path itself goes by: whom Postfix lets send as
@@ -69,19 +76,19 @@ type postfixState struct {
 }
 
 // senderCheckDowntime is for how long the check was not serving before now
-// while Postfix was: the time since the mark at path was last set, or since
+// while Postfix was: the time since the mark was last set (markAt; zero
+// when there is none), or since
 // Postfix started if that was later. No mark means the container is new, and
 // a Postfix that is not running means mail was stopped for another reason -
 // a rollout, a reboot - and neither is the check's downtime. When supervisord
 // could not say, the time since the mark is taken and estimated is true: an
 // upper bound, since Postfix may not have been running all of it (audit
 // 2026-10-12, stage 2b - until then such a start counted nothing).
-func senderCheckDowntime(path string, now time.Time, ask func() postfixState) (down time.Duration, estimated bool) {
-	fi, err := os.Stat(path)
-	if err != nil {
+func senderCheckDowntime(markAt, now time.Time, ask func() postfixState) (down time.Duration, estimated bool) {
+	if markAt.IsZero() {
 		return 0, false
 	}
-	from := fi.ModTime()
+	from := markAt
 	p := ask()
 	switch {
 	case !p.known:

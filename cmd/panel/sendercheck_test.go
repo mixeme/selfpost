@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -13,16 +11,8 @@ import (
 // that time.
 func TestSenderCheckDowntime(t *testing.T) {
 	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
-	mark := filepath.Join(t.TempDir(), "sender.sock.alive")
-	set := func(at time.Time) {
-		t.Helper()
-		if err := os.WriteFile(mark, nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chtimes(mark, at, at); err != nil {
-			t.Fatal(err)
-		}
-	}
+	var mark time.Time // the alive mark's time; zero is no mark
+	set := func(at time.Time) { mark = at }
 	postfix := func(started time.Time, running bool) func() postfixState {
 		return func() postfixState { return postfixState{started: started, running: running, known: true} }
 	}

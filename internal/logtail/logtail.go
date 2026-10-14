@@ -168,7 +168,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		keeper.flush()
 		refusals.retry(time.Now().UTC())
 	}
-	tr := &tracker{st: st, path: path}
+	tr := &tracker{st: st, path: path, hold: refusals.oldest}
 	return follow(ctx, path, tr, caughtUp, flush, func(line string) {
 		// Until the first read reaches end-of-file the lines are those written
 		// while the panel was down - and, after an unclean stop, some it had
@@ -187,7 +187,7 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 			deferred.handle(line, now, catchingUp, tr.line)
 		}
 		keeper.add(line, now, catchingUp)
-		refusals.handle(line, now)
+		refusals.handle(line, now, Place{FP: tr.line.FP, End: tr.lineStart})
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			return
@@ -647,6 +647,7 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			full := pending + line
 			pending = ""
 			tr.line = Place{FP: tr.fp, End: consumed}
+			tr.lineStart = consumed - int64(len(full))
 			handle(strings.TrimRight(full, "\r\n"))
 		}
 	}

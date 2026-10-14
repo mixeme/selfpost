@@ -47,9 +47,16 @@ type tracker struct {
 	behind bool
 	prev   store.LogtailState
 
-	// line is the place of the line being handled: set by follow and
-	// readRotated before each call of handle.
-	line Place
+	// line is the place of the line being handled, lineStart the offset it
+	// starts at: set by follow and readRotated before each call of handle.
+	line      Place
+	lineStart int64
+
+	// hold, when set, names the earliest place in a file that something read
+	// from the log still waits on (a refusal's line, a refusal to recover):
+	// no offset past it is saved, so a stop - clean or not - before the wait
+	// is over reads it again (review of stage 2b).
+	hold func(fp string) (Place, bool)
 }
 
 // Place is where a line of the log ends: the fingerprint of its file and the
@@ -158,6 +165,7 @@ func (t *tracker) readRotated(handle func(string)) bool {
 	r := bufio.NewReader(f)
 	for {
 		line, err := r.ReadString('\n')
+		t.lineStart = end
 		end += int64(len(line))
 		if line != "" {
 			t.line = Place{FP: fp, End: end}
@@ -198,6 +206,11 @@ func (t *tracker) adopt(f *os.File) {
 // record persists offset, at most once per persistInterval unless force is set
 // (rotation and shutdown, where the write must not be skipped).
 func (t *tracker) record(f *os.File, offset int64, force bool) {
+	if t.hold != nil {
+		if p, ok := t.hold(t.fp); ok && p.End < offset {
+			offset = p.End
+		}
+	}
 	if offset == t.saved {
 		return
 	}

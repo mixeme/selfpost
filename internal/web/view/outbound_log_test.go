@@ -144,7 +144,7 @@ func TestOutMessageRefusedForItsFromLine(t *testing.T) {
 	out := renderSignedIn(t, "out-message", p)
 	pageHas(t, "Message", out, `<span class="tag is-danger is-light">wrong From</span>`,
 		`<dt>From: line</dt><dd class="sp-mono sp-small">director@example.org</dd>`, `<dt>Refused</dt>`,
-		`<span class="sp-mono">7BCAF3C75DA0</span> — given, the message was not queued`, `href="/help#sender-check"`,
+		`<span class="sp-mono">7BCAF3C75DA0</span> - given, the message was not queued`, `href="/help#sender-check"`,
 		`Lines from <code>mail.log</code> with this queue id`, `<span class="sp-e">postfix/cleanup[2120]: 7BCAF3C75DA0: milter-reject`)
 }
 

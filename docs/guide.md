@@ -414,7 +414,7 @@ readings, in the order of what stops mail first:
   is one the panel stopped answering for after it had begun. A time marked ≈
   is at most what it shows: at that start supervisord could not say since
   when Postfix ran. Days are UTC days. The card warns when
-  a message was deferred in the last 24 hours. If these numbers do not stay
+  a connection was turned away or a message deferred in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR

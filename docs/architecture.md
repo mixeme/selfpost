@@ -422,9 +422,11 @@ judged); the sender check writes it on the row, and the message's page shows
 the lines stored under it - only those of the minutes around the refusal, since
 Postfix frees the id at once. A message the journal milter refused at
 `MAIL FROM` has none: the tailer reads smtpd's `NOQUEUE: milter-reject: MAIL
-from …; from=<…>` and puts it on the newest refused row of that sender (and
-login, when the line names it) within two minutes (`send_log.refusal_line`),
-retrying for 30 s when the row is not written yet. The sender check writes its
+from <client>[<address>]: …; from=<…>` - it names no login - and puts it on
+the newest refused row of that client address and sender within two minutes
+(`send_log.refusal_line`; the milter writes `send_log.client_ip`), retrying
+for 30 s when the row is not written yet; a line already on a row goes on no
+other. The sender check writes its
 row through a buffer after answering 550; a panel stopped in between wrote
 none. The tailer remembers each queue id's login from smtpd's `client=` line,
 and 30 s after cleanup's `milter-reject: END-OF-MESSAGE … 5.7.1 From:` line it

@@ -7,6 +7,12 @@
 -- headers are judged), and its lines are found by it like any other's.
 -- DDL only; a row written earlier has '' and says so on its page.
 ALTER TABLE send_log ADD COLUMN refusal_line TEXT NOT NULL DEFAULT '';
+-- The client a refusal at MAIL FROM came from, as the milter saw it: Postfix's
+-- line names the client and the envelope sender and nothing else - no login
+-- - so the two together are what finds the line's row; the sender alone would
+-- let one application's line land on another's row of the same sender
+-- (security review of stage 2b).
+ALTER TABLE send_log ADD COLUMN client_ip TEXT NOT NULL DEFAULT '';
 
 -- A refusal row the panel did not get to write - the sender check answers 550
 -- and writes the row a moment later, and a panel stopped in between wrote

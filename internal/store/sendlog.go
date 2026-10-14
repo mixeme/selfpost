@@ -38,6 +38,9 @@ type SendLogEntry struct {
 	// was refused (Reason*), and for ReasonFrom what its From: line said.
 	Reason     string
 	HeaderFrom string
+	// ClientIP is the client a refusal at MAIL FROM came from (InsertRejected
+	// only), which Postfix's line about it names.
+	ClientIP string
 }
 
 // loginDomainID is the domain_id a row is written with: the domain of the
@@ -73,9 +76,9 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
 		`INSERT INTO send_log
-			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at, domain_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, `+loginDomainID+`)`,
-		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, e.Reason, e.HeaderFrom, now, now, e.AppLogin,
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, client_ip, created_at, updated_at, domain_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, `+loginDomainID+`)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, e.Subject, StatusRejected, e.Reason, e.HeaderFrom, e.ClientIP, now, now, e.AppLogin,
 	)
 	if err != nil {
 		return fmt.Errorf("insert rejected send_log: %w", err)
@@ -113,7 +116,9 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 		return 0, fmt.Errorf("update send_log status: %w", err)
 	}
 	defer tx.Rollback()
-	const newest = `id = (SELECT MAX(id) FROM send_log WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE)`
+	// A refused row carries the queue id it was given, and that id may be the
+	// next message's: a delivery line is never about a refusal.
+	const newest = `id = (SELECT MAX(id) FROM send_log WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE AND status <> 'rejected')`
 	marked, err := tx.Exec(
 		`UPDATE send_log SET reason = ? WHERE `+newest+` AND reason = ?`,
 		ReasonReconcileContradicted, queueID, recipient, ReasonReconcile,
@@ -235,22 +240,27 @@ type SendLogRow struct {
 
 // AttachRefusalLine puts Postfix's line about a refusal at MAIL FROM on the
 // row the journal milter wrote for it (audit 2026-10-12, stage 2b). Such a
-// refusal has no queue id, so the row is found by what the line says: a
-// refused row of that sender - and login, when the line names one - without a
-// line yet, written within two minutes of the line's time; the newest when
-// there are several. It reports whether a row took the line.
-func (s *Store) AttachRefusalLine(login, from string, at time.Time, line string) (bool, error) {
+// refusal has no queue id, and the line names no login, so the row is found
+// by what the line says: a refused row of that client and sender without a
+// line yet, written within two minutes of the line's time; the nearest in
+// time, the oldest of equals, when there are several - lines are read in the
+// order the rows were written, so two refusals of one second take one line
+// each in turn (review of stage 2b). A line already on a row - read again
+// after a restart - goes on no other. It reports whether a row took the line.
+func (s *Store) AttachRefusalLine(clientIP, from string, at time.Time, line string) (bool, error) {
 	res, err := s.db.Exec(
-		`UPDATE send_log SET refusal_line = ? WHERE id = (
+		`UPDATE send_log SET refusal_line = ?1 WHERE id = (
 			SELECT id FROM send_log
-			WHERE status = ? AND queue_id = '' AND refusal_line = ''
-			  AND reason IN ('', ?, ?) AND from_addr = ? COLLATE NOCASE
-			  AND (? = '' OR app_login = ?)
-			  AND created_at BETWEEN ? AND ?
-			ORDER BY id DESC LIMIT 1)`,
-		line, StatusRejected, ReasonLimit, ReasonClient, from, login, login,
+			WHERE status = ?2 AND queue_id = '' AND refusal_line = ''
+			  AND reason IN ('', ?3, ?4) AND from_addr = ?5 COLLATE NOCASE AND client_ip = ?6
+			  AND created_at BETWEEN ?7 AND ?8
+			ORDER BY ABS(julianday(created_at) - julianday(?9)), id
+			LIMIT 1)
+		 AND NOT EXISTS (SELECT 1 FROM send_log WHERE refusal_line = ?1)`,
+		line, StatusRejected, ReasonLimit, ReasonClient, from, clientIP,
 		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339),
 		at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
+		at.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return false, fmt.Errorf("attach refusal line: %w", err)
@@ -264,16 +274,20 @@ func (s *Store) AttachRefusalLine(login, from string, at time.Time, line string)
 // wrote the row itself (audit 2026-10-12, stage 2b): the check answers 550
 // and writes the row through a buffer a moment later. The message had a queue
 // id; a refused row with that id from around at means the row was written,
-// and nothing is. It reports whether it wrote one.
+// and nothing is. The domain is the login's, or - when the tailer did not see the login, its
+// client= line read before a restart - the envelope's, so the row is still
+// its domain's administrator's (review of stage 2b). It reports whether it
+// wrote one.
 func (s *Store) RecoverRefusal(e SendLogEntry, at time.Time) (bool, error) {
 	stamp := at.UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
 		`INSERT INTO send_log
 			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, recovered, created_at, updated_at, domain_id)
-		 SELECT ?, ?, ?, ?, ?, '', ?, ?, ?, 1, ?, ?, `+loginDomainID+`
+		 SELECT ?, ?, ?, ?, ?, '', ?, ?, ?, 1, ?, ?,
+			COALESCE(`+loginDomainID+`, (SELECT d.id FROM domains d WHERE d.name = ?))
 		 WHERE NOT EXISTS (SELECT 1 FROM send_log
 			WHERE queue_id = ? AND status = ? AND created_at BETWEEN ? AND ?)`,
-		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, StatusRejected, e.Reason, e.HeaderFrom, stamp, stamp, e.AppLogin,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, StatusRejected, e.Reason, e.HeaderFrom, stamp, stamp, e.AppLogin, e.Domain,
 		e.QueueID, StatusRejected,
 		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339), at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
 	)

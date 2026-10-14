@@ -103,6 +103,7 @@ func (s *session) recordRejected(reason string) {
 		AppLogin: s.login,
 		From:     s.from,
 		Reason:   reason,
+		ClientIP: s.clientIP, // Postfix's line about the refusal names it
 	})
 	if err != nil {
 		log.Printf("journal-milter: record rejected %s: %v", s.from, err)

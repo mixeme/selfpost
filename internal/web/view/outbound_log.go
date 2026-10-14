@@ -265,7 +265,7 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 			facts = append(facts, Fact{Label: "Written", Value: Rich("from ", Code("mail.log"), " after a restart: the panel stopped before it wrote the refusal")})
 		}
 		if in.QueueID != "" {
-			facts = append(facts, Fact{Label: "Queue id", Value: Rich(Mono(in.QueueID), " — given, the message was not queued")})
+			facts = append(facts, Fact{Label: "Queue id", Value: Rich(Mono(in.QueueID), " - given, the message was not queued")})
 		} else {
 			facts = append(facts, Fact{Label: "Queue id", Value: Rich("none - refused at ", Mono("MAIL FROM"), ", before one is given")})
 			delivery.End = Rich("The line from ", Code("mail.log"), " for this refusal")
