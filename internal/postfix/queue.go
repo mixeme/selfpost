@@ -41,28 +41,43 @@ func (l *limitWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Queue returns Postfix's own human-readable mail-queue listing
-// (architecture.md § Panel HTTP surface): active, deferred and held messages,
-// exactly as an administrator would see via the CLI. The command takes a
-// single fixed flag and no user input, so it never goes through a shell
-// (security.md). The panel is responsible for escaping the output before
-// display (security.md); this function returns it as-is.
-func Queue() (string, error) {
+// postqueueP builds the `postqueue -p` command. It is a var so tests can put
+// a fake postqueue in its place, the way readQueueJSON is.
+var postqueueP = func(ctx context.Context) *exec.Cmd {
+	// A single fixed flag and no user input, never through a shell (security.md).
+	return exec.CommandContext(ctx, "postqueue", "-p")
+}
+
+// listQueue runs `postqueue -p` and keeps at most maxQueueOutput bytes of it;
+// truncated says whether there was more.
+func listQueue() (text string, truncated bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), postqueueTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "postqueue", "-p")
+	cmd := postqueueP(ctx)
 	out := &limitWriter{remaining: maxQueueOutput}
 	cmd.Stdout = out
 	cmd.Stderr = out
-	err := cmd.Run()
+	err = cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
+		return "", false, fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
 	}
 	if err != nil {
-		return "", fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(out.buf.String()))
+		return "", false, fmt.Errorf("postqueue -p: %w: %s", err, strings.TrimSpace(out.buf.String()))
 	}
-	text := out.buf.String()
-	if out.truncated {
+	return out.buf.String(), out.truncated, nil
+}
+
+// Queue returns Postfix's own human-readable mail-queue listing
+// (architecture.md § Panel HTTP surface): active, deferred and held messages,
+// exactly as an administrator would see via the CLI. The panel is responsible
+// for escaping the output before display (security.md); this function returns
+// it as-is. A listing over the size cap is shown cut, with a note saying so.
+func Queue() (string, error) {
+	text, truncated, err := listQueue()
+	if err != nil {
+		return "", err
+	}
+	if truncated {
 		text += fmt.Sprintf("\n[listing truncated at %d bytes]\n", maxQueueOutput)
 	}
 	return text, nil
@@ -77,11 +92,16 @@ func Queue() (string, error) {
 //
 // An error means the queue could not be listed and therefore says nothing about
 // any message; the caller must treat it as "no information", never as an empty
-// queue.
+// queue. A listing cut at the size cap is such an error: the messages past the
+// cut are still in the queue, and a backlog that large is the outage the sweep
+// exists for (audit 2026-10-12, H3). QueueMessages treats its cap the same way.
 func QueueIDs() (map[string]struct{}, error) {
-	out, err := Queue()
+	out, truncated, err := listQueue()
 	if err != nil {
 		return nil, err
+	}
+	if truncated {
+		return nil, fmt.Errorf("postqueue -p: listing is larger than %d bytes", maxQueueOutput)
 	}
 	return parseQueueIDs(out), nil
 }

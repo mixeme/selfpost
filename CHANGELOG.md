@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A queue too large to list no longer closes its own messages.** The
+  reconcile sweep asks `postqueue -p` which messages Postfix still holds and
+  closes every `queued` row that is not among them. The listing is capped at
+  4 MiB, and the ids past the cap were read as gone: during a large deferred
+  backlog - the outage the sweep exists for - mail Postfix still held was
+  marked `bounced`. A listing over the cap now tells the sweep nothing, as it
+  already did for the notification about mail waiting too long; the Mail
+  queue page still shows the cut listing with its note (audit 2026-10-12, H3).
+
 ## [2.4.2] - 2026-10-14
 
 Release hygiene: stage 0 of the 2026-10-12 audit. Nothing the panel or the

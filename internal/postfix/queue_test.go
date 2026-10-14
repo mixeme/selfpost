@@ -1,6 +1,76 @@
 package postfix
 
-import "testing"
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+// TestFakePostqueue is not a test: it is the fake `postqueue -p` the tests
+// below run in place of the real one, writing SP_FAKE_POSTQUEUE_BYTES bytes of
+// queue entries.
+func TestFakePostqueue(t *testing.T) {
+	if os.Getenv("SP_FAKE_POSTQUEUE") != "1" {
+		t.Skip("helper process")
+	}
+	var size int
+	fmt.Sscan(os.Getenv("SP_FAKE_POSTQUEUE_BYTES"), &size)
+	out := bufio.NewWriter(os.Stdout)
+	fmt.Fprintln(out, "-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------")
+	for n, i := 0, 0; n < size; i++ {
+		entry := fmt.Sprintf("%010X      446 Fri Aug  8 10:13:31  app@example.com\n%41s rcpt@example.net\n\n", i, "")
+		out.WriteString(entry)
+		n += len(entry)
+	}
+	out.Flush()
+	os.Exit(0)
+}
+
+// fakePostqueue puts a postqueue that lists about size bytes of entries in
+// place of the real one for the rest of the test.
+func fakePostqueue(t *testing.T, size int) {
+	t.Helper()
+	old := postqueueP
+	postqueueP = func(ctx context.Context) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestFakePostqueue$")
+		cmd.Env = append(os.Environ(), "SP_FAKE_POSTQUEUE=1", fmt.Sprintf("SP_FAKE_POSTQUEUE_BYTES=%d", size))
+		return cmd
+	}
+	t.Cleanup(func() { postqueueP = old })
+}
+
+// A listing over the cap is no listing for the reconcile sweep: the messages
+// past the cut are still queued, and taking the first 4 MiB of ids for the
+// whole queue closed every row past it as bounced (audit 2026-10-12, H3).
+// The queue page still shows the cut listing, with the note.
+func TestQueueIDsRefusesATruncatedListing(t *testing.T) {
+	fakePostqueue(t, 5<<20)
+	if ids, err := QueueIDs(); err == nil {
+		t.Fatalf("QueueIDs on a 5 MiB listing = %d ids and no error, want an error", len(ids))
+	}
+	text, err := Queue()
+	if err != nil {
+		t.Fatalf("Queue on a 5 MiB listing: %v", err)
+	}
+	if !strings.HasSuffix(text, fmt.Sprintf("[listing truncated at %d bytes]\n", maxQueueOutput)) {
+		t.Fatalf("Queue on a 5 MiB listing does not end with the truncation note: ...%q", text[len(text)-80:])
+	}
+}
+
+func TestQueueIDsReadsAListingUnderTheCap(t *testing.T) {
+	fakePostqueue(t, 1000)
+	ids, err := QueueIDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ids["0000000000"]; !ok || len(ids) < 5 {
+		t.Fatalf("QueueIDs on a small listing = %v", ids)
+	}
+}
 
 // The reconcile sweep decides whether a message is still Postfix's problem, so
 // the parser must pick queue ids out of a real listing and nothing else out of
