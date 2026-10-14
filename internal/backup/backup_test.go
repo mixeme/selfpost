@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -308,5 +309,53 @@ func TestCheckReportsWhatCannotBeRead(t *testing.T) {
 	}
 	if err := Check(Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot}); err == nil {
 		t.Fatal("Check passed with .env missing from the deploy root")
+	}
+}
+
+// certs/ as certbot's advice leaves it: links into live/, which are relative
+// links into archive/ (C-Q4). The archive holds the files, under the links'
+// names; a link to nothing reachable stops the backup, naming it.
+func TestCertsLinksAreFollowed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows; the container is Linux")
+	}
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	le := t.TempDir()
+	writeFile(t, filepath.Join(le, "archive", "mail.example.com", "fullchain1.pem"), "CERT FROM CERTBOT")
+	writeFile(t, filepath.Join(le, "archive", "mail.example.com", "privkey1.pem"), "KEY FROM CERTBOT")
+	live := filepath.Join(le, "live", "mail.example.com")
+	if err := os.MkdirAll(live, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	certs := filepath.Join(deployRoot, CertsDirName)
+	for _, f := range []string{"fullchain", "privkey"} {
+		if err := os.Symlink("../../archive/mail.example.com/"+f+"1.pem", filepath.Join(live, f+".pem")); err != nil {
+			t.Fatal(err)
+		}
+		os.Remove(filepath.Join(certs, f+".pem"))
+		if err := os.Symlink(filepath.Join(live, f+".pem"), filepath.Join(certs, f+".pem")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.2.3", DeployRoot: deployRoot}
+	if err := Check(p); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := Create(&buf, p); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	files := readArchive(t, buf.Bytes())
+	if files[CertsDirName+"/fullchain.pem"] != "CERT FROM CERTBOT" || files[CertsDirName+"/privkey.pem"] != "KEY FROM CERTBOT" {
+		t.Fatalf("certs in the archive: %q, %q", files[CertsDirName+"/fullchain.pem"], files[CertsDirName+"/privkey.pem"])
+	}
+
+	// /etc/letsencrypt not mounted: the link leads nowhere.
+	if err := os.RemoveAll(le); err != nil {
+		t.Fatal(err)
+	}
+	err := Check(p)
+	if err == nil || !strings.Contains(err.Error(), "certs/fullchain.pem is a link to a file this container cannot reach") {
+		t.Fatalf("Check with a dangling link: %v", err)
 	}
 }

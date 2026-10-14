@@ -147,6 +147,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the next update; the second then failed, and with it that start or that
   report (nothing was damaged). Each update now holds the database from
   its start and checks the version again (assumptions D-S3).
+- **Certificates from certbot reach Postfix and the backup.** The guide had
+  `certs` linked to certbot's `live/<host>`, and the nginx fragment mounted
+  that directory; its files are links into `archive/`, which the container
+  did not have, so Postfix started without a certificate and a full backup
+  went without one. `certs/` now holds two links into `/etc/letsencrypt`,
+  which is mounted read-only at the same path (a commented line in
+  `docker-compose.yml`, mounted in the nginx fragment); the guide gives the
+  two commands certbot's documentation has for a server that is not root.
+  A full backup follows links under `certs/` and carries the files; a link
+  that leads nowhere stops it, named (assumptions C-A1, C-Q4). If you use
+  certbot this way, follow the guide's new "Reverse proxy" steps.
 - **Words for what happens to mail match Postfix's.** A message refused with
   a temporary error while the panel or the spam filter does not answer was
   called deferred, which in Postfix's words is mail waiting in its queue;

@@ -27,7 +27,7 @@ func prepareStage(s *stack) error {
 	if err := removeAllBestEffort(s.stageDir); err != nil {
 		return fmt.Errorf("clean stage dir: %w", err)
 	}
-	dirs := []string{"data", "certs", "dns-stage", "mail-stage"}
+	dirs := []string{"data", "certs", "letsencrypt", "dns-stage", "mail-stage"}
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(s.stageDir, d), 0o755); err != nil {
 			return fmt.Errorf("mkdir %s: %w", d, err)

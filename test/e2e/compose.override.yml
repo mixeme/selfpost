@@ -37,6 +37,12 @@ services:
         # unset. The suite checks the stamp (image_stamped_with_version).
         VERSION: ${SELFPOST_E2E_VERSION:-e2e}
     image: selfpost:e2e
+    volumes:
+      # Where certs/ links lead when it is laid out as the guide has it with
+      # certbot (certbot_layout_followed): certbot's directory, mounted at the
+      # same path as on a host. Empty until that test fills it. Added to the
+      # base file's volumes (a new target).
+      - ./letsencrypt:/etc/letsencrypt:ro
     environment:
       SELFPOST_HOSTNAME: mail.e2e.test
       # Plain HTTP panel for the test client — no reverse proxy in this stand.

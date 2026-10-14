@@ -160,7 +160,7 @@ func Create(w io.Writer, p Params) error {
 		return err
 	}
 
-	if err := addTree(tw, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue); err != nil {
+	if err := addTree(tw, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
 		return err
 	}
 
@@ -221,7 +221,7 @@ func Check(p Params) error {
 	if err := ValidateDeployRoot(p.DeployRoot); err != nil {
 		return err
 	}
-	if err := addTree(nil, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue); err != nil {
+	if err := addTree(nil, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
 		return err
 	}
 	return addDeployFiles(nil, p.DeployRoot, nil)
@@ -267,7 +267,12 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 		}
 		return fmt.Errorf("backup: stat %s: %w", CertsDirName, err)
 	}
-	return addTree(tw, certsDir, CertsDirName+"/", nil, nil)
+	// certs/ may hold links rather than files: certbot's own advice is to
+	// point a server at its live/ files "(or create symlinks)", and those
+	// are links again, relative, into archive/ (eff-certbot docs, "Where are
+	// my certificates?"; assumptions C-Q4, C-A1). The archive carries the
+	// files they lead to, under the links' names.
+	return addTree(tw, certsDir, CertsDirName+"/", nil, nil, true)
 }
 
 // addTree walks root and adds every regular file (and directory, to preserve
@@ -275,8 +280,11 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 // When exclude is non-nil, top-level names relative to root are skipped; skip,
 // when non-nil, leaves out whatever it says. With a nil tw nothing is written:
 // every file is opened and closed, which is how Check finds what cannot be read.
-// Non-regular, non-directory entries (symlinks, sockets) are skipped.
-func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool, skip skipFunc) error {
+// Non-regular, non-directory entries (symlinks, sockets) are skipped - except,
+// with follow, a symbolic link to a regular file, which is archived as that
+// file under the link's name; a link that leads nowhere this process can
+// reach is an error, as an unreadable file is.
+func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool, skip skipFunc, follow bool) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -330,6 +338,15 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 				return nil
 			}
 			return err
+		case follow && info.Mode()&fs.ModeSymlink != 0:
+			target, err := os.Stat(path)
+			if err != nil {
+				return fmt.Errorf("backup: %s is a link to a file this container cannot reach - with certbot, /etc/letsencrypt is mounted at the same path (guide § Reverse proxy): %w", name, err)
+			}
+			if !target.Mode().IsRegular() {
+				return nil
+			}
+			return writeTarFile(tw, name, target.Mode().Perm(), path)
 		default:
 			return nil
 		}

@@ -255,14 +255,14 @@ SelfPost isn't tied to a specific proxy; pick whichever fits your host:
 
 | Proxy | Where certs live | Fragment |
 |---|---|---|
-| **Apache** (default/recommended) | Host disk, via the certbot Apache plugin — PEM files ready to bind-mount, no extraction step. | [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) |
-| nginx | Host disk, via a certbot sidecar container — same PEM-ready shape as Apache. | [deploy/nginx/](../deploy/nginx/) |
+| **Apache** (default/recommended) | Host disk, via the certbot Apache plugin — `certs/` links to them, no extraction step. | [deploy/apache/selfpost-vhost.conf](../deploy/apache/selfpost-vhost.conf) |
+| nginx | Host disk, via a certbot sidecar container — the same shape as Apache. | [deploy/nginx/](../deploy/nginx/) |
 | Caddy | Automatic ACME, zero extra containers — simplest, but its on-disk cert path is versioned internal layout, not a stable API; verify it for the Caddy version you run. | [deploy/caddy/](../deploy/caddy/) |
 | Traefik | Bundled inside `acme.json` — needs a small extraction script to produce standalone PEM files. | [deploy/traefik/](../deploy/traefik/) |
 
 Apache is the recommended default because the certbot Apache plugin already
-writes plain `fullchain.pem`/`privkey.pem` files to a predictable path with no
-extra moving parts between "certificate issued" and "Postfix can read it."
+keeps `fullchain.pem`/`privkey.pem` at a predictable path with no extra moving
+parts between "certificate issued" and "Postfix can read it."
 
 **The proxy needs no security configuration of its own.** The panel emits its
 own `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`,
@@ -276,7 +276,8 @@ reject every form submission as cross-origin — the log says so explicitly,
 printing the `Origin` and `Host` it compared.
 
 In every case the proxy terminates HTTPS for the panel; the resulting
-certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem`.
+certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem` —
+the files, or links that lead to them inside the container.
 
 **Apache (recommended, on the host).** Install Apache with `ssl`, `proxy`, and
 `proxy_http` enabled. Copy
@@ -288,10 +289,30 @@ then issue a certificate:
 sudo certbot --apache -d mail.example.com
 ```
 
-Point `./certs` at the PEM files certbot wrote (symlink is fine):
+Link the two files into `./certs` and let the container see what the links
+lead to. certbot's `live/` files are themselves relative links into
+`archive/` (certbot's documentation, "Where are my certificates?", advises
+pointing servers at them or linking to them), so the whole of
+`/etc/letsencrypt` is mounted, read-only and at the same path — uncomment that
+line in `docker-compose.yml`. Mounting `live/mail.example.com` alone, or
+linking `certs` to it, gives the container links into a directory it does not
+have: Postfix then starts without a certificate.
 
 ```sh
-ln -s /etc/letsencrypt/live/mail.example.com certs
+mkdir certs
+ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
+ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
+```
+
+The panel reads them as its own user (Health shows the certificate, a full
+backup carries both files), through the container's group 998. certbot's
+documentation gives the way for a server that is not root, and certbot keeps
+the key's group and mode at every renewal:
+
+```sh
+sudo chmod 0755 /etc/letsencrypt/live /etc/letsencrypt/archive
+sudo chgrp 998 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
+sudo chmod 0640 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 ```
 
 **nginx (containerised).** From the `deploy/` directory, merge the nginx
@@ -306,8 +327,20 @@ docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
 ```
 
 Edit [deploy/nginx/nginx.conf.example](../deploy/nginx/nginx.conf.example) and
-replace `mail.example.com` first. The fragment bind-mounts certbot's output into
-both nginx and SelfPost.
+replace `mail.example.com` first. The fragment mounts certbot's directory into
+both nginx and SelfPost, at `/etc/letsencrypt`; `./certs` holds two links to
+`/etc/letsencrypt/live/mail.example.com/` — a path that exists inside the
+container, not on the host — and the panel reads the key through group 998,
+as in the Apache case:
+
+```sh
+mkdir certs
+ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
+ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
+sudo chmod 0755 nginx/certbot-etc/live nginx/certbot-etc/archive
+sudo chgrp 998 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
+sudo chmod 0640 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
+```
 
 **Caddy (containerised, automatic ACME).** Edit
 [deploy/caddy/Caddyfile](../deploy/caddy/Caddyfile) and the `<hostname>` placeholders
@@ -654,10 +687,13 @@ both the panel and Postfix —
 chgrp 998 certs/privkey.pem && chmod 640 certs/privkey.pem
 ```
 
-— and have whatever renews the certificate do the same (a certbot deploy hook,
-for one). A key readable by root alone is enough for Postfix, but then the
-panel refuses to make a backup and names the file: it does not hand over an
-archive without the key.
+— and have whatever renews the certificate do the same; certbot does it by
+itself, keeping the group and mode of a key on renewal (with `certs/` as links
+into `/etc/letsencrypt`, the commands of "Reverse proxy" above give certbot's
+own files the group). A key readable by root alone is enough for Postfix, but
+then the panel refuses to make a backup and names the file: it does not hand
+over an archive without the key. Links under `certs/` are followed: the
+archive holds the files they lead to.
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
@@ -719,7 +755,7 @@ methods avoid it by stopping first.
 | SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
 | `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
 | Postfix queue | No | Yes | Yes |
-| `certs/` private key | Yes (the panel needs it readable by group 998) | Yes | No — deploy files separate |
+| `certs/` private key | Yes (the panel needs it readable by group 998; links are followed) | Yes when `certs/` holds the files; links are stored as links unless `tar -h` | No — deploy files separate |
 | `data/manifest.json` | Written (version stamp) | Absent | Absent |
 | Restore version check | Yes — must match image tag | No | No |
 | Post-restore *Resync* | Yes, on first boot | No | No |

@@ -370,6 +370,9 @@ func TestE2E(t *testing.T) {
 	run("full_backup_restore", func(t *testing.T) {
 		testFullBackupRestore(t, sc)
 	})
+	run("certbot_layout_followed", func(t *testing.T) {
+		testCertbotLayout(t, sc)
+	})
 	run("enable_port25_features", func(t *testing.T) {
 		testEnablePort25Features(t, sc)
 	})
