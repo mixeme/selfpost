@@ -333,6 +333,10 @@ docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
 
 Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
 
+Whatever the proxy, SelfPost notices a renewed certificate in the mount within
+a day (`TLS_RELOAD_INTERVAL_SECONDS`) and starts serving it on 465 and 587
+without a restart.
+
 ## Instance administration
 
 After sign-in the global role opens on **Overview** — the place to answer "is

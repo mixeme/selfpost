@@ -48,6 +48,10 @@ services:
       # loops well past this count) is meant to hit it.
       RATE_LIMIT_MESSAGES_PER_IP: "50"
       RATE_LIMIT_WINDOW_SECONDS: "60"
+      # cert-reload compares the mounted certificate with Postfix's copy this
+      # often, so renewed_certificate_picked_up does not wait a day. It
+      # reloads Postfix only when the certificate changed.
+      TLS_RELOAD_INTERVAL_SECONDS: "2"
     ports: !override
       - "20465:465"
       - "20587:587"

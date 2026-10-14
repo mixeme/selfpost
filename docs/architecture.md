@@ -30,7 +30,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | `panel` | panel | 200 | HTTP UI + sender check + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
 | `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
-| `cert-reload` | root | 400 | Daily `postfix reload` for renewed TLS certs |
+| `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
 Start order: OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
@@ -151,8 +151,12 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
 - **Level-1 rate limit** — `smtpd_client_message_rate_limit` /
   `anvil_rate_time_unit` from `RATE_LIMIT_*` env vars; independent of milter.
 - **Chroot disabled** for all services (DNS/TLS inside container).
-- **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`; daily
-  reload via `cert-reload`.
+- **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
+  at start into `/etc/postfix/tls-internal` (Postfix wants the key root-owned
+  and `0600`, which the mount cannot give), and Postfix reads the copy.
+  `cert-reload` compares the mount with the copy daily; when they differ and
+  the certificate and key belong together it renews the copy (each file
+  renamed into place) and reloads Postfix.
 
 ### OpenDKIM
 
@@ -920,8 +924,9 @@ unsupported rather than as a missing doc:
 - **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
   `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
   `MILTER_WAIT_TIMEOUT` (`30` seconds).
-- **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — daily
-  `postfix reload` to pick up renewed certificates),
+- **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — how
+  often a renewed certificate is looked for; Postfix is reloaded only when one
+  is found),
   `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
   hours; logrotate keeps 14 rotated files on a daily schedule, and each
   rotation triggers `postfix reload`).

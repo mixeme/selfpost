@@ -29,6 +29,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   program, as the other patterns of the log tailer are (audit 2026-10-12,
   M12).
 
+- **A renewed TLS certificate is served without a restart.** Postfix reads a
+  copy of the mounted certificate made when the container starts, and the
+  daily reload re-read that copy, not the renewed files: a certificate renewed
+  while the container ran expired on 465 and 587 at the old one's end. The
+  daily job now compares the mount with the copy and, when the certificate and
+  key belong together, renews the copy and reloads Postfix; when nothing
+  changed it no longer reloads (audit 2026-10-12, H2).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

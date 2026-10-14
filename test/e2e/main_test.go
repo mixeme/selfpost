@@ -147,6 +147,12 @@ func TestE2E(t *testing.T) {
 		}
 	})
 
+	run("renewed_certificate_picked_up", func(t *testing.T) {
+		if err := checkCertRenewalPickedUp(h); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	run("setup_and_login", func(t *testing.T) {
 		token, err := readSetupToken(h)
 		if err != nil {
