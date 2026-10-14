@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-10-14
+
+Stage 2b of the 2026-10-12 audit: the log tailer and what the panel shows of
+a refusal. Migration `0009` keeps Postfix's line about a refusal on its row,
+the client a refusal came from, a mark on rows written from `mail.log`, and
+the Sender check's two counts and its estimate mark.
+
 ### Fixed
 
 - **A log rotated while the panel was down is read to its end.** On start,
