@@ -24,6 +24,9 @@ jobs:
         with:
           go-version: "1.26"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
 
       - name: Format
         run: |
@@ -39,3 +42,13 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      # The e2e module runs only in release.yml, after a release is published;
+      # a type error there would first show up then. Compile it here without
+      # running it: `go test -run` would still run TestMain, which brings up
+      # the whole stand.
+      - name: Compile the e2e
+        working-directory: test/e2e
+        run: |
+          go vet ./...
+          go test -c -o /dev/null .

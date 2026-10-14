@@ -17,6 +17,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `selfpost-backup -version` against it, and `release.yml` checks the stamp
   again on the image right before pushing it. Images already published are
   left as they are.
+- **The e2e module is compiled on every push** (`test.yml`: `go vet` and
+  `go test -c` in `test/e2e`), so a type error there no longer first shows
+  up in `release.yml` after a release is published (audit 2026-10-12, M20).
+- **`test/` is out of the image's build context** (`.dockerignore`): a
+  developer build after an e2e run sent the stand's leftovers - DKIM keys,
+  `sasldb2` - to the builder (audit 2026-10-12, L33).
 
 ## [2.4.1] - 2026-10-12
 

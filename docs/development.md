@@ -428,7 +428,9 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 
 `design-first` (needs the full history) → `gofmt -l` → `go vet ./...` →
 `go test ./...` (main module, no e2e; includes the panel guard tests, see
-[§ Panel pages](#panel-pages-the-component-kit-and-its-guards)).
+[§ Panel pages](#panel-pages-the-component-kit-and-its-guards)) → the e2e
+module compiled, not run (`go vet ./...` and `go test -c -o /dev/null .` in
+`test/e2e`).
 
 ### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 

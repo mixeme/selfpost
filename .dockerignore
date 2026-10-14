@@ -4,6 +4,9 @@
 .gitattributes
 dev
 docs
+# test/e2e/.stage holds what an e2e run leaves behind (DKIM keys, sasldb2);
+# the e2e's own sink image is built from test/e2e/sink as its own context.
+test
 bin
 *.exe
 README.md
