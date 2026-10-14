@@ -104,7 +104,7 @@ func (h *Handlers) HandleDelivery(w http.ResponseWriter, r *http.Request) {
 	in := view.MessageInput{
 		ID: row.ID, QueueID: row.QueueID, Domain: row.Domain, App: row.AppLogin,
 		From: row.From, To: row.To, Subject: row.Subject, Status: row.Status,
-		Reason: row.Reason, HeaderFrom: row.HeaderFrom,
+		Reason: row.Reason, HeaderFrom: row.HeaderFrom, Recovered: row.Recovered,
 		Accepted: row.CreatedAt, Reported: row.UpdatedAt,
 		// Where the row came from, so the way back returns to the page and filters
 		// the operator was looking at rather than the top of an unfiltered log.

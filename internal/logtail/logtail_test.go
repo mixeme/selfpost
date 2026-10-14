@@ -286,6 +286,7 @@ func (c *captureStore) AddTailerBlind(time.Time, time.Duration) error { return n
 func (c *captureStore) AttachRefusalLine(string, string, time.Time, string) (bool, error) {
 	return true, nil
 }
+func (c *captureStore) RecoverRefusal(store.SendLogEntry, time.Time) (bool, error) { return false, nil }
 func (c *captureStore) CountQueuedOlderThan(time.Time) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

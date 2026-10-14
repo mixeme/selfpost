@@ -378,3 +378,83 @@ func testRefusalsShowPostfixsLine(t *testing.T, sc *scenario) {
 		}
 	}
 }
+
+// asPanel runs python3 code inside the container as the panel's user, so the
+// database's WAL files stay the panel's.
+func asPanel(code string, args ...string) (string, error) {
+	full := append([]string{"exec", "-T", "-u", "panel", "selfpost", "python3", "-c", code}, args...)
+	out, err := h.compose(full...)
+	return strings.TrimSpace(string(out)), err
+}
+
+// testRefusalRecoveredFromTheLog: the sender check answers 550 and writes the
+// row a moment later; a panel stopped in between leaves a refusal the log
+// knows and the panel does not (audit 2026-10-12, stage 2b). The stop cannot
+// be timed to that moment from outside, so what it leaves is made by hand: a
+// From: refusal, then - the panel stopped - its row deleted and the tailer's
+// saved place moved back before the message's first line. Started again, the
+// panel writes the row from mail.log, marked, and once.
+func testRefusalRecoveredFromTheLog(t *testing.T, sc *scenario) {
+	token := uniqueToken("recover")
+	res := attemptSend(sendAttempt{authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, headerFrom: "director@" + otherDomain, to: recipient,
+		subject: "e2e " + token, body: "refused, and its row lost"})
+	if err := res.refusedAt("DATA", 550, "5.7.1 From:"); err != nil {
+		t.Fatal(err)
+	}
+	var queueID string
+	if err := waitFor("the refused row", 15*time.Second, 300*time.Millisecond, func() (bool, error) {
+		out, err := asPanel(`import sqlite3,sys
+r=sqlite3.connect("/data/selfpost.db").execute("select queue_id from send_log where subject like ?",("%"+sys.argv[1]+"%",)).fetchone()
+print(r[0] if r else "")`, token)
+		queueID = out
+		return err == nil && out != "", err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	supervisorctl := func(verb string) {
+		if _, err := h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", verb, "panel"); err != nil {
+			t.Fatalf("%s panel: %v", verb, err)
+		}
+	}
+	supervisorctl("stop")
+	t.Cleanup(func() {
+		_, _ = h.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "start", "panel")
+	})
+	if out, err := asPanel(`import sqlite3,sys
+q=sys.argv[1]
+data=open("/data/log/mail.log","rb").read()
+pos=data.find((q+": client=").encode())
+if pos < 0: sys.exit("no client= line for "+q)
+start=data.rfind(b"\n",0,pos)+1
+c=sqlite3.connect("/data/selfpost.db")
+c.execute("delete from send_log where queue_id=?",(q,))
+c.execute("update logtail_state set read_offset=?",(start,))
+c.commit()
+print(start)`, queueID); err != nil {
+		t.Fatalf("lose the row: %v %s", err, out)
+	}
+	supervisorctl("start")
+	if err := waitFor("panel HTTP to answer again", 30*time.Second, 300*time.Millisecond, func() (bool, error) {
+		_, err := sc.panel.status()
+		return err == nil, err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	count := func() (string, error) {
+		return asPanel(`import sqlite3,sys
+print(sqlite3.connect("/data/selfpost.db").execute("select count(*), coalesce(sum(recovered),0) from send_log where queue_id=? and status='rejected'",(sys.argv[1],)).fetchone())`, queueID)
+	}
+	if err := waitFor("the refusal written from mail.log", 90*time.Second, time.Second, func() (bool, error) {
+		out, err := count()
+		return err == nil && out == "(1, 1)", fmt.Errorf("rows (count, recovered) = %s, %v", out, err)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Once: the next passes over the log write it no more.
+	time.Sleep(3 * time.Second)
+	if out, _ := count(); out != "(1, 1)" {
+		t.Fatalf("after more passes the rows are %s, want (1, 1)", out)
+	}
+}

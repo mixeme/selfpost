@@ -3,12 +3,20 @@ package logtail
 import (
 	"testing"
 	"time"
+
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 type refusalProbe struct {
-	rows  int // rows waiting for a line
-	lines []string
-	who   []string
+	rows      int // rows waiting for a line
+	lines     []string
+	who       []string
+	recovered []store.SendLogEntry
+}
+
+func (r *refusalProbe) RecoverRefusal(e store.SendLogEntry, _ time.Time) (bool, error) {
+	r.recovered = append(r.recovered, e)
+	return true, nil
 }
 
 func (r *refusalProbe) AttachRefusalLine(login, from string, _ time.Time, line string) (bool, error) {
@@ -54,5 +62,31 @@ func TestRefusalLines(t *testing.T) {
 	r.retry(now.Add(refusalLineWait + time.Second))
 	if len(r.pending) != 0 {
 		t.Fatal("a line kept waiting past its time")
+	}
+}
+
+// cleanup's line about a From: refusal is the row's, written by the panel; once
+// the panel has had the time to, the line is handed to RecoverRefusal, which
+// writes the row only if it is missing - with the login smtpd named for the
+// queue id, the sender, the recipient and the From: line as printed.
+func TestFromRefusalIsRecoveredAfterTheWait(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	st := &refusalProbe{}
+	r := &refusalLines{st: st}
+	r.handle(`2026-10-14T12:00:00+00:00 mail postfix/smtpd[11]: E543D3C75DA0: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now)
+	r.handle(`2026-10-14T12:00:01+00:00 mail postfix/cleanup[13]: E543D3C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: "The - Shop" <director@other.e2e.test> - it names another sender of this server; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now)
+	r.retry(now.Add(time.Second))
+	if len(st.recovered) != 0 {
+		t.Fatal("recovered before the panel had the time to write the row")
+	}
+	r.retry(now.Add(refusalLineWait + time.Second))
+	if len(st.recovered) != 1 {
+		t.Fatalf("recovered %d, want 1", len(st.recovered))
+	}
+	e := st.recovered[0]
+	want := store.SendLogEntry{QueueID: "E543D3C75DA0", AppLogin: "app1", From: "alerts@sender.e2e.test", To: "rcpt@sink.e2e.test",
+		Domain: "sender.e2e.test", Reason: store.ReasonFrom, HeaderFrom: `"The - Shop" <director@other.e2e.test>`}
+	if e != want {
+		t.Fatalf("recovered %+v, want %+v", e, want)
 	}
 }

@@ -176,8 +176,9 @@ func TestMessagePageDrawsTheOutcomeAtItsLevel(t *testing.T) {
 	}
 }
 
-// A message the milter refused never reached the queue: it has no queue id and
-// no lines to show, and says why instead of showing an empty log.
+// A message the milter refused never reached the queue: it has no queue id,
+// and a row from before Postfix's line about it was kept says so instead of
+// showing an empty log.
 func TestMessagePageOfARefusedMessage(t *testing.T) {
 	h, _ := serverWithDelivery(t)
 	if err := h.store.InsertRejected(store.SendLogEntry{
@@ -190,7 +191,7 @@ func TestMessagePageOfARefusedMessage(t *testing.T) {
 		t.Fatalf("query: %v (%d rows)", err, len(rows))
 	}
 	body := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(rows[0].ID))
-	has(t, "refused message", body, `Refused before queueing`, `class="sp-fail"`, `never reached the queue`, `<span class="tag is-light">rejected</span>`)
+	has(t, "refused message", body, `Refused before queueing`, `class="sp-fail"`, `the line was never read`, `<span class="tag is-light">rejected</span>`)
 	lacks(t, "refused message", body, `<pre`)
 }
 

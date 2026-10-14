@@ -33,6 +33,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the page shows it. A row refused before this says the line was not kept.
   A refusal's line is red for a permanent reply, amber for a temporary one
   (audit 2026-10-12, stage 2b).
+- **A refusal the panel did not get to write is written from the log.** The
+  sender check answers 550 and writes the row a moment later; a panel that
+  stopped in between - a rollout, a crash - left an application refused and
+  a log that did not know it. When the log tailer reads cleanup's refusal
+  line and, after giving the panel half a minute, finds no row for that
+  queue id, it writes the row from the line, marked on its page as written
+  from `mail.log` after a restart. A refusal at `MAIL FROM` needs no such
+  thing: its row is written before Postfix is answered.
 
 ## [2.5.0] - 2026-10-14
 

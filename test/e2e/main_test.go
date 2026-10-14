@@ -316,6 +316,9 @@ func TestE2E(t *testing.T) {
 	run("refusals_show_postfixs_line", func(t *testing.T) {
 		testRefusalsShowPostfixsLine(t, sc)
 	})
+	run("refusal_recovered_from_the_log", func(t *testing.T) {
+		testRefusalRecoveredFromTheLog(t, sc)
+	})
 	run("lines_naming_another_sender_never_signed_for_it", func(t *testing.T) {
 		testNeverSignedForAnother(t, sc)
 	})

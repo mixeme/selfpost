@@ -148,6 +148,16 @@ func TestOutMessageRefusedForItsFromLine(t *testing.T) {
 		`Lines from <code>mail.log</code> with this queue id`, `<span class="sp-e">postfix/cleanup[2120]: 7BCAF3C75DA0: milter-reject`)
 }
 
+// A refused row the log tailer wrote from mail.log says so.
+func TestOutMessageRecoveredFromTheLog(t *testing.T) {
+	at := time.Date(2026, 9, 21, 13, 40, 55, 0, time.UTC)
+	p := NewOutMessage(admin(), MessageInput{ID: 184232, QueueID: "E543D3C75DA0", Domain: "shop.example.org", App: "shop",
+		From: "shop@shop.example.org", To: "k.berg@web.de", Status: "rejected", Reason: "from", HeaderFrom: "director@example.org",
+		Recovered: true, Accepted: at, Reported: at}).WithDeliveryLog(nil, "")
+	out := renderSignedIn(t, "out-message", p)
+	pageHas(t, "Message", out, `<dt>Written</dt>`, `after a restart: the panel stopped before it wrote the refusal`)
+}
+
 func TestSendLogTag(t *testing.T) {
 	for _, c := range []struct {
 		status, reason string

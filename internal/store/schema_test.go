@@ -47,7 +47,7 @@ func TestBaselineSchema(t *testing.T) {
 		"applications":          "id domain_id login address_mode auth_ip_restrict auth_allowed_ips created_at",
 		"application_addresses": "id application_id address",
 		"rate_limits":           "id scope ref_id max_messages window_seconds mode auto_multiplier auto_updated_at",
-		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from domain_id refusal_line",
+		"send_log":              "id queue_id domain app_login from_addr to_addr subject status created_at updated_at reason header_from domain_id refusal_line recovered",
 		"logtail_state":         "path fingerprint read_offset updated_at",
 		"inbound_domains":       "id name recipient_mode created_at",
 		"inbound_transports":    "inbound_domain_id host port tls_mode",

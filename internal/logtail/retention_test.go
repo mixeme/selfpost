@@ -102,3 +102,7 @@ func TestRetentionLoopUsesUpdatedValue(t *testing.T) {
 func (s *retentionProbeStore) AttachRefusalLine(string, string, time.Time, string) (bool, error) {
 	return true, nil
 }
+
+func (s *retentionProbeStore) RecoverRefusal(store.SendLogEntry, time.Time) (bool, error) {
+	return false, nil
+}

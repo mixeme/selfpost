@@ -224,7 +224,10 @@ type SendLogRow struct {
 	// RefusalLine is Postfix's line about a refusal that has no queue id
 	// (migration 0009); "" for every other row, and for one refused before.
 	RefusalLine string
-	CreatedAt   time.Time
+	// Recovered is a refusal row the log tailer wrote from mail.log because
+	// the panel stopped before it wrote the row itself.
+	Recovered bool
+	CreatedAt time.Time
 	// UpdatedAt is when the status last changed — the log-tailer's report of
 	// the delivery attempt. It equals CreatedAt while a row is still queued.
 	UpdatedAt time.Time
@@ -256,6 +259,31 @@ func (s *Store) AttachRefusalLine(login, from string, at time.Time, line string)
 	return n > 0, nil
 }
 
+// RecoverRefusal writes the row of a message the sender check refused for its
+// From: line, from Postfix's line about it, when the panel stopped before it
+// wrote the row itself (audit 2026-10-12, stage 2b): the check answers 550
+// and writes the row through a buffer a moment later. The message had a queue
+// id; a refused row with that id from around at means the row was written,
+// and nothing is. It reports whether it wrote one.
+func (s *Store) RecoverRefusal(e SendLogEntry, at time.Time) (bool, error) {
+	stamp := at.UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`INSERT INTO send_log
+			(queue_id, domain, app_login, from_addr, to_addr, subject, status, reason, header_from, recovered, created_at, updated_at, domain_id)
+		 SELECT ?, ?, ?, ?, ?, '', ?, ?, ?, 1, ?, ?, `+loginDomainID+`
+		 WHERE NOT EXISTS (SELECT 1 FROM send_log
+			WHERE queue_id = ? AND status = ? AND created_at BETWEEN ? AND ?)`,
+		e.QueueID, e.Domain, e.AppLogin, e.From, e.To, StatusRejected, e.Reason, e.HeaderFrom, stamp, stamp, e.AppLogin,
+		e.QueueID, StatusRejected,
+		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339), at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return false, fmt.Errorf("recover refusal %s: %w", e.QueueID, err)
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // refusalLineWindow is how far apart a refusal's row and its log line may be
 // dated: the milter writes the row at MAIL FROM, Postfix the line a moment
 // later, and the log's stamps are whole seconds.
@@ -274,10 +302,10 @@ func (s *Store) GetSendLog(id int64) (SendLogRow, error) {
 		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(
-		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, refusal_line, created_at, updated_at
+		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, refusal_line, recovered, created_at, updated_at
 		 FROM send_log WHERE id = ?`, id,
 	).Scan(&row.ID, &row.QueueID, &row.Domain, &row.DomainID, &row.AppLogin, &row.From, &row.To,
-		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &row.RefusalLine, &createdAt, &updatedAt)
+		&row.Subject, &row.Status, &row.Reason, &row.HeaderFrom, &row.RefusalLine, &row.Recovered, &createdAt, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SendLogRow{}, ErrSendLogNotFound
 	}

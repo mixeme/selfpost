@@ -173,8 +173,11 @@ type MessageInput struct {
 	// (store.Reason*) and, for its From: line, what that line said.
 	Reason     string
 	HeaderFrom string
-	Accepted   time.Time
-	Reported   time.Time
+	// Recovered is a refused row the log tailer wrote from mail.log: the
+	// panel stopped before it wrote the row itself.
+	Recovered bool
+	Accepted  time.Time
+	Reported  time.Time
 	// BackHref is the log the message was opened from, filters and page kept.
 	BackHref string
 }
@@ -257,6 +260,9 @@ func NewOutMessage(m Meta, in MessageInput) *OutMessage {
 		if in.Reason == "from" {
 			facts = append(facts, Fact{Label: "From: line", Value: Plain(orDash(in.HeaderFrom)), Mono: true, Small: true})
 			history.Help = topicLink(HelpSenderCheck, "What an application may write in From:")
+		}
+		if in.Recovered {
+			facts = append(facts, Fact{Label: "Written", Value: Rich("from ", Code("mail.log"), " after a restart: the panel stopped before it wrote the refusal")})
 		}
 		if in.QueueID != "" {
 			facts = append(facts, Fact{Label: "Queue id", Value: Rich(Mono(in.QueueID), " — given, the message was not queued")})

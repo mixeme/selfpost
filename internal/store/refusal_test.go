@@ -77,3 +77,39 @@ func TestSendLogLinesOfARefusalAreItsOwn(t *testing.T) {
 		t.Fatalf("lines = %+v, want its own alone", lines)
 	}
 }
+
+// A From: refusal's row is written from the log only when the panel wrote
+// none for that queue id about then; once, however often the line is read.
+func TestRecoverRefusal(t *testing.T) {
+	st := openTestStore(t)
+	d := addTestDomain(t, st, "sender.example")
+	if _, err := st.AddApplication(d.ID, "app1", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	// The panel wrote this one itself.
+	if err := st.InsertRejected(SendLogEntry{QueueID: "WRITTEN", AppLogin: "app1", From: "a@sender.example", Reason: ReasonFrom}); err != nil {
+		t.Fatal(err)
+	}
+	e := SendLogEntry{QueueID: "WRITTEN", AppLogin: "app1", From: "a@sender.example", To: "r@x", Domain: "sender.example", Reason: ReasonFrom, HeaderFrom: "x@y"}
+	if wrote, err := st.RecoverRefusal(e, now); err != nil || wrote {
+		t.Fatalf("a refusal the panel wrote was written again: %v, %v", wrote, err)
+	}
+	e.QueueID = "LOST"
+	for i := 0; i < 2; i++ {
+		wrote, err := st.RecoverRefusal(e, now)
+		if err != nil || wrote != (i == 0) {
+			t.Fatalf("recovery %d: wrote %v, %v", i, wrote, err)
+		}
+	}
+	rows, _ := st.QuerySendLog(SendLogFilter{DomainIDs: []int64{d.ID}}, 10, 0)
+	var found SendLogRow
+	for _, r := range rows {
+		if r.QueueID == "LOST" {
+			found, _ = st.GetSendLog(r.ID)
+		}
+	}
+	if !found.Recovered || found.Status != StatusRejected || found.Reason != ReasonFrom || found.HeaderFrom != "x@y" || found.DomainID != d.ID {
+		t.Fatalf("the recovered row: %+v", found)
+	}
+}
