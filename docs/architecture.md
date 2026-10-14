@@ -118,11 +118,15 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   every change and on every start with the relay on. SelfPost never consults
   them. The sidecar mounts the directory and rspamd's multimap rules
   ([deploy/antispam/rspamd/multimap.conf](../deploy/antispam/rspamd/multimap.conf))
-  read them: a deny entry is a prefilter `reject`, an allow entry a symbol
-  weighing -100. Allow is deliberately not a prefilter `accept`: with two
-  prefilters rspamd lets the one that ran first decide, and deny then won or
-  lost by rule order (seen on rspamd 3.11). A refusal by the deny list
-  overrides any score, so deny wins whichever entries match.
+  read them: a deny entry's rule carries the action `reject`, which rspamd
+  sets as a pre-result, an allow entry is a symbol weighing -100. Allow is
+  deliberately not an `accept` action: with two pre-results rspamd keeps the
+  one set first, and deny then won or lost by rule order (seen on rspamd
+  3.11, date not recorded). A refusal by the deny list overrides any score,
+  so deny wins whichever entries match. A sender entry is matched against
+  the envelope sender only (`extract_from = "smtp"`; by default rspamd takes
+  a bounce's `From:` header instead - rspamd 3.11.1,
+  `src/plugins/lua/multimap.lua`, the `from` callback).
   How often an entry decided a message is not stored: `Lists.Usage` reads it
   off the journal on each view of Filter lists - the rows a list decided (the
   deny rule's reply, the allow rule's symbol, which the journal milter keeps

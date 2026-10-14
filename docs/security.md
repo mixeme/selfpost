@@ -261,7 +261,13 @@ operator can act on it.
   keeps of the filter's verdict only what its patterns recognise. **A verdict
   is read only next to the filter's signature.** The filter is attached so
   that mail flows when it is down, and then nothing removes verdict headers a
-  sender wrote himself. So rspamd adds a third header, `X-SelfPost-Filter`:
+  sender wrote himself. Nor would rspamd itself by default for a client it
+  counts as local - a private address, which every client has when Docker's
+  proxy relays port 25 - or an authenticated one: `skip_local` and
+  `skip_authenticated` (rspamd 3.11.1, `milter_headers.lua`, `skip_wanted()`)
+  leave the sender's headers in place, while the signing routine below runs
+  regardless; both are turned off in `milter_headers.conf` (assumptions
+  C-R7, tried on 2026-10-14). So rspamd adds a third header, `X-SelfPost-Filter`:
   the HMAC-SHA256 of the message's queue id under a key SelfPost generates
   (`data/antispam/filter.key`) and the sidecar reads from the directory it
   mounts. The journal milter recomputes it at end-of-message; with no
@@ -427,8 +433,9 @@ deferred item from the roadmap.
   Senders on the internet, whom the signature is for, cannot read it. Trigger
   to revisit: the same as for the list files - a shared host.
 - **An allow entry for a sender address or domain trusts what the sending
-  server says.** The filter matches the envelope sender, which is not
-  authenticated: anyone who knows or guesses an allowed address can send as it
+  server says.** The filter matches the envelope sender (only that: a
+  bounce's `From:` header is not looked at, `extract_from = "smtp"`), which
+  is not authenticated: anyone who knows or guesses an allowed address can send as it
   and is given the entry's weight, which no spam score outweighs. The page's
   Help and the guide say so and recommend an entry for the client's address or
   network instead. Deny entries have no such problem - claiming to be a denied

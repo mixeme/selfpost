@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **A sender on a private address could have his own spam verdict signed.**
+  rspamd's header module by default leaves a message's verdict headers
+  alone - removes none, adds none - when the client counts as local (a
+  private range, which every client has when Docker's proxy relays port 25)
+  or authenticated, while the routine that signs a verdict for SelfPost runs
+  for every message. Such a sender's `X-Spamd-Result` and `X-Rspamd-Action`
+  then reached Inbound > Log as rspamd's. `milter_headers.conf` now turns
+  both exceptions off; tried against rspamd 3.11.1 before and after
+  (audit 2026-10-12, stage 2c; assumptions C-R7). Copy the new
+  `antispam/rspamd/` files next to your compose fragment.
+
+### Fixed
+
+- **A bounce is judged by the filter lists as the panel counts it.**
+  rspamd's sender rules took a bounce's `From:` header when the envelope
+  sender was empty, so a bounce could be refused or allowed by an entry the
+  Filter lists page never showed as used. They now look at the envelope
+  sender only (assumptions C-R4).
+
+### Changed
+
+- **The rspamd image is pinned to one build**, `rspamd/rspamd:3.11.1-3`:
+  `3.11` and `3.11.1` move with every rebuild (assumptions C-R12). The rules
+  lose their `prefilter = true` lines, which rspamd 3.11.1 does not read.
+
 ## [2.5.1] - 2026-10-14
 
 Stage 2b of the 2026-10-12 audit: the log tailer and what the panel shows of
