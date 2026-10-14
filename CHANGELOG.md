@@ -58,6 +58,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   stored earlier, or imported from another instance, keeps its case, since
   its client uses it (audit 2026-10-12, H4).
 
+- **The last global administrator stays.** Deleting or demoting a global
+  administrator counted the others first and then wrote, so two
+  administrators deleting or demoting each other at the same moment could
+  both succeed and leave nobody able to open Server. The count is now taken
+  in the same transaction as the write; first-user setup is one statement
+  (audit 2026-10-12, M7).
+- **A user is saved whole or not at all.** The users form wrote the name,
+  the password, the role and the assignments one after another; a failure
+  part way left a user renamed with the old role, or a domain administrator
+  with nothing assigned. Saving and creating a user are now one transaction
+  each, the e-mail included (audit 2026-10-12, M9).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

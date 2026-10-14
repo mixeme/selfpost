@@ -210,8 +210,9 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Internal error. Please try again."})
 		return
 	}
-	id, err := h.store.CreateUser(username, string(hash), role, reach)
-	if err != nil {
+	// The user, the e-mail and the reach in one transaction: a failure leaves
+	// no user rather than half of one (audit 2026-10-12, M9).
+	if _, err := h.store.AddUser(store.UserChange{Username: username, PasswordHash: string(hash), Email: email, Role: role, Reach: reach}); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 			return
@@ -219,15 +220,6 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		logf("panel: create user: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Could not create user. Please check the logs."})
 		return
-	}
-	// No domain follows a user who has just been created, so there is nothing
-	// to resync when their address is first stored.
-	if email != "" {
-		if err := h.store.UpdateUser(id, username, string(hash), email); err != nil {
-			logf("panel: create user %d: store e-mail: %v", id, err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, id, userFormView{FormErr: "The user was created, but the e-mail could not be saved. Set it here.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
-			return
-		}
 	}
 	http.Redirect(w, r, "/server/users?done=created", http.StatusSeeOther)
 }
@@ -274,14 +266,19 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		return
 	}
 
+	lastGlobal := func() {
+		msg := "Cannot demote the last global administrator."
+		if u.ID == p.ID {
+			msg = "You cannot demote yourself without another global administrator."
+		}
+		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormEmail: email, FormRole: string(u.Role), Reach: reach})
+	}
+	// Asked here to answer before a password is hashed; SaveUser decides,
+	// inside its transaction.
 	if u.Role == store.RoleGlobal && role == store.RoleDomain {
 		n, err := h.store.CountGlobalUsers()
 		if err != nil || n <= 1 {
-			msg := "Cannot demote the last global administrator."
-			if u.ID == p.ID {
-				msg = "You cannot demote yourself without another global administrator."
-			}
-			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: msg, FormUsername: username, FormEmail: email, FormRole: string(u.Role), Reach: reach})
+			lastGlobal()
 			return
 		}
 	}
@@ -301,11 +298,17 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		hash = string(newHash)
 	}
 
-	if err := h.store.UpdateUser(u.ID, username, hash, email); err != nil {
-		if errors.Is(err, store.ErrUserExists) {
-			h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
-			return
-		}
+	// Name, password, e-mail, role and reach in one transaction (audit
+	// 2026-10-12, M9). Sessions end only once it has committed.
+	err := h.store.SaveUser(store.UserChange{ID: u.ID, Username: username, PasswordHash: hash, Email: email, Role: role, Reach: reach})
+	switch {
+	case errors.Is(err, store.ErrUserExists):
+		h.renderUserForm(w, r, http.StatusConflict, u.ID, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
+		return
+	case errors.Is(err, store.ErrLastGlobal):
+		lastGlobal()
+		return
+	case err != nil:
 		logf("panel: update user: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save user. Please check the logs.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
@@ -313,28 +316,6 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	if password != "" {
 		h.endSessionsAfterPasswordSet(r, p, u)
 	}
-
-	if role != u.Role {
-		if err := h.store.SetUserRole(u.ID, role); err != nil {
-			logf("panel: set user role: %v", err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not update role.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
-			return
-		}
-		if role == store.RoleGlobal {
-			if err := h.store.ClearUserReach(u.ID); err != nil {
-				logf("panel: clear user reach: %v", err)
-			}
-		}
-	}
-
-	if role == store.RoleDomain {
-		if err := h.store.SetUserReach(u.ID, reach); err != nil {
-			logf("panel: set user reach: %v", err)
-			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Could not save domain assignments.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
-			return
-		}
-	}
-
 	http.Redirect(w, r, "/server/users?done=updated", http.StatusSeeOther)
 }
 

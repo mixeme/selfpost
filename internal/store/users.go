@@ -76,22 +76,21 @@ func (s *Store) UserExists() (bool, error) {
 	return n > 0, nil
 }
 
-// CreateGlobalUser inserts the first global user during setup.
+// CreateGlobalUser inserts the first global user during setup. The check that
+// no user exists yet and the insert are one statement, so two setup requests
+// at once cannot both create one (audit 2026-10-12, M7).
 func (s *Store) CreateGlobalUser(username, passwordHash string) error {
-	exists, err := s.UserExists()
-	if err != nil {
-		return err
-	}
-	if exists {
-		return fmt.Errorf("create global user: users already exist")
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err = s.db.Exec(
-		"INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+	res, err := s.db.Exec(
+		`INSERT INTO users (username, password_hash, role, created_at)
+		 SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)`,
 		username, passwordHash, RoleGlobal, now,
 	)
 	if err != nil {
 		return fmt.Errorf("create global user: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("create global user: users already exist")
 	}
 	return nil
 }
@@ -220,17 +219,37 @@ func (s *Store) CountGlobalUsers() (int, error) {
 	return n, nil
 }
 
-// CreateUser inserts a panel user. A domain user is created with its reach in
-// the same call and must be given one (ErrEmptyReach); for a global user the
-// reach is ignored.
+// CreateUser inserts a panel user without an account e-mail; see AddUser.
 func (s *Store) CreateUser(username, passwordHash string, role Role, reach Reach) (int64, error) {
-	if role == RoleDomain && reach.Empty() {
+	return s.AddUser(UserChange{Username: username, PasswordHash: passwordHash, Role: role, Reach: reach})
+}
+
+// UserChange is everything the users form sets on a user, written at once by
+// AddUser and SaveUser. ID is ignored by AddUser.
+type UserChange struct {
+	ID                            int64
+	Username, PasswordHash, Email string
+	Role                          Role
+	Reach                         Reach // a domain user's; ignored for a global one
+}
+
+// AddUser inserts a panel user with its e-mail and, for a domain user, its
+// reach, in one transaction: a domain user must be given one (ErrEmptyReach),
+// and a failure part way leaves no user rather than one without it (audit
+// 2026-10-12, M9).
+func (s *Store) AddUser(c UserChange) (int64, error) {
+	if c.Role == RoleDomain && c.Reach.Empty() {
 		return 0, ErrEmptyReach
 	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("create user: %w", err)
+	}
+	defer tx.Rollback()
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.db.Exec(
-		"INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-		username, passwordHash, role, now,
+	res, err := tx.Exec(
+		"INSERT INTO users (username, password_hash, role, email, created_at) VALUES (?, ?, ?, ?, ?)",
+		c.Username, c.PasswordHash, c.Role, c.Email, now,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -242,12 +261,77 @@ func (s *Store) CreateUser(username, passwordHash string, role Role, reach Reach
 	if err != nil {
 		return 0, fmt.Errorf("create user id: %w", err)
 	}
-	if role == RoleDomain {
-		if err := s.setUserReach(id, reach); err != nil {
+	if c.Role == RoleDomain {
+		if err := writeUserReach(tx, id, c.Reach); err != nil {
 			return 0, err
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("create user: %w", err)
+	}
 	return id, nil
+}
+
+// SaveUser writes what the users form changed - username, password hash,
+// e-mail, role and reach - in one transaction (audit 2026-10-12, M9: five
+// writes in a row left, on a failure part way, a user renamed with the old
+// role, or a domain user with nothing assigned). A domain user must keep a
+// reach (ErrEmptyReach); a user made global loses theirs, so a later demotion
+// does not bring an old assignment back. The last global administrator cannot
+// be demoted (ErrLastGlobal): the count is taken inside the transaction,
+// after the write, so two administrators demoting each other at once cannot
+// both succeed (M7).
+func (s *Store) SaveUser(c UserChange) error {
+	if c.Role == RoleDomain && c.Reach.Empty() {
+		return ErrEmptyReach
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("save user: %w", err)
+	}
+	defer tx.Rollback()
+	// A write first: it takes the write lock, so what is counted below is
+	// what is committed.
+	res, err := tx.Exec(
+		"UPDATE users SET username = ?, password_hash = ?, email = ?, role = ? WHERE id = ?",
+		c.Username, c.PasswordHash, c.Email, c.Role, c.ID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ErrUserExists
+		}
+		return fmt.Errorf("save user: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrUserNotFound
+	}
+	if err := requireAGlobal(tx); err != nil {
+		return err
+	}
+	reach := c.Reach
+	if c.Role == RoleGlobal {
+		reach = Reach{}
+	}
+	if err := writeUserReach(tx, c.ID, reach); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save user: %w", err)
+	}
+	return nil
+}
+
+// requireAGlobal is ErrLastGlobal when the transaction has left no global
+// user.
+func requireAGlobal(tx *sql.Tx) error {
+	var n int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM users WHERE role = ?", RoleGlobal).Scan(&n); err != nil {
+		return fmt.Errorf("count global users: %w", err)
+	}
+	if n == 0 {
+		return ErrLastGlobal
+	}
+	return nil
 }
 
 // UpdateUser replaces a user's username, password hash and account e-mail.
@@ -265,22 +349,6 @@ func (s *Store) UpdateUser(id int64, username, passwordHash, email string) error
 	n, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
-	}
-	if n == 0 {
-		return ErrUserNotFound
-	}
-	return nil
-}
-
-// SetUserRole updates a user's role.
-func (s *Store) SetUserRole(userID int64, role Role) error {
-	res, err := s.db.Exec("UPDATE users SET role = ? WHERE id = ?", role, userID)
-	if err != nil {
-		return fmt.Errorf("set user role: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("set user role: %w", err)
 	}
 	if n == 0 {
 		return ErrUserNotFound
@@ -311,31 +379,27 @@ func (s *Store) SetUserReach(userID int64, reach Reach) error {
 	return s.setUserReach(userID, reach)
 }
 
-// DeleteUser removes a panel user. ErrLastGlobal when deleting the only global user.
+// DeleteUser removes a panel user. ErrLastGlobal when deleting the only global
+// user: the delete and the count are one transaction, so two administrators
+// deleting each other at once cannot both succeed (audit 2026-10-12, M7).
 func (s *Store) DeleteUser(id int64) error {
-	u, err := s.GetUser(id)
+	tx, err := s.db.Begin()
 	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec("DELETE FROM users WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrUserNotFound
+	}
+	if err := requireAGlobal(tx); err != nil {
 		return err
 	}
-	if u.Role == RoleGlobal {
-		n, err := s.CountGlobalUsers()
-		if err != nil {
-			return err
-		}
-		if n <= 1 {
-			return ErrLastGlobal
-		}
-	}
-	res, err := s.db.Exec("DELETE FROM users WHERE id = ?", id)
-	if err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("delete user: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("delete user: %w", err)
-	}
-	if n == 0 {
-		return ErrUserNotFound
 	}
 	return nil
 }
@@ -416,15 +480,23 @@ func (s *Store) listUserDomainNames(userID int64) ([]string, error) {
 }
 
 // setUserReach writes the flags and both assignment tables in one transaction.
-// With an All flag set the rows of that direction are dropped rather than
-// stored: the flag already covers them, and stale rows would come back to life
-// the day the flag is cleared.
 func (s *Store) setUserReach(userID int64, reach Reach) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("set user reach begin: %w", err)
 	}
 	defer tx.Rollback()
+	if err := writeUserReach(tx, userID, reach); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// writeUserReach writes a user's reach inside tx. With an All flag set the
+// rows of that direction are dropped rather than stored: the flag already
+// covers them, and stale rows would come back to life the day the flag is
+// cleared.
+func writeUserReach(tx *sql.Tx, userID int64, reach Reach) error {
 	if _, err := tx.Exec("UPDATE users SET all_domains = ?, all_inbound_domains = ? WHERE id = ?",
 		reach.AllDomains, reach.AllInbound, userID); err != nil {
 		return fmt.Errorf("set user reach flags: %w", err)
@@ -449,6 +521,5 @@ func (s *Store) setUserReach(userID int64, reach Reach) error {
 			}
 		}
 	}
-	return tx.Commit()
-
+	return nil
 }
