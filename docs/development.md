@@ -227,9 +227,16 @@ what it relies on and where that is written, for the version the image runs
 (the Debian bookworm package, not upstream's head):
 
 ```go
-// Postfix 3.7.11, src/smtpd/smtpd_check.c, check_sender_login():
-// the SASL login is compared with the sender map's owners by strcasecmp.
+// Postfix 3.7.11, src/smtpd/smtpd_check.c,
+// reject_auth_sender_login_mismatch(): the SASL login is compared with
+// each owner in sender_login_maps by strcasecmp_utf8.
 ```
+
+The Debian sources of the image's versions are fetched with `apt-get source`
+inside a `debian:bookworm` container (`postfix`, `opendkim`, `cyrus-sasl2`,
+`supervisor`, `logrotate`); `dev/upstream/` (not in git) is where they are
+kept for reading. Go modules are read in the module cache at the version
+`go.mod` pins.
 
 A document instead of source: its URL and section. Where neither answers the
 question, the comment says so and what was measured instead - "measured on
