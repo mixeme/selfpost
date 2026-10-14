@@ -137,7 +137,7 @@ assigned outbound domains and inbound domains **separately**, each list with
 | Outbound: domain page, applications, Domain settings (report address, rate limit, export), log | every domain | assigned outbound domains |
 | Outbound › DMARC reports | every report, with the server's ingest statistics | reports of assigned domains, without the ingest box |
 | Inbound: domain page, upstream, recipients | every inbound domain | assigned inbound domains |
-| Inbound › Log | every row, including those of a domain deleted since | rows of assigned inbound domains (by name), without the links into the filter lists |
+| Inbound › Log | every row, including those of a domain deleted since | rows of assigned inbound domains (by id: not those of an earlier domain of the same name), without the links into the filter lists |
 | Inbound › Filter lists; the inbound log's retention | yes | no — 404 |
 | Add or delete a domain, either direction; import a domain | yes | no |
 | Account, Help | yes | yes |
@@ -152,7 +152,17 @@ assigned outbound domains and inbound domains **separately**, each list with
   (`lookupDomain`, `requireInboundDomain`) and lists are filtered by assignment
   in the query. Each denied path has a test for a `domain` user, including
   another tenant's id.
-- The panel will not remove or demote the last `global` user.
+- The panel will not remove or demote the last `global` user. The guard is
+  inside the transaction that deletes or demotes: the write comes first and
+  the count after it, so two administrators deleting or demoting each other
+  at the same moment cannot both succeed; first-user setup is one statement
+  that inserts only into an empty table. A user's name, password, e-mail,
+  role and assignments are saved in one transaction, so a failure part way
+  leaves no domain user with nothing assigned.
+- A log row - outbound or inbound - belongs to a domain by its id, written
+  when the row is: the outbound row's from the application that sent it. A
+  domain deleted and added again starts with an empty log for whoever it is
+  assigned to; the rows of the deleted one are the global role's alone.
 - A `domain` user can export an assigned domain, and an export carries the
   working application passwords (encrypted unless the box is unticked): assign
   domains with that in mind.
@@ -203,7 +213,13 @@ operator can act on it.
   looks at the raw value once more for any other name of OpenDKIM's
   `SigningTable`, so that a line its parser and OpenDKIM's could read
   differently is refused rather than argued about; outside quoted strings
-  the line may hold one `@`. What this does not promise is what a display
+  the line may hold one `@`. That the two agree is tested, not only argued:
+  the e2e sends every `From:` line the check passes - a list it shares with
+  the check's unit test, `internal/milter/testdata/from-lines-passed.txt` -
+  and wants the message signed for the application's domain and no other.
+  The reply to a refusal says that the line names another sender of the
+  server, not which: it would confirm to whoever tries names that a domain
+  is hosted here. What this does not promise is what a display
   name looks like to a person: a name of another sender written without an
   `@` the scan can find (a full-width dot, a space inside the name) passes,
   signed with the application's own key - a forged display name is as old
@@ -420,11 +436,9 @@ deferred item from the roadmap.
   through - but no message data. The inbound journal itself is in the
   database, 0640. Trigger to revisit: a shared host, where the sidecar should
   instead be given the files through a group it shares with the panel.
-- **A row of the inbound log belongs to a domain by name.** A `domain` user
-  sees the rows whose inbound domain has the name of one assigned to them, so
-  an inbound domain that is deleted and added again shows its earlier rows to
-  whoever it is assigned to next. Accepted: the journal is of a mail domain,
-  and the rows age out with the retention.
+- ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
+  `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
+  § Roles.
 - **Level-2 in-flight reservations can outlive a dropped SMTP session until TTL.**
   The journal milter cannot observe connection-close directly through
   go-milter, so if a client disconnects without an explicit `Abort`, its

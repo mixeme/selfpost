@@ -1098,7 +1098,10 @@ to a domain:
   who the application may send as, its client IP allow-list and its rate limit
   are validated and saved together, or not at all, also when the application
   is created. A password is shown once, on the page that answers the creation
-  or *New password*, and is never shown again.
+  or *New password*, and is never shown again. A new login is stored in lower
+  case - Postfix does not tell `Ops` from `ops`, so the panel does not let two
+  applications be told apart by case - and the page that shows the password
+  shows the login as it was stored.
 - **Domain settings** (`…/settings`) — the *DMARC report address* (see [DMARC
   reports](#dmarc-reports)), the domain's *Rate limit* (see [Rate limiting —
   level 2](#rate-limiting--level-2-domain-and-application)), *Export domain*
@@ -1294,7 +1297,12 @@ applications' **working** SASL passwords, and configured **rate limits**
 instance without regenerating anything, so DNS (the DKIM TXT record)
 doesn't need to change. Unlike a full restore (see [Full backup and
 restore](#full-backup-and-restore)), this works across different
-hostnames/instances. *Import* is for the global role only; *export* is
+hostnames/instances. The file is checked like the forms before anything is
+created - the report address, every rate limit, every client address - and
+refused with the form's own message, naming the field and the application.
+An application login keeps the case it had (new logins are created in lower
+case), and one that differs from a login of this server only in case is
+refused. *Import* is for the global role only; *export* is
 available to any user who can access the domain, **including a user with the
 *domain* role** for a domain assigned to them — so that user can walk away with
 the domain's working SASL passwords, in the clear if they untick the encryption
