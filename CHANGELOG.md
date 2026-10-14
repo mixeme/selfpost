@@ -68,6 +68,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   as `bounced`. The row now holds the recipient as Postfix logs it, once,
   and is found under `orig_to=` when Postfix rewrote it (assumptions B-G5,
   A-9, A-31, D-S20).
+- **Inbound mail between 10 MB and the port's limit is accepted.** Port 25
+  said it took messages up to `INBOUND_MESSAGE_SIZE_LIMIT` (25 MiB by
+  default), but Postfix writes the message to its queue under a limit of
+  its own, main.cf's, never set and so 10240000 bytes: a larger message was
+  taken through `DATA` and then refused with 552. That limit now follows
+  port 25's when it is larger; 465 and 587 keep theirs (assumptions
+  C-P31).
+- **Mail to an address literal of the container is refused, not delivered
+  locally.** An empty `mydestination` left one way to local delivery:
+  `user@[127.0.0.1]` and the container's other addresses. Local delivery is
+  now Postfix's refusal, and Postfix refuses such a recipient at `RCPT TO`:
+  `550 5.1.1 ... local mail delivery is disabled` (assumptions C-P8).
 - **A bounce is judged by the filter lists as the panel counts it.**
   rspamd's sender rules took a bounce's `From:` header when the envelope
   sender was empty, so a bounce could be refused or allowed by an entry the

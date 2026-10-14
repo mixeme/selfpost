@@ -268,6 +268,21 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("mail for the inbound domain never reached its upstream: %v\n%s", err, mailLogTail(h, "postfix/"))
 	}
 
+	// Port 25's limit is the whole limit: a 12 MB message - over the
+	// 10240000 bytes cleanup would hold it to on its own, under the 25 MiB the
+	// listener says - is accepted and passed on (Postfix 3.7.11,
+	// src/cleanup/cleanup_init.c, cleanup_post_jail(); assumptions C-P31).
+	big := uniqueToken("inbound-12mb")
+	line := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab\r\n"
+	bigBody := strings.Repeat(line, 12*1000*1000/len(line))
+	if res := deliverPort25("someone@stranger.e2e.test", inboundRecipient,
+		strings.Replace(message(inboundRecipient, big), "mail for the inbound domain\r\n", bigBody, 1)); !res.ok() {
+		t.Fatalf("port 25 refused a 12 MB message: %v\n%s", res.firstErr(), mailLogTail(h, "postfix/"))
+	}
+	if _, err := findSinkMessage(h.stageDir, big, 60*time.Second); err != nil {
+		t.Fatalf("the 12 MB message never reached the upstream: %v\n%s", err, mailLogTail(h, "postfix/"))
+	}
+
 	// The filter lists exist as files from the first start with the relay on,
 	// readable by a filter that is another user in another container. Nothing
 	// is on them until someone adds an entry.
@@ -335,7 +350,8 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		return ""
 	}
 
-	rows := logRows("e2e " + token)
+	rows := logRows("e2e " + big)
+	rowWith(rows, "user@<wbr>"+inboundDomain, "e2e "+big, `class="tag is-success is-light" popovertarget="why-`)
 	rowWith(rows,
 		"someone@<wbr>stranger.e2e.test", "user@<wbr>"+inboundDomain, "e2e "+token,
 		`class="tag is-success is-light" popovertarget="why-`, `<th>Decided by</th><td>selfpost</td>`,
@@ -343,8 +359,8 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		`href="/inbound/filter-lists?list=deny&amp;kind=address&amp;value=someone%40stranger.e2e.test">Deny sender</a>`)
 	// A report mailed to the server's own name earlier in the run came through
 	// the same listener and is not the relay's mail.
-	if len(rows) != 1 {
-		t.Fatalf("the Inbound log holds %d rows, want the relayed message alone:\n%s", len(rows), strings.Join(rows, "\n"))
+	if len(rows) != 2 {
+		t.Fatalf("the Inbound log holds %d rows, want the two relayed messages alone:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
 	// Postfix 3.7.11, src/smtpd/smtpd_check.c: "User unknown in relay recipient
@@ -377,8 +393,8 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	if strings.Contains(refused, "sender</a>") {
 		t.Fatalf("the refused row offers a way into the filter lists:\n%s", refused)
 	}
-	if len(rows) != 2 {
-		t.Fatalf("the Inbound log holds %d rows, want the relayed message and one refusal:\n%s", len(rows), strings.Join(rows, "\n"))
+	if len(rows) != 3 {
+		t.Fatalf("the Inbound log holds %d rows, want the two relayed messages and one refusal:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
 	// The filter lists: an entry added in the panel is in the map file the

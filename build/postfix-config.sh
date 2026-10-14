@@ -170,6 +170,10 @@ DMARC_RELAY_DOMAINS_MAP="${POSTFIX_DMARC_RELAY_DOMAINS:-/data/postfix/dmarc_rela
 # directory and the file with the ownership postlogd writes and the panel reads.
 MAIL_LOG_PATH="${MAIL_LOG:-/data/log/mail.log}"
 
+# /etc/postfix outlives a restart of the container, so a cleanup limit set for
+# port 25 before is taken back here and set again below when it still applies.
+postconf -PX "cleanup/unix/message_size_limit" 2>/dev/null || true
+
 # --- main.cf -----------------------------------------------------------------
 # maillog_file lives under the persistent /data bind mount (architecture.md §
 # Log tailer). Postfix's default maillog_file_prefixes are only /var and
@@ -199,11 +203,18 @@ postconf -e \
 postconf -M "postlog/unix-dgram=postlog unix-dgram n - n - 1 postlogd"
 
 # This is an outbound relay: no local delivery, no per-user aliases. Empty
-# these so a misfiled recipient never gets delivered locally.
+# these so a misfiled recipient never gets delivered locally. An empty
+# mydestination is not enough: an address literal of an interface the
+# container listens on - x@[127.0.0.1] - is local too (Postfix 3.7.11,
+# src/global/resolve_local.c, resolve_local(), own_inet_addr()), so local(8)
+# itself is replaced by a refusal, as Postfix's null-client example does
+# (README_FILES/STANDARD_CONFIGURATION_README, "local_transport = error:local
+# mail delivery is disabled"; assumptions C-P8).
 postconf -e \
 	"local_recipient_maps=" \
 	"alias_maps=" \
-	"alias_database="
+	"alias_database=" \
+	"local_transport=error:local mail delivery is disabled"
 
 # Outbound delivery: straight to the recipient MX, opportunistic TLS.
 postconf -e \
@@ -563,6 +574,18 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 		"smtp/inet/message_size_limit=${PORT25_SIZE}"
 	master_cf_set_smtp_inet_o smtpd_recipient_restrictions "${RECIPIENT_RESTRICTIONS}"
 	master_cf_set_smtp_inet_o smtpd_milters "${INBOUND_MILTERS}"
+
+	# smtpd's -o limit is not the whole of it: cleanup writes the queue file
+	# under its own message_size_limit, main.cf's, which is never set here and
+	# so is 10240000 (Postfix 3.7.11, src/cleanup/cleanup_init.c,
+	# cleanup_post_jail(), set_file_limit(); src/global/mail_params.h,
+	# DEF_MESSAGE_LIMIT), and a larger message is refused 552 after DATA
+	# (assumptions C-P31). cleanup gets port 25's limit when it is larger;
+	# smtpd on 465 and 587 still holds its own, main.cf's (src/smtpd/smtpd.c,
+	# the DATA and BDAT size checks).
+	if [ "${PORT25_SIZE}" -gt "$(postconf -h message_size_limit)" ]; then
+		postconf -P "cleanup/unix/message_size_limit=${PORT25_SIZE}"
+	fi
 else
 	postconf -MX "smtp/inet" 2>/dev/null || true
 	postconf -MX "dmarc-ingest/unix" 2>/dev/null || true

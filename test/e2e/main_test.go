@@ -348,6 +348,9 @@ func TestE2E(t *testing.T) {
 	run("recipients_as_postfix_logs_them", func(t *testing.T) {
 		testRecipientsAsPostfixLogsThem(t, sc)
 	})
+	run("address_literal_is_not_local", func(t *testing.T) {
+		testAddressLiteralIsNotLocal(t, sc)
+	})
 	run("expired_message_is_closed", func(t *testing.T) {
 		testExpiredMessageIsClosed(t, sc)
 	})

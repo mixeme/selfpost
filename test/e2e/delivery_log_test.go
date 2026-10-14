@@ -181,3 +181,23 @@ print("; ".join(r[0]+" "+r[1] for r in rows))`, token)
 		t.Fatal(err)
 	}
 }
+
+// testAddressLiteralIsNotLocal: an address literal of an interface the
+// container listens on is a local destination to Postfix even with an empty
+// mydestination (Postfix 3.7.11, src/global/resolve_local.c,
+// resolve_local()). Local delivery is Postfix's refusal now
+// (local_transport=error:..., assumptions C-P8), and smtpd refuses such a
+// recipient at RCPT with its text: smtpd_reject_unlisted_recipient (on by
+// default) runs check_rcpt_maps(), which rejects whatever resolves to the
+// error transport (src/smtpd/smtpd_check.c). Before, the message was
+// accepted and handed to local(8).
+func testAddressLiteralIsNotLocal(t *testing.T, sc *scenario) {
+	res := attemptSend(sendAttempt{
+		authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, headerFrom: "alerts@" + senderDomain,
+		to: "probe@[127.0.0.1]", subject: "e2e " + uniqueToken("literal"), body: "to an address literal of the container",
+	})
+	if err := res.refusedAt("RCPT", 550, "local mail delivery is disabled"); err != nil {
+		t.Fatalf("to probe@[127.0.0.1]: %v", err)
+	}
+}
