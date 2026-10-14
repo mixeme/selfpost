@@ -55,6 +55,11 @@ services:
       # often, so renewed_certificate_picked_up does not wait a day. It
       # reloads Postfix only when the certificate changed.
       TLS_RELOAD_INTERVAL_SECONDS: "2"
+      # The wrapper gives up on the milter sockets after this long, and
+      # program postfix's startsecs is this plus ten (build/entrypoint.sh):
+      # supervision_stops_postfix_and_gives_up waits for one give-up and
+      # every start for startsecs, so the stand keeps both short.
+      MILTER_WAIT_TIMEOUT: "10"
     ports: !override
       - "20465:465"
       - "20587:587"

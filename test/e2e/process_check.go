@@ -8,17 +8,20 @@ import (
 
 // wantRunning are the supervisord programs that must be RUNNING once the
 // container is up (build/supervisord.conf). postfix-reload is deliberately
-// excluded: autostart=false, its healthy resting state is STOPPED.
+// excluded: autostart=false, so it rests STOPPED until its first run and
+// EXITED after it (supervisor 4.2.5, supervisor/process.py,
+// Subprocess.finish(); assumptions C-V10).
 var wantRunning = []string{"opendkim", "panel", "postfix", "cert-reload", "logrotate"}
 
 // checkSupervisorProcesses shells into the container directly (not through the
 // panel's /overview page) so it works before an administrator account even
 // exists — this is the first thing the harness checks after `docker compose
 // up` (plan C.4). Programs take a moment to leave STARTING right after the
-// container starts, so this polls rather than checking once.
+// container starts - postfix its startsecs, MILTER_WAIT_TIMEOUT plus ten
+// seconds, 20 on this stand - so this polls rather than checking once.
 func checkSupervisorProcesses(s *stack) error {
 	var lastErr error
-	err := waitFor("all supervised programs to reach their steady state", 20*time.Second, 500*time.Millisecond, func() (bool, error) {
+	err := waitFor("all supervised programs to reach their steady state", 60*time.Second, 500*time.Millisecond, func() (bool, error) {
 		out, execErr := s.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "status")
 		// supervisorctl exits non-zero when any program is not RUNNING, which
 		// is expected for postfix-reload — parse the output regardless of exit
@@ -39,8 +42,8 @@ func checkSupervisorProcesses(s *stack) error {
 				return false, lastErr
 			}
 		}
-		if state, ok := states["postfix-reload"]; ok && state != "STOPPED" {
-			lastErr = fmt.Errorf("program postfix-reload is %s, want STOPPED (autostart=false):\n%s", state, out)
+		if state, ok := states["postfix-reload"]; ok && state != "STOPPED" && state != "EXITED" {
+			lastErr = fmt.Errorf("program postfix-reload is %s, want STOPPED or EXITED (autostart=false):\n%s", state, out)
 			return false, lastErr
 		}
 		return true, nil

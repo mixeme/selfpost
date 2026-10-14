@@ -153,9 +153,17 @@ func checkContainerAlive(s *stack) error {
 // testSessionSurvivesRestart is plan C.4 negative/regression check 8 (moved
 // here from the manual B.1 stand check, plan item C.4's closing note): the
 // login session (SQLite-backed, plan B.1) must survive `docker restart`.
+//
+// The stop half of the restart stops Postfix as "postfix stop" does: before,
+// supervisord's TERM reached the wrapper's shell alone and master went down
+// with the container's SIGKILL (assumptions C-P42; supervision_test.go).
 func testSessionSurvivesRestart(t *testing.T, sc *scenario) {
+	stops := postfixStops(t)
 	if err := h.restartSelfpost(); err != nil {
 		t.Fatalf("restart selfpost: %v", err)
+	}
+	if got := postfixStops(t); got != stops+1 {
+		t.Fatalf("mail.log has %d lines of postfix stop after the container's restart, want %d\n%s", got, stops+1, mailLogTail(h, "postfix"))
 	}
 	if err := waitFor("panel HTTP to answer after restart", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
 		_, err := sc.panel.status()

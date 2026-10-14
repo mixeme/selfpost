@@ -34,14 +34,26 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
 Start order: OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
-polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then
-`postfix start-fg`.
+polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then runs
+`postfix start-fg` and stays its parent: on TERM it runs `postfix stop`, so a
+stop of the program or of the container stops Postfix as Postfix means it to
+be stopped (master runs in a session of its own, which supervisord's signal
+never reaches). Program `postfix` has `startsecs` = `MILTER_WAIT_TIMEOUT` + 10
+(set by the entrypoint), so the wrapper giving up on the sockets, or a Postfix
+that will not start, is an exit supervisord counts as too quick: once
+`startretries` (3) are spent, the program is FATAL. For those seconds after
+each start it is STARTING.
 
-`crashexit` event listener exits the container on any managed process FATAL so
-Docker `restart: unless-stopped` recreates a broken instance.
+`crashexit` event listener exits the container when a program of the mail path
+is FATAL, so Docker `restart: unless-stopped` starts it again. `logrotate`'s
+FATAL (a config logrotate would ignore) stays on Server › Health instead.
+The panel runs `postfix-reload` through supervisord's XML-RPC interface and
+waits for its exit status (`internal/supervisor`, `RunOnce`); the program
+rests EXITED after a run.
 
 **Liveness:** `GET /healthz` (unauthenticated) returns 200 when opendkim,
-panel, and postfix are RUNNING; Docker `HEALTHCHECK` uses the same probe.
+panel, and postfix are RUNNING; Docker `HEALTHCHECK` uses the same probe (its
+90-second start period covers postfix's STARTING).
 
 ---
 

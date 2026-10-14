@@ -177,11 +177,12 @@ rm -f /run/opendkim/*.sock /run/selfpost/*.sock /run/selfpost/*.alive
 # start the same way the /data normalisation above is.
 /usr/local/bin/postfix-config.sh
 
-# Initialise the persistent queue tree on first start or after restore. postfix
-# set-permissions reads queue_directory from main.cf (set by postfix-config.sh).
-if [ ! -d /data/postfix/queue/active ]; then
-	postfix set-permissions
-fi
+# The queue tree, on a first start or after a restore, is already built here:
+# postfix-config.sh ends with "postfix check", whose check-fatal runs
+# "post-install create-missing" (Postfix 3.7.11, conf/postfix-script;
+# conf/postfix-files, "$queue_directory/active:d:$mail_owner:-:700:ucr").
+# A "postfix set-permissions" for a missing active/ stood here and never ran
+# (assumptions C-P34).
 chown -R postfix:postfix /data/postfix/queue
 # The recursive chown above would leave public/ and maildrop/ in group postfix.
 # Postfix keeps those two in its setgid group: postqueue and postdrop are setgid
@@ -198,5 +199,18 @@ chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
 # directories $mail_owner 700; conf/postfix-script, "check-warn": "not owned by
 # root".)
 chown root /data/postfix/queue /data/postfix/queue/pid
+
+# [program:postfix]'s startsecs (build/supervisord.conf): longer than the
+# wrapper's wait for the milter sockets, so its exit at the end of the wait is
+# one supervisord counts as too quick. A value that is not a number stops the
+# start here.
+wait_timeout="${MILTER_WAIT_TIMEOUT:-30}"
+case "$wait_timeout" in
+'' | *[!0-9]*)
+	echo "entrypoint: MILTER_WAIT_TIMEOUT must be a whole number of seconds, got '$wait_timeout'" >&2
+	exit 1
+	;;
+esac
+export POSTFIX_STARTSECS=$((wait_timeout + 10))
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

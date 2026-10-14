@@ -334,6 +334,9 @@ func TestE2E(t *testing.T) {
 	run("session_survives_restart", func(t *testing.T) {
 		testSessionSurvivesRestart(t, sc)
 	})
+	run("supervision_stops_postfix_and_gives_up", func(t *testing.T) {
+		testSupervision(t, sc)
+	})
 	run("negative_level1_ratelimit", func(t *testing.T) {
 		testLevel1RateLimit(t, sc)
 	})

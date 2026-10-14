@@ -7,6 +7,7 @@ package postfix
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -186,6 +187,25 @@ func assertMapSafe(address, login string) error {
 // whenever it is convenient" while new ones get the new configuration; a
 // texthash table is read into memory once per process
 // (README_FILES/DATABASE_README).
+//
+// The call returns when "postfix reload" has ended, with an error unless it
+// exited 0 (a postsuper failure, a main.cf postfix(1) cannot read:
+// conf/postfix-script, "reload"; src/postfix/postfix.c), which the page that
+// saved shows. Before, supervisorctl's start returned as the reload was
+// spawned, and a reload already running counted as done though it may have
+// read the files before this change (supervisor.RunOnce; assumptions B-U2).
+// A reload that fails while program postfix is not RUNNING - stopped, or
+// still in its start, the wrapper waiting for the milter sockets - is no
+// error: "the Postfix mail system is not running", and the master that starts
+// next reads the files as they are now.
 func reloadViaSupervisor() error {
-	return supervisor.Start("postfix-reload")
+	err := supervisor.RunOnce("postfix-reload")
+	if err == nil {
+		return nil
+	}
+	if state, serr := supervisor.State("postfix"); serr == nil && state != "RUNNING" {
+		log.Printf("postfix: reload while program postfix is %s, left to its start: %v", state, err)
+		return nil
+	}
+	return err
 }

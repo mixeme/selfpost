@@ -139,7 +139,10 @@ var postfixAskFor, postfixAskEvery = 30 * time.Second, 2 * time.Second
 // the spawn of program "postfix", which is build/postfix-wrapper.sh; it waits
 // for the milter sockets (up to MILTER_WAIT_TIMEOUT) before it execs
 // "postfix start-fg", so the time given is up to that much early
-// (assumptions A-46).
+// (assumptions A-46). For startsecs - that wait plus ten seconds
+// (build/supervisord.conf) - after its start the program is STARTING, not
+// RUNNING, and is taken here as not running: a panel restart within that
+// time after Postfix's own counts no downtime.
 func postfixStarted() postfixState {
 	deadline := time.Now().Add(postfixAskFor)
 	for {
