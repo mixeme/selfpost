@@ -97,6 +97,41 @@ func TestUpdateStatusRecipientCaseInsensitive(t *testing.T) {
 	}
 }
 
+// The sweep closes only what is still queued, and says it was the sweep: a
+// status the log wrote stands, whatever the sweep believed when it listed the
+// row.
+func TestCloseUnreportedClosesOnlyQueuedRows(t *testing.T) {
+	st := openTestStore(t)
+	for _, e := range []SendLogEntry{{QueueID: "Q1", To: "Lost@example.net"}, {QueueID: "Q2", To: "done@example.net"}} {
+		if err := st.InsertQueued(e); err != nil {
+			t.Fatalf("InsertQueued: %v", err)
+		}
+	}
+	if _, err := st.UpdateStatus("Q2", "done@example.net", StatusSent); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, err := st.CloseUnreported("Q1", "lost@example.net"); err != nil || n != 1 {
+		t.Fatalf("CloseUnreported of a queued row = %d, %v; want 1", n, err)
+	}
+	if n, err := st.CloseUnreported("Q2", "done@example.net"); err != nil || n != 0 {
+		t.Fatalf("CloseUnreported of a sent row = %d, %v; want 0", n, err)
+	}
+
+	var status, reason string
+	for _, c := range []struct{ id, status, reason string }{
+		{"Q1", StatusBounced, ReasonReconcile},
+		{"Q2", StatusSent, ""},
+	} {
+		if err := st.db.QueryRow(`SELECT status, reason FROM send_log WHERE queue_id = ?`, c.id).Scan(&status, &reason); err != nil {
+			t.Fatal(err)
+		}
+		if status != c.status || reason != c.reason {
+			t.Errorf("%s: status %q reason %q, want %q %q", c.id, status, reason, c.status, c.reason)
+		}
+	}
+}
+
 // The reconcile sweep asks for the rows old enough that Postfix should have
 // reported on them by now. A message accepted moments ago is simply in flight,
 // and one the milter refused never reached the queue at all, so neither is the

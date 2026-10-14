@@ -31,6 +31,7 @@ import (
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
 	ListQueuedOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
+	CloseUnreported(queueID, recipient string) (int64, error)
 	DeleteSendLogBefore(cutoff time.Time) (int64, error)
 	InsertSendLogLines(lines []store.SendLogLine, once bool) (int, error)
 	PruneSendLogLines(cutoff time.Time) (int64, error)
@@ -191,7 +192,9 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 }
 
 // reconcile marks as bounced every row still "queued" from before cutoff whose
-// message Postfix no longer holds.
+// message Postfix no longer holds, with reason "reconcile". The close itself
+// is conditional on the row still being queued, so a delivery line read
+// between the listing and the close wins.
 //
 // A row reaches this state only when its delivery lines are gone for good — the
 // log rotated past its fourteen files while the panel was down, or was deleted
@@ -219,16 +222,17 @@ func reconcile(st StatusStore, cutoff time.Time) {
 		return
 	}
 
-	var closed int
+	var closed int64
 	for _, row := range rows {
 		if _, still := held[row.QueueID]; still {
 			continue
 		}
-		if _, err := st.UpdateStatus(row.QueueID, row.To, store.StatusBounced); err != nil {
+		n, err := st.CloseUnreported(row.QueueID, row.To)
+		if err != nil {
 			log.Printf("log-tailer: reconcile: close %s/%s: %v", row.QueueID, row.To, err)
 			continue
 		}
-		closed++
+		closed += n
 	}
 	if closed > 0 {
 		log.Printf("log-tailer: reconcile: closed %d row(s) Postfix no longer holds and never reported", closed)

@@ -23,6 +23,10 @@ func (s *retentionProbeStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDeli
 	return nil, nil
 }
 
+func (s *retentionProbeStore) CloseUnreported(string, string) (int64, error) {
+	return 0, nil
+}
+
 func (s *retentionProbeStore) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	s.mu.Lock()
 	s.cutoff = cutoff

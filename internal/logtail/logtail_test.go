@@ -208,6 +208,14 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 	return 1, nil
 }
 
+// CloseUnreported records the sweep's close as "queue-id|recipient|reconcile".
+func (c *captureStore) CloseUnreported(queueID, recipient string) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.calls = append(c.calls, queueID+"|"+recipient+"|"+store.ReasonReconcile)
+	return 1, nil
+}
+
 func (c *captureStore) DeleteSendLogBefore(time.Time) (int64, error) { return 0, nil }
 
 func (c *captureStore) ListQueuedOlderThan(time.Time) ([]store.QueuedDelivery, error) {
@@ -433,8 +441,8 @@ func TestReconcileClosesOnlyWhatPostfixNoLongerHolds(t *testing.T) {
 	reconcile(cs, time.Now().UTC())
 
 	got := cs.snapshot()
-	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.StatusBounced {
-		t.Fatalf("got %v, want only the message Postfix dropped closed as bounced", got)
+	if len(got) != 1 || got[0] != "GONEQ|lost@example.net|"+store.ReasonReconcile {
+		t.Fatalf("got %v, want only the message Postfix dropped closed by the sweep", got)
 	}
 }
 

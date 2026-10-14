@@ -13,6 +13,10 @@ const (
 	ReasonFrom   = "from"   // the From: line is not the application's
 )
 
+// ReasonReconcile marks a "bounced" row the reconcile sweep closed (send_log.reason):
+// its message left Postfix's queue with no delivery line ever read for it.
+const ReasonReconcile = "reconcile"
+
 // Settings keys of the sender check's statistics.
 const (
 	// settingSenderCheckSince is the first UTC day the statistics cover.

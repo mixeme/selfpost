@@ -15,6 +15,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   marked `bounced`. A listing over the cap now tells the sweep nothing, as it
   already did for the notification about mail waiting too long; the Mail
   queue page still shows the cut listing with its note (audit 2026-10-12, H3).
+- **The sweep closes only what is still queued, and says it did.** Its close
+  was the tailer's plain status update, so a `sent` the log wrote an instant
+  earlier could be overwritten with `bounced`, and a reused queue id could
+  rewrite an old row of the same recipient. The close is now conditional on
+  the row still being `queued`, and the row it closes carries the reason
+  `reconcile` (audit 2026-10-12, H3).
 
 ## [2.4.2] - 2026-10-14
 

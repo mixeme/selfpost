@@ -97,6 +97,25 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	return n, nil
 }
 
+// CloseUnreported is the reconcile sweep's close of one row: "bounced", marked
+// reason "reconcile" so it is known who decided it (architecture.md § Log
+// tailer). Only a row still "queued" is closed - a result the log wrote an
+// instant earlier stands, and a months-old row of a reused queue id is not
+// rewritten (audit 2026-10-12, H3). It returns the number of rows closed.
+func (s *Store) CloseUnreported(queueID, recipient string) (int64, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`UPDATE send_log SET status = ?, reason = ?, updated_at = ?
+		 WHERE queue_id = ? AND to_addr = ? COLLATE NOCASE AND status = ?`,
+		StatusBounced, ReasonReconcile, now, queueID, recipient, StatusQueued,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("close unreported send_log row: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
 // QueuedDelivery is a send-log row still waiting for a delivery result,
 // reduced to what the log-tailer's reconcile sweep needs to look it up in the
 // Postfix queue and, failing that, to close it (architecture.md § Log tailer).
