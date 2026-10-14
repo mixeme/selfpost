@@ -215,6 +215,30 @@ Plex [OFL.txt](../internal/web/view/static/OFL.txt) under
 `/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license` and
 the OFL text at `/static/OFL.txt`.
 
+### Code that relies on another component's behaviour
+
+The owner's rule (2026-10-14): what another program does is read in its
+documentation or its source - never guessed. SelfPost reads Postfix's log
+lines and reply codes, feeds OpenDKIM's tables, parses `postqueue`,
+`postconf`, `supervisorctl` and `db_dump` output, talks the milter protocol
+through go-milter, relies on SQLite's locking, on logrotate's and Docker's
+behaviour. Every block of code that does so carries a comment that says
+what it relies on and where that is written, for the version the image runs
+(the Debian bookworm package, not upstream's head):
+
+```go
+// Postfix 3.7.11, src/smtpd/smtpd_check.c, check_sender_login():
+// the SASL login is compared with the sender map's owners by strcasecmp.
+```
+
+A document instead of source: its URL and section. Where neither answers the
+question, the comment says so and what was measured instead - "measured on
+the e2e stand, 2026-10-14: ..." - and a measurement is never written as if
+it were read. A test fixture copied from a real log says where and when it
+was seen; one composed by hand says that it was composed. The heuristics
+review of 2026-10-14 (audit-2026-10-12, stage 2c) brought the code that
+existed then up to this rule.
+
 ---
 
 ## Building binaries and the image
