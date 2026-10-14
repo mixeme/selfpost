@@ -70,6 +70,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   with nothing assigned. Saving and creating a user are now one transaction
   each, the e-mail included (audit 2026-10-12, M9).
 
+- **A domain import is checked like the forms.** The import trusted the file
+  for the report address, the rate limits and the client addresses: a limit
+  with a window of no seconds counted nothing, and an address that was not
+  one made the application refuse every client without a word. The file is
+  now held to the forms' rules before anything is created, and refused with
+  the form's own message, naming the field and the application (audit
+  2026-10-12, M10).
+
 ### Added
 
 - **The delivery log measures its own guesses** (migration `0007`). A table

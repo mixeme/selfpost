@@ -277,6 +277,11 @@ func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if msg := h.checkDomainImport(&exp); msg != "" {
+		h.renderBackupPage(w, r, http.StatusBadRequest, msg)
+		return
+	}
+
 	d, err := h.domains.Import(exp)
 	if err != nil {
 		logf("panel: import domain %q: %v", exp.Domain, err)
@@ -364,4 +369,68 @@ func importErrorMessage(err error) (int, string) {
 	default:
 		return http.StatusBadRequest, "Could not import the domain: " + err.Error()
 	}
+}
+
+// checkDomainImport holds an export file to the rules the forms hold the same
+// settings to - the report address, the rate limits, the client addresses -
+// before anything is created, and says what is wrong in the validator's own
+// words; "" when nothing is. The file is untrusted input: a window of no
+// seconds made a limit that counted nothing, and an address that is not one
+// made an application refuse every client without a word at import (audit
+// 2026-10-12, M10). Client addresses are written back as the form would store
+// them. The login, the addresses an application may send as and the password
+// are checked where the application is created (app.ImportApplication).
+func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
+	invalid := func(what string, err error) string {
+		return "Invalid " + what + " in export file: " + err.Error()
+	}
+	if exp.DMARCRua != "" {
+		if err := validate.Email(exp.DMARCRua); err != nil {
+			return invalid("report address", err)
+		}
+	}
+	limit := func(rl *domain.RateLimitExport) error {
+		if rl == nil {
+			return nil
+		}
+		mode, err := parseRateLimitMode(rl.Mode)
+		if err != nil {
+			return err
+		}
+		if mode == store.RateLimitModeAuto {
+			if rl.AutoMultiplier == 0 {
+				return nil // as an empty field on the form: the default
+			}
+			return checkAutoMultiplier(rl.AutoMultiplier)
+		}
+		if rl.MaxMessages <= 0 && rl.WindowSeconds <= 0 {
+			return nil // no limit of its own (an export of client addresses only)
+		}
+		return checkManualLimit(rl.MaxMessages, rl.WindowSeconds, h.l1Messages())
+	}
+	if err := limit(exp.RateLimit); err != nil {
+		return invalid("rate limit for the domain", err)
+	}
+	for i := range exp.Applications {
+		a := &exp.Applications[i]
+		if err := limit(a.RateLimit); err != nil {
+			return invalid("rate limit for "+a.Login, err)
+		}
+		ips, err := parseIPList(strings.Join(a.AuthAllowedIPs, ","))
+		if err != nil {
+			return invalid("client addresses for "+a.Login, err)
+		}
+		a.AuthAllowedIPs = ips
+		if a.RateLimit != nil && len(a.RateLimit.AllowedIPs) > 0 {
+			legacy, err := parseIPList(strings.Join(a.RateLimit.AllowedIPs, ","))
+			if err != nil {
+				return invalid("client addresses for "+a.Login, err)
+			}
+			a.RateLimit.AllowedIPs = legacy
+		}
+		if a.AuthIPRestrict && len(a.AuthAllowedIPs) == 0 && (a.RateLimit == nil || len(a.RateLimit.AllowedIPs) == 0) {
+			return invalid("client addresses for "+a.Login, errors.New("enter at least one client IP when the allow-list is enabled"))
+		}
+	}
+	return ""
 }

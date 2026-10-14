@@ -45,10 +45,31 @@ func parseAutoMultiplier(raw string) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("enter a valid multiplier (%.1f–%.1f)", store.MinAutoMultiplier, store.MaxAutoMultiplier)
 	}
+	return v, checkAutoMultiplier(v)
+}
+
+// checkAutoMultiplier is the rule for an auto limit's multiplier, shared by
+// the form and a domain import.
+func checkAutoMultiplier(v float64) error {
 	if v < store.MinAutoMultiplier || v > store.MaxAutoMultiplier {
-		return 0, fmt.Errorf("multiplier must be between %.1f and %.1f", store.MinAutoMultiplier, store.MaxAutoMultiplier)
+		return fmt.Errorf("multiplier must be between %.1f and %.1f", store.MinAutoMultiplier, store.MaxAutoMultiplier)
 	}
-	return v, nil
+	return nil
+}
+
+// checkManualLimit is the rule for a manual limit, shared by the form and a
+// domain import: a window of no seconds would count nothing.
+func checkManualLimit(maxMessages, windowSeconds, l1Max int) error {
+	if maxMessages <= 0 {
+		return fmt.Errorf("enter a message limit greater than zero")
+	}
+	if maxMessages > l1Max {
+		return fmt.Errorf("message limit cannot exceed the level-1 backstop (%d)", l1Max)
+	}
+	if windowSeconds <= 0 {
+		return fmt.Errorf("enter a time window greater than zero seconds")
+	}
+	return nil
 }
 
 func parseRateLimitMode(raw string) (string, error) {
@@ -86,15 +107,15 @@ func parseRateLimitForm(r *http.Request, l1Max int) (rateLimitInput, error) {
 		return rateLimitInput{clear: true}, nil
 	}
 	maxMessages, err := parsePositiveInt(rawMax, 0)
-	if err != nil || maxMessages <= 0 {
-		return rateLimitInput{}, fmt.Errorf("enter a message limit greater than zero")
-	}
-	if maxMessages > l1Max {
-		return rateLimitInput{}, fmt.Errorf("message limit cannot exceed the level-1 backstop (%d)", l1Max)
+	if err != nil {
+		maxMessages = 0
 	}
 	windowSeconds, err := parsePositiveInt(r.PostFormValue("window_seconds"), defaultRateLimitWindowSeconds)
-	if err != nil || windowSeconds <= 0 {
-		return rateLimitInput{}, fmt.Errorf("enter a time window greater than zero seconds")
+	if err != nil {
+		windowSeconds = 0
+	}
+	if err := checkManualLimit(maxMessages, windowSeconds, l1Max); err != nil {
+		return rateLimitInput{}, err
 	}
 	return rateLimitInput{mode: store.RateLimitModeManual, maxMessages: maxMessages, windowSeconds: windowSeconds}, nil
 }
