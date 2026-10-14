@@ -31,7 +31,10 @@ func newSessionStore(st *store.Store, idle time.Duration) *sessionStore {
 
 // MaxAge is the session cookie's Max-Age in seconds, kept equal to the
 // sliding idle window so the browser drops the cookie no later than the
-// server would have expired it anyway.
+// server would have expired it anyway. RFC 6265 § 5.2.2: Max-Age sets the
+// expiry to now plus that many seconds, and a cookie set again under the same
+// name, domain and path replaces the old one (§ 5.3 step 11), so each renewal
+// slides it.
 func (s *sessionStore) MaxAge() int {
 	return int(s.idle.Seconds())
 }

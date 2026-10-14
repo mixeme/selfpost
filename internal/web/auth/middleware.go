@@ -34,6 +34,10 @@ func (m *Module) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
+// isSessionActivity: a GET from htmx is a background poll - every panel hx-get
+// is a load or a poll - and does not renew the session. htmx 2.0.4, src/htmx.js
+// getHeaders(): every request it issues carries HX-Request: true (and
+// loadHistoryFromServer() sets it too).
 func isSessionActivity(r *http.Request) bool {
 	return !(r.Method == http.MethodGet && r.Header.Get("HX-Request") != "")
 }

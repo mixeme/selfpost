@@ -48,6 +48,7 @@ type InboundDomain struct {
 // caller must have validated name (security.md).
 func (s *Store) AddInboundDomain(name string) (InboundDomain, error) {
 	now := time.Now().UTC()
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return InboundDomain{}, fmt.Errorf("begin add inbound domain: %w", err)
@@ -189,6 +190,7 @@ func (s *Store) UpdateInboundTransport(id int64, host string, port int, tlsMode 
 // UpdateInboundRecipients replaces the recipient mode and, in list mode, the
 // address list. In any mode the stored list is cleared.
 func (s *Store) UpdateInboundRecipients(id int64, mode string, addresses []string) error {
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin update inbound recipients: %w", err)

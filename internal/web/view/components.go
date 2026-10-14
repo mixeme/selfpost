@@ -110,6 +110,12 @@ type Tag struct {
 // why a message was decided the way it was). It is the browser's own popover:
 // the tag is a button that names the sheet by ID, so ID is unique on the page.
 // Its content is a table of name and value.
+//
+// HTML Living Standard, popover.html: popovertarget on a button shows or hides
+// (popovertargetaction="hide") the element with that id, with no script; a
+// browser without the popover attribute (before Chrome 114, Firefox 125,
+// Safari 17 - MDN browser-compat-data 6.0.0, html.global_attributes.popover)
+// does not open it.
 type Sheet struct {
 	ID    string
 	Tag   Tag
@@ -163,7 +169,9 @@ func StatusTag(status string) string {
 
 // wbrAt escapes s and puts a <wbr> after every @ (template function wbr_at):
 // an address in a table cell breaks where it reads naturally, so the column can
-// shrink without splitting a name mid-word.
+// shrink without splitting a name mid-word. Go 1.26, text/template funcs.go
+// HTMLEscape(): HTMLEscapeString escapes < > & ' " and NUL, so the only markup
+// in the result is the <wbr> added here.
 func wbrAt(s string) template.HTML {
 	return template.HTML(strings.ReplaceAll(template.HTMLEscapeString(s), "@", "@<wbr>"))
 }
@@ -283,6 +291,10 @@ type Box struct {
 	Poll    string
 	// OOB marks the box to be swapped into the page by its ID when it comes
 	// in a polled fragment beside the element that asked for the fragment.
+	// htmx 2.0.4, src/htmx.js swap(): the response replaces only the target;
+	// findAndSwapOobElements() takes every hx-swap-oob element out of it,
+	// nested ones too (allowNestedOobSwaps defaults true), and oobSwap()
+	// with "true" swaps it outerHTML over the element of its id.
 	OOB bool
 	// DomainPick: see Box.
 	DomainPick bool

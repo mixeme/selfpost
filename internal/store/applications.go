@@ -12,6 +12,9 @@ import (
 // ErrLoginExists is returned when an application login is already taken. The
 // login is globally unique because it is the SASL identity Postfix
 // authenticates (one sasldb2 across all domains, architecture.md § Mail path).
+// It is unique without regard to case too (migration 0008's NOCASE index):
+// Postfix 3.7.11, src/smtpd/smtpd_check.c reject_auth_sender_login_mismatch()
+// compares the SASL login with the map's owners by strcasecmp_utf8.
 var ErrLoginExists = errors.New("application login already exists")
 
 // ErrApplicationNotFound is returned when an application id does not exist.
@@ -74,6 +77,7 @@ type Binding struct {
 // login maps to ErrLoginExists.
 func (s *Store) AddApplication(domainID int64, login, mode string, addresses []string) (Application, error) {
 	now := time.Now().UTC()
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return Application{}, fmt.Errorf("begin add application: %w", err)
@@ -90,6 +94,8 @@ func (s *Store) AddApplication(domainID int64, login, mode string, addresses []s
 		}
 		return Application{}, fmt.Errorf("insert application: %w", err)
 	}
+	// sqlite3_last_insert_rowid() of this connection, the transaction's own
+	// (https://sqlite.org/c3ref/last_insert_rowid.html).
 	id, err := res.LastInsertId()
 	if err != nil {
 		return Application{}, fmt.Errorf("application id: %w", err)
@@ -110,6 +116,7 @@ func (s *Store) AddApplication(domainID int64, login, mode string, addresses []s
 // address list atomically (product.md). The login and password are untouched.
 // Returns ErrApplicationNotFound if the id does not exist.
 func (s *Store) UpdateApplicationMode(id int64, mode string, addresses []string) error {
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin update application: %w", err)
@@ -353,9 +360,9 @@ func (s *Store) UpdateApplicationAuthIPs(id int64, restrict bool, ips []string) 
 	return nil
 }
 
-// DeleteApplication removes an application and its addresses (via cascade),
-// returning the deleted application so the caller can drop its sasldb2 entry
-// (product.md). Returns ErrApplicationNotFound if no such row existed.
+// DeleteApplication removes an application and its addresses (via cascade, see
+// DeleteDomain), returning the deleted application so the caller can drop its
+// sasldb2 entry (product.md). Returns ErrApplicationNotFound if no such row existed.
 func (s *Store) DeleteApplication(id int64) (Application, error) {
 	a, err := s.GetApplication(id)
 	if err != nil {

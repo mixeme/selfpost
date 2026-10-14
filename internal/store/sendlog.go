@@ -47,6 +47,11 @@ type SendLogEntry struct {
 // application whose login it is, NULL for a login that is no application's
 // (audit 2026-10-12, L12). The domain name of the row stays what the
 // envelope said.
+//
+// The login is matched exactly (BINARY): it reaches the milter and the log in
+// the case it is stored in, because Cyrus SASL 2.1.28 looks it up as given -
+// lib/canonusr.c _canonuser_internal() only trims spaces and appends a realm,
+// sasldb/allockey.c _sasl_alloc_key() copies it byte for byte into the key.
 const loginDomainID = `(SELECT a.domain_id FROM applications a WHERE a.login = ?)`
 
 // InsertQueued records an accepted message in the send log with status
@@ -108,7 +113,12 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 // first and then writes fails at once with "database is locked" when another
 // connection - the dmarc-ingest process opens the same file - commits in
 // between, and the line would be lost; a write first takes the write lock,
-// and the busy timeout waits for it.
+// and the busy timeout waits for it. SQLite 3.53.4, btree.c btreeBeginTrans():
+// the busy handler is retried only while the connection has no transaction
+// open, so the upgrade of a read transaction fails with SQLITE_BUSY at once -
+// also while the other connection merely holds the write lock - and with
+// SQLITE_BUSY_SNAPSHOT after it committed (https://sqlite.org/rescode.html#busy_snapshot).
+// Every other transaction of this package opens with a write for this reason.
 func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 	now := time.Now().UTC()
 	tx, err := s.db.Begin()
@@ -184,7 +194,9 @@ type QueuedDelivery struct {
 // about them.
 //
 // created_at is stored as RFC3339 UTC, so a lexical comparison against the same
-// format is chronologically correct.
+// format is chronologically correct. SQLite 3.53.4 compares TEXT with the
+// BINARY collation, memcmp() (https://sqlite.org/datatype3.html § 7), and
+// time.RFC3339 of a UTC time is fixed-width, YYYY-MM-DDTHH:MM:SSZ.
 func (s *Store) ListQueuedOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
 	rows, err := s.db.Query(
 		`SELECT id, queue_id, to_addr FROM send_log
@@ -247,6 +259,12 @@ type SendLogRow struct {
 // order the rows were written, so two refusals of one second take one line
 // each in turn (review of stage 2b). A line already on a row - read again
 // after a restart - goes on no other. It reports whether a row took the line.
+//
+// SQLite 3.53.4: the choice and the write are one UPDATE, a write transaction
+// from its start (https://sqlite.org/lang_transaction.html § 2.1); julianday()
+// reads YYYY-MM-DDTHH:MM:SSZ, the T and the Z included (lang_datefunc.html
+// § 2); NOCASE folds ASCII only (datatype3.html § 7.1); ?1 is bound once and
+// used twice (lang_expr.html § 4).
 func (s *Store) AttachRefusalLine(clientIP, from string, at time.Time, line string) (bool, error) {
 	res, err := s.db.Exec(
 		`UPDATE send_log SET refusal_line = ?1 WHERE id = (
@@ -277,7 +295,8 @@ func (s *Store) AttachRefusalLine(clientIP, from string, at time.Time, line stri
 // and nothing is. The domain is the login's, or - when the tailer did not see the login, its
 // client= line read before a restart - the envelope's, so the row is still
 // its domain's administrator's (review of stage 2b). It reports whether it
-// wrote one.
+// wrote one: the check and the insert are one statement (see
+// CreateGlobalUser), and an INSERT ... SELECT of no row reports 0.
 func (s *Store) RecoverRefusal(e SendLogEntry, at time.Time) (bool, error) {
 	stamp := at.UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
@@ -433,7 +452,7 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 // implementing the configurable retention window (architecture.md §
 // Persistence, SEND_LOG_RETENTION_DAYS). It returns the number of rows pruned.
 // created_at is stored as RFC3339 UTC, so a lexical comparison against the
-// same format is chronologically correct.
+// same format is chronologically correct (see ListQueuedOlderThan).
 func (s *Store) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM send_log WHERE created_at < ?`,

@@ -156,7 +156,8 @@ func (s *Store) GetSetting(key string) (string, error) {
 	return value, nil
 }
 
-// SetSetting upserts a settings key.
+// SetSetting upserts a settings key (https://sqlite.org/lang_upsert.html: on
+// a conflict of the key, excluded.value is the value the INSERT brought).
 func (s *Store) SetSetting(key, value string) error {
 	_, err := s.db.Exec(
 		"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",

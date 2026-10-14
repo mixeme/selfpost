@@ -102,6 +102,8 @@ func (h *Handlers) submitServerSettings(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	// An unticked checkbox is not sent at all: absent is off.
+	// HTML Living Standard, form-control-infrastructure.html#constructing-entry-list:
+	// a checkbox whose checkedness is false is skipped.
 	notifications := r.PostFormValue("notify") != ""
 	if err := h.store.SetSendLogRetentionDays(days); err != nil {
 		logf("panel: settings: set send-log retention failed: %v", err)

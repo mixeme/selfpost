@@ -85,6 +85,10 @@ const domainByName = "domain_id = (SELECT d.id FROM domains d WHERE d.name = ?)"
 // login can be taken again in another domain, and its numbers - statistics,
 // the level-2 count - must not start with the old one's (review of audit
 // stage 2). ?1 twice; a plain ? after it takes the next number.
+// SQLite 3.53.4, https://sqlite.org/lang_expr.html § 4: a plain ? is numbered
+// one more than the largest number already assigned; modernc.org/sqlite
+// v1.60.1, conn.go bind() and argFinder.find(): ?NNN takes argument NNN, a
+// plain ? the argument of its number.
 const appByLogin = "app_login = ?1 AND domain_id = (SELECT a.domain_id FROM applications a WHERE a.login = ?1)"
 
 // sendStats counts the rows that match, a condition with one placeholder
@@ -102,6 +106,9 @@ func (s *Store) sendStats(match, ref string, since time.Time, hours float64) (Se
 		return SendStats{}, fmt.Errorf("send stats total %q: %w", ref, err)
 	}
 
+	// The busiest UTC hour: substr counts characters from 1
+	// (https://sqlite.org/lang_corefunc.html#substr), so 1-13 of an RFC3339
+	// UTC stamp is YYYY-MM-DDTHH.
 	var peak int64
 	err = s.db.QueryRow(
 		`SELECT COALESCE(MAX(bucket_count), 0) FROM (

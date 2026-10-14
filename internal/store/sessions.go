@@ -30,7 +30,10 @@ func (s *Store) CreateSession(tokenHash string, userID int64, expiresAt time.Tim
 
 // LookupSession returns the session for tokenHash, if any. It does not check
 // expiry itself — callers compare ExpiresAt against time.Now() and call
-// DeleteSession on an expired row, keeping the read side lock-free.
+// DeleteSession on an expired row, keeping the read side lock-free: in WAL
+// mode a reader takes no write lock and is not blocked by a writer
+// (https://sqlite.org/wal.html § 2.2). Within this process it still waits for
+// the one pooled connection (Open).
 func (s *Store) LookupSession(tokenHash string) (SessionRow, bool, error) {
 	var (
 		row       SessionRow
@@ -99,6 +102,8 @@ func (s *Store) DeleteUserSessions(userID int64) error {
 // abandoned session (cookie never presented again) does not sit in the table
 // forever. It piggybacks on session creation rather than running as its own
 // background loop.
+// expires_at is RFC3339 UTC text, so < compares moments (see
+// ListQueuedOlderThan).
 func (s *Store) DeleteExpiredSessions(now time.Time) (int64, error) {
 	res, err := s.db.Exec(`DELETE FROM sessions WHERE expires_at < ?`, now.UTC().Format(time.RFC3339))
 	if err != nil {

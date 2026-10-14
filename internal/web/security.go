@@ -19,8 +19,17 @@ import (
 //     relative URL on the page, including the form actions;
 //   - form-action 'self' keeps a form from being retargeted at another host.
 //
+// CSP Level 3, https://www.w3.org/TR/CSP3/ § 6.8.3 "Get fetch directive
+// fallback list": script, style, img, font, connect and object fall back to
+// default-src; base-uri (§ 6.3.1), form-action (§ 6.4.1) and frame-ancestors
+// (§ 6.4.2) are not in any list, so each is set here.
+//
 // This is a second line of defence: XSS is already prevented by
-// html/template's contextual auto-escaping (security.md).
+// html/template's contextual auto-escaping (security.md). Go 1.26,
+// html/template doc.go "Security Model": template authors are trusted, the
+// data is not. An attribute it does not know (hx-get, hx-swap, popovertarget)
+// is escaped as plain text (attr.go attrType()), so the hx-get paths are built
+// by the server, never taken from input.
 const contentSecurityPolicy = "default-src 'self'; " +
 	"object-src 'none'; " +
 	"base-uri 'none'; " +
@@ -31,8 +40,10 @@ const contentSecurityPolicy = "default-src 'self'; " +
 // (CookieSecure, the same condition that gates the cookie's Secure attribute):
 // on the plain-HTTP development setup it would be meaningless at best and
 // would pin the browser to a scheme the dev instance does not speak at worst.
+// RFC 6797 § 8.1: a header received over insecure transport is ignored.
 //
-// Deliberately without includeSubDomains. The panel commonly lives on a
+// Deliberately without includeSubDomains (RFC 6797 § 6.1.2: only with it does
+// the policy reach the host's subdomains). The panel commonly lives on a
 // subdomain of a domain used for other things, but it may also sit at the
 // apex — and there the directive would force HTTPS on every unrelated
 // subdomain of that domain for a year, which is not SelfPost's call to make.
@@ -51,6 +62,8 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		// Equivalent to the CSP's frame-ancestors directive, kept for browsers
 		// that predate it. The two never disagree: both mean "never framed".
+		// CSP3 § 6.4.2.2: 'none' is DENY, and where frame-ancestors is
+		// enforced X-Frame-Options is ignored.
 		h.Set("X-Frame-Options", "DENY")
 		// The panel's behaviour never depends on the referrer, so the strictest
 		// value is free: panel URLs carry domain names and record identifiers
@@ -65,7 +78,12 @@ func (s *Server) secure(next http.Handler) http.Handler {
 			// being the name the browser actually used, which every reverse
 			// proxy fragment this project ships preserves (Apache
 			// ProxyPreserveHost On, nginx proxy_set_header Host $host, Caddy
-			// and Traefik by default) — but a proxy that rewrites Host turns
+			// and Traefik by default: httpd.apache.org/docs/2.4/mod/mod_proxy.html
+			// #proxypreservehost; nginx.org ngx_http_proxy_module
+			// #proxy_set_header, whose default is $proxy_host; Caddy 2
+			// reverse_proxy § Headers > Defaults, "passes through incoming
+			// headers - including Host"; Traefik service load balancer,
+			// passHostHeader true by default) — but a proxy that rewrites Host turns
 			// every form submission into a 403, and without these two values
 			// side by side the symptom just looks like "the panel stopped
 			// saving anything".
@@ -87,6 +105,9 @@ func (s *Server) secure(next http.Handler) http.Handler {
 // domain, a forgotten staging host — counts as same-site and its forged POST
 // would arrive with the session cookie attached. Sec-Fetch-Site and Origin are
 // judged per *origin*, so they tell that neighbour apart from the panel.
+// draft-ietf-httpbis-rfc6265bis § 5.2 (same-site is the [SAMESITE] "same
+// site" of the two origins); W3C Fetch Metadata § 2.3 (Sec-Fetch-Site:
+// same-origin only if every URL of the request is same origin).
 //
 // Read-only methods are exempt: every GET route in the panel is a read (the
 // delete confirmation at GET /outbound/domains/{id}/delete only renders a form), so
@@ -100,26 +121,40 @@ func originAllowed(r *http.Request) bool {
 	// The browser's own account of where the request came from. It cannot be
 	// set by page script (a forbidden header name), so when it is present it
 	// is the answer: anything but same-origin — including "none", a
-	// navigation with no initiator — is refused.
+	// navigation with no initiator — is refused. Fetch Standard § 2.2.2: a
+	// header name starting with `Sec-` is a forbidden request-header; Fetch
+	// Metadata § 2.3: "none" is a navigation the user started directly.
 	if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
 		return site == "same-origin"
 	}
 
-	// Older browsers send only Origin. Compare hosts, not full origins: the
-	// panel speaks plain HTTP behind the proxy and does not know its own
-	// external scheme, while Origin will say https.
+	// Older browsers send only Origin, and so does a current one over plain
+	// HTTP at a name other than localhost: Fetch Metadata § 3 appends its
+	// headers only for a potentially trustworthy URL. Fetch Standard § 3.2: a
+	// request that is neither GET nor HEAD carries Origin. (Which value it
+	// carries under this panel's Referrer-Policy: assumptions-2026-10-14, D-B3.)
+	// Compare hosts, not full origins: the panel speaks plain HTTP behind the
+	// proxy and does not know its own external scheme, while Origin will say
+	// https.
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		// Neither header. A client this old cannot be checked at all; it is
 		// let through as the risk consciously accepted (single-admin panel,
 		// the administrator picks the browser). Turning this return into
-		// false is the whole of the stricter policy.
+		// false is the whole of the stricter policy. By Fetch § 3.2 a browser
+		// that follows it never sends a POST without Origin; Firefox did for a
+		// same-origin form before 70 (MDN browser-compat-data 6.0.0,
+		// http.headers.Origin).
 		return true
 	}
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" {
 		// Unparseable, or the opaque "null" origin (sandboxed iframe,
 		// redirected cross-origin POST) — not this panel either way.
+		// Fetch Standard § 2.2.5 "serializing a request origin": "null" for a
+		// redirect-tainted request; HTML § 7.1.1: an opaque origin serialises
+		// to "null"; url.Parse("null") has no Host. (Fetch § 3.2 also sends
+		// "null" under Referrer-Policy no-referrer: D-B3 of the same register.)
 		return false
 	}
 	return u.Host == r.Host

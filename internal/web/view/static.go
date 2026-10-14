@@ -16,7 +16,10 @@ import (
 // a response carries no validator at all and the browser is free to guess how
 // long to keep it — which is how a replaced favicon keeps showing the old mark
 // long after a deploy. Hashing the content gives every asset a validator that
-// changes exactly when the asset does.
+// changes exactly when the asset does. RFC 9111 § 4.2.2: without explicit
+// freshness a cache may assign a heuristic lifetime; Go 1.26, net/http fs.go
+// ServeContent(): no Last-Modified for a zero modtime, and an ETag the caller
+// set answers If-None-Match.
 var staticETags = buildStaticETags()
 
 func buildStaticETags() map[string]string {
@@ -50,6 +53,8 @@ func buildStaticETags() map[string]string {
 // handful of small files on a single-operator panel that trade is the right way
 // round — correctness after a deploy matters more than saving the round trip.
 // http.ServeContent answers the conditional request from the ETag we set here.
+// RFC 9111 § 5.2.2.4: no-cache lets a cache store the response but not reuse
+// it without validating it first.
 func StaticHandler() http.Handler {
 	files := http.FileServer(http.FS(assetsFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

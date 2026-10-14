@@ -83,6 +83,10 @@ func (s *Store) UserExists() (bool, error) {
 // CreateGlobalUser inserts the first global user during setup. The check that
 // no user exists yet and the insert are one statement, so two setup requests
 // at once cannot both create one (audit 2026-10-12, M7).
+// SQLite 3.53.4, https://sqlite.org/lang_transaction.html § 2.1: an INSERT
+// starts a write transaction, one at a time, so its SELECT reads what is
+// committed; an insert of no row leaves sqlite3_changes() at 0
+// (https://sqlite.org/c3ref/changes.html).
 func (s *Store) CreateGlobalUser(username, passwordHash string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
@@ -249,6 +253,7 @@ func (s *Store) AddUser(c UserChange) (int64, error) {
 	if c.Role == RoleDomain && c.Reach.Empty() {
 		return 0, ErrEmptyReach
 	}
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("create user: %w", err)
@@ -302,7 +307,12 @@ func (s *Store) SaveUser(c UserChange) error {
 	}
 	defer tx.Rollback()
 	// A write first: it takes the write lock, so what is counted below is
-	// what is committed.
+	// what is committed. SQLite 3.53.4, https://sqlite.org/lang_transaction.html
+	// § 2.2: after a deferred BEGIN, a first statement that writes starts a
+	// write transaction, and § 2.1: there is one at a time. RowsAffected counts
+	// the row its WHERE found even when no value changes: update.c
+	// sqlite3Update() writes every such row through sqlite3CompleteInsertion(),
+	// which marks it counted (OPFLAG_NCHANGE).
 	// An empty hash keeps the stored one: the form read it when it was
 	// opened, and the user may have changed it on Account since.
 	res, err := tx.Exec(
@@ -403,7 +413,9 @@ func (s *Store) SetUserReach(userID int64, reach Reach) error {
 
 // DeleteUser removes a panel user. ErrLastGlobal when deleting the only global
 // user: the delete and the count are one transaction, so two administrators
-// deleting each other at once cannot both succeed (audit 2026-10-12, M7).
+// deleting each other at once cannot both succeed (audit 2026-10-12, M7). The
+// DELETE comes first and so takes the write lock (see SaveUser); the rows its
+// cascade removes are not in RowsAffected (https://sqlite.org/c3ref/changes.html).
 func (s *Store) DeleteUser(id int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -517,7 +529,10 @@ func (s *Store) setUserReach(userID int64, reach Reach) error {
 // writeUserReach writes a user's reach inside tx. With an All flag set the
 // rows of that direction are dropped rather than stored: the flag already
 // covers them, and stale rows would come back to life the day the flag is
-// cleared.
+// cleared. Its first statement is a write (see UpdateStatus). A domain deleted
+// meanwhile fails its INSERT at once: SQLite 3.53.4's foreign keys are
+// immediate unless declared deferred (https://sqlite.org/foreignkeys.html § 4.2),
+// and the code is SQLITE_CONSTRAINT_FOREIGNKEY (isForeignKeyViolation).
 func writeUserReach(tx *sql.Tx, userID int64, reach Reach) error {
 	if _, err := tx.Exec("UPDATE users SET all_domains = ?, all_inbound_domains = ? WHERE id = ?",
 		reach.AllDomains, reach.AllInbound, userID); err != nil {

@@ -43,7 +43,12 @@ func cutSendLogLine(line string) string {
 // wrote. The tailer calls it with what it read in one pass over the log,
 // whether or not send-log rows exist for the queue ids yet: a commit per line
 // would be a disk sync per line, on the one connection the journal milter
-// writes through.
+// writes through. SQLite 3.53.4 as modernc builds it keeps synchronous at FULL
+// (SQLITE_DEFAULT_WAL_SYNCHRONOUS 2), and in WAL mode FULL syncs the WAL at
+// every commit (https://sqlite.org/wal.html § 2.3, pragma.html#pragma_synchronous).
+// The first statement stepped is an INSERT, a write (see UpdateStatus):
+// tx.Prepare leaves no transaction open (prepare.c sqlite3InitOne() commits
+// the read it opens to load the schema).
 //
 // With once set, a line is written only if the same line is not there already
 // under its queue id. That is for the lines the tailer reads again after an

@@ -92,6 +92,8 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 	f.Username = strings.TrimSpace(r.PostFormValue("username"))
 	f.Email = strings.TrimSpace(r.PostFormValue("email"))
 	// An unticked checkbox is not sent at all: absent is off.
+	// HTML Living Standard, form-control-infrastructure.html#constructing-entry-list:
+	// a checkbox whose checkedness is false is skipped.
 	f.Notify = r.PostFormValue("notify") != ""
 	if f.Username == "" {
 		f.Username = u.Username

@@ -128,7 +128,10 @@ func (s *Store) GetDomain(id int64) (Domain, error) {
 
 // DeleteDomain removes a domain. Its applications and their address/binding rows
 // go with it via ON DELETE CASCADE (product.md). Returns ErrDomainNotFound if no
-// such row existed.
+// such row existed. SQLite 3.53.4 acts on ON DELETE only on a connection with
+// foreign_keys ON, which Open's DSN sets on every one
+// (https://sqlite.org/foreignkeys.html § 2, § 4.3); the rows the cascade
+// removes are not in RowsAffected (https://sqlite.org/c3ref/changes.html).
 func (s *Store) DeleteDomain(id int64) error {
 	res, err := s.db.Exec("DELETE FROM domains WHERE id = ?", id)
 	if err != nil {
@@ -162,6 +165,11 @@ func scanDomain(r scanRow) (Domain, error) {
 }
 
 // isForeignKeyViolation reports whether err is a SQLite FOREIGN KEY conflict.
+// modernc.org/sqlite v1.60.1, conn.go newConn(): extended result codes are on
+// for every connection, so Error.Code() (error.go) is the extended code
+// (https://sqlite.org/rescode.html#constraint_foreignkey, _unique,
+// _primarykey); a unique index - the NOCASE one on logins too - fails as
+// SQLITE_CONSTRAINT_UNIQUE.
 func isForeignKeyViolation(err error) bool {
 	var se *sqlite.Error
 	return errors.As(err, &se) && se.Code() == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY
@@ -197,7 +205,9 @@ func (s *Store) SetDomainDMARCAddress(id int64, rua string) error {
 
 // DomainExists reports whether a sending domain with this name is configured.
 // Used by the DMARC ingest path to refuse reports for domains this relay does
-// not send for (security.md: report XML is attacker-supplied input).
+// not send for (security.md: report XML is attacker-supplied input). NOCASE
+// folds ASCII letters only (https://sqlite.org/datatype3.html § 7), which is
+// all a domain name the panel accepts holds.
 func (s *Store) DomainExists(name string) (bool, error) {
 	var n int
 	err := s.db.QueryRow(

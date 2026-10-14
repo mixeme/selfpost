@@ -10,7 +10,8 @@
   // read from the field itself, so it can never drift from what is shown. Where
   // the clipboard API is absent (plain HTTP outside localhost) the value is
   // selected instead, ready for the operator's own Ctrl+C. The button's icon
-  // stays; only its word changes for a moment.
+  // stays; only its word changes for a moment. W3C Clipboard API, § Navigator
+  // interface: navigator.clipboard is [SecureContext].
   document.addEventListener("click", function (ev) {
     var button = ev.target.closest("button[data-copy]");
     if (!button) {
@@ -69,6 +70,9 @@
   // inline script. The listener is delegated from the document,
   // so it also covers markup swapped in by HTMX. With JavaScript disabled the
   // form submits without asking — exactly as the inline handler behaved.
+  // HTML Living Standard, form-control-infrastructure.html#form-submission-algorithm:
+  // submit is fired with bubbles and cancelable true, and a cancelled one
+  // ends the submission.
   document.addEventListener("submit", function (ev) {
     var form = ev.target.closest("form[data-confirm]");
     if (form && !window.confirm(form.dataset.confirm)) {
@@ -140,6 +144,10 @@
       form.querySelectorAll(rule.target).forEach(function (target) {
         // hidden alone does not hide an element whose own stylesheet gives it a
         // display (Bulma's .box), so Bulma's is-hidden helper goes with it.
+        // HTML Living Standard, rendering.html#hidden-elements: [hidden] is
+        // display: none in the user agent's sheet, which an author rule such
+        // as Bulma 1.0.4's .box { display: block } overrides; .is-hidden is
+        // display: none !important.
         target.hidden = !show;
         target.classList.toggle("is-hidden", !show);
         if (!show && rule.clearWhenHidden) {
@@ -169,19 +177,26 @@
     initShowWhen(document);
   });
 
-  // htmx:load fires for every element htmx puts into the page, so swapped-in
-  // markup starts with its blocks shown or hidden the way a full page does.
+  // htmx:load fires for each top-level element htmx puts into the page, so
+  // swapped-in markup starts with its blocks shown or hidden the way a full
+  // page does. htmx 2.0.4, src/htmx.js insertNodesBefore() queues
+  // makeAjaxLoadTask(child) for each element of the swapped content, which
+  // triggers htmx:load on it (detail.elt); initShowWhen looks inside it.
   document.addEventListener("htmx:load", function (ev) {
     initShowWhen(ev.detail.elt);
   });
 
   // --- Adaptive monitoring polling ---------------------------------------
   // The four monitoring fragments carry data-poll and hx-trigger="load" for
-  // the first fetch only. panel.js schedules the rest: 5 s while the operator
+  // the first fetch only (htmx 2.0.4, src/htmx.js addTriggerHandler(): "load"
+  // fires once, when the element is first processed). panel.js schedules the rest: 5 s while the operator
   // is active on the page, 30 s when the tab is visible but idle, and nothing
   // while the tab is hidden. hx-trigger="every Ns [expr]" could express some
   // of that, but the filter is evaluated with `new Function`, which the
-  // panel's CSP (default-src 'self', no 'unsafe-eval') would silently break.
+  // panel's CSP (default-src 'self', no 'unsafe-eval') would break: htmx
+  // 2.0.4, src/htmx.js maybeGenerateConditional() compiles the filter with
+  // Function(); the EvalError is caught, logged as htmx:syntax:error, and the
+  // trigger is kept without its filter, so it would fire on every tick.
   var pollActiveMs = 5000;
   var pollIdleMs = 30000;
   // No pointer/keyboard/scroll input for this long → treat the tab as idle.
@@ -238,6 +253,9 @@
     }
     // Swapped-in markup still carries hx-trigger="load"; strip it so htmx does
     // not issue a duplicate GET on top of the response we just received.
+    // htmx 2.0.4, src/htmx.js swap(): htmx:afterSwap fires on the new
+    // elements before doSettle() runs the settle tasks, and only those
+    // (makeAjaxLoadTask -> processNode) act on hx-trigger.
     el.removeAttribute("hx-trigger");
     schedulePoll(el);
   }

@@ -80,8 +80,10 @@ type DMARCIngestStats struct {
 }
 
 // InsertDMARCReport stores a parsed report and its records, replacing any prior
-// row with the same reporter/report_id/domain triple.
+// row with the same reporter/report_id/domain triple; the prior report's
+// records go with it by ON DELETE CASCADE (see DeleteDomain).
 func (s *Store) InsertDMARCReport(rep DMARCReport) (int64, error) {
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("begin insert dmarc report: %w", err)

@@ -11,6 +11,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// draft-ietf-httpbis-rfc6265bis § 4.1.3.2: a cookie named __Host- is accepted
+// only with Secure, Path=/ and no Domain, from a secure origin - so no other
+// host can set or overwrite it, and clearing it needs Secure as well.
 const (
 	sessionCookieBase     = "selfpost_session"
 	sessionCookiePrefixed = "__Host-" + sessionCookieBase
@@ -46,6 +49,9 @@ func (m *Module) sessionToken(r *http.Request) (string, bool) {
 	case 1:
 		return token, true
 	default:
+		// RFC 6265 § 5.4: the Cookie header carries every cookie that
+		// matches, a parent domain's of the same name included. The prefixed
+		// name cannot be planted that way (see sessionCookiePrefixed).
 		logf("panel: %s %s carries %d cookies named %q — treating the request as signed out; "+
 			"another host on this domain is overwriting the session cookie, clear the cookies for the parent domain",
 			r.Method, r.URL.Path, n, name)
@@ -130,6 +136,9 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// setSessionCookie sets the session cookie. SameSite=Lax withholds it from a
+// cross-site request unless that is a top-level navigation with a safe method
+// (rfc6265bis § 5.8.3, § 5.6.7.1), so a cross-site POST arrives without it.
 func (m *Module) setSessionCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     m.sessionCookie(),

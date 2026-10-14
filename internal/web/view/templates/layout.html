@@ -32,7 +32,11 @@
      the head for the request-indicator classes. The panel uses no
      hx-indicator, and that injected element would be the one thing the
      Content-Security-Policy has to make an exception for, so it
-     is switched off here. */}}
+     is switched off here. htmx 2.0.4, src/htmx.js: the ready handler runs
+     mergeMetaConfig() before insertIndicatorStyles(), which adds the element
+     only while includeIndicatorStyles is not false. Both scripts are defer:
+     they run in this order once parsing ends and before DOMContentLoaded
+     (HTML Living Standard, parsing.html#the-end). */}}
 <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
 <script src="/static/htmx.min.js" defer></script>
 <script src="/static/panel.js" defer></script>

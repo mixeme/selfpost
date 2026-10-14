@@ -72,7 +72,8 @@ func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 // detail - and says whether it wrote. The log tailer uses it for the lines it
 // reads when it starts: after an unclean stop those are lines it may have read
 // before, and a refusal read twice is otherwise two rows. e.At must be set; a
-// row dated "now" is never the same as another.
+// row dated "now" is never the same as another. The check and the insert are
+// one statement, and one of no row reports 0 (see CreateGlobalUser).
 func (s *Store) InsertInboundSpamOnce(e InboundSpamEntry) (bool, error) {
 	at := e.At.UTC().Format(time.RFC3339)
 	res, err := s.db.Exec(
@@ -103,6 +104,8 @@ func (s *Store) PruneInboundSpam(cutoff time.Time, keep int) (int64, error) {
 	n, _ := res.RowsAffected()
 	// Oldest by when it happened, not by id: the tailer dates a refusal by its
 	// log line, so after the panel was down the newest ids are old rows.
+	// SQLite 3.53.4, https://sqlite.org/lang_select.html § 5: a negative LIMIT
+	// is no upper bound, so this is every row after the newest keep.
 	res, err = s.db.Exec(
 		`DELETE FROM inbound_spam_log WHERE id IN
 			(SELECT id FROM inbound_spam_log ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?)`, keep)

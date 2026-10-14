@@ -100,6 +100,7 @@ func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string, mess
 	if n <= 0 {
 		return nil
 	}
+	// The first statement is a write (see UpdateStatus).
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("sender check deferred: %w", err)
@@ -118,7 +119,9 @@ func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string, mess
 	}
 	// To the fraction of a second the log gives, and of a fixed width so that
 	// the strings compare as the times do; a re-read log must not move the
-	// mark back.
+	// mark back. SQLite 3.53.4, https://sqlite.org/lang_upsert.html § 2: a
+	// DO UPDATE whose WHERE is false is a no-op, not an error, and excluded.
+	// names the value the INSERT brought.
 	stamp := at.UTC().Format("2006-01-02T15:04:05.000000Z")
 	setting := func(key, value, cond string) error {
 		_, err := tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)

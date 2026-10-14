@@ -29,13 +29,23 @@ type Store struct {
 func Open(path string) (*Store, error) {
 	// _pragma parameters are applied on every pooled connection by the driver,
 	// so foreign-key enforcement and WAL survive connection churn.
+	// modernc.org/sqlite v1.60.1, conn.go newConn() -> sqlite.go
+	// applyQueryParams(): the _pragma list runs on every new connection,
+	// busy_timeout first. SQLite 3.53.4: foreign_keys is per connection
+	// (https://sqlite.org/foreignkeys.html § 2), journal_mode=WAL stays in the
+	// file (https://sqlite.org/wal.html § 3.3).
 	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	// modernc's driver serializes writes anyway; a small pool avoids
-	// "database is locked" surprises under WAL.
+	// One connection: database/sql then runs this process's statements and
+	// transactions one after another, so none of them meets another's lock.
+	// The driver does not serialise across connections (modernc.org/sqlite
+	// v1.60.1, conn.go: the conn's mutex is its own); between processes - the
+	// dmarc-ingest command opens this file too - SQLite allows one write
+	// transaction at a time (https://sqlite.org/lang_transaction.html § 2.1)
+	// and the other waits out busy_timeout.
 	db.SetMaxOpenConns(1)
 
 	s := &Store{db: db}
@@ -83,6 +93,10 @@ func (s *Store) migrate() error {
 	// against today's files would skip the baseline and leave the panel running
 	// on a schema it does not know, so such a file is refused outright; nothing
 	// is migrated from 1.x (docs/schema-migrations.md).
+	// SQLite 3.53.4: the application id is the header's integer at offset 68
+	// (https://sqlite.org/fileformat2.html § 1.3.15); btree.c newDatabase()
+	// zeroes bytes 24-99 of a new file's header, so it reads 0 until set - and
+	// 1.x never set it.
 	if version > 0 {
 		var appID int64
 		if err := s.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil {
@@ -109,12 +123,22 @@ func (s *Store) migrate() error {
 		if err != nil {
 			return fmt.Errorf("begin migration %s: %w", name, err)
 		}
+		// One Exec runs the whole file: modernc.org/sqlite v1.60.1, stmt.go
+		// stmt.exec(), "FALLBACK PATH: Multi-statement script" prepares and
+		// steps each statement of the tail in turn. It runs with foreign_keys
+		// ON, which cannot be switched off inside a transaction
+		// (https://sqlite.org/pragma.html#pragma_foreign_keys): an ADD COLUMN
+		// with REFERENCES needs a NULL default (lang_altertable.html § 4), and
+		// a changed collation means a rebuilt table (§ 8).
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
 		// PRAGMA does not accept a bound parameter, and target is a trusted
 		// loop index, so formatting it in is safe.
+		// SQLite 3.53.4, pragma.c sqlite3Pragma(), PragTyp_HEADER_VALUE: the
+		// value is the literal's text (sqlite3Atoi), written by OP_SetCookie
+		// under a write transaction, so a rollback takes it back with the rest.
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", target)); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("bump schema version for %s: %w", name, err)

@@ -137,6 +137,9 @@ func (s *Store) DeleteNotifyState(key string) error {
 
 // ListNotifyStateKeys returns the keys that begin with prefix, so that the
 // states of subjects that are gone - a deleted domain - can be found.
+// SQLite's substr counts characters of a TEXT value, len(prefix) its bytes
+// (https://sqlite.org/lang_corefunc.html#substr): the two agree for the ASCII
+// prefixes the callers pass ("dns:", "limit:").
 func (s *Store) ListNotifyStateKeys(prefix string) ([]string, error) {
 	rows, err := s.db.Query(
 		"SELECT key FROM notify_state WHERE substr(key, 1, ?) = ? ORDER BY key", len(prefix), prefix)
@@ -181,7 +184,9 @@ type LimitRefusal struct {
 // reason and is still judged the old way.
 func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
 	// The status is a literal so that the partial index of migration 0005
-	// answers the question.
+	// answers the question: the query's term matches the index's WHERE
+	// exactly (https://sqlite.org/partialindex.html § 3) when the statement is
+	// first prepared.
 	rows, err := s.db.Query(
 		`SELECT d.name, a.login, COUNT(*), MIN(l.created_at)
 		 FROM send_log l
