@@ -148,7 +148,12 @@ func (s *Store) SendLogLines(row SendLogRow, lifetime time.Duration, n int) ([]S
 // received, whose row the journal milter has yet to write.
 //
 // The send log is asked once per queue id, not once per line: the ids are read
-// off the index, and a message is several lines.
+// off the index, and a message is several lines. It is the longest write the
+// panel makes: measured on the test server, 2026-10-15 (2 cores; 1.37
+// million lines, 120 days at 1 900 messages a day, timed through this
+// package), 1.9 s to delete 342 000 lines after a 30-day gap, 0.4 s with
+// nothing to delete - inside busy_timeout's 5 s (Open), which dmarc-ingest's
+// writes wait through: the longest waited 1.8 s (assumptions D-S7).
 func (s *Store) PruneSendLogLines(cutoff time.Time) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM send_log_lines

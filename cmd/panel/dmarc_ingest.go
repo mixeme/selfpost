@@ -57,8 +57,11 @@ func runDMARCIngestMode() error {
 // src/global/pipe_command.c takes from stdout and stderr together. postlog is
 // no use here: pipe(8) starts the command without the group that may write to
 // Postfix's log socket (src/util/set_ugid.c, set_ugid(): setgroups() to the
-// user's one group). Whether Debian's postlog is set-gid, which would bring
-// the group with it, is not recorded - assumptions A-43.
+// user's one group). Nor does postlog bring the group with it: upstream
+// installs it set-gid, Debian's package does not - measured in the image,
+// 2026-10-15: /usr/sbin/postlog is -rwxr-xr-x root:root (postfix
+// 3.7.11-0+deb12u1), and dpkg-statoverride lists only postdrop and
+// postqueue (assumptions A-43).
 func logRejected(reason error) {
 	fmt.Fprintln(os.Stderr, "dropped: "+logSafe(strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")))
 }

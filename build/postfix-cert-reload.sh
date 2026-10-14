@@ -41,7 +41,11 @@ reload() {
 }
 
 # same_pair says whether a certificate file and a private key file belong
-# together.
+# together, by comparing the public key each one prints. openssl-x509(1) and
+# openssl-pkey(1) do not say the two print it byte for byte alike; measured
+# in the image, 2026-10-15, OpenSSL 3.0.22: identical for RSA-2048, P-256 and
+# P-384 keys, and for a P-256 key written in SEC1 form ("EC PRIVATE KEY") -
+# certbot 2.0 and later issue ECDSA keys by default (assumptions C-X1).
 same_pair() {
 	cert_pub=$(openssl x509 -noout -pubkey -in "$1" 2>/dev/null) || return 1
 	key_pub=$(openssl pkey -pubout -in "$2" 2>/dev/null) || return 1

@@ -64,8 +64,14 @@ changed (see the CHANGELOG, *Removed*).
 **25** is published even when `INBOUND_RELAY_ENABLE=false`; Postfix does not
 listen on port 25 until you set **`INBOUND_RELAY_ENABLE=true`** and/or
 **`DMARC_REPORTS_ENABLE=true`** (see [Inbound relay](#inbound-relay) and
-[DMARC reports](#dmarc-reports)). Harmless extra publishes can look like open
-ports in external scans.
+[DMARC reports](#dmarc-reports)). A scan over IPv4 sees such a port closed -
+the connection is refused. Over IPv6 the connection goes through Docker's
+proxy (the host runs `docker-proxy` on `::` for every published port), which
+accepts it and then closes it, so a scanner may report it open. Measured on a
+live server, 2026-10-15, Docker 29.6.1, with a published port nothing
+listened on: refused from outside over IPv4 and from the host's public IPv4
+address; accepted and closed through `127.0.0.1`, the same proxy. IPv6 itself
+was not probed for this.
 
 ### Local trial
 
@@ -230,7 +236,7 @@ expected to set; defaults match the code exactly.
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
-| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it). | *(empty — XFF ignored)* | `.env` |
+| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
 [deploy/docker-compose.yml](../deploy/docker-compose.yml) to match the `./certs`
@@ -669,7 +675,18 @@ Level 1 is always on, configured via `.env`:
 - `RATE_LIMIT_WINDOW_SECONDS` → Postfix `anvil_rate_time_unit`
 
 This is an anvil limit per client IP and listener. It keeps working even if the
-journal-milter (level 2) is down. There is no per-IP bypass except the container's own loopback.
+journal-milter (level 2) is down. There is no per-IP bypass except the
+container's own loopback.
+
+**The client IP is the real one over IPv4 only.** Docker's port publishing
+keeps an IPv4 client's address, but the compose network has no IPv6, so a
+client that reaches the server over IPv6 is carried by Docker's proxy and
+arrives from the network's gateway (`172.18.0.1` by default) - and so does a
+connection from the host to `127.0.0.1`. All such clients share one level-1
+budget, an application's client IP list cannot name them, and the spam
+filter sees the gateway. Measured on a live server, 2026-10-15, Docker
+29.6.1: an outside IPv4 client and the host's own public IPv4 address logged
+as themselves, the host's IPv6 address and `127.0.0.1` as `172.18.0.1`.
 
 ### Full backup and restore
 
@@ -985,8 +1002,9 @@ the same way as the nginx/Caddy fragments:
 docker compose -f docker-compose.yml -f antispam/docker-compose.antispam.yml up -d
 ```
 
-The milter sees the real client IP, HELO and PTR — unlike the upstream, which
-only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
+The milter sees the real client IP (over IPv4; see [Rate limiting — level
+1](#rate-limiting--level-1-ip-backstop) for IPv6), HELO and PTR — unlike the
+upstream, which only sees SelfPost. Default action is fail-open (`accept`) so a down sidecar
 does not block backup-MX; set `INBOUND_ANTISPAM_MILTER_ACTION=tempfail` to
 refuse with a temporary error instead, so the sending server tries again.
 
@@ -1283,6 +1301,9 @@ application: when enabled, list one or more client IPs that may **submit** mail
 as that application; a session from any other address is refused with a 4xx at
 `MAIL FROM`. When disabled, any client IP is allowed. This is independent of
 rate limits, and it takes exact addresses only — CIDR ranges are not parsed.
+An application that connects over IPv6 is seen from the Docker network's
+gateway, not its own address (see [Rate limiting — level
+1](#rate-limiting--level-1-ip-backstop)).
 
 It is **not an authentication boundary.** The SASL login itself still succeeds;
 the check runs in the journal-milter, on the same fail-open path as level 2

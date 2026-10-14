@@ -452,7 +452,9 @@ deferred item from the roadmap.
   DKIM to pass.
 - **The filter lists are files readable by anyone on the host.**
   `/data/antispam` is 0755 and its six files 0644, unlike the rest of `/data`:
-  the filter runs under another user in another container. They hold sender
+  the filter runs under another user in another container (rspamd as
+  `_rspamd`, uid 11333, in `rspamd/rspamd:3.11.1-3`; the panel is uid 999 -
+  measured on a live server, 2026-10-15). They hold sender
   addresses, domains and networks - who the operator blocks and whom he lets
   through - but no message data. The inbound journal itself is in the
   database, 0640. Trigger to revisit: a shared host, where the sidecar should

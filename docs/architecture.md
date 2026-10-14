@@ -144,7 +144,11 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   deliberately not an `accept` action: with two pre-results rspamd keeps the
   one set first, and deny then won or lost by rule order (seen on rspamd
   3.11, date not recorded). A refusal by the deny list overrides any score,
-  so deny wins whichever entries match. A sender entry is matched against
+  so deny wins whichever entries match - measured in a throwaway
+  `rspamd/rspamd:3.11.1-3` with this file, 2026-10-15: the same address or
+  IP on both lists, an allowed address with a denied domain or IP, and an
+  allowed IP with a denied address were all `reject` (assumptions
+  D-arch:121). A sender entry is matched against
   the envelope sender only (`extract_from = "smtp"`; by default rspamd takes
   a bounce's `From:` header instead - rspamd 3.11.1,
   `src/plugins/lua/multimap.lua`, the `from` callback).
@@ -584,8 +588,12 @@ reads them:
   send-log row carries is deleted (`PruneSendLogLines`), at start and after
   every six-hourly send-log sweep. That removes the lines of rows the sweep
   deleted and the lines that never had a row. The send log is asked once per
-  queue id; the statement still walks the table, about a second per million
-  lines, with the connection taken meanwhile.
+  queue id; the statement still walks the table, with the connection taken
+  meanwhile. Measured on the test server (2 cores, 2026-10-15) with 1.37
+  million lines, 120 days at 1 900 messages a day: 0.4 s when there is
+  nothing to delete, 1.9 s to delete 30 days' lines (342 000) after a gap -
+  under `busy_timeout`'s 5 s, and the longest a second process's write waited
+  meanwhile was 1.8 s (assumptions D-S7, D-arch:516).
 - **Which lines are a row's.** Postfix reuses a queue id once the message has
   left the queue, and a row outlives that by months. `SendLogLines` gives a row
   the lines of its queue id dated from one hour before the row was written to
@@ -599,8 +607,9 @@ reads them:
   catching up at start it writes a line only if the same line is not there.
 - **Not stored:** what the tailer never read — the tail of a file rotated away
   while the panel was down.
-- **Size:** six to ten lines of about 200 bytes per message — more than the row
-  itself. The table is in the database and therefore in a full backup, which
+- **Size:** about six lines of about 150 bytes per message — more than the row
+  itself (the live installation, 2026-10-15: 6.0 lines per queue id, 146 bytes
+  on average, over its first 18 lines; assumptions D-arch:532). The table is in the database and therefore in a full backup, which
   `log/` is not ([security.md](security.md) § Backup and domain export).
 
 **Two one-shot reads** sit beside the follow loop and are unrelated to it, both

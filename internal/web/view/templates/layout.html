@@ -22,7 +22,11 @@
      the two-line wordmark, which stops resolving below 32px. The PNG is declared
      first and the SVG second: a browser takes the last icon whose type it
      understands, so vector wins wherever it is supported and the raster catches
-     the rest. */}}
+     the rest. HTML links.html#rel-icon leaves "most appropriate" to the
+     browser, so measured, 2026-10-15, by which file was requested: Edge 155
+     (Chromium) takes the SVG, the Claude desktop app's embedded browser
+     (Chromium 152) the PNG, and adding sizes="any" to the SVG changes
+     neither. Firefox and Safari not measured (assumptions D-B16). */}}
 <link rel="icon" href="/static/favicon.png" sizes="32x32">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/bulma.min.css">

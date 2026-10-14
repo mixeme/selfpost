@@ -288,6 +288,10 @@ postconf -e \
 # smtpd_client_event_limit_exceptions (default $mynetworks; Debian's debconf
 # default, debian/templates "postfix/mynetworks", is loopback only).
 # anvil_rate_time_unit is one global window for every anvil limit (postconf(5)).
+# "Client IP" is the address the container sees: an IPv4 client's own, but
+# for a client over IPv6 the compose network's gateway, through Docker's
+# proxy - measured on a live server, 2026-10-15, Docker 29.6.1 (assumptions
+# C-K5; guide, "Rate limiting - level 1").
 postconf -e \
 	"smtpd_client_message_rate_limit=${RATE_MSGS}" \
 	"anvil_rate_time_unit=${RATE_WINDOW}s"

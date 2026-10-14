@@ -84,7 +84,10 @@ type feedbackXML struct {
 // and eight megabytes of it (maxAggregateXML) fit some 160 000 empty records or
 // one name of eight megabytes - every one of them a row or a table cell later.
 // A real report has tens of records, a few thousand from the largest
-// receivers, and no field longer than a line.
+// receivers, and no field longer than a line - an estimate: the live
+// installation had received one report by 2026-10-15, of one record, which
+// says nothing yet about the largest (assumptions C-M8: keep this ten times
+// above the largest seen).
 const (
 	maxReportRecords = 5000
 	maxFieldLen      = 255

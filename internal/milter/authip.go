@@ -11,7 +11,10 @@ import (
 // the connecting client IP. When the application has no IP restriction the
 // check passes. When it has one and the client's address is not known, the
 // check fails: an address list that an unknown address satisfies is no list.
-// Store errors are fail-open (see overLimit).
+// Store errors are fail-open (see overLimit). The address is the one Postfix
+// sees in the container: a client's own over IPv4, the Docker network's
+// gateway for every client over IPv6 (measured on a live server, 2026-10-15;
+// assumptions C-K5).
 func (s *session) authIPAllowed() bool {
 	if s.login == "" {
 		return true

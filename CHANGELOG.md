@@ -29,6 +29,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   case, owners may be separated by blanks or continue on the next line, and
   a key written twice makes the check defer, as it makes Postfix refuse the
   whole table (assumptions B-PS1, B-PS4).
+- **Over IPv6 every client looks the same to SelfPost** - documented, not
+  changed. The compose network has no IPv6, so Docker's proxy carries an
+  IPv6 connection and the container sees the network's gateway
+  (`172.18.0.1` by default), measured on a live server: all IPv6 clients
+  share one level-1 rate limit, and an application's client IP list cannot
+  name them - do not put the gateway's address on such a list, or every
+  IPv6 client passes it. IPv4 clients keep their own address (guide, "Rate
+  limiting - level 1"; assumptions C-K5).
 
 ### Fixed
 
