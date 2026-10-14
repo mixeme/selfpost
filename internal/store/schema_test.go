@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // 2.0 starts from one baseline: the 1.x chain is gone from the binary, not
@@ -381,5 +382,59 @@ func TestBaselineConstraints(t *testing.T) {
 	var n int
 	if err := st.db.QueryRow("SELECT COUNT(*) FROM user_inbound_domains").Scan(&n); err != nil || n != 0 {
 		t.Errorf("after deleting the user %d inbound assignment(s) stayed (%v)", n, err)
+	}
+}
+
+// Two processes opening one file that needs migrating - the panel and
+// dmarc-ingest after an upgrade - each apply every migration at most once:
+// both read the old version, both wait for the write lock, and the second
+// finds the work done (assumptions D-S3). Before _txlock=immediate and the
+// re-read, the second ran 0001 again and failed with "already exists".
+func TestTwoOpensMigrateOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "selfpost.db")
+	// The blocker holds the write lock while both opens read user_version 0
+	// and queue on their first BEGIN IMMEDIATE.
+	blocker, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocker.Close()
+	blocker.SetMaxOpenConns(1)
+	if _, err := blocker.Exec("BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+
+	errs := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			st, err := Open(path)
+			if err == nil {
+				err = st.Close()
+			}
+			errs <- err
+		}()
+	}
+	time.Sleep(500 * time.Millisecond) // both are waiting on the lock by now
+	if _, err := blocker.Exec("COMMIT"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("open %d: %v", i, err)
+		}
+	}
+
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	var version int
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := fs.ReadDir(migrationsFS, "migrations")
+	if version != len(entries) {
+		t.Fatalf("user_version %d, want %d", version, len(entries))
 	}
 }

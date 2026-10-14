@@ -34,7 +34,17 @@ func Open(path string) (*Store, error) {
 	// busy_timeout first. SQLite 3.53.4: foreign_keys is per connection
 	// (https://sqlite.org/foreignkeys.html § 2), journal_mode=WAL stays in the
 	// file (https://sqlite.org/wal.html § 3.3).
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)", path)
+	//
+	// _txlock=immediate: every transaction that may write takes the write
+	// lock at BEGIN (modernc.org/sqlite v1.60.1, sqlite.go applyQueryParams()
+	// sets beginMode, tx.go newTx() issues "begin immediate"; read-only
+	// transactions keep a plain begin). A deferred BEGIN starts nothing
+	// until the first access (lang_transaction.html § 2.2), so two processes
+	// - the panel and dmarc-ingest after an upgrade - could each read the
+	// schema version and then both run the next migration; an immediate one
+	// waits through busy_timeout, holding no lock that the other needs, and
+	// migrate() reads the version again under it (assumptions D-S3).
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)&_txlock=immediate", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
@@ -70,7 +80,10 @@ const applicationID = 0x53503230
 var ErrForeignSchema = errors.New("database was not created by SelfPost 2.x; 2.0 starts from an empty data directory (docs/schema-migrations.md)")
 
 // migrate applies embedded migrations in filename order, tracking progress via
-// SQLite's PRAGMA user_version so each migration runs at most once.
+// SQLite's PRAGMA user_version so each migration runs at most once: the
+// version is read again inside each migration's transaction, which holds the
+// write lock from its BEGIN (Open, _txlock), and a migration another process
+// applied in the meantime is skipped.
 func (s *Store) migrate() error {
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
@@ -122,6 +135,16 @@ func (s *Store) migrate() error {
 		tx, err := s.db.Begin()
 		if err != nil {
 			return fmt.Errorf("begin migration %s: %w", name, err)
+		}
+		var now int
+		if err := tx.QueryRow("PRAGMA user_version").Scan(&now); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("read schema version for %s: %w", name, err)
+		}
+		if now >= target {
+			// Applied by another process while this one waited for the lock.
+			tx.Rollback()
+			continue
 		}
 		// One Exec runs the whole file: modernc.org/sqlite v1.60.1, stmt.go
 		// stmt.exec(), "FALLBACK PATH: Multi-statement script" prepares and

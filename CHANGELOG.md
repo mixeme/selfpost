@@ -141,6 +141,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **A password shown once is emptied when its page is left,** so a browser
   that keeps the page for its Back button shows an empty field; the
   meaningless `Pragma` header goes (assumptions D-B13).
+- **A database update runs once when two programs open the database at
+  the same moment.** After an upgrade, the panel and the DMARC report
+  intake could both find the database one version behind and both apply
+  the next update; the second then failed, and with it that start or that
+  report (nothing was damaged). Each update now holds the database from
+  its start and checks the version again (assumptions D-S3).
 - **Words for what happens to mail match Postfix's.** A message refused with
   a temporary error while the panel or the spam filter does not answer was
   called deferred, which in Postfix's words is mail waiting in its queue;
