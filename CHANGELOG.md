@@ -59,6 +59,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `MAIL FROM`. A refusal written from `mail.log` after a restart says that
   Postfix's line names the last recipient only (assumptions A-15, A-21,
   A-23).
+- **A delivery reaches the row of every recipient Postfix delivers to.** A
+  quoted local part with a blank in it (`"a b"@x`) was cut at the blank, a
+  needlessly quoted one (`"ab"@x`) kept quotes Postfix does not log, a
+  recipient Postfix had rewritten was looked for under its new address, and
+  a recipient given twice made two rows of which Postfix reports one - each
+  row then waited for a line that never named it, and the sweep closed it
+  as `bounced`. The row now holds the recipient as Postfix logs it, once,
+  and is found under `orig_to=` when Postfix rewrote it (assumptions B-G5,
+  A-9, A-31, D-S20).
 - **A bounce is judged by the filter lists as the panel counts it.**
   rspamd's sender rules took a bounce's `From:` header when the envelope
   sender was empty, so a bounce could be refused or allowed by an entry the

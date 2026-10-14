@@ -93,8 +93,15 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 
 // UpdateStatus advances the delivery status of the send-log rows matching a
 // (queue-id, recipient) pair, which the log-tailer parses out of mail.log.
-// Recipient matching is case-insensitive because Postfix may normalise address
-// case between the milter (envelope) and the delivery log. It returns the
+// Recipient matching is case-insensitive. Postfix keeps the case the client
+// wrote, and the milter's row holds it as Postfix logs it
+// (milter.recipientAsLogged); but a recipient repeated in another case is
+// one recipient to Postfix - cleanup drops the second, comparing folded
+// (Postfix 3.7.11, src/cleanup/cleanup_out_recipient.c, been_here() with
+// BH_FLAG_FOLD) - and one row to the milter, spelt as first given, and
+// log_adhoc() writes orig_to= only when it differs from to= other than in
+// case (src/global/log_adhoc.c, strcasecmp_utf8()). Assumptions D-S20. It
+// returns the
 // number of rows updated so the caller can tell whether the line matched a
 // journal entry.
 //

@@ -116,17 +116,24 @@ type RetentionDays func() int
 // controls. A bounce whose reply quoted "status=sent" would then be filed as a
 // success. The real field is always the first one after to=<…>: in
 // log_adhoc() the reply is the "(%s)" after status=.
-var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(.*?)>, (?:orig_to=<.*?>, )?relay=.*?\bstatus=(\w+)`)
+var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(.*?)>, (?:orig_to=<(.*?)>, )?relay=.*?\bstatus=(\w+)`)
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
-// ok is false for lines that are not recognised delivery results.
+// ok is false for lines that are not recognised delivery results. The
+// recipient is the one the application gave: orig_to= when Postfix rewrote
+// the address (log_adhoc() writes it only then), to= otherwise - the row
+// holds the RCPT TO address (assumptions A-9).
 func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 	_, rest := SplitTimestamp(line)
 	m := deliveryRe.FindStringSubmatch(rest)
 	if m == nil {
 		return "", "", "", false
 	}
-	switch m[3] {
+	recipient = m[2]
+	if m[3] != "" {
+		recipient = m[3]
+	}
+	switch m[4] {
 	case "sent":
 		status = store.StatusSent
 	case "deferred":
@@ -136,7 +143,7 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 	default:
 		return "", "", "", false
 	}
-	return m[1], m[2], status, true
+	return m[1], recipient, status, true
 }
 
 // expiryRe matches qmgr's line for a message it gave up on:

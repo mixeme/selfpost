@@ -153,13 +153,14 @@ func TestParseDelivery(t *testing.T) {
 			status:    store.StatusSent,
 		},
 		{
-			// An alias/virtual expansion carries orig_to= as well; the address
-			// the message was actually delivered to is the one in to=.
-			name:      "orig_to is ignored in favour of to",
+			// A rewritten recipient carries orig_to= as well, the address the
+			// application gave - the one its row holds (log_adhoc() writes
+			// orig_to= only when it differs; assumptions A-9).
+			name:      "orig_to is the row's recipient",
 			line:      "host postfix/lmtp[26]: 4Xk9tS1abcz: to=<real@example.net>, orig_to=<alias@example.net>, relay=x, dsn=2.0.0, status=sent (ok)",
 			wantOK:    true,
 			queueID:   "4Xk9tS1abcz",
-			recipient: "real@example.net",
+			recipient: "alias@example.net",
 			status:    store.StatusSent,
 		},
 		{

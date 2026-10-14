@@ -146,8 +146,21 @@ func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, er
 // Postfix 3.7.11, src/smtpd/smtpd.c, rcpt_cmd(): milter_rcpt_event() once per
 // RCPT TO; a recipient Postfix refused goes only to a milter that asked for
 // SMFIP_RCPT_REJ, which Serve's Protocol does not.
+// A recipient given twice - in any case - is one row: cleanup keeps the first
+// and drops the rest (Postfix 3.7.11, src/cleanup/cleanup_out_recipient.c,
+// cleanup_out_recipient(), been_here() on a table made with BH_FLAG_FOLD in
+// cleanup_state.c), so only one delivery line will come (assumptions A-31).
+// Its key also holds the DSN NOTIFY= and ORCPT= of the RCPT TO command, which
+// go-milter does not hand over (session.go, case CodeRcpt): a recipient given
+// twice with different ones is two recipients to Postfix and one row here.
 func (s *session) RcptTo(rcpt string, m *milter.Modifier) (milter.Response, error) {
-	s.rcpts = append(s.rcpts, cleanAddress(rcpt))
+	to := recipientAsLogged(rcpt)
+	for _, have := range s.rcpts {
+		if strings.EqualFold(have, to) {
+			return milter.RespContinue, nil
+		}
+	}
+	s.rcpts = append(s.rcpts, to)
 	return milter.RespContinue, nil
 }
 
@@ -253,37 +266,86 @@ func (s *session) record(queueID string) {
 	}
 }
 
-// cleanAddress strips the angle brackets and any ESMTP parameters Postfix may
-// pass with an address, leaving the bare mailbox. A bracketed address ends at
-// the first ">" outside a quoted local part: a quoted local part may hold a
-// space or a ">", and an address cut there matched no delivery line, so its
-// row was left for the reconcile sweep to close as bounced (review of audit
-// stage 1).
+// cleanAddress is an address as the milter gets it, without the angle
+// brackets: Postfix 3.7.11 hands the milter the command's argument as the
+// client wrote it, ESMTP parameters as separate strings (src/smtpd/smtpd.c,
+// mail_cmd()/rcpt_cmd(), milter_argv()), and go-milter v0.4.1 passes the first
+// with "<>" trimmed (session.go, case CodeMail/CodeRcpt). A quoted local part
+// may hold a blank, so nothing is cut at one (assumptions B-G5).
 func cleanAddress(a string) string {
-	a = strings.TrimSpace(a)
-	if strings.HasPrefix(a, "<") {
-		quoted := false
-		for i := 1; i < len(a); i++ {
-			switch a[i] {
-			case '\\':
-				if quoted {
-					i++ // the escaped character is part of the local part
-				}
-			case '"':
-				quoted = !quoted
-			case '>':
-				if !quoted {
-					return a[1:i]
-				}
+	return strings.Trim(strings.TrimSpace(a), "<>")
+}
+
+// recipientAsLogged is a recipient in the form Postfix writes it in "to=<..>"
+// and "orig_to=<..>", so a delivery line finds its row. Postfix 3.7.11 keeps
+// the address in internal form - a quoted local part unquoted, a backslash
+// dropped before the character it escapes, a blank in quotes made a space
+// (src/smtpd/smtpd.c, extract_addr(), over src/global/tok822_parse.c,
+// COLLECT and tok822_internalize()) - and logs it in external form
+// (src/global/info_log_addr_form.c with info_log_address_format=external,
+// quote_822_local(): the local part quoted again only when it is not a plain
+// dot-string). So "ab"@x is logged ab@x, and "a b"@x stays "a b"@x. Case is
+// kept. An address with a comment or a blank outside quotes is taken as
+// written: tok822 would drop or join them, and no application writes one.
+func recipientAsLogged(a string) string {
+	a = cleanAddress(a)
+	at := strings.LastIndexByte(a, '@')
+	local, domain := a, ""
+	if at >= 0 {
+		local, domain = a[:at], a[at:]
+	}
+	if len(local) >= 2 && local[0] == '"' && local[len(local)-1] == '"' {
+		var b strings.Builder
+		for i := 1; i < len(local)-1; i++ {
+			c := local[i]
+			if c == '\\' && i+1 < len(local)-1 {
+				i++
+				c = local[i]
 			}
+			if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+				c = ' '
+			}
+			b.WriteByte(c)
+		}
+		local = b.String()
+	}
+	return quoteLocalPart(local) + domain
+}
+
+// quoteLocalPart is quote_822_local() of Postfix 3.7.11
+// (src/global/quote_822_local.c, with QUOTE_FLAG_8BITCLEAN, the default): a
+// local part that is a dot-string - atoms of no blank, control character or
+// one of ()<>@,;:\"[], joined by single dots, none first or last - is left as
+// it is; any other is put in quotes, with a backslash before ", \ and CR.
+func quoteLocalPart(local string) string {
+	if isDotString(local) {
+		return local
+	}
+	var b strings.Builder
+	b.WriteByte('"')
+	for i := 0; i < len(local); i++ {
+		c := local[i]
+		if c == '"' || c == '\\' || c == '\r' {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
+// isDotString is is_822_dot_string() of quote_822_local.c, 8-bit clean.
+func isDotString(s string) bool {
+	if s == "" || s[0] == '.' || s[len(s)-1] == '.' || strings.Contains(s, "..") {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == ' ' || c < 32 || c == 127 || strings.IndexByte(`()<>@,;:\"[]`, c) >= 0 {
+			return false
 		}
 	}
-	if i := strings.IndexByte(a, ' '); i >= 0 { // drop "addr SIZE=… BODY=…" params
-		a = a[:i]
-	}
-	a = strings.TrimPrefix(a, "<")
-	a = strings.TrimSuffix(a, ">")
-	return a
+	return true
 }
 
 // domainOf returns the lower-cased domain of an email address, or "" if there

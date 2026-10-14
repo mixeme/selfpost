@@ -345,6 +345,9 @@ func TestE2E(t *testing.T) {
 
 	// From here on the installation is no longer the one the run started: it
 	// is restored from its own backup, then switched to accept mail on port 25.
+	run("recipients_as_postfix_logs_them", func(t *testing.T) {
+		testRecipientsAsPostfixLogsThem(t, sc)
+	})
 	run("expired_message_is_closed", func(t *testing.T) {
 		testExpiredMessageIsClosed(t, sc)
 	})

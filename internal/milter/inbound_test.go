@@ -85,8 +85,10 @@ func inboundSessionFor(t *testing.T, rec InboundStore, filter bool) *inboundSess
 func TestInboundRecordsAcceptedMessage(t *testing.T) {
 	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
 	s := inboundSessionFor(t, rec, false)
-	resp := message(t, s, "<sender@example.net> SIZE=1200",
-		[]string{"<a@in.example.com>", "b@IN.example.com"},
+	// As go-milter hands them: brackets trimmed, ESMTP parameters left out
+	// (go-milter v0.4.1, session.go, case CodeMail/CodeRcpt).
+	resp := message(t, s, "sender@example.net",
+		[]string{"a@in.example.com", "b@IN.example.com"},
 		[][2]string{{"Subject", "=?utf-8?Q?Sch=C3=B6n?="}})
 	if resp != milter.RespContinue {
 		t.Errorf("end-of-message response = %v, want continue", resp)

@@ -23,6 +23,7 @@ const smtpsAddr = "127.0.0.1:20465"
 type sendAttempt struct {
 	authLogin, authPassword string
 	from, to                string
+	moreTo                  []string // further RCPT TO, after to
 	headerFrom              string
 	subject, body           string
 }
@@ -133,10 +134,12 @@ func attemptSend(a sendAttempt) sendResult {
 		_ = c.Quit()
 		return res
 	}
-	if err := c.Rcpt(a.to); err != nil {
-		res.rcptErr = err
-		_ = c.Quit()
-		return res
+	for _, to := range append([]string{a.to}, a.moreTo...) {
+		if err := c.Rcpt(to); err != nil {
+			res.rcptErr = err
+			_ = c.Quit()
+			return res
+		}
 	}
 	w, err := c.Data()
 	if err != nil {

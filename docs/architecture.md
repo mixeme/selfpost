@@ -481,9 +481,19 @@ the meantime stands. A deferred row is the sweep's too because Postfix can
 drop a deferred message without a final line for its recipients: at expiry
 before `2.5.2` read that line, and with `postsuper -d`, which logs only
 `removed`. The listing's `#` - a message forced to expire - is read as part
-of the id's flags (`src/postqueue/showq_compat.c`, `showq_message()`). A delivery line updates only the newest row of its queue id
-and recipient: Postfix reuses a short queue id once the message has left the
-queue, and an old row must not be rewritten. `UpdateStatus`'s transaction
+of the id's flags (`src/postqueue/showq_compat.c`, `showq_message()`).
+
+**Which row a delivery line is.** The journal milter writes a row's
+recipient as Postfix will log it: the address the client gave, its quoted
+local part unquoted and quoted again only where it needs to be (`"ab"@x`
+becomes `ab@x`, `"a b"@x` stays; Postfix 3.7.11, `tok822_parse.c`,
+`quote_822_local.c`), case kept, and a recipient given twice - in any case -
+once, since cleanup keeps one (`cleanup_out_recipient.c`, `been_here()`
+folding case). A delivery line names it in `orig_to=` when Postfix rewrote
+the address, in `to=` otherwise (`log_adhoc.c` writes `orig_to=` only then),
+and is matched without regard to case. It updates only the newest row of its
+queue id and recipient: Postfix reuses a short queue id once the message has
+left the queue, and an old row must not be rewritten. `UpdateStatus`'s transaction
 starts with a write, so a commit by the `dmarc-ingest` process in between
 cannot fail it with `database is locked`.
 Now that the log survives the container, reaching this path should mean the

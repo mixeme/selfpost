@@ -150,3 +150,34 @@ print("" if r is None else r[0]+" "+r[1])`, token)
 		t.Fatalf("no expiry line in mail.log: %v\n%s", err, out)
 	}
 }
+
+// testRecipientsAsPostfixLogsThem: each recipient's row reaches "sent". The
+// row holds the recipient as Postfix logs it - "a b" stays quoted, "ab" loses
+// its quotes - and a recipient given again in other capitals is one row, as
+// cleanup keeps one (Postfix 3.7.11, src/global/quote_822_local.c,
+// src/cleanup/cleanup_out_recipient.c; assumptions B-G5, A-31). Before, the
+// first was cut at its blank and its row closed as bounced by the sweep.
+func testRecipientsAsPostfixLogsThem(t *testing.T, sc *scenario) {
+	token := uniqueToken("rcpt")
+	if res := attemptSend(sendAttempt{
+		authLogin: sc.appLogin, authPassword: sc.appPassword,
+		from: "alerts@" + senderDomain, headerFrom: "alerts@" + senderDomain,
+		to:      `"x y"@sink.e2e.test`,
+		moreTo:  []string{`"ab"@sink.e2e.test`, `"X Y"@sink.e2e.test`},
+		subject: "e2e " + token, body: "three RCPT TO, two recipients",
+	}); !res.ok() {
+		t.Fatalf("send: %v", res.firstErr())
+	}
+	want := `"x y"@sink.e2e.test sent; ab@sink.e2e.test sent`
+	if err := waitFor("both rows to be sent", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out, err := asPanel(`import sqlite3,sys
+rows=sqlite3.connect("/data/selfpost.db").execute("select to_addr, status from send_log where subject like ? order by id",("%"+sys.argv[1]+"%",)).fetchall()
+print("; ".join(r[0]+" "+r[1] for r in rows))`, token)
+		if err != nil {
+			return false, err
+		}
+		return out == want, fmt.Errorf("rows %q, want %q", out, want)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
