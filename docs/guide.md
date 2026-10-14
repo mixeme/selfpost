@@ -410,7 +410,8 @@ readings, in the order of what stops mail first:
   not counted: mail was stopped for another reason then. What is counted as
   a message is a connection Postfix turned away - it refuses before a
   message is offered - so a monitor that only connects during an outage is
-  counted too. Days are UTC days. The card warns when
+  counted too; and when the panel hangs instead of stopping, the message it
+  hung on. Days are UTC days. The card warns when
   a message was deferred in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
@@ -1257,7 +1258,12 @@ rows of their domains. It refreshes its rows without resetting a filter being
 chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
-retrying), `bounced` (final failure), or refused before it was queued. A
+retrying), `bounced` (final failure), or refused before it was queued.
+`bounced` is usually Postfix's word; it is the panel's when Postfix no longer
+holds a message and `mail.log` never said what became of it (the log rotated
+away while the panel was down, or was not readable) - the panel then closes
+the row as a failure rather than show a delivery it cannot evidence, and
+counts that it did. A
 refused row says why in its tag: `rate-limited` (a [level-2 rate
 limit](#rate-limiting--level-2-domain-and-application)), `wrong client` (the
 application's client IP list) or `wrong From` (see [Who an application may
