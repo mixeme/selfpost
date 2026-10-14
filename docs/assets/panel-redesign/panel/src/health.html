@@ -26,15 +26,15 @@
         <div class="box" id="sender-check">
           <div class="sp-box-head"><span class="sp-no">03</span><h2>Sender check</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#sender-check" title="What is checked and what these numbers are for"><i class="ti ti-help-circle"></i></a></div>
           <div class="table-container"><table class="table is-fullwidth">
-            <thead><tr><th>Period</th><th>Panel not answering</th><th>Messages deferred</th></tr></thead>
+            <thead><tr><th>Period</th><th>Panel not answering</th><th>Connections turned away</th><th>Messages deferred</th></tr></thead>
             <tbody>
-              <tr><td>Today</td><td>0 s</td><td>0</td></tr>
-              <tr><td>Last 30 days</td><td>4 s</td><td>0</td></tr>
-              <tr><td>Last 12 months</td><td>41 s</td><td>3</td></tr>
+              <tr><td>Today</td><td>0 s</td><td>0</td><td>0</td></tr>
+              <tr><td>Last 30 days</td><td>4 s</td><td>0</td><td>0</td></tr>
+              <tr><td>Last 12 months</td><td>≈ 41 s</td><td>3</td><td>1</td></tr>
             </tbody>
           </table></div>
           <div class="sp-box-body">
-            <p class="sp-muted">The panel holds each message's <code>From:</code> against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running. Counted since <span class="sp-mono">2026-10-13</span>.</p>
+            <p class="sp-muted">The panel holds each message's <code>From:</code> against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown. Counted since <span class="sp-mono">2026-10-13</span>.</p>
           </div>
         </div>
         <div class="box" id="hostname">
