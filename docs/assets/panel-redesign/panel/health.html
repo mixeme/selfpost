@@ -100,7 +100,7 @@
             </tbody>
           </table></div>
           <div class="sp-box-body">
-            <p class="sp-muted">The panel holds each message's <code>From:</code> against the application that sends it. While the panel does not answer, Postfix defers mail instead of accepting it unchecked. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown. Counted since <span class="sp-mono">2026-10-13</span>.</p>
+            <p class="sp-muted">The panel holds each message's <code>From:</code> against the application that sends it. While the panel does not answer, Postfix answers the sending application with a temporary error instead of accepting mail unchecked, and the application tries again later. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown. Counted since <span class="sp-mono">2026-10-13</span>.</p>
           </div>
         </div>
         <div class="box" id="hostname">
@@ -138,14 +138,15 @@
           </table></div>
         </div>
         <div class="box" id="certificate">
-          <div class="sp-box-head"><span class="sp-no">04</span><h2>TLS certificate</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div><a class="sp-help" href="help.html#certificate" title="When it warns and what to do"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-box-head"><span class="sp-no">04</span><h2>TLS certificate</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#certificate" title="When it warns and what to do"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <dl class="sp-facts">
-              <div><dt>Expires</dt><dd class="sp-mono">2026-10-03 09:14 UTC</dd></div>
+              <div><dt>Expires</dt><dd class="sp-mono">2026-11-02 09:14 UTC</dd></div>
               <div><dt>Names</dt><dd class="sp-mono">mail.example.org</dd></div>
+              <div><dt>Renewal expires</dt><dd class="sp-mono">2027-01-31 08:02 UTC</dd></div>
+              <div><dt>Renewal mounted</dt><dd class="sp-mono">2026-10-15 03:12 UTC</dd></div>
             </dl>
-            <p class="mt-4 has-text-danger">Expires in 12 days — renewal has not run.</p>
-            <p class="sp-muted">Renewal normally runs 30 days before expiry. Check that port 80 is reachable and look for <code>acme</code> lines in the <a href="system-log.html">system log</a>.</p>
+            <p class="mt-4 sp-muted">Postfix still serves the certificate above. A renewed one is waiting in the mounted file; Postfix takes it up at its next check for a renewal, at most a day after it was mounted.</p>
           </div>
         </div>
         <div class="box" id="notification-mail">
