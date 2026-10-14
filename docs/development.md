@@ -133,9 +133,10 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 20 | audit-2026-10-12 stage 0: release hygiene | `2.4.2` (PATCH) |
 | 21 | audit-2026-10-12 stages 1 and 2 | `2.5.0` |
 | 22 | audit-2026-10-12 stage 2b: the log tailer | `2.5.1` |
-| 23 | audit-2026-10-12 stage 3 | `2.5.2` |
-| 24 | audit-2026-10-12 stage 4 | `2.5.3` |
-| 25 | audit-2026-10-12 stage 5 | `2.6.0` |
+| 23 | audit-2026-10-12 stage 2c: the sender check reads From: as OpenDKIM does | `2.5.2` |
+| 24 | audit-2026-10-12 stage 3 | `2.5.3` |
+| 25 | audit-2026-10-12 stage 4 | `2.5.4` |
+| 26 | audit-2026-10-12 stage 5 | `2.6.0` |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.
