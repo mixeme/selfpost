@@ -225,8 +225,8 @@ operator can act on it.
   when the domain is a sender of this server, and passed when it is not,
   still tells an application which domains are hosted here; the probe needs
   an application of this server, and refusing every foreign address in a
-  display name would change the 2.4.0 rule - the owner decides (accepted
-  risks). What this does not promise is what a display
+  display name would change the 2.4.0 rule - accepted by the owner
+  (accepted risks). What this does not promise is what a display
   name looks like to a person: a name of another sender written without an
   `@` the scan can find (a full-width dot, a space inside the name) passes,
   signed with the application's own key - a forged display name is as old
@@ -447,11 +447,13 @@ deferred item from the roadmap.
   A `From:` whose display name or comment names an address at a domain this
   server signs for is refused; one naming any other domain passes. The reply
   no longer names the domain (audit 2026-10-12, L8), but refused or passed
-  answers the question for whoever sends the line. Accepted for now: it needs
-  an application of this server, and closing it means refusing every
-  foreign address in a display name, which changes the owner's 2.4.0 rule
-  (a stranger's address in the name passes) - his decision, asked on
-  2026-10-14.
+  answers the question for whoever sends the line. Accepted by the owner,
+  2026-10-14: it needs an application of this server - a trusted tenant
+  guessing names one at a time, as it already had to before L8, when the
+  reply only said in words what the line had named - and closing it means
+  refusing every foreign address in a display name, which would change his
+  2.4.0 rule (a stranger's address in the name passes). Trigger to revisit:
+  tenants who are not trusted, or a display-name rule decided anew.
 - ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
   `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
   § Roles.
