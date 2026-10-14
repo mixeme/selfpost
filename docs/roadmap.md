@@ -33,15 +33,16 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | agreed (2026-10-13) | — | — |
 | backup-reauth | Ask for the account password before a backup or a domain export is downloaded | agreed (2026-10-13) | — | — |
-| review-2026-08-followups | Remaining findings of the 2026-08-19 code review | candidate | — | — |
+| review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
+| local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, six stages | agreed (2026-10-12: stage 0 first, then 1+2; the rest after) | 0/48 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | agreed (2026-10-12: stage 0 first, then 1+2; the rest after) | 0/61 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
@@ -257,13 +258,13 @@ is in the table below; the rest of it shipped in
 | Area | Item |
 |---|---|
 | Security | ~~Re-authenticate (ask for the current password) before a backup download~~ — struck: agreed on 2026-10-13 as an item of its own, [backup-reauth](#backup-reauth) |
-| Tests | The `internal/dmarc` service layer (`service.go`, `addresses.go`) has no tests |
-| Tests | No direct tests for the apps / domains / users / dmarc handlers; `authz_test` covers them only indirectly |
-| Tests | Nothing covers error page templates, a corrupted backup archive, malformed or oversized DMARC XML, delivery-log pagination edges, concurrent store operations, or zero-traffic `store` stats |
-| Edge case | `internal/secretfile` accepts an empty password at library level — guard it, or state that validation is the caller's job |
-| Edge case | The log fingerprint in [logtail/offset.go](../internal/logtail/offset.go) can collide across a rotation — include the inode |
-| Edge case | `parsePage` in [handlers_monitor.go](../internal/web/handlers/handlers_monitor.go) does not clamp to `lastPage` |
-| Edge case | [dnscheck/resolver.go](../internal/dnscheck/resolver.go) fans out four parallel queries where a fallback chain would do — change it or write down why not |
+| Tests | ~~The `internal/dmarc` service layer (`service.go`, `addresses.go`) has no tests~~ — struck: a step of audit-2026-10-12 stage 4 (DMARC reports tested where they come in) |
+| Tests | ~~No direct tests for the apps / domains / users / dmarc handlers; `authz_test` covers them only indirectly~~ — struck: users with stage 2 (`submitUserUpdate`), DMARC with stage 4; apps and domains get theirs when a step changes them - a test without a change finds nothing the e2e does not |
+| Tests | ~~Nothing covers error page templates, a corrupted backup archive, malformed or oversized DMARC XML, delivery-log pagination edges, concurrent store operations, or zero-traffic `store` stats~~ — struck: the corrupted archive goes to stage 3, DMARC XML to stage 4, paging edges to stage 4 (`parsePage`), concurrency of the last global to stage 2; error templates, other concurrency and zero-traffic stats are dropped (owner, 2026-10-14) - code no step changes, and a test kept for its own sake finds nothing |
+| Edge case | ~~`internal/secretfile` accepts an empty password at library level~~ — struck: audit-2026-10-12 stage 3 (M5) |
+| Edge case | ~~The log fingerprint in `logtail/offset.go` can collide across a rotation — include the inode~~ — struck: agreed on 2026-10-13 as part of a step of [audit-2026-10-12](audit-2026-10-12.md) stage 2b (a log rotated while the panel was down is read to its end) |
+| Edge case | ~~`parsePage` does not clamp to `lastPage`~~ — struck: audit-2026-10-12 stage 4 |
+| Edge case | ~~`dnscheck/resolver.go` fans out four parallel queries where a fallback chain would do~~ — struck: finding M14 of [audit-2026-10-12](audit-2026-10-12.md) |
 | UI | ~~`.pair` (DMARC templates) and `.split` (every other page) are two names for one layout~~ — struck: retired by [panel-redesign](#panel-redesign); both stylesheets are gone and every page is laid out by the component kit |
 | UI | ~~Two `back_link` elements in a row in `dmarc_domain.html`~~ — struck: retired by [panel-redesign](#panel-redesign); the page is rebuilt on the kit with one breadcrumb in its head |
 | UI | ~~`initShowWhen` is not re-run after an htmx swap~~ — struck: the show/hide rules listen on the document and are applied again on `htmx:load` |
@@ -273,6 +274,8 @@ apart from the backup re-auth prompt. Anything here that grows past an hour
 becomes its own roadmap item instead.
 
 **Done when:** each row is either implemented or struck with a written reason.
+**Closed 2026-10-14** with the owner: every row is struck above, placed in a
+stage of [audit-2026-10-12](audit-2026-10-12.md) or dropped with its reason.
 
 **Dependencies / risks:** One finding of that review was **declined** and is
 deliberately absent: `//go:build linux` for the `/proc` reader in
@@ -409,6 +412,72 @@ goes and today Account saves it without the password.
 to come need it - they are not the owner and should not have to ask him for
 a new password). Mockup-first; changing the account e-mail asks for the
 current password in the same cut.
+
+---
+
+## local-time
+
+**Agreed with the owner on 2026-10-13.** It came from one cell: *Today* on
+Health's Sender check card is the UTC day and does not say so. Offered a
+label ("Today, UTC") or the local day, he chose the local day - which is a
+decision about the whole panel, not one cell.
+
+**Today:** every time the panel shows is UTC and says so (*Time, UTC* in the
+logs, "UTC" after a date), and everything counted by day - the sender
+check's days, the delivery-log measurement, the statistics behind the
+charts, retention - is counted by the UTC day.
+
+**Goal:** the panel shows time in a chosen time zone, and "today" is that
+zone's day.
+
+**Where the zone comes from (owner, 2026-10-13):** one setting of the
+instance, *Time zone* under Server › Settings, UTC by default; it holds for
+every user and for notification mail. Not the browser's zone: only a script
+could read it, and the panel works without JavaScript. Not a setting of each
+user yet - **that is added (the same list under Account, "as the server" by
+default) when** a user of the panel lives in another zone than the one set
+for the instance, which the first domain administrator who is not the owner
+may bring.
+
+**What is written beside a time (owner, 2026-10-13):** nothing. The "UTC"
+labels go - the column is *Time*, a date is a date - and the zone is stated
+in one place, the setting. His reason: there is nobody to send a line of the
+panel to yet. **The offset is written where "UTC" is today ("Time, UTC+3",
+"2026-09-21 16:40 UTC+3") when** times of the panel start to be read by
+someone who does not know the instance's zone: a second user of the panel,
+or lines copied out of it to another person.
+
+**A trap this leaves, known in advance (owner asked for it to be written
+down, 2026-10-13):** Server › System log, and the *Delivery log* box on a
+message's page, show the lines of `mail.log` as Postfix wrote them, each with
+its own stamp ("Oct 13 14:01:52"). Those stamps are the container's time -
+UTC unless the container is given a `TZ` - and they are not rewritten. Once
+the rest of the panel is in the instance's zone and no time carries a label,
+a message that the Outbound log puts at 17:01 has lines stamped 14:01 on its
+own page, with nothing on the screen to say why. The plan must close this
+before the item ships, one way or another: rewrite the stamp when a line is
+shown, say on those two screens which clock the lines use, or run the
+container in the instance's zone (which moves `mail.log` itself and what the
+tailer reads). The guide's section on time must say the same thing as the
+screens.
+
+**How a day is counted (owner, 2026-10-13):** the tables that keep a row
+per day - `sender_check_days`, and `delivery_log_days` of
+[audit-2026-10-12](audit-2026-10-12.md) stage 1 - key the row by the date in
+the instance's zone at the moment of counting, from the release on. Rows
+counted before it stay UTC days. Changing the zone later leaves the rows
+already written as days of the old zone, a shift of a few hours in a
+statistic; accepted - the zone is set once, and rows per hour (which would
+survive a change) cost a migration for it. The charts and statistics group
+the log by hour already and need nothing.
+
+**Open, to settle at the mockups:** the trap above; which of the screens
+that show a date show the year.
+
+**Boundary:** what the panel shows and how it groups by day. `mail.log`,
+the database's stored instants and the e2e stay as they are.
+
+**Version:** `2.x` MINOR; `agreed`; the plan is written when it is taken up.
 
 ---
 
@@ -572,6 +641,18 @@ without that it is not offered again.
   behaviour, and gives a new format to everything that reads the output.
   **Returns if:** the log goes to an outside collector, or it has to be
   filtered by level.
+- **Certificate warnings measured by the certificate's lifetime** (left as
+  it is, owner, 2026-10-14). The panel warns 14 and 3 days before a
+  certificate expires, whatever its lifetime
+  ([notify.go](../internal/notify/notify.go), `certFirstDays`,
+  `certLastDays`). A certificate issued for less than 14 days is inside the
+  first warning from its first hour, and each renewal of it is a new
+  certificate and a new message. Not reachable with the 90-day certificate
+  the instance has. **Returns if:** the instance takes a certificate that
+  lives less than 30 days. The rule then offered: the first warning at a
+  quarter of the lifetime left, the last at a tenth, and never earlier than
+  the 14 and 3 days of today - so a longer certificate, a yearly one
+  included, is warned about exactly as now.
 - **contributing** (dropped 2026-10-13) - a `CONTRIBUTING.md` in the root:
   the dev loop, the checks before a PR, the commit protocol. Dropped because
   there is one developer and no PRs, and everything the file would say is in

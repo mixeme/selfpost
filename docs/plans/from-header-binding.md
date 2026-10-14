@@ -174,7 +174,7 @@ silence; each line says what is missing and what it would take.
   2026-10-13 (owner):** the box is required - he had overlooked its absence
   from the picture, it was never a decision to drop it. The tailer attaches
   the line to the row, for all three kinds of refusal; a step of
-  [audit-2026-10-12](../audit-2026-10-12.md) stage 1.
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 2b.
 - **The Outbound log has no status filter.** The mockup draws one; the built
   log filters by domain and application. With three kinds of refusal now
   told apart by tag, a filter by status and reason would be worth having.
@@ -183,32 +183,51 @@ silence; each line says what is missing and what it would take.
 - **"Messages deferred" counts connections Postfix turned away.** Postfix
   refuses from the connection on, before a message is offered, so a monitor
   that only connects during an outage is counted. The guide says so; the
-  card's column head and the help topic still say "messages".
+  card's column head and the help topic still say "messages". **Decided
+  2026-10-13 (owner):** the column is renamed *Connections turned away*; a
+  step of [audit-2026-10-12](../audit-2026-10-12.md) stage 2b.
 
 ### Known and small
 
 - **"Today" on the card is the UTC day**, and the card does not say so.
+  **Decided 2026-10-13 (owner):** not a label - the local day; it became the
+  roadmap item `local-time`, for the whole panel.
 - **A deferral in the very second of the last one counted before an unclean
   stop is passed over** at the restart: `mail.log` stamps whole seconds.
-  Chosen over counting a stretch of the log twice.
+  Chosen over counting a stretch of the log twice. **Decided 2026-10-14
+  (owner):** counted exactly - the counter keeps a place in the log, saved
+  with the count; a step of [audit-2026-10-12](../audit-2026-10-12.md)
+  stage 2b.
 - **Deferrals are lost when `mail.log` is rotated while the panel is down**:
-  the tailer starts on the new file.
+  the tailer starts on the new file. **Decided 2026-10-13 (owner):** the
+  tailer reads the rotated file to its end first - not the deferrals alone,
+  everything the panel takes from the log; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 2b.
 - **A start at which `supervisorctl` fails counts no downtime**; it is
-  logged.
+  logged. **Decided 2026-10-13 (owner):** the question is repeated, and
+  without an answer the downtime is counted from the alive mark and the day
+  marked as estimated; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 2b.
 - **Logins are compared as written**, Postfix compares them without regard
   to case. The panel writes logins one way, so nothing differs today.
 - **The phone order of the `cards` layout is written for four boxes to a
   stack** and takes every child of a stack for a box (said at the partial).
   The rule the technical review suggested instead - the order from the
   box's own number - changes the component and would be drawn first.
+  **Decided 2026-10-13 (owner):** that rule is built; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 4.
 - **Health's socket check looks at the file, not at who listens**: a socket
   nobody answers on would read "ok". The start now removes stale sockets,
-  which was the one way to get such a file.
+  which was the one way to get such a file. **Decided 2026-10-13 (owner):**
+  the check connects to the socket; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 4.
 - **The kit page's table of status tags does not list the new ones**
   (`wrong From`, `wrong client`, `rate-limited`), and `rate-limited` is grey
   beside two red tags - as the mockup has it, not as a decision.
 - **Refusal rows still in the buffer when the panel stops are not written**;
-  the refusals themselves were answered.
+  the refusals themselves were answered. **Decided 2026-10-13 (owner):**
+  the tailer writes such a row from the refusal's line in `mail.log`; a step
+  of [audit-2026-10-12](../audit-2026-10-12.md) stage 2b.
 
 ### Accepted, in security.md
 
@@ -227,7 +246,9 @@ silence; each line says what is missing and what it would take.
   parser is not in this repository. The two rules that do not depend on it -
   no other signing name after any `@`, one `@` outside quotes - are what the
   claim rests on. A test that feeds the stand's OpenDKIM the lines the check
-  passes and reads which key it signs with would settle it.
+  passes and reads which key it signs with would settle it. **Decided
+  2026-10-13 (owner):** that test is built; a step of
+  [audit-2026-10-12](../audit-2026-10-12.md) stage 2.
 - **The pages were not looked at in a browser on the deployed panel**: I
   cannot sign in there. They were rendered from the fixtures and
   screenshotted, the polling and the phone order read from the code and
