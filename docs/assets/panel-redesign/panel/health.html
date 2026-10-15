@@ -76,7 +76,7 @@
 
     <div class="columns sp-cards">
       <div class="column is-6">
-        <div class="box" id="processes">
+        <div class="box" id="processes" data-order="1">
           <div class="sp-box-head"><span class="sp-no">01</span><h2>Processes</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
@@ -89,7 +89,7 @@
             </tbody>
           </table></div>
         </div>
-        <div class="box" id="sender-check">
+        <div class="box" id="sender-check" data-order="3">
           <div class="sp-box-head"><span class="sp-no">03</span><h2>Sender check</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#sender-check" title="What is checked and what these numbers are for"><i class="ti ti-help-circle"></i></a></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Period</th><th>Panel not answering</th><th>Connections turned away</th><th>Messages deferred</th></tr></thead>
@@ -103,7 +103,7 @@
             <p class="sp-muted">The panel holds each message's <code>From:</code> against the application that sends it. While the panel does not answer, Postfix answers the sending application with a temporary error instead of accepting mail unchecked, and the application tries again later. Time is counted only while Postfix itself was running; ≈ marks a period with a start at which that could not be asked, and its time is at most what is shown. Counted since <span class="sp-mono">2026-10-13</span>.</p>
           </div>
         </div>
-        <div class="box" id="hostname">
+        <div class="box" id="hostname" data-order="5">
           <div class="sp-box-head"><span class="sp-no">05</span><h2>Hostname and reverse DNS</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#rdns" title="Forward and reverse DNS"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <dl class="sp-facts">
@@ -112,7 +112,7 @@
             </dl>
           </div>
         </div>
-        <div class="box" id="machine">
+        <div class="box" id="machine" data-order="7">
           <div class="sp-box-head"><span class="sp-no">07</span><h2>Machine</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#checks" title="What these readings mean"><i class="ti ti-help-circle"></i></a></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Resource</th><th>Usage</th><th>Detail</th></tr></thead>
@@ -125,7 +125,7 @@
         </div>
       </div>
       <div class="column is-6">
-        <div class="box" id="sockets">
+        <div class="box" id="sockets" data-order="2">
           <div class="sp-box-head"><span class="sp-no">02</span><h2>Milter sockets</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Milter</th><th>State</th></tr></thead>
@@ -137,7 +137,7 @@
             </tbody>
           </table></div>
         </div>
-        <div class="box" id="certificate">
+        <div class="box" id="certificate" data-order="4">
           <div class="sp-box-head"><span class="sp-no">04</span><h2>TLS certificate</h2><div class="sp-end"><span class="tag is-success is-light">ok</span></div><a class="sp-help" href="help.html#certificate" title="When it warns and what to do"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <dl class="sp-facts">
@@ -149,7 +149,7 @@
             <p class="mt-4 sp-muted">Postfix still serves the certificate above. A renewed one is waiting in the mounted file; Postfix takes it up at its next check for a renewal, at most a day after it was mounted.</p>
           </div>
         </div>
-        <div class="box" id="notification-mail">
+        <div class="box" id="notification-mail" data-order="6">
           <div class="sp-box-head"><span class="sp-no">06</span><h2>Notification mail</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div><a class="sp-help" href="help.html#notifications" title="What the panel sends and what makes it arrive"><i class="ti ti-help-circle"></i></a></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Record</th><th>State</th></tr></thead>
@@ -162,7 +162,7 @@
             <p class="sp-muted">Sent from <span class="sp-mono">postmaster@mail.example.org</span>. What to publish is under <a href="settings.html#notification-mail">Settings</a>.</p>
           </div>
         </div>
-        <div class="box" id="configuration">
+        <div class="box" id="configuration" data-order="8">
           <div class="sp-box-head"><span class="sp-no">08</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
           <div class="sp-box-body">
             <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>

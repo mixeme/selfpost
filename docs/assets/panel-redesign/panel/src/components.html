@@ -18,7 +18,7 @@
         <dl class="sp-facts">
           <div><dt>list</dt><dd>page_head, then full-width boxes: the add form first, the table second. <a href="out-domains.html">Example</a></dd></div>
           <div><dt>detail</dt><dd>page_head, then <code>columns</code>: <code>is-3</code> side menu + <code>is-9</code> boxes. <a href="out-domain.html">Example</a></dd></div>
-          <div><dt>cards</dt><dd>page_head, then <code>columns sp-cards</code>: two <code>is-6</code> stacks of numbered boxes read in rows, odd on the left and even on the right, each stack closed up. On a phone the boxes come in the order of their numbers. The two stacks under this box are laid out so. <a href="health.html">Example</a></dd></div>
+          <div><dt>cards</dt><dd>page_head, then <code>columns sp-cards</code>: two <code>is-6</code> stacks of numbered boxes read in rows, odd on the left and even on the right, each stack closed up. On a phone the boxes come in the order of their numbers: each box carries <code>data-order</code>, its own number, up to twelve. The two stacks under this box are laid out so. <a href="health.html">Example</a></dd></div>
           <div><dt>form</dt><dd>page_head, then boxes in equal <code>columns</code>, one submit row under them. <a href="out-app.html">Example</a></dd></div>
           <div><dt>signed out</dt><dd>The split brand / form screen, no navbar. <a href="login.html">Example</a></dd></div>
         </dl>
@@ -27,7 +27,7 @@
 
     <div class="columns sp-cards">
       <div class="column is-6">
-        <div class="box">
+        <div class="box" data-order="1">
           <div class="sp-box-head"><span class="sp-no">01</span><h2>postmark</h2><div class="sp-end">Worst status of the page's checks</div></div>
           <div class="sp-box-body">
             <div class="buttons">
@@ -39,7 +39,7 @@
           </div>
         </div>
 
-        <div class="box">
+        <div class="box" data-order="3">
           <div class="sp-box-head"><span class="sp-no">03</span><h2>status_tag</h2><div class="sp-end">One mapping, one function</div></div>
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Status</th><th>Tag</th><th>Bulma classes</th></tr></thead>
@@ -56,7 +56,7 @@
       </div>
 
       <div class="column is-6">
-        <div class="box">
+        <div class="box" data-order="2">
           <div class="sp-box-head"><span class="sp-no">02</span><h2>box · box_head</h2><div class="sp-end">The end slot: a note, a tag, a link or a filter form</div><a class="sp-help" href="help.html#checks" title="Optional: the section's Help topic"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body"><p class="mb-2">The <i class="ti ti-help-circle"></i> after the end slot is <code>sp-help</code>: an optional link to the section's topic on the Help page. It replaces today's help drawer.</p><p>box_body — padded content. A <code>table</code> or a run of <code>sp-record</code> blocks sits directly in the box, without box_body.</p></div>
           <div class="sp-box-foot"><span>box_foot — a legend, paging</span><span class="sp-end">end slot</span></div>
