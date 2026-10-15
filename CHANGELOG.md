@@ -5,7 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-Migration `0011` (a table, nothing existing changes).
+## [2.5.4] - 2026-10-15
+
+Stage 4 of the 2026-10-12 audit: the panel's behaviour. Signing in tells
+nothing by its timing and ends a planted session; the server bounds its
+connections; monitoring pages recover from a failed refresh; the Outbound
+log filters by status and by day; a notification is owed to each recipient;
+a DNS outage is unknown, not wrong; Reload configuration writes everything a
+restore writes. Migration `0011` (a table, nothing existing changes).
 
 ### Added
 
