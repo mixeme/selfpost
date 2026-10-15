@@ -41,7 +41,10 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
-| own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | candidate (analysis, 2026-10-15) | — | — |
+| own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
+| port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | candidate (2026-10-15, from own-mta-builds; recommended now, PATCH) | — | — |
+| base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | candidate (2026-10-15, from own-mta-builds; recommended next, MINOR) | — | — |
+| panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | candidate (2026-10-15, from own-mta-builds; recommended after base-trixie, MINOR) | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
@@ -769,6 +772,89 @@ beyond the analysis.
 **Outcome expected:** a recommendation with costs - which limits a build of
 our own would remove, what each costs to keep, and whether a middle way
 gets the same for less.
+
+**Outcome (2026-10-15):** [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md).
+No own builds: no limit of Postfix's needs a patch (the panel reads it
+through the interfaces it offers), and every limit worked around is
+OpenDKIM's - a project with no release since 2018, three CVEs of 2026 open
+in every Debian suite and no one answering. What the question pointed at
+is answered by three rows instead, in this order:
+[port25-bare-newline](#port25-bare-newline) (one line, now),
+[base-trixie](#base-trixie) (bookworm is in LTS since 2026-07-12 and its
+Postfix 3.7.11 lacks the three 2026 security batches, which carry no CVE
+ids and so will not come), and
+[panel-dkim-signing](#panel-dkim-signing) (signing in the panel's own
+milter; OpenDKIM, the syslog relay and the parser port go). Each needs
+the owner's OK.
+
+## port25-bare-newline
+
+**Finding (own-mta-builds, 2026-10-15):** Postfix 3.7.11 has the 2023
+SMTP-smuggling parameter `smtpd_forbid_bare_newline` with the default `no`
+(`src/smtpd/smtpd.c:807`, "Postfix < 3.9: no"; 3.9 made `normalize` the
+default and the 3.7 `RELEASE_NOTES` recommend it). The inbound relay's
+`smtp/inet` block in `build/postfix-config.sh` does not set it, so with
+`INBOUND_RELAY_ENABLE=true` a bare `<LF>.<LF>` inside DATA ends the
+message early and what follows is read as the next transaction. Ports 465
+and 587 are not the case that matters: there the smuggled transaction is
+still the authenticated session's, under its bindings and milters.
+
+**Goal:** `smtp/inet/smtpd_forbid_bare_newline=normalize`, an e2e check on
+port 25 (a bare-LF DATA, one message delivered, nothing smuggled), a
+PATCH release. [base-trixie](#base-trixie) would bring the default, but
+the relay should not wait for it.
+
+## base-trixie
+
+**Problem (own-mta-builds, 2026-10-15):** the image's base,
+`debian:bookworm-slim`, left regular security support on 2026-07-12 (LTS
+until 2028-06-30). Its `postfix 3.7.11-0+deb12u1` is code of mid-2024;
+upstream's three security batches of 2026 (June: unbounded SMTP inputs;
+August: BDAT memory exhaustion, a DATA crash, a policy bypass; September:
+smuggling behind a proxy filter, a Milter-reachable over-read) carry no
+CVE ids, and the LTS team works from CVE ids - no bookworm upload in 2026.
+Trixie's `postfix 3.10.13-0+deb13u1` has the August batch; 3.10.14 with
+September's is upstream and trixie-security follows within weeks.
+
+**Goal:** `debian:trixie-slim` and `golang:1.26-trixie`; every citation of
+`3.7.11` (331 lines in 65 files) re-read against the 3.10.13 tree, with
+attention to 3.10's reject logging (`sasl_method`, `sasl_username`,
+`sasl_sender` on the line), the queue id on an abnormal connection end,
+cleanup's `canceled` line, 3.8's `postfix(1)` stderr logging under
+supervisord; `dev/upstream` refetched from trixie; the cited-package table
+and `checkCitedPackageVersions`; the e2e sink image; `opendkim-tools`
+dropped from the image (used by nothing at run time). OpenDKIM's code is
+the same in trixie, its citations stand. One stage, a MINOR release. Also
+gained: `smtpd_hide_client_session` (3.10) is available - whether the
+relay should hide the application's address from `Received:` is a product
+question to decide separately.
+
+## panel-dkim-signing
+
+**Problem (own-mta-builds, 2026-10-15):** OpenDKIM is a beta of 2018 with
+no upstream answering (CVE-2026-100888, -100889, -101277 open in every
+Debian suite, "vendor did not respond"; Debian bug #1149875 unanswered).
+Every limit SelfPost works around is its: it logs through syslog(3) only
+(the relay), it chooses the key by `From:` with its own parser (the port,
+the 256-byte refusal, the probe scripts), its socket file outlives a
+crash, its tables are reloaded by a cross-uid signal (`CAP_KILL`), its
+keys must be shared through a group.
+
+**Goal:** the panel's own milter signs - `github.com/emersion/go-msgauth/dkim`
+(the e2e suite's verifier already; `relaxed/simple`, `From` over-signed,
+RFC 6376 § 5.4's header set, the body hashed as it streams), the key by
+the login's domain on 465/587 and by the server's name for the panel's
+local submission (`non_smtpd_milters` on the same socket, strict).
+Removed: the `opendkim` and `opendkim-tools` packages, `opendkim.conf`,
+two supervisord programs (OpenDKIM, the syslog relay), the table renderer
+and its reload, the parser port and its scripts, Health's OpenDKIM
+entries, probably `CAP_KILL` - about 1,500 lines. Keys, selectors and
+published DNS records unchanged; nothing for an operator to do. The e2e
+oracle must be an independent verifier (`opendkim-testmsg` in the sink
+image, or rspamd), not the signing library, and a message to a real
+mailbox precedes the cut. Two to three stages, a MINOR release; after
+[base-trixie](#base-trixie) (remote exposure first; the two touch
+disjoint citations).
 
 ## settings-save-row
 
