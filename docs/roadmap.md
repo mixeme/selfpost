@@ -41,6 +41,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
+| own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | candidate (analysis, 2026-10-15) | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
@@ -739,6 +740,36 @@ mail card of its own - but from Settings it cannot be found.
 the check is and how long a result is kept. Design change, mockup first;
 decide together with [dns-record-collapse](#dns-record-collapse) (a record
 that turns right on the re-check folds).
+
+## own-mta-builds
+
+**Question (owner, 2026-10-15):** is it worth patching Postfix and OpenDKIM
+and shipping our own builds of them, to optimise something in SelfPost or to
+lift a limit we work around? Weigh it, for and against; nothing is agreed
+beyond the analysis.
+
+**For the analysis** (starting points, none of them weighed yet):
+
+- *Limits met so far* - OpenDKIM logs through syslog(3) only, hence the
+  syslog relay (audit 2026-10-12, L30); the panel reads Postfix's state from
+  `mail.log` lines and `postconf`/`postqueue` output; the sender check reads
+  From: the way OpenDKIM does rather than asking it; the image is held to
+  what Debian bookworm packages (Postfix 3.7.11, OpenDKIM 2.11.0~beta2, a
+  beta that upstream has not followed with a release).
+- *For own builds* - such limits lifted at the source; newer upstream
+  versions than the distribution's; options compiled in or out.
+- *Against* - security fixes become ours to follow and rebuild (Debian's
+  security team does it now); longer and less reproducible image builds; a
+  patch set to carry across upstream versions by one maintainer; the docs'
+  habit of citing upstream source by version would have to cite ours.
+- *Middle ways to compare* - an unpatched upstream build only where the
+  distribution's version is the limit; a patch sent upstream instead of
+  carried; replacing OpenDKIM with signing in the panel's own milter (Go),
+  which the panel already runs for the sender check.
+
+**Outcome expected:** a recommendation with costs - which limits a build of
+our own would remove, what each costs to keep, and whether a middle way
+gets the same for less.
 
 ## settings-save-row
 
