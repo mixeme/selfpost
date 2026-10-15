@@ -2,7 +2,7 @@
 
 **Status:** draft, 2026-10-15 - the row is agreed (owner, 2026-10-15, the
 order port25-bare-newline -> base-trixie -> panel-dkim-signing); three
-questions below are open and go to the owner one at a time.  
+questions below go to the owner one at a time; Q1 is decided.  
 **Date:** 2026-10-15  
 **Version:** `2.8.0` MINOR (after base-trixie's `2.7.0`). No migration;
 nothing for an operator to do.
@@ -106,6 +106,7 @@ Decided here (technical, the owner may overrule):
   through, not a missing login, decides that the server's key may sign
   it; the sender check stays a header-only milter; and moving the signer
   into a process of its own later is a change of where it is started.
+  **Decided (owner, 2026-10-15): (a).**
 - **Q2. The key directory's name.** `/data/opendkim/keys/<domain>/<sel>.private`
   stays as it is, or becomes `/data/dkim/...` (the entrypoint moves the
   tree once; KeyTable and SigningTable are deleted). A backup restores
