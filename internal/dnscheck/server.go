@@ -24,7 +24,14 @@ func (c *Checker) checkServer(ctx context.Context, hostname string) Server {
 	}
 
 	addrs, err := c.resolver.LookupIPAddr(ctx, hostname)
-	if err != nil || len(addrs) == 0 {
+	if err != nil && !isNotFound(err) {
+		// The resolvers did not answer: not known, rather than "does not
+		// resolve" (audit 2026-10-12, M15). Checker.Server keeps the
+		// addresses it had, for the SPF check that needs them.
+		srv.PTR = lookupFailed("the address of "+hostname, err)
+		return srv
+	}
+	if len(addrs) == 0 {
 		srv.PTR = Result{
 			Status: health.StatusError,
 			Detail: fmt.Sprintf("%s does not resolve to any address. Publish an A (or AAAA) record for it — receiving servers check the name this server announces in HELO.", hostname),
@@ -33,14 +40,21 @@ func (c *Checker) checkServer(ctx context.Context, hostname string) Server {
 	}
 
 	want := normalizeName(hostname)
-	matched, total := 0, len(addrs)
+	matched, total, unanswered := 0, len(addrs), 0
 	var records []string
+	var lastErr error
 	for _, a := range addrs {
 		ip := a.IP.String()
 		srv.IPs = append(srv.IPs, ip)
 
 		names, err := c.resolver.LookupAddr(ctx, ip)
-		if err != nil || len(names) == 0 {
+		if err != nil && !isNotFound(err) {
+			unanswered++
+			lastErr = err
+			records = append(records, ip+" → not answered ("+dnsErrorText(err)+")")
+			continue
+		}
+		if len(names) == 0 {
 			records = append(records, ip+" → no PTR record")
 			continue
 		}
@@ -60,6 +74,10 @@ func (c *Checker) checkServer(ctx context.Context, hostname string) Server {
 
 	srv.PTR.Records = records
 	switch {
+	case unanswered > 0 && matched+unanswered == total:
+		// Every address that was answered matches; the rest are not known.
+		srv.PTR.Status = health.StatusUnknown
+		srv.PTR.Detail = lookupFailed("the reverse DNS of "+joinIPs(srv.IPs), lastErr).Detail
 	case matched == total:
 		srv.PTR.Status = health.StatusOK
 		srv.PTR.Detail = fmt.Sprintf("%s resolves to %s and the reverse lookup points back at it.", hostname, joinIPs(srv.IPs))

@@ -10,26 +10,26 @@ import (
 
 // checksFixture is one reading of every server check, shaped as healthChecks
 // returns it.
-func checksFixture() map[string]any {
-	return map[string]any{
-		"Processes": []health.Process{
+func checksFixture() healthReadings {
+	return healthReadings{
+		Processes: []health.Process{
 			{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
 			{Name: "postfix", State: "FATAL", Status: health.StatusError},
 		},
-		"ProcessError":  false,
-		"ProcessStatus": health.StatusError,
-		"QueueSummary":  "Mail queue is empty",
-		"QueueError":    "",
-		"QueueStatus":   health.StatusOK,
-		"Machine":       health.Machine{Status: health.StatusUnknown},
-		"Cert":          health.Certificate{Subject: "mail.example.org", DaysLeft: 12, Status: health.StatusWarn, Detail: "Expires soon."},
-		"Sockets": []health.Socket{
+		ProcessError:  false,
+		ProcessStatus: health.StatusError,
+		QueueSummary:  "Mail queue is empty",
+		QueueError:    "",
+		QueueStatus:   health.StatusOK,
+		Machine:       health.Machine{Status: health.StatusUnknown},
+		Cert:          health.Certificate{Subject: "mail.example.org", DaysLeft: 12, Status: health.StatusWarn, Detail: "Expires soon."},
+		Sockets: []health.Socket{
 			{Name: "OpenDKIM", Present: true, Status: health.StatusOK},
 			{Name: "send-log", Present: false, Status: health.StatusWarn},
 		},
-		"SocketStatus": health.StatusWarn,
-		"Hostname":     "mail.example.org",
-		"PTR":          dnscheck.Result{Status: health.StatusOK},
+		SocketStatus: health.StatusWarn,
+		Hostname:     "mail.example.org",
+		PTR:          dnscheck.Result{Status: health.StatusOK},
 	}
 }
 
@@ -57,9 +57,9 @@ func TestHealthCards(t *testing.T) {
 
 	// A check that could not run must not look fine.
 	c := checksFixture()
-	c["ProcessError"] = true
-	c["ProcessStatus"] = health.StatusUnknown
-	c["PTR"] = dnscheck.Result{Status: health.StatusUnknown}
+	c.ProcessError = true
+	c.ProcessStatus = health.StatusUnknown
+	c.PTR = dnscheck.Result{Status: health.StatusUnknown}
 	cards = healthCards(c)
 	if cards[1].Level != "warn" || cards[1].Value != "Could not be read" || cards[5].Level != "warn" || cards[5].Value != "Not checked" {
 		t.Errorf("unverified checks render as %+v and %+v", cards[1], cards[5])
@@ -86,18 +86,18 @@ func TestQueueCardValue(t *testing.T) {
 // reload helper idles between runs: it is neither running nor missing.
 func TestProcessesCardLeavesOutTheIdleOneShot(t *testing.T) {
 	c := checksFixture()
-	c["Processes"] = []health.Process{
+	c.Processes = []health.Process{
 		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix-reload", State: "STOPPED", Status: health.StatusOK, OneShot: true},
 	}
-	c["ProcessStatus"] = health.StatusOK
+	c.ProcessStatus = health.StatusOK
 	card := healthCards(c)[1]
 	if card.Value != "2 of 2 running" || card.Sub != "all programs" {
 		t.Errorf("card = %q / %q, want 2 of 2 running / all programs", card.Value, card.Sub)
 	}
 
-	c["Processes"] = []health.Process{
+	c.Processes = []health.Process{
 		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix-reload", State: "FATAL", Status: health.StatusError, OneShot: true},
 	}

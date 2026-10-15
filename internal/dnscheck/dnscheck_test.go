@@ -53,6 +53,9 @@ func (f *fakeResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAdd
 
 func (f *fakeResolver) LookupAddr(_ context.Context, addr string) ([]string, error) {
 	f.lookups++
+	if f.fail[addr] {
+		return nil, &net.DNSError{Err: "i/o timeout", Name: addr, IsTimeout: true}
+	}
 	if v, ok := f.ptr[addr]; ok {
 		return v, nil
 	}
@@ -409,5 +412,52 @@ func TestInboundMXAbsent(t *testing.T) {
 	got := newTestChecker(&fakeResolver{}).InboundMX("none.example", "mail.example.org", false)
 	if got.Status != health.StatusError {
 		t.Fatalf("status = %q, want error", got.Status)
+	}
+}
+
+// A PTR lookup the resolvers did not answer is not known, not "no PTR record"
+// (audit 2026-10-12, M15); an answered address that does not match is still
+// an error.
+func TestServerPTRTimeoutIsUnknown(t *testing.T) {
+	f := &fakeResolver{
+		addr: map[string][]net.IPAddr{"mail.example.com": ipAddrs("203.0.113.10", "203.0.113.11")},
+		ptr:  map[string][]string{"203.0.113.10": {"mail.example.com."}},
+		fail: map[string]bool{"203.0.113.11": true},
+	}
+	srv := newTestChecker(f).Server("mail.example.com", false)
+	if srv.PTR.Status != health.StatusUnknown || !strings.Contains(srv.PTR.Detail, "Could not check the reverse DNS") {
+		t.Fatalf("status = %q (%s), want Unknown", srv.PTR.Status, srv.PTR.Detail)
+	}
+	if len(srv.IPs) != 2 {
+		t.Errorf("IPs = %v", srv.IPs)
+	}
+
+	f.ptr["203.0.113.10"] = []string{"other.example."}
+	srv = newTestChecker(f).Server("mail.example.com", true)
+	if srv.PTR.Status != health.StatusError {
+		t.Errorf("a mismatch beside a timeout = %q, want the error the mismatch is", srv.PTR.Status)
+	}
+}
+
+// The address lookup not answered is not known, not "does not resolve"; the
+// addresses the last answer gave are kept, so a domain's SPF check that needs
+// them does not go Unknown with it (audit 2026-10-12, M15).
+func TestServerAddressTimeoutIsUnknownAndKeepsTheAddresses(t *testing.T) {
+	f := &fakeResolver{
+		addr: map[string][]net.IPAddr{"mail.example.com": ipAddrs("203.0.113.10")},
+		ptr:  map[string][]string{"203.0.113.10": {"mail.example.com."}},
+		fail: map[string]bool{},
+	}
+	c := newTestChecker(f)
+	if srv := c.Server("mail.example.com", false); srv.PTR.Status != health.StatusOK {
+		t.Fatalf("first check = %q", srv.PTR.Status)
+	}
+	f.fail["mail.example.com"] = true
+	srv := c.Server("mail.example.com", true)
+	if srv.PTR.Status != health.StatusUnknown || strings.Contains(srv.PTR.Detail, "does not resolve") {
+		t.Fatalf("status = %q (%s), want Unknown", srv.PTR.Status, srv.PTR.Detail)
+	}
+	if len(srv.IPs) != 1 || srv.IPs[0] != "203.0.113.10" {
+		t.Errorf("IPs = %v, want the ones the last answer gave", srv.IPs)
 	}
 }

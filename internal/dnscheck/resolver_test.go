@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 )
 
 func TestWithDefaultPort(t *testing.T) {
@@ -48,10 +49,10 @@ func TestNewExternalResolverFallsBackToDefaults(t *testing.T) {
 // must not second-guess an authoritative "no such name" — otherwise a domain
 // that genuinely lacks a record costs one timeout per configured resolver.
 func TestQueryEachTriesTheNextResolverOnlyOnFailure(t *testing.T) {
-	servers := []*net.Resolver{{}, {}, {}}
+	e := &externalResolver{servers: []*net.Resolver{{}, {}, {}}, timeout: time.Second}
 
 	asked := 0
-	got, err := queryEach(servers, func(*net.Resolver) (string, error) {
+	got, err := queryEach(context.Background(), e, func(context.Context, int) (string, error) {
 		asked++
 		if asked < 3 {
 			return "", &net.DNSError{Err: "timed out", IsTimeout: true}
@@ -66,7 +67,7 @@ func TestQueryEachTriesTheNextResolverOnlyOnFailure(t *testing.T) {
 	}
 
 	asked = 0
-	_, err = queryEach(servers, func(*net.Resolver) (string, error) {
+	_, err = queryEach(context.Background(), e, func(context.Context, int) (string, error) {
 		asked++
 		return "", notFound("absent.example")
 	})
@@ -76,6 +77,40 @@ func TestQueryEachTriesTheNextResolverOnlyOnFailure(t *testing.T) {
 	}
 	if asked != 1 {
 		t.Errorf("NXDOMAIN asked %d resolvers, want 1 — it is an answer, not a failure", asked)
+	}
+}
+
+// A first resolver that drops packets costs its own time, not the check's:
+// the second is asked with time left, and answers; and the next question goes
+// to the one that answered (audit 2026-10-12, M14).
+func TestADroppingResolverLeavesTheNextItsTime(t *testing.T) {
+	e := &externalResolver{servers: []*net.Resolver{{}, {}, {}}, timeout: 50 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	var order []int
+	drops := func(ctx context.Context, i int) (string, error) {
+		order = append(order, i)
+		if i == 0 {
+			<-ctx.Done() // a resolver that never answers
+			return "", &net.DNSError{Err: "i/o timeout", IsTimeout: true}
+		}
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		return "answer", nil
+	}
+	start := time.Now()
+	got, err := queryEach(ctx, e, drops)
+	if err != nil || got != "answer" {
+		t.Fatalf("got (%q, %v): the second resolver was not given its time", got, err)
+	}
+	if took := time.Since(start); took > 500*time.Millisecond {
+		t.Errorf("the dropping resolver took %v of the check's second", took)
+	}
+	order = nil
+	if _, err := queryEach(ctx, e, drops); err != nil || len(order) != 1 || order[0] != 1 {
+		t.Errorf("the next question went to %v (%v), want the resolver that answered", order, err)
 	}
 }
 

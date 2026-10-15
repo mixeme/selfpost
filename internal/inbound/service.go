@@ -70,10 +70,35 @@ func (s *Service) SetTransport(id int64, host, portRaw, tlsMode string) error {
 	if err := checkTLSMode(tlsMode); err != nil {
 		return err
 	}
+	if err := s.checkOneTLSModePerUpstream(id, host, port, tlsMode); err != nil {
+		return err
+	}
 	if err := s.store.UpdateInboundTransport(id, host, port, tlsMode); err != nil {
 		return err
 	}
 	return s.Resync()
+}
+
+// checkOneTLSModePerUpstream refuses an upstream another inbound domain
+// already forwards to with another TLS mode. Postfix's TLS policy is keyed by
+// the next hop, not by the domain (smtp_tls_policy_maps; Postfix 3.7.11,
+// README_FILES/TLS_README: the key is the verbatim next-hop), so two domains
+// to one [host]:port share one mode: the map held both keys, and the first by
+// domain name won with a warning - the form's choice for the second domain
+// was not what Postfix did (audit 2026-10-12, L5).
+func (s *Service) checkOneTLSModePerUpstream(id int64, host string, port int, tlsMode string) error {
+	domains, err := s.store.ListInboundDomains()
+	if err != nil {
+		return err
+	}
+	for _, d := range domains {
+		if d.ID == id || d.Port != port || normalizeHost(d.Host) != host || d.TLSMode == tlsMode {
+			continue
+		}
+		return invalid("[%s]:%d is already the upstream of %s, with TLS mode %s: an upstream has one TLS mode - choose %s here, or change it on %s first",
+			host, port, d.Name, d.TLSMode, d.TLSMode, d.Name)
+	}
+	return nil
 }
 
 // SetRecipients validates the mode and, in list mode, every address, then

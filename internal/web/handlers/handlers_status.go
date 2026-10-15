@@ -186,20 +186,20 @@ func senderCheckCard(s store.SenderCheckStats, now time.Time) (rows []view.Sende
 // healthPage turns one reading of the checks (healthChecks) into the Health
 // page: a table row per resource, process and socket, and the verdict of each
 // box in its head.
-func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
+func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 	page := view.NewHealth(m, flash)
 
-	machine := c["Machine"].(health.Machine)
+	machine := c.Machine
 	page.Machine.End = view.Verdict(string(machine.Status))
 	page.MachineRows = machineRows(machine)
 
-	page.Processes.End = view.Verdict(string(c["ProcessStatus"].(health.Status)))
-	page.ProcessError = c["ProcessError"].(bool)
-	for _, p := range c["Processes"].([]health.Process) {
+	page.Processes.End = view.Verdict(string(c.ProcessStatus))
+	page.ProcessError = c.ProcessError
+	for _, p := range c.Processes {
 		page.ProcessRows = append(page.ProcessRows, processRow(p))
 	}
 
-	cert := c["Cert"].(health.Certificate)
+	cert := c.Cert
 	page.Certificate.End = view.Verdict(string(cert.Status))
 	if !cert.NotAfter.IsZero() {
 		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Expires", Value: view.Plain(cert.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
@@ -214,8 +214,8 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 	}
 	page.CertDetail, page.CertProblem = cert.Detail, cert.Status != health.StatusOK
 
-	page.Sockets.End = view.Verdict(string(c["SocketStatus"].(health.Status)))
-	for _, s := range c["Sockets"].([]health.Socket) {
+	page.Sockets.End = view.Verdict(string(c.SocketStatus))
+	for _, s := range c.Sockets {
 		row := view.SocketRow{Name: s.Name, Note: s.Note, Path: s.Path, State: view.Tag{Status: string(s.Status)}}
 		if s.Status != health.StatusOK {
 			row.Detail = s.Detail
@@ -223,9 +223,9 @@ func healthPage(m view.Meta, c map[string]any, flash string) *view.Health {
 		page.SocketRows = append(page.SocketRows, row)
 	}
 
-	ptr := c["PTR"].(dnscheck.Result)
+	ptr := c.PTR
 	page.Hostname.End = view.Verdict(string(ptr.Status))
-	host := c["Hostname"].(string)
+	host := c.Hostname
 	if host == "" {
 		host = "(SELFPOST_HOSTNAME is not set)"
 	}
@@ -293,12 +293,12 @@ func lines(s string) []string {
 
 // healthCards turns the checks into the six cards of Overview, in the order of
 // the tables on Health. Each card links to the table behind it.
-func healthCards(c map[string]any) []view.HealthCard {
-	machine := c["Machine"].(health.Machine)
-	procs := c["Processes"].([]health.Process)
-	cert := c["Cert"].(health.Certificate)
-	sockets := c["Sockets"].([]health.Socket)
-	ptr := c["PTR"].(dnscheck.Result)
+func healthCards(c healthReadings) []view.HealthCard {
+	machine := c.Machine
+	procs := c.Processes
+	cert := c.Cert
+	sockets := c.Sockets
+	ptr := c.PTR
 
 	card := func(name, icon, href string, status health.Status, value, sub string) view.HealthCard {
 		return view.HealthCard{Name: name, Icon: icon, Href: href, Level: cardLevel(status), Value: value, Sub: sub}
@@ -331,7 +331,7 @@ func healthCards(c map[string]any) []view.HealthCard {
 	if len(notRunning) > 0 {
 		procSub = strings.Join(notRunning, ", ")
 	}
-	if c["ProcessError"].(bool) {
+	if c.ProcessError {
 		procValue, procSub = "Could not be read", "supervisord"
 	}
 
@@ -340,8 +340,8 @@ func healthCards(c map[string]any) []view.HealthCard {
 		certValue = fmt.Sprintf("Expires in %d days", cert.DaysLeft)
 	}
 
-	queueValue := queueCardValue(c["QueueSummary"].(string))
-	if e := c["QueueError"].(string); e != "" {
+	queueValue := queueCardValue(c.QueueSummary)
+	if e := c.QueueError; e != "" {
 		queueValue = "Could not be read"
 	}
 
@@ -378,12 +378,12 @@ func healthCards(c map[string]any) []view.HealthCard {
 
 	return []view.HealthCard{
 		card("Machine", "ti-cpu", "/server/health", machine.Status, cpu, ram),
-		card("Processes", "ti-server-cog", "/server/health", c["ProcessStatus"].(health.Status), procValue, procSub),
+		card("Processes", "ti-server-cog", "/server/health", c.ProcessStatus, procValue, procSub),
 		card("TLS certificate", "ti-certificate", "/server/health", cert.Status, certValue, cert.Subject),
-		card("Queue", "ti-stack-2", "/outbound/queue", c["QueueStatus"].(health.Status), queueValue, "outbound"),
-		card("Milter sockets", "ti-plug-connected", "/server/health", c["SocketStatus"].(health.Status),
+		card("Queue", "ti-stack-2", "/outbound/queue", c.QueueStatus, queueValue, "outbound"),
+		card("Milter sockets", "ti-plug-connected", "/server/health", c.SocketStatus,
 			fmt.Sprintf("%d of %d answering", answering, len(sockets)), socketSub),
-		card("Reverse DNS", "ti-arrows-exchange", "/server/health", ptr.Status, ptrValue, c["Hostname"].(string)),
+		card("Reverse DNS", "ti-arrows-exchange", "/server/health", ptr.Status, ptrValue, c.Hostname),
 	}
 }
 
@@ -417,8 +417,26 @@ func cardLevel(s health.Status) string {
 	}
 }
 
+// healthReadings are what Health and Overview are drawn from, read once per
+// page. A struct, not a map: a mistyped name is a compile error and not an
+// empty card (owner, 2026-10-13; the last of template-data-typing).
+type healthReadings struct {
+	Processes     []health.Process
+	ProcessError  bool
+	ProcessStatus health.Status
+	QueueSummary  string
+	QueueError    string
+	QueueStatus   health.Status
+	Machine       health.Machine
+	Cert          health.Certificate
+	Sockets       []health.Socket
+	SocketStatus  health.Status
+	Hostname      string
+	PTR           dnscheck.Result
+}
+
 // healthChecks runs every server check once.
-func (h *Handlers) healthChecks() map[string]any {
+func (h *Handlers) healthChecks() healthReadings {
 	procs, procErr := health.Processes()
 	procStatus := health.StatusUnknown
 	if procErr != nil {
@@ -452,19 +470,19 @@ func (h *Handlers) healthChecks() map[string]any {
 	machine := h.machine.Sample()
 	srv := h.dns.Server(h.cfg.Hostname, false)
 
-	return map[string]any{
-		"Processes":     procs,
-		"ProcessError":  procErr != nil,
-		"ProcessStatus": procStatus,
-		"QueueSummary":  queueSummary(queueText),
-		"QueueError":    queueErr,
-		"QueueStatus":   queueStatus,
-		"Machine":       machine,
-		"Cert":          cert,
-		"Sockets":       sockets,
-		"SocketStatus":  socketStatus,
-		"Hostname":      h.cfg.Hostname,
-		"PTR":           srv.PTR,
+	return healthReadings{
+		Processes:     procs,
+		ProcessError:  procErr != nil,
+		ProcessStatus: procStatus,
+		QueueSummary:  queueSummary(queueText),
+		QueueError:    queueErr,
+		QueueStatus:   queueStatus,
+		Machine:       machine,
+		Cert:          cert,
+		Sockets:       sockets,
+		SocketStatus:  socketStatus,
+		Hostname:      h.cfg.Hostname,
+		PTR:           srv.PTR,
 	}
 }
 

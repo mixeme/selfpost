@@ -66,6 +66,12 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 	sort.Slice(routes, func(i, j int) bool { return routes[i].Domain < routes[j].Domain })
 
 	var relayB, transportB, recipB, tlsB strings.Builder
+	// One TLS policy line per next hop: the map is keyed by it, and a key
+	// written twice was a warning from Postfix and the first line's mode
+	// (audit 2026-10-12, L5). The panel refuses two modes for one next hop
+	// (inbound.Service.SetTransport); rows saved before that keep the
+	// first by domain name, which is what Postfix did with them.
+	tlsFor := map[string]bool{}
 	for _, r := range routes {
 		if strings.TrimSpace(r.Host) == "" {
 			continue
@@ -76,7 +82,10 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 		nexthop := inboundNexthop(r.Host, r.Port)
 		fmt.Fprintf(&relayB, "%s OK\n", r.Domain)
 		fmt.Fprintf(&transportB, "%s smtp:%s\n", r.Domain, nexthop)
-		fmt.Fprintf(&tlsB, "%s %s\n", nexthop, r.TLSMode)
+		if !tlsFor[nexthop] {
+			tlsFor[nexthop] = true
+			fmt.Fprintf(&tlsB, "%s %s\n", nexthop, r.TLSMode)
+		}
 		switch r.RecipientMode {
 		case "any":
 			fmt.Fprintf(&recipB, "@%s OK\n", r.Domain)

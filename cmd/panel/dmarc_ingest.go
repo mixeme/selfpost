@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,8 +12,6 @@ import (
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/store"
 )
-
-const maxIngestStdin = 10 << 20 // 10 MiB
 
 func runDMARCIngestMode() error {
 	cfg := loadConfig()
@@ -28,7 +25,7 @@ func runDMARCIngestMode() error {
 	defer st.Close()
 
 	recipient := ingestRecipient(os.Args[1:])
-	if err := dmarc.IngestMessage(st, io.LimitReader(os.Stdin, maxIngestStdin), recipient, time.Now().UTC()); err != nil {
+	if err := dmarc.IngestMessage(st, os.Stdin, recipient, time.Now().UTC()); err != nil {
 		if !errors.Is(err, dmarc.ErrRejected) {
 			return err
 		}

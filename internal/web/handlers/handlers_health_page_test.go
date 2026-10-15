@@ -16,18 +16,18 @@ import (
 
 // healthReading is one plausible reading of every check Health shows, so a test
 // can render the page and vary the one part it is about.
-func healthReading() map[string]any {
+func healthReading() healthReadings {
 	c := checksFixture()
-	c["Processes"] = []health.Process{
+	c.Processes = []health.Process{
 		{Name: "opendkim", State: "RUNNING", Detail: "pid 21", Status: health.StatusOK},
 		{Name: "postfix", State: "FATAL", Detail: "exited too quickly", Status: health.StatusError},
 	}
-	c["Cert"] = health.Certificate{
+	c.Cert = health.Certificate{
 		Path: "/etc/postfix/tls/fullchain.pem", Subject: "mail.example.com",
 		NotAfter: time.Date(2026, 11, 8, 9, 14, 0, 0, time.UTC), DaysLeft: 30,
 		Status: health.StatusOK, Detail: "Valid for another 30 day(s).",
 	}
-	c["Machine"] = health.Machine{
+	c.Machine = health.Machine{
 		CPU: health.CPU{
 			Measured: true, BusyPct: 12.4, Cores: 4, Threads: 4,
 			Status: health.StatusOK, Detail: "4 cores · 4 threads",
@@ -43,13 +43,13 @@ func healthReading() map[string]any {
 		Window: 5 * time.Second,
 		Status: health.StatusOK,
 	}
-	c["Sockets"] = []health.Socket{
+	c.Sockets = []health.Socket{
 		{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening"},
 		{Name: "send-log", Path: "/run/selfpost/journal.sock", Status: health.StatusWarn, Detail: "send-log socket missing: the log stops being written."},
 	}
-	c["SocketStatus"] = health.StatusWarn
-	c["Hostname"] = "mail.example.com"
-	c["PTR"] = dnscheck.Result{
+	c.SocketStatus = health.StatusWarn
+	c.Hostname = "mail.example.com"
+	c.PTR = dnscheck.Result{
 		Status:  health.StatusError,
 		Detail:  "No address has a reverse record.",
 		Records: []string{"203.0.113.10 → no PTR record"},
@@ -57,7 +57,7 @@ func healthReading() map[string]any {
 	return c
 }
 
-func renderHealth(t *testing.T, h *Handlers, c map[string]any, flash string) string {
+func renderHealth(t *testing.T, h *Handlers, c healthReadings, flash string) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	h.view.Render(rec, 200, "health", healthPage(view.Meta{User: "admin", IsGlobal: true}, c, flash))
@@ -111,7 +111,7 @@ func TestHealthPageRendersEveryCheck(t *testing.T) {
 func TestHealthPageWithoutMachineMetrics(t *testing.T) {
 	h, _ := settingsServer(t)
 	c := healthReading()
-	c["Machine"] = health.Machine{
+	c.Machine = health.Machine{
 		CPU:     health.CPU{Status: health.StatusUnknown, Detail: "The kernel's processor counters (/proc/stat) could not be read here."},
 		Memory:  health.Memory{Status: health.StatusUnknown, Detail: "The kernel's memory counters (/proc/meminfo) could not be read here."},
 		Network: health.Network{Status: health.StatusUnknown, Detail: "The kernel's network counters (/proc/net/dev) could not be read here."},
@@ -131,12 +131,12 @@ func TestHealthPageWithoutMachineMetrics(t *testing.T) {
 func TestHealthPageStatesOfTheOtherChecks(t *testing.T) {
 	h, _ := settingsServer(t)
 	c := healthReading()
-	c["ProcessError"] = true
-	c["ProcessStatus"] = health.StatusUnknown
-	c["Processes"] = []health.Process(nil)
-	c["Cert"] = health.Certificate{Status: health.StatusUnknown, Detail: "No certificate path is configured (TLS_CERT_FILE)."}
-	c["Hostname"] = ""
-	c["PTR"] = dnscheck.Result{Status: health.StatusUnknown}
+	c.ProcessError = true
+	c.ProcessStatus = health.StatusUnknown
+	c.Processes = []health.Process(nil)
+	c.Cert = health.Certificate{Status: health.StatusUnknown, Detail: "No certificate path is configured (TLS_CERT_FILE)."}
+	c.Hostname = ""
+	c.PTR = dnscheck.Result{Status: health.StatusUnknown}
 	out := renderHealth(t, h, c, "DNS re-checked.")
 	for _, want := range []string{
 		"Could not ask supervisord for the process list.",
@@ -155,13 +155,13 @@ func TestHealthPageStatesOfTheOtherChecks(t *testing.T) {
 func TestHealthPageNamesARenewalWaiting(t *testing.T) {
 	h, _ := settingsServer(t)
 	c := healthReading()
-	cert := c["Cert"].(health.Certificate)
+	cert := c.Cert
 	cert.Renewal = &health.Renewal{
 		NotAfter: time.Date(2027, 1, 31, 8, 2, 0, 0, time.UTC),
 		Mounted:  time.Date(2026, 10, 15, 3, 12, 0, 0, time.UTC),
 	}
 	cert.Detail = "Postfix still serves the certificate above. A renewed one is waiting in the mounted file."
-	c["Cert"] = cert
+	c.Cert = cert
 	out := renderHealth(t, h, c, "")
 	for _, want := range []string{
 		"<dt>Expires</dt>", "2026-11-08 09:14 UTC",

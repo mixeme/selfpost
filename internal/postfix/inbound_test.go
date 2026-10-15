@@ -117,3 +117,22 @@ func TestRebuildInboundMapsEmptyOmitsPending(t *testing.T) {
 		}
 	}
 }
+
+// Two domains forwarded to one next hop share its TLS policy line: the map
+// holds the key once (audit 2026-10-12, L5).
+func TestRenderInboundMapsOneTLSLinePerNextHop(t *testing.T) {
+	routes := []InboundRoute{
+		{Domain: "b.example", Host: "10.0.0.8", Port: 25, TLSMode: "encrypt", RecipientMode: "any"},
+		{Domain: "a.example", Host: "10.0.0.8", Port: 25, TLSMode: "encrypt", RecipientMode: "any"},
+	}
+	_, transport, _, tlsPolicy, err := renderInboundMaps(routes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(transport) != "a.example smtp:[10.0.0.8]:25\nb.example smtp:[10.0.0.8]:25\n" {
+		t.Errorf("transport = %q", transport)
+	}
+	if string(tlsPolicy) != "[10.0.0.8]:25 encrypt\n" {
+		t.Errorf("tls_policy = %q, want the next hop once", tlsPolicy)
+	}
+}

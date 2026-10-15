@@ -38,7 +38,7 @@ func socketsServer(t *testing.T) *Handlers {
 
 func socketsOf(t *testing.T, h *Handlers) []health.Socket {
 	t.Helper()
-	return h.healthChecks()["Sockets"].([]health.Socket)
+	return h.healthChecks().Sockets
 }
 
 func socketCard(t *testing.T, h *Handlers) view.HealthCard {
@@ -143,8 +143,8 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 		}
 
 		c := h.healthChecks()
-		if c["SocketStatus"].(health.Status) != tt.status {
-			t.Errorf("action %q: SocketStatus = %q, want %q", tt.action, c["SocketStatus"], tt.status)
+		if c.SocketStatus != tt.status {
+			t.Errorf("action %q: SocketStatus = %q, want %q", tt.action, c.SocketStatus, tt.status)
 		}
 		card := socketCard(t, h)
 		if card.Value != "3 of 4 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {

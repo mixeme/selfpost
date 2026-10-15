@@ -235,7 +235,7 @@ expected to set; defaults match the code exactly.
 | `RATE_LIMIT_WINDOW_SECONDS` | Level-1 window length in seconds (Postfix `anvil_rate_time_unit`). | `3600` | `.env` |
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
-| `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
+| `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). Each is given 2 seconds to answer before the next is asked, and the one that answered last is asked first; a lookup none of them answered shows as not known, never as a wrong record. | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
@@ -1015,7 +1015,10 @@ reports](#dmarc-reports).) Outbound 465/587 is unchanged.
 
 **Panel** (`/inbound/domains`): the global role adds and deletes domains. On a
 domain's page, set the upstream host/port and TLS to that hop (opportunistic /
-required / off), and choose recipients — an allow-list, or any address at that
+required / off), and choose recipients. An upstream has one TLS mode: Postfix
+keeps the TLS policy per next hop, not per domain, so a second domain sent to
+the same host and port with another mode is refused, naming the domain that
+already uses it. Recipients are an allow-list, or any address at that
 domain. Inbound domains are assigned to a user with the *domain* role
 separately from outbound ones (see [Users](#users)); such a user sees and
 changes the upstream and recipients of the inbound domains assigned to them,

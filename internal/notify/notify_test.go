@@ -619,3 +619,28 @@ func TestAUserAddedWhileASubjectIsOpenIsNotMailed(t *testing.T) {
 		t.Errorf("who the subject was owed to outlived it: %v", owed)
 	}
 }
+
+// A domain is reported broken on what is wrong, never on what is not known: a
+// check whose SPF lookup did not answer beside a wrong DKIM says DKIM only,
+// and one with SPF unknown alone says nothing (audit 2026-10-12, M14/M15).
+func TestDNSUnknownIsNeverReported(t *testing.T) {
+	b := newBench(t)
+	unknownSPF := good()
+	unknownSPF.SPF = dnscheck.Result{Status: health.StatusUnknown, Detail: "Could not check SPF: the DNS lookup failed (timed out)."}
+	b.dns["example.com"] = unknownSPF
+	want(t, "SPF unknown", b.hour())
+	want(t, "SPF unknown again", b.hour())
+	want(t, "SPF unknown a third time", b.hour())
+
+	mixed := badDKIM()
+	mixed.SPF = unknownSPF.SPF
+	b.dns["example.com"] = mixed
+	want(t, "first bad check", b.hour())
+	problem := "[SelfPost] example.com: DKIM does not match"
+	b.n.Check()
+	body := strings.Join(b.out.body, "")
+	want(t, "DKIM wrong, SPF unknown", b.out.take(), "mine@example.org|"+problem, "root@example.org|"+problem)
+	if body == "" || strings.Contains(body, "SPF") {
+		t.Errorf("the message speaks of SPF, which was not known:\n%s", body)
+	}
+}

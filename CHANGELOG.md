@@ -73,6 +73,23 @@ Migration `0011` (a table, nothing existing changes).
   next check sends it to those who did not get it, once; a user added while
   the problem is open is not mailed about it; "it is over" goes to those
   who were told.
+- **A DNS resolver that dropped packets made the checks report records as
+  wrong.** The first resolver had the whole check's five seconds, so the
+  others were asked with no time left; a lookup that was not answered then
+  read as "does not resolve" or "no PTR record", and the server's addresses
+  were dropped, so every domain's SPF went unknown with it. Each resolver
+  now has 2 seconds of its own and the one that answered last is asked
+  first; an unanswered lookup is *unknown*, the addresses the last answer
+  gave are kept, and notifications report what is wrong, never what is not
+  known (audit 2026-10-12, M14, M15).
+- **A DMARC report too large was refused as a broken one.** A message over
+  10 MiB, or a report that unpacked past 8 MiB, was cut at the limit and then
+  failed as damaged; it is now refused for its size, and `mail.log` says so.
+- **Two inbound domains to one upstream with different TLS modes** wrote two
+  policy lines for one next hop, and Postfix used the first; the form's
+  choice for the other domain did nothing. Saving the second is refused,
+  naming the domain whose mode the upstream has, and the policy map holds
+  each next hop once (audit 2026-10-12, L5).
 
 ## [2.5.3] - 2026-10-15
 

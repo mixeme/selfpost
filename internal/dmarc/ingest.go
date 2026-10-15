@@ -26,6 +26,28 @@ var ErrRejected = errors.New("dmarc report rejected")
 
 func rejected(err error) error { return fmt.Errorf("%w: %w", ErrRejected, err) }
 
+// MaxMessage is the largest report message taken. One is refused, with that
+// reason, rather than cut at the limit and refused as damaged - before
+// 2.5.4 a cut message read as a broken attachment (audit 2026-10-12, stage
+// 4). Postfix hands over no more than its message_size_limit anyway.
+const MaxMessage = 10 << 20
+
+// errTooLarge is a read past its limit.
+var errTooLarge = errors.New("larger than its limit")
+
+// readAtMost reads all of r, or fails with errTooLarge once it holds more
+// than limit bytes.
+func readAtMost(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errTooLarge
+	}
+	return data, nil
+}
+
 // IngestMessage parses a raw RFC 5322 message from r and stores any DMARC
 // aggregate attachment it finds.
 //
@@ -38,7 +60,10 @@ func rejected(err error) error { return fmt.Errorf("%w: %w", ErrRejected, err) }
 // under someone else's domain, skew the panel's alignment figures, and push
 // genuine reports out through the retention cap.
 func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt time.Time) error {
-	raw, err := io.ReadAll(io.LimitReader(r, 12<<20))
+	raw, err := readAtMost(r, MaxMessage)
+	if errors.Is(err, errTooLarge) {
+		return rejected(fmt.Errorf("the message is larger than %d MiB", MaxMessage>>20))
+	}
 	if err != nil {
 		return fmt.Errorf("read message: %w", err)
 	}

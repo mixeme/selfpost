@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/xml"
+	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -207,7 +207,10 @@ func gunzip(raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("dmarc gzip: %w", err)
 	}
 	defer zr.Close()
-	data, err := io.ReadAll(io.LimitReader(zr, maxAggregateXML))
+	data, err := readAtMost(zr, maxAggregateXML)
+	if errors.Is(err, errTooLarge) {
+		return nil, fmt.Errorf("dmarc gzip: the report is larger than %d MiB uncompressed", maxAggregateXML>>20)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("dmarc gzip read: %w", err)
 	}
@@ -229,8 +232,11 @@ func unzip(raw []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("dmarc zip open %q: %w", field(f.Name), err)
 		}
-		data, err := io.ReadAll(io.LimitReader(rc, maxAggregateXML))
+		data, err := readAtMost(rc, maxAggregateXML)
 		rc.Close()
+		if errors.Is(err, errTooLarge) {
+			return nil, fmt.Errorf("dmarc zip: the report is larger than %d MiB uncompressed", maxAggregateXML>>20)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("dmarc zip read %q: %w", field(f.Name), err)
 		}

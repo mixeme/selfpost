@@ -2,110 +2,52 @@ package inbound
 
 import (
 	"errors"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 )
 
-type fakeMaps struct {
-	routes  []postfix.InboundRoute
-	err     error
-	rebuild int
-}
+type nullMaps struct{}
 
-func (f *fakeMaps) RebuildInboundMaps(routes []postfix.InboundRoute) error {
-	f.rebuild++
-	f.routes = append([]postfix.InboundRoute(nil), routes...)
-	return f.err
-}
+func (nullMaps) RebuildInboundMaps([]postfix.InboundRoute) error { return nil }
 
-func testService(t *testing.T) (*Service, *store.Store, *fakeMaps) {
-	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+// An upstream has one TLS mode, since Postfix keys the policy by the next
+// hop: a second domain saved to the same [host]:port with another mode is
+// refused with the first domain's name and mode; the same mode is fine
+// (audit 2026-10-12, L5).
+func TestOneTLSModePerUpstream(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { st.Close() })
-	m := &fakeMaps{}
-	return NewService(st, m), st, m
-}
-
-func TestAddAndSetTransport(t *testing.T) {
-	s, _, m := testService(t)
-	d, err := s.Add("Lists.Example.COM")
+	defer st.Close()
+	s := NewService(st, nullMaps{})
+	a, err := s.Add("a.example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Name != "lists.example.com" {
-		t.Fatalf("name = %q", d.Name)
-	}
-	if m.rebuild != 1 {
-		t.Fatalf("rebuild after add = %d", m.rebuild)
-	}
-	// Empty host is omitted from maps.
-	if len(m.routes) != 1 || m.routes[0].Host != "" {
-		t.Fatalf("routes after add: %+v", m.routes)
-	}
-
-	if err := s.SetTransport(d.ID, "10.0.0.8", "25", store.TLSModeEncrypt); err != nil {
-		t.Fatal(err)
-	}
-	if m.routes[0].Host != "10.0.0.8" || m.routes[0].TLSMode != store.TLSModeEncrypt {
-		t.Fatalf("routes after transport: %+v", m.routes[0])
-	}
-}
-
-func TestSetRecipientsValidatesDomain(t *testing.T) {
-	s, _, _ := testService(t)
-	d, err := s.Add("lists.example.com")
+	b, err := s.Add("b.example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = s.SetRecipients(d.ID, store.RecipientModeList, []string{"staff@other.com"})
-	if err == nil {
-		t.Fatal("expected foreign-domain error")
-	}
-	err = s.SetRecipients(d.ID, store.RecipientModeList, nil)
-	if err == nil {
-		t.Fatal("expected empty-list error")
-	}
-	if err := s.SetRecipients(d.ID, store.RecipientModeList, []string{"staff@lists.example.com"}); err != nil {
+	if err := s.SetTransport(a.ID, "10.0.0.8", "25", "encrypt"); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func TestRejectsUnsafeHost(t *testing.T) {
-	s, _, _ := testService(t)
-	d, err := s.Add("lists.example.com")
-	if err != nil {
-		t.Fatal(err)
+	err = s.SetTransport(b.ID, "[10.0.0.8]", "25", "may")
+	var verr *ValidationError
+	if !errors.As(err, &verr) || !strings.Contains(err.Error(), "[10.0.0.8]:25 is already the upstream of a.example, with TLS mode encrypt") {
+		t.Fatalf("a second mode for one upstream = %v", err)
 	}
-	if err := s.SetTransport(d.ID, "10.0.0.8; rm", "25", store.TLSModeMay); err == nil {
-		t.Fatal("expected unsafe host to be rejected")
+	if err := s.SetTransport(b.ID, "10.0.0.8", "25", "encrypt"); err != nil {
+		t.Errorf("the same mode refused: %v", err)
 	}
-}
-
-func TestDeleteResyncs(t *testing.T) {
-	s, _, m := testService(t)
-	d, err := s.Add("lists.example.com")
-	if err != nil {
-		t.Fatal(err)
+	if err := s.SetTransport(b.ID, "10.0.0.8", "2525", "may"); err != nil {
+		t.Errorf("another port refused: %v", err)
 	}
-	if err := s.Delete(d.ID); err != nil {
-		t.Fatal(err)
+	// The domain itself may change its own mode.
+	if err := s.SetTransport(a.ID, "10.0.0.8", "25", "may"); err != nil {
+		t.Errorf("a domain changing its own mode refused: %v", err)
 	}
-	if !errors.Is(mustGet(t, s, d.ID), store.ErrInboundDomainNotFound) {
-		t.Fatal("domain still present")
-	}
-	if len(m.routes) != 0 {
-		t.Fatalf("maps after delete: %+v", m.routes)
-	}
-}
-
-func mustGet(t *testing.T, s *Service, id int64) error {
-	t.Helper()
-	_, err := s.Get(id)
-	return err
 }

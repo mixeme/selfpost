@@ -145,6 +145,15 @@ func (c *Checker) Server(hostname string, force bool) Server {
 	srv := c.checkServer(ctx, hostname)
 
 	c.mu.Lock()
+	// A lookup the resolvers did not answer finds no addresses; the server
+	// still has the ones the last answer gave, and the SPF check of a domain
+	// asks for them - without them it went Unknown in the same minute
+	// (audit 2026-10-12, M15).
+	if len(srv.IPs) == 0 && srv.PTR.Status == health.StatusUnknown {
+		if prev, ok := c.servers[hostname]; ok {
+			srv.IPs = prev.value.IPs
+		}
+	}
 	c.servers[hostname] = cached[Server]{value: srv, expires: srv.CheckedAt.Add(c.serverTTL)}
 	c.mu.Unlock()
 	return srv
