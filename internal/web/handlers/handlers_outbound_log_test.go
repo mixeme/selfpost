@@ -268,9 +268,12 @@ func TestOutLogFiltersByStatusAndDay(t *testing.T) {
 		t.Errorf("today shows %d rows, want 4", got)
 	}
 	for _, q := range []string{"from=" + tomorrow, "to=" + yesterday} {
-		if body := getBody(t, h.HandleDeliveries, "/outbound/log?"+q); strings.Contains(body, `">Details</a>`) {
+		body := getBody(t, h.HandleDeliveries, "/outbound/log?"+q)
+		if strings.Contains(body, `">Details</a>`) {
 			t.Errorf("%s shows rows from today", q)
 		}
+		// Filtered to nothing is said so, not "no messages logged yet".
+		has(t, q, body, "No messages match these filters.")
 	}
 	body := getBody(t, h.HandleDeliveries, "/outbound/log?status=rejected&from="+today)
 	has(t, "filtered", body, `name="from" value="`+today+`"`,

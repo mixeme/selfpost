@@ -644,3 +644,19 @@ func TestDNSUnknownIsNeverReported(t *testing.T) {
 		t.Errorf("the message speaks of SPF, which was not known:\n%s", body)
 	}
 }
+
+// A subject opened before 2.5.4 has no record of who was told: no follow-up
+// is sent, and its end goes to everyone who is to hear of it, as it did.
+func TestASubjectFromBeforeTheTableEndsForEveryone(t *testing.T) {
+	b := newBench(t)
+	since := b.now.Add(-3 * time.Hour)
+	if err := b.st.SetNotifyState(store.NotifyState{Key: "dns:example.com", Phase: phaseOpen, Since: since, SentAt: since}); err != nil {
+		t.Fatal(err)
+	}
+	b.dns["example.com"] = badDKIM()
+	want(t, "still wrong", b.hour())
+	b.dns["example.com"] = good()
+	want(t, "first good check", b.hour())
+	cleared := "[SelfPost] example.com: DNS records match again"
+	want(t, "over", b.hour(), "mine@example.org|"+cleared, "root@example.org|"+cleared)
+}

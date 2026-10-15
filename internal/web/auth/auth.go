@@ -61,6 +61,9 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 	m.setupLimiter.startSweeper()
 	m.loginLimiter.startSweeper()
 	m.passwordLimiter.startSweeper()
+	// Made now rather than at the first unknown name, which would otherwise
+	// pay for two bcrypt runs (review of audit stage 4).
+	go noSuchUserHash()
 	m.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
 	return m
 }

@@ -30,7 +30,7 @@ const window = {
   },
 };
 vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
-  document, window, htmx: { ajax() {} }, setTimeout, clearTimeout, Date, Object, Math, console,
+  document, window, htmx: { config: {}, ajax() {} }, setTimeout, clearTimeout, Date, Object, Math, console,
 });
 
 function input(type, value, defaultValue) {
@@ -85,6 +85,16 @@ scenario("a box unticked", (f) => (f[2].checked = false), true);
 scenario("a select moved off its first option", (f) => (f[3].selectedIndex = 1), true);
 scenario("a select moved off its selected option", (f) => (f[4].selectedIndex = 0), true);
 scenario("a disabled field differs", (f) => { f[0].value = "150"; f[0].disabled = true; }, false);
+// A password manager filling a password field, a file chosen: not edits.
+scenario("a password filled in", (f) => f.push(input("password", "secret", "")), false);
+scenario("a file chosen", (f) => f.push(input("file", "x.json", "")), false);
+// A list that takes several: any option off what was drawn.
+scenario("a multiple select changed", (f) => f.push(Object.assign(select(-1, [false, false]), {
+  multiple: true, options: [{ selected: true, defaultSelected: false }, { selected: false, defaultSelected: false }],
+})), true);
+scenario("a multiple select as drawn", (f) => f.push(Object.assign(select(-1, [false, false]), {
+  multiple: true, options: [{ selected: true, defaultSelected: true }, { selected: false, defaultSelected: false }],
+})), false);
 
 // Answered yes: the submission goes on.
 fields = drawn();

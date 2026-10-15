@@ -267,8 +267,35 @@ func (s *Service) ClearRateLimit(domainID int64) error {
 // OpenDKIM. It backs the manual reload button (architecture.md § Panel HTTP
 // surface) and doubles as a recovery path if the tables ever drift from the
 // database.
+//
+// It also removes the key directories of names no domain has and that are
+// not the server's own: what a deletion left when the tables could not be
+// rebuilt (Delete keeps the key then). The "Reload configuration" the page
+// points to after such a deletion finishes it here (review of audit stage 4).
 func (s *Service) Resync() error {
-	return s.resync()
+	if err := s.resync(); err != nil {
+		return err
+	}
+	domains, err := s.store.ListDomains()
+	if err != nil {
+		return err
+	}
+	keep := map[string]bool{s.serverName: true}
+	for _, d := range domains {
+		keep[d.Name] = true
+	}
+	names, err := s.odk.KeyDomains()
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if !keep[name] {
+			if err := s.odk.RemoveKey(name); err != nil {
+				return fmt.Errorf("remove the key of %s, a domain that is gone: %w", name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // resync rebuilds KeyTable/SigningTable from the current domain set and reloads.

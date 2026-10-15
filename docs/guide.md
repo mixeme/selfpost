@@ -1016,9 +1016,10 @@ reports](#dmarc-reports).) Outbound 465/587 is unchanged.
 **Panel** (`/inbound/domains`): the global role adds and deletes domains. On a
 domain's page, set the upstream host/port and TLS to that hop (opportunistic /
 required / off), and choose recipients. An upstream has one TLS mode: Postfix
-keeps the TLS policy per next hop, not per domain, so a second domain sent to
-the same host and port with another mode is refused, naming the domain that
-already uses it. Recipients are an allow-list, or any address at that
+keeps the TLS policy per next hop, not per domain, so the mode saved for one
+domain is the mode of every domain forwarded to the same host and port, and
+they are changed with it; a *domain* user who does not manage all of them is
+refused, and told the mode in use. Recipients are an allow-list, or any address at that
 domain. Inbound domains are assigned to a user with the *domain* role
 separately from outbound ones (see [Users](#users)); such a user sees and
 changes the upstream and recipients of the inbound domains assigned to them,

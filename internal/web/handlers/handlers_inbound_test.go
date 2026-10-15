@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -226,4 +227,38 @@ func TestInboundDeletePageNamesWhatGoesWithTheDomain(t *testing.T) {
 	body = inboundCall(h, http.MethodGet, "/inbound/domains/"+id+"/delete", nil, globalPrincipal).Body.String()
 	has(t, "delete page, any recipient", body, `remove its upstream.`)
 	lacks(t, "delete page, any recipient", body, `recipient`)
+}
+
+// A domain user saving an upstream another tenant's inbound domain shares,
+// with another TLS mode, is told the mode and not the domain; the global
+// role changes the mode for both (security and technical reviews of audit
+// stage 4).
+func TestSharedUpstreamTLSModeForADomainUser(t *testing.T) {
+	h, st := inboundHandlers(t)
+	mine, _ := h.inbound.Add("mine.example")
+	theirs, _ := h.inbound.Add("theirs.example")
+	if err := h.inbound.SetTransport(theirs.ID, "10.0.0.8", "25", "encrypt"); err != nil {
+		t.Fatal(err)
+	}
+	p := userWith(t, st, "tenant", store.RoleDomain, store.Reach{InboundDomainIDs: []int64{mine.ID}})
+	form := url.Values{"host": {"10.0.0.8"}, "port": {"25"}, "tls_mode": {"may"}}
+	rec := inboundCall(h, http.MethodPost, fmt.Sprintf("/inbound/domains/%d/upstream", mine.ID), form, p)
+	body := rec.Body.String()
+	if rec.Code != http.StatusBadRequest || !strings.Contains(body, "with TLS mode encrypt, by an inbound domain you do not manage") {
+		t.Fatalf("a domain user on another's upstream = %d:\n%s", rec.Code, body)
+	}
+	if strings.Contains(body, "theirs.example") {
+		t.Error("the refusal names the other tenant's domain")
+	}
+
+	if err := h.inbound.SetTransport(mine.ID, "10.0.0.8", "25", "encrypt"); err != nil {
+		t.Fatal(err)
+	}
+	rec = inboundCall(h, http.MethodPost, fmt.Sprintf("/inbound/domains/%d/upstream", mine.ID), form, globalPrincipal)
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "shared=1") {
+		t.Fatalf("the global role changing a shared mode = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if d, _ := st.GetInboundDomain(theirs.ID); d.TLSMode != "may" {
+		t.Errorf("the other domain kept %s", d.TLSMode)
+	}
 }

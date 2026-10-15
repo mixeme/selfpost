@@ -610,7 +610,12 @@ deferred item from the roadmap.
   panel itself makes no request to the upstream. Trigger to revisit: `domain`
   users who are not trusted operators — the same condition as for CSRF tokens
   — at which point an allow-list of upstream networks, or restricting the
-  field to the global role, is the fix.
+  field to the global role, is the fix. Since `2.5.4` an upstream has one TLS
+  mode for every inbound domain forwarded to it (Postfix keys the policy by
+  the next hop): a `domain` user saving one that another tenant's domain
+  uses with another mode is refused and told that mode - not the domain -
+  so the form tells whether some domain forwards to a given host and port.
+  Accepted with the rest of this item.
 - **Account's profile (username, e-mail) is saved without the password.**
   Saving the profile does not ask for the current password, as changing the
   password does. Since 2.3.0 the e-mail is where notifications go, so a stolen
@@ -619,7 +624,9 @@ deferred item from the roadmap.
   certificate expires, sender addresses of old queued mail - and the user
   stops hearing it. Nothing in a notification gives access. A `domain` user
   can likewise point signed mail of this server at a third party's address,
-  a dozen messages a day per assigned domain at most. It
+  a dozen messages a day per assigned domain at most. The profile form also
+  says when a username is taken, so a signed-in user can tell which
+  usernames exist; signing in does not (`2.5.4`). It
   becomes a requirement to ask for the current password when changing
   `users.email` as soon as [password-reset](roadmap.md#password-reset) mails a
   link to it — from then on whoever can change the address could take the

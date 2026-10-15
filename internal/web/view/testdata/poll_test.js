@@ -61,6 +61,7 @@ const document = {
 const window = { addEventListener: on("window"), confirm: () => true };
 const requests = [];
 const htmx = {
+  config: {},
   ajax(verb, path, ctx) {
     requests.push({ verb, path, ctx });
   },
@@ -79,6 +80,9 @@ vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
 });
 
 // --- the cases --------------------------------------------------------------
+// A request that never ends is ended: htmx's default is no timeout.
+check(htmx.config.timeout === 30000, "htmx.config.timeout is " + htmx.config.timeout + ", want 30000");
+
 const box = element("overview-stats", { "data-poll": "", "hx-get": "/overview/stats", "hx-trigger": "load" });
 inPage = { [box.id]: box };
 

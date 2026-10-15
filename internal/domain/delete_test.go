@@ -50,6 +50,23 @@ func TestDeleteRunsEveryRebuildAndSaysTheDomainIsGone(t *testing.T) {
 	if _, err := os.Stat(keyDir); err != nil {
 		t.Errorf("the key went while the tables may still name it: %v", err)
 	}
+
+	// Reload configuration finishes the deletion: the tables rebuilt, the
+	// key of a domain that is gone goes too; the others' stay.
+	odk.reload = func() error { return nil }
+	keep, err := s.Add("kept.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Resync(); err != nil {
+		t.Fatalf("Resync: %v", err)
+	}
+	if _, err := os.Stat(keyDir); !os.IsNotExist(err) {
+		t.Errorf("the deleted domain's key is still there after Resync: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(odk.keysDir, keep.Name)); err != nil {
+		t.Errorf("Resync removed a domain's key: %v", err)
+	}
 }
 
 // The sender map failing is the same: deleted, said so; the tables were

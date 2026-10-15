@@ -92,6 +92,24 @@ func (o *OpenDKIM) RemoveKey(domainName string) error {
 	return nil
 }
 
+// KeyDomains lists the names that have a key directory.
+func (o *OpenDKIM) KeyDomains() ([]string, error) {
+	entries, err := os.ReadDir(o.keysDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list key dirs: %w", err)
+	}
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() {
+			out = append(out, e.Name())
+		}
+	}
+	return out, nil
+}
+
 // ExportKey returns a domain's DKIM private key as PKCS#1 PEM, for carrying in
 // a domain export so the receiving instance signs with the same key and the
 // DNS TXT record never has to change (architecture.md § Persistence). It

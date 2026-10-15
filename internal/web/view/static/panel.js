@@ -119,16 +119,25 @@
   // what the markup said (HTML Living Standard, the input, select and
   // textarea elements). A select none of whose options says selected was
   // drawn with its first option, or none when it is a list (size or multiple).
+  // Password and file fields are not edits of the page: a password manager
+  // fills the first, nothing draws the second (review of stage 4).
   function hasUnsavedEdit() {
     var fields = document.querySelectorAll("input, select, textarea");
     for (var i = 0; i < fields.length; i++) {
       var f = fields[i];
-      if (f.disabled || f.type === "hidden" || f.type === "submit" || f.type === "button" || f.type === "reset") {
+      if (f.disabled || f.type === "hidden" || f.type === "submit" || f.type === "button" ||
+          f.type === "reset" || f.type === "password" || f.type === "file") {
         continue;
       }
       if (f.type === "checkbox" || f.type === "radio") {
         if (f.checked !== f.defaultChecked) {
           return true;
+        }
+      } else if (f.tagName === "SELECT" && f.multiple) {
+        for (var m = 0; m < f.options.length; m++) {
+          if (f.options[m].selected !== f.options[m].defaultSelected) {
+            return true;
+          }
         }
       } else if (f.tagName === "SELECT") {
         var drawn = -1;
@@ -298,12 +307,26 @@
   // issueAjaxRequest(verb, path, resolveTarget(context.source), ...), and
   // with no source issueAjaxRequest() falls back to the document's body).
   function triggerPoll(el) {
-    htmx.ajax("GET", el.getAttribute("hx-get"), {
+    var done = htmx.ajax("GET", el.getAttribute("hx-get"), {
       source: el,
       target: "#" + el.id,
       swap: el.getAttribute("hx-swap") || "outerHTML"
     });
+    // A failed refresh is handled by htmx:afterRequest below; the promise
+    // htmx.ajax returns is rejected too, and is not to be left unhandled.
+    if (done && done.catch) {
+      done.catch(function () {});
+    }
   }
+
+  // A request that never ends - a panel stopped mid-answer, a proxy holding
+  // it - would end no refresh, and no next one would be scheduled: htmx's
+  // default timeout is none (htmx 2.0.4, src/htmx.js: config.timeout 0, and
+  // issueAjaxRequest() takes requestConfig.timeout from it when neither the
+  // call nor hx-request says one; xhr.timeout = requestConfig.timeout). Thirty seconds is twice the
+  // slowest page the panel draws, one that asks DNS; then htmx:timeout,
+  // and htmx:afterRequest with it.
+  htmx.config.timeout = 30000;
 
   function schedulePoll(el) {
     if (!el || !el.id || !el.hasAttribute("data-poll")) {

@@ -401,7 +401,10 @@ is sent; the operator's view is guide § Notifications.
   who are still recipients. A user who comes to hear of a subject only while
   it is open is not mailed about it, and its ending goes to those who were
   told. A subject opened before `2.5.4` has no such record, and its ending
-  goes to every recipient, as it did.
+  goes to every recipient, as it did. It is owed to an address: a user who
+  changes their e-mail while a subject is open is a new address, told
+  neither its follow-up nor its end - accepted, a subject lasts hours to
+  days.
 - **The notifier's own mail is not a subject.** A notification waiting for a
   mailbox that does not answer, or its bounce coming back to
   `postmaster@<hostname>` - which receives no mail - is left out of the

@@ -61,12 +61,13 @@ Migration `0011` (a table, nothing existing changes).
 - **Recalculate rate limit dropped what was typed on the page.** The button
   leaves the page; when a field holds an edit not saved yet, it now asks
   first (audit 2026-10-12, L19).
-- **Deleting a domain could leave its applications able to send.** When
+- **A domain deletion that failed half way said "internal error".** When
   OpenDKIM's tables failed to rebuild after the domain's row was gone, the
   sender map was not rebuilt either and kept the deleted applications'
-  logins, and the page said "internal error". Every rebuild now runs, and
-  the page says the domain is deleted and that Reload configuration
-  finishes the rest (audit 2026-10-12, L17).
+  logins (their accounts were already gone), and the DKIM key stayed. Every
+  rebuild now runs, the page says the domain is deleted and that Reload
+  configuration finishes the rest, and Reload configuration removes the
+  keys of domains that no longer exist (audit 2026-10-12, L17).
 - **A notification whose copy failed for one user was never sent to them**
   once another user's copy had gone out, and a copy held back by the hourly
   ceiling was dropped. A notification is now owed to each recipient: the
@@ -87,9 +88,16 @@ Migration `0011` (a table, nothing existing changes).
   failed as damaged; it is now refused for its size, and `mail.log` says so.
 - **Two inbound domains to one upstream with different TLS modes** wrote two
   policy lines for one next hop, and Postfix used the first; the form's
-  choice for the other domain did nothing. Saving the second is refused,
-  naming the domain whose mode the upstream has, and the policy map holds
-  each next hop once (audit 2026-10-12, L5).
+  choice for the other domain did nothing. An upstream now has one TLS mode:
+  saving it for one domain changes it for the others forwarded there, when
+  the one saving manages them all; a domain administrator who does not is
+  refused, told the mode in use and not the other domain. The policy map
+  holds each next hop once (audit 2026-10-12, L5).
+- **A monitoring refresh that never got an answer stopped the refreshes.**
+  Requests the panel's pages make in the background now give up after 30
+  seconds and are tried again.
+- **An empty filtered Outbound log said "No messages logged yet."** It says
+  that no message matches the filters.
 
 ## [2.5.3] - 2026-10-15
 

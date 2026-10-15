@@ -250,6 +250,8 @@ func firstNonEmpty(ss ...string) string {
 
 func inboundFlash(r *http.Request) string {
 	switch {
+	case r.URL.Query().Get("shared") != "":
+		return "Upstream saved. Its TLS mode is one for every domain forwarded to it, and the other domains on it were changed too."
 	case r.URL.Query().Get("saved") != "":
 		return "Upstream saved."
 	case r.URL.Query().Get("recipients") != "":
@@ -284,10 +286,28 @@ func (h *Handlers) HandleInboundTransport(w http.ResponseWriter, r *http.Request
 	host := r.PostFormValue("host")
 	port := r.PostFormValue("port")
 	tlsMode := r.PostFormValue("tls_mode")
-	if err := h.inbound.SetTransport(d.ID, host, port, tlsMode); err != nil {
+	p, _ := h.principal(r)
+	changed, err := h.inbound.SetTransportAs(d.ID, host, port, tlsMode, func(o store.InboundDomain) bool {
+		return p.CanAccessInboundDomain(o.ID)
+	})
+	var shared *inbound.UpstreamShared
+	if errors.As(err, &shared) {
+		// The other domain is another tenant's: its mode is said, its name
+		// is not (security review of audit stage 4).
+		logf("panel: inbound: save upstream of %s: %v", d.Name, err)
+		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{
+			TransportErr: "This upstream is also used, with TLS mode " + shared.Mode + ", by an inbound domain you do not manage, and an upstream has one TLS mode: choose " + shared.Mode + ", or ask the administrator to change it for both.",
+		})
+		return
+	}
+	if err != nil {
 		h.renderInboundDetail(w, r, http.StatusBadRequest, d, inboundDetailView{
 			TransportErr: inboundErrorMessage(err, "upstream", "the upstream"),
 		})
+		return
+	}
+	if changed > 0 {
+		http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?saved=1&shared=%d", d.ID, changed), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d?saved=1", d.ID), http.StatusSeeOther)

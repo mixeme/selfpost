@@ -117,7 +117,7 @@ func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []stri
 		}
 		return out
 	}
-	return &OutLog{
+	p := &OutLog{
 		Meta: m,
 		Head: Head{Kicker: "Outbound", Title: "Outbound log", Lead: lead},
 		Messages: Box{No: "01", Title: "Messages", Help: topicLink(HelpLog, "What the statuses mean"), Filter: &Filter{
@@ -137,6 +137,12 @@ func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []stri
 		Foot:    Foot{ID: "out-log-foot", End: Plain("New rows appear on their own")},
 		filter:  f,
 	}
+	// Filtered to nothing is not an empty log (review of audit stage 4),
+	// as on the Inbound log.
+	if f != (OutLogFilter{}) {
+		p.Empty.Text = Plain("No messages match these filters.")
+	}
+	return p
 }
 
 // DetailHref is the address of one message's page, carrying the filters and the

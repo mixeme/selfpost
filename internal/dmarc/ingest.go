@@ -197,7 +197,10 @@ func readEncodedBody(hdr textproto.MIMEHeader, r io.Reader) ([]byte, error) {
 	case "quoted-printable":
 		body = quotedprintable.NewReader(r)
 	}
-	data, err := io.ReadAll(io.LimitReader(body, 8<<20))
+	data, err := readAtMost(body, maxAggregateXML)
+	if errors.Is(err, errTooLarge) {
+		return nil, fmt.Errorf("the report part is larger than %d MiB", maxAggregateXML>>20)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("read part body: %w", err)
 	}

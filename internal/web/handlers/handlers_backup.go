@@ -79,6 +79,17 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 			logf("panel: full backup: %s", msg)
 		},
 	}
+	// The server's write deadline is for pages (cmd/panel newHTTPServer); an
+	// archive streams for as long as it takes, and the read-through before it
+	// (Check) is as long as the archive: the deadline moves first, so a
+	// refusal after a long Check can still be written (review of stage 4).
+	// Two hours carry a gigabyte at a little over 1 Mbit/s, and still end a
+	// client that keeps the connection and stops reading, which TCP alone
+	// would not (net/http, Go 1.26: ResponseController.SetWriteDeadline).
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(2 * time.Hour)); err != nil {
+		logf("panel: full backup: lift the write deadline: %v", err)
+	}
+
 	if err := backup.ValidateDeployRoot(h.cfg.DeployRoot); err != nil {
 		logf("panel: full backup: %v", err)
 		h.renderBackupPageWith(w, r, http.StatusBadRequest, "", deployBackupErr(err))
@@ -106,15 +117,6 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	w.Header().Set("Cache-Control", "no-store")
-
-	// The server's write deadline is for pages (cmd/panel newHTTPServer); an
-	// archive streams for as long as it takes. Two hours carry a gigabyte at
-	// a little over 1 Mbit/s, and still end a client that keeps the
-	// connection and stops reading, which TCP alone would not (net/http, Go
-	// 1.26: ResponseController.SetWriteDeadline).
-	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(2 * time.Hour)); err != nil {
-		logf("panel: full backup: lift the write deadline: %v", err)
-	}
 
 	// Everything below streams: past this point headers (and possibly some
 	// bytes) are already on the wire, so a failure cannot switch to a clean

@@ -5,6 +5,7 @@
 package inbound
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -54,51 +55,77 @@ func (s *Service) Add(name string) (store.InboundDomain, error) {
 	return d, nil
 }
 
-// SetTransport validates and saves the upstream, then rebuilds the maps.
+// SetTransport validates and saves the upstream, then rebuilds the maps; the
+// other domains forwarded to the same upstream take its TLS mode with it
+// (SetTransportAs, with every domain changeable).
 func (s *Service) SetTransport(id int64, host, portRaw, tlsMode string) error {
+	_, err := s.SetTransportAs(id, host, portRaw, tlsMode, func(store.InboundDomain) bool { return true })
+	return err
+}
+
+// UpstreamShared refuses an upstream another inbound domain forwards to with
+// another TLS mode, when the one saving may not change that domain. Its text
+// is for the log; the panel tells a domain user the mode, not the domain,
+// which is another tenant's (security review of audit stage 4).
+type UpstreamShared struct {
+	Upstream string
+	Mode     string
+	Domain   string
+}
+
+func (e *UpstreamShared) Error() string {
+	return fmt.Sprintf("%s is the upstream of %s too, with TLS mode %s", e.Upstream, e.Domain, e.Mode)
+}
+
+// SetTransportAs validates and saves the upstream of domain id, then rebuilds
+// the maps. An upstream has one TLS mode: Postfix's TLS policy is keyed by the
+// next hop, not by the domain (smtp_tls_policy_maps; Postfix 3.7.11,
+// README_FILES/TLS_README: the key is the verbatim next-hop), so two domains
+// to one [host]:port share one mode - the map held both keys and the first by
+// domain name won with a warning (audit 2026-10-12, L5). The other domains
+// forwarded to the upstream with another mode take the new one, when
+// mayChange allows each; one it does not is an *UpstreamShared and nothing is
+// saved. Before, the save was refused, and two domains sharing an upstream
+// could never change its mode (review of audit stage 4). changed is how many
+// other domains took the mode.
+func (s *Service) SetTransportAs(id int64, host, portRaw, tlsMode string, mayChange func(store.InboundDomain) bool) (changed int, err error) {
 	if _, err := s.store.GetInboundDomain(id); err != nil {
-		return err
+		return 0, err
 	}
 	host = normalizeHost(host)
 	if err := checkHost(host); err != nil {
-		return err
+		return 0, err
 	}
 	port, err := parsePort(portRaw)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := checkTLSMode(tlsMode); err != nil {
-		return err
+		return 0, err
 	}
-	if err := s.checkOneTLSModePerUpstream(id, host, port, tlsMode); err != nil {
-		return err
-	}
-	if err := s.store.UpdateInboundTransport(id, host, port, tlsMode); err != nil {
-		return err
-	}
-	return s.Resync()
-}
-
-// checkOneTLSModePerUpstream refuses an upstream another inbound domain
-// already forwards to with another TLS mode. Postfix's TLS policy is keyed by
-// the next hop, not by the domain (smtp_tls_policy_maps; Postfix 3.7.11,
-// README_FILES/TLS_README: the key is the verbatim next-hop), so two domains
-// to one [host]:port share one mode: the map held both keys, and the first by
-// domain name won with a warning - the form's choice for the second domain
-// was not what Postfix did (audit 2026-10-12, L5).
-func (s *Service) checkOneTLSModePerUpstream(id int64, host string, port int, tlsMode string) error {
 	domains, err := s.store.ListInboundDomains()
 	if err != nil {
-		return err
+		return 0, err
 	}
+	var others []store.InboundDomain
 	for _, d := range domains {
 		if d.ID == id || d.Port != port || normalizeHost(d.Host) != host || d.TLSMode == tlsMode {
 			continue
 		}
-		return invalid("[%s]:%d is already the upstream of %s, with TLS mode %s: an upstream has one TLS mode - choose %s here, or change it on %s first",
-			host, port, d.Name, d.TLSMode, d.TLSMode, d.Name)
+		if !mayChange(d) {
+			return 0, &UpstreamShared{Upstream: fmt.Sprintf("[%s]:%d", host, port), Mode: d.TLSMode, Domain: d.Name}
+		}
+		others = append(others, d)
 	}
-	return nil
+	if err := s.store.UpdateInboundTransport(id, host, port, tlsMode); err != nil {
+		return 0, err
+	}
+	for _, d := range others {
+		if err := s.store.UpdateInboundTransport(d.ID, d.Host, d.Port, tlsMode); err != nil {
+			return 0, err
+		}
+	}
+	return len(others), s.Resync()
 }
 
 // SetRecipients validates the mode and, in list mode, every address, then

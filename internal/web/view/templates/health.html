@@ -15,7 +15,7 @@
     {{template "health_mail" .}}
     {{template "box_open" .Configuration}}
     {{template "body_open"}}
-    <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+    <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration and the spam filter's lists from the database, removes the keys of deleted domains, and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
     {{template "action" .Reload}}
     {{template "body_close"}}
     {{template "box_close"}}
