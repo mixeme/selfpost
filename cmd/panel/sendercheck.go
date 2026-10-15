@@ -19,7 +19,7 @@ const aliveEvery = 2 * time.Second
 
 // serveSenderCheck runs the sender check (internal/milter/sender.go) on a
 // socket of its own. Postfix attaches that socket strictly
-// (default_action=tempfail in build/postfix-config.sh; Postfix 3.7.11,
+// (default_action=tempfail in build/postfix-config.sh; Postfix 3.10.13,
 // src/milter/milter8.c, milter8_comm_error(): "451 4.7.1 Service unavailable -
 // try again later"), so while this role is not serving, mail is deferred:
 // what that costs is counted here and

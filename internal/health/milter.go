@@ -17,7 +17,7 @@ import (
 const milterDialTimeout = time.Second
 
 // CheckMilter probes a milter address in the two forms build/postfix-config.sh
-// lets INBOUND_ANTISPAM_MILTER take (Postfix 3.7.11, src/milter/milter8.c,
+// lets INBOUND_ANTISPAM_MILTER take (Postfix 3.10.13, src/milter/milter8.c,
 // milter8_connect(), also accepts "local:", which that script refuses):
 // unix:/path is stat-ed like any milter socket, and inet:host:port is dialled
 // and the connection closed at once, with nothing written. required says what

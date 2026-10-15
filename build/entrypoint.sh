@@ -70,8 +70,13 @@ chmod 755 /data
 # under /data; make sure they stay writable without disturbing anything that a
 # later phase deliberately hands to another service. /data/log is exempt: it is
 # deliberately owned by postfix (postlogd writes the delivery log there) and is
-# normalised on its own below.
-find /data -mindepth 1 -maxdepth 1 ! -user panel ! -name log ! -name postfix -exec chown -R panel:panel {} +
+# normalised on its own below, as are the trees shared through group selfpost.
+# A file's owner is a number: an entry whose user or group is not the panel's
+# by that number - unpacked by root, or written under another image whose
+# useradd gave the panel other ids (bookworm's 999:999, until 2.7.0) - is
+# handed over whole.
+find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim ! -name sasl ! -name antispam \
+	\( ! -user panel -o ! -group panel \) -exec chown -R panel:panel {} +
 
 # DKIM key tree. The panel (user `panel`) generates keys and writes
 # the OpenDKIM tables; OpenDKIM (user `opendkim`) must read them. Normalise the
@@ -133,7 +138,7 @@ chmod 2750 /data/postfix
 # so the directory and its files are readable by anyone: they hold sender
 # addresses and networks, no secrets.
 mkdir -p /data/antispam
-chown panel:selfpost /data/antispam
+chown -R panel:selfpost /data/antispam
 chmod 0755 /data/antispam
 
 # Delivery log (architecture.md § Log tailer). postlogd writes it as user
@@ -141,17 +146,19 @@ chmod 0755 /data/antispam
 # lives under /data — not the ephemeral /var/log — so the delivery lines that
 # resolve a "queued" send-log row survive a container recreate.
 #
-# postlogd creates a missing log itself, but at 0600, which the unprivileged
-# panel cannot read; so create it here (and re-normalise an existing one, plus
-# whatever logrotate left behind) at 0640 owned postfix:selfpost. The setgid
+# postlogd creates a missing log itself, by default at 0600, which the
+# unprivileged panel cannot read (postfix-config.sh now asks it for 0640,
+# maillog_file_permissions); so create it here (and re-normalise an existing
+# one, plus whatever logrotate left behind) at 0640 owned postfix:selfpost. The setgid
 # directory keeps the shared group on anything created inside it later, and
 # 2750 keeps it group-traversable but not group-writable — logrotate refuses to
 # rotate a log whose directory is writable by a non-root group.
-# Postfix 3.7.11: src/util/logwriter.c, logwriter_open_or_die(), creates the
-# file 0644, under master's umask(077) (src/master/master.c) - 0600. logrotate
-# 3.21.0, logrotate.c, findNeedRotating(): "skipping ... because parent
-# directory has insecure permissions" when the directory's group is not root
-# and has write permission.
+# Postfix 3.10.13: src/util/logwriter.c:99, logwriter_open_or_die(), creates the
+# file with logwriter_perms, 0600 (:86) unless maillog_file_permissions says
+# otherwise (proto/postconf.proto:18500, default 0600; Postfix 3.9 and later).
+# logrotate 3.22.0, logrotate.c:1406-1408, findNeedRotating(): "skipping ...
+# because parent directory has insecure permissions" when the directory's
+# group is not root and has write permission.
 mkdir -p /data/log
 [ -e /data/log/mail.log ] || : > /data/log/mail.log
 chown -R postfix:selfpost /data/log
@@ -199,8 +206,8 @@ ln -sfn /run/syslog/log /dev/log
 
 # The queue tree, on a first start or after a restore, is already built here:
 # postfix-config.sh ends with "postfix check", whose check-fatal runs
-# "post-install create-missing" (Postfix 3.7.11, conf/postfix-script;
-# conf/postfix-files, "$queue_directory/active:d:$mail_owner:-:700:ucr").
+# "post-install create-missing" (Postfix 3.10.13, conf/postfix-script:314;
+# conf/postfix-files:55, "$queue_directory/active:d:$mail_owner:-:700:ucr").
 # A "postfix set-permissions" for a missing active/ stood here and never ran
 # (assumptions C-P34).
 chown -R postfix:postfix /data/postfix/queue
@@ -214,10 +221,10 @@ chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
 # It would also leave the queue directory itself and pid/ owned by postfix.
 # Postfix keeps those two owned by root (master, which runs as root, is the only
 # writer) and logs "warning: not owned by root" for each at every start.
-# (Postfix 3.7.11, conf/postfix-files: $queue_directory root 755, maildrop
+# (Postfix 3.10.13, conf/postfix-files:51-68: $queue_directory root 755, maildrop
 # $setgid_group 730, public $setgid_group 710, pid root 755, the other queue
-# directories $mail_owner 700; conf/postfix-script, "check-warn": "not owned by
-# root".)
+# directories $mail_owner 700; conf/postfix-script:354-356, "check-warn": "not
+# owned by root".)
 chown root /data/postfix/queue /data/postfix/queue/pid
 
 # [program:postfix]'s startsecs (build/supervisord.conf): longer than the

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ParseTime reads a Postfix time value as Postfix 3.7.11 reads it:
+// ParseTime reads a Postfix time value as Postfix 3.10.13 reads it:
 // src/global/conv_time.c, conv_time(), called by get_mail_conf_time() in
 // src/global/mail_conf_time.c. One number - strtol(), so leading blanks and a
 // "+" are taken, a negative number or one past an int is invalid - followed

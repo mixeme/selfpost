@@ -3,6 +3,7 @@ package logtail
 import (
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
@@ -28,7 +29,7 @@ import (
 // enable_long_queue_ids, digits and letters without vowels; neither word is
 // either.
 //
-// Postfix 3.7.11, src/global/mail_queue.c, mail_queue_enter(), with
+// Postfix 3.10.13, src/global/mail_queue.c, mail_queue_enter(), with
 // src/global/mail_queue.h MQID_*: a short id is "%05X" of the microseconds
 // and "%lX" of the inode (6 to 21 characters); a long one is the seconds (6+)
 // and microseconds (4) in src/global/safe_ultostr.c's vowel-less alphabet, 'z',
@@ -38,7 +39,7 @@ var queueLineRe = regexp.MustCompile(`^\S+ ([^\s\[]+)\[\d+\]: ([0-9A-F]{6,24}|[0
 
 // smtpdProgramRe tells an smtpd from the other programs, whatever listener it
 // serves: "postfix/smtpd", "postfix/submission/smtpd", "postfix/inbound/smtpd".
-// Postfix 3.7.11, src/global/mail_task.c, mail_task(): the tag is
+// Postfix 3.10.13, src/global/mail_task.c, mail_task(): the tag is
 // "<syslog_name>/<process name>"; a master.cf "-o syslog_name=" reaches it
 // through mail_params_init() (src/global/mail_params.c) before
 // single_server_main() calls maillog_client_init() again.
@@ -55,7 +56,7 @@ const (
 	// logged when it arrives and its row is written at end-of-message; an hour
 	// is a message body sent slowly. Postfix sets no such bound: smtpd_timeout
 	// limits each read, not the message (postconf(5) smtpd_timeout,
-	// smtpd_per_request_deadline, Postfix 3.7.11) - assumptions A-34.
+	// smtpd_per_request_deadline, Postfix 3.10.13) - assumptions A-34.
 	lineGrace = time.Hour
 
 	// lineBatch is how many lines are held before they are written without
@@ -80,13 +81,21 @@ type lineKeeper struct {
 	// port25 holds the queue ids the port-25 smtpd opened: mail offered by
 	// strangers, which never gets a send-log row. Its lines are not kept - what
 	// a stranger can make Postfix log is not something to store on his say-so
-	// and prune later. An id leaves when qmgr removes the message or when
-	// another listener opens a message under it (Postfix reuses ids).
-	// Postfix 3.7.11: smtpd writes "<id>: client=..." when it opens the queue
+	// and prune later. An id leaves when qmgr removes the message, when
+	// cleanup removes a message it did not queue, or when another listener
+	// opens a message under it (Postfix reuses ids).
+	// Postfix 3.10.13: smtpd writes "<id>: client=..." when it opens the queue
 	// file (src/smtpd/smtpd.c, mail_open_stream()); qmgr writes "<id>: removed"
 	// when it deletes it (src/qmgr/qmgr_active.c, qmgr_active_done_3_generic());
-	// short ids repeat (postconf(5) enable_long_queue_ids: the long ones are
-	// the "non-repeating" kind).
+	// cleanup writes "<id>: removed (canceled)" or "<id>: removed (discarded)"
+	// when it deletes the queue file of a message it refused, discarded or
+	// was not given in full (src/cleanup/cleanup_api.c, cleanup_flush(),
+	// msg_info("%s: removed (%s)"), new in 3.10: HISTORY 20241112), after its
+	// milter verdict line (cleanup_milter_inspect() runs earlier in
+	// cleanup_flush()) and after smtpd's line about a connection lost in DATA
+	// (src/smtpd/smtpd.c, smtpd_proto(), logs it before mail_reset() closes the
+	// cleanup stream); short ids repeat (postconf(5) enable_long_queue_ids:
+	// the long ones are the "non-repeating" kind).
 	port25 map[string]struct{}
 }
 
@@ -121,7 +130,8 @@ func (k *lineKeeper) add(line string, now time.Time, catchingUp bool) {
 		}
 	}
 	if _, inbound := k.port25[queueID]; inbound {
-		if program == "postfix/qmgr" && text == "removed" {
+		if program == "postfix/qmgr" && text == "removed" ||
+			program == "postfix/cleanup" && strings.HasPrefix(text, "removed (") {
 			delete(k.port25, queueID)
 		}
 		return

@@ -17,7 +17,7 @@ import (
 
 const (
 	// fingerprintSize is how many bytes from the head of the log identify it.
-	// Postfix writes a timestamped line per event (Postfix 3.7.11,
+	// Postfix writes a timestamped line per event (Postfix 3.10.13,
 	// src/util/msg_logger.c, msg_logger_print(): "%b %d %H:%M:%S" on every
 	// record), so the first 512 bytes are
 	// effectively unique per log generation — enough to tell "the file we were
@@ -130,7 +130,7 @@ func (t *tracker) resume(f *os.File) int64 {
 
 // readRotated reads, when the log was rotated while the panel was down, the
 // rest of the file the saved place belongs to: logrotate renamed it to
-// mail.log.1 (delaycompress leaves it plain - logrotate 3.21.0, logrotate.c,
+// mail.log.1 (delaycompress leaves it plain - logrotate 3.22.0, logrotate.c,
 // prerotateSingleLog()), and what Postfix wrote there
 // between the panel's stop and the rotation - deliveries, refusals, deferrals -
 // was otherwise never read (audit 2026-10-12, stage 2b). It is read from the

@@ -3,9 +3,11 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-msgauth/dkim"
@@ -73,12 +75,50 @@ func verifyDKIM(raw []byte, domain string) error {
 	return fmt.Errorf("no DKIM signature found for domain %s (got %d signature(s))", domain, len(verifications))
 }
 
+// postfixReceived returns the Received: headers of raw that a Postfix smtpd
+// wrote - "(Postfix)" after the host name, the only form it writes (Postfix
+// 3.10.13, src/smtpd/smtpd.c:3627-3645, "by %s (%s)" with var_mail_name).
+// In the stand only SelfPost's Postfix writes one: the sink is smtp-sink,
+// which adds none, and the tests compose their messages without any.
+func postfixReceived(raw []byte) ([]string, error) {
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		return nil, fmt.Errorf("parse the delivered message: %w", err)
+	}
+	var out []string
+	for _, v := range msg.Header["Received"] {
+		if strings.Contains(v, "(Postfix)") {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+// checkReceivedHidden: the submission ports set smtpd_hide_client_session
+// (build/postfix-config.sh), so SelfPost's Received: header is the redacted
+// one - it opens with "by", names no client and no protocol (Postfix 3.10.13,
+// src/smtpd/smtpd.c:3495, the "from" part written only when the parameter
+// is off, and with_protocol emptied with it).
+func checkReceivedHidden(raw []byte) error {
+	recv, err := postfixReceived(raw)
+	if err != nil {
+		return err
+	}
+	if len(recv) != 1 {
+		return fmt.Errorf("want one Received: header from SelfPost's Postfix, got %d: %q", len(recv), recv)
+	}
+	if !strings.HasPrefix(recv[0], "by ") || strings.Contains(recv[0], " with ") {
+		return fmt.Errorf("the Received: header names the client session: %q", recv[0])
+	}
+	return nil
+}
+
 // connectFromPattern matches Postfix's smtpd "connect from ...[ADDR]" log
 // line, which is how the harness learns the source address Postfix itself
 // observed for a just-made connection (needed to configure a level-2 rate
 // limit's allowed-IPs list — the address a host-published port is seen as
 // inside the container depends on Docker's NAT and isn't worth hard-coding).
-// Postfix 3.7.11, src/smtpd/smtpd.c, smtpd_service(): msg_info("connect from
+// Postfix 3.10.13, src/smtpd/smtpd.c, smtpd_service(): msg_info("connect from
 // %s", namaddr), namaddr being "name[addr]".
 var connectFromPattern = regexp.MustCompile(`connect from [^\[]*\[([0-9a-fA-F.:]+)\]`)
 

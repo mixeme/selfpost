@@ -20,7 +20,7 @@ const socketPath = "/run/supervisor.sock"
 
 // runOnceFor bounds RunOnce: a reload that is still running after it is
 // reported as a failure. "postfix reload" checks that master runs, moves the
-// incoming queue to active and sends master SIGHUP (Postfix 3.7.11,
+// incoming queue to active and sends master SIGHUP (Postfix 3.10.13,
 // conf/postfix-script, "reload") - well under a second on the stand.
 var runOnceFor = time.Minute
 

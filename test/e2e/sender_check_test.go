@@ -53,7 +53,7 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		{"the listed address with an extension, in envelope and header", who{listLogin, listPassword, "billing+march@" + senderDomain}, "billing+march@" + senderDomain, true},
 		// What a mail library does with a long display name: the line is
 		// folded, and Postfix hands the milter both of its lines (Postfix
-		// 3.7.11, src/milter/milter8.c, milter8_header(): the value is the
+		// 3.10.13, src/milter/milter8.c, milter8_header(): the value is the
 		// whole header as cleanup's MIME state machine collected it,
 		// continuation line included).
 		{"a long name, folded onto a second line", wildcard, "\"The Shop, its orders and its returns desk\"\r\n <orders@" + senderDomain + ">", true},
@@ -112,7 +112,7 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 
 	// What the header case above holds to: Postfix itself refuses the
 	// wildcard application billing@ as envelope sender, at RCPT, because the
-	// address's own key names app-list only (Postfix 3.7.11,
+	// address's own key names app-list only (Postfix 3.10.13,
 	// src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch(): "553
 	// 5.7.1 <%s>: Sender address rejected: not owned by user %s").
 	if res := attemptSend(sendAttempt{
@@ -250,7 +250,7 @@ func senderCheckDeferredToday(sc *scenario) (int, error) {
 // message is deferred, and the count on Health sees it. Past the DATA
 // command Postfix's cleanup, not smtpd, talks to the milters, so the warning
 // that names the socket is cleanup's (audit 2026-10-12, M13: the counter read
-// smtpd's lines only; Postfix 3.7.11, src/smtpd/smtpd.c, milter_send() to
+// smtpd's lines only; Postfix 3.10.13, src/smtpd/smtpd.c, milter_send() to
 // cleanup, src/cleanup/cleanup_milter.c). The panel is frozen with SIGSTOP
 // once DATA is answered, and thawed after the client has its reply.
 func testPanelHungMidMessage(t *testing.T, sc *scenario) {

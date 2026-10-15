@@ -45,11 +45,15 @@ type Inbound struct {
 // so it counts only for a queue id the port-25 smtpd was seen to open
 // (inboundClientRe).
 //
-// Postfix 3.7.11: smtpd's refusal is src/smtpd/smtpd_check.c, log_whatsup():
+// Postfix 3.10.13: smtpd's refusal is src/smtpd/smtpd_check.c, log_whatsup():
 // "%s: %s: %s from %s: %s;" then " from=<..>", " to=<..>", " proto=",
-// " helo=<..>", nothing after; a milter's at smtpd is src/smtpd/smtpd.c,
+// " helo=<..>", then - new in 3.10 (RELEASE_NOTES, [Incompat 20241023]) -
+// " sasl_method=%s", " sasl_username=%s" and " sasl_sender=%s" for a session
+// that has them, nothing after; a milter's at smtpd is src/smtpd/smtpd.c,
 // check_milter_reply(), whose smtpd_whatsup() appends " sasl_username=<..>"
-// only to an authenticated session (SASL is off on port 25). "name[addr]" is
+// only to an authenticated session. SASL is off on port 25
+// (build/postfix-config.sh, smtpd_sasl_auth_enable=no), so neither tail is
+// written there; the pattern takes the 3.10 one all the same. "name[addr]" is
 // state->namaddr, the address without "IPv6:" (smtpd.h,
 // SMTPD_BUILD_NAMADDRPORT). cleanup's is src/cleanup/cleanup_milter.c,
 // cleanup_milter_apply(); smtpd hands it to the one cleanup service
@@ -64,21 +68,29 @@ type Inbound struct {
 // journal rows.
 //
 // For the same reason the reply is the shortest text before "; from=<", and
-// the HELO name - the last thing on the line, which Postfix logs as the client
-// wrote it, spaces and brackets included - is whatever is left. Taking the
-// longest reply instead would let a HELO name that itself spells
+// the HELO name - the last thing on the line but the SASL fields above, which
+// Postfix logs as the client wrote it, spaces and brackets included - is
+// whatever is left. Taking the longest reply instead would let a HELO name
+// that itself spells
 // "; from=<…> to=<…> proto=…" supply the sender, the recipient and the reply
 // of the row (security review, 2026-10-12).
 var (
-	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*?); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<.*>)?$`)
+	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*?); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<.*>)?(?: sasl_(?:method|username|sender)=.*)?$`)
 	inboundClientRe = regexp.MustCompile(`^\S+ postfix/inbound/smtpd\[\d+\]: ([0-9A-Za-z]+): client=`)
 	// A queue id stops being port 25's when the message is queued (qmgr takes
-	// it: the filter let it through) or when another listener opens a message
-	// under the same id - Postfix reuses ids. Postfix 3.7.11,
+	// it: the filter let it through), when cleanup removes the queue file of
+	// a message it did not queue, or when another listener opens a message
+	// under the same id - Postfix reuses ids. Postfix 3.10.13,
 	// src/qmgr/qmgr_message.c, qmgr_message_read() calls opened()
 	// (src/global/opened.c: "%s: from=<%s>, size=%ld, nrcpt=%d") for a queue
-	// file cleanup has committed, each time it enters the active queue.
-	inboundForgetRe = regexp.MustCompile(`^\S+ postfix/(?:qmgr\[\d+\]: ([0-9A-Za-z]+): from=|(?:[a-z0-9-]+/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=)`)
+	// file cleanup has committed, each time it enters the active queue;
+	// src/cleanup/cleanup_api.c, cleanup_flush(): "%s: removed (%s)", with
+	// "canceled" or "discarded", once the queue file of a refused, discarded
+	// or unfinished message is gone (new in 3.10, HISTORY 20241112) - after
+	// the verdict line, which cleanup_milter_inspect() writes earlier in
+	// cleanup_flush(). Without it, the id of a message whose client went away
+	// in DATA stayed until inboundQueueIDs pushed it out.
+	inboundForgetRe = regexp.MustCompile(`^\S+ postfix/(?:qmgr\[\d+\]: ([0-9A-Za-z]+): from=|(?:[a-z0-9-]+/)?smtpd\[\d+\]: ([0-9A-Za-z]+): client=|cleanup\[\d+\]: ([0-9A-Za-z]+): removed \()`)
 )
 
 // A row holds one line of reason; Postfix's reply text carries the far end's
@@ -95,7 +107,7 @@ const inboundQueueIDs = 4096
 // journal cut back to its row cap, without waiting for the six-hourly prune.
 // Refusals are written at the rate strangers send RCPT TO. Postfix's one
 // limit on that, smtpd_client_recipient_rate_limit, is per client address and
-// off by default (postconf(5), Postfix 3.7.11) and not set here, so between
+// off by default (postconf(5), Postfix 3.10.13) and not set here, so between
 // two prunes the journal would otherwise grow as fast as someone cared to
 // make it.
 const inboundPruneEvery = 500
@@ -140,7 +152,7 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 		return
 	}
 	if m := inboundForgetRe.FindStringSubmatch(rest); m != nil {
-		delete(j.port25, m[1]+m[2])
+		delete(j.port25, m[1]+m[2]+m[3])
 		return
 	}
 	m := inboundRejectRe.FindStringSubmatch(rest)
@@ -150,7 +162,7 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 	program, queueID, kind, clientIP, reason, from, to := m[1], m[2], m[3], m[4], m[5], m[6], m[7]
 	// The sender's address is his own text too, and with a quoted local part it
 	// may hold "> to=<…> proto=…" - which would end the sender early and supply
-	// the recipient (Postfix 3.7.11 logs addresses in external form, the local
+	// the recipient (Postfix 3.10.13 logs addresses in external form, the local
 	// part quoted when it holds spaces or specials: postconf(5)
 	// info_log_address_format, src/global/info_log_addr_form.c). Such a line
 	// shows it: the sender is left with an unclosed quote. An address with a
@@ -198,7 +210,7 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 		e.Engine = store.SpamEnginePostfix
 	}
 	// "450 4.7.1 …" from Postfix, "4.7.1 …" from a milter: either way a reply
-	// that starts with 4 asks the sender to come back. Postfix 3.7.11:
+	// that starts with 4 asks the sender to come back. Postfix 3.10.13:
 	// smtpd_check_reject() logs smtpd's whole "%d %s ..." reply through
 	// log_whatsup(); cleanup_milter_apply() logs a
 	// milter's from its fifth byte (text = resp + 4), so the enhanced code
@@ -263,7 +275,7 @@ func printable(s string, max int) string {
 // tailer got to it: after the panel was down the two are hours apart. The
 // syslog format carries neither year nor zone - the year is taken from now
 // (a stamp that would then lie in the future is last year's), the zone is the
-// container's. Postfix 3.7.11, src/util/msg_logger.c, msg_logger_print(): the
+// container's. Postfix 3.10.13, src/util/msg_logger.c, msg_logger_print(): the
 // stamp is made by the process that logs, with localtime(), and postlogd
 // writes it unchanged (src/postlogd/postlogd.c, postlogd_service()); that
 // process has the container's zone (TZ is in import_environment,

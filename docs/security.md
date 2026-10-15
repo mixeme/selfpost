@@ -218,6 +218,14 @@ operator can act on it.
 
 - **Not an open relay** — SASL only on 465/587; `reject_unauth_destination`;
   `smtpd_sender_login_maps` + `reject_sender_login_mismatch`.
+- **A recipient does not learn where an application runs (`2.7.0`).** The
+  `Received:` header Postfix adds on 465 and 587 carries no client name,
+  address, HELO name, TLS details or login (`smtpd_hide_client_session=yes`,
+  the owner's decision of 2026-10-15): before, every message told its
+  recipients the address and the internal host name of the machine the
+  application sent from. What a complaint needs stays with the operator - the
+  queue id in the header, the panel's log and smtpd's `client=` line in
+  mail.log. Port 25 keeps the full header, as RFC 5321 requires of an MTA.
 - **An application signs only as itself (`2.4.0`).** OpenDKIM chooses the
   key by the `From:` header and Postfix holds only the envelope sender
   against the login, so until `2.4.0` an application of one sending domain
@@ -264,12 +272,16 @@ operator can act on it.
   on inbound. An optional antispam milter is inbound-only; default action is
   fail-open (`accept`). Since `2.6.1` the listener ends DATA only at the
   standard `<CR><LF>.<CR><LF>` (`smtpd_forbid_bare_newline=normalize`, the
-  2023 SMTP-smuggling defence, which Postfix 3.7 leaves off by default): a
+  2023 SMTP-smuggling defence, which Postfix 3.7 left off by default): a
   `.` line next to a bare newline is body, and what a smuggler would put
   behind it is delivered as part of the one message, not read as a second
-  transaction. The submission ports keep the default - there a smuggled
-  transaction is still the authenticated session's, under its sender
-  bindings and milters ([own-mta-builds](own-mta-builds-2026-10-15.md) § 5).
+  transaction. The submission ports keep the default. Since `2.7.0` the
+  image runs Postfix 3.10.13, whose default is `normalize` too (Postfix 3.9
+  and later; `src/global/mail_params.h`, `DEF_SMTPD_FORBID_BARE_LF`), so
+  they end DATA the same way; the port-25 setting stays explicit. Before
+  `2.7.0` a smuggled transaction on a submission port was still the
+  authenticated session's, under its sender bindings and milters
+  ([own-mta-builds](own-mta-builds-2026-10-15.md) § 5).
 - **The panel's milters judge every message of a connection.** Postfix
   introduces a client to a milter once per connection, and the milter library
   replaces the milter's session after any reply that is not "continue". Until
@@ -303,7 +315,7 @@ operator can act on it.
   parsed from `mail.log` from the head of the line, with the reply ending at
   Postfix's own `; from=<` so that the HELO name after it - the client's text,
   which Postfix logs with non-printable characters and ` <>()\";@` turned into
-  `?` (Postfix 3.7.11, src/smtpd/smtpd.c `helo_cmd()`) - cannot stand in for
+  `?` (Postfix 3.10.13, src/smtpd/smtpd.c `helo_cmd()`) - cannot stand in for
   the sender, the recipient or the reply; an address with a quote, a bracket or a space in it is not kept.
   Only a recipient at an inbound domain makes a row. The journal is cut to
   10 000 rows every 500 rows the tailer writes, and by age every six hours.
@@ -524,7 +536,7 @@ deferred item from the roadmap.
   § Roles.
 - **Level-2 in-flight reservations can outlive a broken SMTP session until TTL.**
   Postfix tells the milters ABORT when a client drops the connection
-  mid-transaction (Postfix 3.7.11, src/smtpd/smtpd.c `mail_reset()` ->
+  mid-transaction (Postfix 3.10.13, src/smtpd/smtpd.c `mail_reset()` ->
   `milter_abort()`), and the journal milter releases the reservation then.
   When that never arrives - smtpd killed, the milter connection lost - go-milter
   has no close callback, and the in-memory reservation is released by TTL

@@ -15,12 +15,12 @@ import (
 )
 
 // The mail.log lines in this file are composed by hand, after the formats the
-// code cites (Postfix 3.7.11, src/global/log_adhoc.c and the others), unless a
+// code cites (Postfix 3.10.13, src/global/log_adhoc.c and the others), unless a
 // comment says where one was seen; some carry no stamp, which the parsers
 // take as they come. One shape Postfix does not write here: opendkim lines in
 // mail.log (OpenDKIM logs through syslog(3), to the container log - build/opendkim.conf).
 
-// qmgr's expiry line, as Postfix 3.7.11 writes it (src/qmgr/qmgr_active.c,
+// qmgr's expiry line, as Postfix 3.10.13 writes it (src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(): "%s: from=<%s>, status=%s, returned to
 // sender"); composed by hand after that format. The sender is the client's
 // text, so a line only resembles one when it ends as qmgr's does.
@@ -36,6 +36,11 @@ func TestParseExpiry(t *testing.T) {
 		// qmgr's ordinary from= line, whose sender carries the text.
 		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: from=<x>, status=expired, returned to sender>, size=500, nrcpt=1 (queue active)", ""},
 		{"Oct 14 09:01:02 relay postfix/qmgr[93]: 41E862C00D9E: removed", ""},
+		// cleanup's removal of a message it did not queue (Postfix 3.10.13,
+		// src/cleanup/cleanup_api.c, cleanup_flush(): "%s: removed (%s)")
+		// says nothing of what became of a queued one.
+		{"Oct 14 09:01:02 relay postfix/cleanup[52]: 41E862C00D9E: removed (canceled)", ""},
+		{"Oct 14 09:01:02 relay postfix/cleanup[52]: 41E862C00D9E: removed (discarded)", ""},
 	} {
 		id, ok := parseExpiry(c.line)
 		if ok != (c.id != "") || id != c.id {
@@ -194,7 +199,8 @@ func TestParseDelivery(t *testing.T) {
 			status:    store.StatusSent,
 		},
 		{
-			// The stamp Postfix 3.7's postlogd writes, as on the stand.
+			// The stamp postlogd writes, as on the stand (Postfix 3.7;
+			// 3.10.13's msg_logger_print() keeps the format).
 			name:      "syslog stamp",
 			line:      "Oct 14 11:05:51 mail postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (250 OK)",
 			wantOK:    true,
@@ -219,6 +225,22 @@ func TestParseDelivery(t *testing.T) {
 		{
 			name:   "an smtpd line with the text after its queue id is not one",
 			line:   "Oct 14 11:05:51 mail postfix/smtpd[10]: 5B4A2C1D3E: client=unknown[203.0.113.7], sasl_username=41E862C00D9E: to=<victim@example.net>, status=sent",
+			wantOK: false,
+		},
+		{
+			// Postfix 3.10.13, src/cleanup/cleanup_api.c, cleanup_flush():
+			// "%s: removed (%s)" for a transaction cleanup did not queue. It
+			// is no result for any recipient. Composed from that format.
+			name:   "cleanup's removed (canceled) is not one",
+			line:   "Oct 14 11:05:51 mail postfix/cleanup[52]: 41E862C00D9E: removed (canceled)",
+			wantOK: false,
+		},
+		{
+			// Postfix 3.10.13, src/smtpd/smtpd.c, smtpd_proto(): "%s: %s after
+			// %s (%lu bytes) from %s", the queue id first since 3.10. Composed
+			// from that format.
+			name:   "smtpd's lost connection with a queue id is not one",
+			line:   "Oct 14 11:05:51 mail postfix/submission/smtpd[10]: 41E862C00D9E: lost connection after DATA (5420 bytes) from unknown[203.0.113.7]",
 			wantOK: false,
 		},
 	}
@@ -920,7 +942,7 @@ func TestSplitTimestamp(t *testing.T) {
 		stamp, rest string
 	}{
 		{
-			// An RFC 3339 stamp is not one Postfix 3.7 writes (assumptions
+			// An RFC 3339 stamp is not one Postfix 3.10 writes (assumptions
 			// A-12): it is not taken off.
 			name:  "RFC 3339 is not a stamp Postfix writes",
 			line:  "2026-08-03T05:15:52.219218+00:00 mail postfix/qmgr[10]: 4A1B2C3D: removed",

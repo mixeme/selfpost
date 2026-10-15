@@ -3,7 +3,7 @@
 # the raw received message (headers + body, including the DKIM-Signature
 # Postfix/OpenDKIM added) straight off disk. smtp-sink ships in the postfix
 # package itself — no new dependency.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
@@ -21,7 +21,7 @@ WORKDIR /mail
 # smtp-sink refuses to run as root without an explicit -u to switch to after
 # binding — "-u root" satisfies that check while staying root throughout,
 # which is fine here: throwaway container, isolated e2e network, never
-# exposed. (Postfix 3.7.11, src/smtpstone/smtp-sink.c: -d "Dump each mail
+# exposed. (Postfix 3.10.13, src/smtpstone/smtp-sink.c: -d "Dump each mail
 # transaction to a single-message file" named by the template plus "a
 # pseudo-random hexadecimal number"; main(): "-u option is required if running
 # as root".)

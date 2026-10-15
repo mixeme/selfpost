@@ -7,7 +7,7 @@ import (
 
 // reservationTTL bounds how long a message may stay reserved. A reservation is
 // released at end-of-message or on ABORT. A client that drops the connection
-// mid-transaction still produces ABORT: Postfix 3.7.11, src/smtpd/smtpd.c,
+// mid-transaction still produces ABORT: Postfix 3.10.13, src/smtpd/smtpd.c,
 // smtpd_proto() on a lost connection runs mail_reset(), which calls
 // milter_abort() (src/milter/milter8.c, milter8_abort(), SMFIC_ABORT)
 // (assumptions B-G7). What produces neither is smtpd itself dying, or the

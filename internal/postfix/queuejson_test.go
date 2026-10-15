@@ -7,7 +7,7 @@ import (
 )
 
 // The listing is composed by hand: its first line in the field order of
-// Postfix 3.7.11's src/postqueue/showq_json.c, format_json(); the others
+// Postfix 3.10.13's src/postqueue/showq_json.c, format_json(); the others
 // short of fields or broken on purpose.
 func TestParseQueueJSON(t *testing.T) {
 	out := []byte(`{"queue_name": "deferred", "queue_id": "41E862C00D9E", "arrival_time": 1791000000, "message_size": 446, "forced_expire": false, "sender": "app@example.com", "recipients": [{"address": "a@example.net", "delay_reason": "connect to mx.example.net[203.0.113.9]:25: Connection timed out"}]}

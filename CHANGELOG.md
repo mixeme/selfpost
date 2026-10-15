@@ -5,6 +5,81 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **The image runs Debian trixie instead of bookworm** (base-trixie).
+  Bookworm left regular security support on 2026-07-12, and its Postfix
+  3.7.11 lacks upstream's 2026 security fixes, which carry no CVE ids and
+  so will not reach bookworm LTS. Trixie brings Postfix 3.10.13 with the
+  August batch (among them a BDAT memory exhaustion, a crash by DATA after
+  a BDAT error, and a policy and milter bypass after an end-of-data
+  reject), Debian's security support until 2028, OpenSSL 3.5 and libmilter
+  8.18.1. OpenDKIM's code is unchanged. The build stage is
+  `golang:1.26-trixie`.
+
+### Changed
+
+- **Every listener holds clients to two SMTP rules,** by Postfix 3.10's
+  defaults: DATA ends only at `<CR><LF>.<CR><LF>`
+  (`smtpd_forbid_bare_newline=normalize`, now on 465 and 587 too), and a
+  client that sends commands ahead of the replies where RFC 2920 does not
+  allow it gets `554 5.5.0 Error: SMTP protocol synchronization` and is
+  disconnected (`smtpd_forbid_unauth_pipelining=yes`). An application whose
+  mail library breaks either rule stops sending; the guide says so under
+  Ports.
+- **The code's citations of other programs name the trixie sources:**
+  every place that relies on Postfix, Cyrus SASL, supervisor, logrotate or
+  libmilter was re-read against the trixie package and its comment
+  updated; the cited-package table in development.md and the e2e check of
+  it hold the trixie versions.
+- **Postfix's own start, stop and reload messages reach `docker logs`**
+  as well as mail.log: since 3.8 postfix(1) writes to stderr even when it
+  is not a terminal.
+- **The SASL configuration's directory is set by the image:**
+  bookworm's Postfix found `/etc/postfix/sasl/smtpd.conf` through a Debian
+  patch that trixie dropped; trixie's package writes
+  `cyrus_sasl_config_path=/etc/postfix/sasl` into its main.cf instead. The
+  image now sets it itself, so the login on 465 and 587 does not hang on
+  the package's file.
+- **The `Received:` header no longer shows where an application runs.**
+  On 465 and 587 Postfix now writes the short form, `Received: by <host>
+  (Postfix) id <queue id> for <recipient>; <date>`, without the
+  application's address, host name, HELO name, TLS details or login
+  (`smtpd_hide_client_session=yes`, new in Postfix 3.10; the owner's
+  decision). The queue id still leads to the message in *Outbound › Log*
+  and to the client address in mail.log. Port 25 keeps the full header, as
+  RFC 5321 requires; e2e checks both.
+- **The container's `selfpost` group is 10998, no longer 998.** 998 lies
+  in the range the distribution hands out to system groups (100-999): in
+  the trixie image a package took it and the build failed, and on a host it
+  is often a system group of the host's own, which could then read the key
+  as well (on the test server's host it is `systemd-network`). 10998 is
+  outside that range. **On upgrade, give the private key in `certs/` to
+  the new group on the host** - `chgrp 10998` where the guide said
+  `chgrp 998`, in a certbot deploy hook too - or a full backup is refused
+  until then; Postfix reads its own copy and is not affected. The other
+  accounts keep the numbers their packages give them, and the entrypoint
+  hands everything under `/data` back to them by name on every start.
+- `opendkim-tools` is no longer installed: nothing in the image ran it.
+  `openssl` is installed by name, for the certificate reload.
+
+### Fixed
+
+- **The retry policy shown in the panel could fall back to Postfix's
+  compiled-in defaults:** the panel read `postconf`'s warnings together
+  with its values, and since Postfix 3.9 `postconf` warns about deprecated
+  parameters. It reads the values alone now and logs the warning.
+- **logrotate 3.22 exits 1 when it skips a config it does not trust;**
+  3.21 exited 0. The rotation loop now refuses to run on that output
+  whatever the exit code, instead of retrying for ever.
+- **The log tailer reads Postfix 3.10's new line shapes:** refusal lines
+  that carry `sasl_method=`, `sasl_username=` and `sasl_sender=`, and
+  cleanup's `removed (canceled)` for a transaction that did not complete.
+- Debian's chroot sync no longer copies `/etc/resolv.conf` and the like
+  into the queue under `/data` at every start (`SYNC_CHROOT=` in
+  `/etc/default/postfix`; nothing runs chrooted). A Postfix-created
+  mail.log is `0640`, as the entrypoint and logrotate create it.
+
 ## [2.6.1] - 2026-10-15
 
 The inbound relay's port 25 ends a message only at the standard

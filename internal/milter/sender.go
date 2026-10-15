@@ -39,7 +39,7 @@ import (
 // it up (Bindings). The send-log row of a refusal is written by another
 // goroutine and is not waited for.
 //
-// Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
+// Postfix 3.10.13, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
 // the SASL login is compared with an owner by strcasecmp_utf8();
 // src/milter/milter8.c, milter8_comm_error(): default_action=tempfail answers
 // "451 4.7.1" for a milter that does not answer. OpenDKIM 2.11.0~beta2,
@@ -103,7 +103,7 @@ func (b *Bindings) fresh() error {
 	return b.broken
 }
 
-// parseSenderMap reads the lines of a sender_login_maps file as Postfix 3.7.11
+// parseSenderMap reads the lines of a sender_login_maps file as Postfix 3.10.13
 // reads a texthash table (src/util/dict_thash.c, dict_thash_open(), over
 // src/util/readlline.c, readllines()):
 //   - a line that starts with a blank continues the one before; an empty
@@ -112,8 +112,8 @@ func (b *Bindings) fresh() error {
 //     escaping the next character; a line with an unbalanced quote, or
 //     without a key or a value, is ignored (with a warning, in Postfix);
 //   - the key is folded to lower case (DICT_FLAG_FOLD_FIX, which
-//     src/smtpd/smtpd_check.c, pre_jail_init(), gives
-//     smtpd_sender_login_maps);
+//     src/smtpd/smtpd_check.c, smtpd_check_init(), called from
+//     src/smtpd/smtpd.c, pre_jail_init(), gives smtpd_sender_login_maps);
 //   - a key given twice makes the whole table unusable: no DICT_FLAG_DUP_*
 //     flag is given, so dict_thash_open() returns a surrogate that fails
 //     every lookup, and smtpd answers 451 (reject_server_error()). The check
@@ -194,7 +194,7 @@ func splitTableLine(line string) (key, value string, ok bool) {
 }
 
 // Allowed reports whether login may send as addr - the lookup Postfix makes
-// for the envelope sender. Postfix 3.7.11, src/smtpd/smtpd_check.c,
+// for the envelope sender. Postfix 3.10.13, src/smtpd/smtpd_check.c,
 // reject_auth_sender_login_mismatch(), takes the owners of the first key
 // mail_addr_find() finds (src/global/mail_addr_find.c, mail_addr_find_opt()
 // with MA_FIND_DEFAULT): the address, then the address without its
@@ -242,7 +242,7 @@ const extensionDelimiter = "+"
 // follows its first delimiter. "user+tag@example.org" is "user@example.org";
 // an address whose local part begins with the delimiter has no extension.
 //
-// Postfix 3.7.11, src/global/strip_addr.c, strip_addr_internal(), and
+// Postfix 3.10.13, src/global/strip_addr.c, strip_addr_internal(), and
 // split_addr.c, split_addr_internal(): the local part, up to the last "@", is
 // cut at its first delimiter, unless that is its first character.
 func withoutExtension(addr string) string {
@@ -322,7 +322,7 @@ func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.R
 
 // Headers is the end of the headers, where the message is judged.
 //
-// go-milter v0.4.1, session.go, case CodeEOH: Headers(). Postfix 3.7.11,
+// go-milter v0.4.1, session.go, case CodeEOH: Headers(). Postfix 3.10.13,
 // src/milter/milter8.c, milter8_event(), SMFIR_REPLYCODE: a "4"/"5" reply
 // whose enhanced code starts with the same digit is the message's reply;
 // src/cleanup/cleanup_milter.c, cleanup_milter_apply(): a "5" rejects the
@@ -347,7 +347,7 @@ func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (mil
 	// cleanup has given the message a queue id by the end of its headers
 	// (milter_end_of_header_macros has {i}); Postfix's lines about it - the
 	// refusal among them - are found by it on the message's page.
-	// Postfix 3.7.11, src/global/mail_params.h: DEF_MILT_EOH_MACROS "i",
+	// Postfix 3.10.13, src/global/mail_params.h: DEF_MILT_EOH_MACROS "i",
 	// answered by src/cleanup/cleanup_milter.c, cleanup_milter_eval().
 	s.record(shown, macro(m, "i"))
 	// A reply code of its own, so that the application is told what is wrong
@@ -367,7 +367,7 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	if s.login == "" {
 		// Not reachable while the submission ports demand authentication; a
 		// message nobody answers for is not signed either way.
-		// Postfix 3.7.11, src/smtpd/smtpd_check.c, smtpd_check_rcpt(): with
+		// Postfix 3.10.13, src/smtpd/smtpd_check.c, smtpd_check_rcpt(): with
 		// smtpd_delay_reject (default yes) smtpd_client_restrictions
 		// (permit_sasl_authenticated,reject on 465 and 587) refuse every RCPT;
 		// src/smtpd/smtpd.c, data_cmd(): no valid recipients, no message.
@@ -416,7 +416,7 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	// line must also be one address in RFC 5322's grammar (net/mail), at the
 	// domain OpenDKIM signs for; a quoted display name may say anything.
 	// And that address, its local part unquoted as Postfix holds the
-	// envelope's (Postfix 3.7.11, src/global/tok822_parse.c), is the one
+	// envelope's (Postfix 3.10.13, src/global/tok822_parse.c), is the one
 	// held against the bindings: "x"@mine.com is x@mine.com, which may be
 	// another application's (review of stage 2c, F1, F2).
 	list, perr := fromParser.ParseList(unfold(raw))
@@ -504,7 +504,7 @@ func (s *senderSession) record(shown, queueID string) {
 // holds against nobody, the domain the login is bound to. Without it the row
 // would belong to no domain and its administrator would never see it.
 //
-// Postfix 3.7.11, src/smtpd/smtpd_check.c, generic_checks():
+// Postfix 3.10.13, src/smtpd/smtpd_check.c, generic_checks():
 // reject_*_sender_login_mismatch run only "if (state->sender &&
 // *state->sender)".
 func (s *senderSession) domain() string {
@@ -518,7 +518,7 @@ func (s *senderSession) domain() string {
 // characters that mean something in an SMTP reply or a log line, and cuts it:
 // it is said back to the client, logged and stored.
 //
-// Postfix 3.7.11, src/milter/milter8.c, milter8_event(), SMFIR_REPLYCODE:
+// Postfix 3.10.13, src/milter/milter8.c, milter8_event(), SMFIR_REPLYCODE:
 // "%%" becomes "%" and a single "%" is dropped; src/cleanup/cleanup_milter.c,
 // cleanup_milter_apply(), logs "<id>: milter-reject: END-OF-MESSAGE from
 // <client>: <text>; from=<...> to=<...> ...".
@@ -573,7 +573,7 @@ func ServeSender(ctx context.Context, ln net.Listener, bind *Bindings, rec Refus
 		// The headers decide; and each header value with its leading space,
 		// as OpenDKIM asks for it (opendkim.c, mlfi_negotiate(),
 		// SMFIP_HDR_LEADSPC), so that both read the same bytes. Postfix
-		// 3.7.11, src/milter/milter8.c: milter8_negotiate() keeps the event
+		// 3.10.13, src/milter/milter8.c: milter8_negotiate() keeps the event
 		// mask a milter of any version asks for (go-milter v0.4.1 says
 		// version 2), and milter8_header() drops the space only for a milter
 		// without SMFIP_HDR_LEADSPC.

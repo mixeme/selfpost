@@ -274,6 +274,9 @@ func TestE2E(t *testing.T) {
 		if err := verifyDKIM(raw, senderDomain); err != nil {
 			t.Fatalf("DKIM did not verify against the record the panel published: %v", err)
 		}
+		if err := checkReceivedHidden(raw); err != nil {
+			t.Fatalf("port 465 should hide the application's session: %v", err)
+		}
 
 		if err := waitFor("send-log row to reach status=sent", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
 			rows, err := sc.panel.sendLogRows(senderDomain, "")

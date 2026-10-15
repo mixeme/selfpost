@@ -34,7 +34,7 @@ type InboundStore interface {
 // Postfix attaches the socket with default_action=accept, so
 // neither an error here nor the panel being down holds up inbound mail.
 //
-// Postfix 3.7.11, src/milter/milter.c, milter_message(): the milters are asked
+// Postfix 3.10.13, src/milter/milter.c, milter_message(): the milters are asked
 // in turn while the reply is null, so one that refuses is the last asked;
 // src/milter/milter8.c, milter8_comm_error(): default_action=accept gives no
 // reply when this milter cannot answer.
@@ -91,7 +91,7 @@ func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Respons
 // the last one read is its own - when it is up. Whether it was is decided at
 // end-of-message, by the signature.
 //
-// Postfix 3.7.11, src/milter/milter.c, milter_message(), hands each milter the
+// Postfix 3.10.13, src/milter/milter.c, milter_message(), hands each milter the
 // queue file from the start of the content; src/milter/milter8.c,
 // milter8_message(), reads it with rec_get(), which follows the pointer
 // records src/cleanup/cleanup_milter.c, cleanup_add_header(), leaves after
@@ -151,7 +151,7 @@ func (s *inboundSession) signed(queueID string) bool {
 // upstream. "Continue" lets it through as "accept" would, and keeps this
 // session for the connection's next message.
 //
-// The queue id: Postfix 3.7.11, src/global/mail_params.h, DEF_MILT_EOD_MACROS
+// The queue id: Postfix 3.10.13, src/global/mail_params.h, DEF_MILT_EOD_MACROS
 // "i", answered by src/cleanup/cleanup_milter.c, cleanup_milter_eval(). The
 // rest as session.Body in milter.go.
 func (s *inboundSession) Body(m *milter.Modifier) (milter.Response, error) {

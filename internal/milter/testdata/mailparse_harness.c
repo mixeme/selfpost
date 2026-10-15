@@ -7,7 +7,7 @@
  *
  *   test/upstream/mailparse-diff.sh <opendkim source dir>
  *
- * builds it in debian:bookworm and runs TestMailParseMatchesOpenDKIM with it.
+ * builds it in debian:trixie and runs TestMailParseMatchesOpenDKIM with it.
  */
 #include <sys/types.h>
 #include <stdio.h>

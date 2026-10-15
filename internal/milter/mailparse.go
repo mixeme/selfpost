@@ -2,7 +2,7 @@ package milter
 
 // The address OpenDKIM signs for, found as OpenDKIM finds it: a port of
 // libopendkim's dkim_mail_parse() and its tokenizer, from Debian's
-// opendkim 2.11.0~beta2-8+deb12u1 (libopendkim/dkim-mailparse.c, identical
+// opendkim 2.11.0~beta2-9.1+b1 (libopendkim/dkim-mailparse.c, identical
 // there to upstream's develop branch), line for line. OpenDKIM calls it on the
 // value of the message's first From: field (opendkim/opendkim.c, mlfi_eoh(),
 // dkimf_findheader(dfc, "from", 0): build/opendkim.conf sets no SenderHeaders),

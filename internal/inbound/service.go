@@ -79,7 +79,7 @@ func (e *UpstreamShared) Error() string {
 
 // SetTransportAs validates and saves the upstream of domain id, then rebuilds
 // the maps. An upstream has one TLS mode: Postfix's TLS policy is keyed by the
-// next hop, not by the domain (smtp_tls_policy_maps; Postfix 3.7.11,
+// next hop, not by the domain (smtp_tls_policy_maps; Postfix 3.10.13,
 // README_FILES/TLS_README: the key is the verbatim next-hop), so two domains
 // to one [host]:port share one mode - the map held both keys and the first by
 // domain name won with a warning (audit 2026-10-12, L5). The other domains

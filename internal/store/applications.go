@@ -13,7 +13,7 @@ import (
 // login is globally unique because it is the SASL identity Postfix
 // authenticates (one sasldb2 across all domains, architecture.md § Mail path).
 // It is unique without regard to case too (migration 0008's NOCASE index):
-// Postfix 3.7.11, src/smtpd/smtpd_check.c reject_auth_sender_login_mismatch()
+// Postfix 3.10.13, src/smtpd/smtpd_check.c reject_auth_sender_login_mismatch()
 // compares the SASL login with the map's owners by strcasecmp_utf8.
 var ErrLoginExists = errors.New("application login already exists")
 

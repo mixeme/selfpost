@@ -230,7 +230,7 @@ func TestBindingsFollowTheFile(t *testing.T) {
 
 // The owners of the first key Postfix finds decide, not any key that lists
 // the login: an address bound to one application is not open to another that
-// holds its whole domain (Postfix 3.7.11, smtpd_check.c,
+// holds its whole domain (Postfix 3.10.13, smtpd_check.c,
 // reject_auth_sender_login_mismatch(), over mail_addr_find(); assumptions
 // B-PS1). Composed by hand in internal/postfix's format.
 func TestBindingsFirstKeyWins(t *testing.T) {

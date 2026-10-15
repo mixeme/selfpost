@@ -191,9 +191,22 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `anvil_rate_time_unit` from `RATE_LIMIT_*` env vars; independent of milter.
 - **Port 25 ends DATA only at `<CR><LF>.<CR><LF>`** —
   `smtpd_forbid_bare_newline=normalize` on the `smtp/inet` listener (Postfix
-  3.7.11, `src/smtpd/smtpd.c`, the DATA loop at 3649: a `.` line next to a
-  bare `<LF>` is dropped, not taken as the end); a bare `<LF>` elsewhere is
-  read as `<CR><LF>`. The submission ports keep Postfix's default.
+  3.10.13, `src/smtpd/smtpd.c`, `receive_data_message()`, the DATA loop at
+  3713: a `.` line next to a bare `<LF>` is dropped, not taken as the end); a
+  bare `<LF>` elsewhere is read as `<CR><LF>`. The submission ports keep
+  Postfix's default, which is the same `normalize` since Postfix 3.9
+  (`src/global/mail_params.h`, `DEF_SMTPD_FORBID_BARE_LF`); the image ran
+  Postfix 3.7.11 until `2.7.0`, whose default was `no`, hence the explicit
+  setting on port 25.
+- **The submission ports hide the application in `Received:`** (`2.7.0`) —
+  `smtpd_hide_client_session=yes` on `smtps/inet` and `submission/inet`:
+  Postfix's header reads `Received: by <hostname> (Postfix) id <queue id>`,
+  with the recipient when there is one, and the date - no HELO name, client
+  name or address, TLS, login or protocol (Postfix 3.10.13,
+  `src/smtpd/smtpd.c:3495` and `:3627-3645`). Port 25 keeps the full
+  header, which RFC 5321 requires there (`proto/postconf.proto:19587-19589`).
+  The queue id in the header leads to the message's row in the panel's log
+  and to smtpd's `client=` line in mail.log.
 - **Chroot disabled** for all services (DNS/TLS inside container).
 - **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
   at start into `/etc/postfix/tls-internal`, owned by root and `0600` as
@@ -234,7 +247,7 @@ milter, § Postfix above, port 25):
    `delay_warning_time`), reads each as Postfix does - one number and one
    unit, the parameter's own default unit when there is none (`5d` for the
    lifetimes, so a bare `3` is three days), `bounce_queue_lifetime` capped at
-   `maximal_queue_lifetime` as qmgr caps it (Postfix 3.7.11,
+   `maximal_queue_lifetime` as qmgr caps it (Postfix 3.10.13,
    `src/global/conv_time.c`, `src/qmgr/qmgr.c`) - and caches the snapshot on
    the handlers config. The
    Outbound queue box and a delivery's `deferred` / `bounced` history print those
@@ -295,7 +308,7 @@ server itself.
   reason), then `@domain` - and the **first of these keys in the table
   decides**, its owners alone: an address listed for one application is not
   open to another that holds the whole domain. Logins are compared without
-  regard to case, as Postfix compares them (Postfix 3.7.11,
+  regard to case, as Postfix compares them (Postfix 3.10.13,
   `src/smtpd/smtpd_check.c`, `reject_auth_sender_login_mismatch()`, over
   `src/global/mail_addr_find.c`, `mail_addr_find_opt()`). A key written
   twice makes Postfix refuse the whole table, and the check defers then too.
@@ -461,7 +474,7 @@ recreates the file on its first line after the reload, as root and mode
 `0600`, which the unprivileged panel user cannot read). `follow()` drains the
 old inode once more before switching descriptors, and keeps it open and reads
 it for a minute after: postlogd keeps writing to the renamed file until the
-reload makes it exit, seconds later (Postfix 3.7.11, src/postlogd/postlogd.c;
+reload makes it exit, seconds later (Postfix 3.10.13, src/postlogd/postlogd.c;
 src/master/dgram_server.c, `dgram_server_abort()`). The panel treats a missing
 log file as an empty tail, not an error.
 
@@ -494,7 +507,7 @@ the lines stored under it - only those of the minutes around the refusal, since
 Postfix frees the id at once. A message the journal milter refused at
 `MAIL FROM` has none: the tailer reads smtpd's `NOQUEUE: milter-reject: MAIL
 from <client>[<address>]: …; from=<…> … sasl_username=<login>` - the login is
-Postfix's last field on an authenticated session (Postfix 3.7.11,
+Postfix's last field on an authenticated session (Postfix 3.10.13,
 `src/smtpd/smtpd.c`, `smtpd_whatsup()`), and a line without one is no
 application's - and puts it on the nearest refused row of that client
 address, login and sender within two minutes
@@ -513,7 +526,7 @@ a kill is covered as well as a clean stop.
 **Expiry.** A message Postfix gives up on at the end of its queue lifetime has
 no line per recipient: qmgr writes one line for the message, `<id>:
 from=<...>, status=expired, returned to sender` (`force-expired` after
-`postsuper -e`; Postfix 3.7.11, `src/qmgr/qmgr_active.c`,
+`postsuper -e`; Postfix 3.10.13, `src/qmgr/qmgr_active.c`,
 `qmgr_active_done_25_generic()`), and the recipients' last lines say
 `deferred`. The tailer reads that line and closes the message's open rows -
 each recipient's newest, `queued` or `deferred` - as `bounced`.
@@ -542,7 +555,7 @@ of the id's flags (`src/postqueue/showq_compat.c`, `showq_message()`).
 **Which row a delivery line is.** The journal milter writes a row's
 recipient as Postfix will log it: the address the client gave, its quoted
 local part unquoted and quoted again only where it needs to be (`"ab"@x`
-becomes `ab@x`, `"a b"@x` stays; Postfix 3.7.11, `tok822_parse.c`,
+becomes `ab@x`, `"a b"@x` stays; Postfix 3.10.13, `tok822_parse.c`,
 `quote_822_local.c`), case kept, and a recipient given twice - in any case -
 once, since cleanup keeps one (`cleanup_out_recipient.c`, `been_here()`
 folding case). A delivery line names it in `orig_to=` when Postfix rewrote

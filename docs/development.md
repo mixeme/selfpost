@@ -152,8 +152,8 @@ commit rule but **no** version cut until the next product stage ships.
 | **SQLite** | `modernc.org/sqlite` (pure Go, no cgo) |
 | **Build** | [Makefile](../Makefile): primary targets `vet`, `test`, `build`, `e2e` (also `all`, `clean`) |
 | **Container** | Docker + Compose v2 on the dev host and in CI |
-| **Image (build stage)** | `golang:1.26-bookworm` — [build/Dockerfile](../build/Dockerfile). The tag floats to the newest 1.26 patch release, and most standard-library security fixes (`net/http`, `html/template`, …) arrive only that way: rebuild the image after each Go patch release, no edit needed. Dependencies are raised by hand (`go get …@latest`, `go mod tidy`), at least at each audit |
-| **Image (runtime)** | `debian:bookworm-slim` + Postfix, OpenDKIM, supervisord, SASL, logrotate |
+| **Image (build stage)** | `golang:1.26-trixie` (bookworm until `2.7.0`) — [build/Dockerfile](../build/Dockerfile). The tag floats to the newest 1.26 patch release, and most standard-library security fixes (`net/http`, `html/template`, …) arrive only that way: rebuild the image after each Go patch release, no edit needed. Dependencies are raised by hand (`go get …@latest`, `go mod tidy`), at least at each audit |
+| **Image (runtime)** | `debian:trixie-slim` (bookworm until `2.7.0`) + Postfix, OpenDKIM, supervisord, SASL, logrotate |
 | **CI** | GitHub Actions — [.github/workflows/](../.github/workflows/) |
 | **Image registry** | `ghcr.io/mixeme/selfpost` |
 
@@ -209,8 +209,8 @@ the image.
 ### Debian packages in the runtime image
 
 Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
-from Debian bookworm repositories; licenses are in each package's `copyright`
-file on <https://packages.debian.org/bookworm/>.
+from Debian trixie repositories; licenses are in each package's `copyright`
+file on <https://packages.debian.org/trixie/>.
 The image also ships [LICENSE](../LICENSE), [NOTICE](../NOTICE), and the IBM
 Plex [OFL.txt](../internal/web/view/static/OFL.txt) under
 `/usr/share/doc/selfpost/`. The panel serves the AGPL text at `/license` and
@@ -225,21 +225,22 @@ lines and reply codes, feeds OpenDKIM's tables, parses `postqueue`,
 through go-milter, relies on SQLite's locking, on logrotate's and Docker's
 behaviour. Every block of code that does so carries a comment that says
 what it relies on and where that is written, for the version the image runs
-(the Debian bookworm package, not upstream's head):
+(the Debian trixie package, not upstream's head):
 
 ```go
-// Postfix 3.7.11, src/smtpd/smtpd_check.c,
+// Postfix 3.10.13, src/smtpd/smtpd_check.c,
 // reject_auth_sender_login_mismatch(): the SASL login is compared with
 // each owner in sender_login_maps by strcasecmp_utf8.
 ```
 
 The Debian sources of the image's versions are fetched with `apt-get source`
-inside a `debian:bookworm` container (`postfix`, `opendkim`, `cyrus-sasl2`,
+inside a `debian:trixie` container (`postfix`, `opendkim`, `cyrus-sasl2`,
 `supervisor`, `logrotate`, and `sendmail` for libmilter); `dev/upstream/`
-(not in git) is where they are kept for reading. Go modules are read in the
-module cache at the version `go.mod` pins.
+(not in git) is where they are kept for reading, and `dev/upstream-bookworm/`
+holds the bookworm ones the citations named before `2.7.0`. Go modules are
+read in the module cache at the version `go.mod` pins.
 
-The image takes `debian:bookworm-slim` and installs without pinning (pinned
+The image takes `debian:trixie-slim` and installs without pinning (pinned
 Debian versions leave the mirrors), so a rebuild after a point or security
 release runs packages the citations were not read against. The versions
 read are these; the e2e stand compares them with `dpkg-query` in the image
@@ -249,14 +250,14 @@ re-read what changed, update the citations, then this table:
 <!-- cited-package-versions -->
 | Package | Version read |
 |---|---|
-| `postfix` | `3.7.11-0+deb12u1` |
-| `opendkim` | `2.11.0~beta2-8+deb12u1` |
-| `libopendkim11` | `2.11.0~beta2-8+deb12u1` |
-| `libmilter1.0.1` | `8.17.1.9-2+deb12u2` |
-| `libsasl2-2` | `2.1.28+dfsg-10` |
-| `sasl2-bin` | `2.1.28+dfsg-10` |
-| `supervisor` | `4.2.5-1` |
-| `logrotate` | `3.21.0-1` |
+| `postfix` | `3.10.13-0+deb13u1` |
+| `opendkim` | `2.11.0~beta2-9.1+b1` |
+| `libopendkim11` | `2.11.0~beta2-9.1+b1` |
+| `libmilter1.0.1` | `8.18.1-6+b1` |
+| `libsasl2-2` | `2.1.28+dfsg1-9` |
+| `sasl2-bin` | `2.1.28+dfsg1-9` |
+| `supervisor` | `4.2.5-3` |
+| `logrotate` | `3.22.0-1` |
 <!-- /cited-package-versions -->
 
 A document instead of source: its URL and section. Where neither answers the

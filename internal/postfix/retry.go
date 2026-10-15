@@ -29,7 +29,7 @@ type RetryPolicy struct {
 // build/postfix-config.sh does not set. Used when postconf is missing (unit
 // tests, a binary outside the container) so the panel still starts.
 //
-// Postfix 3.7.11, src/global/mail_params.h: DEF_QUEUE_RUN_DELAY "300s",
+// Postfix 3.10.13, src/global/mail_params.h: DEF_QUEUE_RUN_DELAY "300s",
 // DEF_MIN_BACKOFF_TIME DEF_QUEUE_RUN_DELAY, DEF_MAX_BACKOFF_TIME "4000s",
 // DEF_MAX_QUEUE_TIME "5d", DEF_DSN_QUEUE_TIME "5d", DEF_DELAY_WARN_TIME "0h".
 func DefaultRetryPolicy() RetryPolicy {
@@ -56,7 +56,7 @@ var retryConfKeys = []string{
 }
 
 // retryConfUnits is each key's default unit: the last letter of its default
-// value (Postfix 3.7.11, src/global/mail_params.h, DEF_QUEUE_RUN_DELAY
+// value (Postfix 3.10.13, src/global/mail_params.h, DEF_QUEUE_RUN_DELAY
 // "300s", DEF_MIN_BACKOFF_TIME, DEF_MAX_BACKOFF_TIME "4000s",
 // DEF_MAX_QUEUE_TIME "5d", DEF_DSN_QUEUE_TIME "5d", DEF_DELAY_WARN_TIME
 // "0h"; src/global/mail_conf_time.c, get_def_time_unit()).
@@ -66,23 +66,37 @@ var retryConfUnits = []byte{'s', 's', 's', 'd', 'd', 'h'}
 // the same way logtail stubs queueIDs.
 var readRetryConf = postconfRetryValues
 
-func postconfRetryValues() ([]string, error) {
+// postconfRetryCmd builds the `postconf -h -x` command. It is a var so tests
+// can put a fake postconf in its place, the way postqueueP is.
+var postconfRetryCmd = func() *exec.Cmd {
 	// Fixed argv, no user input — same pattern as Queue (security.md).
-	// Postfix 3.7.11, src/postconf/postconf_main.c, pcf_show_parameters():
-	// named parameters are printed in argument order, with -h one "%s\n"
-	// value each; -x expands "$name" as Postfix itself does when it reads
-	// the value (mail_conf_eval()).
-	cmd := exec.Command("postconf", "-h", "-x",
-		"queue_run_delay",
-		"minimal_backoff_time",
-		"maximal_backoff_time",
-		"maximal_queue_lifetime",
-		"bounce_queue_lifetime",
-		"delay_warning_time",
-	)
-	out, err := cmd.CombinedOutput()
+	return exec.Command("postconf", append([]string{"-h", "-x"}, retryConfKeys...)...)
+}
+
+// postconfRetryValues reads the values from postconf's standard output only.
+// Postfix 3.10.13, src/postconf/postconf_main.c, pcf_show_parameters():
+// named parameters are printed to stdout in argument order, with -h one
+// "%s\n" value each, and an unknown one is a msg_warn() with no line;
+// -x expands "$name" (pcf_expand_parameter_value(),
+// src/postconf/postconf_lookup.c) as Postfix itself does when it reads the
+// value (mail_conf_eval()). Warnings go to stderr (src/postconf/postconf.c,
+// main(), msg_vstream_init(argv[0], VSTREAM_ERR)): an unknown name, and after
+// the values (src/postconf/postconf.c, main()) an unused
+// main.cf parameter, and since 3.9 a deprecated one, "support for parameter
+// \"%s\" will be removed; instead, %s" (src/postconf/postconf_unused.c,
+// pcf_flag_unused_parameters(); RELEASE_NOTES-3.9). Read together with stdout,
+// as CombinedOutput did until base-trixie, such a warning was one value too
+// many and the panel fell back to the compiled-in defaults.
+func postconfRetryValues() ([]string, error) {
+	cmd := postconfRetryCmd()
+	var errOut strings.Builder
+	cmd.Stderr = &errOut
+	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("postconf -h: %w: %s", err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf("postconf -h: %w: %s", err, strings.TrimSpace(errOut.String()))
+	}
+	if why := strings.TrimSpace(errOut.String()); why != "" {
+		log.Printf("postfix: postconf -h: %s", why)
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	if len(lines) != len(retryConfKeys) {
@@ -123,7 +137,7 @@ func parseRetryPolicy(lines []string) (RetryPolicy, error) {
 		}
 		durs[i] = d
 	}
-	// Postfix 3.7.11, src/qmgr/qmgr.c, qmgr_post_init(): "bounce_queue_lifetime
+	// Postfix 3.10.13, src/qmgr/qmgr.c, qmgr_post_init(): "bounce_queue_lifetime
 	// is larger than maximal_queue_lifetime - adjusting" - qmgr uses the
 	// smaller.
 	if durs[4] > durs[3] {
@@ -155,7 +169,7 @@ func (p RetryPolicy) BackoffCap() string {
 // sender, which an application may submit too. It bounds which stored log
 // lines can be about a send-log row (store.SendLogLines).
 //
-// Postfix 3.7.11, src/qmgr/qmgr_active.c, qmgr_active_done_25_generic(): a
+// Postfix 3.10.13, src/qmgr/qmgr_active.c, qmgr_active_done_25_generic(): a
 // message expires after var_max_queue_time, or var_dsn_queue_time when its
 // sender is null - whoever submitted it; qmgr.c caps the second at the
 // first, and so does parseRetryPolicy, which leaves the first the longer.

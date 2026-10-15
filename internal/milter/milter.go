@@ -13,7 +13,7 @@
 // Postfix is configured with default_action=accept for this milter's socket,
 // so even a crash or hang fails open (architecture.md § Mail path).
 //
-// Postfix 3.7.11, src/milter/milter8.c, milter8_comm_error(): a milter that
+// Postfix 3.10.13, src/milter/milter8.c, milter8_comm_error(): a milter that
 // cannot be reached, or does not answer within milter_*_timeout, gives no
 // reply with default_action=accept - the message goes on.
 package milter
@@ -55,7 +55,7 @@ type Store interface {
 //
 // go-milter v0.4.1, session.go, Process(), case CodeMacro: every macro packet
 // replaces the map; server.go, Serve(): NewMilter() for each connection.
-// Postfix 3.7.11, src/milter/milter8.c, milter8_event(): a macro packet, empty
+// Postfix 3.10.13, src/milter/milter8.c, milter8_event(): a macro packet, empty
 // or not, goes before every event (milter.c, milter_macro_lookup(), never
 // returns null).
 type session struct {
@@ -69,7 +69,7 @@ type session struct {
 	// clientIP is the client's address. Postfix gives it at Connect, once per
 	// connection, and again with every MAIL FROM as the {client_addr} macro
 	// (milter_mail_macros in build/postfix-config.sh). The second is the one
-	// that can be relied on: see MailFrom. Postfix 3.7.11,
+	// that can be relied on: see MailFrom. Postfix 3.10.13,
 	// src/smtpd/smtpd_milter.c, smtpd_milter_eval(): {client_addr} is
 	// state->rfc_addr (see clientAddr).
 	clientIP string
@@ -84,7 +84,7 @@ type session struct {
 // Connect captures the client IP of a connection's first message. It is not
 // enough on its own - see MailFrom.
 //
-// Postfix 3.7.11, src/smtpd/smtpd.c, smtpd_proto(): milter_conn_event() is
+// Postfix 3.10.13, src/smtpd/smtpd.c, smtpd_proto(): milter_conn_event() is
 // given state->addr, the address without "IPv6:". go-milter v0.4.1,
 // session.go, case CodeConn: net.ParseIP of it - nil for "unknown" and for a
 // family that sends no address.
@@ -115,7 +115,7 @@ func (s *session) Connect(host, family string, port uint16, addr net.IP, m *milt
 //
 // go-milter v0.4.1, session.go, HandleMilterCommands(): after a reply whose
 // Continue() is false (response.go: accept, discard, reject, tempfail) the
-// backend is replaced by NewMilter(). Postfix 3.7.11, src/milter/milter8.c,
+// backend is replaced by NewMilter(). Postfix 3.10.13, src/milter/milter8.c,
 // milter8_conn_event(): CONNECT goes once per milter connection.
 // {auth_authen}: src/smtpd/smtpd_milter.c, smtpd_milter_eval(), gives
 // state->sasl_username, null without authentication, and then milter.c,
@@ -146,11 +146,11 @@ func (s *session) MailFrom(from string, m *milter.Modifier) (milter.Response, er
 // RcptTo records each recipient. Postfix calls this once per recipient, which
 // is what lets the journal keep a separate row per (queue-id, recipient).
 //
-// Postfix 3.7.11, src/smtpd/smtpd.c, rcpt_cmd(): milter_rcpt_event() once per
+// Postfix 3.10.13, src/smtpd/smtpd.c, rcpt_cmd(): milter_rcpt_event() once per
 // RCPT TO; a recipient Postfix refused goes only to a milter that asked for
 // SMFIP_RCPT_REJ, which Serve's Protocol does not.
 // A recipient given twice - in any case - is one row: cleanup keeps the first
-// and drops the rest (Postfix 3.7.11, src/cleanup/cleanup_out_recipient.c,
+// and drops the rest (Postfix 3.10.13, src/cleanup/cleanup_out_recipient.c,
 // cleanup_out_recipient(), been_here() on a table made with BH_FLAG_FOLD in
 // cleanup_state.c), so only one delivery line will come (assumptions A-31).
 // Its key also holds the DSN NOTIFY= and ORCPT= of the RCPT TO command, which
@@ -181,7 +181,7 @@ func (s *session) Header(name, value string, m *milter.Modifier) (milter.Respons
 // message through just as "accept" does - and, unlike it, leaves this session
 // in place for the connection's next message (see MailFrom).
 //
-// go-milter v0.4.1, session.go, case CodeEOB: Body(). Postfix 3.7.11,
+// go-milter v0.4.1, session.go, case CodeEOB: Body(). Postfix 3.10.13,
 // src/global/mail_params.h: DEF_MILT_EOD_MACROS "i", which
 // src/cleanup/cleanup_milter.c, cleanup_milter_eval(), answers with the queue
 // id. src/milter/milter8.c, milter8_event(): SMFIR_CONTINUE returns the
@@ -198,7 +198,7 @@ func (s *session) Body(m *milter.Modifier) (milter.Response, error) {
 // Postfix rejecting the message for its own reasons). No send-log row will be
 // written, so the level-2 slots this message held must go back.
 //
-// Postfix 3.7.11, src/smtpd/smtpd.c: rset_cmd() and the refusals call
+// Postfix 3.10.13, src/smtpd/smtpd.c: rset_cmd() and the refusals call
 // mail_reset(), which calls milter_abort() (src/milter/milter8.c,
 // milter8_abort(): SMFIC_ABORT); so do the end of every transaction and the
 // end of the session in smtpd_proto().
@@ -214,7 +214,7 @@ func (s *session) Abort(m *milter.Modifier) error {
 // single-character names (e.g. i) arrive bare. go-milter stores whatever name
 // Postfix sends verbatim, so a lookup must try both forms.
 //
-// Postfix 3.7.11, src/milter/milter.c, milter_macro_lookup(): each name is
+// Postfix 3.10.13, src/milter/milter.c, milter_macro_lookup(): each name is
 // sent as milter_*_macros spells it. go-milter v0.4.1, session.go, case
 // CodeMacro: m.macros[name] = value, the name as received.
 func macro(m *milter.Modifier, name string) string {
@@ -228,7 +228,7 @@ func macro(m *milter.Modifier, name string) string {
 // Postfix did not send one that reads as an address. An IPv6 address may come
 // in Sendmail's form, with "IPv6:" in front.
 //
-// Postfix 3.7.11, src/smtpd/smtpd_peer.c, smtpd_peer_sockaddr_to_hostaddr():
+// Postfix 3.10.13, src/smtpd/smtpd_peer.c, smtpd_peer_sockaddr_to_hostaddr():
 // rfc_addr is the dotted quad, "IPv6:" + the address for IPv6, a V4-mapped
 // address rewritten to IPv4, or "unknown".
 func clientAddr(m *milter.Modifier) string {
@@ -270,7 +270,7 @@ func (s *session) record(queueID string) {
 }
 
 // cleanAddress is an address as the milter gets it, without the angle
-// brackets: Postfix 3.7.11 hands the milter the command's argument as the
+// brackets: Postfix 3.10.13 hands the milter the command's argument as the
 // client wrote it, ESMTP parameters as separate strings (src/smtpd/smtpd.c,
 // mail_cmd()/rcpt_cmd(), milter_argv()), and go-milter v0.4.1 passes the first
 // with "<>" trimmed (session.go, case CodeMail/CodeRcpt). A quoted local part
@@ -280,7 +280,7 @@ func cleanAddress(a string) string {
 }
 
 // recipientAsLogged is a recipient in the form Postfix writes it in "to=<..>"
-// and "orig_to=<..>", so a delivery line finds its row. Postfix 3.7.11 keeps
+// and "orig_to=<..>", so a delivery line finds its row. Postfix 3.10.13 keeps
 // the address in internal form - a quoted local part unquoted, a backslash
 // dropped before the character it escapes, a blank in quotes made a space
 // (src/smtpd/smtpd.c, extract_addr(), over src/global/tok822_parse.c,
@@ -315,7 +315,7 @@ func recipientAsLogged(a string) string {
 	return quoteLocalPart(local) + domain
 }
 
-// quoteLocalPart is quote_822_local() of Postfix 3.7.11
+// quoteLocalPart is quote_822_local() of Postfix 3.10.13
 // (src/global/quote_822_local.c, with QUOTE_FLAG_8BITCLEAN, the default): a
 // local part that is a dot-string - atoms of no blank, control character or
 // one of ()<>@,;:\"[], joined by single dots, none first or last - is left as
@@ -366,7 +366,7 @@ func domainOf(addr string) string {
 // gets a fresh session bound to rec. It returns nil on a clean shutdown.
 //
 // go-milter v0.4.1, server.go: Close() closes the listener and Serve() then
-// returns ErrServerClosed. Postfix 3.7.11, src/milter/milter8.c,
+// returns ErrServerClosed. Postfix 3.10.13, src/milter/milter8.c,
 // milter8_message(): SMFIP_NOBODY leaves out only the body chunks - headers,
 // end-of-headers and end-of-body (milter8_eob()) still go; milter8_event()
 // takes a reply code (SMFIR_REPLYCODE) whatever the action mask.

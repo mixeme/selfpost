@@ -38,6 +38,14 @@ versions `go.mod` pins (go-milter v0.4.1, modernc.org/sqlite v1.60.1 with
 SQLite 3.53.4); htmx 2.0.4 as vendored. Upstream paths below are relative
 to the package's source tree.
 
+Since base-trixie (`2.7.0`) the image runs Debian trixie (Postfix 3.10.13,
+opendkim 2.11.0~beta2-9.1+b1, cyrus-sasl2 2.1.28+dfsg1-9, supervisor
+4.2.5-3, logrotate 3.22.0-1; development.md § Code that relies on another
+component's behaviour), and the citations in the code were re-read against
+the trixie sources. This register is left as it was made: its line numbers
+and versions are those of the bookworm sources above, which are now kept
+under `dev/upstream-bookworm/` (where it says `dev/upstream/`).
+
 Counts at the inventory, by the justification the tree had:
 
 | Part | Entries | CITED | MEASURED | GUESSED | WRONG? |

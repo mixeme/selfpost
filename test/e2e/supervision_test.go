@@ -45,7 +45,7 @@ func waitProgramState(t *testing.T, name, want string, within time.Duration) {
 }
 
 // postfixStops counts the lines "postfix stop" writes to mail.log before it
-// sends master TERM (Postfix 3.7.11, conf/postfix-script, "stop": $INFO
+// sends master TERM (Postfix 3.10.13, conf/postfix-script, "stop": $INFO
 // stopping the Postfix mail system; "... with force" when master had not
 // gone after five seconds, which this does not count).
 func postfixStops(t *testing.T) int {

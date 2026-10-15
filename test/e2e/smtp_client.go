@@ -237,7 +237,7 @@ func mailTwiceOnOneConnection(login, password, from string) [2]error {
 // reloaded, and an smtpd that was idle from before the reload can still take
 // a connection in the second that follows and answer 553 "not owned by user"
 // (seen on the stand, date not recorded; two seconds after the save it no
-// longer happened, at 0, 10, 40 or 110 s of waiting). Postfix 3.7.11: an smtpd
+// longer happened, at 0, 10, 40 or 110 s of waiting). Postfix 3.10.13: an smtpd
 // reads the texthash map once, when it starts (html/DATABASE_README.html,
 // "texthash"), and one from before the reload exits only when it next sees
 // master's status pipe closed (src/master/multi_server.c,

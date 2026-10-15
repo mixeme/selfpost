@@ -117,7 +117,7 @@ func writeSelfSignedCert(certPath, keyPath string) error {
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	// Readable by everyone, which a real key must never be. On a server the
-	// operator gives the key to the container's selfpost group (998) so the
+	// operator gives the key to the container's selfpost group (10998) so the
 	// panel can put it into a full backup; the runner of this suite is not
 	// always root and cannot hand a file to a group it is not in. The key is
 	// thrown away with the stage directory.

@@ -39,7 +39,7 @@ func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64, place stri
 // that use the same words - a level-2 refusal of the journal milter, OpenDKIM
 // not answering. Those - smtpd 1149, 1190 and 1201, the second client of
 // 1183, smtpd 1300 and the OpenDKIM warning of cleanup 1339 - are composed,
-// after src/smtpd/smtpd.c and src/milter/milter8.c (Postfix 3.7.11).
+// after src/smtpd/smtpd.c and src/milter/milter8.c (Postfix 3.10.13).
 func TestDeferredCounter(t *testing.T) {
 	st := &deferredStore{}
 	c := newDeferredCounter(&SenderCheck{Store: st, Socket: "/run/selfpost/sender.sock"})

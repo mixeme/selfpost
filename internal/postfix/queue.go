@@ -51,7 +51,7 @@ var postqueueP = func(ctx context.Context) *exec.Cmd {
 // listQueue runs `postqueue -p` and keeps at most maxQueueOutput bytes of it;
 // truncated says whether there was more.
 //
-// Postfix 3.7.11, src/postqueue/postqueue.c, show_queue(): any user passes
+// Postfix 3.10.13, src/postqueue/postqueue.c, show_queue(): any user passes
 // authorized_mailq_users (DEF_SHOWQ_ACL static:anyone), and a failure is
 // msg_fatal_status() - a non-zero exit with the reason on stderr;
 // src/postqueue/showq_compat.c, showq_compat(): "Mail queue is empty".
@@ -107,7 +107,7 @@ func Queue() (string, error) {
 // cut are still in the queue, and a backlog that large is the outage the sweep
 // exists for (audit 2026-10-12, H3). QueueMessages treats its cap the same way.
 //
-// Postfix 3.7.11, src/showq/showq.c, showq_service(): maildrop, active,
+// Postfix 3.10.13, src/showq/showq.c, showq_service(): maildrop, active,
 // incoming, deferred and hold are the queues it lists.
 func QueueIDs() (map[string]struct{}, error) {
 	out, truncated, err := listQueue()
@@ -126,7 +126,7 @@ func QueueIDs() (map[string]struct{}, error) {
 //
 // The id is at the start of the line, optionally flagged '*' (in the active
 // queue) or '!' (on hold), then '#' when the message was forced to expire
-// (Postfix 3.7.11, src/postqueue/showq_compat.c, showq_message(): the flags
+// (Postfix 3.10.13, src/postqueue/showq_compat.c, showq_message(): the flags
 // are appended to the id in that order; assumptions B-PQ1), and is followed
 // by the message size. Requiring the
 // size is what separates an entry from the listing's other left-margin lines:

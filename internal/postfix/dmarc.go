@@ -41,7 +41,7 @@ func (p *Postfix) RebuildDMARCMaps(cfg DMARCMapsConfig) error {
 	return p.reload()
 }
 
-// Postfix 3.7.11, man/man5/access.5: "OK" accepts the address the key
+// Postfix 3.10.13, man/man5/access.5: "OK" accepts the address the key
 // matches; man/man5/transport.5: "user@domain transport:nexthop", and "a
 // non-null transport field with a null nexthop field resets the nexthop
 // information to the recipient domain"; relay_domains as in renderInboundMaps.

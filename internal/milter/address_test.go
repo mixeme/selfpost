@@ -31,7 +31,7 @@ func TestCleanAddress(t *testing.T) {
 // The journal row's recipient has to be the address Postfix later logs in
 // to=<…>, or the delivery line matches no row and the sweep closes it as
 // bounced: the local part unquoted, then quoted again only when it is not a
-// dot-string (Postfix 3.7.11, src/global/tok822_parse.c and
+// dot-string (Postfix 3.10.13, src/global/tok822_parse.c and
 // quote_822_local.c). Composed by hand after those functions.
 func TestRecipientAsLogged(t *testing.T) {
 	for _, c := range []struct{ in, want string }{

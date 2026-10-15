@@ -24,7 +24,7 @@ import (
 // record that was published before the backup.
 func testFullBackupRestore(t *testing.T, sc *scenario) {
 	// A private key the panel may not read - the state a server is in until
-	// its operator gives the key to group 998. The panel does not make an
+	// its operator gives the key to group 10998. The panel does not make an
 	// archive without it: it refuses, names the file and says what to do.
 	keyPath := filepath.Join(h.stageDir, "certs", "privkey.pem")
 	if err := os.Chmod(keyPath, 0o600); err != nil {
@@ -34,7 +34,7 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatalf("full backup with an unreadable key: %v", err)
 	}
-	if resp.StatusCode != 500 || !strings.Contains(body, "not allowed to read certs/privkey.pem") || !strings.Contains(body, "chgrp 998") {
+	if resp.StatusCode != 500 || !strings.Contains(body, "not allowed to read certs/privkey.pem") || !strings.Contains(body, "chgrp 10998") {
 		t.Fatalf("full backup with an unreadable key: status %d, want a refusal that names the file and the way out:\n%.800s", resp.StatusCode, body)
 	}
 	if err := os.Chmod(keyPath, 0o644); err != nil {

@@ -55,7 +55,7 @@ func testDeliveryLogSurvivesRotation(t *testing.T, sc *scenario) {
 
 	// The rotation ends with `postfix reload`, which fails while Postfix is
 	// still starting - and this step follows one that restarts the container.
-	// (Postfix 3.7.11, conf/postfix-script: "reload" and "status" both test
+	// (Postfix 3.10.13, conf/postfix-script: "reload" and "status" both test
 	// "master -t" and exit 1 while master does not hold its pid lock.)
 	if err := waitFor("Postfix to be running", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
 		if _, err := h.execIn("selfpost", "postfix", "status"); err != nil {
@@ -82,7 +82,7 @@ func testDeliveryLogSurvivesRotation(t *testing.T, sc *scenario) {
 // testExpiredMessageIsClosed: a message Postfix gives up on is closed as
 // bounced. Postfix logs expiry once per message, "<id>: from=<..>,
 // status=expired, returned to sender" (here "force-expired"), and no line per
-// recipient (Postfix 3.7.11, src/qmgr/qmgr_active.c,
+// recipient (Postfix 3.10.13, src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(); assumptions A-8). The queue lifetime cannot
 // be waited out, so the message is deferred by hand - defer_transports=smtp,
 // under which qmgr hands the recipient to the retry service, "4.3.2 deferred
@@ -154,7 +154,7 @@ print("" if r is None else r[0]+" "+r[1])`, token)
 // testRecipientsAsPostfixLogsThem: each recipient's row reaches "sent". The
 // row holds the recipient as Postfix logs it - "a b" stays quoted, "ab" loses
 // its quotes - and a recipient given again in other capitals is one row, as
-// cleanup keeps one (Postfix 3.7.11, src/global/quote_822_local.c,
+// cleanup keeps one (Postfix 3.10.13, src/global/quote_822_local.c,
 // src/cleanup/cleanup_out_recipient.c; assumptions B-G5, A-31). Before, the
 // first was cut at its blank and its row closed as bounced by the sweep.
 func testRecipientsAsPostfixLogsThem(t *testing.T, sc *scenario) {
@@ -184,7 +184,7 @@ print("; ".join(r[0]+" "+r[1] for r in rows))`, token)
 
 // testAddressLiteralIsNotLocal: an address literal of an interface the
 // container listens on is a local destination to Postfix even with an empty
-// mydestination (Postfix 3.7.11, src/global/resolve_local.c,
+// mydestination (Postfix 3.10.13, src/global/resolve_local.c,
 // resolve_local()). Local delivery is Postfix's refusal now
 // (local_transport=error:..., assumptions C-P8), and smtpd refuses such a
 // recipient at RCPT with its text: smtpd_reject_unlisted_recipient (on by

@@ -62,7 +62,7 @@ type Binding struct {
 // a comma-separated list, which is how Postfix expects multiple owners of one
 // sender.
 //
-// Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
+// Postfix 3.10.13, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
 // the value is split into owners with mystrtok(&cp, CHARS_COMMA_SP).
 func (p *Postfix) RebuildSenderLoginMaps(bindings []Binding) error {
 	content, err := renderSenderLoginMaps(bindings)
@@ -105,7 +105,7 @@ func renderSenderLoginMaps(bindings []Binding) ([]byte, error) {
 		// One line per key as Postfix folds it: smtpd opens the map with
 		// DICT_FLAG_FOLD_FIX and no DICT_FLAG_DUP_* flag, so two keys that
 		// differ only in case would make the whole table unusable (Postfix
-		// 3.7.11, src/util/dict_thash.c, dict_thash_open()). The panel stores
+		// 3.10.13, src/util/dict_thash.c, dict_thash_open()). The panel stores
 		// addresses in lower case already; this keeps the file safe if a row
 		// ever is not.
 		addr := strings.ToLower(b.Address)
@@ -141,7 +141,7 @@ func appendUnique(list []string, v string) []string {
 // and the backslash. A login additionally may not carry "@" — that would make it
 // look like an address.
 //
-// Postfix 3.7.11, src/util/dict_thash.c, dict_thash_open(): the key ends at
+// Postfix 3.10.13, src/util/dict_thash.c, dict_thash_open(): the key ends at
 // the first blank outside quotes, a backslash escapes the next character;
 // src/util/readlline.c: a newline ends the line (one that starts with a blank
 // continues the one before); the owners split on comma and blank (see
@@ -180,7 +180,7 @@ func assertMapSafe(address, login string) error {
 // Arguments are fixed literals — no user input is interpolated into the command,
 // and it never goes through a shell (security.md).
 //
-// Postfix 3.7.11, conf/postfix-script, start-fg: a process that is not PID 1
+// Postfix 3.10.13, conf/postfix-script, start-fg: a process that is not PID 1
 // runs "$daemon_directory/master -s" as its child, and src/master/master.c
 // puts that master in a session of its own (setsid()). "reload" sends the
 // master SIGHUP; src/master/master.c calls master_refresh(), and

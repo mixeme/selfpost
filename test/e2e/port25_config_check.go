@@ -34,7 +34,7 @@ type port25Case struct {
 // flags=, user= and argv= are arguments of pipe(8); set as -o parameters they
 // are dropped, and a bare "pipe" dies on every report with "fatal: missing
 // user= command-line attribute" - the state of 1.7.0 through 1.9.5 (date not
-// recorded; Postfix 3.7.11, src/pipe/pipe.c, get_service_attr()).
+// recorded; Postfix 3.10.13, src/pipe/pipe.c, get_service_attr()).
 const ingestService = "dmarc-ingest unix - n n - 1 pipe flags=Rq user=panel argv=/usr/local/bin/dmarc-ingest ${recipient}"
 
 var port25Cases = []port25Case{
@@ -51,8 +51,12 @@ var port25Cases = []port25Case{
 			// The log tailer tells this listener's refusals from the
 			// submission ports' by the name they are logged under.
 			{param: "syslog_name", contains: "postfix/inbound", wantExact: true},
-			// The SMTP-smuggling defence, off by default on this Postfix
-			// (own-mta-builds, § 5); testInboundBareNewline drives it.
+			// The SMTP-smuggling defence. Postfix 3.10.13 has it by default
+			// (src/global/mail_params.h, DEF_SMTPD_FORBID_BARE_LF "normalize");
+			// set explicitly since 2.6.1, when the image ran Postfix 3.7.11,
+			// whose default was "no" (own-mta-builds, § 5), and kept so the
+			// listener does not depend on the default. testInboundBareNewline
+			// drives it.
 			{param: "smtpd_forbid_bare_newline", contains: "normalize", wantExact: true},
 			// No antispam milter configured: the inbound journal milter
 			// alone. The submission chain (strict OpenDKIM + journal-milter)
@@ -150,8 +154,9 @@ func checkPort25ConfigCombinations(s *stack) error {
 			// cut at the space and the rest becomes a stray smtpd argument
 			// ("fatal: unexpected command-line argument", port 25 dead while
 			// `postfix check` stays silent). Ask Postfix itself. (Seen in 1.9.1,
-			// date not recorded; Postfix 3.7.11, man/man5/master.5, "-o
-			// name=value (short form)", NOTE 2.)
+			// date not recorded; Postfix 3.10.13, man/man5/master.5, "-o
+			// name=value (short form)": "does not support whitespace
+			// around the "=" or in parameter values".)
 			seen, err := s.execIn("selfpost", "postconf", "-Ph", "smtp/inet/"+c.param)
 			if err != nil {
 				return fmt.Errorf("%s: postconf -P smtp/inet/%s: %v\n%s", tc.name, c.param, err, seen)

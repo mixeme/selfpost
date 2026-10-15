@@ -18,14 +18,17 @@ import (
 //
 //	postfix/smtpd[1149]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test> sasl_username=<l2app>
 //
-// Postfix 3.7.11, src/smtpd/smtpd.c, check_milter_reply(): "%s: %s: %s from
+// Postfix 3.10.13, src/smtpd/smtpd.c, check_milter_reply(): "%s: %s: %s from
 // %s: %s;%s" with "NOQUEUE" before the queue file is opened, and
 // smtpd_whatsup() for the rest: " from=<..>", " to=<..>", " proto=..",
 // " helo=<..>", then " sasl_username=<..>" when the session authenticated
-// (assumptions A-20, A-21). The login is read at the end of the line, where
-// Postfix puts it last; a line without one is no application's refusal - the
-// journal milter refuses at MAIL FROM only an authenticated session
-// (milter/ratelimit.go). The HELO name before it is the client's text and can
+// (assumptions A-20, A-21). smtpd's own refusals are another function,
+// src/smtpd/smtpd_check.c, log_whatsup(), whose line says "reject:", not
+// "milter-reject:", and since 3.10 ends in " sasl_method=%s sasl_username=%s"
+// without the brackets; it is not one of these. The login is read at the end
+// of the line, where Postfix puts it last; a line without one is no
+// application's refusal - the journal milter refuses at MAIL FROM only an
+// authenticated session (milter/ratelimit.go). The HELO name before it is the client's text and can
 // end in what looks like the field, but only in a session that has no login,
 // and so no refused row to take the line; a row must also be of the line's
 // client address and sender, within minutes.
@@ -52,7 +55,7 @@ type RefusalStore interface {
 // The From: line as the check printed it runs to the last " - " before the
 // first semicolon; the reason after it holds neither, and the check prints no
 // ";" of the client's (sender.go printable), so that semicolon is Postfix's
-// and what follows it - the envelope - is Postfix's own text. Postfix 3.7.11,
+// and what follows it - the envelope - is Postfix's own text. Postfix 3.10.13,
 // src/cleanup/cleanup_milter.c, cleanup_milter_apply(): "%s: %s: %s from
 // %s[%s]: %s;" with the reply from its fifth byte (the "550 " dropped), then
 // " from=<..>", " to=<..>" - the last recipient only (assumptions A-15).
@@ -60,7 +63,7 @@ var fromRefusalRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?cleanup\[\d
 
 // clientLoginRe is smtpd's line naming the login a queue id was submitted
 // under: "<id>: client=host[addr], sasl_method=PLAIN, sasl_username=<login>".
-// Postfix 3.7.11, src/smtpd/smtpd.c, mail_open_stream(): ", sasl_sender=.."
+// Postfix 3.10.13, src/smtpd/smtpd.c, mail_open_stream(): ", sasl_sender=.."
 // follows when the client gave AUTH= on MAIL FROM, then ", orig_queue_id=.."
 // and ", orig_client=.." for XFORWARD; the login ends at the comma (a login
 // holds none - internal/postfix assertMapSafe; assumptions A-23).
@@ -148,7 +151,7 @@ func (r *refusalLines) handle(line string, now time.Time, start Place) {
 		return
 	}
 	// The address in "name[addr]" is smtpd's state->addr, which has no
-	// "IPv6:" (Postfix 3.7.11, src/smtpd/smtpd_peer.c, smtpd_peer_init();
+	// "IPv6:" (Postfix 3.10.13, src/smtpd/smtpd_peer.c, smtpd_peer_init();
 	// assumptions A-24).
 	ip := net.ParseIP(m[2])
 	if ip == nil {

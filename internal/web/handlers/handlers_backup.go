@@ -354,7 +354,7 @@ func decryptErrorMessage(err error) string {
 func unreadableBackupErr(err error, deployRoot string) string {
 	if name, ok := backup.UnreadableCert(err, deployRoot); ok {
 		return "The panel is not allowed to read " + name + ", and a backup without it would not bring the server back. " +
-			"On the host, give the file to group 998 and make it group-readable (chgrp 998, chmod 640), then try again. Nothing was downloaded."
+			"On the host, give the file to group 10998 and make it group-readable (chgrp 10998, chmod 640), then try again. Nothing was downloaded."
 	}
 	if errors.Is(err, backup.ErrNoCerts) {
 		return "The project's certs/ holds no certificate, so a backup would bring the server back without one. " +

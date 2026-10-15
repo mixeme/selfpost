@@ -32,7 +32,7 @@ func invalid(format string, args ...any) error {
 // (idx_applications_login_nocase); a login imported from another instance is
 // not folded, since its SASL account and its client use it as it is.
 //
-// Postfix 3.7.11, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
+// Postfix 3.10.13, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
 // the SASL login is compared with each owner by strcasecmp_utf8().
 func foldLogin(login string) string {
 	return strings.ToLower(login)

@@ -91,7 +91,7 @@ type Params struct {
 // bring back is not the queue. Nor could the panel read it - Postfix keeps
 // every queue file readable by its own user alone, which is why the panel's
 // backup failed outright from 1.3.0 to 2.0.0 (date not recorded; Postfix
-// 3.7.11, conf/postfix-files: active, deferred, incoming and the other queue
+// 3.10.13, conf/postfix-files: active, deferred, incoming and the other queue
 // directories are $mail_owner 700). What is not carried over is mail
 // still waiting for delivery; a start without a queue directory builds an
 // empty one. Whoever needs the queue stops the instance and archives the

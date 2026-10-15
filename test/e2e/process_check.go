@@ -73,7 +73,7 @@ func parseSupervisorStatus(out string) map[string]string {
 // port 25: smtp/inet is absent from master.cf (Debian's stock listener is
 // removed when INBOUND_RELAY_ENABLE is not true). For an absent service
 // postconf -M prints nothing on stdout and "warning: unmatched request" on
-// stderr (Postfix 3.7.11, src/postconf/postconf_master.c,
+// stderr (Postfix 3.10.13, src/postconf/postconf_master.c,
 // pcf_show_master_entries()).
 func checkInboundRelayOff(s *stack) error {
 	out, err := s.execIn("selfpost", "postconf", "-M", "smtp/inet")
@@ -90,7 +90,7 @@ func checkInboundRelayOff(s *stack) error {
 // checkCitedPackageVersions compares the Debian packages the image runs with
 // the versions their sources were read at (docs/development.md, the table
 // between the cited-package-versions markers). The image installs unpinned
-// from a moving bookworm, so a point release changes them on a rebuild
+// from a moving trixie, so a point release changes them on a rebuild
 // without anyone reading what changed (assumptions C-D1).
 func checkCitedPackageVersions(s *stack) error {
 	doc, err := os.ReadFile(filepath.Join(s.repoRoot, "docs", "development.md"))

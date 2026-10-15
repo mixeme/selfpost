@@ -55,7 +55,7 @@ type SASLDB struct {
 // realm should match SELFPOST_HOSTNAME so the account identity lines up with
 // Postfix's SASL configuration.
 //
-// Postfix 3.7.11, src/xsasl/xsasl_cyrus_server.c, xsasl_cyrus_server_create():
+// Postfix 3.10.13, src/xsasl/xsasl_cyrus_server.c, xsasl_cyrus_server_create():
 // sasl_server_new() gets $myhostname and, with smtpd_sasl_local_domain empty,
 // no user realm; Cyrus SASL 2.1.28, plugins/sasldb.c,
 // sasldb_auxprop_lookup(), then looks a login without "@" up under the

@@ -44,23 +44,37 @@ for sock in $SOCKS; do
 done
 
 echo "postfix-wrapper: milter sockets ready, starting postfix"
-# Postfix 3.7.11: postfix(1) execs conf/postfix-script (src/postfix/postfix.c),
-# whose "start-fg" execs master only as PID 1 and otherwise runs "master -s" as
-# its child; master then makes itself a session leader (src/master/master.c,
-# setsid()). A signal supervisord sends this program never reaches master
+# Postfix 3.10.13: postfix(1) execs conf/postfix-script (src/postfix/postfix.c:669),
+# whose "start-fg" (:200-210) execs master only as PID 1 and otherwise runs
+# "master -s" as its child; master then makes itself a session leader
+# (src/master/master.c:441, setsid()). A signal supervisord sends this
+# program never reaches master
 # (supervisor 4.2.5, supervisor/process.py, Subprocess.kill(): to the pid
 # alone without stopasgroup, and master is not in its group anyway): before,
 # a stop left master running - a restart of the program then found Postfix
 # "already running", and a stop of the container cut Postfix off with
 # SIGKILL (assumptions C-P42). So this shell stays, and on TERM or INT runs
-# "postfix stop" (conf/postfix-script, "stop": TERM to master, then waits up
-# to five seconds and kills its group; src/master/master_sig.c,
-# master_sigdeath(): "terminating on signal 15").
+# "postfix stop" (conf/postfix-script:237-253, "stop": TERM to master, then
+# waits up to five seconds and kills its group; src/master/master_sig.c:205,
+# master_sigdeath(): "terminating on signal 15"). Debian's redirect of
+# "postfix start" to systemd (debian/patches/
+# debian-re-run-startup-through-systemd.patch, conf/postfix-script:170-189)
+# leaves start-fg alone and needs /run/systemd/system, which this container
+# has not.
+#
+# Since Postfix 3.8 postfix(1) and postlog(1) - postfix-script's $INFO, $WARN
+# and $FATAL - write their messages to stderr even when it is not a terminal
+# (src/postfix/postfix.c:546, msg_vstream_init() no longer under isatty();
+# RELEASE_NOTES-3.8:114-115, [Incompat 20230308]), besides maillog_file. So
+# "starting the Postfix mail system", "stopping ..." and check-warn's
+# warnings now reach the container's log through this program's stderr
+# (build/supervisord.conf) as well as /data/log/mail.log; nothing reads them
+# there but a person.
 #
 # "postfix start-fg" spends its first seconds in its checks before master
 # runs; a stop asked then would find nothing to stop, so it is asked again
 # until the child is gone. "master -t" exits 0, silently, while no master
-# holds the lock (src/master/master.c, test_lock).
+# holds the lock (src/master/master.c:495-499, test_lock).
 daemon_directory=$(postconf -h daemon_directory)
 child=
 stop_asked=

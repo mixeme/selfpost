@@ -11,9 +11,9 @@
 # copies - not the mounted files, which a renewer may be rewriting - are a
 # certificate and the key that belongs to it, renames both over the targets
 # and reloads Postfix. When nothing changed it does nothing.
-# (Postfix 3.7.11: smtpd loads the certificate in pre_jail_init(), once per
-# process, src/smtpd/smtpd.c; "postfix reload" is SIGHUP to master,
-# conf/postfix-script, after which the old smtpd processes exit on the closed
+# (Postfix 3.10.13: smtpd loads the certificate in pre_jail_init(), once per
+# process, src/smtpd/smtpd.c:6442; "postfix reload" is SIGHUP to master,
+# conf/postfix-script:277, after which the old smtpd processes exit on the closed
 # status pipe, src/master/master_conf.c, master_config() ->
 # master_restart_service(), and new ones load the files again.)
 #

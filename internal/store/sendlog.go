@@ -100,7 +100,7 @@ func (s *Store) InsertRejected(e SendLogEntry) error {
 // wrote, and the milter's row holds it as Postfix logs it
 // (milter.recipientAsLogged); but a recipient repeated in another case is
 // one recipient to Postfix - cleanup drops the second, comparing folded
-// (Postfix 3.7.11, src/cleanup/cleanup_out_recipient.c, been_here() with
+// (Postfix 3.10.13, src/cleanup/cleanup_out_recipient.c, been_here() with
 // BH_FLAG_FOLD) - and one row to the milter, spelt as first given, and
 // log_adhoc() writes orig_to= only when it differs from to= other than in
 // case (src/global/log_adhoc.c, strcasecmp_utf8()). Assumptions D-S20. It
@@ -191,7 +191,7 @@ func (s *Store) CloseUnreported(id int64) (int64, error) {
 // ExpireMessage closes the rows of a message Postfix gave up on at the end of
 // its queue lifetime: each recipient's newest row with that queue id, if it
 // is still open ("queued" or "deferred"), becomes "bounced" - Postfix returns
-// the message to its sender. Postfix 3.7.11, src/qmgr/qmgr_active.c,
+// the message to its sender. Postfix 3.10.13, src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(), logs expiry once per message, "<id>:
 // from=<..>, status=expired, returned to sender", with no line per
 // recipient: the recipients' last lines say "deferred" (assumptions A-8). It

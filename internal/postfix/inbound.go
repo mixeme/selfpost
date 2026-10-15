@@ -55,7 +55,7 @@ func (p *Postfix) RebuildInboundMaps(routes []InboundRoute) error {
 	return p.reload()
 }
 
-// Postfix 3.7.11, man/man5/postconf.5: a relay_domains table "is matched when
+// Postfix 3.10.13, man/man5/postconf.5: a relay_domains table "is matched when
 // a (parent) domain appears as lookup key", the value unused; relay_recipient_maps
 // is used as a list, "@domain" its wild-card (src/global/mail_addr_find.c,
 // MA_FIND_AT_DOMAIN, the exact domain only). man/man5/transport.5: "domain
@@ -104,7 +104,7 @@ func renderInboundMaps(routes []InboundRoute) (relay, transport, recipients, tls
 // what disable the MX lookup, so the operator's explicit upstream is used as
 // given; they also delimit a bare IPv6 address.
 //
-// Postfix 3.7.11, src/smtp/smtp_connect.c: no MX lookup for a destination that
+// Postfix 3.10.13, src/smtp/smtp_connect.c: no MX lookup for a destination that
 // starts with "["; src/util/host_port.c, host_port(): "[host]:port", the host
 // a name or an address ("ipv6:" in front is optional), checked by
 // valid_hostaddr().

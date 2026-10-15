@@ -827,9 +827,9 @@ supervisord; `dev/upstream` refetched from trixie; the cited-package table
 and `checkCitedPackageVersions`; the e2e sink image; `opendkim-tools`
 dropped from the image (used by nothing at run time). OpenDKIM's code is
 the same in trixie, its citations stand. One stage, a MINOR release. Also
-gained: `smtpd_hide_client_session` (3.10) is available - whether the
-relay should hide the application's address from `Received:` is a product
-question to decide separately.
+gained: `smtpd_hide_client_session` (3.10); the owner decided on
+2026-10-15 to turn it on for 465 and 587 in the same release, so the
+`Received:` header no longer shows the application's address.
 
 ## panel-dkim-signing
 

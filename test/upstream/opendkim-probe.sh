@@ -16,7 +16,7 @@ set -e
 mkdir -p /tmp/odk && cd /tmp/odk
 for d in sender.e2e.test other.e2e.test mail.e2e.test; do
 	mkdir -p keys/$d
-	opendkim-genkey -D keys/$d -d $d -s sel
+	openssl genrsa -out keys/$d/sel.private 2048 2>/dev/null
 	echo "$d $d:sel:/tmp/odk/keys/$d/sel.private" >> KeyTable
 	echo "*@$d $d" >> SigningTable
 done

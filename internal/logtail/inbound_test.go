@@ -53,8 +53,9 @@ func inboundFixture() (*inboundJournal, *fakeInboundStore) {
 var tailNow = time.Date(2026, 10, 11, 18, 0, 0, 0, time.UTC)
 
 // The mail.log lines in this file are composed by hand, after
-// src/smtpd/smtpd_check.c log_whatsup() and src/cleanup/cleanup_milter.c
-// cleanup_milter_apply() (Postfix 3.7.11), with the stamp Postfix 3.7 writes
+// src/smtpd/smtpd_check.c log_whatsup(), src/cleanup/cleanup_milter.c
+// cleanup_milter_apply() and src/cleanup/cleanup_api.c cleanup_flush()
+// (Postfix 3.10.13), with the stamp Postfix 3.10 writes
 // (src/util/msg_logger.c, "%b %d %H:%M:%S").
 const (
 	head       = "Oct 11 12:00:05 mail "
@@ -86,6 +87,26 @@ func TestInboundTempfailByPostfix(t *testing.T) {
 	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from unknown[2001:db8::9]: 450 4.1.8 <a@nx.example>: Sender address rejected: Domain not found; from=<a@nx.example> to=<B@IN.example.com> proto=ESMTP helo=<x>", tailNow, false)
 	if len(st.rows) != 1 || st.rows[0].Decision != store.SpamDecisionTempfail || st.rows[0].ClientIP != "2001:db8::9" || st.rows[0].InboundDomain != "in.example.com" {
 		t.Errorf("rows = %+v", st.rows)
+	}
+}
+
+// Postfix 3.10's log_whatsup() appends " sasl_method=%s", " sasl_username=%s"
+// and " sasl_sender=%s" after the HELO name for a session that has them
+// (src/smtpd/smtpd_check.c; RELEASE_NOTES, [Incompat 20241023]). Port 25 has
+// SASL off, so it never writes them there; a line that had them, with the
+// HELO name or without it, is still read for what comes before. Composed
+// from that format.
+func TestInboundRejectTakesTheSASLTail(t *testing.T) {
+	for name, line := range map[string]string{
+		"after the HELO name": head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<a@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<mx.example.net> sasl_method=PLAIN sasl_username=u sasl_sender=s",
+		"with no HELO name":   head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<a@example.net> to=<nobody@in.example.com> proto=ESMTP sasl_method=PLAIN sasl_username=u",
+	} {
+		j, st := inboundFixture()
+		j.handle(line, tailNow, false)
+		if len(st.rows) != 1 || st.rows[0].From != "a@example.net" || st.rows[0].To != "nobody@in.example.com" ||
+			st.rows[0].Detail != "550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table" {
+			t.Errorf("%s: rows = %+v", name, st.rows)
+		}
 	}
 }
 
@@ -137,7 +158,7 @@ func TestInboundIgnores(t *testing.T) {
 	for name, line := range map[string]string{
 		"another domain (relay access denied)": head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 554 5.7.1 <c@elsewhere.example>: Relay access denied; from=<a@example.net> to=<c@elsewhere.example> proto=ESMTP helo=<x>",
 		"no recipient (size limit at MAIL)":    head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: MAIL from x[203.0.113.9]: 552 5.3.4 Message size exceeds fixed limit; proto=ESMTP helo=<x>",
-		"a submission port":                    head + "postfix/smtpd[20]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 553 5.7.1 <b@in.example.com>: Sender address rejected: not owned by user app; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<x>",
+		"a submission port":                    head + "postfix/smtpd[20]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 553 5.7.1 <b@in.example.com>: Sender address rejected: not owned by user app; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<x> sasl_method=PLAIN sasl_username=app",
 		"a delivery line":                      head + "postfix/smtp[26]: 41E862C00D9E: to=<b@in.example.com>, relay=mx[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)",
 		"a connect line":                       head + "postfix/inbound/smtpd[41]: connect from mx.example.net[203.0.113.9]",
 		// The HELO name is the sender's; a line cannot be started from inside one.
@@ -176,11 +197,28 @@ func TestInboundLookupFailureLeavesNoRow(t *testing.T) {
 // A message the filter holds goes on to the inbound journal milter, which
 // writes its row; a second one from the log would be the same message twice.
 func TestInboundHoldIsTheMiltersRow(t *testing.T) {
-	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)
-	j.handle(head+"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: milter triggers HOLD action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>", tailNow, false)
-	if len(st.rows) != 0 {
-		t.Errorf("rows = %+v", st.rows)
+	// Postfix 3.10.13 logs a quarantine with the milter's reason, or
+	// "default_action" when milter_default_action asked for it, where 3.7
+	// wrote "milter triggers HOLD action" (src/cleanup/cleanup_milter.c,
+	// cleanup_milter_apply(), and src/smtpd/smtpd.c, check_milter_reply():
+	// text = reply[1] ? reply + 1 : "milter triggers HOLD action";
+	// src/milter/milter8.c, SMFIR_QUARANTINE "H%.*s" and milter8_comm_error()
+	// "Hdefault_action"). Whatever the reason says, the line is a hold.
+	// Composed from those formats.
+	for _, hold := range []string{
+		"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: milter triggers HOLD action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>",
+		"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: Gtube pattern; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>",
+		"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: default_action; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>",
+		// A reason that spells a reject is still the reason of a hold.
+		"postfix/cleanup[52]: Q1: milter-hold: END-OF-MESSAGE from mx.example.net[203.0.113.9]: x: milter-reject: END-OF-MESSAGE from y[192.0.2.1]: 5.7.1 no; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>",
+		"postfix/inbound/smtpd[41]: Q1: milter-hold: RCPT from mx.example.net[203.0.113.9]: held for review; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<mx.example.net>",
+	} {
+		j, st := inboundFixture()
+		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)
+		j.handle(head+hold, tailNow, false)
+		if len(st.rows) != 0 {
+			t.Errorf("%s: rows = %+v", hold, st.rows)
+		}
 	}
 }
 
@@ -216,13 +254,18 @@ func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 	}
 }
 
-// A queue id is port 25's only until the message is queued or the id is
-// opened again by another listener - Postfix reuses ids.
+// A queue id is port 25's only until the message is queued, cleanup removes
+// it unqueued, or the id is opened again by another listener - Postfix reuses
+// ids.
 func TestInboundQueueIDIsForgotten(t *testing.T) {
 	const verdict = "postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from app[203.0.113.4]: 4.7.1 Service unavailable - try again later; from=<a@example.net> to=<b@in.example.com> proto=ESMTP helo=<app>"
 	for name, forget := range map[string]string{
 		"queued":                        "postfix/qmgr[58]: Q1: from=<a@example.net>, size=600, nrcpt=1 (queue active)",
 		"reused by the submission port": "postfix/smtpd[20]: Q1: client=app.example.com[203.0.113.4], sasl_method=PLAIN, sasl_username=app",
+		// Postfix 3.10's cleanup_flush(): "%s: removed (%s)", for a message
+		// whose client went away in DATA, or that was discarded.
+		"canceled by cleanup":  "postfix/cleanup[52]: Q1: removed (canceled)",
+		"discarded by cleanup": "postfix/cleanup[52]: Q1: removed (discarded)",
 	} {
 		j, st := inboundFixture()
 		j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=mx.example.net[203.0.113.9]", tailNow, false)

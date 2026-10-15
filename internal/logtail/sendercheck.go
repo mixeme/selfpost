@@ -29,7 +29,7 @@ import (
 // The reject lines do not: the same words are written when OpenDKIM does not
 // answer and when the journal milter refuses under a level-2 limit.
 //
-// Postfix 3.7.11, src/milter/milter8.c: milter8_connect() warns "connect to
+// Postfix 3.10.13, src/milter/milter8.c: milter8_connect() warns "connect to
 // Milter service %s: %m" with the milter's configured name; then
 // milter8_comm_error() answers, for default_action=tempfail, "451 4.7.1
 // Service unavailable - try again later" - the very text milter8_event()
@@ -50,7 +50,7 @@ import (
 //
 // One cleanup process serves message after message and the first warning
 // ends the message, so each such warning is a message, counted on its own.
-// Postfix 3.7.11, src/milter/milter8.c, milter8_read_resp(): "milter %s:
+// Postfix 3.10.13, src/milter/milter8.c, milter8_read_resp(): "milter %s:
 // can't read %s reply packet header: %m", then milter8_comm_error(), which
 // closes the milter's stream and leaves it in the error state for the rest of
 // that message.

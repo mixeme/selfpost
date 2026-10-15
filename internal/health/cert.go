@@ -26,7 +26,7 @@ const certWarnDays = 14
 // Postfix itself serves the copy build/postfix-config.sh makes in
 // /etc/postfix/tls-internal, refreshed by build/postfix-cert-reload.sh up to
 // TLS_RELOAD_INTERVAL_SECONDS later, and each smtpd loads it when it starts
-// (Postfix 3.7.11, src/smtpd/smtpd.c, pre_jail_init(), TLS_SERVER_INIT) - so
+// (Postfix 3.10.13, src/smtpd/smtpd.c, pre_jail_init(), TLS_SERVER_INIT) - so
 // the mounted file can be newer than what is served (assumptions A-65).
 // CheckServedCertificate reads the copy, and names the mounted file as a
 // renewal waiting while the two differ.
@@ -52,7 +52,7 @@ type Renewal struct {
 }
 
 // ServedCertPath is the certificate file Postfix serves, smtpd_tls_cert_file
-// as postconf prints it (Postfix 3.7.11, postconf(1): -h, the value without
+// as postconf prints it (Postfix 3.10.13, postconf(1): -h, the value without
 // its name): build/postfix-config.sh's copy when the mounted files were there
 // at the start, the mounted file itself otherwise. "" when postconf fails.
 // It is read once, at the panel's start, as the retry policy is: main.cf is

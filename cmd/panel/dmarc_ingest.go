@@ -32,7 +32,7 @@ func runDMARCIngestMode() error {
 		// Not a report this relay keeps. It is dropped: deferring would have
 		// Postfix try it again for days, and a bounce would go to an envelope
 		// sender anyone can write - the report addresses are public. Postfix
-		// 3.7.11: exit 0 is PIPE_STAT_OK, logged "status=sent (delivered via
+		// 3.10.13: exit 0 is PIPE_STAT_OK, logged "status=sent (delivered via
 		// ... service ...)" (src/global/pipe_command.c, pipe_command();
 		// src/pipe/pipe.c, eval_command_status()); a 4.x.x status defers until
 		// maximal_queue_lifetime and a 5.x.x one bounces, either way a notice
@@ -49,7 +49,7 @@ func runDMARCIngestMode() error {
 // what a delivery command wrote - about a hundred bytes - into its own line
 // for the message ("status=sent (delivered via dmarc-ingest service (...))"),
 // so the reason goes out first and bare: no prefix, no date, no recipient,
-// all of which that line already has. Postfix 3.7.11, src/pipe/pipe.c,
+// all of which that line already has. Postfix 3.10.13, src/pipe/pipe.c,
 // eval_command_status(): " (%.100s)" of the output, which
 // src/global/pipe_command.c takes from stdout and stderr together. postlog is
 // no use here: pipe(8) starts the command without the group that may write to
@@ -58,7 +58,9 @@ func runDMARCIngestMode() error {
 // installs it set-gid, Debian's package does not - measured in the image,
 // 2026-10-15: /usr/sbin/postlog is -rwxr-xr-x root:root (postfix
 // 3.7.11-0+deb12u1), and dpkg-statoverride lists only postdrop and
-// postqueue (assumptions A-43).
+// postqueue (assumptions A-43). postfix 3.10.13-0+deb13u1 is the same by its
+// source: debian/postfix.postinst adds statoverrides for /usr/sbin/postdrop
+// and /usr/sbin/postqueue alone, and nothing in debian/ makes postlog set-gid.
 func logRejected(reason error) {
 	fmt.Fprintln(os.Stderr, "dropped: "+logSafe(strings.TrimPrefix(reason.Error(), dmarc.ErrRejected.Error()+": ")))
 }
@@ -83,7 +85,7 @@ func logSafe(s string) string {
 // ingestRecipient is the report address the message was delivered to. Postfix's
 // pipe(8) hands it over as an argument (${recipient} in the service's argv,
 // build/postfix-config.sh) - it sets no RECIPIENT variable, that is local(8).
-// Postfix 3.7.11, src/pipe/pipe.c, deliver_message(): pipe_command() gets only
+// Postfix 3.10.13, src/pipe/pipe.c, deliver_message(): pipe_command() gets only
 // CA_PIPE_CMD_EXPORT(export_environment), no extra environment;
 // src/local/command.c sets "RECIPIENT".
 // Without it the check that a report came to its own domain's address is

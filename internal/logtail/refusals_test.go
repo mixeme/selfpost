@@ -31,8 +31,9 @@ func (r *refusalProbe) AttachRefusalLine(clientIP, login, from string, _ time.Ti
 
 // The mail.log lines in this file are composed by hand, with the e2e stand's
 // names and addresses (smtpd.c check_milter_reply(), mail_open_stream();
-// cleanup_milter.c cleanup_milter_apply(), Postfix 3.7.11), with the stamp
-// Postfix 3.7 writes (src/util/msg_logger.c, "%b %d %H:%M:%S").
+// smtpd_check.c log_whatsup(); cleanup_milter.c cleanup_milter_apply(),
+// Postfix 3.10.13), with the stamp Postfix 3.10 writes
+// (src/util/msg_logger.c, "%b %d %H:%M:%S").
 //
 // The NOQUEUE line of a refusal at MAIL FROM goes on its row; a line whose
 // row is not written yet waits and is tried again; port 25's and other
@@ -45,7 +46,7 @@ func TestRefusalLines(t *testing.T) {
 	for _, other := range []string{
 		`Oct 14 12:00:00 mail postfix/inbound/smtpd[372]: NOQUEUE: milter-reject: MAIL from unknown[203.0.113.7]: 451 4.7.1 Service unavailable - try again later; from=<a@stranger.example> proto=ESMTP helo=<x>`,
 		`Oct 14 12:00:00 mail postfix/smtpd[11]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
-		`Oct 14 12:00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x>`,
+		`Oct 14 12:00:00 mail postfix/smtpd[11]: NOQUEUE: reject: RCPT from unknown[10.77.0.1]: 553 5.7.1 <a@x>: Sender address rejected: not owned by user app1; from=<a@x> to=<b@y> proto=ESMTP helo=<x> sasl_method=PLAIN sasl_username=app1`,
 		// No login: no application's refusal (the panel down refuses every
 		// session, an unauthenticated one too).
 		`Oct 14 12:00:00 mail postfix/smtpd[12]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<billing@sender.e2e.test> proto=ESMTP helo=<x>`,

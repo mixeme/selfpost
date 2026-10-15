@@ -37,7 +37,7 @@ func main() {
 		log.SetPrefix("dmarc-ingest: ")
 		if err := runDMARCIngestMode(); err != nil {
 			log.Printf("ingest failed: %v", err)
-			// EX_TEMPFAIL — ask Postfix to defer. Postfix 3.7.11,
+			// EX_TEMPFAIL — ask Postfix to defer. Postfix 3.10.13,
 			// src/global/pipe_command.c, pipe_command(): a sysexits code maps
 			// to its DSN (src/global/sys_exits.c: 75 is "4.3.0") and a 4 defers,
 			// unless the output starts with a "D.S.N text" of its own - the
@@ -223,7 +223,7 @@ func antispamAction(raw string) string {
 
 // saslRealm chooses the realm new SASL accounts live under. It mirrors the
 // hostname Postfix's SASL layer uses so a client authenticating with a bare
-// login resolves to the right account. Postfix 3.7.11,
+// login resolves to the right account. Postfix 3.10.13,
 // src/xsasl/xsasl_cyrus_server.c, xsasl_cyrus_server_create(): serverFQDN is
 // $myhostname (= SELFPOST_HOSTNAME, build/postfix-config.sh) and user_realm
 // NULL while smtpd_sasl_local_domain is empty; Cyrus SASL 2.1.28,

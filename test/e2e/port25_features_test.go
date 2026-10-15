@@ -272,7 +272,7 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 
 	// Port 25's limit is the whole limit: a 12 MB message - over the
 	// 10240000 bytes cleanup would hold it to on its own, under the 25 MiB the
-	// listener says - is accepted and passed on (Postfix 3.7.11,
+	// listener says - is accepted and passed on (Postfix 3.10.13,
 	// src/cleanup/cleanup_init.c, cleanup_post_jail(); assumptions C-P31).
 	big := uniqueToken("inbound-12mb")
 	line := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab\r\n"
@@ -365,7 +365,7 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("the Inbound log holds %d rows, want the two relayed messages alone:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
-	// Postfix 3.7.11, src/smtpd/smtpd_check.c: "User unknown in relay recipient
+	// Postfix 3.10.13, src/smtpd/smtpd_check.c: "User unknown in relay recipient
 	// table" (check_rcpt_maps(); unknown_relay_recipient_reject_code,
 	// DEF_RELAY_RCPT_CODE 550) and "Relay access denied"
 	// (reject_unauth_destination(); DEF_RELAY_CODE 554).
@@ -464,7 +464,8 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 // smuggling sequence, with a second transaction's commands behind it - is
 // body, and the one message delivered carries all of it; nothing is read as
 // a second transaction (smtpd_forbid_bare_newline=normalize on smtp/inet,
-// build/postfix-config.sh; Postfix 3.7.11, src/smtpd/smtpd.c:3649-3652).
+// build/postfix-config.sh; Postfix 3.10.13, src/smtpd/smtpd.c:3713-3716,
+// receive_data_message()).
 // Runs after testInboundRelay, whose domain, upstream and recipient it uses.
 func testInboundBareNewline(t *testing.T, sc *scenario) {
 	token := uniqueToken("inbound-bare")
@@ -483,6 +484,17 @@ func testInboundBareNewline(t *testing.T, sc *scenario) {
 	}
 	if !bytes.Contains(raw, []byte(smuggled)) {
 		t.Fatalf("the message was cut at the bare-newline \".\": what followed it is not in the delivered message\n%s", raw)
+	}
+	// Port 25 keeps RFC 5321's trace: smtpd_hide_client_session is set on
+	// the submission ports only (build/postfix-config.sh; Postfix 3.10.13,
+	// proto/postconf.proto:19587-19589, "must be used for the port 25 MTA
+	// service"), so this Received: header opens with "from" and the HELO.
+	recv, err := postfixReceived(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recv) != 1 || !strings.HasPrefix(recv[0], "from mx.stranger.e2e.test ") {
+		t.Fatalf("port 25's Received: header should name the sending server, got %q", recv)
 	}
 	// A second transaction, had Postfix read one, would be delivered right
 	// behind the first: give it the time and count the files that carry the

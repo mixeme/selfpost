@@ -24,6 +24,15 @@ func TestQueueLineHead(t *testing.T) {
 		{"port-25 smtpd", "mail postfix/inbound/smtpd[41]: 4A1B2C3D: client=mx.example.net[203.0.113.9]", "4A1B2C3D"},
 		{"cleanup", "mail postfix/cleanup[52]: 41E862C00D9E: message-id=<1@example.com>", "41E862C00D9E"},
 		{"qmgr removes it", "mail postfix/qmgr[10]: 41E862C00D9E: removed", "41E862C00D9E"},
+		// Postfix 3.10.13: src/cleanup/cleanup_api.c, cleanup_flush(), "%s:
+		// removed (%s)"; src/smtpd/smtpd.c, smtpd_proto(), "%s: %s after %s
+		// (%lu bytes) from %s" with the queue id or "NOQUEUE".
+		{"cleanup removes an unqueued message", "mail postfix/cleanup[52]: 41E862C00D9E: removed (canceled)", "41E862C00D9E"},
+		{"a connection lost in DATA", "mail postfix/submission/smtpd[10]: 41E862C00D9E: lost connection after DATA (5420 bytes) from unknown[203.0.113.7]", "41E862C00D9E"},
+		{"a connection lost before a queue id", "mail postfix/smtpd[10]: NOQUEUE: lost connection after EHLO from unknown[203.0.113.7]", ""},
+		// The same function's "%s: %s after %s from %s" for the other reasons.
+		{"too many errors with a queue id", "mail postfix/submission/smtpd[10]: 41E862C00D9E: too many errors after RCPT from unknown[203.0.113.7]", "41E862C00D9E"},
+		{"a timeout before a queue id", "mail postfix/smtpd[10]: NOQUEUE: timeout after MAIL from unknown[203.0.113.7]", ""},
 		{"a bounce is sent: the id at the head, not the new message's", "mail postfix/bounce[30]: 41E862C00D9E: sender non-delivery notification: 5F00AA12", "41E862C00D9E"},
 		{"long queue id", "mail postfix/qmgr[10]: 3sJ8Xh2Cgqz4Xy1: removed", "3sJ8Xh2Cgqz4Xy1"},
 		{"refused before queueing", "mail postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from mx.example.net[203.0.113.9]: 550 5.1.1 <n@in.example.com>: Recipient address rejected; from=<a@example.net> to=<n@in.example.com> proto=ESMTP helo=<mx.example.net>", ""},
@@ -159,6 +168,38 @@ func TestLineKeeperLeavesOutPort25Mail(t *testing.T) {
 	}
 	if len(k.port25) > port25IDs {
 		t.Errorf("%d port-25 ids remembered, ceiling is %d", len(k.port25), port25IDs)
+	}
+}
+
+// A port-25 message that is never queued - refused at end-of-message, or its
+// client gone in DATA - ends with cleanup's "removed (canceled)" rather than
+// qmgr's "removed", and its id is anybody's again from there. Postfix 3.10.13:
+// src/smtpd/smtpd.c, smtpd_proto(), logs the lost connection before
+// mail_reset() closes the cleanup stream; src/cleanup/cleanup_api.c,
+// cleanup_flush(), logs "%s: removed (%s)" after the milter verdict. The
+// lines are composed from those formats.
+func TestLineKeeperForgetsPort25AtCleanupRemoval(t *testing.T) {
+	cs := &captureStore{}
+	k := newLineKeeper(cs)
+	now := time.Date(2026, 10, 12, 18, 0, 0, 0, time.UTC)
+
+	const bounce = "host postfix/cleanup[52]: 4A1B2C3D: message-id=<20261012180000.4A1B2C3D@mail.example.com>"
+	for _, line := range []string{
+		"host postfix/inbound/smtpd[41]: 4A1B2C3D: client=mx.example.net[198.51.100.9]",
+		"host postfix/inbound/smtpd[41]: 4A1B2C3D: lost connection after DATA (5420 bytes) from mx.example.net[198.51.100.9]",
+		"host postfix/cleanup[52]: 4A1B2C3D: removed (canceled)",
+		// The id comes round for a bounce Postfix generates, which has no smtpd.
+		bounce,
+	} {
+		k.add(line, now, false)
+	}
+	k.flush()
+
+	if got := cs.kept(); len(got) != 1 || got[0] != "4A1B2C3D|"+bounce {
+		t.Errorf("kept %v, want only the bounce's line", got)
+	}
+	if len(k.port25) != 0 {
+		t.Errorf("port-25 ids still remembered: %v", k.port25)
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Postfix 3.7.11, src/global/conv_time.c, conv_time(): one number, one
+// Postfix 3.10.13, src/global/conv_time.c, conv_time(): one number, one
 // lower-case unit, the default unit when there is none, the rest ignored.
 func TestParseTime(t *testing.T) {
 	cases := []struct {
