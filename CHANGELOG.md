@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-10-15
+
+The image runs Debian trixie and Postfix 3.10.13, with upstream's 2026
+security fixes that bookworm will not get. The `Received:` header no
+longer shows where an application runs. The container's `selfpost` group
+is 10998 and the panel user 10999: **on upgrade, `chgrp 10998` the TLS
+private key in `certs/` on the host** (a certbot deploy hook too). The
+panel's database is the panel's alone. No migration; schema 11.
+
 ### Security
 
 - **The panel's database was readable by every user of the container.**
