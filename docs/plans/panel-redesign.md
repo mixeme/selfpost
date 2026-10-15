@@ -24,7 +24,8 @@ When an implementation and a mockup disagree, the implementation is wrong.
 
 The 2026-09-08 givens ("no component library, Web Awesome layout CSS only") are
 withdrawn. `docs/assets/panel-ui/` and the stage-1 directions `a/`, `b/`, `c/`
-are history, not a brief.
+were history, not a brief, and were removed on 2026-10-16 (`6099716`; they
+are in the git history).
 
 ## Goal
 

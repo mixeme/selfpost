@@ -193,7 +193,7 @@ Filter lists** page (global-only: the lists are instance-wide) — see
 [panel-redesign.md](panel-redesign.md) § Room for roadmap items. The journal
 table has filters (decision, domain, date range). Mockups are drawn first, in
 `docs/assets/panel-redesign/panel/src/` under that plan's design contract —
-not in the superseded `docs/assets/panel-ui/`.
+not in the superseded `docs/assets/panel-ui/` (removed 2026-10-16).
 
 ## Schema (migration `0002_inbound_spam_log.sql`, the first after the 2.0 baseline)
 
