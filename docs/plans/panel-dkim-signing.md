@@ -2,7 +2,7 @@
 
 **Status:** draft, 2026-10-15 - the row is agreed (owner, 2026-10-15, the
 order port25-bare-newline -> base-trixie -> panel-dkim-signing); three
-questions below go to the owner one at a time; Q1 is decided.  
+questions below go to the owner one at a time; Q1 and Q2 are decided.  
 **Date:** 2026-10-15  
 **Version:** `2.8.0` MINOR (after base-trixie's `2.7.0`). No migration;
 nothing for an operator to do.
@@ -114,6 +114,7 @@ Decided here (technical, the owner may overrule):
   new name. **Recommended: rename** - the cost is the entrypoint's move,
   the paths in the code and the backup tests; a directory named after a
   program the image no longer has would mislead whoever reads `/data`.
+  **Decided (owner, 2026-10-15): rename to `/data/dkim`.**
 - **Q3. Health.** The Overview's socket check and the process list name
   OpenDKIM and the syslog relay. **Recommended:** the socket row becomes
   "DKIM signer" (the panel's `sign.sock`, checked the same way), the two
@@ -156,7 +157,9 @@ Decided here (technical, the owner may overrule):
   programs, the `/dev/log` link and `/run/opendkim`, `usermod -aG selfpost
   opendkim`, crashexit's spared list; `deploy/docker-compose.yml`'s `KILL`
   capability (its only use was the reload).
-- [ ] Keys: Q2.
+- [ ] Keys: `/data/opendkim/keys` -> `/data/dkim/keys` (Q2): the entrypoint
+  copies the tree once and leaves the old one for a rollback to 2.7.x until
+  the next release; KeyTable and SigningTable go with the new layout.
 - [ ] Tests: `test/upstream/*.sh`, e2e's OpenDKIM log and process checks,
   the 256-byte test rewritten for the new rule.
 
