@@ -30,15 +30,45 @@ import (
 // signHeaders is the set of header names signed when present: RFC 6376
 // § 5.4.1's list, as OpenDKIM's dkim_should_signhdrs[] held it (OpenDKIM
 // 2.11.0~beta2, libopendkim/dkim.c:223-246), which SelfPost signed with until
-// 2.8.0. Every occurrence is signed, in message order, and From once more
+// 2.8.0; and two that list leaves out: Sender, which a mail program shows
+// beside From ("on behalf of"), and List-Unsubscribe-Post, which RFC 8058
+// § 4 wants signed for a one-click unsubscribe to be honoured. Every
+// occurrence is signed, in message order, and the shown ones once more
 // (signLines).
 var signHeaders = map[string]bool{
-	"from": true, "reply-to": true, "subject": true, "date": true, "to": true, "cc": true,
+	"from": true, "sender": true, "reply-to": true, "subject": true, "date": true, "to": true, "cc": true,
 	"resent-date": true, "resent-from": true, "resent-sender": true, "resent-to": true, "resent-cc": true,
 	"in-reply-to": true, "references": true,
-	"list-id": true, "list-help": true, "list-unsubscribe": true, "list-subscribe": true,
-	"list-post": true, "list-owner": true, "list-archive": true,
+	"list-id": true, "list-help": true, "list-unsubscribe": true, "list-unsubscribe-post": true,
+	"list-subscribe": true, "list-post": true, "list-owner": true, "list-archive": true,
 }
+
+// overSign are the signed headers a mail program shows: each that the message
+// has is named once more in h=, so that one added after signing breaks the
+// signature (RFC 6376 § 5.4.2, § 8.15). Only those present: Postfix's cleanup
+// adds a Date: or Message-ID: a message lacks after the milters, out of their
+// sight (src/cleanup/cleanup_message.c:722, cleanup_header_done_callback(); a
+// header cleanup adds is hidden from milters, cleanup_milter.c:758,
+// hidden_header), and an absent name in h= would refuse it. From is present
+// in every message the signer signs (the sender check refuses one without;
+// the panel writes its own) and comes last.
+var overSign = map[string]bool{"subject": true, "date": true, "to": true, "cc": true, "reply-to": true, "sender": true}
+
+// headerLimit bounds the header section the signer keeps for a message. The
+// signer holds it whole until the body starts (go-msgauth hashes headers at
+// the end of the block), and Postfix bounds one header (60000 bytes with
+// milters, src/cleanup/cleanup_message.c, KLUDGE_HEADER_LIMIT) but not their
+// number: a message of nothing but headers up to message_size_limit, sent on
+// fifty connections at once, would cost the panel gigabytes (security review
+// of panel-dkim-signing). A mebibyte is far beyond any mail program's.
+const headerLimit = 1 << 20
+
+// smtpLineLimit is the longest line Postfix's SMTP client sends as it is:
+// smtp_line_length_limit, 998 by default (Postfix 3.10.13,
+// src/global/mail_params.h:1188), past which src/smtp/smtp_proto.c:1266-1274
+// breaks the line and starts the rest with a space - after the signer hashed
+// it whole, so the body hash no longer matches.
+const smtpLineLimit = 998
 
 // signLimit bounds how long a message may take from the end of its headers
 // to its end. go-milter v0.4.1 tells a session nothing when its connection
@@ -53,15 +83,17 @@ const signLimit = time.Hour
 // SignKeys reads the names the server signs for and their selectors from the
 // selector table the panel writes (internal/domain, renderSelectors(): a line
 // "<name> <selector>" each); the key of a name is
-// keysDir/<name>/<selector>.private (domain.KeyPath). The table is read again
-// when it changes, a key file when it does.
+// keysDir/<name>/<selector>.private (domain.KeyPath). The table, a few
+// lines, is read for every message: a stamp of modification time and size
+// would miss a rewrite of the same size within one tick of the file system's
+// clock (review of panel-dkim-signing, F7). A key is parsed again when its
+// file changes, and forgotten when the table no longer names it.
 type SignKeys struct {
 	table, keysDir string
 
-	mu    sync.Mutex
-	stamp fileStamp
-	rows  map[string]keyRow
-	keys  map[string]loadedKey
+	mu   sync.Mutex
+	rows map[string]keyRow
+	keys map[string]loadedKey
 }
 
 type keyRow struct{ selector, path string }
@@ -71,10 +103,11 @@ type loadedKey struct {
 	signer crypto.Signer
 }
 
-// fileStamp tells a file's versions apart: the panel replaces a table or a
-// key by writing a new file and renaming it over the old one
-// (internal/atomicfile), so a new version is a new modification time or
-// size.
+// fileStamp tells a key file's versions apart: the panel replaces a key by
+// writing a new file and renaming it over the old one (internal/atomicfile),
+// so a new version is a new modification time or size - a key of the same
+// size written within the same tick as the one before it is not told apart,
+// which a person replacing a key by hand in the panel cannot do.
 type fileStamp struct {
 	mod  time.Time
 	size int64
@@ -119,13 +152,6 @@ func (k *SignKeys) Lookup(domain string) (string, crypto.Signer, error) {
 }
 
 func (k *SignKeys) readTable() error {
-	fi, err := os.Stat(k.table)
-	if err != nil {
-		return fmt.Errorf("selector table: %w", err)
-	}
-	if k.rows != nil && k.stamp == stampOf(fi) {
-		return nil
-	}
 	data, err := os.ReadFile(k.table)
 	if err != nil {
 		return fmt.Errorf("selector table: %w", err)
@@ -144,7 +170,17 @@ func (k *SignKeys) readTable() error {
 		domain := strings.ToLower(name)
 		rows[domain] = keyRow{selector, filepath.Join(k.keysDir, domain, selector+".private")}
 	}
-	k.rows, k.stamp = rows, stampOf(fi)
+	k.rows = rows
+	// A deleted domain's key does not stay in memory.
+	named := map[string]bool{}
+	for _, r := range rows {
+		named[r.path] = true
+	}
+	for path := range k.keys {
+		if !named[path] {
+			delete(k.keys, path)
+		}
+	}
 	return nil
 }
 
@@ -189,8 +225,12 @@ type signSession struct {
 
 	login   string
 	headers []field
+	size    int  // the header section's bytes so far
+	tooBig  bool // past headerLimit: refused at the end of the headers
 	signer  *dkim.Signer
 	domain  string
+	line    int           // bytes of the body line being read
+	long    bool          // a body line longer than smtpLineLimit was logged
 	expired chan struct{} // closed by the watchdog at signLimit
 	done    chan struct{} // closed when the message ends, to stop it
 }
@@ -202,7 +242,8 @@ func (s *signSession) reset() {
 		close(s.done)
 		_ = s.signer.Close()
 	}
-	s.login, s.headers, s.signer, s.domain = "", nil, nil, ""
+	s.login, s.headers, s.size, s.tooBig, s.signer, s.domain = "", nil, 0, false, nil, ""
+	s.line, s.long = 0, false
 }
 
 // MailFrom starts a message. {auth_authen} is the SASL login (see
@@ -219,7 +260,14 @@ func (s *signSession) MailFrom(from string, m *milter.Modifier) (milter.Response
 // ServeSign); a header of several lines as text separated by "\n"; and not
 // Postfix's own Received:, which goes above the signature anyway (an
 // inserted header is placed relative to the message as delivered).
+//
+// Past headerLimit nothing more is kept, and Headers refuses the message.
 func (s *signSession) Header(name, value string, m *milter.Modifier) (milter.Response, error) {
+	s.size += len(name) + len(value) + 3
+	if s.size > headerLimit {
+		s.tooBig, s.headers = true, nil
+		return milter.RespContinue, nil
+	}
 	s.headers = append(s.headers, field{name, value})
 	return milter.RespContinue, nil
 }
@@ -231,6 +279,10 @@ func (s *signSession) Header(name, value string, m *milter.Modifier) (milter.Res
 // h is not read: go-milter v0.4.1 keeps every header of the connection in it
 // (see senderSession.Headers).
 func (s *signSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milter.Response, error) {
+	if s.tooBig {
+		log.Printf("dkim-signer: login %q: a header section of more than %d bytes - refused", s.login, headerLimit)
+		return milter.NewResponseStr('y', fmt.Sprintf("552 5.3.4 The header section is larger than %d bytes", headerLimit)), nil
+	}
 	s.domain = s.domainOf(s.login)
 	if s.domain == "" {
 		log.Printf("dkim-signer: no sending domain for login %q - deferring", s.login)
@@ -242,6 +294,7 @@ func (s *signSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milte
 		return milter.RespTempFail, nil
 	}
 	keys, block := signLines(s.headers)
+	s.headers = nil // the block is what is kept now
 	signer, err := dkim.NewSigner(&dkim.SignOptions{
 		Domain:                 s.domain,
 		Selector:               selector,
@@ -280,32 +333,60 @@ func watch(signer *dkim.Signer, expired, done chan struct{}) {
 // Each header is written as Postfix will deliver it: the name, the colon, the
 // value with its own leading white space, the lines of a folded value joined
 // with CRLF; and the empty line that ends the block. The names: every header
-// in signHeaders, in message order, and From once more, so that a From:
-// added later breaks the signature (RFC 6376 § 5.4.2; OversignHeaders From in
-// OpenDKIM's configuration until 2.8.0; go-msgauth v0.7.0, dkim/sign.go,
-// NewSigner(): a name with no instance left is kept in h= and hashes
-// nothing).
+// in signHeaders, in message order; then each of overSign the message has,
+// once more, in the order it first comes; then From once more (RFC 6376
+// § 5.4.2; OversignHeaders From in OpenDKIM's configuration until 2.8.0;
+// go-msgauth v0.7.0, dkim/sign.go, NewSigner(): a name with no instance left
+// is kept in h= and hashes nothing).
 func signLines(headers []field) ([]string, []byte) {
-	var keys []string
+	var keys, again []string
+	seen := map[string]bool{}
 	var b strings.Builder
 	for _, f := range headers {
 		b.WriteString(f.name)
 		b.WriteString(":")
 		b.WriteString(strings.ReplaceAll(strings.ReplaceAll(f.value, "\r\n", "\n"), "\n", "\r\n"))
 		b.WriteString("\r\n")
-		if signHeaders[strings.ToLower(strings.TrimSpace(f.name))] {
-			keys = append(keys, strings.TrimSpace(f.name))
+		name := strings.TrimSpace(f.name)
+		lower := strings.ToLower(name)
+		if !signHeaders[lower] {
+			continue
+		}
+		keys = append(keys, name)
+		if overSign[lower] && !seen[lower] {
+			seen[lower] = true
+			again = append(again, name)
 		}
 	}
 	b.WriteString("\r\n")
+	keys = append(keys, again...)
 	return append(keys, "From"), []byte(b.String())
 }
 
 // BodyChunk hashes the body as it comes. Postfix 3.10.13,
 // src/milter/milter8.c:2470-2500, milter8_body(): every line ends "\r\n".
+// A line longer than smtpLineLimit is logged, once a message: its signature
+// will not verify where the line is broken on the way out - the panel's log
+// names the domain for whoever has to tell the application's author.
 func (s *signSession) BodyChunk(chunk []byte, m *milter.Modifier) (milter.Response, error) {
 	if s.signer == nil {
 		return milter.RespContinue, nil
+	}
+	if !s.long {
+		for _, c := range chunk {
+			if c == '\n' {
+				s.line = 0
+				continue
+			}
+			if c != '\r' {
+				s.line++
+			}
+			if s.line > smtpLineLimit {
+				s.long = true
+				log.Printf("dkim-signer: %s (login %q): a body line longer than %d bytes - Postfix breaks it on delivery and the signature will not verify", s.domain, s.login, smtpLineLimit)
+				break
+			}
+		}
 	}
 	if _, err := s.signer.Write(chunk); err != nil {
 		log.Printf("dkim-signer: %s: %v - deferring", s.domain, err)
@@ -324,7 +405,10 @@ func (s *signSession) BodyChunk(chunk []byte, m *milter.Modifier) (milter.Respon
 // own Received:, which a milter never sees (milter8.c:2352-2358, "insert
 // requests are relative to the message as delivered"). go-milter v0.4.1,
 // modifier.go, InsertHeader() turns the folded value's CRLF into LF, as
-// Postfix keeps a header.
+// Postfix keeps a header. The value carries its own leading space: a milter
+// that asked for SMFIP_HDR_LEADSPC gets none from Postfix
+// (milter8.c:1378, :1464, MILTER8_HDR_SPACE; cleanup_milter.c:1085,
+// "%s:%s%s").
 func (s *signSession) Body(m *milter.Modifier) (milter.Response, error) {
 	signer := s.signer
 	if signer == nil {
@@ -348,7 +432,7 @@ func (s *signSession) Body(m *milter.Modifier) (milter.Response, error) {
 		log.Printf("dkim-signer: %s: malformed signature from the library - deferring", s.domain)
 		return milter.RespTempFail, nil
 	}
-	if err := m.InsertHeader(0, name, strings.TrimSuffix(value, "\r\n")); err != nil {
+	if err := m.InsertHeader(0, name, " "+strings.TrimSuffix(value, "\r\n")); err != nil {
 		return nil, err
 	}
 	return milter.RespContinue, nil

@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -50,9 +52,13 @@ type Service struct {
 // them the name is signed like a sending domain: it gets a DKIM key and a line
 // in the selector table, without being a row of the registry - no application
 // can send as it. The name comes from SELFPOST_HOSTNAME, which the entrypoint
-// has validated; it is not user input.
+// has validated; it is not user input. It is kept in lower case, as every
+// domain is (validate.NormalizeDomain): the signer finds a key by the name in
+// lower case (internal/milter, SignKeys), and a key written under
+// "Mail.Example.com" would never be found. Only the DKIM side lowers it - the
+// SASL realm, which defaults to the hostname, is compared as written.
 func (s *Service) SetServerName(hostname string) {
-	s.serverName = hostname
+	s.serverName = strings.ToLower(hostname)
 }
 
 // ServerMail is how the server's own name is signed.
@@ -84,29 +90,16 @@ func (s *Service) ServerMail() (ServerMail, error) {
 	return ServerMail{Name: s.serverName, Selector: selector, Record: rec}, nil
 }
 
-// EnsureServerSigned makes sure the selector table has the line for the
-// server's own name, rebuilding it if it does not - or if there is no table
-// yet, as on the first start of 2.8.0, whose table replaced OpenDKIM's. The
-// table is otherwise rebuilt only when a domain is added or deleted, so an
-// installation whose DKIM_SELECTOR_DEFAULT was changed would go on signing
-// with the key of the old selector while the panel shows the record of the
-// new. It reports whether it had to rebuild.
-func (s *Service) EnsureServerSigned() (bool, error) {
-	if s.serverName == "" {
-		return false, nil
-	}
-	selector, err := s.serverSelector()
-	if err != nil {
-		return false, err
-	}
-	signed, err := s.keys.signs(s.serverName, selector)
-	if err != nil {
-		return false, err
-	}
-	if signed {
-		return false, nil
-	}
-	return true, s.resync()
+// WriteSelectors rewrites the selector table from the registry. The signer
+// calls it before it serves (cmd/panel/signer.go): the table is otherwise
+// rewritten only when a domain is added, deleted or imported, by Reload
+// configuration and after a restore, so a start would leave it out of step
+// after a rewrite that was cut short (a panel killed between a domain's row
+// and its line), after a changed DKIM_SELECTOR_DEFAULT (the server's name
+// would be signed with the old selector's key while the panel shows the new
+// record), and on the first start of 2.8.0, which has no table yet.
+func (s *Service) WriteSelectors() error {
+	return s.resync()
 }
 
 // serverSelector is the selector the server's own name is signed with: that of
@@ -297,8 +290,17 @@ func (s *Service) Resync() error {
 	return nil
 }
 
+// tableMu orders the selector table's writers. Each role builds a Service of
+// its own (cmd/panel, newMailStack), and a rewrite is a read of the registry
+// and then a write: without it, a writer that read before another's domain
+// was added could write after it, and the table would lack that domain until
+// the next rewrite.
+var tableMu sync.Mutex
+
 // resync rebuilds the selector table from the current domain set.
 func (s *Service) resync() error {
+	tableMu.Lock()
+	defer tableMu.Unlock()
 	domains, err := s.store.ListDomains()
 	if err != nil {
 		return err

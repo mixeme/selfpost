@@ -82,10 +82,10 @@ func TestServerNameThatIsAlsoADomain(t *testing.T) {
 	}
 }
 
-// The first start of 2.8.0 finds no selector table - OpenDKIM's tables were
-// the earlier versions' - and an installation may lack the server's line.
-// The start rebuilds, once.
-func TestEnsureServerSignedRebuildsOnce(t *testing.T) {
+// The signer rewrites the table at every start: the first start of 2.8.0
+// finds none (OpenDKIM's tables were the earlier versions'), and a rewrite
+// cut short leaves a domain without its line while the server's is there.
+func TestWriteSelectorsAtTheStart(t *testing.T) {
 	svc, keys := newTestService(t, &fakeApps{})
 	if _, err := svc.Add("example.com"); err != nil {
 		t.Fatal(err)
@@ -95,47 +95,75 @@ func TestEnsureServerSignedRebuildsOnce(t *testing.T) {
 	}
 
 	svc.SetServerName("mail.example.org")
-	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
-		t.Fatalf("first start: rebuilt = %v, %v; want a rebuild", rebuilt, err)
+	if err := svc.WriteSelectors(); err != nil {
+		t.Fatalf("first start: %v", err)
 	}
-	if got, want := readSelectors(t, keys), "example.com selfpost\nmail.example.org selfpost\n"; got != want {
-		t.Errorf("selector table after the rebuild = %q, want %q", got, want)
+	want := "example.com selfpost" + "\n" + "mail.example.org selfpost" + "\n"
+	if got := readSelectors(t, keys); got != want {
+		t.Errorf("selector table after the first start = %q, want %q", got, want)
 	}
-	if rebuilt, err := svc.EnsureServerSigned(); err != nil || rebuilt {
-		t.Errorf("second start: rebuilt = %v, %v; want nothing to do", rebuilt, err)
+
+	// A domain's line lost (a rewrite cut short): the next start puts it back.
+	if err := os.WriteFile(keys.selectorsPath, []byte("mail.example.org selfpost"+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.WriteSelectors(); err != nil {
+		t.Fatal(err)
+	}
+	if got := readSelectors(t, keys); got != want {
+		t.Errorf("selector table after the next start = %q, want %q", got, want)
 	}
 
 	// A name that only begins like the server's is not it.
 	other, otherKeys := newTestService(t, &fakeApps{})
 	other.SetServerName("mail.example.org.evil.example")
-	if _, err := other.EnsureServerSigned(); err != nil {
+	if err := other.WriteSelectors(); err != nil {
 		t.Fatal(err)
 	}
-	if signed, err := otherKeys.signs("mail.example.org", "selfpost"); err != nil || signed {
-		t.Errorf("a longer name was taken for the server's: %v, %v", signed, err)
+	if got := readSelectors(t, otherKeys); got != "mail.example.org.evil.example selfpost"+"\n" {
+		t.Errorf("selector table = %q", got)
 	}
 }
 
-// A table that signs the server's name with the key of another selector - the
-// default selector was changed - is rebuilt: the signer must sign with the key
-// whose record the panel shows.
-func TestEnsureServerSignedFollowsTheSelector(t *testing.T) {
+// A changed default selector: the server's name is signed with the key of the
+// new one, whose record the panel shows.
+func TestWriteSelectorsFollowsTheSelector(t *testing.T) {
 	svc, keys := newTestService(t, &fakeApps{})
 	svc.SetServerName("mail.example.org")
-	if _, err := svc.EnsureServerSigned(); err != nil {
+	if err := svc.WriteSelectors(); err != nil {
 		t.Fatal(err)
 	}
 
 	svc.selector = "sp2027"
-	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
-		t.Fatalf("after the selector changed: rebuilt = %v, %v; want a rebuild", rebuilt, err)
+	if err := svc.WriteSelectors(); err != nil {
+		t.Fatal(err)
 	}
-	if got := readSelectors(t, keys); got != "mail.example.org sp2027\n" {
-		t.Errorf("selector table after the rebuild = %q", got)
+	if got := readSelectors(t, keys); got != "mail.example.org sp2027"+"\n" {
+		t.Errorf("selector table after the change = %q", got)
 	}
 	mail, err := svc.ServerMail()
 	if err != nil || mail.Selector != "sp2027" {
 		t.Errorf("the panel shows selector %q (%v), the table signs with sp2027", mail.Selector, err)
+	}
+}
+
+// A hostname written with capitals is the server's name in lower case: the
+// signer looks a key up by the name in lower case, and a key written under the
+// capitals would never be found.
+func TestServerNameInCapitals(t *testing.T) {
+	svc, keys := newTestService(t, &fakeApps{})
+	svc.SetServerName("Mail.Example.ORG")
+	if err := svc.WriteSelectors(); err != nil {
+		t.Fatal(err)
+	}
+	if got := readSelectors(t, keys); got != "mail.example.org selfpost"+"\n" {
+		t.Errorf("selector table = %q", got)
+	}
+	if _, err := os.Stat(KeyPath(keys.keysDir, "mail.example.org", "selfpost")); err != nil {
+		t.Errorf("the key is not under the name in lower case: %v", err)
+	}
+	if mail, err := svc.ServerMail(); err != nil || mail.Name != "mail.example.org" {
+		t.Errorf("server mail = %+v, %v", mail, err)
 	}
 }
 

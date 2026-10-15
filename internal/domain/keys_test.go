@@ -91,11 +91,8 @@ func TestRebuildWritesThePanelsOwnFiles(t *testing.T) {
 	if err := o.Rebuild([]SigningDomain{{Name: "example.com", Selector: "selfpost"}}); err != nil {
 		t.Fatalf("Rebuild: %v", err)
 	}
-	if signed, err := o.signs("example.com", "selfpost"); err != nil || !signed {
-		t.Errorf("signs after Rebuild = %v, %v", signed, err)
-	}
-	if signed, err := o.signs("example.com", "other"); err != nil || signed {
-		t.Errorf("signs with another selector = %v, %v", signed, err)
+	if got, err := os.ReadFile(o.selectorsPath); err != nil || string(got) != "example.com selfpost"+"\n" {
+		t.Errorf("selector table after Rebuild = %q, %v", got, err)
 	}
 	if runtime.GOOS == "windows" {
 		return // no Unix modes

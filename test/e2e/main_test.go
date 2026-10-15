@@ -303,6 +303,9 @@ func TestE2E(t *testing.T) {
 		sc.deliveryPage = page
 	})
 
+	run("signature_over_awkward_headers", func(t *testing.T) {
+		testSignatureOverAwkwardHeaders(t, sc)
+	})
 	run("notifications_set_up", func(t *testing.T) {
 		testNotificationsSetUp(t, sc)
 	})

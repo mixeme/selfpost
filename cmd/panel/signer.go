@@ -5,11 +5,16 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/milter"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 )
+
+// rewriteRetry is how often the signer tries again to write the selector
+// table when the write at its start failed.
+const rewriteRetry = 10 * time.Second
 
 // serveSigner runs the DKIM signer (internal/milter/sign.go) on its two
 // sockets: signSocket for what applications send on 465/587, signed with the
@@ -20,16 +25,33 @@ import (
 // build/postfix-config.sh), so while this role is not serving, mail waits.
 //
 // The keys and selectors come from the key tree and the selector table under
-// dkimDir (internal/domain, Keys). Before it serves, the table is made to
-// hold the server's own name - and written at all on the first start of
-// 2.8.0, whose table replaced OpenDKIM's: Postfix waits for these sockets
-// (build/postfix-wrapper.sh), so no message meets the table before it.
+// dkimDir (internal/domain, Keys). Before it serves, the table is rewritten
+// from the registry (WriteSelectors): Postfix waits for these sockets
+// (build/postfix-wrapper.sh), so no message meets a table from before. A
+// rewrite that fails is tried again every rewriteRetry until it succeeds;
+// meanwhile what the signer finds no key for it defers, and the panel's
+// pages - Reload configuration among them - stay up.
 func serveSigner(ctx context.Context, cfg config, st *store.Store) error {
-	if rebuilt, err := newMailStack(cfg, st).Domains.EnsureServerSigned(); err != nil {
-		// Mail waits: what the signer cannot find a key for it defers.
-		log.Printf("dkim-signer: the selector table: %v", err)
-	} else if rebuilt {
-		log.Printf("dkim-signer: the selector table was rewritten from the registry")
+	domains := newMailStack(cfg, st).Domains
+	if err := domains.WriteSelectors(); err != nil {
+		log.Printf("dkim-signer: the selector table: %v - trying again every %s", err, rewriteRetry)
+		go func() {
+			tick := time.NewTicker(rewriteRetry)
+			defer tick.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-tick.C:
+					if err := domains.WriteSelectors(); err != nil {
+						log.Printf("dkim-signer: the selector table: %v", err)
+						continue
+					}
+					log.Printf("dkim-signer: the selector table is written")
+					return
+				}
+			}
+		}()
 	}
 	keys := milter.NewSignKeys(filepath.Join(cfg.dkimDir, "selectors"), filepath.Join(cfg.dkimDir, "keys"))
 	bind := milter.NewBindings(postfix.New(cfg.postfixDir).SenderLoginMapsPath())

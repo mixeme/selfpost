@@ -15,6 +15,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   once more, as OpenDKIM signed; strict. Before OpenDKIM left, both signed
   every message on the e2e stand and agreed on `h=` and `bh=`; dkimpy - an
   independent implementation - verifies the panel's signature on every run.
+  Beyond what OpenDKIM signed: `Sender` and `List-Unsubscribe-Post` (RFC 8058
+  wants it signed for one-click unsubscribe), and the shown headers a message
+  has - Subject, Date, To, Cc, Reply-To, Sender - named once more, so that
+  one added on the way breaks the signature. A header section over 1 MiB is
+  refused (`552 5.3.4`); a body line over 998 bytes, which Postfix breaks on
+  delivery, is logged with its domain.
 
 ### Removed
 
@@ -26,10 +32,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ### Changed
 
 - **The DKIM keys moved to `/data/dkim`** and are the panel's alone (0600):
-  the first start copies them from `/data/opendkim`, which is left as it was
-  for a rollback to 2.7.x. Keys, selectors and DNS records do not change.
-  The KeyTable and SigningTable are gone; a selector table the signer reads
-  takes their place. `OPENDKIM_DIR` and `OPENDKIM_SOCKET` are gone.
+  the first start copies them from `/data/opendkim`, which is kept, the
+  panel's alone as well, for a rollback to 2.7.x, and left out of backups.
+  Keys, selectors and DNS records do not change. The KeyTable and
+  SigningTable are gone; a selector table the signer reads takes their
+  place, rewritten from the database at every start. `OPENDKIM_DIR` and
+  `OPENDKIM_SOCKET` are gone.
 - **The sender check reads `From:` as a mail program does** and no longer as
   OpenDKIM did: the line must be one address at a domain the application
   may send as, and the 256-byte limit of OpenDKIM's buffer goes. The key is
@@ -41,6 +49,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   it as quoted-printable for a server that does not announce 8BITMIME, after
   it was signed; `disable_mime_output_conversion=yes` now delivers it as
   signed. OpenDKIM's signatures were exposed to this too.
+- **A start on a queue of an earlier image could stop at `postfix check`.**
+  The numbers the image's package accounts get depend on what else it
+  installs, and the queue under `/data` kept the old ones; `postsuper`, which
+  the check runs as the mail owner, could not read it. The entrypoint hands
+  the queue to Postfix's users by name before the check now. The first
+  rollout of this version to the test server met it and was rolled back.
 
 ## [2.7.0] - 2026-10-15
 

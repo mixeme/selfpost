@@ -218,6 +218,11 @@ libmilter1.0.1.
 - **go-msgauth is small and released slowly.** It can be vendored if it
   ever matters; the signing path is about 300 lines of it.
 - **Rollback:** until stage 2 ships, the chain change is one line; after
-  the cut, the previous image (2.7.x) still has OpenDKIM and reads the same
-  keys - under Q2's rename, from the old path, which the move leaves as a
-  copy until the next release.
+  the cut, the previous image (2.7.x) still has OpenDKIM and reads the keys
+  from the old path, which the move leaves as a copy until the next release
+  - the keys as they were at the upgrade: a domain added under 2.8.x is not
+  in that tree, and 2.7.x sends its mail unsigned; one re-added under 2.8.x
+  has another key there. Going forward again after a rollback, a domain
+  added under 2.7.x has its key only in the old tree: remove `/data/dkim`
+  before the start, and the entrypoint copies again (it copies while
+  `/data/dkim` holds no key).

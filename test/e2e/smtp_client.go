@@ -26,6 +26,9 @@ type sendAttempt struct {
 	moreTo                  []string // further RCPT TO, after to
 	headerFrom              string
 	subject, body           string
+	// raw, when set, is the whole message as written - headers, the empty
+	// line and the body - in place of buildMessage's.
+	raw string
 }
 
 // sendResult records the error (if any) at each stage the transaction
@@ -148,6 +151,9 @@ func attemptSend(a sendAttempt) sendResult {
 		return res
 	}
 	msg := buildMessage(a)
+	if a.raw != "" {
+		msg = a.raw
+	}
 	if _, err := w.Write([]byte(msg)); err != nil {
 		res.dataErr = err
 	} else if err := w.Close(); err != nil {

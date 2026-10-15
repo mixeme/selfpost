@@ -167,27 +167,6 @@ func (o *Keys) Rebuild(domains []SigningDomain) error {
 	return writeFileAtomic(o.selectorsPath, table, 0o600)
 }
 
-// signs reports whether the selector table signs name with the key of
-// selector. A table that does not exist yet signs nothing. The selector is
-// part of the question because the panel shows and checks the record of one
-// key; a table that names another would have the signer sign with a key whose
-// record nobody is told to publish.
-func (o *Keys) signs(name, selector string) (bool, error) {
-	data, err := os.ReadFile(o.selectorsPath)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("read %s: %w", filepath.Base(o.selectorsPath), err)
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if line == name+" "+selector {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // renderSelectors builds the selector table for a domain set, a line
 // "<name> <selector>" each, sorted by name so the output is deterministic.
 // Every domain is re-checked for config-injection safety before being written

@@ -108,27 +108,42 @@ find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim 
 # DKIM keys and the selector table, /data/dkim: the panel's alone - it makes
 # the keys, writes the table and signs (internal/domain, Keys; internal/milter,
 # sign.go). Until 2.8.0 the keys were under /data/opendkim, shared with
-# OpenDKIM through group selfpost. The first start without /data/dkim copies
-# them over and leaves the old tree as it was, for an image of 2.7.x rolled
-# back to (docs/plans/panel-dkim-signing.md, Q2). The copy is made as the
-# panel user, which can read nothing there the panel could not, into a
-# directory beside, renamed into place when it is whole: a start that stops
-# midway copies again. A copy that fails stops the start (set -e) - the
+# OpenDKIM through group selfpost. That tree is kept for an image of 2.7.x
+# rolled back to (docs/plans/panel-dkim-signing.md, Q2), but nothing of
+# 2.8.0 reads it beyond the copy below: it is the panel's alone like the new
+# one - a 2.7.x start gives it back to group selfpost itself - and a backup
+# leaves it out (internal/backup, excludedFromArchive). While /data/dkim
+# holds no key and the old tree does, the keys are copied over. The copy is
+# made as the panel user, which can read nothing there the panel could not,
+# into a directory beside, renamed into place when it is whole: a start that
+# stops midway copies again. A copy that fails stops the start (set -e) - the
 # panel would otherwise make the server's own name a new key, and its
 # published record would no longer match. The selector table is written by
-# the panel before its signer serves (cmd/panel/signer.go).
+# the panel before its signer serves (cmd/panel/signer.go). After a rollback
+# to 2.7.x, a domain added there has its key only in the old tree: remove
+# /data/dkim before the next start of 2.8.x to copy again.
 # (util-linux 2.41, setpriv(1): --reuid, --regid, --clear-groups; cp(1)
-# -P: never follow a symbolic link in the source.)
+# -P: never follow a symbolic link in the source; chown -R and find never
+# follow one either. GNU chmod keeps a directory's set-group-ID bit under a
+# numeric mode unless it is cleared by name - "g-s" - and 2.7.x set it on
+# the old tree: e2e TestStartsOnA27Data.)
+has_keys() { [ -d "$1" ] && [ -n "$(find "$1" -type f -name '*.private' | head -n 1)" ]; }
+if [ -d /data/opendkim ]; then
+	chown -R panel:panel /data/opendkim
+	find /data/opendkim -type d -exec chmod 0700 {} + -exec chmod g-s {} +
+	find /data/opendkim -type f -exec chmod 0600 {} +
+fi
 rm -rf /data/dkim.new
-if [ ! -e /data/dkim ] && [ -d /data/opendkim/keys ]; then
+if ! has_keys /data/dkim/keys && has_keys /data/opendkim/keys; then
 	setpriv --reuid=panel --regid=panel --clear-groups -- \
 		sh -c 'mkdir /data/dkim.new && cp -RP /data/opendkim/keys /data/dkim.new/keys'
+	rm -rf /data/dkim
 	mv /data/dkim.new /data/dkim
 	echo "entrypoint: the DKIM keys were copied from /data/opendkim to /data/dkim; /data/opendkim is left for a rollback" >&2
 fi
 mkdir -p /data/dkim/keys
 chown -R panel:panel /data/dkim
-find /data/dkim -type d -exec chmod 0700 {} +
+find /data/dkim -type d -exec chmod 0700 {} + -exec chmod g-s {} +
 find /data/dkim -type f -exec chmod 0600 {} +
 
 # Application SASL accounts. The panel (user `panel`) writes the
@@ -219,34 +234,53 @@ chmod 2750 /run/selfpost
 # (test(1), -S: true for any socket file, whether or not anything listens.)
 rm -f /run/selfpost/*.sock /run/selfpost/*.alive
 
+# The queue tree belongs to Postfix's users by name. Their numbers are what
+# the package's install hands out and depend on what else the image installs:
+# without opendkim (2.8.0) postfix went from uid 101 to 100 and postdrop from
+# gid 103 to 102, and a queue of an earlier image kept the old numbers. So an
+# existing tree is handed over before postfix-config.sh runs "postfix check",
+# whose postsuper drops to the mail owner before it reads the queue and
+# otherwise stops the start ("scan_dir_push: open directory defer: Permission
+# denied", the test server, 2026-10-16; Postfix 3.10.13,
+# src/postsuper/postsuper.c:1442, set_ugid(var_owner_uid, var_owner_gid);
+# conf/postfix-script:342). After the check it is done again for a tree the
+# check has just built.
+own_queue() {
+	[ -d /data/postfix/queue/active ] || return 0
+	chown -R postfix:postfix /data/postfix/queue
+	# The recursive chown would leave public/ and maildrop/ in group postfix.
+	# Postfix keeps those two in its setgid group: postqueue and postdrop are
+	# setgid postdrop and reach the showq socket and the maildrop directory
+	# through that group alone. With the wrong group `postqueue -p` run by the
+	# panel answers "Connect to the Postfix showq service: Permission denied"
+	# and the panel cannot read the queue (the Queue card and the Outbound
+	# queue page).
+	chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
+	# It would also leave the queue directory itself and pid/ owned by
+	# postfix. Postfix keeps those two owned by root (master, which runs as
+	# root, is the only writer) and logs "warning: not owned by root" for each
+	# at every start. (Postfix 3.10.13, conf/postfix-files:51-68:
+	# $queue_directory root 755, maildrop $setgid_group 730, public
+	# $setgid_group 710, pid root 755, the other queue directories
+	# $mail_owner 700; conf/postfix-script:354-356, "check-warn": "not owned
+	# by root".)
+	chown root /data/postfix/queue /data/postfix/queue/pid
+}
+own_queue
+
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the
 # optional 587 service are all driven by env at run time, and re-derived on every
 # start the same way the /data normalisation above is.
 /usr/local/bin/postfix-config.sh
 
-# The queue tree, on a first start or after a restore, is already built here:
+# The queue tree, on a first start or after a restore, is built here:
 # postfix-config.sh ends with "postfix check", whose check-fatal runs
 # "post-install create-missing" (Postfix 3.10.13, conf/postfix-script:314;
 # conf/postfix-files:55, "$queue_directory/active:d:$mail_owner:-:700:ucr").
 # A "postfix set-permissions" for a missing active/ stood here and never ran
 # (assumptions C-P34).
-chown -R postfix:postfix /data/postfix/queue
-# The recursive chown above would leave public/ and maildrop/ in group postfix.
-# Postfix keeps those two in its setgid group: postqueue and postdrop are setgid
-# postdrop and reach the showq socket and the maildrop directory through that
-# group alone. With the wrong group `postqueue -p` run by the panel answers
-# "Connect to the Postfix showq service: Permission denied" and the panel cannot
-# read the queue (the Queue card and the Outbound queue page).
-chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop
-# It would also leave the queue directory itself and pid/ owned by postfix.
-# Postfix keeps those two owned by root (master, which runs as root, is the only
-# writer) and logs "warning: not owned by root" for each at every start.
-# (Postfix 3.10.13, conf/postfix-files:51-68: $queue_directory root 755, maildrop
-# $setgid_group 730, public $setgid_group 710, pid root 755, the other queue
-# directories $mail_owner 700; conf/postfix-script:354-356, "check-warn": "not
-# owned by root".)
-chown root /data/postfix/queue /data/postfix/queue/pid
+own_queue
 
 # [program:postfix]'s startsecs (build/supervisord.conf): longer than the
 # wrapper's wait for the milter sockets, so its exit at the end of the wait is

@@ -136,11 +136,14 @@ func sendMessage(t *testing.T, s *milter.ClientSession, login string, headers []
 }
 
 // delivered is the message as Postfix delivers it with the signature
-// inserted at the top: every header line ending CRLF.
+// inserted at the top: every header line ending CRLF, and the signature as
+// "name:value" - its value brings its own space (Postfix 3.10.13,
+// src/cleanup/cleanup_milter.c:1085, "%s:%s%s" with no space for a milter
+// that asked for SMFIP_HDR_LEADSPC).
 func delivered(sig milter.ModifyAction, headers []field, body string) []byte {
 	var b bytes.Buffer
 	crlf := func(v string) string { return strings.ReplaceAll(v, "\n", "\r\n") }
-	b.WriteString(sig.HeaderName + ": " + crlf(sig.HeaderValue) + "\r\n")
+	b.WriteString(sig.HeaderName + ":" + crlf(sig.HeaderValue) + "\r\n")
 	for _, h := range headers {
 		b.WriteString(h.name + ":" + crlf(h.value) + "\r\n")
 	}
@@ -187,15 +190,28 @@ func TestSignerSignsWithTheLoginsDomain(t *testing.T) {
 	if v.Domain != "example.org" {
 		t.Errorf("d=%s, want example.org", v.Domain)
 	}
-	for _, want := range []string{"c=relaxed/simple", "s=sel", "h=From:To:Subject:Date:From"} {
-		if !strings.Contains(strings.ReplaceAll(sig.HeaderValue, "\n", ""), want) {
+	if !strings.HasPrefix(sig.HeaderValue, " ") {
+		t.Errorf("the signature's value does not bring its space: %q", sig.HeaderValue)
+	}
+	for _, want := range []string{"c=relaxed/simple;", "s=sel;", "h=From:To:Subject:Date:To:Subject:Date:From;"} {
+		if !strings.Contains(strings.Join(strings.Fields(sig.HeaderValue), ""), want) {
 			t.Errorf("signature lacks %q: %s", want, sig.HeaderValue)
 		}
 	}
-	// A second From: added on the way breaks it: From is over-signed.
-	tampered := append([]field{{"From", " Mallory <m@evil.example>"}}, testHeaders...)
-	if v := verifyWith(t, f.record, delivered(sig, tampered, testBody)); v.Err == nil {
-		t.Error("a From: added above still verifies")
+	// A second From:, Subject: or To: added on the way breaks it: each is
+	// over-signed.
+	for _, added := range []field{{"From", " Mallory <m@evil.example>"}, {"Subject", " urgent: wire the money"}, {"To", " victim@example.net"}} {
+		tampered := append([]field{added}, testHeaders...)
+		if v := verifyWith(t, f.record, delivered(sig, tampered, testBody)); v.Err == nil {
+			t.Errorf("a %s: added above still verifies", added.name)
+		}
+	}
+	// A Cc: the message had none of may be added: only what is present is
+	// over-signed, as Postfix's cleanup adds a missing Date: after the
+	// milters.
+	withCc := append([]field{{"Cc", " someone@example.net"}}, testHeaders...)
+	if v := verifyWith(t, f.record, delivered(sig, withCc, testBody)); v.Err != nil {
+		t.Errorf("a Cc: the message did not have breaks it: %v", v.Err)
 	}
 	// A changed body breaks it.
 	if v := verifyWith(t, f.record, delivered(sig, testHeaders, testBody+"more\r\n")); v.Err == nil {
@@ -297,10 +313,57 @@ func TestSignerDefersWhatItCannotSign(t *testing.T) {
 	}
 }
 
+// Two To: lines and the headers OpenDKIM's list left out verify as signed.
+func TestSignerSignsRepeatedHeaders(t *testing.T) {
+	f := newSignFixture(t)
+	s := startSigner(t, f, appDomains)
+	headers := []field{
+		{"From", " Alice <alice@example.org>"}, {"Sender", " list@example.org"},
+		{"To", " bob@example.net"}, {"To", " carol@example.net"}, {"Cc", " dave@example.net"},
+		{"Subject", " two To lines"},
+		{"List-Unsubscribe", " <https://example.org/u/1>"}, {"List-Unsubscribe-Post", " List-Unsubscribe=One-Click"},
+	}
+	sig := signed(t, s, "app1", headers, testBody)
+	if v := verifyWith(t, f.record, delivered(sig, headers, testBody)); v.Err != nil {
+		t.Fatalf("signature does not verify: %v", v.Err)
+	}
+	// The second To: changed: it was signed too.
+	changed := append([]field(nil), headers...)
+	changed[3] = field{"To", " mallory@example.net"}
+	if v := verifyWith(t, f.record, delivered(sig, changed, testBody)); v.Err == nil {
+		t.Error("a changed second To: still verifies")
+	}
+}
+
+// A header section past headerLimit is refused for good, before any key is
+// looked up, and nothing is inserted.
+func TestSignerRefusesAHugeHeaderSection(t *testing.T) {
+	f := newSignFixture(t)
+	s := startSigner(t, f, appDomains)
+	headers := []field{{"From", " Alice <alice@example.org>"}}
+	filler := strings.Repeat("x", 50000)
+	for i := 0; i*50000 < headerLimit; i++ {
+		headers = append(headers, field{"X-Filler", " " + filler})
+	}
+	mods, act := sendMessage(t, s, "app1", headers, testBody)
+	if act.Code != milter.ActReplyCode || act.SMTPCode != 552 || len(mods) != 0 {
+		t.Fatalf("got %+v with %d modifications, want a 552 reply and none", act, len(mods))
+	}
+}
+
 // signLines writes the block Postfix will deliver and names what is signed.
 func TestSignLines(t *testing.T) {
 	keys, block := signLines(testHeaders)
-	if got := strings.Join(keys, ":"); got != "From:To:Subject:Date:From" {
+	if got := strings.Join(keys, ":"); got != "From:To:Subject:Date:To:Subject:Date:From" {
+		t.Errorf("keys %s", got)
+	}
+	// Every occurrence is signed; a shown one is named once more, once.
+	keys, _ = signLines([]field{
+		{"From", " a@example.org"}, {"Sender", " b@example.org"}, {"To", " c@example.net"}, {"To", " d@example.net"},
+		{"List-Unsubscribe", " <https://example.org/u>"}, {"List-Unsubscribe-Post", " List-Unsubscribe=One-Click"},
+		{"X-Other", " not signed"},
+	})
+	if got := strings.Join(keys, ":"); got != "From:Sender:To:To:List-Unsubscribe:List-Unsubscribe-Post:Sender:To:From" {
 		t.Errorf("keys %s", got)
 	}
 	want := "From: Alice <alice@example.org>\r\nTo: bob@example.net\r\n" +
