@@ -19,7 +19,7 @@ import (
 func healthReading() healthReadings {
 	c := checksFixture()
 	c.Processes = []health.Process{
-		{Name: "opendkim", State: "RUNNING", Detail: "pid 21", Status: health.StatusOK},
+		{Name: "panel", State: "RUNNING", Detail: "pid 21", Status: health.StatusOK},
 		{Name: "postfix", State: "FATAL", Detail: "exited too quickly", Status: health.StatusError},
 	}
 	c.Cert = health.Certificate{
@@ -44,7 +44,7 @@ func healthReading() healthReadings {
 		Status: health.StatusOK,
 	}
 	c.Sockets = []health.Socket{
-		{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", Present: true, Status: health.StatusOK, Detail: "Listening"},
+		{Name: "dkim-signer", Note: "applications", Path: "/run/selfpost/sign.sock", Present: true, Status: health.StatusOK, Detail: "Listening"},
 		{Name: "send-log", Path: "/run/selfpost/journal.sock", Status: health.StatusWarn, Detail: "send-log socket missing: the log stops being written."},
 	}
 	c.SocketStatus = health.StatusWarn
@@ -73,7 +73,7 @@ func TestHealthPageRendersEveryCheck(t *testing.T) {
 	h, _ := settingsServer(t)
 	out := renderHealth(t, h, healthReading(), "")
 	for _, want := range []string{
-		"opendkim", "fatal", "exited too quickly",
+		"panel", "fatal", "exited too quickly",
 		"mail.example.com", "203.0.113.10 → no PTR record", "2026-11-08 09:14 UTC",
 		`action="/server/health/reload"`, `action="/server/health/recheck"`,
 		`hx-get="/server/health/fragment"`,
@@ -208,7 +208,7 @@ func TestHealthFragmentCarriesTheSameRows(t *testing.T) {
 func TestOverviewPageShowsVerdictsAndDomains(t *testing.T) {
 	h, _ := settingsServer(t)
 	h.machine = &health.MachineSampler{}
-	h.domains = domain.NewService(h.store, domain.NewOpenDKIM(t.TempDir()), nil, "selfpost")
+	h.domains = domain.NewService(h.store, domain.NewKeys(t.TempDir()), nil, "selfpost")
 	h.cfg.Hostname = "mail.example.org"
 	d, err := h.store.AddDomain("example.org", "mail")
 	if err != nil {

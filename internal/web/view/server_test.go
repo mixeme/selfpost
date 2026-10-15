@@ -18,7 +18,7 @@ func TestSystemLogShowsNewestFirstAndPollsItsBox(t *testing.T) {
 		`<span class="sp-d">Sep 21 14:01:52</span> postfix/smtp[2131]`,
 		`<span class="sp-w">postfix/smtp[2123]`, `<span class="sp-e">postfix/smtpd[2119]`,
 	)
-	if strings.Index(out, "postfix/smtp[2131]") > strings.Index(out, "opendkim[39]") {
+	if strings.Index(out, "postfix/smtp[2131]") > strings.Index(out, "journal-milter[40]") {
 		t.Error("the log is not shown newest line first")
 	}
 	// What a line says is escaped, not interpreted.

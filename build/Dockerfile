@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# SelfPost — single Debian-slim image running postfix + opendkim + panel under
+# SelfPost — single Debian-slim image running postfix + panel under
 # supervisord. Build from the repository root:
 #
 #     docker build -f build/Dockerfile -t selfpost:dev --build-arg VERSION=dev .
@@ -52,8 +52,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 # the panel runs (internal/app/sasl.go); that db-util ships that path on
 # trixie is not in a source read here - the image build and the e2e sasldb
 # test say whether it does.
-# opendkim-tools is not installed: nothing in the image runs its programs
-# (DKIM keys are made in Go, internal/domain/dkim.go).
+# No DKIM package is installed: the panel signs itself (internal/milter,
+# sign.go) and makes the keys in Go (internal/domain/dkim.go); OpenDKIM left
+# the image in 2.8.0 (docs/plans/panel-dkim-signing.md).
 # systemd-standalone-sysusers is named so that cron-daemon-common, which
 # logrotate brings (logrotate 3.22.0-1, debian/control: "Depends: cron |
 # anacron | cron-daemon | systemd-sysv"), creates its group with it rather
@@ -65,7 +66,6 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
       postfix \
-      opendkim \
       sasl2-bin \
       libsasl2-modules \
       db-util \
@@ -94,13 +94,13 @@ RUN printf 'SYNC_CHROOT=\n' > /etc/default/postfix
 # back to it by name on every start, so files of the old ids follow.
 RUN groupadd --system --gid 10999 panel  && useradd --system --uid 10999 --gid panel --no-create-home --shell /usr/sbin/nologin panel
 
-# Shared group bridging the unprivileged services: the panel generates
-# per-domain DKIM keys, application SASL accounts (sasldb2) and the Postfix
-# sender map, while OpenDKIM and Postfix (different users) must read them.
-# Membership in this group - plus setgid dirs under /data (set up in
-# entrypoint.sh) - lets OpenDKIM read the panel-owned keys and lets Postfix
-# read the sasldb2/sender map. (The supervisor control socket has a group of
-# its own, `supervisor`, below.)
+# Shared group bridging the unprivileged services: the panel writes the
+# application SASL accounts (sasldb2) and the Postfix sender map and opens the
+# milter sockets, while Postfix (another user) must read and reach them.
+# Membership in this group - plus setgid dirs under /data and /run/selfpost
+# (set up in entrypoint.sh) - lets Postfix read the sasldb2/sender map and
+# connect to the panel's milters. The DKIM keys are the panel's alone. (The
+# supervisor control socket has a group of its own, `supervisor`, below.)
 # The id is fixed, because the host sees it: an operator gives the TLS
 # private key on the host to this group by number, so that the panel can put
 # it into a full backup (guide § Taking a full backup). It lies outside the
@@ -117,7 +117,6 @@ RUN groupadd --system --gid 10999 panel  && useradd --system --uid 10999 --gid p
 # fail this build rather than share the group.
 RUN groupadd --system --gid 10998 selfpost \
  && usermod -aG selfpost panel \
- && usermod -aG selfpost opendkim \
  && usermod -aG selfpost postfix
 
 # The panel reads the mail queue with `postqueue -p` (and the status page's
@@ -138,14 +137,13 @@ RUN groupadd --system --gid 10998 selfpost \
 # with no_new_privs, execve() no longer changes the gid for a setgid file.)
 RUN usermod -aG postdrop panel
 # The supervisord control socket's group (supervisord.conf, [unix_http_server]):
-# the panel alone - not OpenDKIM's or Postfix's users, which share `selfpost`
-# for the files under /data.
+# the panel alone - not Postfix's user, which shares `selfpost` for the files
+# under /data.
 RUN groupadd --system supervisor \
  && usermod -aG supervisor panel
 
 # Runtime directories: milter sockets and the consolidated persistent root.
-RUN mkdir -p /run/opendkim /run/selfpost /data \
- && chown opendkim:opendkim /run/opendkim \
+RUN mkdir -p /run/selfpost /data \
  && chown panel:panel /run/selfpost /data
 
 COPY --from=build /out/panel /usr/local/bin/panel
@@ -162,7 +160,6 @@ COPY --chmod=0644 internal/web/view/static/OFL.txt /usr/share/doc/selfpost/OFL.t
 # POSIX permissions (e.g. Windows tar sync) cannot land group-writable config
 # that logrotate would silently ignore — see docs/development.md § Building
 # binaries and the image.
-COPY --chmod=0644 build/opendkim.conf /etc/opendkim.conf
 COPY --chmod=0644 build/logrotate-mail.conf /etc/logrotate.d/mail
 COPY --chmod=0755 build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
 COPY --chmod=0755 build/postfix-reload.sh /usr/local/bin/postfix-reload.sh
@@ -178,7 +175,7 @@ COPY --chmod=0644 build/supervisord.conf /etc/supervisor/supervisord.conf
 # Outbound delivery dials remote MXs on 25 as a client even when inbound is off.
 EXPOSE 8080 465 587 25
 
-# Liveness probe: panel HTTP plus mail-path processes (opendkim, panel, postfix).
+# Liveness probe: panel HTTP plus mail-path processes (panel, postfix).
 # Does not verify TLS, DNS, or end-to-end delivery — see docs/guide.md Operations.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1

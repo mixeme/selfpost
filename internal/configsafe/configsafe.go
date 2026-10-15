@@ -5,7 +5,7 @@
 //
 // The forbidden set stays with the caller rather than living here, because what
 // breaks a line differs per format — a comma separates values in a Postfix map,
-// a colon separates fields in an OpenDKIM table — and the set belongs next to
+// a slash would lead a key's path out of its directory — and the set belongs next to
 // the writer it protects, where a reviewer of that writer can see it.
 package configsafe
 

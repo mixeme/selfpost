@@ -13,7 +13,7 @@ import (
 func checksFixture() healthReadings {
 	return healthReadings{
 		Processes: []health.Process{
-			{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
+			{Name: "panel", State: "RUNNING", Status: health.StatusOK},
 			{Name: "postfix", State: "FATAL", Status: health.StatusError},
 		},
 		ProcessError:  false,
@@ -24,7 +24,7 @@ func checksFixture() healthReadings {
 		Machine:       health.Machine{Status: health.StatusUnknown},
 		Cert:          health.Certificate{Subject: "mail.example.org", DaysLeft: 12, Status: health.StatusWarn, Detail: "Expires soon."},
 		Sockets: []health.Socket{
-			{Name: "OpenDKIM", Present: true, Status: health.StatusOK},
+			{Name: "dkim-signer", Present: true, Status: health.StatusOK},
 			{Name: "send-log", Present: false, Status: health.StatusWarn},
 		},
 		SocketStatus: health.StatusWarn,
@@ -87,7 +87,7 @@ func TestQueueCardValue(t *testing.T) {
 func TestProcessesCardLeavesOutTheIdleOneShot(t *testing.T) {
 	c := checksFixture()
 	c.Processes = []health.Process{
-		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
+		{Name: "panel", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix-reload", State: "STOPPED", Status: health.StatusOK, OneShot: true},
 	}
@@ -98,7 +98,7 @@ func TestProcessesCardLeavesOutTheIdleOneShot(t *testing.T) {
 	}
 
 	c.Processes = []health.Process{
-		{Name: "opendkim", State: "RUNNING", Status: health.StatusOK},
+		{Name: "panel", State: "RUNNING", Status: health.StatusOK},
 		{Name: "postfix-reload", State: "FATAL", Status: health.StatusError, OneShot: true},
 	}
 	card = healthCards(c)[1]

@@ -8,13 +8,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ### Added
 
 - **The panel signs outgoing mail with DKIM itself** (panel-dkim-signing,
-  stage 1 of [the plan](docs/plans/panel-dkim-signing.md)): a milter of the
-  panel's on two sockets, one for applications' mail - signed with the key of
-  the domain the login belongs to - and one for the panel's own, signed with
-  the server's name. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From`
-  once more, as OpenDKIM signs; strict. Until OpenDKIM leaves the image both
-  sign every message, and the e2e suite holds the two to the same `h=` and
-  `bh=` and has dkimpy - an independent implementation - verify each.
+  [the plan](docs/plans/panel-dkim-signing.md)): a milter of the panel's on
+  two sockets, one for applications' mail - signed with the key of the
+  domain the login belongs to - and one for the panel's own, signed with the
+  server's name. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From`
+  once more, as OpenDKIM signed; strict. Before OpenDKIM left, both signed
+  every message on the e2e stand and agreed on `h=` and `bh=`; dkimpy - an
+  independent implementation - verifies the panel's signature on every run.
+
+### Removed
+
+- **OpenDKIM** - a 2018 beta with open 2026 CVEs and no maintainer - and what
+  SelfPost kept around it: the syslog relay and `/dev/log`, the reload by a
+  signal through supervisord, the port of OpenDKIM's `From:` parser.
+  Server › Health shows the signer's two sockets in its place.
+
+### Changed
+
+- **The DKIM keys moved to `/data/dkim`** and are the panel's alone (0600):
+  the first start copies them from `/data/opendkim`, which is left as it was
+  for a rollback to 2.7.x. Keys, selectors and DNS records do not change.
+  The KeyTable and SigningTable are gone; a selector table the signer reads
+  takes their place. `OPENDKIM_DIR` and `OPENDKIM_SOCKET` are gone.
+- **The sender check reads `From:` as a mail program does** and no longer as
+  OpenDKIM did: the line must be one address at a domain the application
+  may send as, and the 256-byte limit of OpenDKIM's buffer goes. The key is
+  the login's, so no `From:` line can choose another tenant's.
 
 ### Fixed
 

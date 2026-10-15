@@ -16,7 +16,7 @@
 // boot if the manifest's version does not match the running binary so
 // schema/format skew between versions cannot silently corrupt state
 // (architecture.md § Persistence), or if the archive was unpacked in part
-// (ContentsName), and a one-time Resync of OpenDKIM's tables
+// (ContentsName), and a one-time Resync of the DKIM selector table
 // and the Postfix sender map from SQLite on that first boot, so any drift
 // between the archive and the database is healed before mail flows. If
 // on-disk state drifts again later — for example after a manual edit under

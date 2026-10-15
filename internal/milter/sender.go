@@ -22,12 +22,11 @@ import (
 
 // The sender check: a message's From: line is held against the application
 // that sends it, under the rule Postfix holds the envelope sender to
-// (docs/plans/from-header-binding.md). OpenDKIM chooses the signing key by
-// that line, so without the check an application could have mail signed as
-// another domain of the server, or as the server itself.
-//
-// The line is read with OpenDKIM's own parser, ported (mailparse.go), so the
-// address judged is the one OpenDKIM signs for.
+// (docs/plans/from-header-binding.md). The signer signs with the key of the
+// domain the login belongs to (sign.go), and a receiver holds that signature
+// to the domain of this line (DMARC, RFC 7489 § 3.1.1), so without the check
+// an application could send under the server's signature as another domain
+// of the server, or as the server itself.
 //
 // Unlike the journal milter this one is attached strictly
 // (default_action=tempfail in build/postfix-config.sh): while it does not
@@ -42,9 +41,7 @@ import (
 // Postfix 3.10.13, src/smtpd/smtpd_check.c, reject_auth_sender_login_mismatch():
 // the SASL login is compared with an owner by strcasecmp_utf8();
 // src/milter/milter8.c, milter8_comm_error(): default_action=tempfail answers
-// "451 4.7.1" for a milter that does not answer. OpenDKIM 2.11.0~beta2,
-// opendkim/opendkim.c, mlfi_eoh(): with SenderHeaders unset the signing
-// domain is that of the first From: field, as dkim_mail_parse() reads it.
+// "451 4.7.1" for a milter that does not answer.
 
 // tableFile is a table of the mail path that the panel rewrites and the check
 // reads: it is read again when it has changed. An unreadable file is an error
@@ -208,8 +205,8 @@ func splitTableLine(line string) (key, value string, ok bool) {
 // Case is folded in ASCII only. Postfix folds as Unicode (src/util/casefold.c
 // with ICU, which Debian builds with), but every key and login the panel
 // writes is ASCII; a Unicode fold would only let a look-alike pass - the
-// Kelvin sign for "k" - for an address OpenDKIM, folding ASCII, does not
-// sign (review of stage 2c).
+// Kelvin sign for "k" - for an address that is not the domain's (review of
+// stage 2c).
 func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -223,8 +220,10 @@ func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	if bare := withoutExtension(addr); bare != addr {
 		keys = append(keys, bare)
 	}
-	if d := domainOf(addr); d != "" {
-		keys = append(keys, "@"+d)
+	// The domain as written, folded in ASCII alone: domainOf folds as
+	// Unicode, which would make the Kelvin sign a "k".
+	if at := strings.LastIndexByte(addr, '@'); at >= 0 && at < len(addr)-1 {
+		keys = append(keys, addr[at:])
 	}
 	for _, k := range keys {
 		if owners, found := b.logins[k]; found {
@@ -380,53 +379,23 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	default:
 		return printable(strings.Join(s.froms, " | ")), "the message has more than one From: line", nil
 	}
-	// The value is the one OpenDKIM gets - Postfix hands both milters the
-	// field as it came, folded lines and all, and with the leading space each
-	// asked for (OptHeaderLeadingSpace, ServeSender) - and it is read with
-	// OpenDKIM's own parser (mailparse.go). So the address judged here is the
-	// address OpenDKIM signs for, whatever the display name, a comment or a
-	// quoted string around it holds; the domain of the key it signs with is
-	// that address's (assumptions B-PM12; audit 2026-10-12, stage 2c).
+	// The line must be one address in RFC 5322's grammar (net/mail), the
+	// address a mail program shows; a display name may say anything. A line
+	// a lenient program could show as another address - "ceo@bank.com
+	// <me@mine.com>", "ceo@bank.com:me@mine.com", "<b@evil.com, a@mine.com>"
+	// - is refused (review of stage 2c, F1). The value comes as the client
+	// wrote it, folded lines and all (assumptions B-PM12). And that address,
+	// its local part unquoted as Postfix holds the envelope's (Postfix
+	// 3.10.13, src/global/tok822_parse.c), is the one held against the
+	// bindings: "x"@mine.com is x@mine.com, which may be another
+	// application's (F2).
 	raw := s.froms[0]
 	shown = printable(raw)
-	r := dkimMailParse(raw)
-	if r.err != mailparseOK || !r.hasUser || !r.hasDomain || r.user == "" || r.domain == "" {
-		// OpenDKIM does not sign then either (mlfi_eoh(): BADFORMAT).
-		return shown, "it holds no address OpenDKIM can read", nil
-	}
-	if moreAfter(raw, r.rest) {
-		// OpenDKIM takes the first; a reader may show the others.
-		return shown, "it must be one address", nil
-	}
-	signedDomain := asciiLower(r.domain)
-	addr := r.user + "@" + signedDomain
-	// OpenDKIM matches its SigningTable against "user@domain" as
-	// snprintf() leaves it in a buffer of MAXADDRESS + 1 = 257 bytes
-	// (opendkim.c, dkimf_apply_signtable(); libopendkim/dkim-internal.h).
-	// Cut there, a quoted local part could end in another tenant's
-	// "@domain" and pick that tenant's key; an address that fits is read
-	// whole, and its domain (DKIM_MAXHOSTNAMELEN, 256) with it.
-	if len(addr) > 256 {
-		return printable(addr), "the address is longer than OpenDKIM reads whole", nil
-	}
-	// The address a mail program shows. OpenDKIM's parser reads lines no
-	// standard reader takes for one address - "ceo@bank.com:me@mine.com",
-	// "ceo@bank.com <me@mine.com>", "<b@evil.com, a@mine.com>" - and signs
-	// for the last of them while a lenient program shows the first. So the
-	// line must also be one address in RFC 5322's grammar (net/mail), at the
-	// domain OpenDKIM signs for; a quoted display name may say anything.
-	// And that address, its local part unquoted as Postfix holds the
-	// envelope's (Postfix 3.10.13, src/global/tok822_parse.c), is the one
-	// held against the bindings: "x"@mine.com is x@mine.com, which may be
-	// another application's (review of stage 2c, F1, F2).
 	list, perr := fromParser.ParseList(unfold(raw))
 	if perr != nil || len(list) != 1 {
 		return shown, "it must be one address, as a mail program reads it", nil
 	}
 	seen := asciiLower(list[0].Address)
-	if domainOf(seen) != signedDomain {
-		return shown, "a mail program would show another address than the one signed", nil
-	}
 	shown = printable(seen)
 	ok, err := s.bind.Allowed(s.login, seen)
 	if err != nil {
@@ -452,8 +421,8 @@ func unfold(v string) string {
 	return strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(v)
 }
 
-// asciiLower lower-cases A-Z only, as OpenDKIM's dkimf_lowercase() and
-// Postfix's table lookups do; strings.ToLower would also fold characters
+// asciiLower lower-cases A-Z only, as Postfix's table lookups do for the
+// ASCII keys the panel writes; strings.ToLower would also fold characters
 // outside ASCII - the Kelvin sign to "k" - into names they are not.
 func asciiLower(v string) string {
 	b := []byte(v)
@@ -571,12 +540,11 @@ func ServeSender(ctx context.Context, ln net.Listener, bind *Bindings, rec Refus
 		},
 		Actions: 0, // read-only
 		// The headers decide; and each header value with its leading space,
-		// as OpenDKIM asks for it (opendkim.c, mlfi_negotiate(),
-		// SMFIP_HDR_LEADSPC), so that both read the same bytes. Postfix
-		// 3.10.13, src/milter/milter8.c: milter8_negotiate() keeps the event
-		// mask a milter of any version asks for (go-milter v0.4.1 says
-		// version 2), and milter8_header() drops the space only for a milter
-		// without SMFIP_HDR_LEADSPC.
+		// as the client wrote it, the bytes the signer reads too (sign.go).
+		// Postfix 3.10.13, src/milter/milter8.c: milter8_negotiate() keeps
+		// the event mask a milter of any version asks for (go-milter v0.4.1
+		// says version 2), and milter8_header() drops the space only for a
+		// milter without SMFIP_HDR_LEADSPC.
 		Protocol: milter.OptNoBody | milter.OptHeaderLeadingSpace,
 	}
 

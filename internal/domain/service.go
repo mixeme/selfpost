@@ -29,14 +29,14 @@ type Applications interface {
 }
 
 // Service coordinates the places a sending domain lives: the SQLite registry,
-// the on-disk DKIM keys and OpenDKIM's tables, plus — on deletion — the SASL
-// database and Postfix sender map its applications touch. Callers (the web
-// handlers) validate user input first; Service keeps the stores in agreement
-// and drives the OpenDKIM/Postfix reloads (architecture.md § OpenDKIM,
-// product.md).
+// the on-disk DKIM keys and the selector table the signer reads, plus — on
+// deletion — the SASL database and Postfix sender map its applications touch.
+// Callers (the web handlers) validate user input first; Service keeps the
+// stores in agreement and drives the Postfix reloads (architecture.md § DKIM
+// signing, product.md).
 type Service struct {
 	store    *store.Store
-	odk      *OpenDKIM
+	keys     *Keys
 	apps     Applications
 	selector string
 	// serverName is the server's own hostname, which the panel's notifications
@@ -48,7 +48,7 @@ type Service struct {
 // SetServerName gives the service the server's own hostname. The panel sends
 // its notifications from postmaster@ that name, and for a receiver to believe
 // them the name is signed like a sending domain: it gets a DKIM key and a line
-// in OpenDKIM's tables, without being a row of the registry - no application
+// in the selector table, without being a row of the registry - no application
 // can send as it. The name comes from SELFPOST_HOSTNAME, which the entrypoint
 // has validated; it is not user input.
 func (s *Service) SetServerName(hostname string) {
@@ -74,23 +74,23 @@ func (s *Service) ServerMail() (ServerMail, error) {
 	if err != nil {
 		return ServerMail{}, err
 	}
-	if _, err := s.odk.EnsureKey(s.serverName, selector); err != nil {
+	if _, err := s.keys.EnsureKey(s.serverName, selector); err != nil {
 		return ServerMail{}, err
 	}
-	rec, err := s.odk.Record(s.serverName, selector)
+	rec, err := s.keys.Record(s.serverName, selector)
 	if err != nil {
 		return ServerMail{}, err
 	}
 	return ServerMail{Name: s.serverName, Selector: selector, Record: rec}, nil
 }
 
-// EnsureServerSigned makes sure OpenDKIM's tables have the line for the
-// server's own name, rebuilding them if they do not. The tables are otherwise
-// rebuilt only when a domain is added or deleted, so an installation that was
-// upgraded to a version with notifications would go on sending them unsigned
-// until then, and one whose DKIM_SELECTOR_DEFAULT was changed would go on
-// signing with the key of the old selector while the panel shows the record
-// of the new. It reports whether it had to rebuild.
+// EnsureServerSigned makes sure the selector table has the line for the
+// server's own name, rebuilding it if it does not - or if there is no table
+// yet, as on the first start of 2.8.0, whose table replaced OpenDKIM's. The
+// table is otherwise rebuilt only when a domain is added or deleted, so an
+// installation whose DKIM_SELECTOR_DEFAULT was changed would go on signing
+// with the key of the old selector while the panel shows the record of the
+// new. It reports whether it had to rebuild.
 func (s *Service) EnsureServerSigned() (bool, error) {
 	if s.serverName == "" {
 		return false, nil
@@ -99,7 +99,7 @@ func (s *Service) EnsureServerSigned() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	signed, err := s.odk.signs(s.serverName, selector)
+	signed, err := s.keys.signs(s.serverName, selector)
 	if err != nil {
 		return false, err
 	}
@@ -129,8 +129,8 @@ func (s *Service) serverSelector() (string, error) {
 // DKIM_SELECTOR_DEFAULT); it is operator-configured, not user input. apps is
 // used only on deletion, to clear the SASL accounts and sender-map bindings of
 // the domain's applications.
-func NewService(st *store.Store, odk *OpenDKIM, apps Applications, selectorDefault string) *Service {
-	return &Service{store: st, odk: odk, apps: apps, selector: selectorDefault}
+func NewService(st *store.Store, keys *Keys, apps Applications, selectorDefault string) *Service {
+	return &Service{store: st, keys: keys, apps: apps, selector: selectorDefault}
 }
 
 // List returns all domains with application counts (product.md).
@@ -144,7 +144,7 @@ func (s *Service) Get(id int64) (store.Domain, error) {
 }
 
 // Add registers a new sending domain: it records the row, ensures a DKIM key
-// exists on disk, and regenerates + reloads the OpenDKIM tables (product.md).
+// exists on disk, and regenerates the selector table (product.md).
 // name must already be normalised and validated by the caller. A duplicate
 // returns store.ErrDomainExists.
 //
@@ -152,15 +152,15 @@ func (s *Service) Get(id int64) (store.Domain, error) {
 // arbiter of "already exists" (avoiding a check-then-act race). An existing
 // on-disk key is reused rather than overwritten, so re-adding a domain whose DB
 // row was lost keeps its published DNS record valid. If key generation or the
-// OpenDKIM rebuild fails, the row is rolled back so we never leave a registered
-// domain that OpenDKIM cannot sign.
+// table's rebuild fails, the row is rolled back so we never leave a registered
+// domain the signer cannot sign for.
 func (s *Service) Add(name string) (store.Domain, error) {
 	d, err := s.store.AddDomain(name, s.selector)
 	if err != nil {
 		return store.Domain{}, err
 	}
 
-	if _, err := s.odk.EnsureKey(d.Name, d.DKIMSelector); err != nil {
+	if _, err := s.keys.EnsureKey(d.Name, d.DKIMSelector); err != nil {
 		s.rollbackAdd(d.ID)
 		return store.Domain{}, err
 	}
@@ -181,10 +181,10 @@ func (s *Service) rollbackAdd(id int64) {
 // Delete removes a domain and everything bound to it (product.md). The
 // order matters: the applications' SASL accounts are cleared first, while their
 // logins are still in the registry; then the registry rows (applications and
-// their addresses) go via the DB cascade; then the OpenDKIM tables and the
-// Postfix sender map are rebuilt from what remains — so OpenDKIM stops signing
-// and Postfix stops authorising the domain's senders — before the DKIM key is
-// deleted.
+// their addresses) go via the DB cascade; then the selector table and the
+// Postfix sender map are rebuilt from what remains — so the signer stops
+// signing and Postfix stops authorising the domain's senders — before the
+// DKIM key is deleted.
 func (s *Service) Delete(id int64) error {
 	d, err := s.store.GetDomain(id)
 	if err != nil {
@@ -204,26 +204,26 @@ func (s *Service) Delete(id int64) error {
 		return err
 	}
 	// From here the domain is deleted, whatever fails after: each rebuild
-	// runs - the sender map was left with the purged logins when OpenDKIM's
-	// failed first - and a failure says the domain is gone (audit
-	// 2026-10-12, L17).
+	// runs - the sender map was left with the purged logins when the
+	// signing tables failed first - and a failure says the domain is gone
+	// (audit 2026-10-12, L17).
 	var errs []error
 	tablesRebuilt := true
 	if err := s.resync(); err != nil {
 		tablesRebuilt = false
-		errs = append(errs, fmt.Errorf("rebuild OpenDKIM's tables: %w", err))
+		errs = append(errs, fmt.Errorf("rebuild the selector table: %w", err))
 	}
 	if err := s.apps.Resync(); err != nil {
 		errs = append(errs, fmt.Errorf("rebuild the sender map: %w", err))
 	}
 	// A sending domain named like the server shared its key with the server's
-	// own mail. The resync above kept the name in the tables under the default
+	// own mail. The resync above kept the name in the table under the default
 	// selector: the same key if that was the domain's selector, a new one -
 	// with a new record to publish, which Settings shows - if it was not.
-	// Either way the directory holds the key now in use. And while the tables
+	// Either way the directory holds the key now in use. And while the table
 	// may still name the deleted domain's key, the key stays.
 	if d.Name != s.serverName && tablesRebuilt {
-		if err := s.odk.RemoveKey(d.Name); err != nil {
+		if err := s.keys.RemoveKey(d.Name); err != nil {
 			errs = append(errs, fmt.Errorf("remove its DKIM key: %w", err))
 		}
 	}
@@ -240,7 +240,7 @@ var ErrDeletedIncomplete = errors.New("domain deleted, but the mail configuratio
 
 // DKIMRecord returns the DNS TXT record to publish for a domain (product.md).
 func (s *Service) DKIMRecord(d store.Domain) (DKIMRecord, error) {
-	return s.odk.Record(d.Name, d.DKIMSelector)
+	return s.keys.Record(d.Name, d.DKIMSelector)
 }
 
 // RateLimit returns the domain-level differentiated rate limit (guide § Rate
@@ -263,13 +263,12 @@ func (s *Service) ClearRateLimit(domainID int64) error {
 	return s.store.DeleteRateLimit(store.RateLimitScopeDomain, domainID)
 }
 
-// Resync regenerates the OpenDKIM tables from the registry and reloads
-// OpenDKIM. It backs the manual reload button (architecture.md § Panel HTTP
-// surface) and doubles as a recovery path if the tables ever drift from the
-// database.
+// Resync regenerates the selector table from the registry. It backs the
+// manual reload button (architecture.md § Panel HTTP surface) and doubles as
+// a recovery path if the table ever drifts from the database.
 //
 // It also removes the key directories of names no domain has and that are
-// not the server's own: what a deletion left when the tables could not be
+// not the server's own: what a deletion left when the table could not be
 // rebuilt (Delete keeps the key then). The "Reload configuration" the page
 // points to after such a deletion finishes it here (review of audit stage 4).
 func (s *Service) Resync() error {
@@ -284,13 +283,13 @@ func (s *Service) Resync() error {
 	for _, d := range domains {
 		keep[d.Name] = true
 	}
-	names, err := s.odk.KeyDomains()
+	names, err := s.keys.KeyDomains()
 	if err != nil {
 		return err
 	}
 	for _, name := range names {
 		if !keep[name] {
-			if err := s.odk.RemoveKey(name); err != nil {
+			if err := s.keys.RemoveKey(name); err != nil {
 				return fmt.Errorf("remove the key of %s, a domain that is gone: %w", name, err)
 			}
 		}
@@ -298,7 +297,7 @@ func (s *Service) Resync() error {
 	return nil
 }
 
-// resync rebuilds KeyTable/SigningTable from the current domain set and reloads.
+// resync rebuilds the selector table from the current domain set.
 func (s *Service) resync() error {
 	domains, err := s.store.ListDomains()
 	if err != nil {
@@ -313,12 +312,12 @@ func (s *Service) resync() error {
 		}
 	}
 	// The server's own name, for the panel's notifications - unless it is a
-	// sending domain already and so in the tables above.
+	// sending domain already and so in the table above.
 	if s.serverName != "" && !registered {
-		if _, err := s.odk.EnsureKey(s.serverName, s.selector); err != nil {
+		if _, err := s.keys.EnsureKey(s.serverName, s.selector); err != nil {
 			return fmt.Errorf("dkim key for %s: %w", s.serverName, err)
 		}
 		signing = append(signing, SigningDomain{Name: s.serverName, Selector: s.selector})
 	}
-	return s.odk.Rebuild(signing)
+	return s.keys.Rebuild(signing)
 }

@@ -155,24 +155,47 @@ Two findings while writing it: a folded header reaches a milter
 `-separated (the signer rebuilds CRLF), and go-milter calls no Abort on a
 dropped connection (a one-hour watchdog closes the signer).
 
-### Stage 2 - OpenDKIM removed (no release)
+### Stage 2 - OpenDKIM removed (no release) - done
 
-- [ ] Chain: OpenDKIM out of both milter lists.
-- [ ] Go: `internal/domain/opendkim.go` reduced to key storage (tables,
+- [x] Chain: OpenDKIM out of both milter lists.
+- [x] Go: `internal/domain/opendkim.go` reduced to key storage (tables,
   `Rebuild`, `assertConfigSafe`, the USR1 reload go), `internal/supervisor`
   (its only caller is the reload), `internal/syslogrelay`,
   `internal/milter/mailparse.go` and its tests and testdata, the
   sender-check texts; Resync's "OpenDKIM's tables" step; Health's
   liveness set and socket row (Q3); `OPENDKIM_SOCKET`/`OPENDKIM_DIR`.
-- [ ] Image: the `opendkim` package, `opendkim.conf`, the two supervisord
+- [x] Image: the `opendkim` package, `opendkim.conf`, the two supervisord
   programs, the `/dev/log` link and `/run/opendkim`, `usermod -aG selfpost
   opendkim`, crashexit's spared list; `deploy/docker-compose.yml`'s `KILL`
-  capability (its only use was the reload).
-- [ ] Keys: `/data/opendkim/keys` -> `/data/dkim/keys` (Q2): the entrypoint
+  capability (its only use was the reload) - **kept, see below**.
+- [x] Keys: `/data/opendkim/keys` -> `/data/dkim/keys` (Q2): the entrypoint
   copies the tree once and leaves the old one for a rollback to 2.7.x until
   the next release; KeyTable and SigningTable go with the new layout.
-- [ ] Tests: `test/upstream/*.sh`, e2e's OpenDKIM log and process checks,
+- [x] Tests: `test/upstream/*.sh`, e2e's OpenDKIM log and process checks,
   the 256-byte test rewritten for the new rule.
+
+*Done (2026-10-16):* `internal/domain/keys.go` (`Keys`, `NewKeys`,
+`DKIM_DIR`) keeps the keys and writes a selector table,
+`/data/dkim/selectors`, a line `<name> <selector>` each, which the signer
+reads instead of the KeyTable: the signer reads no database, as the sender
+check reads none - the panel's one SQLite connection is shared with the
+pages, and a long query would hold up mail. The table is written before the
+signer serves (`EnsureServerSigned`, moved there from the notifier), so the
+first start of 2.8.0 needs nothing of the operator. Keys and table are
+0600, directories 0700, owned by the panel; the entrypoint copies the old
+keys as the panel user (`setpriv`), into `/data/dkim.new`, renamed when
+whole, and stops the start if the copy fails - else the server's name would
+get a new key. Three findings: `KILL` stays - measured on the test server,
+root without it cannot signal a process of another uid, and supervisord
+stops the panel and Postfix's master its children that way (the plan's
+"only use" was wrong); the sender check's `Allowed` took the domain through
+`strings.ToLower`, which makes the Kelvin sign a "k" - the comparison with
+OpenDKIM's reading had hidden it, it now folds ASCII only; the Milter
+sockets card told the spam filter by its row having a note, which the
+signer's rows have too. The e2e drops the OpenDKIM-only cases
+(`testNeverSignedForAnother`) and checks the one signature, the tree's
+modes and the cited packages without opendkim, libopendkim11 and
+libmilter1.0.1.
 
 ### Stage 3 - documents, the canary, the cut
 

@@ -103,7 +103,7 @@ services:
 
   # Sink-MX: accepts any inbound mail and dumps each transaction to its own
   # file under ./mail-stage, which the harness reads directly to check the
-  # DKIM-Signature header Postfix/OpenDKIM produced.
+  # DKIM-Signature header the panel's signer produced.
   sink:
     build:
       context: ../sink

@@ -26,8 +26,8 @@ import (
 // it again.
 //
 // It is counted at the warning, which is the one line that names the socket.
-// The reject lines do not: the same words are written when OpenDKIM does not
-// answer and when the journal milter refuses under a level-2 limit.
+// The reject lines do not: the same words are written when the DKIM signer
+// does not answer and when the journal milter refuses under a level-2 limit.
 //
 // Postfix 3.10.13, src/milter/milter8.c: milter8_connect() warns "connect to
 // Milter service %s: %m" with the milter's configured name; then

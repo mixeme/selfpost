@@ -41,6 +41,7 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 	wildcard := who{sc.appLogin, sc.appPassword, "alerts@" + senderDomain}
 	list := who{listLogin, listPassword, "billing@" + senderDomain}
 
+	refused := 0 // the cases the check refuses: each a row of the Outbound log
 	for _, c := range []struct {
 		name   string
 		as     who
@@ -66,15 +67,15 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		// app-list, so the wildcard application may not have it, in the
 		// header as in the envelope (assumptions B-PS1; the envelope below).
 		{"the address listed for another application", wildcard, "billing@" + senderDomain, false},
-		// Since 2.5.2 the address OpenDKIM reads decides (OpenDKIM's parser,
-		// internal/milter/mailparse.go): another sender's name in the display
-		// name passes, and is signed for the application's own domain
-		// (passed_from_lines_signed_for_their_domain_only looks at the key).
+		// The address a mail program reads decides: another sender's name
+		// in a quoted display name passes, and is signed for the
+		// application's own domain - the key is the login's
+		// (passed_from_lines_signed_for_their_domain_only looks at it).
 		{"another sender in the display name", wildcard, `"director@` + otherDomain + `" <alerts@` + senderDomain + `>`, true},
-		// Past 256 bytes OpenDKIM matches its SigningTable against the
-		// address cut short, which here would end in the other domain's
-		// name (opendkim.c, dkimf_apply_signtable(), MAXADDRESS).
-		{"an address longer than OpenDKIM reads", wildcard, `"` + strings.Repeat("a", 256-len("@"+otherDomain)-1) + `@` + otherDomain + `x"@` + senderDomain, false},
+		// Until 2.8.0 OpenDKIM read an address past 256 bytes cut short, and
+		// this one would have ended in the other domain's name; refused
+		// then, it is the application's own address now.
+		{"a long quoted local part naming another domain", wildcard, `"` + strings.Repeat("a", 256-len("@"+otherDomain)-1) + `@` + otherDomain + `x"@` + senderDomain, true},
 	} {
 		token := uniqueToken("from")
 		res := attemptSend(sendAttempt{
@@ -92,6 +93,7 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 			}
 			continue
 		}
+		refused++
 		if res.ok() {
 			t.Errorf("%s: From: %s was accepted", c.name, c.header)
 			continue
@@ -129,8 +131,8 @@ func testSenderCheck(t *testing.T, sc *scenario) {
 		if err != nil {
 			return false, err
 		}
-		if n := strings.Count(rows, `">wrong From</span>`); n < 6 {
-			return false, fmt.Errorf("%d rows tagged wrong From, want 6", n)
+		if n := strings.Count(rows, `">wrong From</span>`); n < refused {
+			return false, fmt.Errorf("%d rows tagged wrong From, want %d", n, refused)
 		}
 		return true, nil
 	}); err != nil {

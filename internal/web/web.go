@@ -66,12 +66,14 @@ type Config struct {
 	TLSCertFile       string
 	TLSServedCertFile string
 	TLSReloadInterval time.Duration
-	// OpenDKIMSocket and JournalSocket are the two milter sockets Postfix
-	// connects to. The status page dials them: the first is required for mail
-	// to leave at all (OpenDKIM runs with default_action=tempfail), the second
-	// only for the send log (the journal-milter fails open).
-	OpenDKIMSocket string
-	JournalSocket  string
+	// SignSocket and SignLocalSocket are the DKIM signer's two milter
+	// sockets, applications' mail and the panel's own; JournalSocket is the
+	// journal-milter's. The status page dials them: the signer's are required
+	// for mail to leave at all (default_action=tempfail), the journal's only
+	// for the send log (the journal-milter fails open).
+	SignSocket      string
+	SignLocalSocket string
+	JournalSocket   string
 	// SenderSocket is the sender check's socket, attached strictly.
 	SenderSocket string
 	// SessionIdleDays is the sliding inactivity window after which a login
@@ -118,7 +120,7 @@ type Server struct {
 
 // New builds the panel server. setupTokenPath is where the current setup token
 // is mirrored on disk (security.md); domains is the sending-domain service
-// that owns DKIM keys and the OpenDKIM tables (architecture.md § OpenDKIM);
+// that owns DKIM keys and the selector table (architecture.md § DKIM signing);
 // apps owns application SASL accounts and the Postfix sender map
 // (architecture.md § Mail path).
 func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc *inbound.Service, lists *inbound.Lists, dmarcSvc *dmarc.Service, cfg Config, setupTokenPath string) (*Server, error) {
@@ -145,7 +147,8 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		TLSCertFile:                cfg.TLSCertFile,
 		TLSServedCertFile:          cfg.TLSServedCertFile,
 		TLSReloadInterval:          cfg.TLSReloadInterval,
-		OpenDKIMSocket:             cfg.OpenDKIMSocket,
+		SignSocket:                 cfg.SignSocket,
+		SignLocalSocket:            cfg.SignLocalSocket,
 		JournalSocket:              cfg.JournalSocket,
 		SenderSocket:               cfg.SenderSocket,
 		RateLimitMessagesPerIP:     cfg.RateLimitMessagesPerIP,

@@ -29,7 +29,8 @@ type Config struct {
 	TLSCertFile       string
 	TLSServedCertFile string
 	TLSReloadInterval time.Duration
-	OpenDKIMSocket    string
+	SignSocket        string
+	SignLocalSocket   string
 	JournalSocket     string
 	SenderSocket      string
 	// Level-1 Postfix anvil backstop (env RATE_LIMIT_*), shown in the panel

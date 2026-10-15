@@ -88,42 +88,34 @@ func verifyDKIM(raw []byte, domain string) error {
 	return nil
 }
 
-// checkBothSigners is the oracle of docs/plans/panel-dkim-signing.md, stage
-// 1: the panel's signer and OpenDKIM both sign (OpenDKIM after the panel in
-// the chain, so its signature is the top one - build/postfix-config.sh);
-// the two must agree on what they sign - the same h= and bh= - and each
-// must verify with dkimpy (python3-dkim in the sink image), an
-// implementation that is neither go-msgauth, the panel's library, nor
-// OpenDKIM. name is the file in the sink's /mail.
-func checkBothSigners(s *stack, name string, raw []byte, domain string) error {
+// checkPanelSignature is the oracle of docs/plans/panel-dkim-signing.md: the
+// message carries one DKIM signature, the panel's, for domain - signed as
+// OpenDKIM signed until 2.8.0 (relaxed/simple, rsa-sha256, From over-signed)
+// - and dkimpy (python3-dkim in the sink image), an implementation that is
+// not go-msgauth, the panel's library, verifies it. Stage 1 compared it with
+// OpenDKIM's on every message before OpenDKIM left. name is the file in the
+// sink's /mail.
+func checkPanelSignature(s *stack, name string, raw []byte, domain string) error {
 	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("parse the delivered message: %w", err)
 	}
-	var sigs []map[string]string
-	for _, v := range msg.Header["Dkim-Signature"] {
-		tags := dkimTags(v)
-		if tags["d"] == domain {
-			sigs = append(sigs, tags)
+	sigs := msg.Header["Dkim-Signature"]
+	if len(sigs) != 1 {
+		return fmt.Errorf("%d DKIM signatures, want 1, the panel's", len(sigs))
+	}
+	tags := dkimTags(sigs[0])
+	for tag, want := range map[string]string{"d": domain, "c": "relaxed/simple", "a": "rsa-sha256"} {
+		if tags[tag] != want {
+			return fmt.Errorf("the signature has %s=%q, want %q", tag, tags[tag], want)
 		}
 	}
-	if len(sigs) != 2 {
-		return fmt.Errorf("%d DKIM signatures for %s, want 2 (the panel's and OpenDKIM's)", len(sigs), domain)
+	if h := strings.ToLower(tags["h"]); !strings.HasPrefix(h, "from:") || !strings.HasSuffix(h, ":from") {
+		return fmt.Errorf("the signature's h=%q does not sign From and over-sign it", tags["h"])
 	}
-	for _, tag := range []string{"bh", "h", "c", "s", "a"} {
-		a, b := sigs[0][tag], sigs[1][tag]
-		if tag == "h" {
-			a, b = strings.ToLower(a), strings.ToLower(b)
-		}
-		if a != b {
-			return fmt.Errorf("the signatures differ in %s=: OpenDKIM %q, the panel %q", tag, a, b)
-		}
-	}
-	for i := range sigs {
-		out, err := s.execIn("sink", "sh", "-c", fmt.Sprintf("dkimverify --index %d < '/mail/%s'", i, name))
-		if err != nil || !strings.Contains(out, "signature ok") {
-			return fmt.Errorf("dkimpy on signature %d (%s): %v\n%s", i, []string{"OpenDKIM's", "the panel's"}[i], err, out)
-		}
+	out, err := s.execIn("sink", "sh", "-c", fmt.Sprintf("dkimverify --index 0 < '/mail/%s'", name))
+	if err != nil || !strings.Contains(out, "signature ok") {
+		return fmt.Errorf("dkimpy: %v\n%s", err, out)
 	}
 	return nil
 }

@@ -87,7 +87,7 @@ func testNotificationsSetUp(t *testing.T, sc *scenario) {
 // testRateLimitRefusalIsNotified checks the whole path of a notification: the
 // level-2 refusal of the previous step is noticed by the notifier (it looks
 // every minute), written to the administrator, submitted by the unprivileged
-// panel through sendmail, signed by OpenDKIM with the key of the server's own
+// panel through sendmail, signed by the panel's signer with the key of the server's own
 // name and delivered. It also holds what a notification is not: a row of the
 // Outbound log. That it is said once is for the unit tests to hold
 // (internal/notify): here it would be a minute of waiting for nothing to happen.
@@ -108,7 +108,7 @@ func testRateLimitRefusalIsNotified(t *testing.T, sc *scenario) {
 			t.Errorf("the notification lacks %q:\n%s", want, msg)
 		}
 	}
-	if err := checkBothSigners(h, file, raw, serverName); err != nil {
+	if err := checkPanelSignature(h, file, raw, serverName); err != nil {
 		t.Errorf("the panel's signer on its own mail: %v", err)
 	}
 	if err := verifyDKIM(raw, serverName); err != nil {

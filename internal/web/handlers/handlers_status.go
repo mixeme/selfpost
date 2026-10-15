@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -346,19 +347,24 @@ func healthCards(c healthReadings) []view.HealthCard {
 	}
 
 	// The line under the count has to fit a card: the sockets that do not
-	// answer when some do not; otherwise their names, or - with the inbound spam
-	// filter among them, when three names no longer fit - that it is included.
+	// answer when some do not; otherwise their names - the signer's two once -
+	// or, with the inbound spam filter among them, when three names no longer
+	// fit, that it is included.
 	answering, socketNames, silent, withFilter := 0, make([]string, 0, len(sockets)), []string{}, false
 	for _, s := range sockets {
 		if s.Present {
 			answering++
+		} else if s.Note != "" && s.Name != filterName {
+			silent = append(silent, s.Name+" · "+s.Note)
 		} else {
 			silent = append(silent, s.Name)
 		}
-		if s.Note != "" {
+		if s.Name == filterName {
 			withFilter = true
 		}
-		socketNames = append(socketNames, s.Name)
+		if !slices.Contains(socketNames, s.Name) {
+			socketNames = append(socketNames, s.Name)
+		}
 	}
 	socketSub := strings.Join(socketNames, ", ")
 	switch {
@@ -455,7 +461,8 @@ func (h *Handlers) healthChecks() healthReadings {
 
 	cert := health.CheckServedCertificate(h.cfg.TLSServedCertFile, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now())
 	sockets := []health.Socket{
-		health.CheckSocket("OpenDKIM", h.cfg.OpenDKIMSocket, true),
+		signerSocket(h.cfg.SignSocket, "applications"),
+		signerSocket(h.cfg.SignLocalSocket, "notifications"),
 		health.CheckSocket("sender-check", h.cfg.SenderSocket, true),
 		health.CheckSocket("send-log", h.cfg.JournalSocket, false),
 	}
@@ -486,15 +493,27 @@ func (h *Handlers) healthChecks() healthReadings {
 	}
 }
 
+// filterName is the inbound spam filter's row among the milter sockets.
+const filterName = "Spam filter"
+
+// signerSocket is a row of the DKIM signer's: one socket for what
+// applications send, one for the panel's own notifications. Postfix attaches
+// both strictly, so either one down defers the mail that goes through it.
+func signerSocket(path, note string) health.Socket {
+	s := health.CheckSocket("dkim-signer", path, true)
+	s.Note = note
+	return s
+}
+
 // filterSocket is the inbound spam filter's row among the milter sockets. A
 // filter that is down costs what the server's setting says: with the action
-// tempfail Postfix defers inbound mail (an error, like OpenDKIM), otherwise it
+// tempfail Postfix defers inbound mail (an error, like the signer), otherwise it
 // accepts the mail unfiltered (a warning, like the send log). The address is the
 // one in INBOUND_ANTISPAM_MILTER as configured; Health and Overview, the only
 // pages that show it, are for the global administrator.
 func filterSocket(milter, action string) health.Socket {
 	tempfail := action == "tempfail"
-	s := health.CheckMilter("Spam filter", milter, tempfail)
+	s := health.CheckMilter(filterName, milter, tempfail)
 	s.Note = "inbound"
 	switch {
 	case s.Status != health.StatusError && s.Status != health.StatusWarn:
@@ -519,7 +538,7 @@ func queueSummary(out string) string {
 func statusFlash(r *http.Request) string {
 	switch {
 	case r.URL.Query().Get("reloaded") != "":
-		return "Configuration regenerated from the database - OpenDKIM's tables, every map the panel writes for Postfix, the filter lists - and OpenDKIM and Postfix have re-read it."
+		return "Configuration regenerated from the database - the DKIM selector table, every map the panel writes for Postfix, the filter lists - and Postfix has re-read it."
 	case r.URL.Query().Get("rechecked") != "":
 		return "DNS re-checked."
 	default:

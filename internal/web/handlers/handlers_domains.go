@@ -85,7 +85,7 @@ func dashboardFlash(r *http.Request) string {
 }
 
 // HandleAddDomain validates the submitted name, creates the domain (DKIM key +
-// OpenDKIM reload), and redirects to the domain's page so the DNS record to
+// selector table), and redirects to the domain's page so the DNS record to
 // publish is shown (product.md).
 func (h *Handlers) HandleAddDomain(w http.ResponseWriter, r *http.Request) {
 	_, ok := h.requireGlobal(w, r)
@@ -171,9 +171,10 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleReload writes again, from the database, every file the panel keeps
-// for the mail path and has OpenDKIM and Postfix re-read them - what the
-// first start after a restore does (cmd/panel mailStack.Resync): OpenDKIM's
-// tables, the sender map, with the inbound relay on its maps and the filter
+// for the mail path and has Postfix re-read them - what the first start after
+// a restore does (cmd/panel mailStack.Resync): the DKIM selector table (and
+// the keys of deleted domains removed), the sender map, with the inbound
+// relay on its maps and the filter
 // lists, with DMARC reports on their maps (architecture.md § Panel HTTP
 // surface). Before 2.5.4 it left the last two out, and said "regenerated"
 // over them (audit 2026-10-12, L13). A failure is a message on Health that
@@ -187,7 +188,7 @@ func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 		run  func() error
 	}
 	steps := []step{
-		{"OpenDKIM's tables", h.domains.Resync},
+		{"the DKIM selector table", h.domains.Resync},
 		{"the sender map", h.apps.Resync},
 	}
 	if h.cfg.InboundEnabled && h.inbound != nil {

@@ -6,7 +6,7 @@ name: release
 # You can also run it manually via workflow_dispatch with an explicit SemVer X.Y.Z.
 #
 # Native per-architecture builds (see docs/development.md), not qemu: running
-# the full Postfix/OpenDKIM stack under emulation for the e2e gate below is
+# the full Postfix and panel stack under emulation for the e2e gate below is
 # impractically slow. Each arch builds, e2e-gates and pushes its own tag on its
 # own native runner; a merge job then combines them into the one manifest tag
 # documented in deploy/docker-compose.yml. "test, then push" (not push-by-digest

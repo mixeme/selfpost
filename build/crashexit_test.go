@@ -75,7 +75,7 @@ func TestCrashexitCountsCrashes(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		calm = append(calm, exit("panel", "1"), exit("logrotate", "0"))
 	}
-	calm = append(calm, exit("opendkim", "0"), exit("opendkim", "0"), exit("opendkim", "0"))
+	calm = append(calm, exit("postfix", "0"), exit("postfix", "0"), exit("postfix", "0"))
 	if got := runListener(t, calm...); strings.Contains(got, "would shut down") {
 		t.Errorf("expected exits, spared programs and three crashes of another shut down:\n%s", got)
 	}
@@ -89,7 +89,7 @@ func TestCrashexitFatal(t *testing.T) {
 	if got := runListener(t, fatal("postfix")); !strings.Contains(got, "postfix entered FATAL; shutting down") || !strings.Contains(got, "would shut down") {
 		t.Errorf("postfix FATAL:\n%s", got)
 	}
-	if got := runListener(t, fatal("logrotate"), fatal("syslog-relay")); strings.Contains(got, "would shut down") {
+	if got := runListener(t, fatal("logrotate"), fatal("cert-reload")); strings.Contains(got, "would shut down") {
 		t.Errorf("a spared program's FATAL shut down:\n%s", got)
 	}
 }

@@ -103,7 +103,7 @@ services:
     # `user: panel` or a fully read-only rootfs without breaking that startup
     # self-healing. What IS applied: no privilege escalation past what the
     # image already grants, and every Linux capability dropped except the
-    # small set the root startup phase and Postfix/OpenDKIM genuinely need:
+    # small set the root startup phase and Postfix genuinely need:
     #   - NET_BIND_SERVICE — bind 465/587 and inbound 25 below 1024;
     #   - CHOWN            — entrypoint re-owns /data (bind mount) to `panel`;
     #   - FOWNER           — entrypoint then chmods those now panel-owned /data
@@ -113,12 +113,18 @@ services:
     #   - SETUID/SETGID    — supervisord drops the panel to the unprivileged
     #                        `panel` user; Postfix switches to its own users;
     #   - DAC_OVERRIDE     — cross-user file access within the `selfpost` group.
-    #   - KILL             — supervisord (root) sends SIGUSR1 to opendkim (a
-    #                        different uid) on domain add/remove to reload its
-    #                        KeyTable/SigningTable; without it os.kill() fails
-    #                        with EPERM even though the caller is root, because
-    #                        the kernel's signal permission check for
-    #                        cross-uid kill() still consults CAP_KILL.
+    #   - KILL             — root signals processes of other uids: supervisord
+    #                        stops and restarts the panel (supervisor 4.2.5,
+    #                        supervisor/process.py:467, options.kill()), and
+    #                        Postfix's master ends its children, which run as
+    #                        `postfix` (Postfix 3.10.13, src/master/master_sig.c:196,
+    #                        master_sigdeath(); master_spawn.c:365,
+    #                        master_delete_children()). Without it kill() fails
+    #                        with EPERM although the caller is root (kill(2),
+    #                        capabilities(7); measured on the test server
+    #                        2026-10-16: root with SETUID/SETGID and no KILL
+    #                        cannot kill a process of uid 65534). Until 2.8.0
+    #                        it also carried OpenDKIM's USR1 reload.
     # FOWNER/FSETID are required by build/entrypoint.sh's permission
     # self-healing; without them chmod fails with EPERM and the container
     # crash-loops on start.

@@ -27,16 +27,14 @@ type mailStack struct {
 	Lists          *inbound.Lists
 	DMARC          *dmarc.Service
 	pf             *postfix.Postfix
-	odk            *domain.OpenDKIM
 	inboundEnabled bool
 	dmarcEnabled   bool
 }
 
 func newMailStack(cfg config, st *store.Store) *mailStack {
 	pf := postfix.New(cfg.postfixDir)
-	odk := domain.NewOpenDKIM(cfg.opendkimDir)
 	apps := app.NewService(st, app.NewSASLDB(cfg.saslDBPath, cfg.saslRealm), pf)
-	domains := domain.NewService(st, odk, apps, cfg.dkimSelectorDef)
+	domains := domain.NewService(st, domain.NewKeys(cfg.dkimDir), apps, cfg.dkimSelectorDef)
 	// The panel's notifications are sent as postmaster@ the server's own name,
 	// and signed as it.
 	domains.SetServerName(cfg.hostname)
@@ -45,15 +43,15 @@ func newMailStack(cfg config, st *store.Store) *mailStack {
 	return &mailStack{
 		Domains: domains, Apps: apps, Inbound: inb, DMARC: dmarcSvc,
 		Lists: inbound.NewLists(st, cfg.antispamDir),
-		pf:    pf, odk: odk, inboundEnabled: cfg.inboundEnabled, dmarcEnabled: cfg.dmarcEnabled,
+		pf:    pf, inboundEnabled: cfg.inboundEnabled, dmarcEnabled: cfg.dmarcEnabled,
 	}
 }
 
-// Resync rebuilds OpenDKIM's tables and Postfix's sender map from SQLite and
-// reloads both daemons — the same work as the Status page's Reload button.
+// Resync rebuilds the selector table and Postfix's maps from SQLite and
+// reloads Postfix — the same work as the Health page's Reload button.
 func (m *mailStack) Resync() error {
 	if err := m.Domains.Resync(); err != nil {
-		return fmt.Errorf("opendkim resync: %w", err)
+		return fmt.Errorf("dkim resync: %w", err)
 	}
 	if err := m.Apps.Resync(); err != nil {
 		return fmt.Errorf("postfix resync: %w", err)
@@ -78,7 +76,6 @@ func (m *mailStack) Resync() error {
 
 func (m *mailStack) skipReloadForTest() {
 	m.pf.SetReloadHook(func() error { return nil })
-	m.odk.SetReloadHook(func() error { return nil })
 }
 
 // resyncAfterRestore runs one mail-path Resync on the first boot after a
@@ -116,7 +113,8 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		TLSCertFile:                cfg.tlsCertFile,
 		TLSServedCertFile:          cfg.tlsServedCertFile,
 		TLSReloadInterval:          cfg.tlsReloadInterval,
-		OpenDKIMSocket:             cfg.opendkimSocket,
+		SignSocket:                 cfg.signSocket,
+		SignLocalSocket:            cfg.signLocalSocket,
 		JournalSocket:              cfg.journalSocket,
 		SenderSocket:               cfg.senderSocket,
 		SessionIdleDays:            cfg.sessionIdleDays,

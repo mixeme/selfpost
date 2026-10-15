@@ -116,14 +116,14 @@ func TestCheckCertificate(t *testing.T) {
 
 func TestCheckSocket(t *testing.T) {
 	dir := t.TempDir()
-	sock := filepath.Join(dir, "opendkim.sock")
+	sock := filepath.Join(dir, "sign.sock")
 	l, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Skipf("unix sockets unavailable here: %v", err)
 	}
 	defer l.Close()
 
-	if got := CheckSocket("OpenDKIM", sock, true); got.Status != StatusOK || !got.Present {
+	if got := CheckSocket("dkim-signer", sock, true); got.Status != StatusOK || !got.Present {
 		t.Errorf("live socket: status %q present=%v", got.Status, got.Present)
 	}
 
@@ -131,7 +131,7 @@ func TestCheckSocket(t *testing.T) {
 	if got := CheckSocket("journal", missing, false); got.Status != StatusWarn {
 		t.Errorf("missing optional socket: status %q", got.Status)
 	}
-	if got := CheckSocket("OpenDKIM", missing, true); got.Status != StatusError {
+	if got := CheckSocket("dkim-signer", missing, true); got.Status != StatusError {
 		t.Errorf("missing required socket: status %q", got.Status)
 	}
 
@@ -139,7 +139,7 @@ func TestCheckSocket(t *testing.T) {
 	if err := os.WriteFile(plain, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := CheckSocket("OpenDKIM", plain, true); got.Status != StatusError || got.Present {
+	if got := CheckSocket("dkim-signer", plain, true); got.Status != StatusError || got.Present {
 		t.Errorf("regular file in place of a socket: status %q present=%v", got.Status, got.Present)
 	}
 }
@@ -170,8 +170,7 @@ func writeCert(t *testing.T, path, cn string, validFor time.Duration) {
 
 func TestLivenessFromParsedProcesses(t *testing.T) {
 	// Composed, in the columns of TestParseProcesses.
-	allRunning := `opendkim                         RUNNING   pid 21, uptime 0:04:10
-panel                            RUNNING   pid 22, uptime 0:04:09
+	allRunning := `panel                            RUNNING   pid 22, uptime 0:04:09
 postfix                          RUNNING   pid 23, uptime 0:04:08
 postfix-reload                   STOPPED   Not started
 `
@@ -182,8 +181,7 @@ postfix-reload                   STOPPED   Not started
 		}
 	}
 
-	postfixDead := `opendkim                         RUNNING   pid 21, uptime 0:04:10
-panel                            RUNNING   pid 22, uptime 0:04:09
+	postfixDead := `panel                            RUNNING   pid 22, uptime 0:04:09
 postfix                          FATAL     Exited too quickly
 `
 	procs = parseProcesses(postfixDead)

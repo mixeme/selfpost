@@ -178,10 +178,9 @@ need_time MILTER_CONNECT_TIMEOUT "${MILTER_CONNECT_TIMEOUT:-15s}"
 need_time MILTER_COMMAND_TIMEOUT "${MILTER_COMMAND_TIMEOUT:-15s}"
 need_time MILTER_CONTENT_TIMEOUT "${MILTER_CONTENT_TIMEOUT:-30s}"
 
-# Milter sockets: OpenDKIM (signing, strict), the panel's sender check
-# (strict) and its journal-milter (monitoring, fail-open). Fixed container
-# paths, matched by postfix-wrapper.sh.
-OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
+# Milter sockets, all the panel's: its journal-milter (monitoring,
+# fail-open), the sender check and the DKIM signer (both strict). Fixed
+# container paths, matched by postfix-wrapper.sh.
 JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
 # The panel's sender check (the From: line against the login, strict).
 SENDER_SOCK="${SENDER_CHECK_SOCKET:-/run/selfpost/sender.sock}"
@@ -400,26 +399,23 @@ postconf -e \
 	"smtpd_client_message_rate_limit=${RATE_MSGS}" \
 	"anvil_rate_time_unit=${RATE_WINDOW}s"
 
-# Milter chain. OpenDKIM signs and is treated strictly (default_action=tempfail:
-# if it is unreachable, defer rather than send unsigned). The journal-milter is
-# monitoring only and is fail-open (default_action=accept): its failure must
-# never block the relay. Per-milter settings use Postfix 3.0+ brace syntax.
+# Milter chain. The sender check comes first and is strict
+# (default_action=tempfail): it holds the From: line against the login, the
+# address a receiver holds the signature to, so a message it could not judge
+# must not be signed. While the panel does not answer on that socket, mail is
+# deferred (docs/security.md).
 #
-# The sender check comes first and is strict as well: it holds the From: line
-# against the login, which is what OpenDKIM then chooses the key by, so a
-# message it could not judge must not reach the signer. While the panel does
-# not answer on that socket, mail is deferred (docs/security.md).
-#
-# The panel's DKIM signer follows the sender check, strict too
-# (docs/plans/panel-dkim-signing.md). Until OpenDKIM leaves the image both
-# sign (stage 1 of that plan): OpenDKIM after the panel, so that every
-# message carries both signatures and the e2e suite compares them.
+# The panel's DKIM signer follows, strict too: unreachable, it defers rather
+# than send unsigned (docs/plans/panel-dkim-signing.md). It signs with the
+# key of the login's domain. The journal-milter is monitoring only and is
+# fail-open (default_action=accept): its failure must never block the relay.
+# Per-milter settings use Postfix 3.0+ brace syntax.
 #
 # non_smtpd_milters is the chain for mail submitted locally with sendmail(1) -
 # the panel's own notifications, sent as postmaster@ the hostname. The
-# signer's own socket for it, and OpenDKIM, sign them with the key of the
-# server's own name; the journal-milter is not on this chain, since they are
-# not an application's mail. Bounces Postfix
+# signer's own socket for it signs them with the key of the server's own
+# name; the journal-milter is not on this chain, since they are not an
+# application's mail. Bounces Postfix
 # generates itself do not pass it (internal_mail_filter_classes is empty).
 #
 # Postfix 3.10.13: html/MILTER_README.html:584, "Different settings for different
@@ -431,8 +427,8 @@ postconf -e \
 postconf -e \
 	"milter_protocol=6" \
 	"milter_default_action=tempfail" \
-	"smtpd_milters={ unix:${SENDER_SOCK}, default_action=tempfail }, { unix:${SIGN_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
-	"non_smtpd_milters={ unix:${SIGN_LOCAL_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }"
+	"smtpd_milters={ unix:${SENDER_SOCK}, default_action=tempfail }, { unix:${SIGN_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
+	"non_smtpd_milters={ unix:${SIGN_LOCAL_SOCK}, default_action=tempfail }"
 
 # A signed message is delivered as it was signed: Postfix's SMTP client would
 # otherwise rewrite an 8-bit message as quoted-printable for a server that
@@ -440,8 +436,8 @@ postconf -e \
 # Postfix 3.10.13, src/global/mail_params.h:3088, DEF_DISABLE_MIME_OCONV 0
 # (the conversion is on by default); proto/postconf.proto:7992,
 # disable_mime_output_conversion: "Disable the conversion of 8BITMIME format
-# to 7BIT format". Not set until 2.8.0 - OpenDKIM's signatures were exposed
-# to it as well.
+# to 7BIT format". Not set until 2.8.0 - OpenDKIM's signatures, before the
+# panel's, were exposed to it as well.
 postconf -e "disable_mime_output_conversion=yes"
 
 # What Postfix tells a milter with MAIL FROM: its defaults plus the client's
@@ -456,7 +452,7 @@ postconf -e \
 # Bounded milter timeouts: a *hung* milter (socket accepts but never replies)
 # must fail open just like a crash, not stall mail acceptance until the Postfix
 # defaults (300s content) elapse. With default_action per milter, a
-# journal-milter hang then resolves to accept and an OpenDKIM hang to tempfail,
+# journal-milter hang then resolves to accept and a signer hang to tempfail,
 # but within seconds rather than minutes. Values are well above any healthy
 # response time (signing/DB insert are sub-second), so they never fire in normal
 # operation. The defaults: Postfix 3.10.13, src/global/mail_params.h:3559-3567,
@@ -518,7 +514,7 @@ fi
 # debian/patches/40_chroot_by_default.diff:16: "smtp inet n - y - - smtpd",
 # uncommented; conf/master.cf:12). When both flags are off, remove
 # that listener so port 25 is not an inbound smtpd (outbound delivery uses
-# smtp/unix). When either is on: no SASL, no OpenDKIM; relay accepts only
+# smtp/unix). When either is on: no SASL, no signing; relay accepts only
 # configured domains/recipients; DMARC accepts only allow-listed report addresses.
 if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
 	RELAY_DOMAINS_SETTING=""
@@ -622,8 +618,8 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 			"smtp_tls_policy_maps="
 	fi
 
-	# Milters on port 25. main.cf's chain (OpenDKIM strict + journal-milter) is
-	# for the SUBMISSION path only: OpenDKIM must not gate someone else's
+	# Milters on port 25. main.cf's chain (sender check and signer strict +
+	# journal-milter) is for the SUBMISSION path only: the signer must not gate someone else's
 	# inbound mail (a signing outage would defer it), and the journal-milter
 	# would file inbound mail into the outbound send log under the *sender's*
 	# domain — polluting Deliveries and letting a forged From: consume that

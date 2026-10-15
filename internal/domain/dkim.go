@@ -1,8 +1,8 @@
 // Package domain owns SelfPost's sending-domain model: per-domain DKIM key
-// generation, the OpenDKIM KeyTable/SigningTable that drive signing, and the
-// orchestration that keeps the SQLite registry, the on-disk keys and OpenDKIM
-// in agreement (architecture.md § OpenDKIM). Key material lives under /data so
-// it survives container restarts (architecture.md § OpenDKIM).
+// generation, the selector table the panel's signer reads, and the
+// orchestration that keeps the SQLite registry and the on-disk keys in
+// agreement (architecture.md § DKIM signing). Key material lives under /data
+// so it survives container restarts.
 package domain
 
 import (
@@ -32,23 +32,15 @@ func generateDKIMKey() (*rsa.PrivateKey, error) {
 }
 
 // writePrivateKeyPEM writes key to path as a PKCS#1 "RSA PRIVATE KEY" PEM,
-// atomically and group-readable (0640). The file is owned by the panel user and
-// read by OpenDKIM through the shared `selfpost` group (see build/opendkim.conf
-// and entrypoint.sh); the parent directory carries setgid so the group is
-// inherited. The write is atomic (temp file + rename) so OpenDKIM never observes
-// a half-written key.
-//
-// OpenDKIM 2.11.0~beta2, libopendkim/dkim.c, dkim_privkey_load(): a key that
-// starts as PEM goes to OpenSSL's PEM_read_bio_PrivateKey(), which takes this
-// PKCS#1 form; opendkim/opendkim.c, dkimf_add_signrequest(): a key file
-// dkimf_securefile() finds insecure is only logged while RequireSafeKeys is no
-// (build/opendkim.conf).
+// atomically and readable by the panel user alone (0600): the panel's signer
+// is the only reader (internal/milter, readKey()). The write is atomic (temp
+// file + rename) so the signer never reads a half-written key.
 func writePrivateKeyPEM(path string, key *rsa.PrivateKey) error {
 	block := &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	}
-	return writeFileAtomic(path, pem.EncodeToMemory(block), 0o640)
+	return writeFileAtomic(path, pem.EncodeToMemory(block), 0o600)
 }
 
 // loadPrivateKeyPEM reads and parses a PKCS#1 RSA private key written by
@@ -79,7 +71,7 @@ type DKIMRecord struct {
 }
 
 // dkimRecord builds the published DKIM DNS record for a public key. The value
-// mirrors what opendkim-genkey emits: v=DKIM1, sha256, RSA, and the public key
+// is the one opendkim-genkey emitted: v=DKIM1, sha256, RSA, and the public key
 // as base64-encoded SubjectPublicKeyInfo (PKIX) DER.
 func dkimRecord(selector, domainName string, pub *rsa.PublicKey) (DKIMRecord, error) {
 	der, err := x509.MarshalPKIXPublicKey(pub)
@@ -95,7 +87,7 @@ func dkimRecord(selector, domainName string, pub *rsa.PublicKey) (DKIMRecord, er
 
 // writeFileAtomic writes data to path via a temp file in the same directory
 // followed by a rename, so readers only ever see the complete old or new file.
-// It is the single safe-write primitive for DKIM keys and OpenDKIM tables
+// It is the single safe-write primitive for DKIM keys and the selector table
 // (security.md).
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)

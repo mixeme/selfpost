@@ -155,7 +155,7 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 		`↓ 18.0 KiB/s`, `eth0: 2.1 GiB in, 6.4 GiB out`,
 		`pid 41, uptime 18 days`, `<span class="tag is-success is-light">running</span>`,
 		`2026-10-21 09:14 UTC`, `class="mt-4 has-text-danger"`, `Check that renewal on the host still works.`,
-		`inet:127.0.0.1:8891`, `→ 203.0.113.25<br>← mail.example.org`,
+		`dkim-signer <span class="sp-muted">· notifications</span>`, `unix:/run/selfpost/sign-local.sock`, `→ 203.0.113.25<br>← mail.example.org`,
 		`hx-get="/server/health/fragment"`,
 	)
 	pageLacks(t, "Health", out, `hx-swap-oob`, `/overview/fragment`)
@@ -252,8 +252,8 @@ func TestHealthStatesTheFixtureDoesNotDraw(t *testing.T) {
 	h.ProcessError = true
 	h.ProcessRows = nil
 	h.CertFacts, h.CertDetail, h.CertProblem = nil, "No certificate path is configured (TLS_CERT_FILE).", true
-	h.SocketRows = []SocketRow{{Name: "OpenDKIM", Path: "/run/opendkim/opendkim.sock", State: Tag{Status: "error"},
-		Detail: "OpenDKIM socket missing: mail cannot leave."}}
+	h.SocketRows = []SocketRow{{Name: "dkim-signer", Note: "applications", Path: "/run/selfpost/sign.sock", State: Tag{Status: "error"},
+		Detail: "dkim-signer socket missing: mail cannot leave."}}
 	h.SocketRows = append(h.SocketRows, SocketRow{Name: "rspamd", Note: "inbound spam filter", Path: "inet:antispam:11332", State: Tag{Status: "ok"}})
 	h.HostFacts = []Fact{{Label: "Hostname", Value: Plain("(SELFPOST_HOSTNAME is not set)"), Mono: true}}
 	h.Flash = &Flash{Text: Plain("DNS re-checked.")}
@@ -261,7 +261,7 @@ func TestHealthStatesTheFixtureDoesNotDraw(t *testing.T) {
 	pageHas(t, "Health", out,
 		`Could not ask supervisord for the process list.`,
 		`No certificate path is configured`,
-		`<span class="tag is-danger is-light">error</span>`, `OpenDKIM socket missing: mail cannot leave.`,
+		`<span class="tag is-danger is-light">error</span>`, `dkim-signer socket missing: mail cannot leave.`,
 		`SELFPOST_HOSTNAME is not set`, `rspamd <span class="sp-muted">· inbound spam filter</span>`,
 		`<div class="notification is-success is-light">`, `DNS re-checked.`,
 	)

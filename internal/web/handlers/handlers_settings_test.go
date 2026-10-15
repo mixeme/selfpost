@@ -124,7 +124,7 @@ func settingsServerAt(t *testing.T, dbPath string) (*Handlers, string) {
 		// A domain service that does not know the server's own name, so that
 		// the records of Settings and Health come out as "cannot be read";
 		// the tests of those records use serverMailStand.
-		domains: domain.NewService(st, domain.NewOpenDKIM(t.TempDir()), nil, "selfpost"),
+		domains: domain.NewService(st, domain.NewKeys(t.TempDir()), nil, "selfpost"),
 		cfg:     Config{SendLogRetentionEnvDefault: 90},
 	}, password
 }

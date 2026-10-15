@@ -41,13 +41,12 @@ func fromLines(repoRoot, file, domain, other string) ([]string, error) {
 	return out, nil
 }
 
-// testSignedForItsDomainOnly: the sender check and OpenDKIM read From: with
-// two parsers, and that they agree was argued, never run (audit 2026-10-12,
-// stage 2). Every From: line the check passes for an application is sent as
-// that application, and what arrives must be signed for its domain - with a
-// signature that validates - and for no other: a line the check reads as the
-// application's own and OpenDKIM as another sender's would be signed with
-// that sender's key.
+// testSignedForItsDomainOnly: every From: line the check passes for an
+// application is sent as that application, and what arrives must be signed
+// for its domain - with a signature that validates over these headers - and
+// for no other (audit 2026-10-12, stage 2). Until 2.8.0 OpenDKIM chose the
+// key by the line and this was the check that the two read it alike; the
+// panel's signer takes the login's key, and the run holds it to that.
 func testSignedForItsDomainOnly(t *testing.T, sc *scenario) {
 	lines, err := fromLines(h.repoRoot, "from-lines-passed.txt", senderDomain, otherDomain)
 	if err != nil {
@@ -85,49 +84,6 @@ func testSignedForItsDomainOnly(t *testing.T, sc *scenario) {
 		}
 		if !valid {
 			t.Errorf("From: %q has no valid signature for %s (%d signature(s))", line, senderDomain, len(verifications))
-		}
-	}
-}
-
-// testNeverSignedForAnother: no line that names another sender of the server
-// arrives signed with that sender's key (review of audit stage 2). Since stage
-// 2c the check reads a line as OpenDKIM does: one whose address is the
-// application's passes, wherever the other sender's name is written, and must
-// arrive signed for the application's domain; the rest are refused.
-func testNeverSignedForAnother(t *testing.T, sc *scenario) {
-	lines, err := fromLines(h.repoRoot, "from-lines-other.txt", senderDomain, otherDomain)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, line := range lines {
-		token := uniqueToken("dkimother")
-		res := attemptSend(sendAttempt{
-			authLogin: sc.appLogin, authPassword: sc.appPassword,
-			from: "alerts@" + senderDomain, headerFrom: line, to: recipient,
-			subject: "e2e " + token, body: "which key signs this",
-		})
-		if err := res.refusedAt("DATA", 550, "5.7.1 From:"); err == nil {
-			continue
-		}
-		if !res.ok() {
-			t.Errorf("From: %q: neither passed nor refused by the check: %v", line, res.firstErr())
-			continue
-		}
-		raw, err := findSinkMessage(h.stageDir, token, 15*time.Second)
-		if err != nil {
-			t.Errorf("From: %q passed and never arrived: %v", line, err)
-			continue
-		}
-		verifications, _ := dkim.VerifyWithOptions(bytes.NewReader(raw), &dkim.VerifyOptions{LookupTXT: lookupTXTFunc()})
-		own := false
-		for _, v := range verifications {
-			if v.Domain == otherDomain {
-				t.Errorf("From: %q arrived signed for %s", line, otherDomain)
-			}
-			own = own || (v.Domain == senderDomain && v.Err == nil)
-		}
-		if !own {
-			t.Errorf("From: %q passed and did not arrive signed for %s: %+v", line, senderDomain, verifications)
 		}
 	}
 }

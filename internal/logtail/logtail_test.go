@@ -17,8 +17,7 @@ import (
 // The mail.log lines in this file are composed by hand, after the formats the
 // code cites (Postfix 3.10.13, src/global/log_adhoc.c and the others), unless a
 // comment says where one was seen; some carry no stamp, which the parsers
-// take as they come. One shape Postfix does not write here: opendkim lines in
-// mail.log (OpenDKIM logs through syslog(3), to the container log - build/opendkim.conf).
+// take as they come.
 
 // qmgr's expiry line, as Postfix 3.10.13 writes it (src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(): "%s: from=<%s>, status=%s, returned to
@@ -823,7 +822,7 @@ func TestQueueLinesPicksOutOneMessage(t *testing.T) {
 		"host postfix/cleanup[15]: 41E862C00D9E: message-id=<abc@example.com>",
 		// Same run of characters, longer id: not this message.
 		"host postfix/smtp[26]: FF41E862C00D9E: to=<z@example.net>, status=sent (250 OK)",
-		"host opendkim[30]: 41E862C00D9E: DKIM-Signature field added (s=mail d=example.com)",
+		"host postfix/qmgr[10]: 41E862C00D9E: from=<a@example.com>, size=500, nrcpt=1 (queue active)",
 		"host postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=mx.example.net[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)",
 	)
 

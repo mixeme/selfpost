@@ -43,7 +43,7 @@ func seedDataDir(t *testing.T) (dataDir, dbPath, deployRoot string) {
 		t.Fatalf("close store: %v", err)
 	}
 
-	writeFile(t, filepath.Join(dataDir, "opendkim", "keys", "example.com", "selfpost.private"), "PRIVATE KEY")
+	writeFile(t, filepath.Join(dataDir, "dkim", "keys", "example.com", "selfpost.private"), "PRIVATE KEY")
 	writeFile(t, filepath.Join(dataDir, "sasl", "sasldb2"), "SASLDB")
 	writeFile(t, filepath.Join(dataDir, "postfix", "sender_login_maps"), "@example.com login")
 	writeFile(t, filepath.Join(dataDir, "antispam", "deny_domain.map"), "evil.example\n")
@@ -117,7 +117,7 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 	for _, name := range []string{
 		DataArchivePrefix + ManifestName,
 		DataArchivePrefix + "selfpost.db",
-		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
+		DataArchivePrefix + "dkim/keys/example.com/selfpost.private",
 		DataArchivePrefix + "sasl/sasldb2",
 		DataArchivePrefix + "postfix/sender_login_maps",
 		// The filter lists as the spam filter reads them. They are rewritten
@@ -452,7 +452,7 @@ func TestCreateLeavesTheQueueOut(t *testing.T) {
 	}
 	for _, name := range []string{
 		DataArchivePrefix + "selfpost.db",
-		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
+		DataArchivePrefix + "dkim/keys/example.com/selfpost.private",
 		DataArchivePrefix + "sasl/sasldb2",
 		DataArchivePrefix + "postfix/sender_login_maps",
 		ComposeFileName, EnvFileName,

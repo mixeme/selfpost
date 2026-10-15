@@ -63,8 +63,7 @@ func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 		}
 	}()
 
-	// The two tables the mail path itself goes by: whom Postfix lets send as
-	// what, and what OpenDKIM signs.
+	// The table the mail path itself goes by: whom Postfix lets send as what.
 	bind := milter.NewBindings(postfix.New(cfg.postfixDir).SenderLoginMapsPath())
 	return milter.ServeSender(ctx, ln, bind, st)
 }

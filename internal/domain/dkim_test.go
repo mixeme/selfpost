@@ -21,8 +21,8 @@ func TestWriteLoadPrivateKeyRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if perm := info.Mode().Perm(); perm != 0o640 {
-		t.Errorf("key perm = %o, want 0640", perm)
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("key perm = %o, want 0600", perm)
 	}
 
 	loaded, err := loadPrivateKeyPEM(path)

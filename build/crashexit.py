@@ -5,7 +5,7 @@ If a managed program of the mail path exhausts its restart retries and
 enters FATAL, or keeps crashing - CRASH_LIMIT unexpected exits within
 CRASH_WINDOW seconds - this listener signals supervisord (its parent) to
 terminate, so the whole container exits and Docker's `restart` policy starts it
-again, rather than lingering "alive" with a dead Postfix/OpenDKIM/panel.
+again, rather than lingering "alive" with a dead Postfix or panel.
 FATAL alone did not cover the second: a program reaches FATAL only through
 exits before its startsecs, and one that crashed after it was restarted for
 ever (audit 2026-10-12, L32; supervisor 4.2.5, supervisor/process.py,
@@ -37,10 +37,9 @@ import time
 # Programs whose failure does not take the container down
 # (build/supervisord.conf): logrotate is not on the mail path, postfix-reload
 # runs on demand - a reload it could not start is reported to whoever asked for
-# it - syslog-relay carries OpenDKIM's log lines, not mail, and cert-reload
-# looks for a renewed certificate once a day (a crash of it leaves the one
-# Postfix serves).
-SPARED = {"logrotate", "postfix-reload", "syslog-relay", "cert-reload"}
+# it - and cert-reload looks for a renewed certificate once a day (a crash of
+# it leaves the one Postfix serves).
+SPARED = {"logrotate", "postfix-reload", "cert-reload"}
 
 # CRASH_LIMIT unexpected exits of one program within CRASH_WINDOW seconds are a
 # program that does not stay up. A program on the mail path restarts in

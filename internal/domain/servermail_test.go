@@ -6,37 +6,27 @@ import (
 	"testing"
 )
 
-func readTables(t *testing.T, odk *OpenDKIM) (keyTable, signingTable string) {
+func readSelectors(t *testing.T, keys *Keys) string {
 	t.Helper()
-	kt, err := os.ReadFile(odk.keyTablePath)
+	data, err := os.ReadFile(keys.selectorsPath)
 	if err != nil {
-		t.Fatalf("read KeyTable: %v", err)
+		t.Fatalf("read the selector table: %v", err)
 	}
-	st, err := os.ReadFile(odk.signingTablePath)
-	if err != nil {
-		t.Fatalf("read SigningTable: %v", err)
-	}
-	return string(kt), string(st)
+	return string(data)
 }
 
 // The server's own name is signed like a sending domain - a key, a line in
-// each table - without being one: no row in the registry, so no application
-// can send as it.
+// the selector table - without being one: no row in the registry, so no
+// application can send as it.
 func TestServerNameIsSignedWithoutBeingADomain(t *testing.T) {
-	svc, odk := newTestService(t, &fakeApps{})
+	svc, keys := newTestService(t, &fakeApps{})
 	svc.SetServerName("mail.example.org")
 
 	if _, err := svc.Add("example.com"); err != nil {
 		t.Fatalf("add domain: %v", err)
 	}
-	kt, st := readTables(t, odk)
-	for _, want := range []string{"mail.example.org mail.example.org:selfpost:", "example.com example.com:selfpost:"} {
-		if !strings.Contains(kt, want) {
-			t.Errorf("KeyTable lacks %q:\n%s", want, kt)
-		}
-	}
-	if !strings.Contains(st, "*@mail.example.org mail.example.org\n") {
-		t.Errorf("SigningTable does not sign the server's own name:\n%s", st)
+	if got, want := readSelectors(t, keys), "example.com selfpost\nmail.example.org selfpost\n"; got != want {
+		t.Errorf("selector table =\n%q\nwant\n%q", got, want)
 	}
 	domains, err := svc.List()
 	if err != nil || len(domains) != 1 {
@@ -61,16 +51,15 @@ func TestServerNameIsSignedWithoutBeingADomain(t *testing.T) {
 // When the hostname is itself a sending domain, there is one key and one line,
 // the domain's; deleting the domain leaves the server's mail signed with it.
 func TestServerNameThatIsAlsoADomain(t *testing.T) {
-	svc, odk := newTestService(t, &fakeApps{})
+	svc, keys := newTestService(t, &fakeApps{})
 	svc.SetServerName("example.com")
 
 	d, err := svc.Add("example.com")
 	if err != nil {
 		t.Fatalf("add domain: %v", err)
 	}
-	_, st := readTables(t, odk)
-	if strings.Count(st, "*@example.com ") != 1 {
-		t.Errorf("the name is in the SigningTable more than once:\n%s", st)
+	if got := readSelectors(t, keys); got != "example.com selfpost\n" {
+		t.Errorf("selector table = %q, want the name once", got)
 	}
 	asDomain, err := svc.DKIMRecord(d)
 	if err != nil {
@@ -84,9 +73,8 @@ func TestServerNameThatIsAlsoADomain(t *testing.T) {
 	if err := svc.Delete(d.ID); err != nil {
 		t.Fatalf("delete domain: %v", err)
 	}
-	_, st = readTables(t, odk)
-	if !strings.Contains(st, "*@example.com example.com\n") {
-		t.Errorf("deleting the domain stopped the server's own mail being signed:\n%s", st)
+	if got := readSelectors(t, keys); got != "example.com selfpost\n" {
+		t.Errorf("deleting the domain stopped the server's own mail being signed: %q", got)
 	}
 	after, err := svc.ServerMail()
 	if err != nil || after.Record.Value != asDomain.Value {
@@ -94,48 +82,45 @@ func TestServerNameThatIsAlsoADomain(t *testing.T) {
 	}
 }
 
-// An installation upgraded to a version that signs the server's own name has
-// tables without its line until something rebuilds them. The start does, once.
+// The first start of 2.8.0 finds no selector table - OpenDKIM's tables were
+// the earlier versions' - and an installation may lack the server's line.
+// The start rebuilds, once.
 func TestEnsureServerSignedRebuildsOnce(t *testing.T) {
-	svc, odk := newTestService(t, &fakeApps{})
+	svc, keys := newTestService(t, &fakeApps{})
 	if _, err := svc.Add("example.com"); err != nil {
 		t.Fatal(err)
 	}
-	reloads := 0
-	odk.reload = func() error { reloads++; return nil }
+	if err := os.Remove(keys.selectorsPath); err != nil {
+		t.Fatal(err)
+	}
 
-	// The tables as the earlier version left them; now the name is known.
 	svc.SetServerName("mail.example.org")
 	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
 		t.Fatalf("first start: rebuilt = %v, %v; want a rebuild", rebuilt, err)
 	}
-	if _, st := readTables(t, odk); !strings.Contains(st, "*@mail.example.org mail.example.org\n") || !strings.Contains(st, "*@example.com ") {
-		t.Errorf("SigningTable after the rebuild:\n%s", st)
+	if got, want := readSelectors(t, keys), "example.com selfpost\nmail.example.org selfpost\n"; got != want {
+		t.Errorf("selector table after the rebuild = %q, want %q", got, want)
 	}
 	if rebuilt, err := svc.EnsureServerSigned(); err != nil || rebuilt {
 		t.Errorf("second start: rebuilt = %v, %v; want nothing to do", rebuilt, err)
 	}
-	if reloads != 1 {
-		t.Errorf("OpenDKIM was reloaded %d times, want once", reloads)
-	}
 
 	// A name that only begins like the server's is not it.
-	other, otherOdk := newTestService(t, &fakeApps{})
+	other, otherKeys := newTestService(t, &fakeApps{})
 	other.SetServerName("mail.example.org.evil.example")
 	if _, err := other.EnsureServerSigned(); err != nil {
 		t.Fatal(err)
 	}
-	other.SetServerName("mail.example.org")
-	if signed, err := otherOdk.signs("mail.example.org", "selfpost"); err != nil || signed {
+	if signed, err := otherKeys.signs("mail.example.org", "selfpost"); err != nil || signed {
 		t.Errorf("a longer name was taken for the server's: %v, %v", signed, err)
 	}
 }
 
-// Tables that sign the server's name with the key of another selector - the
-// default selector was changed - are rebuilt: OpenDKIM must sign with the key
+// A table that signs the server's name with the key of another selector - the
+// default selector was changed - is rebuilt: the signer must sign with the key
 // whose record the panel shows.
 func TestEnsureServerSignedFollowsTheSelector(t *testing.T) {
-	svc, odk := newTestService(t, &fakeApps{})
+	svc, keys := newTestService(t, &fakeApps{})
 	svc.SetServerName("mail.example.org")
 	if _, err := svc.EnsureServerSigned(); err != nil {
 		t.Fatal(err)
@@ -145,24 +130,23 @@ func TestEnsureServerSignedFollowsTheSelector(t *testing.T) {
 	if rebuilt, err := svc.EnsureServerSigned(); err != nil || !rebuilt {
 		t.Fatalf("after the selector changed: rebuilt = %v, %v; want a rebuild", rebuilt, err)
 	}
-	kt, _ := readTables(t, odk)
-	if !strings.Contains(kt, "mail.example.org mail.example.org:sp2027:") || strings.Contains(kt, ":selfpost:") {
-		t.Errorf("KeyTable after the rebuild:\n%s", kt)
+	if got := readSelectors(t, keys); got != "mail.example.org sp2027\n" {
+		t.Errorf("selector table after the rebuild = %q", got)
 	}
 	mail, err := svc.ServerMail()
 	if err != nil || mail.Selector != "sp2027" {
-		t.Errorf("the panel shows selector %q (%v), the tables sign with sp2027", mail.Selector, err)
+		t.Errorf("the panel shows selector %q (%v), the table signs with sp2027", mail.Selector, err)
 	}
 }
 
 // Without a hostname nothing is added and nothing is signed for it.
 func TestNoServerName(t *testing.T) {
-	svc, odk := newTestService(t, &fakeApps{})
+	svc, keys := newTestService(t, &fakeApps{})
 	if _, err := svc.Add("example.com"); err != nil {
 		t.Fatal(err)
 	}
-	if _, st := readTables(t, odk); strings.Count(st, "\n") != 1 {
-		t.Errorf("SigningTable has more than the one domain:\n%s", st)
+	if got := readSelectors(t, keys); got != "example.com selfpost\n" {
+		t.Errorf("selector table has more than the one domain: %q", got)
 	}
 	if _, err := svc.ServerMail(); err == nil {
 		t.Error("ServerMail without a hostname returned no error")

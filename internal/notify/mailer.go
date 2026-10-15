@@ -20,7 +20,7 @@ const (
 // Mailer hands notifications to Postfix by local submission, as
 // postmaster@<hostname>. They are the panel's own mail: they pass no SASL
 // login, are not rows of the send log and count against no rate limit.
-// Postfix signs them through OpenDKIM with the key of the server's own name
+// The panel's signer signs them with the key of the server's own name
 // (non_smtpd_milters in build/postfix-config.sh, domain.Service.SetServerName).
 type Mailer struct {
 	hostname string

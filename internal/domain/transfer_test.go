@@ -43,18 +43,17 @@ func (f *fakeApps) ImportApplication(domainID int64, login, mode string, address
 	return nil
 }
 
-// newTestService builds a Service over a fresh SQLite store and OpenDKIM tree in
-// a temp dir, with the OpenDKIM reload signal stubbed out.
-func newTestService(t *testing.T, apps Applications) (*Service, *OpenDKIM) {
+// newTestService builds a Service over a fresh SQLite store and key tree in a
+// temp dir.
+func newTestService(t *testing.T, apps Applications) (*Service, *Keys) {
 	t.Helper()
 	st, err := store.Open(t.TempDir() + "/selfpost.db")
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { st.Close() })
-	odk := NewOpenDKIM(t.TempDir())
-	odk.reload = func() error { return nil }
-	return NewService(st, odk, apps, "selfpost"), odk
+	keys := NewKeys(t.TempDir())
+	return NewService(st, keys, apps, "selfpost"), keys
 }
 
 func TestExportImportRoundTrip(t *testing.T) {

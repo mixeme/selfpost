@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -81,13 +83,11 @@ func contains(list []string, want string) bool {
 // and its DMARC record says so.
 func TestNewDomainHasNoReports(t *testing.T) {
 	s, _ := hostedStand(t)
-	// A second OpenDKIM that reloads nothing: the stand's has no supervisor.
-	odk := domain.NewOpenDKIM(t.TempDir())
-	odk.SetReloadHook(func() error { return nil })
-	if _, err := odk.EnsureKey("example.org", "mail"); err != nil {
+	keys := domain.NewKeys(t.TempDir())
+	if _, err := keys.EnsureKey("example.org", "mail"); err != nil {
 		t.Fatal(err)
 	}
-	s.h.domains = domain.NewService(s.h.store, odk, s.h.apps, "mail")
+	s.h.domains = domain.NewService(s.h.store, keys, s.h.apps, "mail")
 	rec := postFormAs(s.h.HandleAddDomain, globalPrincipal, "/outbound/domains", nil, url.Values{"name": {"new.example"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("adding a domain = %d:\n%s", rec.Code, rec.Body.String())
@@ -309,11 +309,9 @@ func (failingDMARCMaps) RebuildDMARCMaps(postfix.DMARCMapsConfig) error {
 // not a plain-text page (audit 2026-10-12, L13).
 func TestReloadWritesTheDMARCMapsAndSaysWhereItFailed(t *testing.T) {
 	s, maps := hostedStand(t)
-	// An OpenDKIM that reloads nothing - the stand has no supervisor - and
-	// a sampler for the Health page a failure is shown on.
-	odk := domain.NewOpenDKIM(t.TempDir())
-	odk.SetReloadHook(func() error { return nil })
-	s.h.domains = domain.NewService(s.h.store, odk, s.h.apps, "mail")
+	// Keys of its own, and a sampler for the Health page a failure is shown
+	// on.
+	s.h.domains = domain.NewService(s.h.store, domain.NewKeys(t.TempDir()), s.h.apps, "mail")
 	s.h.machine = &health.MachineSampler{}
 	rec := postFormAs(s.h.HandleReload, globalPrincipal, "/server/health/reload", nil, url.Values{})
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/server/health?reloaded=1" {
@@ -335,14 +333,20 @@ func TestReloadWritesTheDMARCMapsAndSaysWhereItFailed(t *testing.T) {
 // the way to finish, not "internal error" (audit 2026-10-12, L17).
 func TestDeleteDomainSaysItIsGoneWhenARebuildFails(t *testing.T) {
 	s, _ := hostedStand(t)
-	odk := domain.NewOpenDKIM(t.TempDir())
-	odk.SetReloadHook(func() error { return nil })
-	s.h.domains = domain.NewService(s.h.store, odk, s.h.apps, "mail")
+	dir := t.TempDir()
+	s.h.domains = domain.NewService(s.h.store, domain.NewKeys(dir), s.h.apps, "mail")
 	d, err := s.h.domains.Add("gone.example")
 	if err != nil {
 		t.Fatal(err)
 	}
-	odk.SetReloadHook(func() error { return errors.New("supervisor away") })
+	// A directory where the selector table goes: it cannot be rewritten.
+	table := filepath.Join(dir, "selectors")
+	if err := os.Remove(table); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(table, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	rec := postFormAs(s.h.HandleDeleteDomain, globalPrincipal, "/outbound/domains/x/delete", map[string]string{"id": strconv.FormatInt(d.ID, 10)}, url.Values{})
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("delete with a failing rebuild = %d", rec.Code)

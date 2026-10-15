@@ -8,6 +8,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/milter"
 	"github.com/mixeme/selfpost/internal/postfix"
+	"github.com/mixeme/selfpost/internal/store"
 )
 
 // serveSigner runs the DKIM signer (internal/milter/sign.go) on its two
@@ -18,11 +19,19 @@ import (
 // name. Postfix attaches both strictly (default_action=tempfail,
 // build/postfix-config.sh), so while this role is not serving, mail waits.
 //
-// The keys and selectors come from the KeyTable under opendkimDir, which the
-// panel writes for OpenDKIM too while both sign (docs/plans/panel-dkim-signing.md,
-// stage 1).
-func serveSigner(ctx context.Context, cfg config) error {
-	keys := milter.NewSignKeys(filepath.Join(cfg.opendkimDir, "KeyTable"), filepath.Join(cfg.opendkimDir, "keys"))
+// The keys and selectors come from the key tree and the selector table under
+// dkimDir (internal/domain, Keys). Before it serves, the table is made to
+// hold the server's own name - and written at all on the first start of
+// 2.8.0, whose table replaced OpenDKIM's: Postfix waits for these sockets
+// (build/postfix-wrapper.sh), so no message meets the table before it.
+func serveSigner(ctx context.Context, cfg config, st *store.Store) error {
+	if rebuilt, err := newMailStack(cfg, st).Domains.EnsureServerSigned(); err != nil {
+		// Mail waits: what the signer cannot find a key for it defers.
+		log.Printf("dkim-signer: the selector table: %v", err)
+	} else if rebuilt {
+		log.Printf("dkim-signer: the selector table was rewritten from the registry")
+	}
+	keys := milter.NewSignKeys(filepath.Join(cfg.dkimDir, "selectors"), filepath.Join(cfg.dkimDir, "keys"))
 	bind := milter.NewBindings(postfix.New(cfg.postfixDir).SenderLoginMapsPath())
 	server := strings.ToLower(cfg.hostname)
 

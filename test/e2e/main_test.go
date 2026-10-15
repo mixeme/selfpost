@@ -105,7 +105,7 @@ func TestE2E(t *testing.T) {
 		if err := checkSupervisorProcesses(h); err != nil {
 			t.Fatal(err)
 		}
-		if err := checkOpenDKIMLogs(h); err != nil {
+		if err := checkDKIMTree(h); err != nil {
 			t.Fatal(err)
 		}
 		if err := checkPostfixHardening(h); err != nil {
@@ -274,7 +274,7 @@ func TestE2E(t *testing.T) {
 		if err := verifyDKIM(raw, senderDomain); err != nil {
 			t.Fatalf("DKIM did not verify against the record the panel published: %v", err)
 		}
-		if err := checkBothSigners(h, file, raw, senderDomain); err != nil {
+		if err := checkPanelSignature(h, file, raw, senderDomain); err != nil {
 			t.Fatalf("the panel's signer: %v\n%s", err, raw)
 		}
 		if err := checkReceivedHidden(raw); err != nil {
@@ -332,9 +332,6 @@ func TestE2E(t *testing.T) {
 	})
 	run("refusal_recovered_from_the_log", func(t *testing.T) {
 		testRefusalRecoveredFromTheLog(t, sc)
-	})
-	run("lines_naming_another_sender_never_signed_for_it", func(t *testing.T) {
-		testNeverSignedForAnother(t, sc)
 	})
 	run("login_in_other_capitals_does_not_authenticate", func(t *testing.T) {
 		testLoginCaseMatters(t, sc)

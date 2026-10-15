@@ -96,9 +96,9 @@ func TestSenderCheck(t *testing.T) {
 		{"a name in windows-1251", "shop", [][2]string{from("=?windows-1251?B?zODj4Ofo7Q==?= <a@shop.example.org>")}, true, ""},
 		{"a name in koi8-r, quoted-printable", "shop", [][2]string{from("=?koi8-r?Q?=ED=C1=C7=C1=DA=C9=CE?= <a@shop.example.org>")}, true, ""},
 		{"a comment after the address", "shop", [][2]string{from("a@shop.example.org (the shop)")}, true, ""},
-		{"the leading space Postfix keeps for OpenDKIM", "shop", [][2]string{from(" a@shop.example.org")}, true, ""},
-		// Whatever the name, a comment or a quoted local part holds: OpenDKIM
-		// signs for the address it reads, and that is the one judged.
+		{"the leading space the check asks Postfix to keep", "shop", [][2]string{from(" a@shop.example.org")}, true, ""},
+		// Whatever the name, a comment or a quoted local part holds: the
+		// address a mail program reads is the one judged.
 		{"another sender in the display name", "shop", [][2]string{from(`"director@example.org" <a@shop.example.org>`)}, true, ""},
 		{"the server's name in a comment", "shop", [][2]string{from("a@shop.example.org (postmaster@mail.example.org)")}, true, ""},
 		{"a domain with a key and no application, in the display name", "shop", [][2]string{from(`"x@empty.example.com" <a@shop.example.org>`)}, true, ""},
@@ -107,9 +107,9 @@ func TestSenderCheck(t *testing.T) {
 		{"a stranger's address in a comment", "shop", [][2]string{from("a@shop.example.org (someone@gmail.example)")}, true, ""},
 		{"an unquoted address as the display name", "shop", [][2]string{from("director@example.org <a@shop.example.org>")}, false, "as a mail program reads it"},
 		{"another domain inside a quoted local part", "shop", [][2]string{from(`"director@example.org"@shop.example.org`)}, true, ""},
-		{"no local part: OpenDKIM takes the domain for it", "shop", [][2]string{from("@shop.example.org")}, false, "as a mail program reads it"},
-		// Lines OpenDKIM signs for the application's domain while a lenient
-		// mail program shows another address first (review of stage 2c, F1).
+		{"no local part", "shop", [][2]string{from("@shop.example.org")}, false, "as a mail program reads it"},
+		// Lines a lenient mail program could show as another address
+		// (review of stage 2c, F1).
 		{"another address before a colon", "shop", [][2]string{from("ceo@bank.example:me@shop.example.org")}, false, "as a mail program reads it"},
 		{"a route-like colon inside the brackets", "shop", [][2]string{from("Name <ceo@bank.example:me@shop.example.org>")}, false, "as a mail program reads it"},
 		{"a list inside the brackets", "shop", [][2]string{from("<b@evil.example, a@shop.example.org>")}, false, "as a mail program reads it"},
@@ -119,9 +119,8 @@ func TestSenderCheck(t *testing.T) {
 		{"another application's address, quoted", "shop", [][2]string{from(`"desk"@shop.example.org`)}, false, "not an address this application sends as"},
 		{"its own bound address, quoted", "shop2", [][2]string{from(`"desk"@shop.example.org`)}, true, ""},
 		// A look-alike of the domain in a character a Unicode fold maps
-		// to ASCII (F3): OpenDKIM would not sign it, and it is not the
-		// application's.
-		{"the Kelvin sign for k in the domain", "kiosk", [][2]string{from("a@\u212Aiosk.example.net")}, false, "a mail program would show another address"},
+		// to ASCII (F3): it is not the application's.
+		{"the Kelvin sign for k in the domain", "kiosk", [][2]string{from("a@\u212Aiosk.example.net")}, false, "not an address this application sends as"},
 		{"the same domain in ASCII", "kiosk", [][2]string{from("a@kiosk.example.net")}, true, ""},
 
 		{"another registered domain", "shop", [][2]string{from("director@example.org")}, false, "not an address this application sends as"},
@@ -134,14 +133,14 @@ func TestSenderCheck(t *testing.T) {
 		{"no From: line", "shop", [][2]string{{"Subject", "hello"}}, false, "no From: line"},
 		{"two From: lines", "shop", [][2]string{from("a@shop.example.org"), from("director@example.org")}, false, "more than one From: line"},
 		{"two addresses in one line", "shop", [][2]string{from("a@shop.example.org, director@example.org")}, false, "one address"},
-		{"not an address", "shop", [][2]string{from("the shop")}, false, "no address OpenDKIM can read"},
+		{"not an address", "shop", [][2]string{from("the shop")}, false, "as a mail program reads it"},
 		{"an address before a list comma, then another", "shop", [][2]string{from("director@example.org, <a@shop.example.org>")}, false, "one address"},
-		// Past 256 bytes OpenDKIM matches its SigningTable against a cut
-		// "user@domain" - which could end in another tenant's domain.
-		{"an address longer than OpenDKIM reads", "shop", [][2]string{from(`"` + strings.Repeat("a", 240) + `@example.org"@shop.example.org`)}, false, "longer than OpenDKIM reads whole"},
+		// The key is the login's, so a long quoted local part naming another
+		// domain picks nothing: OpenDKIM's 256-byte cut went with it.
+		{"a long quoted local part naming another domain", "shop", [][2]string{from(`"` + strings.Repeat("a", 240) + `@example.org"@shop.example.org`)}, true, ""},
 		{"a group", "shop", [][2]string{from("friends: a@shop.example.org, b@shop.example.org;")}, false, "one address"},
 		{"another sender folded onto the next line", "shop", [][2]string{from("\"x\"\r\n <director@example.org>")}, false, "not an address this application sends as"},
-		{"a quote left open before another address", "shop", [][2]string{from(`"a@shop.example.org <director@example.org>`)}, false, "no address OpenDKIM can read"},
+		{"a quote left open before another address", "shop", [][2]string{from(`"a@shop.example.org <director@example.org>`)}, false, "as a mail program reads it"},
 		{"no login", "", [][2]string{from("a@shop.example.org")}, false, "no authenticated application"},
 		{"an unknown login", "ghost", [][2]string{from("a@shop.example.org")}, false, "not an address this application sends as"},
 	}
@@ -389,8 +388,8 @@ func fromLines(t *testing.T, file, domain, other string) []string {
 }
 
 // No line of the shared file of lines naming another sender is passed to be
-// signed with that sender's key: a line the check passes is one OpenDKIM
-// reads the application's own address in (the e2e looks at the signature).
+// passed as that sender: a line the check passes is one a mail program reads
+// as an address of the application's own domain.
 func TestSenderCheckNeverPassesTheSharedLinesForAnother(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
 	for _, line := range fromLines(t, "from-lines-other.txt", "shop.example.org", "news.example.net") {
@@ -398,14 +397,15 @@ func TestSenderCheckNeverPassesTheSharedLinesForAnother(t *testing.T) {
 		if resp != milter.RespContinue {
 			continue
 		}
-		if r := dkimMailParse(line); asciiLower(r.domain) != "shop.example.org" {
-			t.Errorf("From: %q passed, and OpenDKIM reads the domain %q in it", line, r.domain)
+		list, err := fromParser.ParseList(unfold(line))
+		if err != nil || len(list) != 1 || domainOf(asciiLower(list[0].Address)) != "shop.example.org" {
+			t.Errorf("From: %q passed, and a mail program reads it as %v (%v)", line, list, err)
 		}
 	}
 }
 
 // Every line of the shared file is passed for the domain's application; the
-// e2e then checks OpenDKIM signs each for that domain alone.
+// e2e then checks each arrives signed for that domain alone.
 func TestSenderCheckPassesTheSharedLines(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
 	for _, line := range passedFromLines(t, "shop.example.org") {

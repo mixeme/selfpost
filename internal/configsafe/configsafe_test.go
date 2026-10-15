@@ -18,7 +18,7 @@ func TestToken(t *testing.T) {
 		}
 	}
 	// A character outside the caller's set is that format's business, not this
-	// function's: a colon is fatal in an OpenDKIM table and fine in a texthash.
+	// function's: a colon is refused for a key's name and fine in a texthash.
 	if err := Token("domain", "a:b", " \t\r\n,\\"); err != nil {
 		t.Errorf("character outside the forbidden set rejected: %v", err)
 	}

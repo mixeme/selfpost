@@ -51,7 +51,7 @@ func NewSystemLog(m Meta, lines []LogLine, errText string) *SystemLog {
 		Head: Head{
 			Kicker: "Server",
 			Title:  "System log",
-			Lead:   Rich("The tail of ", Code("mail.log"), " — Postfix, OpenDKIM and the milters. For one message, open it from the ", Link(outboundLog, "Outbound log"), " instead."),
+			Lead:   Rich("The tail of ", Code("mail.log"), ", the log Postfix writes. For one message, open it from the ", Link(outboundLog, "Outbound log"), " instead."),
 		},
 		Log: Box{No: "01", Title: "Recent lines", ID: "system-log", Poll: serverLog + "/fragment",
 			End: Plain("Last 200 lines · refreshes on its own")},

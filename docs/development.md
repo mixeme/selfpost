@@ -253,9 +253,6 @@ re-read what changed, update the citations, then this table:
 | Package | Version read |
 |---|---|
 | `postfix` | `3.10.13-0+deb13u1` |
-| `opendkim` | `2.11.0~beta2-9.1+b1` |
-| `libopendkim11` | `2.11.0~beta2-9.1+b1` |
-| `libmilter1.0.1` | `8.18.1-6+b1` |
 | `libsasl2-2` | `2.1.28+dfsg1-9` |
 | `sasl2-bin` | `2.1.28+dfsg1-9` |
 | `supervisor` | `4.2.5-3` |

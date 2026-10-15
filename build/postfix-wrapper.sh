@@ -2,8 +2,8 @@
 # Postfix start wrapper: solves the cold-start race where Postfix would try to
 # reach the milter sockets before they are listening.
 #
-# It blocks until the milter sockets — OpenDKIM, the panel's sender check,
-# DKIM signer (two) and journal-milter and, with the inbound relay on, its
+# It blocks until the milter sockets — the panel's sender check, DKIM signer
+# (two) and journal-milter and, with the inbound relay on, its
 # inbound journal milter —
 # are present, then runs `postfix start-fg` and stays its parent. If they are
 # not ready within the timeout it exits non-zero WITHOUT starting Postfix.
@@ -17,10 +17,9 @@
 #
 # This handles cold start only. Once Postfix runs, a milter that does not
 # answer costs what its default_action says (build/postfix-config.sh): mail is
-# deferred for OpenDKIM and the sender check, and passes the journal-milter.
+# deferred for the signer and the sender check, and passes the journal-milter.
 set -eu
 
-OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
 JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
 SENDER_SOCK="${SENDER_CHECK_SOCKET:-/run/selfpost/sender.sock}"
 SIGN_SOCK="${DKIM_SIGN_SOCKET:-/run/selfpost/sign.sock}"
@@ -28,7 +27,7 @@ SIGN_LOCAL_SOCK="${DKIM_SIGN_LOCAL_SOCKET:-/run/selfpost/sign-local.sock}"
 TIMEOUT="${MILTER_WAIT_TIMEOUT:-30}"
 INTERVAL=1
 
-SOCKS="$OPENDKIM_SOCK $JOURNAL_SOCK $SENDER_SOCK $SIGN_SOCK $SIGN_LOCAL_SOCK"
+SOCKS="$JOURNAL_SOCK $SENDER_SOCK $SIGN_SOCK $SIGN_LOCAL_SOCK"
 if [ "${INBOUND_RELAY_ENABLE:-false}" = "true" ]; then
 	SOCKS="$SOCKS ${INBOUND_JOURNAL_MILTER_SOCKET:-/run/selfpost/inbound-journal.sock}"
 fi

@@ -1,15 +1,12 @@
 # From: lines the sender check lets through for an application of {domain}
-# (audit 2026-10-12, stage 2: which key OpenDKIM signs with, seen and not
-# reasoned). One Go-quoted string per line; {domain} is the application's
-# domain. Two tests read this file: the check's unit test
+# (audit 2026-10-12, stage 2). One Go-quoted string per line; {domain} is the
+# application's domain. Two tests read this file: the check's unit test
 # (internal/milter/sender_test.go) wants each line passed, and the e2e
 # (test/e2e/dkim_from_test.go) sends each one and wants the message signed
-# for {domain} and nothing else. A line added here is run by both. {DOMAIN}
+# for {domain} - the signer's key is the login's - with a signature that
+# validates over these headers. A line added here is run by both. {DOMAIN}
 # is {domain} in capitals; {other} is another sender of the server, which a
-# line here names in a way the check's scan does not see (a space after the
-# @) - passed by design, and so signed for {domain} alone.
-# The lines are composed by hand; what OpenDKIM signs each with is measured,
-# by the e2e on every run.
+# line here names inside a quoted display name - passed by design.
 "a@{domain}"
 "<a@{domain}>"
 "\"The Shop\" <Orders@{domain}>"

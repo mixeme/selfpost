@@ -797,6 +797,6 @@ func NewOutDomainDelete(m Meta, id int64, name string, logins []string) *OutDoma
 		item = append(item, Inline{Text: ") with their credentials and sender bindings;"})
 		p.Consequences = append(p.Consequences, item)
 	}
-	p.Consequences = append(p.Consequences, Rich("reload OpenDKIM so the domain is no longer signed."))
+	p.Consequences = append(p.Consequences, Rich("stop signing mail as the domain."))
 	return p
 }

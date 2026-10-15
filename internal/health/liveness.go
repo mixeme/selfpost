@@ -8,14 +8,13 @@ import (
 // mailPathPrograms are the supervised processes whose absence means the
 // container should not report healthy to orchestrators.
 var mailPathPrograms = map[string]bool{
-	"opendkim": true,
-	"panel":    true,
-	"postfix":  true,
+	"panel":   true,
+	"postfix": true,
 }
 
 // Liveness reports whether the mail path is healthy enough for container
-// probes. It requires opendkim, panel, and postfix to be RUNNING under
-// supervisord.
+// probes. It requires panel - whose roles include the DKIM signer - and
+// postfix to be RUNNING under supervisord.
 func Liveness() error {
 	procs, err := Processes()
 	if err != nil {

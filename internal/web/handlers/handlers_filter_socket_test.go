@@ -16,17 +16,18 @@ import (
 // The inbound spam filter's socket is one of the milter sockets on Health and
 // counts in the Milter sockets card of Overview — and only when the filter is on.
 
-// socketsServer is a server whose two Postfix milter sockets answer, so that
+// socketsServer is a server whose Postfix milter sockets answer, so that
 // every difference in the Milter sockets card comes from the filter.
 func socketsServer(t *testing.T) *Handlers {
 	t.Helper()
 	h, _ := settingsServer(t)
 	h.machine = &health.MachineSampler{}
 	dir := t.TempDir()
-	h.cfg.OpenDKIMSocket = filepath.Join(dir, "opendkim.sock")
+	h.cfg.SignSocket = filepath.Join(dir, "sign.sock")
+	h.cfg.SignLocalSocket = filepath.Join(dir, "sign-local.sock")
 	h.cfg.JournalSocket = filepath.Join(dir, "journal.sock")
 	h.cfg.SenderSocket = filepath.Join(dir, "sender.sock")
-	for _, path := range []string{h.cfg.OpenDKIMSocket, h.cfg.SenderSocket, h.cfg.JournalSocket} {
+	for _, path := range []string{h.cfg.SignSocket, h.cfg.SignLocalSocket, h.cfg.SenderSocket, h.cfg.JournalSocket} {
 		l, err := net.Listen("unix", path)
 		if err != nil {
 			t.Skipf("unix sockets unavailable here: %v", err)
@@ -56,24 +57,24 @@ func TestFilterOffAddsNoSocket(t *testing.T) {
 	h := socketsServer(t)
 	h.cfg.InboundEnabled = true
 	h.cfg.InboundAntispamMilter = "" // no filter attached
-	if got := socketsOf(t, h); len(got) != 3 {
-		t.Fatalf("%d sockets with the filter off, want 3: %+v", len(got), got)
+	if got := socketsOf(t, h); len(got) != 4 {
+		t.Fatalf("%d sockets with the filter off, want 4: %+v", len(got), got)
 	}
 
 	// A milter address with the inbound relay off is not a filter either.
 	h.cfg.InboundEnabled = false
 	h.cfg.InboundAntispamMilter = "inet:127.0.0.1:1"
 	got := socketsOf(t, h)
-	if len(got) != 3 {
-		t.Fatalf("%d sockets with the inbound relay off, want 3: %+v", len(got), got)
+	if len(got) != 4 {
+		t.Fatalf("%d sockets with the inbound relay off, want 4: %+v", len(got), got)
 	}
 	card := socketCard(t, h)
-	if card.Value != "3 of 3 answering" || card.Sub != "OpenDKIM, sender-check, send-log" || card.Level != "" {
+	if card.Value != "4 of 4 answering" || card.Sub != "dkim-signer, sender-check, send-log" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 }
 
-func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
+func TestFilterOnAnsweringIsTheLastSocket(t *testing.T) {
 	h := socketsServer(t)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -84,7 +85,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 	h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = "inet:"+l.Addr().String(), "tempfail"
 
 	got := socketsOf(t, h)
-	if len(got) != 4 || got[3].Name != "Spam filter" || got[3].Note != "inbound" || got[3].Path != "inet:"+l.Addr().String() {
+	if len(got) != 5 || got[4].Name != "Spam filter" || got[4].Note != "inbound" || got[4].Path != "inet:"+l.Addr().String() {
 		t.Fatalf("sockets = %+v", got)
 	}
 	for _, s := range got {
@@ -93,7 +94,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 		}
 	}
 	card := socketCard(t, h)
-	if card.Value != "4 of 4 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
+	if card.Value != "5 of 5 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 
@@ -111,7 +112,7 @@ func TestFilterOnAnsweringIsTheThirdSocket(t *testing.T) {
 }
 
 // A filter that does not answer is a socket that is missing: an error when
-// Postfix defers inbound mail while it is down (as for OpenDKIM), a warning when
+// Postfix defers inbound mail while it is down (as for the signer), a warning when
 // it accepts the mail unfiltered (as for the send log).
 func TestFilterDownIsAMissingSocket(t *testing.T) {
 	h := socketsServer(t)
@@ -133,10 +134,10 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 	} {
 		h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = dead, tt.action
 		got := socketsOf(t, h)
-		if len(got) != 4 {
-			t.Fatalf("action %q: %d sockets, want 4", tt.action, len(got))
+		if len(got) != 5 {
+			t.Fatalf("action %q: %d sockets, want 5", tt.action, len(got))
 		}
-		f := got[3]
+		f := got[4]
 		refused := "Connection to " + l.Addr().String() + " refused. " + tt.detail
 		if f.Present || f.Status != tt.status || f.Detail != refused {
 			t.Errorf("action %q: filter = %+v, want status %q, detail %q", tt.action, f, tt.status, refused)
@@ -147,7 +148,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 			t.Errorf("action %q: SocketStatus = %q, want %q", tt.action, c.SocketStatus, tt.status)
 		}
 		card := socketCard(t, h)
-		if card.Value != "3 of 4 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
+		if card.Value != "4 of 5 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
 			t.Errorf("action %q: card = %+v", tt.action, card)
 		}
 
@@ -161,7 +162,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleOverviewFragment(rec, reqAs("/overview/fragment", globalPrincipal))
 		page := rec.Body.String()
-		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a> (3 of 4 answering)`} {
+		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a> (4 of 5 answering)`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("action %q: Overview is missing %q", tt.action, want)
 			}
@@ -200,4 +201,20 @@ func TestFilterAddressIsGlobalOnly(t *testing.T) {
 
 func reqAs(path string, p auth.Principal) *http.Request {
 	return auth.RequestWithPrincipal(httptest.NewRequest("GET", path, nil), p)
+}
+
+// The signer's two rows are one name on the card, and a row that does not
+// answer says which of the two it is.
+func TestSignerSocketsOnTheCard(t *testing.T) {
+	h := socketsServer(t)
+	h.cfg.SignLocalSocket = filepath.Join(t.TempDir(), "gone.sock")
+	got := socketsOf(t, h)
+	if got[0].Name != "dkim-signer" || got[0].Note != "applications" || !got[0].Present ||
+		got[1].Name != "dkim-signer" || got[1].Note != "notifications" || got[1].Present || got[1].Status != health.StatusError {
+		t.Fatalf("sockets = %+v", got)
+	}
+	card := socketCard(t, h)
+	if card.Value != "3 of 4 answering" || card.Sub != "dkim-signer · notifications" || card.Level != "fail" {
+		t.Errorf("card = %+v", card)
+	}
 }

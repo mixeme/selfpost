@@ -1148,9 +1148,8 @@ unsupported rather than as a missing doc:
   and `build/postfix-wrapper.sh`, which must agree), `MAIL_LOG`
   (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
   here has to be matched in `build/postfix-config.sh`),
-  `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`
-  (`/run/opendkim/opendkim.sock`), `OPENDKIM_DIR` (`/data/opendkim`),
-  `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
+  `PANEL_COOKIE_SECURE` (`true`), `DKIM_DIR` (`/data/dkim` — the keys and
+  the selector table), `DKIM_SELECTOR_DEFAULT` (`selfpost`), `SASL_DB_PATH`
   (`/data/sasl/sasldb2`), `SASL_REALM` (defaults to `SELFPOST_HOSTNAME`),
   `POSTFIX_DIR` (`/data/postfix`), `POSTFIX_SENDER_LOGIN_MAPS`
   (`/data/postfix/sender_login_maps` — read by Postfix config only; the panel

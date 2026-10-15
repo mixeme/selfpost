@@ -2,7 +2,7 @@
 // sender check (sender.go) and the inbound journal (inbound.go).
 //
 // The journal-milter is a lightweight milter (architecture.md § Mail path)
-// attached to Postfix's smtpd_milters alongside OpenDKIM. On the receive path it reads the SASL login, From, recipients and
+// attached to Postfix's smtpd_milters after the sender check and the signer. On the receive path it reads the SASL login, From, recipients and
 // Subject of each accepted message and records one send-log row per (queue-id,
 // recipient), giving the panel a structured, filterable history that raw
 // mail.log cannot.

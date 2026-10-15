@@ -59,8 +59,8 @@ var port25Cases = []port25Case{
 			// drives it.
 			{param: "smtpd_forbid_bare_newline", contains: "normalize", wantExact: true},
 			// No antispam milter configured: the inbound journal milter
-			// alone. The submission chain (strict OpenDKIM + journal-milter)
-			// must not reach inbound mail.
+			// alone. The submission chain (the strict sender check and
+			// signer + journal-milter) must not reach inbound mail.
 			{param: "smtpd_milters", contains: "{unix:/run/selfpost/inbound-journal.sock,default_action=accept}", wantExact: true},
 		},
 	},
@@ -104,8 +104,8 @@ var port25Cases = []port25Case{
 			"INBOUND_ANTISPAM_MILTER_ACTION=accept",
 		},
 		check: []optionCheck{
-			// Exact equality also covers the absence of OpenDKIM/journal-milter
-			// sockets — anything else there would fail the comparison.
+			// Exact equality also covers the absence of the submission
+			// chain's sockets — anything else there would fail the comparison.
 			{param: "smtpd_milters", contains: "{inet:antispam:11332,default_action=accept},{unix:/run/selfpost/inbound-journal.sock,default_action=accept}", wantExact: true},
 		},
 	},

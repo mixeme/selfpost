@@ -213,7 +213,7 @@ func TestStepLevelAndLogLineLevel(t *testing.T) {
 		"postfix/smtp[1]: Q1: to=<a@b>, status=bounced (no such user)":                                            "error",
 		"postfix/qmgr[1]: Q1: status=expired, returned to sender":                                                 "error",
 		"postfix/smtp[1]: warning: TLS library problem":                                                           "warn",
-		"opendkim[1]: Q1: DKIM-Signature field added":                                                             "",
+		"postfix/qmgr[1]: Q1: from=<a@b>, size=1, nrcpt=1 (queue active)":                                         "",
 		"postfix/cleanup[1]: Q1: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 From: x - no":       "error",
 		"postfix/smtpd[1]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable":   "warn",
 		"postfix/smtpd[1]: NOQUEUE: reject: RCPT from unknown[2001:db8::1]: 554 5.7.1 <a@b>: Relay access denied": "error",

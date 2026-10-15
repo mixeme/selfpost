@@ -165,7 +165,7 @@ func testSupervision(t *testing.T, sc *scenario) {
 	if !strings.Contains(h.logs("selfpost"), "crashexit: logrotate entered FATAL; it is not on the mail path, the container stays up") {
 		t.Fatalf("crashexit did not spare logrotate:\n%s", h.logs("selfpost"))
 	}
-	for _, p := range []string{"opendkim", "panel", "postfix"} {
+	for _, p := range []string{"panel", "postfix"} {
 		if state, status := programState(p); state != "RUNNING" {
 			t.Fatalf("program %s with logrotate FATAL: %s", p, status)
 		}

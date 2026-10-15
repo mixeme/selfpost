@@ -146,7 +146,7 @@ func TestCheckMilterInet6(t *testing.T) {
 	}
 }
 
-// A socket file whose listener is gone - a killed OpenDKIM or panel leaves
+// A socket file whose listener is gone - a killed panel leaves
 // one (unix(7)) - is not a listener, though the file is there (A-38).
 func TestStaleSocketFileIsNotListening(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -163,8 +163,8 @@ func TestStaleSocketFileIsNotListening(t *testing.T) {
 		t.Fatalf("the socket file should outlive its listener: %v", err)
 	}
 
-	got := CheckSocket("OpenDKIM", sock, true)
-	if got.Present || got.Status != StatusError || !strings.HasPrefix(got.Detail, "Nothing listens on the OpenDKIM socket") {
+	got := CheckSocket("dkim-signer", sock, true)
+	if got.Present || got.Status != StatusError || !strings.HasPrefix(got.Detail, "Nothing listens on the dkim-signer socket") {
 		t.Errorf("stale required socket: %+v", got)
 	}
 	if got := CheckSocket("send-log", sock, false); got.Status != StatusWarn {

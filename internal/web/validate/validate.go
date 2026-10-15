@@ -52,15 +52,15 @@ func isASCIILetterOrDigit(r rune) bool {
 const maxDomainLen = 253 // RFC 1035 limit on a fully-qualified name
 
 // NormalizeDomain lower-cases and trims a domain name. Domain names are
-// case-insensitive, and the generated OpenDKIM tables/keys use the canonical
+// case-insensitive, and the DKIM selector table and keys use the canonical
 // lower-case form, so we normalise before both validation and storage.
 func NormalizeDomain(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // Domain enforces a strict server-side whitelist for sending-domain names
-// (security.md). The result is safe to write verbatim into the OpenDKIM
-// KeyTable/SigningTable and to use as a filesystem path segment: only
+// (security.md). The result is safe to write verbatim into the DKIM
+// selector table and to use as a filesystem path segment: only
 // lower-case letters, digits, '.' and '-' are allowed, in valid DNS label
 // shape. Input must already be normalised with NormalizeDomain.
 func Domain(name string) error {
@@ -85,7 +85,7 @@ func Domain(name string) error {
 // Selector checks a DKIM selector: one or more DNS labels as Domain allows
 // them, at most 63 characters in all. The panel's own selector is fixed in
 // its configuration; this is for one read from a domain export file, which
-// goes into OpenDKIM's tables, a key file's name and every signature's s=
+// goes into the selector table, a key file's name and every signature's s=
 // (review of audit stage 2).
 func Selector(s string) error {
 	if s == "" {

@@ -56,11 +56,11 @@ func newAppStandAt(t *testing.T, dbPath string) appStand {
 	// The domain page is rendered with the domain's DKIM record and its DNS
 	// state: a real key in a temporary directory, and a resolver nobody
 	// listens on, so every check answers at once without leaving the machine.
-	odk := domain.NewOpenDKIM(t.TempDir())
-	if _, err := odk.EnsureKey("example.org", "mail"); err != nil {
+	keys := domain.NewKeys(t.TempDir())
+	if _, err := keys.EnsureKey("example.org", "mail"); err != nil {
 		t.Fatalf("EnsureKey: %v", err)
 	}
-	h.domains = domain.NewService(h.store, odk, h.apps, "mail")
+	h.domains = domain.NewService(h.store, keys, h.apps, "mail")
 	h.dns = offlineDNS
 	h.cfg.RateLimitMessagesPerIP, h.cfg.RateLimitWindowSeconds = 600, 3600
 	var err error

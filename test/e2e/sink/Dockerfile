@@ -1,7 +1,7 @@
 # SMTP sink-MX for the e2e stand (plan C.4): accepts any mail on 25 and dumps
 # each transaction to its own file under /mail, so the test harness can read
 # the raw received message (headers + body, including the DKIM-Signature
-# Postfix/OpenDKIM added) straight off disk. smtp-sink ships in the postfix
+# the panel's signer added) straight off disk. smtp-sink ships in the postfix
 # package itself. python3-dkim (dkimpy 1.1.8-2 in trixie, /usr/bin/dkimverify)
 # is the independent DKIM verifier the suite holds the panel's signer to
 # (docs/plans/panel-dkim-signing.md); it looks the keys up through the

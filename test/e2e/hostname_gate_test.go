@@ -97,7 +97,7 @@ func runEntrypointBackground(t *testing.T, hostnameEnv string) (output string, s
 	_ = exec.Command("docker", "rm", "-f", name).Run()
 	defer func() {
 		// Make bind-mounted /data deletable by Go's TempDir cleanup: the panel
-		// leaves setup-token/db/opendkim owned by container UIDs.
+		// leaves setup-token/db/dkim owned by container UIDs.
 		_ = exec.Command("docker", "exec", name, "sh", "-c",
 			"chown -R root:root /data && chmod -R a+rwX /data").Run()
 		_ = exec.Command("docker", "rm", "-f", name).Run()

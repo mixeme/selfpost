@@ -28,7 +28,6 @@ import (
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/store"
-	"github.com/mixeme/selfpost/internal/syslogrelay"
 )
 
 func main() {
@@ -48,19 +47,10 @@ func main() {
 	}
 
 	showVersion := flag.Bool("version", false, "print version and exit")
-	relay := flag.String("syslog-relay", "", "relay syslog(3) datagrams sent to this socket path to stdout, and do nothing else")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println(buildinfo.Version)
-		return
-	}
-	if *relay != "" {
-		// The container's /dev/log, for OpenDKIM (internal/syslogrelay;
-		// build/supervisord.conf, [program:syslog-relay]).
-		if err := syslogrelay.Run(*relay, os.Stdout); err != nil {
-			log.Fatal(err)
-		}
 		return
 	}
 
@@ -98,19 +88,17 @@ type config struct {
 	rateLimitMessagesPerIP int
 	rateLimitWindowSeconds int
 
-	// Read-only inputs to the panel's status page: the certificate Postfix
-	// serves and the two milter sockets it connects to. The defaults mirror
-	// build/postfix-config.sh, so the status page checks exactly what Postfix
-	// was configured with.
-	tlsCertFile    string
-	opendkimSocket string
+	// Read-only input to the panel's status page: the certificate Postfix
+	// serves. The default mirrors build/postfix-config.sh, so the status
+	// page checks exactly what Postfix was configured with.
+	tlsCertFile string
 	// tlsServedCertFile is the certificate Postfix serves (its copy of
 	// tlsCertFile), read from postconf at the start; tlsReloadInterval is
 	// how often build/postfix-cert-reload.sh looks for a renewal.
 	tlsServedCertFile string
 	tlsReloadInterval time.Duration
 
-	opendkimDir     string
+	dkimDir         string
 	dkimSelectorDef string
 
 	saslDBPath string
@@ -184,11 +172,10 @@ func loadConfig() config {
 
 		tlsCertFile:       envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
 		tlsReloadInterval: time.Duration(envInt("TLS_RELOAD_INTERVAL_SECONDS", 86400)) * time.Second,
-		opendkimSocket:    envDefault("OPENDKIM_SOCKET", "/run/opendkim/opendkim.sock"),
 
-		// Per-domain DKIM state (architecture.md § OpenDKIM). The directory layout
-		// matches what entrypoint.sh prepares (setgid, shared `selfpost` group).
-		opendkimDir:     envDefault("OPENDKIM_DIR", filepath.Join(dataDir, "opendkim")),
+		// Per-domain DKIM state (architecture.md § DKIM signing): the keys and
+		// the selector table, the layout entrypoint.sh prepares.
+		dkimDir:         envDefault("DKIM_DIR", filepath.Join(dataDir, "dkim")),
 		dkimSelectorDef: envDefault("DKIM_SELECTOR_DEFAULT", "selfpost"),
 
 		// Application SASL accounts and the Postfix sender map (architecture.md §
@@ -419,7 +406,7 @@ func run() error {
 		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg, st) }},
 		{"journal-milter", func(ctx context.Context) error { return serveJournal(ctx, cfg, st) }},
 		{"sender-check", func(ctx context.Context) error { return serveSenderCheck(ctx, cfg, st) }},
-		{"dkim-signer", func(ctx context.Context) error { return serveSigner(ctx, cfg) }},
+		{"dkim-signer", func(ctx context.Context) error { return serveSigner(ctx, cfg, st) }},
 		{"log-tailer", func(ctx context.Context) error {
 			return logtail.Run(ctx, cfg.mailLog, st, func() int {
 				days, err := st.GetSendLogRetentionDays(cfg.retentionDays)

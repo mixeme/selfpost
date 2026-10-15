@@ -58,10 +58,11 @@ esac
 # — the one place still running as root — before handing off to supervisord,
 # which starts the panel as the panel user.
 #
-# Mode must stay world-traversable (0755): OpenDKIM and Postfix reach their
-# trees under /data as other users. Go's testing.TempDir is 0700, and a bare
-# chown would leave that mode in place — opendkim then cannot read KeyTable and
-# the container crash-loops (e2e TestHostnameGate/valid_hostname_starts).
+# Mode must stay world-traversable (0755): Postfix reaches its trees under
+# /data as another user. Go's testing.TempDir is 0700, and a bare chown would
+# leave that mode in place — OpenDKIM, which read its tables there until
+# 2.8.0, then could not, and the container crash-looped (e2e
+# TestHostnameGate/valid_hostname_starts).
 # (Go: testing.TempDir uses os.MkdirTemp, src/os/tempfile.go: "created with
 # mode 0o700".)
 chown panel:panel /data
@@ -85,8 +86,8 @@ drop_links() {
 		fi
 	done
 }
-drop_links /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
-	/data/opendkim/keys /data/opendkim/KeyTable /data/opendkim/SigningTable \
+drop_links /data/dkim /data/dkim.new /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
+	/data/dkim/keys /data/dkim/selectors /data/opendkim/keys \
 	/data/sasl/sasldb2 /data/postfix/queue \
 	/data/postfix/sender_login_maps /data/postfix/relay_domains \
 	/data/postfix/transport /data/postfix/relay_recipients /data/postfix/tls_policy \
@@ -95,7 +96,8 @@ drop_links /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
 # under /data; make sure they stay writable without disturbing anything that a
 # later phase deliberately hands to another service. /data/log is exempt: it is
 # deliberately owned by postfix (postlogd writes the delivery log there) and is
-# normalised on its own below, as are the trees shared through group selfpost.
+# normalised on its own below, as are the trees shared through group selfpost
+# and the one OpenDKIM read until 2.8.0, which is left as it was (below).
 # A file's owner is a number: an entry whose user or group is not the panel's
 # by that number - unpacked by root, or written under another image whose
 # image gave the panel other ids (999:999 until 2.7.0, 10999:10999 since) - is
@@ -103,24 +105,31 @@ drop_links /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
 find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim ! -name sasl ! -name antispam \
 	\( ! -user panel -o ! -group panel \) -exec chown -R panel:panel {} +
 
-# DKIM key tree. The panel (user `panel`) generates keys and writes
-# the OpenDKIM tables; OpenDKIM (user `opendkim`) must read them. Normalise the
-# tree on every start so it is correct whether /data is fresh, restarted, or
-# just restored from a backup:
-#   - group `selfpost` + setgid on directories so anything the panel creates
-#     inherits the shared group OpenDKIM traverses (inode(7), "The
-#     set-group-ID bit": files created in such a directory take its group);
-#   - private keys and tables group-readable (0640);
-#   - both table files present (empty is fine) BEFORE OpenDKIM starts, so the
-#     daemon comes up cleanly with no domains yet.
-mkdir -p /data/opendkim/keys
-for t in /data/opendkim/KeyTable /data/opendkim/SigningTable; do
-	[ -e "$t" ] || : > "$t"
-done
-chown -R panel:selfpost /data/opendkim
-find /data/opendkim -type d -exec chmod 2750 {} +
-chmod 0640 /data/opendkim/KeyTable /data/opendkim/SigningTable
-find /data/opendkim/keys -type f -name '*.private' -exec chmod 0640 {} +
+# DKIM keys and the selector table, /data/dkim: the panel's alone - it makes
+# the keys, writes the table and signs (internal/domain, Keys; internal/milter,
+# sign.go). Until 2.8.0 the keys were under /data/opendkim, shared with
+# OpenDKIM through group selfpost. The first start without /data/dkim copies
+# them over and leaves the old tree as it was, for an image of 2.7.x rolled
+# back to (docs/plans/panel-dkim-signing.md, Q2). The copy is made as the
+# panel user, which can read nothing there the panel could not, into a
+# directory beside, renamed into place when it is whole: a start that stops
+# midway copies again. A copy that fails stops the start (set -e) - the
+# panel would otherwise make the server's own name a new key, and its
+# published record would no longer match. The selector table is written by
+# the panel before its signer serves (cmd/panel/signer.go).
+# (util-linux 2.41, setpriv(1): --reuid, --regid, --clear-groups; cp(1)
+# -P: never follow a symbolic link in the source.)
+rm -rf /data/dkim.new
+if [ ! -e /data/dkim ] && [ -d /data/opendkim/keys ]; then
+	setpriv --reuid=panel --regid=panel --clear-groups -- \
+		sh -c 'mkdir /data/dkim.new && cp -RP /data/opendkim/keys /data/dkim.new/keys'
+	mv /data/dkim.new /data/dkim
+	echo "entrypoint: the DKIM keys were copied from /data/opendkim to /data/dkim; /data/opendkim is left for a rollback" >&2
+fi
+mkdir -p /data/dkim/keys
+chown -R panel:panel /data/dkim
+find /data/dkim -type d -exec chmod 0700 {} +
+find /data/dkim -type f -exec chmod 0600 {} +
 
 # Application SASL accounts. The panel (user `panel`) writes the
 # sasldb2 via saslpasswd2; Postfix (user `postfix`) reads it to authenticate SMTP
@@ -190,18 +199,16 @@ chown -R postfix:selfpost /data/log
 chmod 2750 /data/log
 find /data/log -type f -exec chmod 0640 {} +
 
-# Milter socket directories. Postfix (user `postfix`) must actually CONNECT to
-# the milter sockets — OpenDKIM's and the panel's — not just probe them at
-# start-up. The sockets are created by the opendkim and panel
-# users respectively, so bridge them to `postfix` through the shared `selfpost`
-# group: group-owned + setgid dirs mean each socket created inside inherits
-# group `selfpost`, and group-traversable (2750) lets postfix reach it. Without
-# this, smtpd cannot talk to OpenDKIM and, because signing is strict
-# (default_action=tempfail), rejects all mail.
-mkdir -p /run/opendkim /run/selfpost
-chown opendkim:selfpost /run/opendkim
+# The milter socket directory. Postfix (user `postfix`) must actually CONNECT
+# to the panel's milter sockets, not just probe them at start-up. The panel
+# user creates them, so they are bridged to `postfix` through the shared
+# `selfpost` group: a group-owned + setgid dir means each socket created
+# inside inherits group `selfpost`, and group-traversable (2750) lets postfix
+# reach it. Without this, smtpd cannot talk to the signer and, because
+# signing is strict (default_action=tempfail), defers all mail.
+mkdir -p /run/selfpost
 chown panel:selfpost /run/selfpost
-chmod 2750 /run/opendkim /run/selfpost
+chmod 2750 /run/selfpost
 # A container that was killed leaves its sockets behind, and a file nobody
 # listens on would satisfy postfix-wrapper.sh's wait: Postfix would start
 # before the sender check does and defer mail until it is there. The check's
@@ -210,18 +217,7 @@ chmod 2750 /run/opendkim /run/selfpost
 # downtime (guide § Health) - a mark left from before would count the whole
 # outage when supervisord cannot say since when Postfix runs.
 # (test(1), -S: true for any socket file, whether or not anything listens.)
-rm -f /run/opendkim/*.sock /run/selfpost/*.sock /run/selfpost/*.alive
-
-# The container's /dev/log: a link to the socket the syslog-relay program (the
-# panel's binary, as `panel`) listens on, so what OpenDKIM logs through
-# syslog(3) reaches the container's log (build/supervisord.conf; audit
-# 2026-10-12, L30). The directory is the relay's and reachable by all: the
-# socket is the container's local log, as /dev/log is on a host.
-mkdir -p /run/syslog
-chown panel:panel /run/syslog
-chmod 0755 /run/syslog
-rm -f /run/syslog/log
-ln -sfn /run/syslog/log /dev/log
+rm -f /run/selfpost/*.sock /run/selfpost/*.alive
 
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the

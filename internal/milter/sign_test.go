@@ -18,8 +18,8 @@ import (
 	"github.com/emersion/go-msgauth/dkim"
 )
 
-// signFixture is a key directory and KeyTable laid out as internal/domain
-// writes them (renderTables(), writePrivateKeyPEM(): PKCS#1 PEM) for
+// signFixture is a key directory and selector table laid out as
+// internal/domain writes them (renderSelectors(), writePrivateKeyPEM(): PKCS#1 PEM) for
 // example.org with selector sel, and the DNS record of the key.
 type signFixture struct {
 	dir, table, keysDir string
@@ -35,15 +35,15 @@ func newSignFixture(t *testing.T) signFixture {
 		t.Fatal(err)
 	}
 	keyPath := filepath.Join(keysDir, "example.org", "sel.private")
-	if err := os.MkdirAll(filepath.Dir(keyPath), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	if err := os.WriteFile(keyPath, pemBytes, 0o640); err != nil {
+	if err := os.WriteFile(keyPath, pemBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	table := filepath.Join(dir, "KeyTable")
-	if err := os.WriteFile(table, []byte("example.org example.org:sel:"+keyPath+"\n"), 0o640); err != nil {
+	table := filepath.Join(dir, "selectors")
+	if err := os.WriteFile(table, []byte("example.org sel\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	pub, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
@@ -247,7 +247,7 @@ func TestSignerDefersWhatItCannotSign(t *testing.T) {
 	}{
 		{"a login with no domain", "stranger", nil},
 		{"no line for the domain", "app1", func(t *testing.T, f signFixture) {
-			if err := os.WriteFile(f.table, []byte("other.example other.example:sel:"+filepath.Join(f.keysDir, "other.example", "sel.private")+"\n"), 0o640); err != nil {
+			if err := os.WriteFile(f.table, []byte("other.example sel\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 		}},
@@ -261,12 +261,23 @@ func TestSignerDefersWhatItCannotSign(t *testing.T) {
 			if err := os.Rename(filepath.Join(f.keysDir, "example.org", "sel.private"), outside); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(f.table, []byte("example.org example.org:sel:"+outside+"\n"), 0o640); err != nil {
+			if err := os.WriteFile(f.table, []byte("example.org ../../sel\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 		}},
-		{"a key table that is not one", "app1", func(t *testing.T, f signFixture) {
-			if err := os.WriteFile(f.table, []byte("example.org\n"), 0o640); err != nil {
+		{"a name of dots", "app1", func(t *testing.T, f signFixture) {
+			if err := os.WriteFile(f.table, []byte("example.org sel\n.. sel\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a selector table that is not one", "app1", func(t *testing.T, f signFixture) {
+			if err := os.WriteFile(f.table, []byte("example.org\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"an old KeyTable line", "app1", func(t *testing.T, f signFixture) {
+			line := "example.org example.org:sel:" + filepath.Join(f.keysDir, "example.org", "sel.private") + "\n"
+			if err := os.WriteFile(f.table, []byte(line), 0o600); err != nil {
 				t.Fatal(err)
 			}
 		}},

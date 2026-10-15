@@ -153,7 +153,7 @@ func serverMailStand(t *testing.T) (*Handlers, *fakeZone, domain.ServerMail) {
 	h.dns = dnscheck.New([]string{addr})
 	h.cfg.Hostname = notifyHost
 	h.machine = &health.MachineSampler{}
-	h.domains = domain.NewService(h.store, domain.NewOpenDKIM(t.TempDir()), nil, "sp2026")
+	h.domains = domain.NewService(h.store, domain.NewKeys(t.TempDir()), nil, "sp2026")
 	h.domains.SetServerName(notifyHost)
 	mail, err := h.domains.ServerMail()
 	if err != nil {

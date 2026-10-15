@@ -65,10 +65,10 @@ func admin() Meta { return Meta{User: "admin", IsGlobal: true} }
 func overviewFixture() *Overview {
 	cards := []HealthCard{
 		{Name: "Machine", Value: "CPU 12%", Sub: "RAM 41%", Icon: "ti-cpu", Href: "/server/health"},
-		{Name: "Processes", Value: "5 of 5 running", Sub: "all programs", Icon: "ti-server-cog", Href: "/server/health"},
+		{Name: "Processes", Value: "4 of 4 running", Sub: "all programs", Icon: "ti-server-cog", Href: "/server/health"},
 		{Name: "TLS certificate", Value: "Expires in 12 days", Sub: "mail.example.org", Icon: "ti-certificate", Href: "/server/health", Level: LevelWarn},
 		{Name: "Queue", Value: "Empty", Sub: "outbound", Icon: "ti-stack-2", Href: "/outbound/queue"},
-		{Name: "Milter sockets", Value: "2 of 2 answering", Sub: "OpenDKIM, send-log", Icon: "ti-plug-connected", Href: "/server/health"},
+		{Name: "Milter sockets", Value: "5 of 5 answering", Sub: "incl. the spam filter", Icon: "ti-plug-connected", Href: "/server/health"},
 		{Name: "Reverse DNS", Value: "Forward = reverse", Sub: "mail.example.org", Icon: "ti-arrows-exchange", Href: "/server/health"},
 	}
 	o := NewOverview(admin(), "mail.example.org", cards, time.Date(2026, 10, 9, 14, 2, 31, 0, time.UTC), 30, true)
@@ -87,8 +87,8 @@ func overviewFixture() *Overview {
 	return o
 }
 
-// healthFixture is the mockup's Health: a healthy machine and five processes,
-// a certificate close to expiry, the two milter sockets and a good reverse
+// healthFixture is the mockup's Health: a healthy machine and four processes,
+// a certificate close to expiry, the milter sockets and a good reverse
 // record. refresh renders it as the polled fragment.
 func healthFixture(refresh bool) *Health {
 	h := NewHealth(admin(), "")
@@ -107,7 +107,7 @@ func healthFixture(refresh bool) *Health {
 		{Resource: "Network", Usage: "↓ 18.0 KiB/s · ↑ 44.0 KiB/s", Detail: []string{"eth0: 2.1 GiB in, 6.4 GiB out"}},
 	}
 	h.Processes.End = Verdict("ok")
-	for i, name := range []string{"postfix", "opendkim", "journal-milter", "panel", "dmarc-ingest"} {
+	for i, name := range []string{"postfix", "journal-milter", "panel", "dmarc-ingest"} {
 		h.ProcessRows = append(h.ProcessRows, ProcessRow{Name: name, State: Tag{Status: "ok", Label: "running"},
 			Detail: "pid " + strconv.Itoa(41-i) + ", uptime 18 days"})
 	}
@@ -119,7 +119,8 @@ func healthFixture(refresh bool) *Health {
 	h.CertDetail, h.CertProblem = "Expires in 12 day(s). Check that renewal on the host still works.", true
 	h.Sockets.End = Verdict("ok")
 	h.SocketRows = []SocketRow{
-		{Name: "OpenDKIM", Path: "inet:127.0.0.1:8891", State: Tag{Status: "ok"}},
+		{Name: "dkim-signer", Note: "applications", Path: "unix:/run/selfpost/sign.sock", State: Tag{Status: "ok"}},
+		{Name: "dkim-signer", Note: "notifications", Path: "unix:/run/selfpost/sign-local.sock", State: Tag{Status: "ok"}},
 		{Name: "sender-check", Path: "unix:/run/selfpost/sender.sock", State: Tag{Status: "ok"}},
 		{Name: "send-log", Path: "unix:/run/selfpost/journal.sock", State: Tag{Status: "ok"}},
 	}
@@ -271,7 +272,7 @@ func outLogFixture() *OutLog {
 }
 
 // outMessageFixture is the mockup's message page: a deferred alert, with the
-// four lines Postfix and OpenDKIM wrote about it.
+// four lines Postfix wrote about it.
 func outMessageFixture() *OutMessage {
 	at := time.Date(2026, 9, 21, 13, 58, 7, 0, time.UTC)
 	p := NewOutMessage(admin(), MessageInput{
@@ -290,7 +291,7 @@ func outMessageFixture() *OutMessage {
 	return p.WithDeliveryLog([]LogLine{
 		{Time: "13:58:07", Text: "postfix/smtpd[2114]: 4XcB7k2Jm9z1: client=unknown[198.51.100.7], sasl_username=alerts"},
 		{Time: "13:58:07", Text: "postfix/cleanup[2120]: 4XcB7k2Jm9z1: message-id=<a81f0c@alertmanager>"},
-		{Time: "13:58:07", Text: "opendkim[39]: 4XcB7k2Jm9z1: DKIM-Signature field added (s=sp2026, d=example.org)"},
+		{Time: "13:58:07", Text: "postfix/qmgr[2061]: 4XcB7k2Jm9z1: from=<alerts@example.org>, size=2214, nrcpt=1 (queue active)"},
 		{Time: "13:58:09", Level: "warn", Text: "postfix/smtp[2123]: 4XcB7k2Jm9z1: to=<noc@example.org>, relay=mx1.example.org[192.0.2.10]:25, delay=1.9, status=deferred (host mx1.example.org said: 451 4.7.1 Greylisted, try again in 5 minutes)"},
 	}, "")
 }
@@ -389,12 +390,11 @@ func outQueueFixture() *OutQueue {
 	return NewOutQueue(admin(), listing, "").WithRetryPolicy("5 minutes", "about 1 hour 7 minutes", "5 days", false)
 }
 
-// systemLogFixture is the mockup's System log: ten lines of mail.log, as the
+// systemLogFixture is the mockup's System log: nine lines of mail.log, as the
 // handler reads them (oldest first), with the deferrals in amber and the
 // refusals and the bounce in red.
 func systemLogFixture() *SystemLog {
 	return NewSystemLog(admin(), []LogLine{
-		{Time: "Sep 21 13:00:00", Text: "opendkim[39]: key table reloaded (3 domains)"},
 		{Time: "Sep 21 13:40:02", Text: "journal-milter[40]: rate limit: app=prod-server 201/200 in 3600s — tempfail at MAIL FROM", Level: "warn"},
 		{Time: "Sep 21 13:41:19", Text: "postfix/smtp[2098]: 4XcB1c3Rk8z1: to=<j.doe@nonexistent.example>, status=bounced (Host or domain name not found)", Level: "error"},
 		{Time: "Sep 21 13:44:02", Text: "postfix/smtp[2101]: 4XcB2m7Hd4z1: to=<jobs@acme.io>, relay=none, status=deferred (connect to 10.0.4.12[10.0.4.12]:2525: Connection timed out)", Level: "warn"},

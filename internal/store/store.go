@@ -74,7 +74,7 @@ func Open(path string) (*Store, error) {
 // keepPrivate makes the database file and its WAL and shared-memory files
 // the panel's alone (0600). They hold the panel users' password hashes and
 // the session token hashes, and /data is traversable by every user of the
-// container (entrypoint.sh) - Postfix and OpenDKIM among them. SQLite
+// container (entrypoint.sh) - Postfix among them. SQLite
 // creates a file with 0644 less the umask, and the panel sets no umask; the
 // -wal and -shm files take the database file's mode when they are created
 // (SQLite 3.53.4 as modernc.org/sqlite v1.60.1 builds it,

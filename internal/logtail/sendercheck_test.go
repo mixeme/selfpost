@@ -36,9 +36,9 @@ func (d *deferredStore) AddSenderCheckDeferred(at time.Time, n int64, place stri
 // with the panel stopped and for a refused From: (2026-10-12), and with the
 // panel frozen in the middle of a message (cleanup 1339, 2026-10-14); the
 // stamps are put in ISO form. Around them are the lines of two other things
-// that use the same words - a level-2 refusal of the journal milter, OpenDKIM
-// not answering. Those - smtpd 1149, 1190 and 1201, the second client of
-// 1183, smtpd 1300 and the OpenDKIM warning of cleanup 1339 - are composed,
+// that use the same words - a level-2 refusal of the journal milter, the DKIM
+// signer not answering. Those - smtpd 1149, 1190 and 1201, the second client
+// of 1183, smtpd 1300 and the signer's warning of cleanup 1339 - are composed,
 // after src/smtpd/smtpd.c and src/milter/milter8.c (Postfix 3.10.13).
 func TestDeferredCounter(t *testing.T) {
 	st := &deferredStore{}
@@ -67,9 +67,9 @@ func TestDeferredCounter(t *testing.T) {
 		`Oct 12 16:23:40 mail postfix/smtpd[1190]: warning: Illegal address syntax from unknown[10.77.0.1] in MAIL command: <warning: connect to Milter service unix:/run/selfpost/sender.sock: milter>`,
 		`Oct 12 16:23:40 mail postfix/smtpd[1190]: NOQUEUE: milter-reject: MAIL from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; from=<a@sender.e2e.test> proto=ESMTP helo=<x>`,
 
-		// OpenDKIM does not answer: another socket, not counted.
+		// The signer does not answer: another socket, not counted.
 		`Oct 12 16:24:00 mail postfix/smtpd[1201]: connect from unknown[10.77.0.1]`,
-		`Oct 12 16:24:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/opendkim/opendkim.sock: Connection refused`,
+		`Oct 12 16:24:00 mail postfix/smtpd[1201]: warning: connect to Milter service unix:/run/selfpost/sign.sock: Connection refused`,
 		`Oct 12 16:24:00 mail postfix/smtpd[1201]: NOQUEUE: milter-reject: CONNECT from unknown[10.77.0.1]: 451 4.7.1 Service unavailable - try again later; proto=SMTP`,
 
 		// The check stops answering in the middle of a message, the next day:
@@ -81,8 +81,8 @@ func TestDeferredCounter(t *testing.T) {
 		`Oct 13 00:01:20 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sender.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
 		`Oct 13 00:01:20 mail postfix/cleanup[1339]: 8C1D43C75DA0: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 4.7.1 Service unavailable - try again later; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<e2e-client.e2e.test>`,
 
-		// OpenDKIM hung in the middle of a message: another socket.
-		`Oct 13 00:01:30 mail postfix/cleanup[1339]: warning: milter unix:/run/opendkim/opendkim.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
+		// The signer hung in the middle of a message: another socket.
+		`Oct 13 00:01:30 mail postfix/cleanup[1339]: warning: milter unix:/run/selfpost/sign.sock: can't read SMFIC_HEADER reply packet header: Connection timed out`,
 
 		// The check's own verdict is a refusal, not a deferral, and it is
 		// cleanup that writes it.

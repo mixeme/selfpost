@@ -85,9 +85,9 @@ func TestPanelBootsOnADataDirectoryRestoredFromItsOwnBackup(t *testing.T) {
 	// The archive carries the daemon files, and the first boot after restore
 	// re-derives the maps from SQLite so they stay aligned with the database.
 	for path, want := range map[string]string{
-		filepath.Join("opendkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
-		filepath.Join("sasl", "sasldb2"):                                     "SASLDB",
-		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop\n",
+		filepath.Join("dkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
+		filepath.Join("sasl", "sasldb2"):                                 "SASLDB",
+		filepath.Join("postfix", "sender_login_maps"):                    "@" + restoreDomain + " shop\n",
 	} {
 		got, err := os.ReadFile(filepath.Join(r.dataDir, path))
 		if err != nil {
@@ -268,10 +268,10 @@ func seedPanelProject(t *testing.T) string {
 	}
 
 	for path, content := range map[string]string{
-		filepath.Join("opendkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
-		filepath.Join("sasl", "sasldb2"):                                     "SASLDB",
-		filepath.Join("postfix", "sender_login_maps"):                        "@" + restoreDomain + " shop\n",
-		filepath.Join("log", "mail.log"):                                     "postfix/smtp[1]: 4A1B2C3D: status=sent",
+		filepath.Join("dkim", "keys", restoreDomain, "selfpost.private"): "PRIVATE KEY",
+		filepath.Join("sasl", "sasldb2"):                                 "SASLDB",
+		filepath.Join("postfix", "sender_login_maps"):                    "@" + restoreDomain + " shop\n",
+		filepath.Join("log", "mail.log"):                                 "postfix/smtp[1]: 4A1B2C3D: status=sent",
 	} {
 		full := filepath.Join(dataDir, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {

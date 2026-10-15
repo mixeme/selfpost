@@ -14,7 +14,7 @@ import (
 // excluded: autostart=false, so it rests STOPPED until its first run and
 // EXITED after it (supervisor 4.2.5, supervisor/process.py,
 // Subprocess.finish(); assumptions C-V10).
-var wantRunning = []string{"syslog-relay", "opendkim", "panel", "postfix", "cert-reload", "logrotate"}
+var wantRunning = []string{"panel", "postfix", "cert-reload", "logrotate"}
 
 // checkSupervisorProcesses shells into the container directly (not through the
 // panel's /overview page) so it works before an administrator account even
@@ -130,16 +130,20 @@ func checkCitedPackageVersions(s *stack) error {
 	return nil
 }
 
-// checkOpenDKIMLogs waits for OpenDKIM's start line in the container's log:
-// OpenDKIM logs through syslog(3) only, and /dev/log is the syslog-relay
-// program's (audit 2026-10-12, L30). OpenDKIM 2.11.0~beta2,
-// opendkim/opendkim.c: syslog(LOG_INFO, "%s v%s starting%s%s%s",
-// DKIMF_PRODUCT, ...), DKIMF_PRODUCT "OpenDKIM Filter" (opendkim.h).
-func checkOpenDKIMLogs(s *stack) error {
-	return waitFor("OpenDKIM's start line in the container log", 20*time.Second, 500*time.Millisecond, func() (bool, error) {
-		out := s.logs("selfpost")
-		return strings.Contains(out, "opendkim[") && strings.Contains(out, "OpenDKIM Filter v"), fmt.Errorf("no OpenDKIM line in the log")
-	})
+// checkDKIMTree: the keys and the selector table are the panel's alone,
+// directories 0700 and files 0600 (build/entrypoint.sh; internal/domain,
+// Keys) - no other program reads them since OpenDKIM left - and the table
+// is there, written before the signer serves (cmd/panel/signer.go).
+func checkDKIMTree(s *stack) error {
+	out, err := s.execIn("selfpost", "sh", "-c",
+		`test -f /data/dkim/selectors && find /data/dkim ! \( -user panel -group panel \( -type d -perm 0700 -o -type f -perm 0600 \) \)`)
+	if err != nil {
+		return fmt.Errorf("the DKIM tree: %v\n%s", err, out)
+	}
+	if strings.TrimSpace(out) != "" {
+		return fmt.Errorf("not the panel's alone under /data/dkim:\n%s", out)
+	}
+	return nil
 }
 
 // checkPostfixHardening reads back what postfix-config.sh sets against

@@ -15,7 +15,7 @@ import (
 // the old file back (fsync(2): syncing a file "does not necessarily ensure
 // that the entry in the directory containing the file has also reached
 // disk"; audit 2026-10-12, L7). Every map the panel writes for Postfix and
-// OpenDKIM goes through here.
+// the DKIM signer goes through here.
 func Write(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".tmp-*")

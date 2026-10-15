@@ -44,11 +44,12 @@ func testHealthShowsWhatIsServed(t *testing.T, sc *scenario) {
 		return rest
 	}
 
-	// The panel's user reaches all three sockets through the selfpost group,
-	// as Postfix does: three ok rows and no detail under any.
+	// The panel's user reaches all four sockets - the signer's two, the
+	// sender check's, the journal's - through the selfpost group, as Postfix
+	// does: four ok rows and no detail under any.
 	sockets := box(health(), "sockets")
-	if n := strings.Count(sockets, `<tr><td>`); n != 3 {
-		t.Fatalf("Milter sockets has %d rows, want 3:\n%s", n, sockets)
+	if n := strings.Count(sockets, `<tr><td>`); n != 4 {
+		t.Fatalf("Milter sockets has %d rows, want 4:\n%s", n, sockets)
 	}
 	if strings.Contains(sockets, `sp-muted sp-small">`) {
 		t.Fatalf("a milter socket is not answering the panel's dial:\n%s", sockets)

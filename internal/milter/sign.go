@@ -27,10 +27,11 @@ import (
 	"github.com/emersion/go-msgauth/dkim"
 )
 
-// signHeaders is the set of header names signed when present: OpenDKIM's
-// dkim_should_signhdrs[], RFC 6376 § 5.4.1's list (OpenDKIM 2.11.0~beta2,
-// libopendkim/dkim.c:223-246), which OpenDKIM signed with until now. Every
-// occurrence is signed, in message order, and From once more (signLines).
+// signHeaders is the set of header names signed when present: RFC 6376
+// § 5.4.1's list, as OpenDKIM's dkim_should_signhdrs[] held it (OpenDKIM
+// 2.11.0~beta2, libopendkim/dkim.c:223-246), which SelfPost signed with until
+// 2.8.0. Every occurrence is signed, in message order, and From once more
+// (signLines).
 var signHeaders = map[string]bool{
 	"from": true, "reply-to": true, "subject": true, "date": true, "to": true, "cc": true,
 	"resent-date": true, "resent-from": true, "resent-sender": true, "resent-to": true, "resent-cc": true,
@@ -49,11 +50,11 @@ var signHeaders = map[string]bool{
 // far above Postfix's own bounds on a transaction.
 const signLimit = time.Hour
 
-// SignKeys reads the domains the server signs for, their selectors and key
-// files from the KeyTable the panel writes (internal/domain, renderTables():
-// "<domain> <domain>:<selector>:<keysDir>/<domain>/<selector>.private"), the
-// table OpenDKIM reads too until it leaves the image. A key file is read
-// when it changes, and only from under keysDir.
+// SignKeys reads the names the server signs for and their selectors from the
+// selector table the panel writes (internal/domain, renderSelectors(): a line
+// "<name> <selector>" each); the key of a name is
+// keysDir/<name>/<selector>.private (domain.KeyPath). The table is read again
+// when it changes, a key file when it does.
 type SignKeys struct {
 	table, keysDir string
 
@@ -81,13 +82,13 @@ type fileStamp struct {
 
 func stampOf(fi os.FileInfo) fileStamp { return fileStamp{fi.ModTime(), fi.Size()} }
 
-// errNoKey is a domain the KeyTable has no line for.
+// errNoKey is a domain the selector table has no line for.
 var errNoKey = errors.New("no signing key")
 
-// NewSignKeys reads keyTable; keysDir is the directory every key in it must
-// be under.
-func NewSignKeys(keyTable, keysDir string) *SignKeys {
-	return &SignKeys{table: keyTable, keysDir: keysDir, keys: map[string]loadedKey{}}
+// NewSignKeys reads the selector table at selectors and the keys under
+// keysDir.
+func NewSignKeys(selectors, keysDir string) *SignKeys {
+	return &SignKeys{table: selectors, keysDir: keysDir, keys: map[string]loadedKey{}}
 }
 
 // Lookup gives the selector and key of domain.
@@ -120,37 +121,37 @@ func (k *SignKeys) Lookup(domain string) (string, crypto.Signer, error) {
 func (k *SignKeys) readTable() error {
 	fi, err := os.Stat(k.table)
 	if err != nil {
-		return fmt.Errorf("key table: %w", err)
+		return fmt.Errorf("selector table: %w", err)
 	}
 	if k.rows != nil && k.stamp == stampOf(fi) {
 		return nil
 	}
 	data, err := os.ReadFile(k.table)
 	if err != nil {
-		return fmt.Errorf("key table: %w", err)
+		return fmt.Errorf("selector table: %w", err)
 	}
 	rows := map[string]keyRow{}
 	for n, line := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		name, value, ok := strings.Cut(line, " ")
-		// Domain and selector never hold a colon (internal/domain,
-		// opendkimForbidden); the path takes the rest.
-		parts := strings.SplitN(value, ":", 3)
-		if !ok || len(parts) != 3 || !strings.EqualFold(parts[0], name) {
-			return fmt.Errorf("key table: line %d is not \"<domain> <domain>:<selector>:<path>\"", n+1)
+		name, selector, ok := strings.Cut(line, " ")
+		// The two are names of a directory and a file under keysDir: nothing
+		// that would lead out of it (internal/domain, assertConfigSafe()).
+		if !ok || !pathToken(name) || !pathToken(selector) {
+			return fmt.Errorf("selector table: line %d is not \"<name> <selector>\"", n+1)
 		}
-		domain, selector, path := strings.ToLower(name), parts[1], parts[2]
-		// The panel writes exactly this path (renderTables); anything else
-		// is not read.
-		if want := filepath.Join(k.keysDir, domain, selector+".private"); filepath.Clean(path) != want {
-			return fmt.Errorf("key table: line %d names %s, not %s", n+1, path, want)
-		}
-		rows[domain] = keyRow{selector, path}
+		domain := strings.ToLower(name)
+		rows[domain] = keyRow{selector, filepath.Join(k.keysDir, domain, selector+".private")}
 	}
 	k.rows, k.stamp = rows, stampOf(fi)
 	return nil
+}
+
+// pathToken reports whether v can name a directory or a file of the key
+// tree: not empty, no separator or white space, not dots alone.
+func pathToken(v string) bool {
+	return v != "" && !strings.ContainsAny(v, " \t\r\n:/\\") && strings.Trim(v, ".") != ""
 }
 
 // readKey reads a PEM private key: PKCS#1 as internal/domain writes it
@@ -281,7 +282,7 @@ func watch(signer *dkim.Signer, expired, done chan struct{}) {
 // with CRLF; and the empty line that ends the block. The names: every header
 // in signHeaders, in message order, and From once more, so that a From:
 // added later breaks the signature (RFC 6376 § 5.4.2; OversignHeaders From in
-// OpenDKIM's configuration until now; go-msgauth v0.7.0, dkim/sign.go,
+// OpenDKIM's configuration until 2.8.0; go-msgauth v0.7.0, dkim/sign.go,
 // NewSigner(): a name with no instance left is kept in h= and hashes
 // nothing).
 func signLines(headers []field) ([]string, []byte) {
@@ -315,7 +316,8 @@ func (s *signSession) BodyChunk(chunk []byte, m *milter.Modifier) (milter.Respon
 }
 
 // Body is the end of the message: the signature goes in at the top, where
-// OpenDKIM put it (opendkim/opendkim.c:3673, dkimf_insheader(ctx, 0, ...)).
+// OpenDKIM put it until 2.8.0 (OpenDKIM 2.11.0~beta2, opendkim/opendkim.c:3673,
+// dkimf_insheader(ctx, 0, ...)).
 // Postfix 3.10.13, src/milter/milter8.c:1445-1465, SMFIR_INSHEADER: the
 // index is passed on plus one; src/cleanup/cleanup_milter.c:1193,
 // cleanup_ins_header(): "Index 1 is the top-most header" - above Postfix's

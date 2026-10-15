@@ -127,7 +127,7 @@ func TestADamagedRestoredFileIsRefusedByName(t *testing.T) {
 	extract(t, archiveOf(t, seedPanelProject(t)), target)
 	cfg := panelConfig(t, target)
 
-	key := filepath.Join(cfg.dataDir, "opendkim", "keys", restoreDomain, "selfpost.private")
+	key := filepath.Join(cfg.dataDir, "dkim", "keys", restoreDomain, "selfpost.private")
 	f, err := os.OpenFile(key, os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {
 		t.Fatalf("open key: %v", err)
@@ -139,7 +139,7 @@ func TestADamagedRestoredFileIsRefusedByName(t *testing.T) {
 		t.Error("a refused restore ran its Resync")
 		return nil
 	})
-	want := "data/opendkim/keys/" + restoreDomain + "/selfpost.private"
+	want := "data/dkim/keys/" + restoreDomain + "/selfpost.private"
 	if err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("the start on a damaged key = %v, want a refusal naming %s", err, want)
 	}

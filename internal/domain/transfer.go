@@ -57,7 +57,7 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 	if err != nil {
 		return DomainExport{}, err
 	}
-	pem, err := s.odk.ExportKey(d.Name, d.DKIMSelector)
+	pem, err := s.keys.ExportKey(d.Name, d.DKIMSelector)
 	if err != nil {
 		return DomainExport{}, fmt.Errorf("export DKIM key for %s: %w", d.Name, err)
 	}
@@ -109,7 +109,7 @@ func (s *Service) Export(id int64) (DomainExport, error) {
 // Import re-creates a domain from an export file on this instance
 // (architecture.md § Persistence): it stores the imported DKIM key (so the
 // published DNS record needs no change), registers the domain and rebuilds the
-// OpenDKIM tables, then re-creates each application with its working password
+// selector table, then re-creates each application with its working password
 // and rebuilds the Postfix sender map.
 //
 // exp.Domain must already be normalised and validated by the caller
@@ -133,7 +133,7 @@ func (s *Service) Import(exp DomainExport) (store.Domain, error) {
 		return store.Domain{}, err // ErrDomainExists surfaces to the caller
 	}
 
-	if err := s.odk.ImportKey(d.Name, d.DKIMSelector, []byte(exp.DKIMPrivateKey)); err != nil {
+	if err := s.keys.ImportKey(d.Name, d.DKIMSelector, []byte(exp.DKIMPrivateKey)); err != nil {
 		s.importRollback(d.ID)
 		return store.Domain{}, err
 	}
