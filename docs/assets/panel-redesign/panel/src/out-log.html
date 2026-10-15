@@ -13,7 +13,9 @@
         <form class="sp-end" method="get" action="#">
           <div class="select"><select name="domain"><option>All domains</option><option>example.org</option><option>shop.example.org</option><option>notify.acme.io</option></select></div>
           <div class="select"><select name="app"><option>All applications</option><option>prod-server</option><option>alerts</option></select></div>
-          <div class="select"><select name="status"><option>Any status</option><option>sent</option><option>deferred</option><option>bounced</option><option>rate-limited</option></select></div>
+          <div class="select"><select name="status"><option>Any status</option><option>queued</option><option>sent</option><option>deferred</option><option>bounced</option><option>rejected</option></select></div>
+          <input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">
+          <input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">
           <button type="submit" class="button"><i class="ti ti-filter"></i>Filter</button>
         </form>
         <a class="sp-help" href="help.html#log" title="What the statuses mean"><i class="ti ti-help-circle"></i></a>
