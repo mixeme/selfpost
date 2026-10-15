@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-15
+
+Stage 5 of the 2026-10-12 audit: the image and Postfix. The supervisor
+socket is the panel's alone; Postfix takes TLS 1.2 at least, and the start
+refuses settings that would kill its daemons at the first connection;
+OpenDKIM's log reaches the container log and it oversigns From:; a program
+that keeps crashing takes the container down; logrotate remembers what it
+rotated; extract-cert.sh never replaces a certificate with nothing. A new
+program, `syslog-relay`, and a new group, `supervisor`, in the image; no
+migration.
+
 ### Security
 
 - **Postfix and OpenDKIM could stop every program in the container.** The
