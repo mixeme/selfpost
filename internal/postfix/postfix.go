@@ -6,6 +6,7 @@
 package postfix
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -194,18 +195,22 @@ func assertMapSafe(address, login string) error {
 // saved shows. Before, supervisorctl's start returned as the reload was
 // spawned, and a reload already running counted as done though it may have
 // read the files before this change (supervisor.RunOnce; assumptions B-U2).
-// A reload that fails while program postfix is not RUNNING - stopped, or
-// still in its start, the wrapper waiting for the milter sockets - is no
-// error: "the Postfix mail system is not running", and the master that starts
-// next reads the files as they are now.
+// A reload while no master runs - Postfix stopped, or still in its start,
+// the wrapper waiting for the milter sockets - is no error: the program exits
+// 75 then (build/postfix-reload.sh), and the master that starts next reads
+// the files as they are now. Before, the program's state stood in for that,
+// and for the whole of startsecs after a start any failed reload passed as
+// one (review of stage 2c, F5).
 func reloadViaSupervisor() error {
 	err := supervisor.RunOnce("postfix-reload")
-	if err == nil {
-		return nil
-	}
-	if state, serr := supervisor.State("postfix"); serr == nil && state != "RUNNING" {
-		log.Printf("postfix: reload while program postfix is %s, left to its start: %v", state, err)
+	var end *supervisor.EndError
+	if errors.As(err, &end) && end.State == "EXITED" && end.Status == reloadNotRunning {
+		log.Printf("postfix: no Postfix master runs; its start reads the files")
 		return nil
 	}
 	return err
 }
+
+// reloadNotRunning is build/postfix-reload.sh's exit status when no master
+// runs.
+const reloadNotRunning = 75

@@ -120,6 +120,7 @@ COPY --chmod=0644 internal/web/view/static/OFL.txt /usr/share/doc/selfpost/OFL.t
 COPY --chmod=0644 build/opendkim.conf /etc/opendkim.conf
 COPY --chmod=0644 build/logrotate-mail.conf /etc/logrotate.d/mail
 COPY --chmod=0755 build/postfix-wrapper.sh /usr/local/bin/postfix-wrapper.sh
+COPY --chmod=0755 build/postfix-reload.sh /usr/local/bin/postfix-reload.sh
 COPY --chmod=0755 build/postfix-config.sh /usr/local/bin/postfix-config.sh
 COPY --chmod=0755 build/postfix-cert-reload.sh /usr/local/bin/postfix-cert-reload.sh
 COPY --chmod=0755 build/logrotate-loop.sh /usr/local/bin/logrotate-loop.sh

@@ -296,7 +296,10 @@ server itself.
   holds; a parse failure, no address, or a second one after it is refused,
   and so is an address over 256 bytes, which OpenDKIM would match its
   `SigningTable` against cut short (`dkimf_apply_signtable()`,
-  `MAXADDRESS`). Encoded words are not decoded, by either.
+  `MAXADDRESS`). Encoded words are not decoded, by either. The line must also
+  be one address in RFC 5322's grammar (`net/mail`), at the domain OpenDKIM
+  signs for, so that a mail program shows the address that is signed; that
+  address, its local part unquoted, is what the bindings are asked about.
 - **The verdict** comes at the end of the headers: `550 5.7.1`, permanent,
   naming the line, as a reply code of the milter's own. What the client wrote
   is reduced to printable ASCII and cut before it is said back, logged or

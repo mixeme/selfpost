@@ -101,6 +101,10 @@ mkdir -p /data/sasl
 chown -R panel:selfpost /data/sasl
 chmod 2750 /data/sasl
 [ -e /data/sasl/sasldb2 ] && chmod 0640 /data/sasl/sasldb2
+# The copy a password change is made on (internal/app, replaceSASLDB), left
+# by a panel killed mid-change: a second copy of every password, which the
+# next change would remove anyway.
+rm -f /data/sasl/sasldb2.new
 
 # Postfix state under /data (architecture.md § Persistence). The panel writes
 # sender_login_maps; Postfix owns the on-disk queue tree under queue/.
@@ -211,6 +215,8 @@ case "$wait_timeout" in
 	exit 1
 	;;
 esac
-export POSTFIX_STARTSECS=$((wait_timeout + 10))
+# expr, not $((...)): dash's arithmetic reads "010" as octal and refuses
+# "08"; expr takes decimal (review of stage 2c, F11).
+export POSTFIX_STARTSECS=$(expr "$wait_timeout" + 10)
 
 exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

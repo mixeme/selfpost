@@ -66,16 +66,6 @@ func RunOnce(program string) error {
 	return newRPC(socketPath).runOnce(program)
 }
 
-// State is the state supervisord gives a program, by its name: RUNNING,
-// STARTING, EXITED ... (supervisor 4.2.5, supervisor/states.py).
-func State(program string) (string, error) {
-	v, err := newRPC(socketPath).call("supervisor.getProcessInfo", program)
-	if err != nil {
-		return "", fmt.Errorf("supervisor: state of %s: %w", program, err)
-	}
-	return v.members()["statename"].str(), nil
-}
-
 type rpc struct {
 	client *http.Client
 }
@@ -125,11 +115,25 @@ func (c *rpc) runOnce(program string) error {
 	if info.state == stateExited && info.exitStatus == 0 {
 		return nil
 	}
-	msg := fmt.Sprintf("supervisor: %s ended %s, exit status %d", program, info.stateName, info.exitStatus)
-	if info.spawnErr != "" {
-		msg += ": " + info.spawnErr
+	return &EndError{Program: program, State: info.stateName, Status: info.exitStatus, SpawnErr: info.spawnErr}
+}
+
+// EndError is a run of RunOnce that did not end EXITED with status 0: the
+// state it ended in, its exit status, and supervisord's account of a failed
+// spawn.
+type EndError struct {
+	Program  string
+	State    string
+	Status   int
+	SpawnErr string
+}
+
+func (e *EndError) Error() string {
+	msg := fmt.Sprintf("supervisor: %s ended %s, exit status %d", e.Program, e.State, e.Status)
+	if e.SpawnErr != "" {
+		msg += ": " + e.SpawnErr
 	}
-	return errors.New(msg)
+	return msg
 }
 
 // processInfo is the part of getProcessInfo's struct RunOnce reads.

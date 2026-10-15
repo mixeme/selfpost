@@ -200,9 +200,16 @@ func validateDeployRoot(deployRoot string) error {
 // left out of the archive. A directory left out is not descended into.
 type skipFunc func(path, rel string, d fs.DirEntry) bool
 
-// skipQueue leaves the Postfix queue out of every archive.
+// skipQueue leaves the Postfix queue out of every archive, and the copy of
+// sasldb2 a change is made on (internal/app, replaceSASLDB): a panel killed
+// mid-change leaves it, a second copy of every application's password, until
+// the next start removes it (build/entrypoint.sh; review of stage 2c).
 func skipQueue(_, rel string, _ fs.DirEntry) bool {
-	return filepath.ToSlash(rel) == QueueDir
+	switch filepath.ToSlash(rel) {
+	case QueueDir, "sasl/sasldb2.new":
+		return true
+	}
+	return false
 }
 
 // Check reads through everything Create would put into the archive, without
@@ -258,6 +265,13 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 	}
 
 	certsDir := filepath.Join(deployRoot, CertsDirName)
+	// certs/ itself may be a link - the guide once had it linked to
+	// certbot's live/<host> - and the walk below does not follow its root
+	// (path/filepath, WalkDir: "WalkDir does not follow symbolic links"), so
+	// the link is resolved first (review of stage 2c, F7).
+	if resolved, err := filepath.EvalSymlinks(certsDir); err == nil {
+		certsDir = resolved
+	}
 	if _, err := os.Stat(certsDir); err != nil {
 		if os.IsNotExist(err) {
 			if onWarn != nil {

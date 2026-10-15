@@ -42,6 +42,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and so is an address over 256 bytes, which OpenDKIM would match against its
   signing table cut short - cut there, a quoted local part could end in
   another domain's name.
+- **The `From:` line must also read as one address to a mail program, at the
+  domain that is signed** (review of the stage). OpenDKIM's parser takes
+  lines no mail program reads as one address - `ceo@bank.com:me@mine.com`,
+  `ceo@bank.com <me@mine.com>` - and signs for the last address while a
+  lenient program shows the first; such lines are refused. A quoted display
+  name may still say anything. And the address a reader sees, its local part
+  unquoted, is the one held against the application's addresses: `"x"@…` no
+  longer passes where `x@…` belongs to another application.
 - **Over IPv6 every client looks the same to SelfPost** - documented, not
   changed. The compose network has no IPv6, so Docker's proxy carries an
   IPv6 connection and the container sees the network's gateway

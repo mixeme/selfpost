@@ -24,8 +24,10 @@ import os
 import signal
 import sys
 
-# Programs whose FATAL does not take the container down (build/supervisord.conf).
-SPARED = {"logrotate"}
+# Programs whose FATAL does not take the container down (build/supervisord.conf):
+# logrotate is not on the mail path, and postfix-reload runs on demand - a
+# reload it could not start is reported to whoever asked for it.
+SPARED = {"logrotate", "postfix-reload"}
 
 
 def write_stdout(s):

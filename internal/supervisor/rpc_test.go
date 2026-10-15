@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -119,6 +120,10 @@ func TestRunOnceReportsAFailedRun(t *testing.T) {
 	err := serveFake(t, f).runOnce("postfix-reload")
 	if err == nil || !strings.Contains(err.Error(), "ended EXITED, exit status 1") {
 		t.Fatalf("runOnce: %v; want the exit status 1", err)
+	}
+	var end *EndError
+	if !errors.As(err, &end) || end.State != "EXITED" || end.Status != 1 {
+		t.Fatalf("runOnce: %#v; want an EndError, EXITED, status 1", err)
 	}
 }
 

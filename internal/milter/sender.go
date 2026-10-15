@@ -3,8 +3,11 @@ package milter
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"mime"
 	"net"
+	"net/mail"
 	"net/textproto"
 	"os"
 	"strings"
@@ -201,13 +204,19 @@ func splitTableLine(line string) (key, value string, ok bool) {
 // whole domain (assumptions B-PS1). The bare local part MA_FIND_DEFAULT also
 // tries for a local domain is never a key here: every key the panel writes
 // has an "@" (internal/postfix renderSenderLoginMaps).
+//
+// Case is folded in ASCII only. Postfix folds as Unicode (src/util/casefold.c
+// with ICU, which Debian builds with), but every key and login the panel
+// writes is ASCII; a Unicode fold would only let a look-alike pass - the
+// Kelvin sign for "k" - for an address OpenDKIM, folding ASCII, does not
+// sign (review of stage 2c).
 func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if err := b.fresh(); err != nil {
 		return false, err
 	}
-	login, addr = strings.ToLower(login), strings.ToLower(addr)
+	login, addr = asciiLower(login), asciiLower(addr)
 	keys := []string{addr}
 	// recipient_delimiter is "+" (build/postfix-config.sh), so an
 	// application listed as invoices@ may also send as invoices+march@.
@@ -256,7 +265,7 @@ func (b *Bindings) DomainOf(login string) string {
 	if b.fresh() != nil {
 		return ""
 	}
-	return b.domainOf[strings.ToLower(login)]
+	return b.domainOf[asciiLower(login)]
 }
 
 // Refusals is where the check leaves the send-log rows of what it refused.
@@ -384,7 +393,8 @@ func (s *senderSession) judge() (shown, why string, err error) {
 		// OpenDKIM takes the first; a reader may show the others.
 		return shown, "it must be one address", nil
 	}
-	addr := r.user + "@" + asciiLower(r.domain)
+	signedDomain := asciiLower(r.domain)
+	addr := r.user + "@" + signedDomain
 	// OpenDKIM matches its SigningTable against "user@domain" as
 	// snprintf() leaves it in a buffer of MAXADDRESS + 1 = 257 bytes
 	// (opendkim.c, dkimf_apply_signtable(); libopendkim/dkim-internal.h).
@@ -394,8 +404,26 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	if len(addr) > 256 {
 		return printable(addr), "the address is longer than OpenDKIM reads whole", nil
 	}
-	shown = printable(addr)
-	ok, err := s.bind.Allowed(s.login, asciiLower(addr))
+	// The address a mail program shows. OpenDKIM's parser reads lines no
+	// standard reader takes for one address - "ceo@bank.com:me@mine.com",
+	// "ceo@bank.com <me@mine.com>", "<b@evil.com, a@mine.com>" - and signs
+	// for the last of them while a lenient program shows the first. So the
+	// line must also be one address in RFC 5322's grammar (net/mail), at the
+	// domain OpenDKIM signs for; a quoted display name may say anything.
+	// And that address, its local part unquoted as Postfix holds the
+	// envelope's (Postfix 3.7.11, src/global/tok822_parse.c), is the one
+	// held against the bindings: "x"@mine.com is x@mine.com, which may be
+	// another application's (review of stage 2c, F1, F2).
+	list, perr := fromParser.ParseList(unfold(raw))
+	if perr != nil || len(list) != 1 {
+		return shown, "it must be one address, as a mail program reads it", nil
+	}
+	seen := asciiLower(list[0].Address)
+	if domainOf(seen) != signedDomain {
+		return shown, "a mail program would show another address than the one signed", nil
+	}
+	shown = printable(seen)
+	ok, err := s.bind.Allowed(s.login, seen)
 	if err != nil {
 		return shown, "", fmt.Errorf("sender bindings: %w", err)
 	}
@@ -403,6 +431,20 @@ func (s *senderSession) judge() (shown, why string, err error) {
 		return shown, "not an address this application sends as", nil
 	}
 	return shown, "", nil
+}
+
+// fromParser reads the From: line as a mail program would. A display name
+// encoded in a charset Go does not convert (windows-1251, koi8-r, ...) is
+// still a display name: its bytes are passed through unread.
+var fromParser = mail.AddressParser{WordDecoder: &mime.WordDecoder{
+	CharsetReader: func(charset string, input io.Reader) (io.Reader, error) { return input, nil },
+}}
+
+// unfold joins the lines of a folded header value (RFC 5322 2.2.3): a line
+// break is dropped, the white space that follows it stays. Postfix hands a
+// milter the line breaks as LF (assumptions B-PM12).
+func unfold(v string) string {
+	return strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(v)
 }
 
 // asciiLower lower-cases A-Z only, as OpenDKIM's dkimf_lowercase() and

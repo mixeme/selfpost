@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -57,12 +58,12 @@ type feedbackXML struct {
 		} `xml:"date_range"`
 	} `xml:"report_metadata"`
 	Policy struct {
-		Domain string `xml:"domain"`
-		P      string `xml:"p"`
-		SP     string `xml:"sp"`
-		Pct    *int   `xml:"pct"`
-		ADKIM  string `xml:"adkim"`
-		ASPF   string `xml:"aspf"`
+		Domain string  `xml:"domain"`
+		P      string  `xml:"p"`
+		SP     string  `xml:"sp"`
+		Pct    *string `xml:"pct"`
+		ADKIM  string  `xml:"adkim"`
+		ASPF   string  `xml:"aspf"`
 	} `xml:"policy_published"`
 	Records []struct {
 		Row struct {
@@ -139,11 +140,15 @@ func ParseAggregate(raw []byte) (ParsedReport, error) {
 		PolicyASPF:   field(doc.Policy.ASPF),
 	}
 	// RFC 7489 § 6.3: pct is "between 0 and 100, inclusive", 100 when absent.
-	// An explicit 0 is a policy applied to no message, and stays 0; only a
-	// report without the element gets the default (assumptions C-M7).
+	// An explicit 0 is a policy applied to no message, and stays 0; a report
+	// without the element, or with an empty or unreadable one, gets the
+	// default, and a value outside the range is held to it (assumptions
+	// C-M7; review of stage 2c, F9).
 	out.PolicyPct = 100
 	if doc.Policy.Pct != nil {
-		out.PolicyPct = *doc.Policy.Pct
+		if n, err := strconv.Atoi(strings.TrimSpace(*doc.Policy.Pct)); err == nil {
+			out.PolicyPct = min(max(n, 0), 100)
+		}
 	}
 	for _, rec := range doc.Records {
 		row := ParsedRecord{

@@ -758,6 +758,10 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		select {
 		case <-ctx.Done():
 			blind.see(time.Now(), false)
+			// What postlogd wrote to the rotated file since the last tick:
+			// the next start resumes in the new file only (review of stage
+			// 2c, F8).
+			drainOld(time.Now())
 			tr.record(f, read(), true) // shutdown: the next start resumes here
 			return nil
 		case <-ticker.C:

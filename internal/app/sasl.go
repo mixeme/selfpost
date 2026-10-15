@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -112,6 +113,14 @@ func replaceSASLDB(path string, edit func(path string) error) error {
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("rename %s -> %s: %w", tmp, path, err)
+	}
+	// The rename is the directory's change; without its own sync a power
+	// loss may bring the old database back, out of step with the panel's
+	// records (review of stage 2c, F10). A directory that cannot be synced
+	// - not on every system - leaves the change as durable as before.
+	if dir, err := os.Open(filepath.Dir(path)); err == nil {
+		_ = dir.Sync()
+		dir.Close()
 	}
 	return nil
 }

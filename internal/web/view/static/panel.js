@@ -74,8 +74,14 @@
   // traversal (its salvageable state, the event's persisted).
   window.addEventListener("pagehide", function () {
     var secrets = document.querySelectorAll("[data-secret]");
+    // defaultValue too: it is the input's value attribute and the
+    // textarea's text, which the kept page still holds after .value is
+    // emptied (HTML, "The input element": defaultValue reflects the value
+    // content attribute; "The textarea element": its setter replaces the
+    // child text).
     for (var i = 0; i < secrets.length; i++) {
       secrets[i].value = "";
+      secrets[i].defaultValue = "";
     }
   });
 

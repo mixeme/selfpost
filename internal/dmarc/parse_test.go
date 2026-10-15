@@ -271,6 +271,11 @@ func TestPolicyPct(t *testing.T) {
 		{"<pct>0</pct>", 0},
 		{"<pct>25</pct>", 25},
 		{"", 100},
+		{"<pct/>", 100},
+		{"<pct> 50 </pct>", 50},
+		{"<pct>150</pct>", 100},
+		{"<pct>-5</pct>", 0},
+		{"<pct>x</pct>", 100},
 	} {
 		doc := strings.Replace(sampleXML, "<pct>100</pct>", c.pct, 1)
 		got, err := ParseAggregate([]byte(doc))

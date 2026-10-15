@@ -20,6 +20,8 @@ import (
 // example.org, and two applications share shop.example.org.
 const senderMaps = `@news.example.net news
 @shop.example.org shop,shop2
+desk@shop.example.org shop2
+@kiosk.example.net kiosk
 invoices@example.org billing
 billing@example.org billing
 `
@@ -102,9 +104,24 @@ func TestSenderCheck(t *testing.T) {
 		{"a stranger's address in the display name", "shop", [][2]string{from(`"someone@gmail.example" <a@shop.example.org>`)}, true, ""},
 		{"another sender in an encoded display name", "shop", [][2]string{from("=?utf-8?q?director=40example=2Eorg?= <a@shop.example.org>")}, true, ""},
 		{"a stranger's address in a comment", "shop", [][2]string{from("a@shop.example.org (someone@gmail.example)")}, true, ""},
-		{"an unquoted address as the display name", "shop", [][2]string{from("director@example.org <a@shop.example.org>")}, true, ""},
+		{"an unquoted address as the display name", "shop", [][2]string{from("director@example.org <a@shop.example.org>")}, false, "as a mail program reads it"},
 		{"another domain inside a quoted local part", "shop", [][2]string{from(`"director@example.org"@shop.example.org`)}, true, ""},
-		{"no local part: OpenDKIM takes the domain for it", "shop", [][2]string{from("@shop.example.org")}, true, ""},
+		{"no local part: OpenDKIM takes the domain for it", "shop", [][2]string{from("@shop.example.org")}, false, "as a mail program reads it"},
+		// Lines OpenDKIM signs for the application's domain while a lenient
+		// mail program shows another address first (review of stage 2c, F1).
+		{"another address before a colon", "shop", [][2]string{from("ceo@bank.example:me@shop.example.org")}, false, "as a mail program reads it"},
+		{"a route-like colon inside the brackets", "shop", [][2]string{from("Name <ceo@bank.example:me@shop.example.org>")}, false, "as a mail program reads it"},
+		{"a list inside the brackets", "shop", [][2]string{from("<b@evil.example, a@shop.example.org>")}, false, "as a mail program reads it"},
+		{"an address with two @", "shop", [][2]string{from("ceo@bank.example@shop.example.org")}, false, "as a mail program reads it"},
+		// An address bound to another application, its local part quoted
+		// (F2): a reader and Postfix take "desk" for desk.
+		{"another application's address, quoted", "shop", [][2]string{from(`"desk"@shop.example.org`)}, false, "not an address this application sends as"},
+		{"its own bound address, quoted", "shop2", [][2]string{from(`"desk"@shop.example.org`)}, true, ""},
+		// A look-alike of the domain in a character a Unicode fold maps
+		// to ASCII (F3): OpenDKIM would not sign it, and it is not the
+		// application's.
+		{"the Kelvin sign for k in the domain", "kiosk", [][2]string{from("a@\u212Aiosk.example.net")}, false, "a mail program would show another address"},
+		{"the same domain in ASCII", "kiosk", [][2]string{from("a@kiosk.example.net")}, true, ""},
 
 		{"another registered domain", "shop", [][2]string{from("director@example.org")}, false, "not an address this application sends as"},
 		{"the server's own name", "shop", [][2]string{from("postmaster@mail.example.org")}, false, "not an address this application sends as"},

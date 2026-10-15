@@ -303,6 +303,11 @@ operator can act on it.
   private key from `certs/` when present; a domain export carries the DKIM key
   and **working** application passwords in the clear (otherwise a transfer
   without recreating credentials would be impossible).
+- Links under `certs/` (and `certs` itself as a link) are followed, in the
+  container's view: the archive carries whatever regular file they lead to
+  that the panel's user may read. `certs/` is the operator's, mounted
+  read-only; only someone who can write the project directory places a link
+  there, and only a global user can download the archive (`2.5.2`).
 - Since 2.2.0 a full backup also carries, in the database, what Postfix logged
   about each message still in the send log (`send_log_lines`): the submitting
   client's address and SASL login, the message id, the receiving server and

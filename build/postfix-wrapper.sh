@@ -63,9 +63,15 @@ echo "postfix-wrapper: milter sockets ready, starting postfix"
 # holds the lock (src/master/master.c, test_lock).
 daemon_directory=$(postconf -h daemon_directory)
 child=
+stop_asked=
 stop_postfix() {
+	if [ -z "$child" ]; then
+		# Between "&" and "child=$!": stopped right after the pid is known.
+		stop_asked=1
+		return
+	fi
 	trap '' TERM INT
-	while [ -n "$child" ] && kill -0 "$child" 2>/dev/null; do
+	while kill -0 "$child" 2>/dev/null; do
 		if "$daemon_directory/master" -t 2>/dev/null; then
 			sleep 1
 		else
@@ -77,6 +83,9 @@ stop_postfix() {
 trap stop_postfix TERM INT
 postfix start-fg &
 child=$!
+if [ -n "$stop_asked" ]; then
+	stop_postfix
+fi
 # A trapped signal makes wait return at once, the trap is taken right after
 # (POSIX, Shell Command Language, 2.11 Signals and Error Handling) and exits.
 # Otherwise wait returns when Postfix ended on its own: its status is this
