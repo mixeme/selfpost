@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,8 +30,9 @@ type Module struct {
 	sessions *sessionStore
 	setup    *setupManager
 
-	loginLimiter *rateLimiter
-	setupLimiter *rateLimiter
+	loginLimiter    *rateLimiter
+	setupLimiter    *rateLimiter
+	passwordLimiter *rateLimiter
 
 	trustedProxies []*net.IPNet
 }
@@ -43,16 +45,22 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		idleDays = 7
 	}
 	m := &Module{
-		store:          st,
-		cfg:            cfg,
-		view:           v,
-		sessions:       newSessionStore(st, time.Duration(idleDays)*24*time.Hour),
-		setupLimiter:   newRateLimiter(10, time.Minute),
-		loginLimiter:   newRateLimiter(10, 15*time.Minute),
-		trustedProxies: cfg.TrustedProxyCIDRs,
+		store:        st,
+		cfg:          cfg,
+		view:         v,
+		sessions:     newSessionStore(st, time.Duration(idleDays)*24*time.Hour),
+		setupLimiter: newRateLimiter(10, time.Minute),
+		loginLimiter: newRateLimiter(10, 15*time.Minute),
+		// The Account form's current-password check has a bucket of its
+		// own, per user: ten wrong guesses there used to lock the address
+		// out of signing in (audit 2026-10-12, L15), and the one guessing
+		// is whoever holds that user's session, wherever from.
+		passwordLimiter: newRateLimiter(10, 15*time.Minute),
+		trustedProxies:  cfg.TrustedProxyCIDRs,
 	}
 	m.setupLimiter.startSweeper()
 	m.loginLimiter.startSweeper()
+	m.passwordLimiter.startSweeper()
 	m.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
 	return m
 }
@@ -63,10 +71,10 @@ func (m *Module) Bootstrap() error {
 	return m.setup.bootstrap()
 }
 
-// AllowLoginAttempt reports whether a login or account-password change attempt
-// from r is within the rate limit (security.md).
-func (m *Module) AllowLoginAttempt(r *http.Request) bool {
-	return m.loginLimiter.Allow(clientIP(r, m.trustedProxies))
+// AllowPasswordChange reports whether another current-password check on the
+// Account form is within the user's rate limit (security.md).
+func (m *Module) AllowPasswordChange(userID int64) bool {
+	return m.passwordLimiter.Allow("user:" + strconv.FormatInt(userID, 10))
 }
 
 // SessionToken returns the session token the request carries, if exactly one

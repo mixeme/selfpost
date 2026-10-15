@@ -141,7 +141,7 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 		f.Err = msg
 		h.renderAccount(w, r, status, u, f)
 	}
-	if !h.auth.AllowLoginAttempt(r) {
+	if !h.auth.AllowPasswordChange(u.ID) {
 		fail(http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return
 	}

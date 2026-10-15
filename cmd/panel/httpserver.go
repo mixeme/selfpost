@@ -134,6 +134,26 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 	}, cfg.setupTokenPath)
 }
 
+// newHTTPServer bounds what a client may hold the panel's server for (audit
+// 2026-10-12, L14): the request with its body - a form, or a domain export
+// of 1 MiB at most - in 30 s; the answer in 60 s, the slowest page being one
+// that asks DNS; an idle kept-alive connection 2 min. The full backup moves
+// its own write deadline to two hours: it streams for as long as the archive
+// takes (handlers.HandleBackup). net/http, Go 1.26: ReadTimeout covers the
+// header and the body, WriteTimeout runs from the end of the header's read
+// to the end of the response's write, IdleTimeout is the wait for the next
+// request on a kept-alive connection.
+func newHTTPServer(addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+}
+
 // serveHTTP runs the control-panel HTTP server until ctx is cancelled, using
 // the database handle shared by all roles: setup, login and the authenticated
 // panel surface (security.md).
@@ -146,11 +166,7 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 		return err
 	}
 
-	srv := &http.Server{
-		Addr:              cfg.httpAddr,
-		Handler:           srvApp.Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
+	srv := newHTTPServer(cfg.httpAddr, srvApp.Handler())
 
 	// Shut the server down cleanly when the process is asked to stop.
 	go func() {

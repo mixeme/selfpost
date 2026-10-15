@@ -107,6 +107,15 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	w.Header().Set("Cache-Control", "no-store")
 
+	// The server's write deadline is for pages (cmd/panel newHTTPServer); an
+	// archive streams for as long as it takes. Two hours carry a gigabyte at
+	// a little over 1 Mbit/s, and still end a client that keeps the
+	// connection and stops reading, which TCP alone would not (net/http, Go
+	// 1.26: ResponseController.SetWriteDeadline).
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(2 * time.Hour)); err != nil {
+		logf("panel: full backup: lift the write deadline: %v", err)
+	}
+
 	// Everything below streams: past this point headers (and possibly some
 	// bytes) are already on the wire, so a failure cannot switch to a clean
 	// error page. Log it and let the truncated download fail loudly on the

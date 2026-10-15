@@ -104,10 +104,19 @@ The panel is exposed to the internet — the items below are **not optional**.
 - `postfix reload` and any `exec` run **without** shell interpolation of user
   input; arguments are passed as separate elements.
 - Writes to config files are escaped (no injection of Postfix directives).
+- The panel's HTTP server bounds every phase a client could hold it in: the
+  header 10 s, the request 30 s, the answer 60 s, an idle kept-alive
+  connection 2 min; a full backup download moves its own write limit to
+  two hours (`2.5.4`).
 
 ### Authentication and sessions
 
-- Rate limiting on login (per IP, with lockout or delay).
+- Rate limiting on login (per IP, with lockout or delay). The Account form's
+  current-password check has a limit of its own, ten in 15 minutes per user,
+  so guesses there do not lock the address out of signing in (`2.5.4`).
+- An unknown username is refused in the time a wrong password is: the sign-in
+  compares a bcrypt hash of the panel's work factor either way, so the delay
+  does not tell which names exist (`2.5.4`).
 - Sessions: cryptographically random token; cookie `HttpOnly`, `Secure`,
   `SameSite`.
 - Sessions live in SQLite (SHA-256 of the token, not the token itself); sliding
@@ -120,7 +129,9 @@ The panel is exposed to the internet — the items below are **not optional**.
 - **What ends a user's sessions:** deleting the user (all); a password change on
   Account (that user's *other* sessions — never another user's); a password set
   for them by a global user on the user form (all of theirs, except the current
-  one when they set their own); signing out (the current one only). There is no
+  one when they set their own); signing out (the current one only); signing
+  in (the session the browser presented, if any - a token planted before the
+  sign-in is worth nothing after it, `2.5.4`). There is no
   "sign out everywhere", and a restored backup brings back the session rows it
   held.
 - Polling by the monitoring screens (`HX-Request` `GET`s) does not renew a

@@ -58,6 +58,11 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if ct := resp.Header.Get("Content-Type"); resp.StatusCode != 200 || ct != "application/gzip" {
 		t.Fatalf("full backup: status %d, Content-Type %q, want an application/gzip download:\n%.600s", resp.StatusCode, ct, archive)
 	}
+	// The download moves the server's write deadline (handlers.HandleBackup);
+	// through the real server, unlike a test recorder, that is supported.
+	if l := logTail(h.logs("selfpost"), "write deadline"); l != "" {
+		t.Errorf("the backup could not move its write deadline:\n%s", l)
+	}
 
 	// A download that broke off half way is still a 200: the panel streams the
 	// archive and can only log what went wrong. Read it through once while the

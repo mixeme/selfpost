@@ -724,9 +724,15 @@ a refresh cannot differ. HTMX refreshes them every 5 s while the operator is
 active on the page, every 30 s when the tab is visible but idle, and not at all
 when it is hidden — scheduled in `panel.js` via `data-poll`, not
 `hx-trigger="every …"`, because a trigger filter is evaluated with `new
-Function`, which the CSP forbids. Polling does not extend the session idle
-timeout (only non-`HX-Request` `GET`s and mutating requests count as
-activity). The Outbound queue's retry-policy box is outside the polled region:
+Function`, which the CSP forbids. The next refresh is scheduled when a
+request of the box ends, however it ended: a refresh that failed - an error
+answer, the panel restarting, the network gone - is tried again after twice
+the wait, doubling with each failure in a row up to a minute, and the wait
+is back to normal after one that works. A request without a session answers
+htmx with `HX-Redirect: /login` (status 401), and htmx loads the sign-in
+page in place of the whole page; a browser gets the 303 as before. Polling
+does not extend the session idle timeout (only non-`HX-Request` `GET`s and
+mutating requests count as activity). The Outbound queue's retry-policy box is outside the polled region:
 it is the start-up `postconf -h` snapshot (see [Panel
 binary](#panel-binary-cmdpanel)), not a live re-read.
 

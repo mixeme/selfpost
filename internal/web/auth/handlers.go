@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
@@ -117,6 +118,10 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 		if !errors.Is(err, store.ErrUserNotFound) {
 			logf("panel: login: get user failed: %v", err)
 		}
+		// A comparison anyway, so an unknown name is refused in the time
+		// a wrong password is: the answer's delay told which names exist
+		// (audit 2026-10-12, M8).
+		_ = bcrypt.CompareHashAndPassword(noSuchUserHash(), []byte(password))
 		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
 		return
 	}
@@ -126,6 +131,15 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The session the browser presents, if any, ends here: a sign-in issues
+	// a new token and leaves no other behind it - one planted before the
+	// sign-in is worth nothing after (audit 2026-10-12, L16).
+	name := m.sessionCookie()
+	for _, c := range r.Cookies() {
+		if c.Name == name {
+			m.sessions.Destroy(c.Value)
+		}
+	}
 	token, err := m.sessions.Create(user.ID)
 	if err != nil {
 		logf("panel: login: create session failed: %v", err)
@@ -135,6 +149,16 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 	m.setSessionCookie(w, token)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+
+// noSuchUserHash is a hash of the panel's work factor, compared against when
+// a sign-in names no user.
+var noSuchUserHash = sync.OnceValue(func() []byte {
+	h, err := bcrypt.GenerateFromPassword([]byte("selfpost: no such user"), BcryptCost)
+	if err != nil {
+		panic(err)
+	}
+	return h
+})
 
 // setSessionCookie sets the session cookie. SameSite=Lax withholds it from a
 // cross-site request unless that is a top-level navigation with a safe method

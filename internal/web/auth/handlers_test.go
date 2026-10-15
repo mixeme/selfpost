@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -281,4 +284,95 @@ func expireSetupToken(m *Module) {
 	m.setup.mu.Lock()
 	defer m.setup.mu.Unlock()
 	m.setup.expiresAt = m.setup.expiresAt.Add(-2 * setupTokenTTL)
+}
+
+// An unknown name is refused in the time a wrong password is: both pay one
+// bcrypt comparison at the panel's work factor (audit 2026-10-12, M8). The
+// medians of a few attempts each must be within a factor of two; before the
+// fix the unknown name answered some hundred times faster.
+func TestLoginTakesAsLongForAnUnknownName(t *testing.T) {
+	m := testModule(t, false)
+	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), BcryptCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.store.CreateGlobalUser("admin", string(hash)); err != nil {
+		t.Fatal(err)
+	}
+	noSuchUserHash() // made once, not inside a measurement
+
+	median := func(username string) time.Duration {
+		var d []time.Duration
+		for i := 0; i < 5; i++ {
+			start := time.Now()
+			// A fresh address each time: the limiter is not what is timed.
+			rec := postLogin(m, fmt.Sprintf("203.0.113.%d:5000", len(d)+10*len(username)), username, "not-the-password")
+			d = append(d, time.Since(start))
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("%s: status %d, want 401", username, rec.Code)
+			}
+		}
+		slices.Sort(d)
+		return d[len(d)/2]
+	}
+	known, unknown := median("admin"), median("nobody")
+	if unknown*2 < known || known*2 < unknown {
+		t.Errorf("a wrong password takes %v, an unknown name %v: the time tells which names exist", known, unknown)
+	}
+}
+
+// A sign-in ends the session the browser presented: a token planted before
+// it is worth nothing after (audit 2026-10-12, L16).
+func TestLoginEndsThePresentedSession(t *testing.T) {
+	m := moduleWithAdmin(t)
+	u, err := m.store.GetUserByUsername("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	planted, err := m.sessions.Create(u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"username": {"admin"}, "password": {testPassword}}
+	r := httptest.NewRequest(http.MethodPost, "http://panel.example.com/login", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(&http.Cookie{Name: m.sessionCookie(), Value: planted})
+	rec := httptest.NewRecorder()
+	m.HandleLogin(rec, r)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("sign-in = %d", rec.Code)
+	}
+	if _, ok := m.sessions.Lookup(planted); ok {
+		t.Error("the session presented at sign-in still works after it")
+	}
+	if fresh := sessionCookieValue(t, m, rec); fresh == "" || fresh == planted {
+		t.Errorf("the sign-in issued %q", fresh)
+	} else if _, ok := m.sessions.Lookup(fresh); !ok {
+		t.Error("the new session does not work")
+	}
+}
+
+// htmx asking without a session is told to load the sign-in page, not given
+// it to swap into the box that asked (audit 2026-10-12, M11); a browser is
+// redirected as before.
+func TestRequireAuthTellsHtmxToSignIn(t *testing.T) {
+	m := moduleWithAdmin(t)
+	h := m.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("a request without a session reached the page")
+	}))
+
+	r := httptest.NewRequest(http.MethodGet, "http://panel.example.com/overview/stats", nil)
+	r.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if rec.Code != http.StatusUnauthorized || rec.Header().Get("HX-Redirect") != "/login" || rec.Header().Get("Location") != "" {
+		t.Errorf("htmx without a session: %d, HX-Redirect %q, Location %q; want 401 with HX-Redirect /login",
+			rec.Code, rec.Header().Get("HX-Redirect"), rec.Header().Get("Location"))
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://panel.example.com/overview", nil))
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Errorf("a browser without a session: %d, Location %q", rec.Code, rec.Header().Get("Location"))
+	}
 }

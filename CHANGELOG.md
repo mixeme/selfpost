@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **The sign-in told which usernames exist by how long it took.** A wrong
+  password cost a bcrypt comparison, an unknown name none. Both now cost one
+  (audit 2026-10-12, M8).
+- **Signing in kept the session the browser already presented.** A sign-in
+  now ends it before it issues its own, so a session planted before the
+  sign-in is worth nothing after (audit 2026-10-12, L16).
+
+### Fixed
+
+- **Ten wrong current passwords on Account locked the address out of
+  signing in for 15 minutes.** The check has its own limit now, ten in 15
+  minutes per user (audit 2026-10-12, L15).
+- **A client could hold the panel's server as long as it liked** once its
+  request header was read. The body now has 30 seconds, the answer 60, an
+  idle kept-alive connection 2 minutes; a full backup download moves its own
+  limit to two hours (audit 2026-10-12, L14).
+- **One failed refresh stopped a monitoring page for good.** Overview,
+  Health and the logs refresh their boxes on a timer; a refresh that failed
+  - the panel restarting, the network gone - scheduled no next one, and the
+  page stood still until the tab was hidden and shown again. Each refresh
+  now schedules the next however it ended, waiting twice as long after each
+  failure in a row, up to a minute. A box whose session had expired was
+  filled with the sign-in page; the whole page goes to sign-in now (audit
+  2026-10-12, M11).
+
 ## [2.5.3] - 2026-10-15
 
 Stage 3 of the 2026-10-12 audit: persistence and restore. A restore is

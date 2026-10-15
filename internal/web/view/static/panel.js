@@ -221,6 +221,12 @@
   // trigger is kept without its filter, so it would fire on every tick.
   var pollActiveMs = 5000;
   var pollIdleMs = 30000;
+  // A refresh that failed - the panel restarting, the network gone, an
+  // error answer - is tried again, later each time: the wait doubles with
+  // each failure in a row, up to a minute, and is back to normal after the
+  // first refresh that works (audit 2026-10-12, M11).
+  var pollMaxMs = 60000;
+  var pollFailures = Object.create(null);
   // No pointer/keyboard/scroll input for this long → treat the tab as idle.
   var userIdleMs = 30000;
   var lastActivity = Date.now();
@@ -232,12 +238,19 @@
     }, { passive: true });
   });
 
-  function pollDelayMs() {
-    return Date.now() - lastActivity < userIdleMs ? pollActiveMs : pollIdleMs;
+  function pollDelayMs(id) {
+    var base = Date.now() - lastActivity < userIdleMs ? pollActiveMs : pollIdleMs;
+    var n = pollFailures[id] || 0;
+    return n ? Math.min(base * Math.pow(2, n), pollMaxMs) : base;
   }
 
+  // The box is the request's source, so htmx fires the request's events on
+  // it and not on the body (htmx 2.0.4, src/htmx.js ajaxHelper():
+  // issueAjaxRequest(verb, path, resolveTarget(context.source), ...), and
+  // with no source issueAjaxRequest() falls back to the document's body).
   function triggerPoll(el) {
     htmx.ajax("GET", el.getAttribute("hx-get"), {
+      source: el,
       target: "#" + el.id,
       swap: el.getAttribute("hx-swap") || "outerHTML"
     });
@@ -266,11 +279,12 @@
         return;
       }
       triggerPoll(current);
-    }, pollDelayMs());
+    }, pollDelayMs(id));
   }
 
-  function onPollElementReady(el) {
-    if (!el || !el.hasAttribute("data-poll")) {
+  document.body.addEventListener("htmx:afterSwap", function (ev) {
+    var el = ev.detail.elt;
+    if (!el || !el.hasAttribute || !el.hasAttribute("data-poll")) {
       return;
     }
     // Swapped-in markup still carries hx-trigger="load"; strip it so htmx does
@@ -279,15 +293,31 @@
     // elements before doSettle() runs the settle tasks, and only those
     // (makeAjaxLoadTask -> processNode) act on hx-trigger.
     el.removeAttribute("hx-trigger");
-    schedulePoll(el);
-  }
-
-  document.body.addEventListener("htmx:afterSwap", function (ev) {
-    onPollElementReady(ev.detail.elt);
   });
 
-  document.body.addEventListener("htmx:responseError", function (ev) {
-    onPollElementReady(ev.detail.elt);
+  // The next refresh is scheduled when a request of the box ends, however
+  // it ended. htmx 2.0.4, src/htmx.js issueAjaxRequest(): htmx:afterRequest
+  // is fired on load, error, abort and timeout alike, and after a swap that
+  // took the box out of the page it is fired again on the nearest parent
+  // still in it - the event that reaches the body names the box by its
+  // target. A refresh that ended in an error answer is not successful
+  // (handleAjaxResponse(): responseInfo.successful = !isError); one cut off
+  // never got that far.
+  document.body.addEventListener("htmx:afterRequest", function (ev) {
+    var target = ev.detail.target;
+    if (!target || !target.id) {
+      return;
+    }
+    var el = document.getElementById(target.id);
+    if (!el || !el.hasAttribute("data-poll")) {
+      return;
+    }
+    if (ev.detail.successful) {
+      delete pollFailures[el.id];
+    } else {
+      pollFailures[el.id] = (pollFailures[el.id] || 0) + 1;
+    }
+    schedulePoll(el);
   });
 
   document.body.addEventListener("htmx:beforeRequest", function (ev) {

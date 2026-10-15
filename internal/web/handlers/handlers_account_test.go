@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -195,5 +196,31 @@ func TestAccountPageForADomainAdministrator(t *testing.T) {
 		if strings.Contains(out, gone) {
 			t.Errorf("a domain administrator's menu carries %s", gone)
 		}
+	}
+}
+
+// The Account form's current-password check has its own bucket, per user:
+// it stops a guesser at ten, and does not lock the address out of signing in
+// (audit 2026-10-12, L15).
+func TestAccountPasswordGuessesHaveTheirOwnLimit(t *testing.T) {
+	h, _ := settingsServer(t)
+	wrong := url.Values{"current_password": {"nope"}, "new_password": {"another-long-password-2"}, "new_password_confirm": {"another-long-password-2"}}
+	for i := 0; i < 10; i++ {
+		if rec := postFormAs(h.HandleAccountPassword, globalPrincipal, "/account/password", nil, wrong); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("guess %d = %d, want 401", i+1, rec.Code)
+		}
+	}
+	if rec := postFormAs(h.HandleAccountPassword, globalPrincipal, "/account/password", nil, wrong); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("the eleventh guess = %d, want 429", rec.Code)
+	}
+
+	// The same address may still sign in: postFormAs and this request come
+	// from httptest's one RemoteAddr.
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{"username": {"x"}, "password": {"y"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	h.auth.HandleLogin(rec, req)
+	if rec.Code == http.StatusTooManyRequests {
+		t.Error("the password guesses locked the address out of signing in")
 	}
 }
