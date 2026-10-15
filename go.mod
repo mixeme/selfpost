@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/emersion/go-milter v0.4.1
+	github.com/emersion/go-msgauth v0.7.0
 	golang.org/x/crypto v0.58.0
 	modernc.org/sqlite v1.60.1
 )
@@ -11,7 +12,6 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emersion/go-message v0.18.1 // indirect
-	github.com/emersion/go-msgauth v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
