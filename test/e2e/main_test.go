@@ -386,6 +386,9 @@ func TestE2E(t *testing.T) {
 	run("inbound_relay_delivers_and_refuses", func(t *testing.T) {
 		testInboundRelay(t, sc)
 	})
+	run("inbound_bare_newline_is_one_message", func(t *testing.T) {
+		testInboundBareNewline(t, sc)
+	})
 }
 
 // trimZoneSuffix strips the "e2e.test" suffix a fully-qualified DKIM record

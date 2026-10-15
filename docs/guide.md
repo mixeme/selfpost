@@ -1010,7 +1010,11 @@ SelfPost never stores the message locally.
 container. Until then there is no inbound-relay `smtp inet` listener, no
 *Inbound* group in the menu, and `/inbound/…` is 404. (Port 25 can still
 listen when only `DMARC_REPORTS_ENABLE=true` — see [DMARC
-reports](#dmarc-reports).) Outbound 465/587 is unchanged.
+reports](#dmarc-reports).) Outbound 465/587 is unchanged. Port 25 ends a
+message only at the standard `<CR><LF>.<CR><LF>` (the SMTP-smuggling
+defence, since `2.6.1`); a sending server that ends DATA with a bare
+newline waits for a reply that does not come, and there is no allow-list
+for such a sender.
 
 **Panel** (`/inbound/domains`): the global role adds and deletes domains. On a
 domain's page, set the upstream host/port and TLS to that hop (opportunistic /

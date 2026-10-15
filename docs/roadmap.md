@@ -42,9 +42,9 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
-| port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | candidate (2026-10-15, from own-mta-builds; recommended now, PATCH) | — | — |
-| base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | candidate (2026-10-15, from own-mta-builds; recommended next, MINOR) | — | — |
-| panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | candidate (2026-10-15, from own-mta-builds; recommended after base-trixie, MINOR) | — | — |
+| port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | agreed (2026-10-15; first of the three, PATCH) | — | — |
+| base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | agreed (2026-10-15; after port25-bare-newline, MINOR) | — | — |
+| panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | agreed (2026-10-15; after base-trixie, MINOR) | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
@@ -784,8 +784,8 @@ is answered by three rows instead, in this order:
 Postfix 3.7.11 lacks the three 2026 security batches, which carry no CVE
 ids and so will not come), and
 [panel-dkim-signing](#panel-dkim-signing) (signing in the panel's own
-milter; OpenDKIM, the syslog relay and the parser port go). Each needs
-the owner's OK.
+milter; OpenDKIM, the syslog relay and the parser port go). The owner
+agreed to the three and their order on 2026-10-15.
 
 ## port25-bare-newline
 

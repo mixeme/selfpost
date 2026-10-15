@@ -51,6 +51,9 @@ var port25Cases = []port25Case{
 			// The log tailer tells this listener's refusals from the
 			// submission ports' by the name they are logged under.
 			{param: "syslog_name", contains: "postfix/inbound", wantExact: true},
+			// The SMTP-smuggling defence, off by default on this Postfix
+			// (own-mta-builds, § 5); testInboundBareNewline drives it.
+			{param: "smtpd_forbid_bare_newline", contains: "normalize", wantExact: true},
 			// No antispam milter configured: the inbound journal milter
 			// alone. The submission chain (strict OpenDKIM + journal-milter)
 			// must not reach inbound mail.

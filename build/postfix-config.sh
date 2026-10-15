@@ -643,7 +643,20 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	# program name. Only smtpd carries it: cleanup and the rest are other
 	# services and log as postfix/.)
 	postconf -M "smtp/inet=smtp inet n - n - - smtpd"
+	# smtpd_forbid_bare_newline: the 2023 SMTP-smuggling defence, which this
+	# Postfix leaves off. normalize takes a bare <LF> as a line end but ends
+	# DATA only at the standard <CR><LF>.<CR><LF>: a "." line that a bare
+	# <LF> precedes or ends is dropped, not taken as the end of the message
+	# (Postfix 3.7.11, src/smtpd/smtpd.c:807, the default "no" for Postfix
+	# < 3.9; :1656, bare_lf_mask_table, normalize = BARE_LF_FLAG_WANT_STD_EOD;
+	# :3649-3652, the DATA loop; RELEASE_NOTES, "Major changes with Postfix
+	# 3.8.5, 3.7.10": normalize is the recommended setting and 3.9's
+	# default). Its exclusions default to $mynetworks, loopback only here
+	# (above), so no client is spared. The submission ports keep the
+	# default: their smuggled transaction would still be the authenticated
+	# session's, under its bindings and milters (own-mta-builds, § 5).
 	postconf -P \
+		"smtp/inet/smtpd_forbid_bare_newline=normalize" \
 		"smtp/inet/syslog_name=postfix/inbound" \
 		"smtp/inet/smtpd_sasl_auth_enable=no" \
 		"smtp/inet/smtpd_tls_auth_only=no" \

@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -455,4 +457,59 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 	if got := denyDomain(); strings.Contains(got, spammer) {
 		t.Fatalf("deny_domain.map after removing %s:\n%s", spammer, got)
 	}
+}
+
+// testInboundBareNewline: port 25 ends DATA only at the standard
+// <CR><LF>.<CR><LF>. A "." line that a bare <LF> precedes or ends - the SMTP
+// smuggling sequence, with a second transaction's commands behind it - is
+// body, and the one message delivered carries all of it; nothing is read as
+// a second transaction (smtpd_forbid_bare_newline=normalize on smtp/inet,
+// build/postfix-config.sh; Postfix 3.7.11, src/smtpd/smtpd.c:3649-3652).
+// Runs after testInboundRelay, whose domain, upstream and recipient it uses.
+func testInboundBareNewline(t *testing.T, sc *scenario) {
+	token := uniqueToken("inbound-bare")
+	smuggled := uniqueToken("smuggled")
+	data := "From: someone@stranger.e2e.test\r\nTo: " + inboundRecipient +
+		"\r\nSubject: e2e " + token + "\r\nDate: " + time.Now().UTC().Format(time.RFC1123Z) +
+		"\r\n\r\nthe first part\n.\n" +
+		"MAIL FROM:<someone@stranger.e2e.test>\r\nRCPT TO:<" + inboundRecipient + ">\r\nDATA\r\n" +
+		"Subject: e2e " + smuggled + "\r\n\r\nthe part a smuggler would send\r\n.\r\n"
+	if err := deliverPort25Raw("someone@stranger.e2e.test", inboundRecipient, []byte(data)); err != nil {
+		t.Fatalf("port 25 did not take the message with a bare-newline \".\" inside: %v\n%s", err, mailLogTail(h, "postfix/"))
+	}
+	raw, err := findSinkMessage(h.stageDir, token, 30*time.Second)
+	if err != nil {
+		t.Fatalf("the message never reached the upstream: %v\n%s", err, mailLogTail(h, "postfix/"))
+	}
+	if !bytes.Contains(raw, []byte(smuggled)) {
+		t.Fatalf("the message was cut at the bare-newline \".\": what followed it is not in the delivered message\n%s", raw)
+	}
+	// A second transaction, had Postfix read one, would be delivered right
+	// behind the first: give it the time and count the files that carry the
+	// smuggled token.
+	time.Sleep(3 * time.Second)
+	if n := sinkMessagesWith(t, h.stageDir, smuggled); n != 1 {
+		t.Fatalf("%d messages at the upstream carry the smuggled part, want 1\n%s", n, mailLogTail(h, "postfix/"))
+	}
+}
+
+// sinkMessagesWith counts the sink's dumped messages that contain token.
+func sinkMessagesWith(t *testing.T, stageDir, token string) int {
+	t.Helper()
+	dir := filepath.Join(stageDir, "mail-stage")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	n := 0
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err == nil && bytes.Contains(b, []byte(token)) {
+			n++
+		}
+	}
+	return n
 }

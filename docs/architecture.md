@@ -189,6 +189,11 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   panel's sender check (§ Panel roles).
 - **Level-1 rate limit** — `smtpd_client_message_rate_limit` /
   `anvil_rate_time_unit` from `RATE_LIMIT_*` env vars; independent of milter.
+- **Port 25 ends DATA only at `<CR><LF>.<CR><LF>`** —
+  `smtpd_forbid_bare_newline=normalize` on the `smtp/inet` listener (Postfix
+  3.7.11, `src/smtpd/smtpd.c`, the DATA loop at 3649: a `.` line next to a
+  bare `<LF>` is dropped, not taken as the end); a bare `<LF>` elsewhere is
+  read as `<CR><LF>`. The submission ports keep Postfix's default.
 - **Chroot disabled** for all services (DNS/TLS inside container).
 - **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
   at start into `/etc/postfix/tls-internal`, owned by root and `0600` as

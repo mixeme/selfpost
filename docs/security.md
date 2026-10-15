@@ -262,7 +262,14 @@ operator can act on it.
   is never accepted with nowhere to send it. Prefer recipient mode `list` to
   refuse unknown addresses at RCPT (no backscatter). OpenDKIM is not attached
   on inbound. An optional antispam milter is inbound-only; default action is
-  fail-open (`accept`).
+  fail-open (`accept`). Since `2.6.1` the listener ends DATA only at the
+  standard `<CR><LF>.<CR><LF>` (`smtpd_forbid_bare_newline=normalize`, the
+  2023 SMTP-smuggling defence, which Postfix 3.7 leaves off by default): a
+  `.` line next to a bare newline is body, and what a smuggler would put
+  behind it is delivered as part of the one message, not read as a second
+  transaction. The submission ports keep the default - there a smuggled
+  transaction is still the authenticated session's, under its sender
+  bindings and milters ([own-mta-builds](own-mta-builds-2026-10-15.md) § 5).
 - **The panel's milters judge every message of a connection.** Postfix
   introduces a client to a milter once per connection, and the milter library
   replaces the milter's session after any reply that is not "continue". Until

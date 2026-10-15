@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/smtp"
+	"net/textproto"
 	"time"
 )
 
@@ -79,4 +80,54 @@ func waitForPort25Ready(timeout time.Duration) error {
 		}
 		return true, nil
 	})
+}
+
+// deliverPort25Raw is deliverPort25 with the DATA bytes written as they
+// stand. net/smtp's data writer would turn a bare LF into CRLF and stuff a
+// lone "." (net/textproto, DotWriter), which is the very input this is for.
+// It returns an error for a reply other than the one each step expects.
+func deliverPort25Raw(from, to string, data []byte) error {
+	conn, err := net.DialTimeout("tcp", port25Addr, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", port25Addr, err)
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(60 * time.Second))
+	tp := textproto.NewConn(conn)
+	expect := func(code int, after string) error {
+		if _, _, err := tp.ReadResponse(code); err != nil {
+			return fmt.Errorf("after %s: %w", after, err)
+		}
+		return nil
+	}
+	if err := expect(220, "connect"); err != nil {
+		return err
+	}
+	for _, step := range []struct {
+		cmd  string
+		code int
+	}{
+		{"HELO mx.stranger.e2e.test", 250},
+		{"MAIL FROM:<" + from + ">", 250},
+		{"RCPT TO:<" + to + ">", 250},
+		{"DATA", 354},
+	} {
+		if err := tp.PrintfLine("%s", step.cmd); err != nil {
+			return fmt.Errorf("%s: %w", step.cmd, err)
+		}
+		if err := expect(step.code, step.cmd); err != nil {
+			return err
+		}
+	}
+	if _, err := tp.W.Write(data); err != nil {
+		return fmt.Errorf("DATA content: %w", err)
+	}
+	if err := tp.W.Flush(); err != nil {
+		return fmt.Errorf("DATA content: %w", err)
+	}
+	if err := expect(250, "end of data"); err != nil {
+		return err
+	}
+	_ = tp.PrintfLine("QUIT")
+	return nil
 }

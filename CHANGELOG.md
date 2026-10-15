@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **Port 25 could be made to read a second transaction out of a message's
+  body.** Postfix 3.7 leaves its 2023 SMTP-smuggling defence off
+  (`smtpd_forbid_bare_newline`, default `no` before 3.9), and the inbound
+  relay's listener did not turn it on: a `.` line ended by a bare newline
+  ended DATA, and what followed was read as the next transaction's commands.
+  The listener now sets `normalize` - the setting Postfix recommends and 3.9
+  made the default: DATA ends only at the standard `<CR><LF>.<CR><LF>`, a
+  bare newline elsewhere is read as a line end. Found while reading for
+  [own-mta-builds](docs/own-mta-builds-2026-10-15.md) (§ 5); `test/e2e`
+  sends the sequence and finds one message at the upstream with all of it
+  inside. Only installations with `INBOUND_RELAY_ENABLE=true` or
+  `DMARC_REPORTS_ENABLE=true` have the listener.
+
 ## [2.6.0] - 2026-10-15
 
 Stage 5 of the 2026-10-12 audit: the image and Postfix. The supervisor
