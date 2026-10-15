@@ -52,7 +52,18 @@ under Accepted risks (the allow list keyed on an address anyone can claim, the
 list files readable by anyone). A third it named - with the filter down, a
 sender's own verdict headers were recorded as the filter's - was closed the
 same day at the owner's suggestion: the filter signs each message and a
-verdict is read only next to its signature.
+verdict is read only next to its signature. The 2026-10-16 security review of
+panel-dkim-signing (`2.8.0`: the panel's own DKIM signer, OpenDKIM removed)
+found no path by which an application gets another tenant's key or the
+server's, or a valid signature over a `From:` a mail program reads as another
+domain; no Critical or High. The signer held a message's whole header section,
+bounded only by `message_size_limit` (now 1 MiB, refused above it); the old
+key tree stayed readable by group `selfpost` and went into every backup (now
+the panel's alone and left out); a hostname with capitals deferred every
+notification (the server's name is kept in lower case for DKIM); only `From`
+was over-signed (now the shown headers too) - all fixed. `Sender:` is now
+signed but not held to the login, which waits for the owner; that and what the
+header cap leaves are under Accepted risks.
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -211,8 +222,24 @@ operator can act on it.
 - The panel process is **not root** (`user=panel` in supervisord); path access
   is granted through the `selfpost` group with minimal permissions. The
   supervisord control socket, which can stop or restart any program, is the
-  `supervisor` group's, whose one member is the panel; OpenDKIM and Postfix
-  share `selfpost` for files and do not reach it (`2.6.0`).
+  `supervisor` group's, whose one member is the panel; Postfix shares
+  `selfpost` for files and does not reach it (`2.6.0`; OpenDKIM shared
+  `selfpost` too until `2.8.0`).
+- **Group `selfpost` (gid 10998) has two members, `panel` and `postfix`.**
+  Through it Postfix reads what the panel writes - `sasldb2` and the maps
+  under `/data/postfix` (2750, files 0640) - and connects to the panel's
+  milter sockets in `/run/selfpost` (2750, sockets 0660); the panel reads
+  `mail.log`, which `postfix` writes, through it the other way
+  ([build/Dockerfile](../build/Dockerfile), `build/entrypoint.sh`). The DKIM
+  keys are not in it (§ Mail path).
+- **The container keeps `KILL`** (`deploy/docker-compose.yml`, `cap_add`;
+  every other capability not listed there is dropped). Without it root
+  cannot signal a process of another uid (kill(2), capabilities(7); measured
+  on the test server, 2026-10-16), and two root processes must: supervisord
+  stops and restarts the panel, and Postfix's master ends its children,
+  which run as `postfix`. Until `2.8.0` it also carried OpenDKIM's `USR1`
+  reload through supervisord, which went with OpenDKIM; the plan had taken
+  that for its only use, wrongly.
 
 ### Mail path (security-relevant)
 
@@ -226,50 +253,93 @@ operator can act on it.
   application sent from. What a complaint needs stays with the operator - the
   queue id in the header, the panel's log and smtpd's `client=` line in
   mail.log. Port 25 keeps the full header, as RFC 5321 requires of an MTA.
-- **An application signs only as itself (`2.4.0`).** OpenDKIM chooses the
-  key by the `From:` header and Postfix holds only the envelope sender
-  against the login, so until `2.4.0` an application of one sending domain
-  could write another registered domain - or, since `2.3.0`, the server's
-  own name - into `From:` and have the message signed with that name's key
-  (found by the security review of panel-notifications, 2026-10-12). The
-  panel's sender check now holds the header to the table the envelope is
-  held to and refuses anything else with `550 5.7.1`, a domain the server
-  does not sign for included (the owner's rule: the header may say what the
-  envelope may, nothing more). It is the first milter of the chain and
-  strict: a message it could not judge is deferred, never passed on to the
-  signer. Since `2.5.2` it reads the header with OpenDKIM's own parser,
-  `dkim_mail_parse()` ported line for line from the opendkim the image runs
-  (`internal/milter/mailparse.go`), and judges the address that parser
-  returns - the address OpenDKIM signs for - whatever a display name, a
-  comment or a quoted local part holds; one `From:` field and one address in
-  it stay required, and an address longer than the 256 bytes OpenDKIM
-  matches its `SigningTable` against is refused, since cut there it could end
-  in another domain's name (opendkim.c, `dkimf_apply_signtable()`,
-  `MAXADDRESS`). That the port is OpenDKIM's parser is tested against the C
-  itself, two hundred thousand lines and every result alike; that the signed
-  domain follows, by the e2e: it sends every `From:` line the check passes (a
-  list shared with the unit test,
-  `internal/milter/testdata/from-lines-passed.txt`) and wants it signed for
-  the application's domain and no other, and every
-  line of a second list naming another sender of the server in a quoted
-  string, a comment, a quoted pair, capitals or an encoded word
-  (`from-lines-other.txt`) must be refused or arrive signed for the
-  application's domain, never for that sender. What this does not promise is
-  what a display name looks like to a person: a name of another sender in
-  it passes, signed with the application's own key - a forged display name is
-  as old as mail, and no key of another's is involved. What the client wrote
-  reaches the reply, the log and the send log only as printable ASCII, cut,
-  and a refused message is one row of the log whatever its recipient count.
-  Mail the panel submits itself does not pass the check: only root,
-  `postfix` and the panel can submit locally. Architecture § Sender check.
+- **The panel signs, with the key of the login's domain (`2.8.0`).** The
+  DKIM signer is a role of the panel process (`internal/milter/sign.go`,
+  `cmd/panel/signer.go`) on two sockets of its own, both attached strictly
+  (`default_action=tempfail`, `build/postfix-config.sh`). `sign.sock`,
+  second in `smtpd_milters` after the sender check, signs what applications
+  send on 465/587 with the key of the domain the SASL login belongs to:
+  `{auth_authen}`, looked up in the `sender_login_maps` file Postfix itself
+  reads (`Bindings.DomainOf`). `sign-local.sock`, the whole of
+  `non_smtpd_milters`, signs what is submitted with sendmail(1) with the key
+  of the server's own name. Nothing in a message chooses the key, and the
+  socket a message comes through - not a missing login - decides that the
+  server's key may sign it. What cannot be signed (a login with no domain, a
+  name with no key, a read error) is deferred, never sent unsigned. Port 25
+  has no signer. `relaxed/simple`, rsa-sha256; `h=` names every header of
+  RFC 6376 § 5.4.1's list the message has, and `Sender` and
+  `List-Unsubscribe-Post`, then once more each of the shown ones present
+  (Subject, Date, To, Cc, Reply-To, Sender) and `From` last, so one of those
+  added after signing breaks the signature. Until `2.8.0` OpenDKIM signed - a
+  2018 beta with three 2026 CVEs open and nobody upstream to fix them
+  ([own-mta-builds](own-mta-builds-2026-10-15.md) § 1) - and chose the key
+  by the `From:` header; it left the image, and with it the syslog relay and
+  `/dev/log`, the port of its `From:` parser, its tables and their reload by
+  a signal across uids. Architecture § DKIM signing.
+- **The DKIM keys are the panel's alone (`2.8.0`).** The key tree and the
+  selector table the signer reads, `/data/dkim/keys/<name>/<selector>.private`
+  and `/data/dkim/selectors` (`internal/domain`, `Keys`), are owned by
+  `panel`, directories 0700 and files 0600 - no group, no other user; the
+  signer reads them and never the database. The entrypoint sets these modes
+  at every start (e2e `checkDKIMTree` holds the tree to them). Until `2.8.0`
+  the keys were under `/data/opendkim`, 2750/0640 in group `selfpost` so
+  that OpenDKIM could read them - and so could every `postfix` process. That
+  tree is kept for a rollback to 2.7.x until the next release; since `2.8.0`
+  the entrypoint makes it the panel's alone as well (0700/0600, panel:panel)
+  at every start, copies its keys as the panel user (`setpriv`) while
+  `/data/dkim` holds none, and a backup leaves it out (§ Backup and domain
+  export). A root step of the entrypoint follows no symbolic link the panel
+  could plant in either tree (`drop_links`; `cp -RP`; `chown -R` and `find`
+  do not follow one).
+- **An application signs only as itself (`2.4.0`).** The signature's `d=` is
+  the login's domain, and a receiver holds it to the domain of the `From:`
+  line (DMARC, RFC 7489 § 3.1.1): without a check of that line an
+  application could still send under the server's signature as another
+  domain of the server, or as the server itself. The panel's sender check
+  holds the header to the table the envelope is held to and refuses anything
+  else with `550 5.7.1`, a domain the server does not sign for included (the
+  owner's rule: the header may say what the envelope may, nothing more). It
+  is the first milter of the chain and strict: a message it could not judge
+  is deferred, and one it refuses never reaches the signer. The `From:`
+  line must be one field holding one address in RFC 5322's grammar as Go's
+  `net/mail` reads it - a mail program's reading; a line a lenient program
+  could show as another address (`ceo@bank.com <me@mine.com>`,
+  `<b@evil.com, a@mine.com>`) is refused - and that address, its local
+  part unquoted as Postfix unquotes the envelope's, is held against the
+  application's bindings; its domain is compared in ASCII lower case only,
+  so a look-alike such as the Kelvin sign for `k` is no letter of a
+  registered domain (`internal/milter/sender.go`, `judge`, `asciiLower`).
+  The unit test reads a list of lines naming another sender of the server in a quoted string, a
+  comment, a quoted pair, capitals or an encoded word
+  (`internal/milter/testdata/from-lines-other.txt`) and wants each refused
+  or read as the application's own address; the e2e sends every line of a
+  second list the check passes (`from-lines-passed.txt`, shared with the
+  unit test) and wants it signed for the application's domain and no other.
+  What this does not promise is what a display name looks like to a person:
+  a name of another sender in it passes, signed with the application's own
+  key - a forged display name is as old as mail, and no key of another's is
+  involved. Nor does it look at `Sender:` (Accepted risks). What the client
+  wrote reaches the reply, the log and the send log only as printable ASCII,
+  cut, and a refused message is one row of the log whatever its recipient
+  count. Until `2.4.0` nothing held the header: OpenDKIM chose the key by it
+  and Postfix holds only the envelope sender against the login, so an
+  application of one sending domain could write another registered domain -
+  or, since `2.3.0`, the server's own name - into `From:` and have the
+  message signed with that name's key (security review of
+  panel-notifications, 2026-10-12). From `2.5.2` to `2.8.0` the check read
+  the line with OpenDKIM's own parser, ported line for line, and refused an
+  address over the 256 bytes OpenDKIM matched its `SigningTable` against;
+  with the key chosen by the login both went. Mail the panel submits itself
+  does not pass the check: only root, `postfix` and the panel can submit
+  locally (Accepted risks). Architecture § Sender check.
 - **Inbound relay (optional, `INBOUND_RELAY_ENABLE`)** — port 25 is not an
   open relay either: SASL is off; `smtpd_relay_restrictions` /
   `smtpd_recipient_restrictions` are `reject_unauth_destination` and
   `reject_unlisted_recipient`; maps list only configured domains and
   recipients. Domains with no upstream host are omitted from the maps so mail
   is never accepted with nowhere to send it. Prefer recipient mode `list` to
-  refuse unknown addresses at RCPT (no backscatter). OpenDKIM is not attached
-  on inbound. An optional antispam milter is inbound-only; default action is
+  refuse unknown addresses at RCPT (no backscatter). Nothing signs on port
+  25. An optional antispam milter is inbound-only; default action is
   fail-open (`accept`). Since `2.6.1` the listener ends DATA only at the
   standard `<CR><LF>.<CR><LF>` (`smtpd_forbid_bare_newline=normalize`, the
   2023 SMTP-smuggling defence, which Postfix 3.7 left off by default): a
@@ -335,7 +405,12 @@ operator can act on it.
   panel users' password hashes, `docker-compose.yml`, `.env`, and the TLS
   private key from `certs/` when present; a domain export carries the DKIM key
   and **working** application passwords in the clear (otherwise a transfer
-  without recreating credentials would be impossible).
+  without recreating credentials would be impossible). The keys a backup
+  carries are those of `/data/dkim`; `/data/opendkim`, the tree 2.7.x read
+  and kept for a rollback, is left out (`internal/backup`,
+  `excludedFromArchive`, `2.8.0`): an archive restores into its own version
+  alone, and a second copy of every key - one that outlives a deleted
+  domain's - has no place in it.
 - Links under `certs/` (and `certs` itself as a link) are followed, in the
   container's view: the archive carries whatever regular file they lead to
   that the panel's user may read. `certs/` is the operator's, mounted
@@ -526,11 +601,12 @@ deferred item from the roadmap.
   instead be given the files through a group it shares with the panel.
 - ~~**An application can learn which domains are senders of this server.**~~
   Struck in `2.5.2` (audit 2026-10-12, stage 2c; L8 closed): the sender
-  check reads a `From:` line with OpenDKIM's own parser, ported
-  (`internal/milter/mailparse.go`), and decides by the address OpenDKIM signs
-  for; what a display name, a comment or a quoted local part names no longer
-  matters, so refused or passed says nothing about other domains of the
-  server.
+  check read a `From:` line with OpenDKIM's own parser, ported, and decided
+  by the address OpenDKIM signed for; what a display name, a comment or a
+  quoted local part names no longer mattered, so refused or passed said
+  nothing about other domains of the server. Since `2.8.0` the check judges
+  the one address `net/mail` reads and the signer takes the login's key, so
+  the same holds without the port.
 - ~~**A row of the inbound log belongs to a domain by name.**~~ Struck in
   `2.5.0` (audit 2026-10-12, L12): both logs now hold a domain by id, see
   § Roles.
@@ -581,12 +657,32 @@ deferred item from the roadmap.
   a dozen times a day at most by someone who flaps the zone; a domain's
   limits once a day; and no more than 60 messages leave in any hour whatever
   the rules arrive at.
-- **The sender check stops mail while the panel does not answer.** It is a
-  role of the panel process, attached with `default_action=tempfail`, so a
-  panel that is down or slower than the milter timeouts (15 s to connect
-  and for a command, 30 s for the verdict at the end of the headers) defers
-  every submission: availability of sending now depends on the panel,
-  which it did not before `2.4.0`. Chosen by the owner over the alternative,
+- **Whatever is submitted with sendmail(1) is signed as the server.** The
+  signer's local socket, the whole of `non_smtpd_milters`, signs every
+  message submitted locally with the key of the server's own name, whatever
+  its `From:` says, and no sender check stands on that path (`2.8.0`; under
+  OpenDKIM a local message was signed for its `From:` domain). Who can submit
+  is what bounds it: root, `postfix`, and the panel through `postdrop` (the
+  item above) - so any code running as `panel`, the panel process and
+  `dmarc-ingest`, which pipe(8) runs as `panel`, can have a message signed as
+  the server; the same code can read every key anyway, as it could in 2.7.
+  Mail from the Internet never reaches the socket: smtpd runs its own milter
+  list, and one whose list is empty (port 25 with DMARC reports on and the
+  inbound relay off, `-o smtpd_milters=`) turns `non_smtpd_milters` off for
+  what it receives
+  (Postfix 3.10.13, src/smtpd/smtpd.c, `setup_milters()`, "Safety: disable
+  non_smtpd_milters when not sending our own mail filter list"), and the
+  applications on 465/587 have no code in the container. Trigger to revisit:
+  anything else able to run as `panel` or `postfix` in the container, or a
+  local submitter that is not the panel.
+- **The sender check and the signer stop mail while the panel does not
+  answer.** Both are roles of the panel process, attached with
+  `default_action=tempfail`, so a panel that is down or slower than the
+  milter timeouts (15 s to connect and for a command, 30 s for the verdict
+  at the end of the headers) defers every submission and its own
+  notifications: availability of sending now depends on the panel, which it
+  did not before `2.4.0` (until `2.8.0` the signer was OpenDKIM, attached as
+  strictly, a process of its own). Chosen by the owner over the alternative,
   a check that is absent whenever the panel is - that one could be switched
   off by whoever can make the panel slow. Supervisord starts a panel that
   died again at once; one that dies within a second of starting is tried
@@ -607,19 +703,65 @@ deferred item from the roadmap.
   of the restart defer mail instead of passing it unjournalled (technical
   review, 2026-10-12). Trigger to revisit: anything untrusted able to open
   a Unix socket in the container.
-- **The container's `/dev/log` takes datagrams from any user in it** (since
-  `2.6.0`, for OpenDKIM's log): what is written there reaches the container
-  log, each line marked `syslog: `, control characters written out, at most
-  200 lines a second (the rest counted and dropped). A user who can write it
-  can add lines to `docker logs` under that mark and no other; the panel
-  reads only `mail.log`. logrotate's state file is under `/data/log`, the
-  `postfix` user's directory: that user could stop rotation through it -
-  as through the log itself, which it owns. Trigger to revisit: anything
-  untrusted able to run in the container.
+- ~~**The container's `/dev/log` takes datagrams from any user in it.**~~
+  Struck in `2.8.0`: the syslog relay that read it from `2.6.0` existed for
+  OpenDKIM's log, and left the image with OpenDKIM, as did the `/dev/log`
+  link; the signer logs to the panel's own output (the container log).
+- **logrotate's state file is under `/data/log`,** the `postfix` user's
+  directory: that user could stop rotation through it - as through the log
+  itself, which it owns. Trigger to revisit: anything untrusted able to run
+  in the container.
 - **When the hostname is itself a sending domain,** the server's mail is
   signed with that domain's key. Whoever may export the domain has the key,
   and its applications may send as `postmaster@<hostname>` by right. The
   guide says so; a hostname that is nobody's sending domain avoids it.
+- **`Sender:` is signed but not held to the login** (open: the owner's
+  decision). Since `2.8.0` the signer signs `Sender:` and `Resent-From:`
+  and over-signs `Sender:`, so neither can be added or changed after the
+  message leaves without breaking the signature; the sender check judges
+  `From:` alone (`senderSession.Header` keeps `From` and `Subject`). An
+  application of `mine.com` can write `From: billing@mine.com` and
+  `Sender: ceo@bank.com`: the check passes it, the signature is
+  `d=mine.com`, DMARC aligns on `From:` and passes, and a mail program that
+  shows `Sender:` beside `From:` - Outlook as "on behalf of", by the
+  review's account, not tried on this build - shows the other address. No
+  key of another's is involved, as with a display name; until `2.8.0` the
+  header was neither checked nor signed. The fix the security review of
+  2026-10-16 (F1) gives, and recommends: the check also reads `Sender:` and
+  `Resent-From:` and refuses one whose single address the application may
+  not send as, under the rule `From:` is held to - a few lines in
+  `internal/milter/sender.go` and their tests. It changes what is refused
+  (an application whose mail program writes a `Sender:` of another domain
+  today would be refused), hence the owner's decision; this item goes when
+  it is taken.
+- **A header section is bounded at 1 MiB by the signer, not by the milter
+  library.** The signer counts a message's headers as Postfix hands them
+  over and refuses a section of more than 1 MiB with `552 5.3.4`
+  (`internal/milter/sign.go`, `headerLimit`; `2.8.0`): it keeps no more
+  than that and drops its list once the block it signs is built, so its own
+  memory per message is a few mebibytes at most. No mail program writes such
+  a section, and the refusal is permanent, so a sender is told rather than
+  retried. What the cap does not bound: go-milter v0.4.1 adds every header
+  of a message to a map of its own in each milter it is sent to (session.go,
+  `CodeHeader`), which none of SelfPost's milters reads - the sender check,
+  the signer and the journal milter on 465/587, the inbound journal milter
+  on port 25 - and that copy is bounded only by the port's message size
+  limit (Postfix's default 10 240 000 bytes on 465/587;
+  `INBOUND_MESSAGE_SIZE_LIMIT` or `DMARC_MESSAGE_SIZE_LIMIT` on port 25,
+  from strangers), since a refusal at the end of the headers comes after
+  they are all in. A message of nothing but headers still costs the panel
+  about its size once per milter while it is in the milters, times the
+  messages Postfix runs at once (as many as its cleanup processes,
+  `default_process_limit`, 100), and `deploy/docker-compose.yml` sets no
+  memory limit, so the host's out-of-memory killer chooses what goes; a
+  panel killed is started again, and submissions wait meanwhile. The
+  library's copy is older than `2.8.0`: every milter of the panel has had
+  it. The fix, priced: a go-milter patched not to keep the map (vendored;
+  SelfPost reads headers only through `Header`), or a memory limit in the
+  compose file, which makes an exhausted panel a restart of the panel alone
+  rather than a victim the host picks. Trigger to revisit: the inbound relay
+  on an address strangers send to in volume, or a panel seen near the
+  host's memory.
 - **A message's page can show another message's log lines after a queue-id
   collision.** Postfix's short queue ids repeat: the id is the microsecond of
   arrival and the queue file's inode, and inodes come round within seconds.

@@ -70,7 +70,8 @@ These are the operator's responsibility or accepted trade-offs, documented in
 - Deliverability outcomes: mail rejected or filtered by a receiving provider is
   a policy decision of that provider, not a defect
 - Denial of service through sheer volume against a single-tenant relay
-- Vulnerabilities in upstream Postfix, OpenDKIM, or the base image — report
+- Vulnerabilities in upstream Postfix, the Go libraries SelfPost builds on,
+  or the base image — report
   those upstream; if SelfPost's configuration makes an upstream issue
   exploitable when it otherwise would not be, that *is* in scope
 

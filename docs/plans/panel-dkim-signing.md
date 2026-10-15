@@ -199,12 +199,21 @@ libmilter1.0.1.
 
 ### Stage 3 - documents, the canary, the cut
 
-- [ ] architecture § OpenDKIM -> § DKIM signing; security.md (the
+- [x] architecture § OpenDKIM -> § DKIM signing; security.md (the
   mail-path bullets, the accepted risks that were OpenDKIM's); guide;
   development's cited-package table (opendkim and libopendkim11 leave);
   the assumptions register's header notes what left; help (design commit
   first) and Health's label (Q3, mockup first).
-- [ ] Reviews: technical and security.
+- [x] Reviews: technical and security.
+
+*Done (2026-10-16):* help and Health went with stage 2 (design `005922b`);
+the reviews ran on stages 1-2 and their findings are fixed in `c2f63d2`,
+with the first rollout's incident (the queue's owner numbers); the
+documents in the commit after it. Open: holding `Sender:` to the login
+(security review F1, the owner's decision), and go-milter v0.4.1 keeping
+every header in a map of its own per session (security.md, accepted risks)
+- a header section the signer refuses past 1 MiB is still held by the
+library, on 465/587 and on port 25 alike, as before 2.8.0.
 - [ ] On the test server: a day of the owner's mail; one message from an
   application through 465 and one notification to a real mailbox, the
   headers read (dkim=pass with the panel's `d=`).
@@ -222,7 +231,11 @@ libmilter1.0.1.
   from the old path, which the move leaves as a copy until the next release
   - the keys as they were at the upgrade: a domain added under 2.8.x is not
   in that tree, and 2.7.x sends its mail unsigned; one re-added under 2.8.x
-  has another key there. Going forward again after a rollback, a domain
-  added under 2.7.x has its key only in the old tree: remove `/data/dkim`
-  before the start, and the entrypoint copies again (it copies while
-  `/data/dkim` holds no key).
+  has another key there. 2.7.x reads the queue as its own postfix (uid
+  101) before it hands it over, and 2.8.0 left it to uid 100: the guide
+  (§ Upgrading) gives the hand-over by name to run in the 2.7.x image first,
+  measured on a copy of the test server's queue. Going forward again after
+  a rollback, a domain added under 2.7.x has its key only in the old tree:
+  copy its directory into `/data/dkim/keys` (removing `/data/dkim` instead
+  copies the old tree again and loses the keys of domains added under
+  2.8.x).

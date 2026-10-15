@@ -46,6 +46,14 @@ the trixie sources. This register is left as it was made: its line numbers
 and versions are those of the bookworm sources above, which are now kept
 under `dev/upstream-bookworm/` (where it says `dev/upstream/`).
 
+With panel-dkim-signing (`2.8.0`) OpenDKIM left the image: the panel signs
+outgoing mail itself (`internal/milter/sign.go`), and `build/opendkim.conf`,
+the syslog relay (`internal/syslogrelay`, `/dev/log`), the KeyTable and
+SigningTable, the USR1 reload through supervisord and the port of
+OpenDKIM's From: parser (`internal/milter/mailparse.go`) went with it. The
+rows about OpenDKIM, the syslog relay and those pieces describe code that
+is gone; they are left as they were, like the rest of this register.
+
 Counts at the inventory, by the justification the tree had:
 
 | Part | Entries | CITED | MEASURED | GUESSED | WRONG? |

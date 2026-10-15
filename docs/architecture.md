@@ -26,15 +26,17 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
 | Program | User | Priority | Role |
 |---|---|---|---|
-| `syslog-relay` | panel | 50 | The container's `/dev/log`: passes what OpenDKIM logs through syslog(3) to the container's log (`panel -syslog-relay`) |
-| `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
-| `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
-| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the DKIM signer's two, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
+| `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc + notifier; with the inbound relay on also the inbound journal milter |
+| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (the sender check's, the DKIM signer's two, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
-Start order: syslog-relay → OpenDKIM → panel (opens the sender check's, the DKIM signer's and the journal-milter's sockets) → Postfix wrapper
+Until `2.8.0` two more programs ran before the panel: `opendkim`, the DKIM
+signing milter, and `syslog-relay`, the container's `/dev/log` for what
+OpenDKIM logged; the panel signs now (§ DKIM signing).
+
+Start order: panel (opens the sender check's, the DKIM signer's two and the journal-milter's sockets) → Postfix wrapper
 polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then runs
 `postfix start-fg` and stays its parent: on TERM it runs `postfix stop`, so a
 stop of the program or of the container stops Postfix as Postfix means it to
@@ -55,14 +57,15 @@ new one: the entrypoint clears what the last run left in `/run` (the milter
 sockets, the sender check's alive mark). Besides a stop, supervisord itself
 dying, or the entrypoint refusing a setting, nothing else exits the
 container. `logrotate`'s FATAL (a config logrotate would ignore),
-`postfix-reload`'s (reported to the page that asked), `cert-reload`'s and
-`syslog-relay`'s stay on Server › Health instead.
+`postfix-reload`'s (reported to the page that asked) and `cert-reload`'s
+stay on Server › Health instead.
 The panel runs `postfix-reload` through supervisord's XML-RPC interface and
 waits for its exit status (`internal/supervisor`, `RunOnce`); the program
 rests EXITED after a run.
 
-**Liveness:** `GET /healthz` (unauthenticated) returns 200 when opendkim,
-panel, and postfix are RUNNING; Docker `HEALTHCHECK` uses the same probe (its
+**Liveness:** `GET /healthz` (unauthenticated) returns 200 when panel - whose
+roles include the DKIM signer - and postfix are RUNNING
+(`internal/health`, `Liveness`); Docker `HEALTHCHECK` uses the same probe (its
 90-second start period covers postfix's STARTING).
 
 ---
@@ -73,7 +76,7 @@ panel, and postfix are RUNNING; Docker `HEALTHCHECK` uses the same probe (its
 Client ──TLS+SASL──► Postfix (465 smtps, optional 587 submission)
                          │
                          ├─► sender check (From: against the login, tempfail on failure)
-                         ├─► OpenDKIM milter (sign, tempfail on failure)
+                         ├─► DKIM signer (the login's domain, tempfail on failure)
                          ├─► journal-milter (send log + L2 rate limits, fail-open)
                          └─► outbound MX delivery (port 25 client)
 
@@ -96,7 +99,7 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
 - **587/submission** — only when `SUBMISSION_ENABLE=true`; STARTTLS with
   `smtpd_tls_security_level=encrypt`.
 - **25/smtp inet** — when `INBOUND_RELAY_ENABLE=true` and/or
-  `DMARC_REPORTS_ENABLE=true`. No SASL, no OpenDKIM, no journal-milter —
+  `DMARC_REPORTS_ENABLE=true`. No SASL, no sender check, no signing, no journal-milter —
   `smtpd_milters` is always overridden on this service, because main.cf's
   submission chain would otherwise let a signing outage defer relayed mail and
   would file inbound mail into the outbound send log under the sender's
@@ -216,24 +219,104 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   the certificate and key belong together it renews the copy (each file
   renamed into place) and reloads Postfix.
 
-### OpenDKIM
+### DKIM signing
 
-Per-domain keys under `/data/opendkim/keys`; `KeyTable` / `SigningTable` maintained
-by the panel. Socket `/run/opendkim/opendkim.sock`.
+The panel signs outgoing mail itself, in a role of its own, `dkim-signer`
+([cmd/panel/signer.go](../cmd/panel/signer.go),
+[internal/milter/sign.go](../internal/milter/sign.go)), since `2.8.0`; until
+then OpenDKIM did, in a program of its own
+([plans/panel-dkim-signing.md](plans/panel-dkim-signing.md)).
 
-The server's own name (`SELFPOST_HOSTNAME`) has a key and a line in both
-tables too, without being a row of the registry
-(`domain.Service.SetServerName`): the panel's notifications are sent as
-`postmaster@` that name and signed with it. No application can use it as an
-envelope sender - the sender map is built from the registry - and since
-`2.4.0` none can have a message signed as the server by writing it into
-`From:` either: the sender check holds the header against the login (§ Sender
-check). A sending domain of the same name shares its key and selector with
-the server; deleting that domain leaves the server signed under the default
-selector, which is the same key only if that was the domain's. At its start
-the notifier makes sure the tables have the line and name the selector the
-panel shows (`EnsureServerSigned`): tables are otherwise rebuilt only when a
-domain is added or deleted.
+- **Keys** — `/data/dkim/keys/<name>/<selector>.private`, PKCS#1 PEM, one
+  for each sending domain and one for the server's own name
+  (`internal/domain`, `Keys`; `DKIM_DIR`, default `/data/dkim`). A key is
+  made when a domain is added and an existing one is reused, never
+  overwritten: that would invalidate the record already published
+  (`EnsureKey`). A domain export carries the key and an import writes it. A
+  deleted domain's key directory is removed once the selector table no
+  longer names it; one a deletion had to leave, Reload configuration removes
+  (`Service.Resync`).
+- **The selector table** — `/data/dkim/selectors`, a line `<name> <selector>`
+  for every name the server signs, sorted, written whole from the database
+  and renamed into place (`Keys.Rebuild`). It is rewritten when a domain is
+  added, deleted or imported, by Server › Health › Reload configuration,
+  after a restore, and at every start of the signer before it serves
+  (`WriteSelectors`): Postfix waits for the signer's sockets, so no message
+  meets a table from before - one a rewrite cut short left, the first start
+  of `2.8.0` without one, or one naming the old selector after a changed
+  `DKIM_SELECTOR_DEFAULT`. A rewrite at start that fails is tried again every
+  10 seconds; meanwhile the signer defers what it finds no key for, and the
+  pages stay up. Each role builds a domain service of its own, so the
+  writers are serialised by a mutex (`tableMu`): a writer that read the
+  registry before another's domain was added cannot write after it.
+- **The signer reads files, not the database.** The panel's one SQLite
+  connection is shared with the pages, and a long query would hold up mail.
+  It reads the table for every message (a few lines; a stamp of time and
+  size would miss a rewrite of the same size within one tick of the file
+  system's clock) and a key again when its file's time or size changes; a key
+  the table no longer names is forgotten. Nothing is reloaded.
+- **The panel's alone.** All of `/data/dkim` is `panel:panel`, directories
+  `0700`, files `0600`, set by the entrypoint at every start: no group, no
+  other program reads it.
+- **Two sockets, both strict** (`default_action=tempfail`, so while the role
+  does not answer mail waits, never goes unsigned):
+  `DKIM_SIGN_SOCKET` (`/run/selfpost/sign.sock`) for what applications send
+  on 465/587, signed with the key of the domain the SASL login belongs to -
+  `{auth_authen}`, then `Bindings.DomainOf`, the `sender_login_maps` file
+  Postfix and the sender check read; `DKIM_SIGN_LOCAL_SOCKET`
+  (`/run/selfpost/sign-local.sock`) for what the panel itself submits with
+  `sendmail(1)` (`non_smtpd_milters`), signed with the key of the server's
+  name. The socket a message comes through, not the absence of a login,
+  decides that the server's key may sign it.
+- **The server's own name** (`SELFPOST_HOSTNAME`) has a key and a line in the
+  table without being a row of the registry (`domain.Service.SetServerName`):
+  the panel's notifications are sent as `postmaster@` that name and signed
+  with it. The name is kept in lower case for DKIM, as the signer finds keys
+  by the name in lower case; the SASL realm, which defaults to the hostname,
+  stays as written. No application can use it as an envelope sender - the
+  sender map is built from the registry - and since `2.4.0` none can have a
+  message signed as the server by writing it into `From:` either: the sender
+  check holds the header against the login (§ Sender check). A sending
+  domain of the same name shares its key and selector with the server;
+  deleting that domain leaves the server signed under the default selector,
+  which is the same key only if that was the domain's.
+- **What is signed** — `relaxed/simple`, `rsa-sha256`, with
+  `github.com/emersion/go-msgauth` v0.7.0 (`dkim`). `h=`: every header of
+  the message whose name is in RFC 6376 § 5.4.1's list as OpenDKIM's
+  `dkim_should_signhdrs[]` held it, and `Sender` and `List-Unsubscribe-Post`
+  besides (`signHeaders`), each occurrence, in message order; then, once
+  more, each of `Subject`, `Date`, `To`, `Cc`, `Reply-To` and `Sender` the
+  message has (`overSign` - only those present: Postfix's cleanup adds a
+  missing `Date:` after the milters, out of their sight, and a name in `h=`
+  the message lacked would break the signature over the one added); then `From` once more, last (`signLines`). Each header is hashed as
+  Postfix will deliver it: the value with its leading space (the signer asks
+  for `SMFIP_HDR_LEADSPC`), the lines of a folded one joined with CRLF. The
+  signature is inserted at the top, above Postfix's own `Received:`, as
+  `DKIM-Signature: ...`. `disable_mime_output_conversion=yes`
+  ([build/postfix-config.sh](../build/postfix-config.sh)): an 8-bit message
+  is delivered as it was signed, not converted to 7-bit for a server that
+  does not announce 8BITMIME.
+- **Limits.** What cannot be signed - no line in the table, no key file, a
+  login with no domain, a read error - is deferred. A header section over
+  1 MiB is refused, `552 5.3.4`: the signer holds it whole until the body
+  starts. A body line over 998 bytes is logged (`dkim-signer: <domain> ...`)
+  and the message goes on: Postfix's SMTP client breaks such a line on
+  delivery (`smtp_line_length_limit`), and the signature will not verify. A
+  message has an hour from the end of its headers to its end - go-milter
+  v0.4.1 tells a session nothing of a dropped connection - after which it is
+  deferred, never signed over part of its body.
+- **Logs** go to the panel's stdout, the container's log, as `dkim-signer:`
+  lines; nothing is written to `mail.log` (nor did OpenDKIM write there).
+- **The old tree,** `/data/opendkim` - the keys, `KeyTable` and
+  `SigningTable` until `2.8.0`, shared with OpenDKIM through group
+  `selfpost`. While `/data/dkim` holds no key and the old tree does, the
+  entrypoint copies `/data/opendkim/keys` to `/data/dkim/keys` as the panel
+  user (`setpriv`), into `/data/dkim.new`, renamed when whole; a copy that
+  fails stops the start - the server's name would otherwise get a new key
+  and its published record would no longer match. Keys, selectors and DNS
+  records do not change. The old tree is left for a rollback to a 2.7.x
+  image until the next release, made the panel's alone at every start like
+  the new one, and left out of backups (§ Persistence).
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
@@ -261,9 +344,8 @@ milter, § Postfix above, port 25):
    with the key of the domain the SASL login belongs to) and
    `DKIM_SIGN_LOCAL_SOCKET` (the panel's own mail, `non_smtpd_milters`,
    signed with the key of the server's name); after the sender check and
-   **strict**. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From` once
-   more, go-msgauth/dkim; keys and selectors from OpenDKIM's KeyTable while
-   both sign (`internal/milter/sign.go`).
+   **strict**. Keys and the selector table from `/data/dkim`, no database:
+   § DKIM signing above.
 4. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
@@ -287,12 +369,13 @@ milter, § Postfix above, port 25):
 7. **notifier** — writes to the panel's users when something needs them
    (§ Notifications below).
 
-Milter chain in Postfix: the sender check (tempfail), the panel's DKIM
-signer (tempfail), OpenDKIM (tempfail), then the journal (accept on
-failure); until OpenDKIM leaves the image both sign every message
-(docs/plans/panel-dkim-signing.md, stage 1). Mail submitted locally with
-`sendmail(1)` — the notifier's — passes the signer's own socket and OpenDKIM
-(`non_smtpd_milters`): it is signed, it is the panel's own and so needs no
+Milter chain in Postfix ([build/postfix-config.sh](../build/postfix-config.sh),
+`smtpd_milters`): the sender check (tempfail), the DKIM signer (tempfail),
+then the journal (accept on failure) - the check first, since the signature
+is held to the `From:` domain and a message the check could not judge must
+not be signed. Until `2.8.0` OpenDKIM signed in the signer's place. Mail
+submitted locally with `sendmail(1)` — the notifier's — passes the signer's
+own socket alone (`non_smtpd_milters`, tempfail): it is signed, it is the panel's own and so needs no
 check of whose it is, and it is not an application's mail to be journalled
 or limited. Bounces Postfix
 generates pass no milter.
@@ -302,10 +385,13 @@ generates pass no milter.
 [internal/milter/sender.go](../internal/milter/sender.go) holds a message's
 `From:` header against the application that sends it
 ([plans/from-header-binding.md](plans/from-header-binding.md)). Postfix holds
-the envelope sender against the SASL login, and OpenDKIM chooses the signing
-key by the header; until `2.4.0` nothing connected the two, and an
-application could have mail signed as another domain of the server or as the
-server itself.
+the envelope sender against the SASL login, and the signer signs with the key
+of the login's domain (§ DKIM signing): the signature's `d=` is that domain,
+and a receiver holds it to the domain of `From:` (DMARC, RFC 7489 § 3.1.1).
+Without the check an application could send under the server's signature as
+another domain of the server or as the server itself. The check came in
+`2.4.0`, when OpenDKIM still signed and chose its key by the header itself;
+the hole it closed was the same.
 
 - **The rule is the envelope's.** The check reads the file Postfix reads for
   `smtpd_sender_login_maps` and makes the same lookup: the address itself is
@@ -324,20 +410,20 @@ server itself.
   `src/global/mail_addr_find.c`, `mail_addr_find_opt()`). A key written
   twice makes Postfix refuse the whole table, and the check defers then too.
 - **How the header is read.** Exactly one `From:` field (none, or more than
-  one, is refused), read with OpenDKIM's own parser: libopendkim's
-  `dkim_mail_parse()`, ported line for line from Debian's opendkim
-  2.11.0~beta2 (`internal/milter/mailparse.go`) and tested against the C on
-  two hundred thousand lines. The check asks Postfix for header values with
-  their leading space, as OpenDKIM does (`SMFIP_HDR_LEADSPC`), so both read the
-  same bytes. The address it returns is the one judged - the one OpenDKIM
-  signs for - whatever a display name, a comment or a quoted local part
-  holds; a parse failure, no address, or a second one after it is refused,
-  and so is an address over 256 bytes, which OpenDKIM would match its
-  `SigningTable` against cut short (`dkimf_apply_signtable()`,
-  `MAXADDRESS`). Encoded words are not decoded, by either. The line must also
-  be one address in RFC 5322's grammar (`net/mail`), at the domain OpenDKIM
-  signs for, so that a mail program shows the address that is signed; that
-  address, its local part unquoted, is what the bindings are asked about.
+  one, is refused). The line, its folds joined, must be one address in RFC
+  5322's grammar as Go's `net/mail` reads it - a mail program's reading, the
+  address it shows; a display name may say anything (an encoded one in a
+  charset Go does not convert is passed through unread). A line a lenient
+  program could show as another address - `ceo@bank.com <me@mine.com>`,
+  `<b@evil.com, a@mine.com>` - is refused. That address, its local part
+  unquoted as Postfix holds the envelope's, is what the bindings are asked
+  about, folded to lower case in ASCII only: a Unicode fold would make the
+  Kelvin sign a `k` and let a look-alike pass. The check asks Postfix for
+  header values with their leading space (`SMFIP_HDR_LEADSPC`), as the
+  signer does, so both read the same bytes. Until `2.8.0` the line was also
+  read with a port of OpenDKIM's own parser, so that the address judged was
+  the one OpenDKIM signed for, and an address over 256 bytes was refused;
+  both went with OpenDKIM.
 - **The verdict** comes at the end of the headers: `550 5.7.1`, permanent,
   naming the line, as a reply code of the milter's own. What the client wrote
   is reduced to printable ASCII and cut before it is said back, logged or
@@ -925,19 +1011,19 @@ the cookie and the restored row's `expires_at` has not passed.
 ## Code layers
 
 Multi-store writes that must land in more than one place (SQLite row,
-`sasldb2` entry, Postfix map, OpenDKIM table) go through a service, which is
+`sasldb2` entry, Postfix map, DKIM key or selector table) go through a service, which is
 also where the rollback of a partial failure lives. Handlers may call
 `store` directly for single-table reads and simple writes (sessions, users,
 send-log queries); the first-run setup-token file is read and written in
 `web` itself. The adapters below the services are the only code that knows
-about Postfix, OpenDKIM, DNS or the log file, which is what makes them
+about Postfix, the milter protocol, DNS or the log file, which is what makes them
 substitutable in tests — `milter.Store`, `app.SenderMaps` and
 `logtail.StatusStore` are the seams the unit tests replace with fakes.
 
 ```mermaid
 flowchart TB
   subgraph cmd ["cmd — composition root"]
-    panel["panel: HTTP + journal-milter + log-tailer"]
+    panel["panel: HTTP + sender check + DKIM signer + journal-milter + log-tailer"]
     backupcli["selfpost-backup CLI"]
   end
   subgraph web ["internal/web — HTTP surface"]
@@ -995,7 +1081,7 @@ flowchart TB
   dmarcSvc --> postfix
 ```
 
-The roles inside the `panel` process (HTTP server, sender check,
+The roles inside the `panel` process (HTTP server, sender check, DKIM signer,
 journal-milter, log-tailer, rate-limit recalc, notifier) share one binary and
 one SQLite handle on purpose — see
 [Panel binary](#panel-binary-cmdpanel) for why, and *Persistence* below for the
@@ -1009,7 +1095,8 @@ single-connection trade-off that follows from it.
 |---|---|
 | `selfpost.db` | SQLite panel state (users, sessions, domains, apps, send log, L2 limits, log-tailer offset, inbound relay, DMARC reports) — see [Database](#database) and [schema-migrations.md](schema-migrations.md) |
 | `setup-token` | First-run setup token file |
-| `opendkim/` | DKIM keys + tables |
+| `dkim/` | DKIM keys (`keys/<name>/<selector>.private`) and the selector table (`selectors`) the signer reads; the panel's alone, `0700` / `0600` — § DKIM signing |
+| `opendkim/` | The key tree OpenDKIM read until `2.8.0` (keys, `KeyTable`, `SigningTable`): copied to `dkim/` once, then kept only for a rollback to 2.7.x until the next release; the panel's alone, excluded from backups |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
 | `postfix/relay_domains` | Inbound domains accepted on port 25 |
@@ -1019,7 +1106,7 @@ single-connection trade-off that follows from it.
 | `postfix/dmarc_recipients` | Allow-listed DMARC aggregate report addresses |
 | `postfix/dmarc_transport` | Pipe transport for report ingest |
 | `postfix/dmarc_relay_domains` | Domains accepted for DMARC report delivery |
-| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
+| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate. Handed to `postfix` / `postdrop` by name at every start, before `postfix check` (`own_queue` in `build/entrypoint.sh`): the package accounts' numbers moved in `2.8.0` (postfix 101 → 100, postdrop 103 → 102) |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
 | `manifest.json` | Backup version stamp; removed by the first start after a restore once its Resync is done |
 | `contents.json` | A backup's last entry: the size and SHA-256 of each file under `data/`, compared by the first start after a restore before it opens the database (renamed `contents.checked.json` once compared, removed with the manifest) |
@@ -1089,15 +1176,18 @@ the stored log lines follow;
 `postfix reload` in `postrotate` — see § Log tailer above).
 
 **Restore:** panel button or `selfpost-backup` CLI — self-contained archive:
-`data/` (SQLite snapshot + tree minus `log/`, the setup token and any `tls/`
-under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
+`data/` (SQLite snapshot + tree minus `log/`, the setup token, the old
+`opendkim/` tree and any `tls/` under `/data`), `docker-compose.yml`, `.env`,
+and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
-first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
-tables, Postfix's sender map, inbound relay maps and the filter lists (when
-`INBOUND_RELAY_ENABLE=true`), and DMARC maps (when `DMARC_REPORTS_ENABLE=true`)
-are re-derived from SQLite and both daemons are reloaded, so drift between the
-extracted archive and the database is healed before mail flows. Manual
+first successful boot after restore, the panel runs one **Resync**
+(`mailStack.Resync`, `cmd/panel/httpserver.go`) — the DKIM selector table
+(and the keys of deleted domains removed), Postfix's sender map, inbound relay
+maps and the filter lists (when `INBOUND_RELAY_ENABLE=true`), and DMARC maps
+(when `DMARC_REPORTS_ENABLE=true`) are re-derived from SQLite and Postfix is
+reloaded, so drift between the extracted archive and the database is healed
+before mail flows; the signer reads the new table without a reload. Manual
 `POST /server/health/reload` (the *Reload configuration* button on Server ›
 Health) writes the same files in the same order (`HandleReload`; before
 `2.5.4` it left out the filter lists and the DMARC maps), and on a failure

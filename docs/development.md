@@ -155,16 +155,16 @@ commit rule but **no** version cut until the next product stage ships.
 | **Build** | [Makefile](../Makefile): primary targets `vet`, `test`, `build`, `e2e` (also `all`, `clean`) |
 | **Container** | Docker + Compose v2 on the dev host and in CI |
 | **Image (build stage)** | `golang:1.26-trixie` (bookworm until `2.7.0`) — [build/Dockerfile](../build/Dockerfile). The tag floats to the newest 1.26 patch release, and most standard-library security fixes (`net/http`, `html/template`, …) arrive only that way: rebuild the image after each Go patch release, no edit needed. Dependencies are raised by hand (`go get …@latest`, `go mod tidy`), at least at each audit |
-| **Image (runtime)** | `debian:trixie-slim` (bookworm until `2.7.0`) + Postfix, OpenDKIM, supervisord, SASL, logrotate |
+| **Image (runtime)** | `debian:trixie-slim` (bookworm until `2.7.0`) + Postfix, supervisord, SASL, logrotate (OpenDKIM until `2.8.0`; the panel signs since) |
 | **CI** | GitHub Actions — [.github/workflows/](../.github/workflows/) |
 | **Image registry** | `ghcr.io/mixeme/selfpost` |
 
 **Repository layout** (brief; process details in [architecture.md](architecture.md)):
 
-- `cmd/panel` — HTTP panel + journal-milter + log-tailer
+- `cmd/panel` — HTTP panel + milters (sender check, DKIM signer, journal) + log-tailer + notifier
 - `cmd/selfpost-backup` — backup CLI (`docker exec … selfpost-backup`)
 - `internal/` — domain logic, store, web, health
-- `build/` — Dockerfile, supervisord, Postfix/OpenDKIM, entrypoint
+- `build/` — Dockerfile, supervisord, Postfix, entrypoint
 - `deploy/` — `docker-compose.yml`, proxy examples, `.env.example`
 - `test/e2e/` — **separate Go module**; container integration tests
 
@@ -183,8 +183,9 @@ dependencies must be permissive or GPL-family (see
 | Package | Version | Repository | License |
 |---|---|---|---|
 | `github.com/emersion/go-milter` | v0.4.1 | <https://github.com/emersion/go-milter> | BSD-2-Clause |
-| `golang.org/x/crypto` | v0.54.0 | <https://github.com/golang/crypto> | BSD-3-Clause |
-| `modernc.org/sqlite` | v1.53.0 | <https://gitlab.com/cznic/sqlite> (mirror: <https://github.com/modernc-org/sqlite>) | BSD-3-Clause |
+| `github.com/emersion/go-msgauth` | v0.7.0 (`dkim`, the signer) | <https://github.com/emersion/go-msgauth> | MIT |
+| `golang.org/x/crypto` | v0.58.0 | <https://github.com/golang/crypto> | BSD-3-Clause |
+| `modernc.org/sqlite` | v1.60.1 | <https://gitlab.com/cznic/sqlite> (mirror: <https://github.com/modernc-org/sqlite>) | BSD-3-Clause |
 
 Transitive dependencies — `go mod graph` / `go.sum`; all indirect packages in
 the tree are AGPL-3.0-compatible.
@@ -203,14 +204,16 @@ the tree are AGPL-3.0-compatible.
 
 | Package | Version | Repository | License |
 |---|---|---|---|
-| `github.com/emersion/go-msgauth` | v0.6.8 | <https://github.com/emersion/go-msgauth> | BSD-2-Clause |
+| `github.com/emersion/go-msgauth` | v0.6.8 | <https://github.com/emersion/go-msgauth> | MIT |
 
 The test module is not part of the main `go build` graph and is not shipped in
-the image.
+the image. The e2e sink image also installs dkimpy (`python3-dkim`, Debian
+trixie) as the verifier that is not the signer's library
+([test/e2e/sink/Dockerfile](../test/e2e/sink/Dockerfile)).
 
 ### Debian packages in the runtime image
 
-Postfix, OpenDKIM, `supervisord`, `sasl2-bin`, `logrotate`, and others come
+Postfix, `supervisord`, `sasl2-bin`, `logrotate`, and others come
 from Debian trixie repositories; licenses are in each package's `copyright`
 file on <https://packages.debian.org/trixie/>.
 The image also ships [LICENSE](../LICENSE), [NOTICE](../NOTICE), and the IBM
@@ -222,9 +225,9 @@ the OFL text at `/static/OFL.txt`.
 
 The owner's rule (2026-10-14): what another program does is read in its
 documentation or its source - never guessed. SelfPost reads Postfix's log
-lines and reply codes, feeds OpenDKIM's tables, parses `postqueue`,
-`postconf`, `supervisorctl` and `db_dump` output, talks the milter protocol
-through go-milter, relies on SQLite's locking, on logrotate's and Docker's
+lines and reply codes, parses `postqueue`, `postconf`, `supervisorctl` and
+`db_dump` output, talks the milter protocol through go-milter, signs with
+go-msgauth over the headers Postfix hands a milter, relies on SQLite's locking, on logrotate's and Docker's
 behaviour. Every block of code that does so carries a comment that says
 what it relies on and where that is written, for the version the image runs
 (the Debian trixie package, not upstream's head):
@@ -236,11 +239,14 @@ what it relies on and where that is written, for the version the image runs
 ```
 
 The Debian sources of the image's versions are fetched with `apt-get source`
-inside a `debian:trixie` container (`postfix`, `opendkim`, `cyrus-sasl2`,
-`supervisor`, `logrotate`, and `sendmail` for libmilter); `dev/upstream/`
-(not in git) is where they are kept for reading, and `dev/upstream-bookworm/`
-holds the bookworm ones the citations named before `2.7.0`. Go modules are
-read in the module cache at the version `go.mod` pins.
+inside a `debian:trixie` container (`postfix`, `cyrus-sasl2`, `supervisor`,
+`logrotate`); `dev/upstream/` (not in git) is where they are kept for
+reading, and `dev/upstream-bookworm/` holds the bookworm ones the citations
+named before `2.7.0`. `opendkim` and `sendmail` (for libmilter) are no longer
+the image's since `2.8.0`; they stay in `dev/upstream/` only as what the
+removed code and some historical comments cite (the signer's header list,
+`internal/milter/sign.go`, names OpenDKIM's). Go modules are read in the
+module cache at the version `go.mod` pins.
 
 The image takes `debian:trixie-slim` and installs without pinning (pinned
 Debian versions leave the mirrors), so a rebuild after a point or security
@@ -480,9 +486,29 @@ L1/L2 limits, the panel down or hung mid-message (Postfix defers the mail
 rather than letting it through: `panel_down_defers_mail`,
 `panel_hung_mid_message_is_counted`), bad `SELFPOST_HOSTNAME`, session
 survives `docker restart`); startup checks that supervisord actually brought up
-OpenDKIM, the panel, and Postfix (`checkSupervisorProcesses`), plus logrotate
-config-mode and forced-rotation checks (`checkLogrotateConfigMode`,
-`checkLogrotateRotation` — [test/e2e/logrotate_check.go](../test/e2e/logrotate_check.go)).
+the panel, Postfix, cert-reload and logrotate (`checkSupervisorProcesses`),
+that `/data/dkim` is the panel's alone, directories 0700 and files 0600
+(`checkDKIMTree`), and that the image's Debian packages are the cited ones
+(`checkCitedPackageVersions`), plus logrotate config-mode and forced-rotation
+checks (`checkLogrotateConfigMode`, `checkLogrotateRotation` —
+[test/e2e/logrotate_check.go](../test/e2e/logrotate_check.go)).
+
+DKIM has an oracle that is not the signer's library: on every positive send
+and on a notification, `checkPanelSignature`
+([test/e2e/mail_helpers.go](../test/e2e/mail_helpers.go)) requires exactly
+one signature, the panel's (`relaxed/simple`, `rsa-sha256`, `From` signed and
+over-signed), and has dkimpy (`dkimverify` in the sink) verify it against the
+stand's CoreDNS; go-msgauth's verifier (`verifyDKIM`) checks the published
+record as a receiver would. `signature_over_awkward_headers`
+([test/e2e/dkim_shapes_test.go](../test/e2e/dkim_shapes_test.go)) sends the
+header shapes Postfix hands a milter in its own way - folded, tab-led, no
+space after the colon, two `To:` - and an 8-bit body, and dkimpy verifies
+what was delivered. `TestStartsOnA27Data`
+([test/e2e/upgrade_test.go](../test/e2e/upgrade_test.go)) starts the image on
+a `/data` a 2.7.x image left: the key under `/data/opendkim` is copied to
+`/data/dkim` unchanged and the selector table names it, the old tree becomes
+the panel's alone, and a queue owned by other uids is handed to Postfix's
+users by name.
 Waits poll with a timeout (`waitFor`); a fixed sleep is the exception and says
 why where it stands (`sender_check_test.go`: a downtime worth a second or two,
 and 35 s to show a row is not written again).
@@ -528,7 +554,7 @@ prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
       → GitHub Packages API → drop untagged versions no tagged manifest references
 ```
 
-Native per-arch matrix (no QEMU): running the full Postfix/OpenDKIM stack under
+Native per-arch matrix (no QEMU): running the full Postfix stack under
 emulation for e2e is impractical. E2e first, then push — the registry receives
 the bytes that passed the gate. Each release leaves three tags in GHCR:
 `X.Y.Z` (the multi-arch manifest operators pin) and `X.Y.Z-amd64` /

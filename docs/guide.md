@@ -451,9 +451,9 @@ assumptions stay here in `docs/guide.md`.
 
 **Overview** (`/overview`, global role) shows the stamp — the worst of its
 checks — and one card per check: machine (processor and memory), supervised
-processes (Postfix, OpenDKIM, panel), TLS certificate, queue, milter sockets
-and reverse DNS. A check the panel could not run shows as a warning, never as
-fine. Below the cards are the outbound domain list and, with the inbound relay
+processes (Postfix, the panel - whose roles include the DKIM signer - and
+their helpers), TLS certificate, queue, milter sockets and reverse DNS. A
+check the panel could not run shows as a warning, never as fine. Below the cards are the outbound domain list and, with the inbound relay
 on, the inbound one. Each card leads to its table on **Server › Health**
 (`/server/health`) — the queue card to the Outbound queue — and Health has the
 readings, in the order of what stops mail first:
@@ -466,7 +466,12 @@ readings, in the order of what stops mail first:
   memory is a warning, because both delay or kill the mail path; throughput is
   only reported.
 - **Processes**, **TLS certificate** (validity and expiry) and **Milter
-  sockets** (OpenDKIM, the sender check and the journal-milter).
+  sockets**: the DKIM signer's two - `dkim-signer · applications` for what
+  applications send on 465/587, `dkim-signer · notifications` for the
+  panel's own mail - the sender check, the send log (the journal-milter)
+  and, with one configured, the spam filter. Postfix attaches the signer
+  strictly, so either of its rows down means the mail that goes through it
+  waits.
 - **Sender check** — what the strict check of the `From:` line has cost
   today, in the last 30 days and in the last 12 months: for how long the
   panel did not answer while Postfix was running, how many connections
@@ -487,10 +492,12 @@ readings, in the order of what stops mail first:
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
   *Re-check DNS* after changing DNS.
 - **Configuration** — the **Reload configuration** button writes again, from
-  the database, every file the panel keeps for the mail path - OpenDKIM's
-  tables, the Postfix sender map, the inbound relay maps and the filter lists
-  (with `INBOUND_RELAY_ENABLE=true`), the DMARC report maps (with
-  `DMARC_REPORTS_ENABLE=true`) - and has OpenDKIM and Postfix re-read them:
+  the database, every file the panel keeps for the mail path - the DKIM
+  selector table (`/data/dkim/selectors`), the Postfix sender map, the
+  inbound relay maps and the filter lists (with `INBOUND_RELAY_ENABLE=true`),
+  the DMARC report maps (with `DMARC_REPORTS_ENABLE=true`) - removes the keys
+  of deleted domains, and has Postfix re-read them; the signer needs no
+  reload, it reads the table for every message. This is
   what the first start after a restore does (see [Restore](#restore)). Use it
   if the daemons drifted from what the panel shows after manual edits under
   `/data`. A step that fails is named on the page, and the panel's log says
@@ -513,6 +520,16 @@ readings, in the order of what stops mail first:
   six hours. It lives in the data volume, so it survives a container recreate
   along with the rest of the state — `./data/log/` on the host — but it is
   *not* included in backups: it is diagnostics, not state.
+- **The container log** (`docker compose logs selfpost`) — what the panel
+  itself says, its milters among it; none of it is in `mail.log`. A message
+  the DKIM signer cannot sign is not sent unsigned, it waits: Postfix
+  answers an application with a temporary error and the application sends
+  it again later. Why is a line of the container log that begins `dkim-signer:` and
+  ends `- deferring`, e.g. `dkim-signer: no signing key for example.com -
+  deferring` (the selector table has no line for the domain: *Reload
+  configuration* on Server › Health writes it again from the database) or
+  `dkim-signer: no sending domain for login "shop" - deferring`. The sender
+  check's lines begin `sender-check:`.
 
 ### Account
 
@@ -650,11 +667,52 @@ published, then `docker compose up -d`. The backup version check requires the ru
 to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag).
 
+**To 2.8.0** there is nothing to do. From 2.8.0 the panel signs outgoing
+mail itself, in a milter of its own, and OpenDKIM is no longer in the image;
+the keys, the selectors and the DNS records stay as they are. The keys move
+from `data/opendkim/keys` to `data/dkim/keys`: on the first start the
+entrypoint copies them, as the panel's user, into `data/dkim.new`, renamed
+into place when the copy is whole, and says so in the container log
+(`entrypoint: the DKIM keys were copied from /data/opendkim to /data/dkim;
+/data/opendkim is left for a rollback`). A copy that fails stops the start -
+the panel would otherwise give the server's own name a new key, and its
+published record would no longer match. `data/dkim` is the panel's alone
+(directories 0700, files 0600); so is `data/opendkim`, which is left as it
+was, for a rollback, until the next release, and which a full backup leaves
+out. The selector table, `data/dkim/selectors`, is written from the database
+at every start, before the signer serves.
+
+**Rolling back to 2.7.x** after that: the 2.7.x image signs with OpenDKIM
+from `data/opendkim`, which holds the keys as they were at the upgrade. A
+domain added under 2.8.x has no key there, and 2.7.x sends its mail
+unsigned; one deleted and added again under 2.8.x has its old key there,
+which no longer matches its published record. Postfix's queue under
+`data/postfix/queue` belongs to Postfix's users, which have other numbers
+in the two images (postfix 100 in 2.8.0, 101 in 2.7.x); a 2.7.x start
+reads the queue before it hands it over and stops at `postfix check`
+("scan_dir_push: open directory defer: Permission denied"). With the
+instance stopped, hand the queue over in the 2.7.x image itself, by name,
+before its first start (the image is the one you roll back to):
+
+```bash
+docker run --rm -v ./data:/data --entrypoint sh ghcr.io/mixeme/selfpost:2.7.0 -c 'chown -R postfix:postfix /data/postfix/queue && chgrp postdrop /data/postfix/queue/public /data/postfix/queue/maildrop && chown root /data/postfix/queue /data/postfix/queue/pid'
+```
+
+(Measured on the test server, 2026-10-16, on a copy of its queue: 2.7.x's
+`postsuper` failed before and passed after.) Going forward again needs
+nothing for the queue - 2.8.0 hands it over itself. A domain added under
+2.7.x has its key only in `data/opendkim/keys/<domain>/`, and the
+entrypoint copies only while `data/dkim` holds no key at all: with the
+instance stopped, copy that directory into `data/dkim/keys/` (the start
+makes it the panel's). Removing `data/dkim` instead has the old tree copied
+again whole and loses the keys of domains added under 2.8.x.
+
 ### Container health
 
 The image declares a Docker `HEALTHCHECK` that probes `GET /healthz` on port
-8080 (unauthenticated). It returns `200 ok` when OpenDKIM, the panel, and
-Postfix are all `RUNNING` under supervisord; otherwise `503 unhealthy`. This
+8080 (unauthenticated). It returns `200 ok` when the panel - whose roles
+include the DKIM signer - and Postfix are both `RUNNING` under supervisord;
+otherwise `503 unhealthy`. This
 catches a dead mail path that would still leave the HTTP server up, but it
 does **not** verify TLS certificates, DNS records, or end-to-end delivery —
 use the authenticated [Overview and Health](#overview-and-health) pages for
@@ -708,10 +766,12 @@ as themselves, the host's IPv6 address and `127.0.0.1` as `172.18.0.1`.
 ### Full backup and restore
 
 **Full backup** is a self-contained project archive: `data/` (SQLite, all
-domains' DKIM keys, all applications' SASL credentials, `manifest.json` with
-the version that created it), plus `docker-compose.yml`, `.env`, and `certs/`
-from the operator directory next to `./data`. Delivery logs under `data/log/`
-are excluded, and so is the Postfix queue: the archive is taken while the
+domains' DKIM keys under `data/dkim/`, all applications' SASL credentials,
+`manifest.json` with the version that created it), plus `docker-compose.yml`,
+`.env`, and `certs/` from the operator directory next to `./data`. Delivery
+logs under `data/log/` are excluded, so is `data/opendkim/` (the key tree an
+installation upgraded from 2.7.x keeps for a rollback, see
+[Upgrading](#upgrading)), and so is the Postfix queue: the archive is taken while the
 instance runs, and a copy of a queue Postfix is working on can hold a message
 twice or not at all. Mail still waiting for delivery is therefore not carried
 over, and a restored instance starts with an empty queue; to keep the queue,
@@ -828,10 +888,10 @@ container of the **exact same image version** that created the backup — SelfPo
 refuses to start otherwise and tells you which tag to use. On the first
 successful start after restore, `data/manifest.json` from the archive is
 **deleted** — it guards only that one boot, so a later in-place upgrade is not
-blocked. On that same first boot the panel also runs one **Resync** — OpenDKIM's
-tables and Postfix's sender map are re-derived from SQLite (inbound relay maps
+blocked. On that same first boot the panel also runs one **Resync** — the DKIM
+selector table and Postfix's sender map are re-derived from SQLite (inbound relay maps
 when `INBOUND_RELAY_ENABLE=true`; DMARC maps when `DMARC_REPORTS_ENABLE=true`)
-and both daemons are reloaded, healing any drift between the extracted files and
+and Postfix is reloaded, healing any drift between the extracted files and
 the database. The manifest is deleted only after that Resync is done: a first
 start that fails on the way leaves it, and the next start is a restore again
 and runs the Resync. The *Reload configuration* button on Server › Health runs the same Resync.
@@ -1142,7 +1202,7 @@ inbound mail is being refused with a temporary error (`tempfail`) or going throu
 (`accept`).
 
 **Inbound mail is not in the Outbound log.** Port 25 runs its own milter chain:
-the optional anti-spam milter, and nothing else. OpenDKIM does not sign relayed
+the optional anti-spam milter, and nothing else. The DKIM signer does not sign relayed
 mail (and a signing outage therefore cannot hold it up), and the journal-milter
 does not file it — the [Outbound log](#outbound-log) stays a record of what
 *you* sent.
@@ -1259,7 +1319,7 @@ listed for it. Since `2.4.0` that rule covers both senders a message has:
 
 - the **envelope sender** (`MAIL FROM`), which Postfix checks;
 - the **`From:` line** of the message - the one a mail program shows and the
-  one the DKIM signature is chosen by - which the panel checks.
+  one DMARC holds the DKIM signature's domain to - which the panel checks.
 
 An address with an extension counts as the address: an application listed as
 `invoices@…` may also send as `invoices+march@…`, in the envelope and in
@@ -1272,13 +1332,15 @@ Postfix asks who owns the address before it asks who owns the domain.
 A message whose `From:` is anything else is refused with `550 5.7.1` and a
 text naming the line: another of your domains, the server's own name, an
 address at a domain that is not on this server, a line with two addresses,
-or no `From:` at all. The line is read the way the signer, OpenDKIM, reads
-it - the panel runs OpenDKIM's own parser - so only its address counts: what a
-display name or a comment around it says is not judged, and a line with more
-than one address is refused. A display name with a comma or brackets has to
-be quoted (`"Shop, Inc." <orders@…>`), as the mail standard asks and mail
-libraries do; unquoted, OpenDKIM may take a word of the name for the
-address. The refusal
+or no `From:` at all. The line must be one address as the mail standard
+(RFC 5322) writes it - the address a mail program shows - and only that
+address counts: what a display name or a comment around it says is not
+judged, and a line with more than one address is refused. A display name
+with a comma or brackets has to be quoted (`"Shop, Inc." <orders@…>`), as
+the standard asks and mail libraries do; unquoted, the line does not read
+as one address and is refused. The address is held to the application's
+list the way Postfix holds the envelope sender, a quoted local part as the
+same address unquoted. The refusal
 is permanent, so the application does not send the message again; it is a
 row of the [Outbound log](#outbound-log) tagged `wrong From`, and the row's
 page shows what the line said.
@@ -1298,6 +1360,23 @@ temporary error (`451`, and `454` to the login): an application that queues
 its mail sends it again later, one that sends directly gets an error to retry;
 nothing is accepted unchecked. **Server › Health** counts how often
 that happens.
+
+Since `2.8.0` the check also guards the signature: the panel signs an
+application's message with the key of the domain its login belongs to, and
+DMARC counts that signature only when its domain aligns with the domain of
+`From:`. Without the check an application could send under this server's
+signature as another of its domains, or as the server itself.
+
+**Lines of more than 998 bytes.** The signer signs the message as the
+application handed it over. Postfix's SMTP client breaks a body line longer
+than 998 bytes when it delivers the message (`smtp_line_length_limit`),
+after the signature was made, and the receiver's check of the signature
+then fails. Such a message is still sent; the container log names its
+domain and login (`dkim-signer: example.com (login "shop"): a body line
+longer than 998 bytes - ...`). Mail libraries keep lines short with
+quoted-printable or base64; an application that writes its own body has to
+as well. A message whose header section is over 1 MiB is refused,
+`552 5.3.4`.
 
 *Export domain* writes a single-domain file; *Import a domain* on *Server ›
 Backup* reads one back in (**global role only**) — see [Exporting and importing

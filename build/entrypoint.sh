@@ -120,8 +120,8 @@ find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim 
 # panel would otherwise make the server's own name a new key, and its
 # published record would no longer match. The selector table is written by
 # the panel before its signer serves (cmd/panel/signer.go). After a rollback
-# to 2.7.x, a domain added there has its key only in the old tree: remove
-# /data/dkim before the next start of 2.8.x to copy again.
+# to 2.7.x, a domain added there has its key only in the old tree: its
+# directory is copied into /data/dkim/keys by hand (guide § Upgrading).
 # (util-linux 2.41, setpriv(1): --reuid, --regid, --clear-groups; cp(1)
 # -P: never follow a symbolic link in the source; chown -R and find never
 # follow one either. GNU chmod keeps a directory's set-group-ID bit under a

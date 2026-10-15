@@ -6,9 +6,9 @@
 
 Self-hosted SMTP relay with a web panel — one Docker image, no provider.
 
-Postfix, OpenDKIM, and a small Go panel run together under `supervisord`; you
-configure domains, DKIM keys, and SASL applications once, then point your apps
-at the SMTP endpoint.
+Postfix and a small Go panel, which also signs outgoing mail with DKIM, run
+together under `supervisord`; you configure domains, DKIM keys, and SASL
+applications once, then point your apps at the SMTP endpoint.
 
 SelfPost sends mail straight to the internet from **your own IP**, with
 per-domain DKIM signing. No mailboxes or webmail. An optional inbound relay

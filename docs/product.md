@@ -41,8 +41,8 @@ decision:
    are not a current target but not ruled out forever.
 2. **Send from your own IP (DIY)** — no intermediate relay provider. Requires
    outbound port 25, static IP, and configurable PTR/rDNS from the operator.
-3. **Single container** — Postfix, OpenDKIM, and the panel run under one
-   `supervisord` inside one image.
+3. **Single container** — Postfix and the panel, which signs outgoing mail
+   with DKIM itself, run under one `supervisord` inside one image.
 4. **Panel is internet-facing** — mandatory security requirements in
    [security.md](security.md).
 
