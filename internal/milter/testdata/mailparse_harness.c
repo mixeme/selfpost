@@ -5,8 +5,9 @@
  * line. Output per line: the error, then the local part and the domain, each
  * "-" when NULL and "=" followed by its bytes in hex otherwise.
  *
- *   cc -o mailparse_harness -I <opendkim>/libopendkim mailparse_harness.c
- *   MAILPARSE_C=./mailparse_harness go test -run TestMailParseMatchesOpenDKIM ./internal/milter
+ *   test/upstream/mailparse-diff.sh <opendkim source dir>
+ *
+ * builds it in debian:bookworm and runs TestMailParseMatchesOpenDKIM with it.
  */
 #include <sys/types.h>
 #include <stdio.h>
