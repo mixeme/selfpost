@@ -78,8 +78,10 @@ func verifyDKIM(raw []byte, domain string) error {
 // postfixReceived returns the Received: headers of raw that a Postfix smtpd
 // wrote - "(Postfix)" after the host name, the only form it writes (Postfix
 // 3.10.13, src/smtpd/smtpd.c:3627-3645, "by %s (%s)" with var_mail_name).
-// In the stand only SelfPost's Postfix writes one: the sink is smtp-sink,
-// which adds none, and the tests compose their messages without any.
+// In the stand only SelfPost's Postfix writes one: the tests compose their
+// messages without any, and the sink, smtp-sink, adds its own with "by
+// <host> (smtp-sink)" (src/smtpstone/smtp-sink.c:520-531,
+// mail_file_finish_header()), which the "(Postfix)" filter leaves out.
 func postfixReceived(raw []byte) ([]string, error) {
 	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {

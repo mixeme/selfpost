@@ -85,10 +85,14 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
 # it off (debian/configure-instance.in:22-24 and :44; debian/README.Debian:136-138).
 RUN printf 'SYNC_CHROOT=\n' > /etc/default/postfix
 
-# Unprivileged user for the panel process. Its ids are left to useradd: the
-# entrypoint gives /data back to it by name on every start, so a number
-# that differs from one image to the next changes nothing.
-RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
+# Unprivileged user for the panel process, with ids of its own outside the
+# system range for the same reason as selfpost's below: its files under
+# /data show on the host by number, and a number from that range is a
+# system group of the host's too (useradd gave the panel group 998 in the
+# trixie image, systemd-network on the test server's host; bookworm's
+# 999:999 was the host's systemd-journal group). The entrypoint gives /data
+# back to it by name on every start, so files of the old ids follow.
+RUN groupadd --system --gid 10999 panel  && useradd --system --uid 10999 --gid panel --no-create-home --shell /usr/sbin/nologin panel
 
 # Shared group bridging the unprivileged services: the panel generates
 # per-domain DKIM keys, application SASL accounts (sasldb2) and the Postfix

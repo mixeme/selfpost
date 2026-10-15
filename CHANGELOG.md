@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Security
 
+- **The panel's database was readable by every user of the container.**
+  `selfpost.db` and its `-wal` and `-shm` files were 0644 under a
+  traversable `/data`; they hold the panel users' password hashes and the
+  session token hashes, and Postfix's smtpd - which faces the Internet -
+  and OpenDKIM run as other users there. The panel now makes them 0600 at
+  every start; SQLite gives the next `-wal` and `-shm` the database's mode.
+  Found by the security review of this release.
+- **The entrypoint no longer follows a symbolic link the panel user could
+  leave under `/data`.** Several of its steps run as root and chmod,
+  create or regroup paths in a tree the panel writes; a link where a
+  directory or table is expected is now removed first. No escalation was
+  found - a compromised panel could only have turned it against the
+  container itself.
+
 - **The image runs Debian trixie instead of bookworm** (base-trixie).
   Bookworm left regular security support on 2026-07-12, and its Postfix
   3.7.11 lacks upstream's 2026 security fixes, which carry no CVE ids and
@@ -14,7 +28,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   August batch (among them a BDAT memory exhaustion, a crash by DATA after
   a BDAT error, and a policy and milter bypass after an end-of-data
   reject), Debian's security support until 2028, OpenSSL 3.5 and libmilter
-  8.18.1. OpenDKIM's code is unchanged. The build stage is
+  8.18.1. OpenDKIM's signing and From:-parsing code is unchanged (Debian's
+  new patches touch the verifier's Authentication-Results and librbl).
+  The build stage is
   `golang:1.26-trixie`.
 
 ### Changed
@@ -54,7 +70,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the trixie image a package took it and the build failed, and on a host it
   is often a system group of the host's own, which could then read the key
   as well (on the test server's host it is `systemd-network`). 10998 is
-  outside that range. **On upgrade, give the private key in `certs/` to
+  outside that range. The panel user is 10999:10999 for the same reason
+  (it was 999:999, the host's `systemd-journal` group on the test server).
+  **On upgrade, give the private key in `certs/` to
   the new group on the host** - `chgrp 10998` where the guide said
   `chgrp 998`, in a certbot deploy hook too - or a full backup is refused
   until then; Postfix reads its own copy and is not affected. The other
@@ -63,22 +81,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - `opendkim-tools` is no longer installed: nothing in the image ran it.
   `openssl` is installed by name, for the certificate reload.
 
+- **Made ready for what trixie's programs do differently:** the log tailer
+  reads Postfix 3.10's refusal lines that carry `sasl_method=`,
+  `sasl_username=` and `sasl_sender=`, and cleanup's `removed (canceled)`
+  for a transaction that did not complete; the rotation loop refuses on
+  logrotate 3.22's "Ignoring" output, now with exit status 1 where 3.21
+  gave 0; Debian's chroot sync, which trixie's postfix runs at every
+  start, is turned off (`SYNC_CHROOT=` in `/etc/default/postfix`; nothing
+  runs chrooted), so `/etc/resolv.conf` and the like are not copied into
+  the queue under `/data`; a mail.log Postfix creates itself is `0640`, as
+  the entrypoint and logrotate create it.
+
 ### Fixed
 
-- **The retry policy shown in the panel could fall back to Postfix's
-  compiled-in defaults:** the panel read `postconf`'s warnings together
-  with its values, and since Postfix 3.9 `postconf` warns about deprecated
-  parameters. It reads the values alone now and logs the warning.
-- **logrotate 3.22 exits 1 when it skips a config it does not trust;**
-  3.21 exited 0. The rotation loop now refuses to run on that output
-  whatever the exit code, instead of retrying for ever.
-- **The log tailer reads Postfix 3.10's new line shapes:** refusal lines
-  that carry `sasl_method=`, `sasl_username=` and `sasl_sender=`, and
-  cleanup's `removed (canceled)` for a transaction that did not complete.
-- Debian's chroot sync no longer copies `/etc/resolv.conf` and the like
-  into the queue under `/data` at every start (`SYNC_CHROOT=` in
-  `/etc/default/postfix`; nothing runs chrooted). A Postfix-created
-  mail.log is `0640`, as the entrypoint and logrotate create it.
+- **The retry policy shown in the panel fell back to Postfix's compiled-in
+  defaults whenever `postconf` warned:** the panel read `postconf`'s
+  standard error together with its values, and a warning there - an
+  unused parameter in main.cf, and since Postfix 3.9 a deprecated one -
+  was one value too many. The image's own main.cf sets none, so it took a
+  parameter an operator added. The panel reads the values alone now and
+  logs the warning. `db_dump`'s output, which the panel parses to list the
+  SASL accounts, is read the same way.
 
 ## [2.6.1] - 2026-10-15
 

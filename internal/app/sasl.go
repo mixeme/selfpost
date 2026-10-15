@@ -309,11 +309,17 @@ func runSaslpasswd2(args []string, stdin []byte) error {
 // dumpSASLDB runs db_dump to export the sasldb2 as key/value hex pairs. The path
 // is our own sasldb2 file (never user input) and is passed as a fixed argument
 // with no shell (security.md).
+//
+// Only standard output is the dump: a message db_dump writes to standard
+// error is not data and is left out of what is parsed (the same rule as
+// postconf's values in internal/postfix, retry.go; review of base-trixie).
 func dumpSASLDB(path string) ([]byte, error) {
 	cmd := exec.Command("db_dump", path)
-	out, err := cmd.CombinedOutput()
+	var errOut bytes.Buffer
+	cmd.Stderr = &errOut
+	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("db_dump: %w: %s", err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf("db_dump: %w: %s", err, strings.TrimSpace(errOut.String()))
 	}
 	return out, nil
 }

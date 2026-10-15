@@ -518,11 +518,11 @@ deferred item from the roadmap.
 - **The filter lists are files readable by anyone on the host.**
   `/data/antispam` is 0755 and its six files 0644, unlike the rest of `/data`:
   the filter runs under another user in another container (rspamd as
-  `_rspamd`, uid 11333, in `rspamd/rspamd:3.11.1-3`; the panel is uid 999 -
-  measured on a live server, 2026-10-15). They hold sender
+  `_rspamd`, uid 11333, in `rspamd/rspamd:3.11.1-3`, measured on a live
+  server, 2026-10-15; the panel is uid 10999 since `2.7.0`). They hold sender
   addresses, domains and networks - who the operator blocks and whom he lets
   through - but no message data. The inbound journal itself is in the
-  database, 0640. Trigger to revisit: a shared host, where the sidecar should
+  database, which is 0600 since `2.7.0` (0644 before). Trigger to revisit: a shared host, where the sidecar should
   instead be given the files through a group it shares with the panel.
 - ~~**An application can learn which domains are senders of this server.**~~
   Struck in `2.5.2` (audit 2026-10-12, stage 2c; L8 closed): the sender

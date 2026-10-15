@@ -825,8 +825,9 @@ attention to 3.10's reject logging (`sasl_method`, `sasl_username`,
 cleanup's `canceled` line, 3.8's `postfix(1)` stderr logging under
 supervisord; `dev/upstream` refetched from trixie; the cited-package table
 and `checkCitedPackageVersions`; the e2e sink image; `opendkim-tools`
-dropped from the image (used by nothing at run time). OpenDKIM's code is
-the same in trixie, its citations stand. One stage, a MINOR release. Also
+dropped from the image (used by nothing at run time). OpenDKIM's signing
+and From:-parsing code is the same in trixie (its new Debian patches touch
+the verifier and librbl), its citations stand. One stage, a MINOR release. Also
 gained: `smtpd_hide_client_session` (3.10); the owner decided on
 2026-10-15 to turn it on for 465 and 587 in the same release, so the
 `Received:` header no longer shows the application's address.

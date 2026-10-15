@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo), keeps the static build
@@ -63,7 +64,34 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := keepPrivate(path); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+// keepPrivate makes the database file and its WAL and shared-memory files
+// the panel's alone (0600). They hold the panel users' password hashes and
+// the session token hashes, and /data is traversable by every user of the
+// container (entrypoint.sh) - Postfix and OpenDKIM among them. SQLite
+// creates a file with 0644 less the umask, and the panel sets no umask; the
+// -wal and -shm files take the database file's mode when they are created
+// (SQLite 3.53.4 as modernc.org/sqlite v1.60.1 builds it,
+// lib/sqlite_linux_386.go: findCreateFileMode(), "WAL and journal files are
+// created using the same permissions as the associated database file";
+// unixOpenSharedMemory(), robust_open(... st_mode&0777) of the database's
+// fstat). So the database file is chmodded and the two files beside it,
+// where they exist already; the next ones follow its mode. Found by the
+// security review of base-trixie (2026-10-15): the file was 0644 on the
+// test server.
+func keepPrivate(path string) error {
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(p, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("database mode: %w", err)
+		}
+	}
+	return nil
 }
 
 // Close closes the underlying database.

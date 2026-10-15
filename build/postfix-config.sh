@@ -387,7 +387,8 @@ postconf -e \
 # what the exceptions above and smtpd_forbid_bare_newline_exclusions (below)
 # spare. The value is the one Debian's debconf default gives (postfix
 # 3.10.13-0+deb13u1, debian/templates:124-126, "postfix/mynetworks", written
-# by debian/postfix.postinst:249-262; debian/main.cf.in:28 has 127.0.0.0/8
+# by debian/postfix.postinst:249-262 on a new main.cf, where :180,
+# fset_all_changed, marks every debconf value to be written; main.cf.in:28 has 127.0.0.0/8
 # alone), so on this image it changes nothing.
 postconf -e \
 	"mynetworks=127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128" \

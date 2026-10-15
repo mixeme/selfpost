@@ -66,6 +66,31 @@ esac
 # mode 0o700".)
 chown panel:panel /data
 chmod 755 /data
+
+# What follows runs as root over a tree the panel user writes: /data is the
+# panel's, and so is /data/postfix. A symbolic link the panel put where a
+# directory or a file of its own is expected would lead root's mkdir, ": >",
+# chmod and chgrp to whatever it names (chmod follows a link; so do a
+# redirect and mkdir -p; chown -R and find do not descend into one given as
+# their operand). None of these paths is ever a link in a working
+# installation, so a link there is removed and the path made anew below.
+# (Security review of base-trixie, 2026-10-15: no escalation found, as the
+# TLS key copy and the read-only mounts stand, but nothing for root to
+# follow either.)
+drop_links() {
+	for p in "$@"; do
+		if [ -L "$p" ]; then
+			echo "entrypoint: removing the symbolic link $p" >&2
+			rm -f "$p"
+		fi
+	done
+}
+drop_links /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
+	/data/opendkim/keys /data/opendkim/KeyTable /data/opendkim/SigningTable \
+	/data/sasl/sasldb2 /data/postfix/queue \
+	/data/postfix/sender_login_maps /data/postfix/relay_domains \
+	/data/postfix/transport /data/postfix/relay_recipients /data/postfix/tls_policy \
+	/data/log/mail.log
 # Restored backups or previously-created state may contain panel-owned files
 # under /data; make sure they stay writable without disturbing anything that a
 # later phase deliberately hands to another service. /data/log is exempt: it is
@@ -73,7 +98,7 @@ chmod 755 /data
 # normalised on its own below, as are the trees shared through group selfpost.
 # A file's owner is a number: an entry whose user or group is not the panel's
 # by that number - unpacked by root, or written under another image whose
-# useradd gave the panel other ids (bookworm's 999:999, until 2.7.0) - is
+# image gave the panel other ids (999:999 until 2.7.0, 10999:10999 since) - is
 # handed over whole.
 find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim ! -name sasl ! -name antispam \
 	\( ! -user panel -o ! -group panel \) -exec chown -R panel:panel {} +
