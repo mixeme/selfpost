@@ -209,6 +209,20 @@ func (s *Store) ExpireMessage(queueID string) (int64, error) {
 	return n, nil
 }
 
+// openRows selects the rows still open, StatusQueued and StatusDeferred
+// written as literals: a term the same as the WHERE of the partial index
+// idx_send_log_open (migration 0010) is what lets SQLite use it
+// (https://sqlite.org/partialindex.html § 3), and a bound parameter is not.
+const openRows = `status IN ('queued', 'deferred') AND queue_id <> ''`
+
+// listOpenQuery is ListOpenOlderThan's. The unary + on the order keeps SQLite
+// from walking the whole table in id order instead of the index
+// (https://sqlite.org/optoverview.html § 18): the open rows are few, and
+// sorting them is nothing.
+const listOpenQuery = `SELECT id, queue_id, to_addr FROM send_log
+		 WHERE ` + openRows + ` AND created_at < ?
+		 ORDER BY +id`
+
 // QueuedDelivery is a send-log row still waiting for a delivery result,
 // reduced to what the log-tailer's reconcile sweep needs to look it up in the
 // Postfix queue and, failing that, to close it (architecture.md § Log tailer).
@@ -232,12 +246,7 @@ type QueuedDelivery struct {
 // BINARY collation, memcmp() (https://sqlite.org/datatype3.html § 7), and
 // time.RFC3339 of a UTC time is fixed-width, YYYY-MM-DDTHH:MM:SSZ.
 func (s *Store) ListOpenOlderThan(cutoff time.Time) ([]QueuedDelivery, error) {
-	rows, err := s.db.Query(
-		`SELECT id, queue_id, to_addr FROM send_log
-		 WHERE status IN (?, ?) AND queue_id <> '' AND created_at < ?
-		 ORDER BY id`,
-		StatusQueued, StatusDeferred, cutoff.UTC().Format(time.RFC3339),
-	)
+	rows, err := s.db.Query(listOpenQuery, cutoff.UTC().Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("list queued send_log rows: %w", err)
 	}
@@ -284,6 +293,23 @@ type SendLogRow struct {
 	UpdatedAt time.Time
 }
 
+// attachRefusalLineQuery is AttachRefusalLine's. The refused row is found by
+// its time among the refused rows
+// (idx_send_log_rejected: the status a literal, and the unary + keeps
+// SQLite from walking every refusal without a queue id instead), and the
+// line by idx_send_log_refusal_line (migration 0010; the second term is that
+// index's WHERE) - https://sqlite.org/partialindex.html § 3,
+// optoverview.html § 18.
+const attachRefusalLineQuery = `UPDATE send_log SET refusal_line = ?1 WHERE id = (
+			SELECT id FROM send_log
+			WHERE status = 'rejected' AND +queue_id = '' AND refusal_line = ''
+			  AND reason IN ('', ?2, ?3) AND from_addr = ?4 COLLATE NOCASE AND client_ip = ?5
+			  AND app_login = ?9 COLLATE NOCASE
+			  AND created_at BETWEEN ?6 AND ?7
+			ORDER BY ABS(julianday(created_at) - julianday(?8)), id
+			LIMIT 1)
+		 AND NOT EXISTS (SELECT 1 FROM send_log WHERE refusal_line = ?1 AND refusal_line <> '')`
+
 // AttachRefusalLine puts Postfix's line about a refusal at MAIL FROM on the
 // row the journal milter wrote for it (audit 2026-10-12, stage 2b). Such a
 // refusal has no queue id, and the line names no login, so the row is found
@@ -302,17 +328,8 @@ type SendLogRow struct {
 // § 2); NOCASE folds ASCII only (datatype3.html § 7.1); ?1 is bound once and
 // used twice (lang_expr.html § 4).
 func (s *Store) AttachRefusalLine(clientIP, login, from string, at time.Time, line string) (bool, error) {
-	res, err := s.db.Exec(
-		`UPDATE send_log SET refusal_line = ?1 WHERE id = (
-			SELECT id FROM send_log
-			WHERE status = ?2 AND queue_id = '' AND refusal_line = ''
-			  AND reason IN ('', ?3, ?4) AND from_addr = ?5 COLLATE NOCASE AND client_ip = ?6
-			  AND app_login = ?10 COLLATE NOCASE
-			  AND created_at BETWEEN ?7 AND ?8
-			ORDER BY ABS(julianday(created_at) - julianday(?9)), id
-			LIMIT 1)
-		 AND NOT EXISTS (SELECT 1 FROM send_log WHERE refusal_line = ?1)`,
-		line, StatusRejected, ReasonLimit, ReasonClient, from, clientIP,
+	res, err := s.db.Exec(attachRefusalLineQuery,
+		line, ReasonLimit, ReasonClient, from, clientIP,
 		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339),
 		at.Add(refusalLineWindow).UTC().Format(time.RFC3339),
 		at.UTC().Format(time.RFC3339),
@@ -409,19 +426,24 @@ type SendLogFilter struct {
 	AllDomains bool
 }
 
+// sendLogPageQuery is a page of the rows where selects, newest first. A page
+// of one domain or one application reads its rows off idx_send_log_domain_id
+// or idx_send_log_app_login (migration 0010), already in id order; a scope of
+// several domains is sorted, keeping only the page.
+func sendLogPageQuery(where string) string {
+	return `SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
+		 FROM send_log` + where + `
+		 ORDER BY id DESC
+		 LIMIT ? OFFSET ?`
+}
+
 // QuerySendLog returns send-log rows matching filter, newest first, for the
 // monitoring screen's server-side pagination (product.md's send-log view).
 // The filter's authorization scope is mandatory: see SendLogFilter.
 func (s *Store) QuerySendLog(filter SendLogFilter, limit, offset int) ([]SendLogRow, error) {
 	where, args := sendLogWhere(filter)
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(
-		`SELECT id, queue_id, domain, COALESCE(domain_id, 0), app_login, from_addr, to_addr, subject, status, reason, header_from, created_at, updated_at
-		 FROM send_log`+where+`
-		 ORDER BY id DESC
-		 LIMIT ? OFFSET ?`,
-		args...,
-	)
+	rows, err := s.db.Query(sendLogPageQuery(where), args...)
 	if err != nil {
 		return nil, fmt.Errorf("query send_log: %w", err)
 	}

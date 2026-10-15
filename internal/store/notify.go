@@ -168,6 +168,20 @@ type LimitRefusal struct {
 	First time.Time
 }
 
+// limitRefusalsQuery is LimitRefusalsSince's. The status is a literal so
+// that the partial index of migration 0005 answers the question: the
+// query's term matches the index's WHERE exactly
+// (https://sqlite.org/partialindex.html § 3) when the statement is first
+// prepared.
+const limitRefusalsQuery = `SELECT d.name, a.login, COUNT(*), MIN(l.created_at)
+		 FROM send_log l
+		 JOIN domains d ON d.id = l.domain_id
+		 JOIN applications a ON a.login = l.app_login AND a.domain_id = d.id
+		 WHERE l.status = 'rejected' AND l.created_at >= ? AND l.reason IN ('', 'limit')
+		   AND (EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'application' AND r.ref_id = a.id)
+		     OR EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'domain' AND r.ref_id = d.id))
+		 GROUP BY d.name, a.login ORDER BY d.name, a.login`
+
 // LimitRefusalsSince returns, per sending domain, the messages the journal
 // milter refused under a level-2 limit at or after since.
 //
@@ -183,19 +197,7 @@ type LimitRefusal struct {
 // address or its From: line is left out by that; a row from before has no
 // reason and is still judged the old way.
 func (s *Store) LimitRefusalsSince(since time.Time) ([]LimitRefusal, error) {
-	// The status is a literal so that the partial index of migration 0005
-	// answers the question: the query's term matches the index's WHERE
-	// exactly (https://sqlite.org/partialindex.html § 3) when the statement is
-	// first prepared.
-	rows, err := s.db.Query(
-		`SELECT d.name, a.login, COUNT(*), MIN(l.created_at)
-		 FROM send_log l
-		 JOIN domains d ON d.id = l.domain_id
-		 JOIN applications a ON a.login = l.app_login AND a.domain_id = d.id
-		 WHERE l.status = 'rejected' AND l.created_at >= ? AND l.reason IN ('', 'limit')
-		   AND (EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'application' AND r.ref_id = a.id)
-		     OR EXISTS (SELECT 1 FROM rate_limits r WHERE r.scope = 'domain' AND r.ref_id = d.id))
-		 GROUP BY d.name, a.login ORDER BY d.name, a.login`,
+	rows, err := s.db.Query(limitRefusalsQuery,
 		since.UTC().Format(time.RFC3339),
 	)
 	if err != nil {

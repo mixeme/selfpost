@@ -187,9 +187,7 @@ func (s *Store) CountMessages(scope, ref string, since time.Time) (int64, error)
 	var n int64
 	// created_at is stored as RFC3339 UTC, so a lexical comparison against the
 	// same format is chronologically correct (as in DeleteSendLogBefore).
-	err := s.db.QueryRow(
-		`SELECT COUNT(DISTINCT queue_id) FROM send_log
-		 WHERE `+match+` AND status != ? AND created_at >= ?`,
+	err := s.db.QueryRow(countMessagesQuery(match),
 		ref, StatusRejected, since.UTC().Format(time.RFC3339),
 	).Scan(&n)
 	if err != nil {

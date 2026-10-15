@@ -201,22 +201,6 @@ func TestLimitRefusalsSince(t *testing.T) {
 		t.Errorf("other.example = %+v", g)
 	}
 
-	// The question is answered from the index of the refused rows alone.
-	var plan []string
-	rows, err := s.db.Query(`EXPLAIN QUERY PLAN SELECT COUNT(*) FROM send_log l WHERE l.status = 'rejected' AND l.created_at >= '2026-10-01T00:00:00Z'`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var id, parent, notused int
-		var detail string
-		if err := rows.Scan(&id, &parent, &notused, &detail); err != nil {
-			t.Fatal(err)
-		}
-		plan = append(plan, detail)
-	}
-	rows.Close()
-	if !strings.Contains(strings.Join(plan, "; "), "idx_send_log_rejected") {
-		t.Errorf("refused rows are not found through their index: %v", plan)
-	}
+	// The question is answered from the index of the refused rows alone:
+	// TestSendLogQueriesUseTheirIndexes.
 }

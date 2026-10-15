@@ -5,7 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+Migration `0010` (indexes only).
+
 ### Fixed
+
+- **Questions asked of the send log on every message or every few minutes
+  walked the whole table.** Measured with SQLite's own plans against the
+  statements the panel runs: the sweep for rows still queued or deferred
+  (every 5 minutes) and the check whether a refusal line from `mail.log` is
+  already on a row (every such line) read every row of the retention
+  period; a level-2 limit of an application counted through all of its
+  domain's rows; a page of a domain administrator's log sorted the domain's
+  whole log. Migration `0010` adds four indexes, and a test now holds each
+  of these statements to its index (audit 2026-10-12, M2).
 
 - **A restore whose first start failed never ran its Resync.** The panel
   removed the restore manifest as soon as it had checked the version, before

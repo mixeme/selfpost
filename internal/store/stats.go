@@ -89,7 +89,31 @@ const domainByName = "domain_id = (SELECT d.id FROM domains d WHERE d.name = ?)"
 // one more than the largest number already assigned; modernc.org/sqlite
 // v1.60.1, conn.go bind() and argFinder.find(): ?NNN takes argument NNN, a
 // plain ? the argument of its number.
-const appByLogin = "app_login = ?1 AND domain_id = (SELECT a.domain_id FROM applications a WHERE a.login = ?1)"
+//
+// The unary + keeps domain_id out of the choice of index: the rows are found
+// by the login and the time (idx_send_log_app_login_created_at), not among
+// all of the domain's (https://sqlite.org/optoverview.html § 18,
+// "Disqualifying WHERE clause terms using unary-+"; audit 2026-10-12, stage 3).
+const appByLogin = "app_login = ?1 AND +domain_id = (SELECT a.domain_id FROM applications a WHERE a.login = ?1)"
+
+// countMessagesQuery counts the distinct messages of the rows match selects
+// (domainByName or appByLogin, then the status to leave out and the start of
+// the window): the level-2 count and the statistics' total ask it alike.
+func countMessagesQuery(match string) string {
+	return `SELECT COUNT(DISTINCT queue_id) FROM send_log
+		 WHERE ` + match + ` AND status != ? AND created_at >= ?`
+}
+
+// peakPerHourQuery is the busiest UTC hour of the same rows: substr counts
+// characters from 1 (https://sqlite.org/lang_corefunc.html#substr), so 1-13
+// of an RFC3339 UTC stamp is YYYY-MM-DDTHH.
+func peakPerHourQuery(match string) string {
+	return `SELECT COALESCE(MAX(bucket_count), 0) FROM (
+		   SELECT COUNT(DISTINCT queue_id) AS bucket_count FROM send_log
+		   WHERE ` + match + ` AND status != ? AND created_at >= ?
+		   GROUP BY substr(created_at, 1, 13)
+		 )`
+}
 
 // sendStats counts the rows that match, a condition with one placeholder
 // taking ref.
@@ -97,27 +121,13 @@ func (s *Store) sendStats(match, ref string, since time.Time, hours float64) (Se
 	sinceStr := since.UTC().Format(time.RFC3339)
 
 	var total int64
-	err := s.db.QueryRow(
-		`SELECT COUNT(DISTINCT queue_id) FROM send_log
-		 WHERE `+match+` AND status != ? AND created_at >= ?`,
-		ref, StatusRejected, sinceStr,
-	).Scan(&total)
+	err := s.db.QueryRow(countMessagesQuery(match), ref, StatusRejected, sinceStr).Scan(&total)
 	if err != nil {
 		return SendStats{}, fmt.Errorf("send stats total %q: %w", ref, err)
 	}
 
-	// The busiest UTC hour: substr counts characters from 1
-	// (https://sqlite.org/lang_corefunc.html#substr), so 1-13 of an RFC3339
-	// UTC stamp is YYYY-MM-DDTHH.
 	var peak int64
-	err = s.db.QueryRow(
-		`SELECT COALESCE(MAX(bucket_count), 0) FROM (
-		   SELECT COUNT(DISTINCT queue_id) AS bucket_count FROM send_log
-		   WHERE `+match+` AND status != ? AND created_at >= ?
-		   GROUP BY substr(created_at, 1, 13)
-		 )`,
-		ref, StatusRejected, sinceStr,
-	).Scan(&peak)
+	err = s.db.QueryRow(peakPerHourQuery(match), ref, StatusRejected, sinceStr).Scan(&peak)
 	if err != nil {
 		return SendStats{}, fmt.Errorf("send stats peak %q: %w", ref, err)
 	}

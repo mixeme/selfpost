@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 9` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql` |
+| Chain head | `user_version = 10` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql`, `0010_send_log_indexes.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -67,7 +67,8 @@ delivery-log-storage (`2.2.0`), `0004_notifications.sql` and
 `0005_send_log_rejected_index.sql` of panel-notifications (`2.3.0`), and
 `0006_sender_check.sql` of from-header-binding (`2.4.0`), and
 `0007_delivery_log_days.sql` and `0008_tenant_boundary.sql` of the 2026-10-12
-audit (`2.5.0`).
+audit (`2.5.0`), `0009_refusal_line.sql` (`2.5.1`) and
+`0010_send_log_indexes.sql` (`2.5.3`).
 
 ---
 
@@ -84,6 +85,7 @@ audit (`2.5.0`).
 | 7 | `0007_delivery_log_days.sql` | 2.5.0 | DDL | `delivery_log_days`: what the reconcile sweep and the log tailer did, a row per UTC day, kept a year, shown nowhere - the measurement that decides the sweep's fate (audit 2026-10-12, stage 1). `send_log.reason` gains the values `reconcile` and `reconcile-contradicted` without a schema change |
 | 8 | `0008_tenant_boundary.sql` | 2.5.0 | DDL + data | `idx_applications_login_nocase`: an application login is unique without regard to case (audit 2026-10-12, H4). `send_log.domain_id` and `inbound_spam_log.inbound_domain_id` (`ON DELETE SET NULL`), each with an index, filled once by name from the registry as it was then: a row belongs to a domain by id, and a domain deleted and added again starts with an empty log (L12) |
 | 9 | `0009_refusal_line.sql` | 2.5.1 | DDL | `send_log.refusal_line`: Postfix's line about a refusal at MAIL FROM (a level-2 limit, a client address off the list), which has no queue id; the log tailer puts it on the row; `send_log.recovered`, a refusal row the tailer wrote from `mail.log` because the panel stopped before writing it; `sender_check_days.messages` (messages deferred mid-message, counted apart from the connections turned away) and `sender_check_days.estimated` (a day whose downtime is an upper bound) (audit 2026-10-12, stage 2b) |
+| 10 | `0010_send_log_indexes.sql` | 2.5.3 | DDL | Four indexes of `send_log`, each for a question that walked the table or sorted a domain's log (audit 2026-10-12, M2, stage 3): `idx_send_log_open`, partial, the queued and deferred rows by time (the tailer's sweep every 5 min); `idx_send_log_domain_id` and `idx_send_log_app_login`, a page of one domain's or one application's log in id order; `idx_send_log_refusal_line`, partial, whether a refusal line is already on a row. `TestSendLogQueriesUseTheirIndexes` checks the plans of the statements the store runs |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.

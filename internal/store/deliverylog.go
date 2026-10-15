@@ -69,15 +69,15 @@ func (s *Store) SetQueuedOverLifetime(at time.Time, n int64) error {
 	return nil
 }
 
+// countOpenQuery is CountOpenOlderThan's, by idx_send_log_open (openRows).
+const countOpenQuery = `SELECT COUNT(*) FROM send_log WHERE ` + openRows + ` AND created_at < ?`
+
 // CountOpenOlderThan counts the rows still open - "queued" or "deferred" -
 // that were accepted before cutoff. created_at is RFC3339 UTC, so the strings
 // compare as times.
 func (s *Store) CountOpenOlderThan(cutoff time.Time) (int64, error) {
 	var n int64
-	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM send_log WHERE status IN (?, ?) AND queue_id <> '' AND created_at < ?`,
-		StatusQueued, StatusDeferred, cutoff.UTC().Format(time.RFC3339),
-	).Scan(&n)
+	err := s.db.QueryRow(countOpenQuery, cutoff.UTC().Format(time.RFC3339)).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("count queued send_log rows: %w", err)
 	}
