@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-10-15
+
+The inbound relay's port 25 ends a message only at the standard
+`<CR><LF>.<CR><LF>`: the SMTP-smuggling defence Postfix 3.7 leaves off.
+No migration; schema 11.
+
 ### Security
 
 - **Port 25 could be made to read a second transaction out of a message's

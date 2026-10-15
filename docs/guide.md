@@ -190,14 +190,14 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `2.6.0`. **No 2.x image is
+deliberately never `:latest`. The current pin is `2.6.1`. **No 2.x image is
 published on ghcr.io yet** (the newest there is `1.3.0`); until one is, build
 it from the checkout under the pinned name, and Compose uses the local image
 instead of pulling:
 
 ```sh
-docker build -f build/Dockerfile --build-arg VERSION=2.6.0 \
-  -t ghcr.io/mixeme/selfpost:2.6.0 .
+docker build -f build/Dockerfile --build-arg VERSION=2.6.1 \
+  -t ghcr.io/mixeme/selfpost:2.6.1 .
 ```
 
 `VERSION` must equal the tag: it is the version the backup check compares
@@ -860,7 +860,7 @@ A version mismatch at step 5 refuses to start and leaves `/data` untouched —
 the panel exits with a message naming the tag to use, e.g.:
 
 ```
-backup: this backup was created by SelfPost 2.5.4 but this image is 2.6.0 — restore into the matching image (selfpost:2.5.4)
+backup: this backup was created by SelfPost 2.6.0 but this image is 2.6.1 — restore into the matching image (selfpost:2.6.0)
 ```
 
 Fix the tag in `docker-compose.yml` (build that tag as under [Fixed image
