@@ -267,12 +267,15 @@ func TestE2E(t *testing.T) {
 				res.dialErr, res.authErr, res.mailErr, res.rcptErr, res.dataErr)
 		}
 
-		raw, err := findSinkMessage(h.stageDir, token, 30*time.Second)
+		file, raw, err := findSinkFile(h.stageDir, token, 30*time.Second)
 		if err != nil {
 			t.Fatalf("message never reached the sink: %v", err)
 		}
 		if err := verifyDKIM(raw, senderDomain); err != nil {
 			t.Fatalf("DKIM did not verify against the record the panel published: %v", err)
+		}
+		if err := checkBothSigners(h, file, raw, senderDomain); err != nil {
+			t.Fatalf("the panel's signer: %v\n%s", err, raw)
 		}
 		if err := checkReceivedHidden(raw); err != nil {
 			t.Fatalf("port 465 should hide the application's session: %v", err)

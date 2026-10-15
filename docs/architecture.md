@@ -28,13 +28,13 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 |---|---|---|---|
 | `syslog-relay` | panel | 50 | The container's `/dev/log`: passes what OpenDKIM logs through syslog(3) to the container's log (`panel -syslog-relay`) |
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
-| `panel` | panel | 200 | HTTP UI + sender check + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
-| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
+| `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
+| `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the DKIM signer's two, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
-Start order: syslog-relay → OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
+Start order: syslog-relay → OpenDKIM → panel (opens the sender check's, the DKIM signer's and the journal-milter's sockets) → Postfix wrapper
 polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then runs
 `postfix start-fg` and stays its parent: on TERM it runs `postfix stop`, so a
 stop of the program or of the container stops Postfix as Postfix means it to
@@ -237,7 +237,7 @@ domain is added or deleted.
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
-One process, six roles (seven with the inbound relay on: its inbound journal
+One process, seven roles (eight with the inbound relay on: its inbound journal
 milter, § Postfix above, port 25):
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
@@ -256,7 +256,15 @@ milter, § Postfix above, port 25):
    (`300s` / `4000s` / `5d` / `0`) with a muted note on the box.
 2. **sender check** — unix socket `SENDER_CHECK_SOCKET`, first in the chain
    and **strict** (`default_action=tempfail`): § Sender check below.
-3. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
+3. **DKIM signer** (`2.8.0`, [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md))
+   — unix sockets `DKIM_SIGN_SOCKET` (applications' mail on 465/587, signed
+   with the key of the domain the SASL login belongs to) and
+   `DKIM_SIGN_LOCAL_SOCKET` (the panel's own mail, `non_smtpd_milters`,
+   signed with the key of the server's name); after the sender check and
+   **strict**. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From` once
+   more, go-msgauth/dkim; keys and selectors from OpenDKIM's KeyTable while
+   both sign (`internal/milter/sign.go`).
+4. **journal-milter** — unix socket `JOURNAL_MILTER_SOCKET`; records From/To/
    Subject/SASL user at DATA; enforces level-2 rate limits; **fail-open**
    (`default_action=accept`) so milter failure does not stop mail. Domain
    ceilings apply to every client IP; an application ceiling **overrides** the
@@ -268,22 +276,25 @@ milter, § Postfix above, port 25):
    this process has admitted but not yet written (`internal/milter/inflight.go`),
    so concurrent sessions cannot each spend the same last slot; a reservation
    is released at end-of-message, on ABORT, or after a 10-minute TTL.
-4. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
+5. **log-tailer** — follows `MAIL_LOG`, updates send-log delivery status by
    queue-id. Send-log `queued → sent` transitions depend on this goroutine alone
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
    It also keeps the lines Postfix writes under a queue id, for the message's
    page (§ Log tailer, *Stored lines*), and counts the mail Postfix deferred
    because the sender check did not answer.
-5. **rate-limit recalc** — every six hours (and on demand from Domain settings and
+6. **rate-limit recalc** — every six hours (and on demand from Domain settings and
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
-6. **notifier** — writes to the panel's users when something needs them
+7. **notifier** — writes to the panel's users when something needs them
    (§ Notifications below).
 
-Milter chain in Postfix: the sender check (tempfail), OpenDKIM (tempfail),
-then the journal (accept on failure). Mail submitted locally with
-`sendmail(1)` — the notifier's — passes OpenDKIM alone (`non_smtpd_milters`):
-it is signed, it is the panel's own and so needs no check of whose it is, and
-it is not an application's mail to be journalled or limited. Bounces Postfix
+Milter chain in Postfix: the sender check (tempfail), the panel's DKIM
+signer (tempfail), OpenDKIM (tempfail), then the journal (accept on
+failure); until OpenDKIM leaves the image both sign every message
+(docs/plans/panel-dkim-signing.md, stage 1). Mail submitted locally with
+`sendmail(1)` — the notifier's — passes the signer's own socket and OpenDKIM
+(`non_smtpd_milters`): it is signed, it is the panel's own and so needs no
+check of whose it is, and it is not an application's mail to be journalled
+or limited. Bounces Postfix
 generates pass no milter.
 
 ### Sender check
@@ -1129,6 +1140,9 @@ unsupported rather than as a missing doc:
   (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
   `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`),
   `SENDER_CHECK_SOCKET` (`/run/selfpost/sender.sock`),
+  `DKIM_SIGN_SOCKET` (`/run/selfpost/sign.sock`) and `DKIM_SIGN_LOCAL_SOCKET`
+  (`/run/selfpost/sign-local.sock` — the DKIM signer's, read by the panel,
+  `build/postfix-config.sh` and `build/postfix-wrapper.sh`, which must agree),
   `INBOUND_JOURNAL_MILTER_SOCKET` (`/run/selfpost/inbound-journal.sock` — the
   inbound journal milter's socket, read by the panel, `build/postfix-config.sh`
   and `build/postfix-wrapper.sh`, which must agree), `MAIL_LOG`

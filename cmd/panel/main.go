@@ -78,9 +78,12 @@ type config struct {
 	httpAddr      string
 	journalSocket string
 	// The sender check's socket; the default mirrors build/postfix-config.sh.
-	senderSocket  string
-	mailLog       string
-	retentionDays int
+	senderSocket string
+	// The DKIM signer's sockets: applications' mail and the panel's own
+	// (cmd/panel/signer.go).
+	signSocket, signLocalSocket string
+	mailLog                     string
+	retentionDays               int
 
 	dataDir                string
 	dbPath                 string
@@ -138,6 +141,10 @@ func loadConfig() config {
 		httpAddr:      envDefault("PANEL_HTTP_ADDR", ":8080"),
 		journalSocket: envDefault("JOURNAL_MILTER_SOCKET", "/run/selfpost/journal.sock"),
 		senderSocket:  envDefault("SENDER_CHECK_SOCKET", "/run/selfpost/sender.sock"),
+		// The DKIM signer's two sockets; the defaults must match
+		// build/postfix-config.sh and build/postfix-wrapper.sh.
+		signSocket:      envDefault("DKIM_SIGN_SOCKET", "/run/selfpost/sign.sock"),
+		signLocalSocket: envDefault("DKIM_SIGN_LOCAL_SOCKET", "/run/selfpost/sign-local.sock"),
 		// Postfix's delivery log, under /data so the lines that resolve a
 		// "queued" send-log row outlive the container. The default must match
 		// maillog_file in build/postfix-config.sh.
@@ -402,8 +409,8 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	// Room for every role to report a failure without blocking: seven at most.
-	errc := make(chan error, 7)
+	// Room for every role to report a failure without blocking: eight at most.
+	errc := make(chan error, 8)
 
 	roles := []struct {
 		name string
@@ -412,6 +419,7 @@ func run() error {
 		{"http", func(ctx context.Context) error { return serveHTTP(ctx, cfg, st) }},
 		{"journal-milter", func(ctx context.Context) error { return serveJournal(ctx, cfg, st) }},
 		{"sender-check", func(ctx context.Context) error { return serveSenderCheck(ctx, cfg, st) }},
+		{"dkim-signer", func(ctx context.Context) error { return serveSigner(ctx, cfg) }},
 		{"log-tailer", func(ctx context.Context) error {
 			return logtail.Run(ctx, cfg.mailLog, st, func() int {
 				days, err := st.GetSendLogRetentionDays(cfg.retentionDays)

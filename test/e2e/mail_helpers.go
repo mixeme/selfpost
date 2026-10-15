@@ -28,7 +28,15 @@ const (
 // sleeping a fixed duration is what keeps this deterministic even under a
 // slow CI runner (plan C.4).
 func findSinkMessage(stageDir, token string, timeout time.Duration) ([]byte, error) {
+	_, raw, err := findSinkFile(stageDir, token, timeout)
+	return raw, err
+}
+
+// findSinkFile is findSinkMessage that also says the file's name in the
+// sink's /mail (the same directory, mounted).
+func findSinkFile(stageDir, token string, timeout time.Duration) (string, []byte, error) {
 	dir := filepath.Join(stageDir, "mail-stage")
+	var name string
 	var found []byte
 	err := waitFor(fmt.Sprintf("sink-MX to receive a message tagged %q", token), timeout, 300*time.Millisecond, func() (bool, error) {
 		entries, err := os.ReadDir(dir)
@@ -44,19 +52,20 @@ func findSinkMessage(stageDir, token string, timeout time.Duration) ([]byte, err
 				continue
 			}
 			if bytes.Contains(b, []byte(token)) {
-				found = b
+				name, found = e.Name(), b
 				return true, nil
 			}
 		}
 		return false, fmt.Errorf("no dumped message contains %q yet (%d on disk)", token, len(entries))
 	})
-	return found, err
+	return name, found, err
 }
 
 // verifyDKIM checks that raw (a message dumped by the sink) carries a DKIM
-// signature for domain that validates against the public key published in the
-// fake zone — i.e. exactly what a real receiver would check, using DNS the
-// harness itself controls instead of net.DefaultResolver (plan C.4).
+// signature for domain and that every signature for it validates against the
+// public key published in the fake zone — i.e. exactly what a real receiver
+// would check, using DNS the harness itself controls instead of
+// net.DefaultResolver (plan C.4).
 func verifyDKIM(raw []byte, domain string) error {
 	verifications, err := dkim.VerifyWithOptions(bytes.NewReader(raw), &dkim.VerifyOptions{
 		LookupTXT: lookupTXTFunc(),
@@ -64,15 +73,73 @@ func verifyDKIM(raw []byte, domain string) error {
 	if err != nil {
 		return fmt.Errorf("dkim verify: %w", err)
 	}
+	n := 0
 	for _, v := range verifications {
 		if v.Domain == domain {
 			if v.Err != nil {
 				return fmt.Errorf("dkim signature for %s did not validate: %w", domain, v.Err)
 			}
-			return nil
+			n++
 		}
 	}
-	return fmt.Errorf("no DKIM signature found for domain %s (got %d signature(s))", domain, len(verifications))
+	if n == 0 {
+		return fmt.Errorf("no DKIM signature found for domain %s (got %d signature(s))", domain, len(verifications))
+	}
+	return nil
+}
+
+// checkBothSigners is the oracle of docs/plans/panel-dkim-signing.md, stage
+// 1: the panel's signer and OpenDKIM both sign (OpenDKIM after the panel in
+// the chain, so its signature is the top one - build/postfix-config.sh);
+// the two must agree on what they sign - the same h= and bh= - and each
+// must verify with dkimpy (python3-dkim in the sink image), an
+// implementation that is neither go-msgauth, the panel's library, nor
+// OpenDKIM. name is the file in the sink's /mail.
+func checkBothSigners(s *stack, name string, raw []byte, domain string) error {
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("parse the delivered message: %w", err)
+	}
+	var sigs []map[string]string
+	for _, v := range msg.Header["Dkim-Signature"] {
+		tags := dkimTags(v)
+		if tags["d"] == domain {
+			sigs = append(sigs, tags)
+		}
+	}
+	if len(sigs) != 2 {
+		return fmt.Errorf("%d DKIM signatures for %s, want 2 (the panel's and OpenDKIM's)", len(sigs), domain)
+	}
+	for _, tag := range []string{"bh", "h", "c", "s", "a"} {
+		a, b := sigs[0][tag], sigs[1][tag]
+		if tag == "h" {
+			a, b = strings.ToLower(a), strings.ToLower(b)
+		}
+		if a != b {
+			return fmt.Errorf("the signatures differ in %s=: OpenDKIM %q, the panel %q", tag, a, b)
+		}
+	}
+	for i := range sigs {
+		out, err := s.execIn("sink", "sh", "-c", fmt.Sprintf("dkimverify --index %d < '/mail/%s'", i, name))
+		if err != nil || !strings.Contains(out, "signature ok") {
+			return fmt.Errorf("dkimpy on signature %d (%s): %v\n%s", i, []string{"OpenDKIM's", "the panel's"}[i], err, out)
+		}
+	}
+	return nil
+}
+
+// dkimTags splits a DKIM-Signature value into its tags, white space removed
+// (RFC 6376 § 3.2: tag=value pairs separated by ";", FWS anywhere).
+func dkimTags(v string) map[string]string {
+	tags := map[string]string{}
+	for _, part := range strings.Split(v, ";") {
+		k, val, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		tags[strings.TrimSpace(k)] = strings.Join(strings.Fields(val), "")
+	}
+	return tags
 }
 
 // postfixReceived returns the Received: headers of raw that a Postfix smtpd

@@ -2,14 +2,17 @@
 # each transaction to its own file under /mail, so the test harness can read
 # the raw received message (headers + body, including the DKIM-Signature
 # Postfix/OpenDKIM added) straight off disk. smtp-sink ships in the postfix
-# package itself — no new dependency.
+# package itself. python3-dkim (dkimpy 1.1.8-2 in trixie, /usr/bin/dkimverify)
+# is the independent DKIM verifier the suite holds the panel's signer to
+# (docs/plans/panel-dkim-signing.md); it looks the keys up through the
+# stand's CoreDNS (compose.override.yml, sink's dns).
 FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
  && echo "postfix postfix/main_mailer_type string Internet Site" | debconf-set-selections \
  && apt-get update \
- && apt-get install -y --no-install-recommends postfix \
+ && apt-get install -y --no-install-recommends postfix python3-dkim \
  && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /mail

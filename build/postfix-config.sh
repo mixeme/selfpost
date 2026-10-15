@@ -185,6 +185,11 @@ OPENDKIM_SOCK="${OPENDKIM_SOCKET:-/run/opendkim/opendkim.sock}"
 JOURNAL_SOCK="${JOURNAL_MILTER_SOCKET:-/run/selfpost/journal.sock}"
 # The panel's sender check (the From: line against the login, strict).
 SENDER_SOCK="${SENDER_CHECK_SOCKET:-/run/selfpost/sender.sock}"
+# The panel's DKIM signer (strict): applications' mail, signed with the key
+# of the login's domain, and the panel's own, with the server's name's
+# (cmd/panel/signer.go). Matched by postfix-wrapper.sh.
+SIGN_SOCK="${DKIM_SIGN_SOCKET:-/run/selfpost/sign.sock}"
+SIGN_LOCAL_SOCK="${DKIM_SIGN_LOCAL_SOCKET:-/run/selfpost/sign-local.sock}"
 
 # Persistent panel-managed sender map; texthash needs no postmap, so the
 # unprivileged panel can rewrite it and just ask for a reload. Postfix 3.10.13,
@@ -405,10 +410,16 @@ postconf -e \
 # message it could not judge must not reach the signer. While the panel does
 # not answer on that socket, mail is deferred (docs/security.md).
 #
+# The panel's DKIM signer follows the sender check, strict too
+# (docs/plans/panel-dkim-signing.md). Until OpenDKIM leaves the image both
+# sign (stage 1 of that plan): OpenDKIM after the panel, so that every
+# message carries both signatures and the e2e suite compares them.
+#
 # non_smtpd_milters is the chain for mail submitted locally with sendmail(1) -
-# the panel's own notifications, sent as postmaster@ the hostname. OpenDKIM
-# signs them with the key of the server's own name; the journal-milter is not
-# on this chain, since they are not an application's mail. Bounces Postfix
+# the panel's own notifications, sent as postmaster@ the hostname. The
+# signer's own socket for it, and OpenDKIM, sign them with the key of the
+# server's own name; the journal-milter is not on this chain, since they are
+# not an application's mail. Bounces Postfix
 # generates itself do not pass it (internal_mail_filter_classes is empty).
 #
 # Postfix 3.10.13: html/MILTER_README.html:584, "Different settings for different
@@ -420,8 +431,18 @@ postconf -e \
 postconf -e \
 	"milter_protocol=6" \
 	"milter_default_action=tempfail" \
-	"smtpd_milters={ unix:${SENDER_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
-	"non_smtpd_milters={ unix:${OPENDKIM_SOCK}, default_action=tempfail }"
+	"smtpd_milters={ unix:${SENDER_SOCK}, default_action=tempfail }, { unix:${SIGN_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }, { unix:${JOURNAL_SOCK}, default_action=accept }" \
+	"non_smtpd_milters={ unix:${SIGN_LOCAL_SOCK}, default_action=tempfail }, { unix:${OPENDKIM_SOCK}, default_action=tempfail }"
+
+# A signed message is delivered as it was signed: Postfix's SMTP client would
+# otherwise rewrite an 8-bit message as quoted-printable for a server that
+# does not announce 8BITMIME, and every body hash over it would fail.
+# Postfix 3.10.13, src/global/mail_params.h:3088, DEF_DISABLE_MIME_OCONV 0
+# (the conversion is on by default); proto/postconf.proto:7992,
+# disable_mime_output_conversion: "Disable the conversion of 8BITMIME format
+# to 7BIT format". Not set until 2.8.0 - OpenDKIM's signatures were exposed
+# to it as well.
+postconf -e "disable_mime_output_conversion=yes"
 
 # What Postfix tells a milter with MAIL FROM: its defaults plus the client's
 # address. The panel's milters judge every message by that address (an

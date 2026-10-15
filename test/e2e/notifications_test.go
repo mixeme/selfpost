@@ -93,7 +93,7 @@ func testNotificationsSetUp(t *testing.T, sc *scenario) {
 // (internal/notify): here it would be a minute of waiting for nothing to happen.
 func testRateLimitRefusalIsNotified(t *testing.T, sc *scenario) {
 	subject := "[SelfPost] " + senderDomain + ": a rate limit is refusing mail"
-	raw, err := findSinkMessage(h.stageDir, subject, 100*time.Second)
+	file, raw, err := findSinkFile(h.stageDir, subject, 100*time.Second)
 	if err != nil {
 		t.Fatalf("no notification reached %s: %v\npanel log:\n%s", adminEmail, err, tailLines(h.logs("selfpost"), "notify", 20))
 	}
@@ -107,6 +107,9 @@ func testRateLimitRefusalIsNotified(t *testing.T, sc *scenario) {
 		if !strings.Contains(msg, want) {
 			t.Errorf("the notification lacks %q:\n%s", want, msg)
 		}
+	}
+	if err := checkBothSigners(h, file, raw, serverName); err != nil {
+		t.Errorf("the panel's signer on its own mail: %v", err)
 	}
 	if err := verifyDKIM(raw, serverName); err != nil {
 		t.Errorf("the notification is not signed as %s with the key Settings shows: %v", serverName, err)

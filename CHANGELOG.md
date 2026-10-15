@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **The panel signs outgoing mail with DKIM itself** (panel-dkim-signing,
+  stage 1 of [the plan](docs/plans/panel-dkim-signing.md)): a milter of the
+  panel's on two sockets, one for applications' mail - signed with the key of
+  the domain the login belongs to - and one for the panel's own, signed with
+  the server's name. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From`
+  once more, as OpenDKIM signs; strict. Until OpenDKIM leaves the image both
+  sign every message, and the e2e suite holds the two to the same `h=` and
+  `bh=` and has dkimpy - an independent implementation - verify each.
+
+### Fixed
+
+- **An 8-bit message could leave with a broken signature.** Postfix rewrote
+  it as quoted-printable for a server that does not announce 8BITMIME, after
+  it was signed; `disable_mime_output_conversion=yes` now delivers it as
+  signed. OpenDKIM's signatures were exposed to this too.
+
 ## [2.7.0] - 2026-10-15
 
 The image runs Debian trixie and Postfix 3.10.13, with upstream's 2026

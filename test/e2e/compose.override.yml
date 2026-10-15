@@ -109,6 +109,9 @@ services:
       context: ../sink
     volumes:
       - ./mail-stage:/mail
+    # dkimverify looks the DKIM keys up in the fake zone.
+    dns:
+      - 10.77.0.10
     networks:
       e2e:
         ipv4_address: 10.77.0.11
