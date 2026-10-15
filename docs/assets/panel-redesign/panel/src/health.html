@@ -99,7 +99,7 @@
         <div class="box" id="configuration" data-order="8">
           <div class="sp-box-head"><span class="sp-no">08</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
           <div class="sp-box-body">
-            <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration from the database and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+            <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration and the spam filter's lists from the database, removes the keys of deleted domains, and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
             <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
           </div>
         </div>
