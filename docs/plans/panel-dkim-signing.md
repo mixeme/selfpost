@@ -126,26 +126,34 @@ Decided here (technical, the owner may overrule):
 
 ## Stages
 
-### Stage 1 - the signer, beside OpenDKIM (no release)
+### Stage 1 - the signer, beside OpenDKIM (no release) - done `14de9a0`
 
-- [ ] `internal/milter/sign.go`: the session (Connect, MailFrom with
+- [x] `internal/milter/sign.go`: the session (Connect, MailFrom with
   `{auth_authen}`, Header, Headers, BodyChunk, Body), `OptHeaderLeadingSpace`,
   `InsertHeader(0, "DKIM-Signature", ...)` (the server's `Actions` gain
   add-header), the key read per message from the key file (a small cache
   keyed by path and mtime), the selector from the store as `Record` reads
   it.
-- [ ] Unit tests: sign and verify with go-msgauth; folded and tab-led
+- [x] Unit tests: sign and verify with go-msgauth; folded and tab-led
   headers; a header absent and present twice; an empty body; a body
   without a final newline; a login with no domain and a missing key file
   answer tempfail; the server's socket never signs with a domain's key.
-- [ ] `cmd/panel`: the role, its two sockets (`listenMilter`, group
+- [x] `cmd/panel`: the role, its two sockets (`listenMilter`, group
   selfpost, 0660), the wrapper waits for them.
-- [ ] `build/postfix-config.sh`: `smtpd_milters` = sender, sign, OpenDKIM,
+- [x] `build/postfix-config.sh`: `smtpd_milters` = sender, sign, OpenDKIM,
   journal (OpenDKIM kept for the cross-check); `non_smtpd_milters` =
   sign-local, OpenDKIM; `disable_mime_output_conversion=yes`.
-- [ ] e2e: dkimpy in the stand; every positive send and the notification
+- [x] e2e: dkimpy in the stand; every positive send and the notification
   verified by dkimpy against the panel's signature; the panel's and
   OpenDKIM's `bh=`/`h=` compared.
+
+*Done (2026-10-15, `14de9a0`):* e2e exit 0 on the server; on an
+application's message and on a notification the panel's and OpenDKIM's
+signatures agree on `h=`, `bh=`, `c=`, `s=`, `a=` and dkimpy verifies both.
+Two findings while writing it: a folded header reaches a milter
+`
+`-separated (the signer rebuilds CRLF), and go-milter calls no Abort on a
+dropped connection (a one-hour watchdog closes the signer).
 
 ### Stage 2 - OpenDKIM removed (no release)
 
