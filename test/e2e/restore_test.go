@@ -70,7 +70,7 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatalf("unpack the backup into the empty project directory: %v", err)
 	}
-	for _, want := range []string{"docker-compose.yml", ".env", "data/manifest.json", "data/selfpost.db", "certs/fullchain.pem", "certs/privkey.pem"} {
+	for _, want := range []string{"docker-compose.yml", ".env", "data/manifest.json", "data/selfpost.db", "data/contents.json", "certs/fullchain.pem", "certs/privkey.pem"} {
 		if !names[want] {
 			t.Fatalf("the backup has no %s (it has %d entries)", want, len(names))
 		}
@@ -93,12 +93,15 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 		t.Fatal(err)
 	}
 
-	// The manifest guards the first start only and is removed by it.
+	// The manifest guards the first start only and is removed by it, with the
+	// record of the archive's files that start compared /data with - after
+	// the entrypoint had set owners and modes and the daemons had started,
+	// which is what this run shows the comparison survives.
 	if err := waitFor("manifest.json to be removed by the first start", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
-		out, _ := h.execIn("selfpost", "sh", "-c", "test -e /data/manifest.json && echo present || echo gone")
-		return strings.TrimSpace(out) == "gone", fmt.Errorf("manifest.json is %s", strings.TrimSpace(out))
+		out, _ := h.execIn("selfpost", "sh", "-c", "ls /data/manifest.json /data/contents.json /data/contents.checked.json 2>/dev/null; true")
+		return strings.TrimSpace(out) == "", fmt.Errorf("still there: %s", strings.TrimSpace(out))
 	}); err != nil {
-		t.Fatal(err)
+		t.Fatalf("%v\n%s", err, logTail(h.logs("selfpost"), "backup"))
 	}
 
 	p, err := newPanelClient()

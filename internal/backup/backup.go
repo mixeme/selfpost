@@ -15,7 +15,8 @@
 // restore-specific steps the panel runs are CheckRestore, which refuses to
 // boot if the manifest's version does not match the running binary so
 // schema/format skew between versions cannot silently corrupt state
-// (architecture.md § Persistence), and a one-time Resync of OpenDKIM's tables
+// (architecture.md § Persistence), or if the archive was unpacked in part
+// (ContentsName), and a one-time Resync of OpenDKIM's tables
 // and the Postfix sender map from SQLite on that first boot, so any drift
 // between the archive and the database is healed before mail flows. If
 // on-disk state drifts again later — for example after a manual edit under
@@ -25,6 +26,7 @@ package backup
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"database/sql"
 	"encoding/json"
@@ -113,12 +115,15 @@ var excludedFromArchive = map[string]bool{
 	"tls":                 true,
 	"log":                 true,
 	ManifestName:          true,
+	ContentsName:          true,
+	contentsCheckedName:   true,
 }
 
 // Create writes a gzip-compressed tar backup to w. Archive layout:
 //
 //	data/manifest.json, data/selfpost.db, data/<rest of /data>
 //	docker-compose.yml, .env, certs/...
+//	data/contents.json
 //
 // Extract the archive into an empty project directory, then docker compose up.
 func Create(w io.Writer, p Params) error {
@@ -140,6 +145,7 @@ func Create(w io.Writer, p Params) error {
 
 	gz := gzip.NewWriter(w)
 	tw := tar.NewWriter(gz)
+	a := &archive{tw: tw}
 
 	manifest := Manifest{
 		Format:    FormatFull,
@@ -150,21 +156,26 @@ func Create(w io.Writer, p Params) error {
 	if err != nil {
 		return fmt.Errorf("backup: encode manifest: %w", err)
 	}
-	if err := writeTarBytes(tw, DataArchivePrefix+ManifestName, 0o600, manifestJSON); err != nil {
+	if err := writeTarBytes(a, DataArchivePrefix+ManifestName, 0o600, manifestJSON); err != nil {
 		return err
 	}
 
 	// The consistent SQLite snapshot, under the canonical filename the panel
 	// opens on start (the live file and its WAL/SHM are excluded from the walk).
-	if err := writeTarFile(tw, DataArchivePrefix+"selfpost.db", 0o640, snapshot); err != nil {
+	if err := writeTarFile(a, DataArchivePrefix+"selfpost.db", 0o640, snapshot); err != nil {
 		return err
 	}
 
-	if err := addTree(tw, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
+	if err := addTree(a, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
 		return err
 	}
 
-	if err := addDeployFiles(tw, p.DeployRoot, p.OnWarn); err != nil {
+	if err := addDeployFiles(a, p.DeployRoot, p.OnWarn); err != nil {
+		return err
+	}
+
+	// Last, so that only an archive unpacked to its end has it.
+	if err := a.writeContents(); err != nil {
 		return err
 	}
 
@@ -249,7 +260,7 @@ func UnreadableCert(err error, deployRoot string) (name string, ok bool) {
 	return CertsDirName + "/" + filepath.ToSlash(rel), true
 }
 
-func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) error {
+func addDeployFiles(a *archive, deployRoot string, onWarn func(string)) error {
 	for _, name := range []string{ComposeFileName, EnvFileName} {
 		src := filepath.Join(deployRoot, name)
 		info, err := os.Stat(src)
@@ -259,7 +270,7 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("backup: deploy file %s is not a regular file", name)
 		}
-		if err := writeTarFile(tw, name, info.Mode().Perm(), src); err != nil {
+		if err := writeTarFile(a, name, info.Mode().Perm(), src); err != nil {
 			return err
 		}
 	}
@@ -286,19 +297,19 @@ func addDeployFiles(tw *tar.Writer, deployRoot string, onWarn func(string)) erro
 	// are links again, relative, into archive/ (eff-certbot docs, "Where are
 	// my certificates?"; assumptions C-Q4, C-A1). The archive carries the
 	// files they lead to, under the links' names.
-	return addTree(tw, certsDir, CertsDirName+"/", nil, nil, true)
+	return addTree(a, certsDir, CertsDirName+"/", nil, nil, true)
 }
 
 // addTree walks root and adds every regular file (and directory, to preserve
-// empty ones and modes) to tw under archivePrefix + path relative to root.
+// empty ones and modes) to a under archivePrefix + path relative to root.
 // When exclude is non-nil, top-level names relative to root are skipped; skip,
-// when non-nil, leaves out whatever it says. With a nil tw nothing is written:
+// when non-nil, leaves out whatever it says. With a nil a nothing is written:
 // every file is opened and closed, which is how Check finds what cannot be read.
 // Non-regular, non-directory entries (symlinks, sockets) are skipped - except,
 // with follow, a symbolic link to a regular file, which is archived as that
 // file under the link's name; a link that leads nowhere this process can
 // reach is an error, as an unreadable file is.
-func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool, skip skipFunc, follow bool) error {
+func addTree(a *archive, root, archivePrefix string, exclude map[string]bool, skip skipFunc, follow bool) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -334,7 +345,7 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 		}
 		switch {
 		case d.IsDir():
-			if tw == nil {
+			if a == nil {
 				return nil
 			}
 			hdr := &tar.Header{
@@ -343,9 +354,9 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 				Mode:     int64(info.Mode().Perm()),
 				ModTime:  info.ModTime(),
 			}
-			return tw.WriteHeader(hdr)
+			return a.tw.WriteHeader(hdr)
 		case info.Mode().IsRegular():
-			err := writeTarFile(tw, name, info.Mode().Perm(), path)
+			err := writeTarFile(a, name, info.Mode().Perm(), path)
 			if errors.Is(err, fs.ErrNotExist) {
 				// A writer's temporary file, renamed into place between
 				// the listing and the open: not part of /data's state.
@@ -360,7 +371,7 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 			if !target.Mode().IsRegular() {
 				return nil
 			}
-			return writeTarFile(tw, name, target.Mode().Perm(), path)
+			return writeTarFile(a, name, target.Mode().Perm(), path)
 		default:
 			return nil
 		}
@@ -368,21 +379,14 @@ func addTree(tw *tar.Writer, root, archivePrefix string, exclude map[string]bool
 }
 
 // writeTarBytes writes an in-memory file entry.
-func writeTarBytes(tw *tar.Writer, name string, mode int64, data []byte) error {
-	hdr := &tar.Header{
+func writeTarBytes(a *archive, name string, mode int64, data []byte) error {
+	return a.writeFile(&tar.Header{
 		Typeflag: tar.TypeReg,
 		Name:     name,
 		Mode:     mode,
 		Size:     int64(len(data)),
 		ModTime:  time.Now().UTC(),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return fmt.Errorf("backup: write header %s: %w", name, err)
-	}
-	if _, err := tw.Write(data); err != nil {
-		return fmt.Errorf("backup: write %s: %w", name, err)
-	}
-	return nil
+	}, bytes.NewReader(data))
 }
 
 // writeTarFile streams a file from disk into the archive under name.
@@ -394,13 +398,13 @@ func writeTarBytes(tw *tar.Writer, name string, mode int64, data []byte) error {
 // the queue are not walked), and a rename leaves the file open here as it
 // was: the archive holds the old file or the new one, whole (assumptions
 // C-Q3).
-func writeTarFile(tw *tar.Writer, name string, mode fs.FileMode, srcPath string) error {
+func writeTarFile(a *archive, name string, mode fs.FileMode, srcPath string) error {
 	f, err := os.Open(srcPath)
 	if err != nil {
 		return fmt.Errorf("backup: open %s: %w", srcPath, err)
 	}
 	defer f.Close()
-	if tw == nil {
+	if a == nil {
 		return nil
 	}
 
@@ -408,20 +412,13 @@ func writeTarFile(tw *tar.Writer, name string, mode fs.FileMode, srcPath string)
 	if err != nil {
 		return fmt.Errorf("backup: stat %s: %w", srcPath, err)
 	}
-	hdr := &tar.Header{
+	return a.writeFile(&tar.Header{
 		Typeflag: tar.TypeReg,
 		Name:     name,
 		Mode:     int64(mode.Perm()),
 		Size:     info.Size(),
 		ModTime:  info.ModTime(),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return fmt.Errorf("backup: write header %s: %w", name, err)
-	}
-	if _, err := io.Copy(tw, f); err != nil {
-		return fmt.Errorf("backup: copy %s: %w", name, err)
-	}
-	return nil
+	}, f)
 }
 
 // snapshotDB produces a consistent copy of the SQLite database at dbPath using
@@ -463,10 +460,13 @@ func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
 // CheckRestore enforces the backup version guard (architecture.md §
 // Persistence). If manifestPath exists (a backup was extracted into the data
 // directory), its version must match binaryVersion or the panel refuses to
-// start, telling the operator which image tag to use. On a match the manifest
-// is consumed (deleted) so it guards only the first boot after a restore and
-// never blocks a later in-place image upgrade, and restored is true so the
-// caller can heal drifted daemon maps once. Absence of the manifest is the
+// start, telling the operator which image tag to use; and the data directory
+// must hold every file the archive recorded at its end, as the archive holds
+// it, or the panel refuses to start on an archive unpacked in part (see
+// ContentsName). Then restored is true so the caller can heal drifted daemon
+// maps once. The manifest stays until the caller has done that and calls
+// ConsumeRestore: a start that fails on the way leaves it, and the next start
+// is a restore again (audit 2026-10-12, M1). Absence of the manifest is the
 // normal case and returns restored == false with a nil error.
 func CheckRestore(manifestPath, binaryVersion string) (restored bool, err error) {
 	data, err := os.ReadFile(manifestPath)
@@ -489,10 +489,24 @@ func CheckRestore(manifestPath, binaryVersion string) (restored bool, err error)
 			"backup: this backup was created by SelfPost %s but this image is %s — restore into the matching image (selfpost:%s)",
 			m.Version, binaryVersion, m.Version)
 	}
-	// Version matches: consume the manifest so subsequent normal starts (and
-	// in-place upgrades) are not gated by it.
-	if err := os.Remove(manifestPath); err != nil {
-		return false, fmt.Errorf("backup: consume restore manifest: %w", err)
+	if err := checkContents(filepath.Dir(manifestPath)); err != nil {
+		return false, err
 	}
 	return true, nil
+}
+
+// ConsumeRestore ends a restore once its first start has done what a restore
+// start does: the manifest is removed, so later starts (and in-place
+// upgrades) are not gated by it, and then the record of the checked files. A
+// start stopped between the two leaves the record alone, which nothing reads
+// without a manifest and no backup carries.
+func ConsumeRestore(manifestPath string) error {
+	if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("backup: consume restore manifest: %w", err)
+	}
+	checked := filepath.Join(filepath.Dir(manifestPath), contentsCheckedName)
+	if err := os.Remove(checked); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("backup: consume restore manifest: %w", err)
+	}
+	return nil
 }

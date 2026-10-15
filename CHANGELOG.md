@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A restore whose first start failed never ran its Resync.** The panel
+  removed the restore manifest as soon as it had checked the version, before
+  it opened the database and regenerated the mail maps from it; a start that
+  failed in between left a data directory the next start took for an
+  ordinary one. The manifest is now removed after the Resync is done, so the
+  next start is a restore again (audit 2026-10-12, M1).
+- **An archive unpacked in part was started on.** A download cut short, or a
+  `tar` stopped by a damaged block, left the manifest (the archive's first
+  entry) and half of the rest, and the panel opened whatever database was
+  there. Every archive now ends with `data/contents.json`, the size and
+  SHA-256 of each file under `data/`, and the first start after a restore
+  compares `/data` with it before it opens anything: an archive unpacked in
+  part, or a file that differs, is refused with a message that names it, and
+  the directory is left as it was (guide § Restore). A damaged or cut domain
+  export was already refused before anything is created; a test now says so.
+
 ## [2.5.2] - 2026-10-15
 
 Stage 2c of the 2026-10-12 audit: every place SelfPost relied on what Postfix,

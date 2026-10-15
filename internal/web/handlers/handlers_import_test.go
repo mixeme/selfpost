@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"html"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
@@ -114,5 +116,59 @@ func TestDomainImportRefusedCreatesNothing(t *testing.T) {
 	}
 	if domains, _ := st.ListDomains(); len(domains) != 0 {
 		t.Fatalf("the refused import created %v", domains)
+	}
+}
+
+// A domain export cut short or altered on the way is refused with what is
+// wrong with it, before anything is created (audit 2026-10-12, stage 3).
+func TestDomainImportOfADamagedFileCreatesNothing(t *testing.T) {
+	h, st := inboundHandlers(t)
+	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	plain, _ := json.Marshal(domain.DomainExport{
+		Format: domain.FormatDomainExport, Domain: "example.com", DKIMSelector: "mail",
+		Applications: []domain.AppExport{{Login: "app1", AddressMode: store.AddressModeWildcard, Password: "imported-password"}},
+	})
+	const password = "a-long-enough-password"
+	var sealed bytes.Buffer
+	w, err := secretfile.NewWriter(&sealed, secretfile.TypeDomainExport, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write(plain)
+	w.Close()
+	flipped := bytes.Clone(sealed.Bytes())
+	flipped[len(flipped)-20] ^= 1
+
+	for _, c := range []struct {
+		name, file, password string
+		body                 []byte
+		want                 string
+	}{
+		{"plain, cut", "example.com.json", "", plain[:len(plain)/2], "That file is not a valid SelfPost domain export."},
+		{"encrypted, cut", "example.com.spde", password, sealed.Bytes()[:sealed.Len()-10], "That file is damaged or incomplete."},
+		{"encrypted, altered", "example.com.spde", password, flipped, "Wrong password, or the file has been altered since it was exported."},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var body bytes.Buffer
+			mw := multipart.NewWriter(&body)
+			fw, _ := mw.CreateFormFile("file", c.file)
+			fw.Write(c.body)
+			mw.WriteField("import_password", c.password)
+			mw.Close()
+			req := httptest.NewRequest("POST", "/server/backup/import", &body)
+			req.Header.Set("Content-Type", mw.FormDataContentType())
+			req = auth.RequestWithPrincipal(req, root)
+			rec := httptest.NewRecorder()
+			h.HandleImportDomain(rec, req)
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), html.EscapeString(c.want)) {
+				t.Fatalf("import = %d, want 400 saying %q:\n%s", rec.Code, c.want, rec.Body.String())
+			}
+			if domains, _ := st.ListDomains(); len(domains) != 0 {
+				t.Fatalf("the refused import created %v", domains)
+			}
+			if _, err := st.GetApplicationByLogin("app1"); err == nil {
+				t.Fatal("the refused import created the application")
+			}
+		})
 	}
 }

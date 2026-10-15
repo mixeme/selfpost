@@ -27,7 +27,8 @@ import (
 // below stubs that story out — the archive is downloaded from a running panel
 // through /backup, unpacked the way `tar -xzf` unpacks it, and a second panel
 // is started on the result through the same startup sequence run() uses:
-// CheckRestore, store.Open, newPanel, Start.
+// openData (CheckRestore, store.Open, Resync, ConsumeRestore), newPanel,
+// Start.
 
 const (
 	restorePassword = "correct-horse-battery"
@@ -171,22 +172,17 @@ func TestResyncAfterRestoreHealsDriftedMaps(t *testing.T) {
 		t.Fatalf("write manifest: %v", err)
 	}
 
-	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
-	if err != nil {
-		t.Fatalf("CheckRestore: %v", err)
-	}
-	if !restored {
-		t.Fatal("CheckRestore did not report a restore")
-	}
+	// A record of no files: this test is about the maps, and the files it
+	// seeded were never in an archive.
+	writeContents(t, dataDir, backup.Contents{Format: backup.FormatContents})
 
-	st, err := store.Open(cfg.dbPath)
+	st, restored, err := openData(cfg, testResync(cfg))
 	if err != nil {
-		t.Fatalf("open store: %v", err)
+		t.Fatalf("open the restored data: %v", err)
 	}
 	defer st.Close()
-
-	if err := resyncAfterRestore(cfg, st, true); err != nil {
-		t.Fatalf("resync after restore: %v", err)
+	if !restored {
+		t.Fatal("the start did not take the data directory for a restore")
 	}
 
 	got, err := os.ReadFile(mapPath)
@@ -326,25 +322,14 @@ func bootPanel(t *testing.T, deployRoot string) http.Handler {
 	t.Helper()
 	cfg := panelConfig(t, deployRoot)
 
-	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	st, restored, err := openData(cfg, testResync(cfg))
 	if err != nil {
 		t.Fatalf("the panel refused to start on %s: %v", deployRoot, err)
 	}
+	t.Cleanup(func() { _ = st.Close() })
 	if restored {
 		if _, err := os.Stat(cfg.manifestPath); err == nil {
 			t.Errorf("the restore manifest was not consumed, so the next start is gated by it too")
-		}
-	}
-
-	st, err := store.Open(cfg.dbPath)
-	if err != nil {
-		t.Fatalf("open the restored database: %v", err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-
-	if restored {
-		if err := resyncAfterRestore(cfg, st, true); err != nil {
-			t.Fatalf("resync after restore: %v", err)
 		}
 	}
 
@@ -418,6 +403,15 @@ func downloadBackup(t *testing.T, h http.Handler, session *http.Cookie, password
 // directory before the image is started.
 func extract(t *testing.T, archive []byte, dir string) {
 	t.Helper()
+	extractCut(t, archive, dir, "", 0)
+}
+
+// extractCut unpacks the archive as extract does, except that the stream ends
+// cutAt bytes into the entry named cut: that entry is written as far as the
+// stream went and nothing after it is, which is what tar leaves of a download
+// cut short or a damaged block. An empty cut unpacks the whole archive.
+func extractCut(t *testing.T, archive []byte, dir, cut string, cutAt int64) {
+	t.Helper()
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		t.Fatalf("the download is not a gzip stream: %v", err)
@@ -426,6 +420,9 @@ func extract(t *testing.T, archive []byte, dir string) {
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
+			if cut != "" {
+				t.Fatalf("the archive has no entry %s to cut", cut)
+			}
 			break
 		}
 		if err != nil {
@@ -436,6 +433,10 @@ func extract(t *testing.T, archive []byte, dir string) {
 			t.Fatalf("the archive escapes the directory it is extracted into: %q", hdr.Name)
 		}
 		path := filepath.Join(dir, name)
+		var body io.Reader = tr
+		if hdr.Name == cut {
+			body = io.LimitReader(tr, cutAt)
+		}
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
@@ -450,7 +451,7 @@ func extract(t *testing.T, archive []byte, dir string) {
 			if err != nil {
 				t.Fatalf("create %s: %v", path, err)
 			}
-			if _, err := io.Copy(f, tr); err != nil {
+			if _, err := io.Copy(f, body); err != nil {
 				f.Close()
 				t.Fatalf("write %s: %v", path, err)
 			}
@@ -458,6 +459,28 @@ func extract(t *testing.T, archive []byte, dir string) {
 				t.Fatalf("close %s: %v", path, err)
 			}
 		}
+		if hdr.Name == cut {
+			return
+		}
+	}
+}
+
+// testResync is the Resync a restore start runs, without reloading daemons
+// the test does not have.
+func testResync(cfg config) func(*store.Store) error {
+	return func(st *store.Store) error { return resyncAfterRestore(cfg, st, true) }
+}
+
+// writeContents writes the record of an archive's files into dataDir, as the
+// archive's last entry would have.
+func writeContents(t *testing.T, dataDir string, c backup.Contents) {
+	t.Helper()
+	body, err := json.Marshal(c)
+	if err != nil {
+		t.Fatalf("marshal contents: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, backup.ContentsName), body, 0o600); err != nil {
+		t.Fatalf("write contents: %v", err)
 	}
 }
 

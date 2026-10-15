@@ -809,7 +809,9 @@ blocked. On that same first boot the panel also runs one **Resync** — OpenDKIM
 tables and Postfix's sender map are re-derived from SQLite (inbound relay maps
 when `INBOUND_RELAY_ENABLE=true`; DMARC maps when `DMARC_REPORTS_ENABLE=true`)
 and both daemons are reloaded, healing any drift between the extracted files and
-the database. The *Reload configuration* button on Server › Health resyncs
+the database. The manifest is deleted only after that Resync is done: a first
+start that fails on the way leaves it, and the next start is a restore again
+and runs the Resync. The *Reload configuration* button on Server › Health resyncs
 OpenDKIM, the sender map, and inbound maps only — not DMARC maps. This is why the
 compose file pins a fixed tag rather than `:latest`: without a known version,
 there'd be no way to tell which image restoring a given backup actually requires
@@ -856,6 +858,20 @@ Fix the tag in `docker-compose.yml` (build that tag as under [Fixed image
 tag](#fixed-image-tag) if it is not published), then `docker compose up -d`
 again — the manifest is still there because the failed boot never got to
 delete it.
+
+An archive unpacked **in part** — a download cut short, or a `tar` that
+stopped at a damaged block (it says so and exits non-zero) — is refused at
+step 5 as well, before the database is opened:
+
+```
+backup: the archive was not unpacked whole (data/contents.json, its last entry, is not there) - it was cut short or is damaged; nothing was opened. Unpack it again, from an intact copy, into an empty directory
+```
+
+The last entry of every panel and CLI archive, `data/contents.json`, records
+each file under `data/` with its size and SHA-256, and the first start
+compares `/data` with it; a file that differs is named in the message.
+`docker-compose.yml`, `.env` and `certs/` are not compared — they are yours to
+edit before that start.
 
 **Moving to a different host** is the same flow: create an empty project
 directory, unpack the backup there, edit `.env` (and `docker-compose.yml` if

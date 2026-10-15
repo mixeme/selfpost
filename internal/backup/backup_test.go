@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -200,9 +202,33 @@ func TestCheckRestoreNoManifestIsNormalStart(t *testing.T) {
 	}
 }
 
-func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
+// unpackData writes the data directory of a Create archive into a new
+// directory and returns the manifest's path there.
+func unpackData(t *testing.T, archive []byte) string {
+	t.Helper()
 	dir := t.TempDir()
-	path := writeManifest(t, dir, FormatFull, "1.0.0")
+	for name, body := range readArchive(t, archive) {
+		if rel, ok := strings.CutPrefix(name, DataArchivePrefix); ok {
+			writeFile(t, filepath.Join(dir, filepath.FromSlash(rel)), body)
+		}
+	}
+	return filepath.Join(dir, ManifestName)
+}
+
+func createArchive(t *testing.T, version string) []byte {
+	t.Helper()
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	var buf bytes.Buffer
+	if err := Create(&buf, Params{DataDir: dataDir, DBPath: dbPath, Version: version, DeployRoot: deployRoot}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// A matching restore keeps its manifest until the start that runs it is done
+// with it (audit 2026-10-12, M1): CheckRestore reports, ConsumeRestore ends.
+func TestCheckRestoreMatchKeepsTheManifestUntilConsumed(t *testing.T) {
+	path := unpackData(t, createArchive(t, "1.0.0"))
 	restored, err := CheckRestore(path, "1.0.0")
 	if err != nil {
 		t.Fatalf("CheckRestore matching = %v, want nil", err)
@@ -210,8 +236,145 @@ func TestCheckRestoreMatchConsumesManifest(t *testing.T) {
 	if !restored {
 		t.Fatal("CheckRestore matching did not report a restore")
 	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("manifest should be consumed after a matching restore, stat err = %v", err)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("CheckRestore consumed the manifest before the start was done with it: %v", err)
+	}
+	if err := ConsumeRestore(path); err != nil {
+		t.Fatalf("ConsumeRestore: %v", err)
+	}
+	for _, name := range []string{ManifestName, ContentsName, contentsCheckedName} {
+		if _, err := os.Stat(filepath.Join(filepath.Dir(path), name)); !os.IsNotExist(err) {
+			t.Errorf("%s left after ConsumeRestore (stat err = %v)", name, err)
+		}
+	}
+	if err := ConsumeRestore(path); err != nil {
+		t.Errorf("ConsumeRestore on a consumed restore = %v, want nil", err)
+	}
+}
+
+// The archive's last entry records the data directory's files - every one,
+// with its size and digest - and nothing of the deploy files, which the
+// operator edits before the first start.
+func TestCreateEndsWithTheRecordOfItsData(t *testing.T) {
+	archive := createArchive(t, "1.0.0")
+	gz, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatalf("gzip: %v", err)
+	}
+	tr := tar.NewReader(gz)
+	var last string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar next: %v", err)
+		}
+		last = hdr.Name
+	}
+	if last != DataArchivePrefix+ContentsName {
+		t.Fatalf("the last entry is %s, want %s", last, DataArchivePrefix+ContentsName)
+	}
+
+	files := readArchive(t, archive)
+	var c Contents
+	if err := json.Unmarshal([]byte(files[DataArchivePrefix+ContentsName]), &c); err != nil {
+		t.Fatalf("contents: %v", err)
+	}
+	recorded := map[string]FileSum{}
+	for _, f := range c.Files {
+		recorded[f.Name] = f
+	}
+	for name, body := range files {
+		if name == DataArchivePrefix+ContentsName {
+			continue
+		}
+		f, ok := recorded[name]
+		if !strings.HasPrefix(name, DataArchivePrefix) {
+			if ok {
+				t.Errorf("the record names the deploy file %s", name)
+			}
+			continue
+		}
+		sum := sha256.Sum256([]byte(body))
+		if !ok || f.Size != int64(len(body)) || f.SHA256 != hex.EncodeToString(sum[:]) {
+			t.Errorf("%s recorded as %+v, want size %d sha256 %x", name, f, len(body), sum)
+		}
+		delete(recorded, name)
+	}
+	for name := range recorded {
+		t.Errorf("the record names %s, which the archive does not hold", name)
+	}
+}
+
+// Without the archive's last entry, or with a file that is not the one it
+// holds, a restore is refused, and the manifest stays for the next try.
+func TestCheckRestoreRefusesAnArchiveUnpackedInPart(t *testing.T) {
+	sasldb := func(body string) func(string) {
+		return func(dir string) { writeFile(t, filepath.Join(dir, "sasl", "sasldb2"), body) }
+	}
+	for _, c := range []struct {
+		name   string
+		break_ func(dir string)
+		want   string
+	}{
+		{"no record", func(dir string) { os.Remove(filepath.Join(dir, ContentsName)) }, "contents.json, its last entry, is not there"},
+		{"a record cut", func(dir string) { writeFile(t, filepath.Join(dir, ContentsName), `{"format":"selfpost-backup-con`) }, "is not a record"},
+		{"a file missing", func(dir string) { os.Remove(filepath.Join(dir, "sasl", "sasldb2")) }, "data/sasl/sasldb2 is missing"},
+		{"a file cut", sasldb("SASL"), "data/sasl/sasldb2 is not the file"},
+		{"a file altered", sasldb("SASLDC"), "data/sasl/sasldb2 is not the file"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := unpackData(t, createArchive(t, "1.0.0"))
+			c.break_(filepath.Dir(path))
+			restored, err := CheckRestore(path, "1.0.0")
+			if err == nil || !strings.Contains(err.Error(), c.want) || !strings.Contains(err.Error(), "not unpacked whole") {
+				t.Fatalf("CheckRestore = %v, want a refusal saying %q", err, c.want)
+			}
+			if restored {
+				t.Error("a refused restore reported a restore")
+			}
+			if _, err := os.Stat(path); err != nil {
+				t.Errorf("the refusal removed the manifest: %v", err)
+			}
+		})
+	}
+}
+
+// A record names files of the data directory only; one that names another
+// path is refused, not followed.
+func TestCheckRestoreRefusesARecordOutsideTheDataDirectory(t *testing.T) {
+	for _, name := range []string{"data/../.env", "data/", "docker-compose.yml", "data//sasl/sasldb2", "data/./x", "data/.."} {
+		path := unpackData(t, createArchive(t, "1.0.0"))
+		body, _ := json.Marshal(Contents{Format: FormatContents, Files: []FileSum{{Name: name}}})
+		writeFile(t, filepath.Join(filepath.Dir(path), ContentsName), string(body))
+		if _, err := CheckRestore(path, "1.0.0"); err == nil || !strings.Contains(err.Error(), "not a file of the data directory") {
+			t.Errorf("a record naming %q = %v, want it refused", name, err)
+		}
+	}
+}
+
+// The files are compared once per restore: a start that failed after the
+// check had the database open, and the next start must not take the changes
+// it made for damage. A different archive unpacked over the directory since
+// is compared anew.
+func TestCheckRestoreComparesTheFilesOncePerRestore(t *testing.T) {
+	path := unpackData(t, createArchive(t, "1.0.0"))
+	dir := filepath.Dir(path)
+	if _, err := CheckRestore(path, "1.0.0"); err != nil {
+		t.Fatalf("first CheckRestore: %v", err)
+	}
+	writeFile(t, filepath.Join(dir, "selfpost.db"), "changed by the start that failed")
+	if _, err := CheckRestore(path, "1.0.0"); err != nil {
+		t.Fatalf("the start after a failed one compared the files again: %v", err)
+	}
+
+	// Another archive's manifest, its record lost on the way.
+	b, _ := json.Marshal(Manifest{Format: FormatFull, Version: "1.0.0", CreatedAt: "another time"})
+	writeFile(t, path, string(b))
+	if _, err := CheckRestore(path, "1.0.0"); err == nil || !strings.Contains(err.Error(), "not unpacked whole") {
+		t.Fatalf("another archive's manifest over a checked restore = %v, want it compared anew and refused", err)
 	}
 }
 

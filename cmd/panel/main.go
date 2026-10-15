@@ -281,6 +281,37 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 	return nets
 }
 
+// openData opens the database the panel runs on. When a backup was unpacked
+// into /data, the restore guard comes first (architecture.md § Persistence):
+// the manifest's version must match this binary and the archive must have
+// been unpacked whole before the database is touched, so neither schema skew
+// nor half an archive can corrupt the restored state. That first start then
+// runs resync, and only after it the manifest is consumed: a start that fails
+// on the way leaves it, and the next start is a restore again (audit
+// 2026-10-12, M1). Without a manifest it is an ordinary start.
+func openData(cfg config, resync func(*store.Store) error) (st *store.Store, restored bool, err error) {
+	restored, err = backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
+	if err != nil {
+		return nil, false, err
+	}
+	st, err = store.Open(cfg.dbPath)
+	if err != nil {
+		return nil, false, err
+	}
+	if restored {
+		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
+		if err := resync(st); err != nil {
+			_ = st.Close()
+			return nil, false, err
+		}
+		if err := backup.ConsumeRestore(cfg.manifestPath); err != nil {
+			_ = st.Close()
+			return nil, false, err
+		}
+	}
+	return st, restored, nil
+}
+
 // run starts the panel's three roles and blocks until a shutdown signal or the
 // first fatal error from any role. A signal triggers a clean stop of all
 // roles; a role error cancels the others and is returned so the process exits
@@ -297,31 +328,18 @@ func run() error {
 
 	log.Printf("starting selfpost panel %s", buildinfo.Version)
 
-	// Restore version guard (architecture.md § Persistence): if a backup was
-	// extracted into /data, its manifest version must match this binary before we
-	// touch the database, so schema/format skew between versions cannot corrupt
-	// the restored state. A match consumes the manifest; its absence is the
-	// normal (non-restore) case.
-	restored, err := backup.CheckRestore(cfg.manifestPath, buildinfo.Version)
-	if err != nil {
-		return err
-	}
-
 	// One database handle shared by every role. The store serialises writes
 	// (MaxOpenConns(1)), so the HTTP panel, the journal-milter and the tailer
 	// can all use it without stepping on each other under WAL.
-	st, err := store.Open(cfg.dbPath)
+	st, restored, err := openData(cfg, func(st *store.Store) error {
+		return resyncAfterRestore(cfg, st, false)
+	})
 	if err != nil {
 		return err
 	}
 	defer st.Close()
 
-	if restored {
-		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
-		if err := resyncAfterRestore(cfg, st, false); err != nil {
-			return err
-		}
-	} else if cfg.dmarcEnabled {
+	if !restored && cfg.dmarcEnabled {
 		ms := newMailStack(cfg, st)
 		ms.pf.SetReloadHook(func() error { return nil })
 		if err := ms.DMARC.Resync(); err != nil {

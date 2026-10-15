@@ -960,7 +960,8 @@ single-connection trade-off that follows from it.
 | `postfix/dmarc_relay_domains` | Domains accepted for DMARC report delivery |
 | `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
-| `manifest.json` | Backup version stamp (consumed on restore) |
+| `manifest.json` | Backup version stamp; removed by the first start after a restore once its Resync is done |
+| `contents.json` | A backup's last entry: the size and SHA-256 of each file under `data/`, compared by the first start after a restore before it opens the database (renamed `contents.checked.json` once compared, removed with the manifest) |
 
 Not in `/data`: TLS certificates for the panel (reverse-proxy mount) — though
 full backups also archive the operator's `./certs` PEM files when present.
