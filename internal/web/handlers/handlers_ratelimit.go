@@ -50,8 +50,11 @@ func parseAutoMultiplier(raw string) (float64, error) {
 
 // checkAutoMultiplier is the rule for an auto limit's multiplier, shared by
 // the form and a domain import.
+// Written as "not within" so NaN, which compares false with everything, is
+// outside too: ParseFloat reads "NaN" (audit 2026-10-12, L11 - stored as NULL,
+// read back as 0, recalculated as the default without a word).
 func checkAutoMultiplier(v float64) error {
-	if v < store.MinAutoMultiplier || v > store.MaxAutoMultiplier {
+	if !(v >= store.MinAutoMultiplier && v <= store.MaxAutoMultiplier) {
 		return fmt.Errorf("multiplier must be between %.1f and %.1f", store.MinAutoMultiplier, store.MaxAutoMultiplier)
 	}
 	return nil

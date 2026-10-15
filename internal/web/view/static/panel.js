@@ -99,8 +99,57 @@
     var form = ev.target.closest("form[data-confirm]");
     if (form && !window.confirm(form.dataset.confirm)) {
       ev.preventDefault();
+      return;
+    }
+    // A button that does something else than save - recalculate a rate
+    // limit - leaves the page, and what was typed on it and not saved goes
+    // with it. Such a button carries data-unsaved, the question to ask when
+    // a field of the page differs from what the page was drawn with (audit
+    // 2026-10-12, L19). HTML Living Standard, SubmitEvent: submitter is the
+    // button that submitted the form.
+    var button = ev.submitter;
+    if (button && button.dataset && button.dataset.unsaved && hasUnsavedEdit() &&
+        !window.confirm(button.dataset.unsaved)) {
+      ev.preventDefault();
     }
   });
+
+  // hasUnsavedEdit tells whether a field of the page holds a value the page
+  // was not drawn with: defaultValue, defaultChecked and defaultSelected are
+  // what the markup said (HTML Living Standard, the input, select and
+  // textarea elements). A select none of whose options says selected was
+  // drawn with its first option, or none when it is a list (size or multiple).
+  function hasUnsavedEdit() {
+    var fields = document.querySelectorAll("input, select, textarea");
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (f.disabled || f.type === "hidden" || f.type === "submit" || f.type === "button" || f.type === "reset") {
+        continue;
+      }
+      if (f.type === "checkbox" || f.type === "radio") {
+        if (f.checked !== f.defaultChecked) {
+          return true;
+        }
+      } else if (f.tagName === "SELECT") {
+        var drawn = -1;
+        for (var j = 0; j < f.options.length; j++) {
+          if (f.options[j].defaultSelected) {
+            drawn = j;
+            break;
+          }
+        }
+        if (drawn < 0 && !f.multiple && f.size <= 1 && f.options.length > 0) {
+          drawn = 0;
+        }
+        if (f.selectedIndex !== drawn) {
+          return true;
+        }
+      } else if (f.value !== f.defaultValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // --- Conditional field visibility ------------------------------------
   // Several forms hide a block until a select, checkbox or file input says it

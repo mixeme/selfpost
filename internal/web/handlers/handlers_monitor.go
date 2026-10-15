@@ -380,20 +380,21 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		}
 	}
 
-	page := parsePage(q.Get("p"))
-
 	total, err := h.store.CountSendLog(filter)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
-	if err != nil {
-		return nil, err
-	}
-
 	lastPage := 1
 	if total > 0 {
 		lastPage = int((total + sendLogPageSize - 1) / sendLogPageSize)
+	}
+	// A page past the end is the last one, as on the Inbound log: a link
+	// kept while the log was pruned, or a number typed, shows rows, not an
+	// empty table under "Page 9 of 2" (audit 2026-10-12, L10).
+	page := min(parsePage(q.Get("p")), lastPage)
+	rows, err := h.store.QuerySendLog(filter, sendLogPageSize, (page-1)*sendLogPageSize)
+	if err != nil {
+		return nil, err
 	}
 	out := view.NewOutLog(h.shellMeta(r), h.sendLogRetentionDays(), p.IsGlobal(), domainNames, logins, filter.Domain, filter.AppLogin)
 	table := make([]view.OutLogRow, len(rows))
@@ -409,8 +410,16 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 
 // parsePage clamps the "p" query parameter to a valid page number, defaulting
 // to 1 for anything missing or malformed rather than rejecting the request.
+//
+// A number too large for an int is past every last page, and is taken as
+// that: strconv returns it as the largest int with ErrRange (Go 1.26,
+// strconv.ParseInt: "the maximum magnitude integer of the appropriate
+// bitSize and sign"), and the caller clamps it to the last page.
 func parsePage(v string) int {
 	n, err := strconv.Atoi(v)
+	if errors.Is(err, strconv.ErrRange) && n > 0 {
+		return n
+	}
 	if err != nil || n < 1 {
 		return 1
 	}

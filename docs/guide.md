@@ -473,11 +473,15 @@ readings, in the order of what stops mail first:
   record the internet publishes for this server's IP (forward-confirmed
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
   *Re-check DNS* after changing DNS.
-- **Configuration** — the **Reload configuration** button re-applies OpenDKIM
-  tables and the Postfix sender map from the database (and inbound relay maps
-  when `INBOUND_RELAY_ENABLE=true`) — use it if daemons drifted from what the
-  panel shows after manual edits under `/data`. It does **not** rebuild DMARC
-  Postfix maps; a full restore Resync does (see [Restore](#restore)).
+- **Configuration** — the **Reload configuration** button writes again, from
+  the database, every file the panel keeps for the mail path - OpenDKIM's
+  tables, the Postfix sender map, the inbound relay maps and the filter lists
+  (with `INBOUND_RELAY_ENABLE=true`), the DMARC report maps (with
+  `DMARC_REPORTS_ENABLE=true`) - and has OpenDKIM and Postfix re-read them:
+  what the first start after a restore does (see [Restore](#restore)). Use it
+  if the daemons drifted from what the panel shows after manual edits under
+  `/data`. A step that fails is named on the page, and the panel's log says
+  why.
 
 ### Queue and System log
 
@@ -817,8 +821,8 @@ when `INBOUND_RELAY_ENABLE=true`; DMARC maps when `DMARC_REPORTS_ENABLE=true`)
 and both daemons are reloaded, healing any drift between the extracted files and
 the database. The manifest is deleted only after that Resync is done: a first
 start that fails on the way leaves it, and the next start is a restore again
-and runs the Resync. The *Reload configuration* button on Server › Health resyncs
-OpenDKIM, the sender map, and inbound maps only — not DMARC maps. This is why the
+and runs the Resync. The *Reload configuration* button on Server › Health runs the same Resync.
+This is why the
 compose file pins a fixed tag rather than `:latest`: without a known version,
 there'd be no way to tell which image restoring a given backup actually requires
 (see [Fixed image tag](#fixed-image-tag)).

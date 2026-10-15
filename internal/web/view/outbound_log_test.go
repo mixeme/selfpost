@@ -22,7 +22,7 @@ func TestOutLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<th>Time, UTC</th>`, `09-21 14:01:52`,
 		`shop@<wbr>shop.example.org`, `m.keller@<wbr>gmx.de`, `title="[FIRING] disk usage above 90 % on db-2"`,
 		`<span class="tag is-success is-light">sent</span>`, `<span class="tag is-warning is-light">deferred</span>`,
-		`<span class="tag is-danger is-light">bounced</span>`, `<span class="tag is-light">rate-limited</span>`, `<span class="tag is-danger is-light">wrong From</span>`,
+		`<span class="tag is-danger is-light">bounced</span>`, `<span class="tag is-danger is-light">rate-limited</span>`, `<span class="tag is-danger is-light">wrong From</span>`,
 		`href="/outbound/log/184220">Details</a>`,
 		`Page 1 of 412`, `<a href="/outbound/log?p=2">Older →</a>`, `New rows appear on their own`,
 	)

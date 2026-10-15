@@ -101,7 +101,7 @@ func KitPage() *Kit {
 		StatusRows: []KitStatusRow{
 			{"ok, published, running, sent, accept", Tag{Status: "ok"}},
 			{"warn, deferred, quiet, tempfail", Tag{Status: "warn"}},
-			{"error, fail, mismatch, bounced, reject", Tag{Status: "fail"}},
+			{"error, fail, mismatch, bounced, reject, rate-limited", Tag{Status: "fail"}},
 			{"unknown, off, neutral counts", Tag{Status: "off"}},
 			{"held: quarantine · role: global", Tag{Status: "quarantine"}},
 		},

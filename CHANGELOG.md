@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Reload configuration writes everything a restore's first start writes.**
+  The button on Server › Health left the DMARC report maps and the filter
+  lists out while it said the configuration was regenerated; it now writes
+  them too, and a step that fails is a message on the page that names it,
+  not a plain-text error (audit 2026-10-12, L13).
+
 ### Security
 
 - **The sign-in told which usernames exist by how long it took.** A wrong
@@ -31,6 +39,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   failure in a row, up to a minute. A box whose session had expired was
   filled with the sign-in page; the whole page goes to sign-in now (audit
   2026-10-12, M11).
+- **The Outbound log showed an empty table under "Page 9 of 2"** for a page
+  past its end - a link kept while old rows were pruned, or a number typed.
+  It shows the last page, as the Inbound log does (audit 2026-10-12, L10).
+- **An auto limit's multiplier took "NaN"**, stored nothing, and was
+  recalculated with the default without a word. It is refused like any
+  number out of range (audit 2026-10-12, L11).
+- **A message refused under a rate limit was a grey tag** beside its two
+  red siblings, *wrong From* and *wrong client*. It is red (audit
+  2026-10-12, L18).
+- **Recalculate rate limit dropped what was typed on the page.** The button
+  leaves the page; when a field holds an edit not saved yet, it now asks
+  first (audit 2026-10-12, L19).
 
 ## [2.5.3] - 2026-10-15
 

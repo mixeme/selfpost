@@ -85,7 +85,7 @@ func TestStatusTagMapsEveryStatusOfTheKitTable(t *testing.T) {
 }
 
 func TestStatusTagTreatsAnUnknownStatusAsNeutral(t *testing.T) {
-	for _, status := range []string{"", "rate-limited", "3", "DKIM", "something new"} {
+	for _, status := range []string{"", "limited", "3", "DKIM", "something new"} {
 		if got := StatusTag(status); got != "tag is-light" {
 			t.Errorf("StatusTag(%q) = %q, want the neutral tag", status, got)
 		}

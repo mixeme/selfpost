@@ -1038,8 +1038,8 @@ tables, Postfix's sender map, inbound relay maps (when
 are re-derived from SQLite and both daemons are reloaded, so drift between the
 extracted archive and the database is healed before mail flows. Manual
 `POST /server/health/reload` (the *Reload configuration* button on Server ›
-Health) resyncs OpenDKIM, the sender map, and
-inbound maps only — not DMARC maps. Stopped-container
+Health) runs the same Resync, the filter lists with it, since `2.5.4`.
+Stopped-container
 `tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads

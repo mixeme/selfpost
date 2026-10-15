@@ -229,6 +229,8 @@ func TestInboundLogPages(t *testing.T) {
 	// A page past the end, or nonsense, is the last page, or the first.
 	has(t, "page 9", s.get(s.h.HandleInboundLog, "/inbound/log?domain=a.example.com&p=9", globalPrincipal).Body.String(), `Page 2 of 2`, `Hello A`)
 	has(t, "page x", s.get(s.h.HandleInboundLog, "/inbound/log?domain=a.example.com&p=x", globalPrincipal).Body.String(), `Page 1 of 2`)
+	has(t, "page huge", s.get(s.h.HandleInboundLog, "/inbound/log?domain=a.example.com&p=99999999999999999999", globalPrincipal).Body.String(), `Page 2 of 2`, `Hello A`)
+	has(t, "page 0", s.get(s.h.HandleInboundLog, "/inbound/log?domain=a.example.com&p=0", globalPrincipal).Body.String(), `Page 1 of 2`)
 }
 
 func TestInboundLogEmptyAndOff(t *testing.T) {
@@ -237,6 +239,9 @@ func TestInboundLogEmptyAndOff(t *testing.T) {
 	body := s.get(h.HandleInboundLog, "/inbound/log", globalPrincipal).Body.String()
 	has(t, "empty log", body, `No messages logged yet.`)
 	lacks(t, "empty log", body, `<table`, `Page 1`)
+	body = s.get(h.HandleInboundLog, "/inbound/log?p=5", globalPrincipal).Body.String()
+	has(t, "empty log, page 5", body, `No messages logged yet.`)
+	lacks(t, "empty log, page 5", body, `<table`, `Page `)
 
 	h.cfg.InboundEnabled = false
 	if rec := s.get(h.HandleInboundLog, "/inbound/log", globalPrincipal); rec.Code != http.StatusNotFound {

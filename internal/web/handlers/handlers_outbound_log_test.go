@@ -74,6 +74,19 @@ func TestOutLogPagesKeepTheFiltersAndThePage(t *testing.T) {
 	lacks(t, "page 2", second, `Older →`)
 	// A row's page is opened from the page it is on and leads back to it.
 	has(t, "page 2", second, `?domain=bs.example.ru&amp;p=2">Details</a>`)
+
+	// The edges (audit 2026-10-12, L10): a page past the end is the last,
+	// however far past; nonsense, zero or a negative number is the first.
+	for _, p := range []string{"3", "9", "99999999999999999999", "9223372036854775807"} {
+		body := getBody(t, h.HandleDeliveries, "/outbound/log?domain=bs.example.ru&p="+p)
+		has(t, "page "+p, body, `Page 2 of 2`, `<a href="/outbound/log?domain=bs.example.ru">← Newer</a>`)
+		if got := strings.Count(body, `">Details</a>`); got == 0 {
+			t.Errorf("page %s shows no rows", p)
+		}
+	}
+	for _, p := range []string{"0", "-1", "x", ""} {
+		has(t, "page "+p, getBody(t, h.HandleDeliveries, "/outbound/log?domain=bs.example.ru&p="+p), `Page 1 of 2`)
+	}
 }
 
 // Nothing logged yet is a sentence in the polled region, which goes on polling,
@@ -84,6 +97,10 @@ func TestOutLogEmpty(t *testing.T) {
 	body := getBodyAs(t, h.HandleDeliveries, "/outbound/log", p)
 	has(t, "empty log", body, `No messages logged yet.`, `id="out-log-rows"`, `data-poll`, `New rows appear on their own`)
 	lacks(t, "empty log", body, `<table`, `Page 1`)
+	// A page asked of an empty log is the same empty log.
+	body = getBodyAs(t, h.HandleDeliveries, "/outbound/log?p=5", p)
+	has(t, "empty log, page 5", body, `No messages logged yet.`)
+	lacks(t, "empty log, page 5", body, `<table`, `Page `)
 	// Only the global role is pointed at the setting that decides how long rows live.
 	lacks(t, "empty log", body, `href="/server/settings"`)
 	has(t, "log", getBody(t, h.HandleDeliveries, "/outbound/log"), `href="/server/settings">Settings</a>`)

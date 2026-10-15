@@ -146,6 +146,9 @@ var statusClass = map[string]string{
 	"error": "tag is-danger is-light", "fail": "tag is-danger is-light",
 	"mismatch": "tag is-danger is-light", "bounced": "tag is-danger is-light",
 	"reject": "tag is-danger is-light",
+	// A message refused under a level-2 limit, beside its two siblings that
+	// are red (audit 2026-10-12, L18).
+	"rate-limited": "tag is-danger is-light",
 
 	"quarantine": "tag is-primary is-light", "held": "tag is-primary is-light",
 	"global": "tag is-primary is-light",

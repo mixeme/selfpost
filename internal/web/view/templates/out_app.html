@@ -64,7 +64,7 @@
 
   <div class="buttons">
     <button type="submit" class="button is-primary">{{.Submit}}</button>
-    {{if .Recalc}}<button type="submit" class="button" formaction="{{.Recalc}}">Recalculate rate limit</button>{{end}}
+    {{if .Recalc}}<button type="submit" class="button" formaction="{{.Recalc}}" data-unsaved="Recalculating leaves this page, and what you changed on it and did not save is lost. Recalculate anyway?">Recalculate rate limit</button>{{end}}
     <a class="button is-text" href="{{.Cancel}}">Cancel</a>
   </div>
 </form>

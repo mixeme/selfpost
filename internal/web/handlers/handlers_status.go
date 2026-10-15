@@ -501,7 +501,7 @@ func queueSummary(out string) string {
 func statusFlash(r *http.Request) string {
 	switch {
 	case r.URL.Query().Get("reloaded") != "":
-		return "Configuration regenerated from the database; OpenDKIM and Postfix have re-read it."
+		return "Configuration regenerated from the database - OpenDKIM's tables, every map the panel writes for Postfix, the filter lists - and OpenDKIM and Postfix have re-read it."
 	case r.URL.Query().Get("rechecked") != "":
 		return "DNS re-checked."
 	default:

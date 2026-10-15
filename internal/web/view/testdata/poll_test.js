@@ -1,6 +1,6 @@
 // The polling of panel.js, run in node against a stand-in for the few parts
 // of the DOM and htmx it uses, with a clock the test moves. Run by
-// TestPanelJSPolling (paneljs_test.go): node poll_test.js <panel.js>.
+// TestPanelJS (paneljs_test.go): node poll_test.js <panel.js>.
 // Exits non-zero with what went wrong.
 "use strict";
 const fs = require("fs");

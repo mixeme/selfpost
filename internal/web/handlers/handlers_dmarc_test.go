@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/domain"
+	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -292,4 +294,38 @@ func TestDeletingAUserLeavesDomainAddressesAndNamesNobody(t *testing.T) {
 	}
 	confirm := send(s.h.HandleUserDeleteConfirm, &globalPrincipal, "GET", "/server/users/"+idStr(admin.ID)+"/delete", map[string]string{"uid": idStr(admin.ID)}, nil).Body.String()
 	lacks(t, "delete confirmation", confirm, `report address`, `will have no`)
+}
+
+// failingDMARCMaps stands in for Postfix refusing the DMARC maps.
+type failingDMARCMaps struct{}
+
+func (failingDMARCMaps) RebuildDMARCMaps(postfix.DMARCMapsConfig) error {
+	return errors.New("disk full")
+}
+
+// Reload configuration writes what a restore's first start writes, the DMARC
+// maps among it, and a failure is a message on Health that names the step,
+// not a plain-text page (audit 2026-10-12, L13).
+func TestReloadWritesTheDMARCMapsAndSaysWhereItFailed(t *testing.T) {
+	s, maps := hostedStand(t)
+	// An OpenDKIM that reloads nothing - the stand has no supervisor - and
+	// a sampler for the Health page a failure is shown on.
+	odk := domain.NewOpenDKIM(t.TempDir())
+	odk.SetReloadHook(func() error { return nil })
+	s.h.domains = domain.NewService(s.h.store, odk, s.h.apps, "mail")
+	s.h.machine = &health.MachineSampler{}
+	rec := postFormAs(s.h.HandleReload, globalPrincipal, "/server/health/reload", nil, url.Values{})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/server/health?reloaded=1" {
+		t.Fatalf("reload = %d, Location %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if len(maps.got) != 1 {
+		t.Errorf("the reload rebuilt the DMARC maps %d times, want once", len(maps.got))
+	}
+
+	s.h.dmarc = dmarc.NewService(s.h.store, failingDMARCMaps{}, "mail.example.org", true)
+	rec = postFormAs(s.h.HandleReload, globalPrincipal, "/server/health/reload", nil, url.Values{})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("a failed reload = %d, want 500", rec.Code)
+	}
+	has(t, "failed reload", rec.Body.String(), "Reload failed at the DMARC report maps", "Reload configuration")
 }

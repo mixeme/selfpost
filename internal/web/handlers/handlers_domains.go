@@ -162,26 +162,41 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/outbound/domains?deleted=1", http.StatusSeeOther)
 }
 
-// HandleReload re-applies both the OpenDKIM configuration and the Postfix
-// sender map on demand (architecture.md § Panel HTTP surface).
+// HandleReload writes again, from the database, every file the panel keeps
+// for the mail path and has OpenDKIM and Postfix re-read them - what the
+// first start after a restore does (cmd/panel mailStack.Resync): OpenDKIM's
+// tables, the sender map, with the inbound relay on its maps and the filter
+// lists, with DMARC reports on their maps (architecture.md § Panel HTTP
+// surface). Before 2.5.4 it left the last two out, and said "regenerated"
+// over them (audit 2026-10-12, L13). A failure is a message on Health that
+// names the step; the log has the error.
 func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	if err := h.domains.Resync(); err != nil {
-		logf("panel: manual reload (opendkim): %v", err)
-		http.Error(w, "reload failed", http.StatusInternalServerError)
-		return
+	type step struct {
+		name string
+		run  func() error
 	}
-	if err := h.apps.Resync(); err != nil {
-		logf("panel: manual reload (postfix): %v", err)
-		http.Error(w, "reload failed", http.StatusInternalServerError)
-		return
+	steps := []step{
+		{"OpenDKIM's tables", h.domains.Resync},
+		{"the sender map", h.apps.Resync},
 	}
 	if h.cfg.InboundEnabled && h.inbound != nil {
-		if err := h.inbound.Resync(); err != nil {
-			logf("panel: manual reload (inbound): %v", err)
-			http.Error(w, "reload failed", http.StatusInternalServerError)
+		steps = append(steps, step{"the inbound relay maps", h.inbound.Resync})
+	}
+	if h.cfg.InboundEnabled && h.lists != nil {
+		steps = append(steps, step{"the filter lists", h.lists.Sync})
+	}
+	if h.dmarc != nil && h.dmarc.Enabled() {
+		steps = append(steps, step{"the DMARC report maps", h.dmarc.Resync})
+	}
+	for _, s := range steps {
+		if err := s.run(); err != nil {
+			logf("panel: manual reload (%s): %v", s.name, err)
+			page := h.healthView(r, "")
+			page.Flash = &view.Flash{Error: true, Text: view.Plain("Reload failed at " + s.name + "; what came before it was written and re-read. The panel's log says why.")}
+			h.view.Render(w, http.StatusInternalServerError, "health", page)
 			return
 		}
 	}

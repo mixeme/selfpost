@@ -66,7 +66,7 @@
 </form>
 <div class="buttons">
   <button type="submit" class="button is-primary" form="rate-limit">Save limit</button>
-  {{if .Rate.Auto}}<form method="post" action="{{.RecalcAction}}"><button type="submit" class="button">Recalculate now</button></form>{{end}}
+  {{if .Rate.Auto}}<form method="post" action="{{.RecalcAction}}"><button type="submit" class="button" data-unsaved="Recalculating leaves this page, and what you changed on it and did not save is lost. Recalculate anyway?">Recalculate now</button></form>{{end}}
   {{if .Rate.Active}}<form method="post" action="{{.LimitAction}}" data-confirm="Remove the domain rate limit? Only the global level-1 limit will apply."><input type="hidden" name="clear" value="1"><button type="submit" class="button is-danger is-light">Remove limit</button></form>{{end}}
 </div>
 <p class="sp-muted mt-4">{{template "inline" .LimitNote}}</p>
