@@ -1,10 +1,10 @@
 # Plan: panel-dkim-signing
 
-**Status:** draft, 2026-10-15 - the row is agreed (owner, 2026-10-15, the
+**Status:** agreed, 2026-10-15 - the row is agreed (owner, 2026-10-15, the
 order port25-bare-newline -> base-trixie -> panel-dkim-signing); three
-questions below go to the owner one at a time; Q1 and Q2 are decided.  
+questions below were settled one at a time the same day.  
 **Date:** 2026-10-15  
-**Version:** `2.8.0` MINOR (after base-trixie's `2.7.0`). No migration;
+**Version:** `2.8.0` MINOR (after base-trixie, shipped `2.7.0`). No migration;
 nothing for an operator to do.
 
 ---
@@ -120,6 +120,9 @@ Decided here (technical, the owner may overrule):
   "DKIM signer" (the panel's `sign.sock`, checked the same way), the two
   programs leave the process list. A mockup first, as for any page
   change.
+  **Settled 2026-10-15:** shown to the owner as a picture; it follows from
+  the card's own rule (a row per milter socket Postfix needs, and the
+  signer is strict), so it is not his choice - the two rows as drawn.
 
 ## Stages
 

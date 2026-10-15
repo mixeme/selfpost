@@ -44,7 +44,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
 | base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | shipped `2.7.0` | — | — |
-| panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | agreed (2026-10-15; after base-trixie, MINOR); plan drafted, three questions open | 0/14 | [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md) |
+| panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | agreed (2026-10-15; plan agreed, next) | 0/14 | [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md) |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
