@@ -16,7 +16,6 @@
             <thead><tr><th>Program</th><th>State</th><th>Detail</th></tr></thead>
             <tbody>
               <tr><td>postfix</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 41, uptime 18 days</td></tr>
-              <tr><td>opendkim</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 39, uptime 18 days</td></tr>
               <tr><td>journal-milter</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 40, uptime 18 days</td></tr>
               <tr><td>panel</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 44, uptime 18 days</td></tr>
               <tr><td>dmarc-ingest</td><td><span class="tag is-success is-light">running</span></td><td class="sp-muted">pid 47, uptime 18 days</td></tr>
@@ -64,7 +63,8 @@
           <div class="table-container"><table class="table is-fullwidth">
             <thead><tr><th>Milter</th><th>State</th></tr></thead>
             <tbody>
-              <tr><td>opendkim<br><span class="sp-muted sp-mono sp-small">inet:127.0.0.1:8891</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
+              <tr><td>dkim-signer <span class="sp-muted">· applications</span><br><span class="sp-muted sp-mono sp-small">unix:/run/selfpost/sign.sock</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
+              <tr><td>dkim-signer <span class="sp-muted">· notifications</span><br><span class="sp-muted sp-mono sp-small">unix:/run/selfpost/sign-local.sock</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
               <tr><td>journal-milter<br><span class="sp-muted sp-mono sp-small">unix:/run/selfpost/journal.sock</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
               <tr><td>sender-check<br><span class="sp-muted sp-mono sp-small">unix:/run/selfpost/sender.sock</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
               <tr><td>rspamd <span class="sp-muted">· inbound spam filter</span><br><span class="sp-muted sp-mono sp-small">inet:antispam:11332</span></td><td><span class="tag is-success is-light">ok</span></td></tr>
@@ -99,7 +99,7 @@
         <div class="box" id="configuration" data-order="8">
           <div class="sp-box-head"><span class="sp-no">08</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
           <div class="sp-box-body">
-            <p class="mb-3">Regenerates the OpenDKIM and Postfix configuration and the spam filter's lists from the database, removes the keys of deleted domains, and reloads both daemons. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
+            <p class="mb-3">Regenerates the Postfix configuration and the spam filter's lists from the database, removes the keys of deleted domains, and reloads Postfix. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
             <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
           </div>
         </div>
