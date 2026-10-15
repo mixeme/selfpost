@@ -25,15 +25,12 @@ func (h *Handlers) HandleServerSettings(w http.ResponseWriter, r *http.Request) 
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		h.renderServerSettings(w, r, http.StatusOK, "", h.currentRetentions())
-	case http.MethodPost:
+	// The routes are method-bound (GET and POST), so it is one or the other.
+	if r.Method == http.MethodPost {
 		h.submitServerSettings(w, r)
-	default:
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	h.renderServerSettings(w, r, http.StatusOK, "", h.currentRetentions())
 }
 
 // retentions are the two journal retentions the Settings form shows: the

@@ -1,5 +1,5 @@
 // Package store owns the SelfPost SQLite database: the single file under /data
-// that persists panel users (global administrators and domain-admins), sending
+// that persists panel users (the global and domain roles), sending
 // domains and applications, optional inbound-relay domains, the send log and
 // rate-limit settings (architecture.md § Persistence). It exposes typed queries
 // so the rest of the panel never builds SQL by hand.

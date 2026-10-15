@@ -247,26 +247,6 @@ func TestServiceDeleteKeepsRowWhenSASLFails(t *testing.T) {
 	}
 }
 
-func TestServiceUpdateMode(t *testing.T) {
-	svc, st, _, maps := newServiceHarness(t)
-	d := addDomain(t, st, "example.com")
-	a, _, err := svc.Create(d.ID, "app1", store.AddressModeWildcard, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := svc.UpdateMode(a.ID, store.AddressModeList, []string{"alerts@example.com"}); err != nil {
-		t.Fatalf("UpdateMode: %v", err)
-	}
-	if len(maps.last) != 1 || maps.last[0].Address != "alerts@example.com" {
-		t.Errorf("map after mode switch = %+v", maps.last)
-	}
-	got, _ := st.GetApplication(a.ID)
-	if got.AddressMode != store.AddressModeList || len(got.Addresses) != 1 {
-		t.Errorf("stored app after switch = %+v", got)
-	}
-}
-
 func TestServiceRegeneratePassword(t *testing.T) {
 	svc, st, rec, _ := newServiceHarness(t)
 	d := addDomain(t, st, "example.com")

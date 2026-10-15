@@ -17,11 +17,6 @@ import (
 // "custom" (an address typed for the domain). What is stored is the address
 // alone; "" is no reports.
 func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", "POST")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
 		return

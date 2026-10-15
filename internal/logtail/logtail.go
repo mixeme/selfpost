@@ -612,11 +612,12 @@ func SplitTimestamp(line string) (stamp, rest string) {
 // follow tails path line by line, calling handle for each complete line, until
 // ctx is cancelled. Where it starts is tr's decision (a persisted offset, the
 // start of a file that changed while the panel was down, or end-of-file on a
-// first ever run); it reopens the file when it is rotated (inode change from
-// logrotate's create, or truncation from copytruncate) so nothing is missed.
+// first ever run); it reopens the file when it is rotated, so nothing is missed.
+// The inode changes under logrotate's create, which build/logrotate-mail.conf
+// uses; a file shorter than the read position is taken as truncation.
 // logrotate 3.21.0, logrotate.c, rotateSingleLog(): without copytruncate the
-// file is rename()d and, with create (build/logrotate-mail.conf), a new one
-// made by createOutputFile(); with copytruncate it is copied and truncated.
+// file is rename()d and, with create, a new one made by createOutputFile();
+// with copytruncate it is copied and truncated, which that config does not use.
 //
 // caughtUp is closed after the first read that reaches end-of-file, which is
 // the point where every line the panel missed while it was down has been

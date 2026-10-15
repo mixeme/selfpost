@@ -3,6 +3,9 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -59,5 +62,28 @@ func TestServerSubtreeIsGlobalOnly(t *testing.T) {
 	}
 	if checked < 15 {
 		t.Fatalf("only %d /server/ routes were checked", checked)
+	}
+}
+
+// The test above walks the routes table; a /server/ route registered beside
+// it, or past the server() guard, would not be looked at. Every pattern under
+// /server/ that web.go registers goes through server() and is in the table.
+func TestEveryServerRouteIsGuardedAndListed(t *testing.T) {
+	src, err := os.ReadFile("web.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := regexp.MustCompile(`([\w.]+)\("((?:GET|POST|PUT|DELETE|PATCH|HEAD) )?(/server/[^"]*)"`).FindAllStringSubmatch(string(src), -1)
+	if len(found) < 15 {
+		t.Fatalf("only %d /server/ patterns found in web.go", len(found))
+	}
+	for _, m := range found {
+		pattern := m[2] + m[3]
+		if m[1] != "server" {
+			t.Errorf("%q is registered by %s, not server(): the subtree's guard is skipped", pattern, m[1])
+		}
+		if !slices.Contains(routes.always, pattern) {
+			t.Errorf("%q is not in routes.always, so no test opens it as a domain administrator", pattern)
+		}
 	}
 }

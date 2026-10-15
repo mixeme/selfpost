@@ -67,15 +67,12 @@ func (h *Handlers) HandleUserNew(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		h.renderUserForm(w, r, http.StatusOK, 0, userFormView{FormRole: string(store.RoleDomain)})
-	case http.MethodPost:
+	// The routes are method-bound (GET and POST), so it is one or the other.
+	if r.Method == http.MethodPost {
 		h.submitUserCreate(w, r)
-	default:
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	h.renderUserForm(w, r, http.StatusOK, 0, userFormView{FormRole: string(store.RoleDomain)})
 }
 
 // HandleUserEdit edits or deletes a panel user (global only).
@@ -97,24 +94,21 @@ func (h *Handlers) HandleUserEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		h.renderUserForm(w, r, http.StatusOK, u.ID, userFormView{
-			FormUsername: u.Username,
-			FormEmail:    u.Email,
-			FormRole:     string(u.Role),
-			Reach:        u.Reach(),
-		})
-	case http.MethodPost:
+	// The routes are method-bound (GET and POST), so it is one or the other.
+	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "Invalid form submission.", FormUsername: u.Username, FormEmail: u.Email, FormRole: string(u.Role)})
 			return
 		}
 		h.submitUserUpdate(w, r, u)
-	default:
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	h.renderUserForm(w, r, http.StatusOK, u.ID, userFormView{
+		FormUsername: u.Username,
+		FormEmail:    u.Email,
+		FormRole:     string(u.Role),
+		Reach:        u.Reach(),
+	})
 }
 
 func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status int, userID int64, form userFormView) {

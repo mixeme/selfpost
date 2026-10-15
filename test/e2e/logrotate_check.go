@@ -2,11 +2,7 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
-	"testing"
 	"time"
 )
 
@@ -60,47 +56,4 @@ func checkLogrotateRotation(s *stack) error {
 		return fmt.Errorf("rotated file does not contain marker (out=%q err=%v)", body, err)
 	}
 	return nil
-}
-
-// TestImageBuildPreservesLogrotateMode builds from a context where
-// logrotate-mail.conf is group-writable and checks the image still ships 0644.
-func TestImageBuildPreservesLogrotateMode(t *testing.T) {
-	conf := filepath.Join(h.repoRoot, "build", "logrotate-mail.conf")
-	info, err := os.Stat(conf)
-	if err != nil {
-		t.Fatalf("stat source config: %v", err)
-	}
-	origMode := info.Mode().Perm()
-
-	if err := os.Chmod(conf, origMode|0o020); err != nil {
-		t.Fatalf("chmod g+w source config: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chmod(conf, origMode)
-	})
-
-	tag := "selfpost:e2e-logrotate-mode"
-	build := exec.Command("docker", "build",
-		"-f", filepath.Join(h.repoRoot, "build", "Dockerfile"),
-		"-t", tag,
-		"--build-arg", "VERSION=e2e",
-		h.repoRoot,
-	)
-	build.Env = os.Environ()
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("docker build with group-writable context config: %v\n%s", err, out)
-	}
-	t.Cleanup(func() {
-		_, _ = exec.Command("docker", "rmi", "-f", tag).CombinedOutput()
-	})
-
-	run := exec.Command("docker", "run", "--rm", tag, "stat", "-c", "%a", "/etc/logrotate.d/mail")
-	run.Env = os.Environ()
-	out, err := run.CombinedOutput()
-	if err != nil {
-		t.Fatalf("stat in image: %v\n%s", err, out)
-	}
-	if strings.TrimSpace(string(out)) != "644" {
-		t.Fatalf("image logrotate config mode is %q, want 644", strings.TrimSpace(string(out)))
-	}
 }

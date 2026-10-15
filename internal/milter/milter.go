@@ -1,14 +1,17 @@
-// Package milter implements the SelfPost journal-milter: a lightweight milter
-// (architecture.md § Mail path) attached to Postfix's smtpd_milters alongside
-// OpenDKIM. On the receive path it reads the SASL login, From, recipients and
+// Package milter implements the SelfPost milters: the journal-milter here, the
+// sender check (sender.go) and the inbound journal (inbound.go).
+//
+// The journal-milter is a lightweight milter (architecture.md § Mail path)
+// attached to Postfix's smtpd_milters alongside OpenDKIM. On the receive path it reads the SASL login, From, recipients and
 // Subject of each accepted message and records one send-log row per (queue-id,
 // recipient), giving the panel a structured, filterable history that raw
 // mail.log cannot.
 //
-// It is monitoring only: it never rejects, and every callback returns Continue
-// or Accept so a failure of this milter can never block the relay. Postfix is
-// configured with default_action=accept for this milter's socket, so even a
-// crash or hang fails open (architecture.md § Mail path).
+// It refuses only at MAIL FROM, with a 4xx tempfail, when a level-2 rate limit
+// or the application's client-address list says no (see MailFrom); every other
+// callback returns Continue. A failure of this milter never blocks the relay:
+// Postfix is configured with default_action=accept for this milter's socket,
+// so even a crash or hang fails open (architecture.md § Mail path).
 //
 // Postfix 3.7.11, src/milter/milter8.c, milter8_comm_error(): a milter that
 // cannot be reached, or does not answer within milter_*_timeout, gives no

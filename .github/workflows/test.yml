@@ -40,6 +40,14 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # Unused code, dead branches and the usual slips go vet does not look
+      # for. The version is pinned: a new release adds checks, and a check
+      # that appears under a push is a red build nobody asked for. 2026.1 is
+      # the release for Go 1.26. test/e2e is a module of its own, so ./...
+      # skips it; it is checked in its own step below.
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@2026.1 ./...
+
       - name: Test
         run: go test ./...
 
@@ -52,3 +60,4 @@ jobs:
         run: |
           go vet ./...
           go test -c -o /dev/null .
+          go run honnef.co/go/tools/cmd/staticcheck@2026.1 ./...

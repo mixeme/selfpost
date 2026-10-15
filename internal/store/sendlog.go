@@ -16,10 +16,13 @@ const (
 	StatusSent     = "sent"
 	StatusDeferred = "deferred"
 	StatusBounced  = "bounced"
-	// StatusRejected marks a message the journal-milter refused with a 4xx under
-	// a level-2 rate limit (guide § Rate limiting). Such a row never gets a
-	// queue-id and is excluded from the level-2 message count (it was never
-	// sent).
+	// StatusRejected marks a message the relay refused, and the row of that
+	// refusal. The journal-milter refuses at MAIL FROM with a 4xx when a level-2
+	// rate limit or the application's client-address list says no (Reason is
+	// ReasonLimit or ReasonClient; such a row has no queue-id). The sender check
+	// refuses a From: line that is not the application's with a 550 (ReasonFrom;
+	// its row has the queue-id). Every refused row is left out of the level-2
+	// message count (it was never sent).
 	StatusRejected = "rejected"
 )
 
@@ -72,11 +75,11 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 	return nil
 }
 
-// InsertRejected records a message the journal-milter refused under a level-2
-// rate limit (guide § Rate limiting), so the rejection is visible in the
-// send-log UI. Only the fields known at MAIL FROM are set (domain, sender, app
-// login); there is no queue-id or recipient because the message was rejected
-// before it was queued.
+// InsertRejected records a refused message (StatusRejected), so the refusal is
+// visible in the send-log UI with its reason. The journal-milter writes its
+// MAIL FROM refusals with only the fields known there (domain, sender, app
+// login, client address): no queue-id, no recipient. The sender check writes
+// its From: refusals with the queue-id and the first recipient.
 func (s *Store) InsertRejected(e SendLogEntry) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(

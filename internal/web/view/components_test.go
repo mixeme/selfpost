@@ -311,9 +311,6 @@ func TestFactsBigMonoAndNote(t *testing.T) {
 		`<dl class="sp-facts"><div><dt>Domain</dt><dd><a href="/outbound/domains/1">example.org</a></dd></div>`,
 		`<dd class="sp-mono">4XcB7k2Jm9z1</dd>`,
 		`<dd class="sp-big">5 days</dd><dd class="sp-muted">a supporting line</dd>`)
-	if got := Facts("A", "1", "B", "2", "odd"); len(got) != 2 || got[1].Label != "B" {
-		t.Errorf("Facts(pairs) = %#v", got)
-	}
 }
 
 func TestSideMenu(t *testing.T) {

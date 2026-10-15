@@ -127,24 +127,6 @@ func (s *Service) Secret(login string) (string, error) {
 	return s.sasl.Secret(login)
 }
 
-// UpdateMode switches an application's address mode / list and rebuilds the
-// sender map (product.md). The login and password are untouched. Addresses are
-// re-validated against the application's domain.
-func (s *Service) UpdateMode(id int64, mode string, rawAddresses []string) error {
-	a, err := s.store.GetApplication(id)
-	if err != nil {
-		return err
-	}
-	addresses, err := s.validateForDomain(a.DomainID, a.Login, mode, rawAddresses)
-	if err != nil {
-		return err
-	}
-	if err := s.store.UpdateApplicationMode(id, mode, addresses); err != nil {
-		return err
-	}
-	return s.Resync()
-}
-
 // RegeneratePassword issues a fresh password for an existing application (spec
 // 7.2.9). The old password is invalidated by overwriting the SASL account; the
 // address mode and bindings are unchanged, so no map rebuild is needed. The new

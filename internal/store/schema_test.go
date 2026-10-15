@@ -12,8 +12,9 @@ import (
 )
 
 // 2.0 starts from one baseline: the 1.x chain is gone from the binary, not
-// carried along (docs/schema-migrations.md).
-func TestBaselineIsTheOnlyMigration(t *testing.T) {
+// carried along (docs/schema-migrations.md): the chain starts at the
+// baseline, and the baseline holds none of the 1.x schema.
+func TestChainStartsAtTheBaseline(t *testing.T) {
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
 		t.Fatalf("read migrations: %v", err)

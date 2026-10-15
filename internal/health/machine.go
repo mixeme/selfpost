@@ -225,7 +225,7 @@ func (m *MachineSampler) Sample() Machine {
 
 // cpuUsage grades the processor over the window. Detail carries only the
 // core and thread counts — load average and busy prose stay out of the Status
-// card (see roadmap panel-docs for operator-facing explanation later).
+// card (the readings are described in docs/guide.md, "Overview and Health").
 func cpuUsage(prev, cur cpuTimes, cores, threads int, load [3]float64, fresh bool, err error) CPU {
 	c := CPU{Cores: cores, Threads: threads}
 	if !isZeroLoad(load) {

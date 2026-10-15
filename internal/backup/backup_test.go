@@ -409,6 +409,28 @@ func TestCheckRestoreWrongFormatRejected(t *testing.T) {
 	}
 }
 
+// A manifest that is not JSON - cut short, or not one at all - stops the
+// start and stays for the operator to look at.
+func TestCheckRestoreRefusesAManifestThatIsNotJSON(t *testing.T) {
+	for _, body := range []string{`{"format": "selfpost-full", "version":`, "not json", ""} {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ManifestName)
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		restored, err := CheckRestore(path, "1.0.0")
+		if err == nil || !strings.Contains(err.Error(), "not valid JSON") {
+			t.Errorf("manifest %q: err = %v, want not valid JSON", body, err)
+		}
+		if restored {
+			t.Errorf("manifest %q reported a restore", body)
+		}
+		if _, statErr := os.Stat(path); statErr != nil {
+			t.Errorf("manifest %q must be kept: %v", body, statErr)
+		}
+	}
+}
+
 // No archive holds the Postfix queue; the rest is there, the private key
 // included, and Check agrees that it can be made.
 func TestCreateLeavesTheQueueOut(t *testing.T) {

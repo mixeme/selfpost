@@ -11,6 +11,15 @@ import (
 	"github.com/emersion/go-msgauth/dkim"
 )
 
+// senderDomain and recipient are fixed for the whole run: one sending domain
+// registered in the panel, and the sink-MX as the single recipient every
+// positive send targets. Here, not in main_test.go: smtp_client.go uses them,
+// and the package builds without its tests (staticcheck reads it so).
+const (
+	senderDomain = "sender.e2e.test"
+	recipient    = "rcpt@sink.e2e.test"
+)
+
 // findSinkMessage polls the sink-MX's dump directory (see test/e2e/sink) for
 // a file whose contents contain token — the unique Subject-line marker every
 // test send carries — and returns it. Polling a directory listing rather than

@@ -94,7 +94,7 @@ for operators upgrading from older 2.x images.
 
 ---
 
-## Schema at head (v2)
+## Schema at head
 
 | Table | Role |
 |-------|------|
@@ -106,7 +106,7 @@ for operators upgrading from older 2.x images.
 | `applications` | SASL applications per domain, with the client-IP restriction (`auth_ip_restrict`, `auth_allowed_ips`) |
 | `application_addresses` | Explicit From addresses (`list` mode) |
 | `rate_limits` | Level-2 limits per domain / application, manual or auto |
-| `send_log` | Delivery journal |
+| `send_log` | Delivery journal. `reason` says why a row was refused (`limit`, `client`, `from`) or that the sweep closed it (`reconcile`, `reconcile-contradicted`), `header_from` what the From: line of a message refused for it said (v6), `refusal_line`, `client_ip` and `recovered` (v9), and `domain_id` (v8: the row belongs to a domain by id, `ON DELETE SET NULL`) |
 | `logtail_state` | Log-tailer read position |
 | `inbound_domains` | Inbound relay domains |
 | `inbound_transports` | Upstream host / port / TLS per inbound domain |
@@ -114,9 +114,12 @@ for operators upgrading from older 2.x images.
 | `user_inbound_domains` | Inbound domains assigned to a `domain` user — granted separately from the outbound ones |
 | `dmarc_reports` | Parsed aggregate report summaries |
 | `dmarc_report_records` | Per-source rows inside a report |
-| `inbound_spam_log` | Inbound antispam journal: one row per recipient of a message offered on port 25, with the decision (`accept`, `reject`, `tempfail`, `quarantine`) and who made it (`rspamd`, `postfix`, `selfpost`). Metadata only (v2) |
+| `inbound_spam_log` | Inbound antispam journal: one row per recipient of a message offered on port 25, with the decision (`accept`, `reject`, `tempfail`, `quarantine`) and who made it (`rspamd`, `postfix`, `selfpost`). Metadata only. `inbound_domain_id` (v8) ties a row to its domain by id (v2) |
 | `inbound_spam_list` | Allow / deny entries for the external filter (`address`, `domain`, `ip`), instance-wide; unique per list (v2) |
 | `notify_state` | What the panel has already written to its users about, one row per subject (`dns:<domain>`, `cert`, `queue`, `limit:<domain>`), so that each thing is said once and a restart says nothing again (v4) |
+| `sender_check_days` | What the sender check costs, a row per UTC day that has something to say: seconds the panel did not answer while Postfix ran, connections turned away (`deferred`), messages deferred mid-message (`messages`), and whether the day's downtime is an upper bound (`estimated`). Kept a year (v6, v9) |
+| `delivery_log_days` | What the reconcile sweep and the log tailer did, a row per UTC day, kept a year. Read off a copy of the database; no page shows it (v7) |
+| `notify_addressees` | Who a subject's notification is owed to and whether each was handed it; goes with the subject's `notify_state` row (v11) |
 | `send_log_lines` | The `mail.log` lines Postfix wrote under a queue id, with the line's own time; what a message's page shows once the log has rotated. No reference to `send_log`: a line belongs to a row by queue id and time, and goes when no row carries its id (v3) |
 
 `TestBaselineSchema` (`internal/store/schema_test.go`) pins every table, column
@@ -150,7 +153,7 @@ for the domain. Nothing refers to a user: deleting one changes no domain.
 
 1. Add `internal/store/migrations/00NN_short_name.sql` (next number).
 2. Update the table in [Migration chain](#migration-chain), the snapshot at the
-   top, and the affected rows of [Schema at head](#schema-at-head-v2).
+   top, and the affected rows of [Schema at head](#schema-at-head).
 3. Update `TestBaselineSchema` if tables, columns or indexes change, and add a
    test that opens a database at the previous version and migrates it.
 4. A *data* migration states in a comment which 2.x versions it is written for.

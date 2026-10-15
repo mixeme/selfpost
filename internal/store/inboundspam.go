@@ -356,8 +356,9 @@ type SpamListHit struct {
 
 // ListSpamListHits returns the journal rows of the filter in whose detail one
 // of the marks occurs - the marks the filter lists leave (internal/inbound).
-// Which entry a row belongs to is for the caller to work out; here the rows
-// are only narrowed, so that a page view does not read the whole journal.
+// Which entry a row belongs to is for the caller to work out. No index covers
+// detail or engine, so the query goes through the whole journal row by row and
+// returns the rspamd rows whose detail holds a mark.
 func (s *Store) ListSpamListHits(marks ...string) ([]SpamListHit, error) {
 	if len(marks) == 0 {
 		return nil, nil

@@ -207,10 +207,10 @@ The server's own name (`SELFPOST_HOSTNAME`) has a key and a line in both
 tables too, without being a row of the registry
 (`domain.Service.SetServerName`): the panel's notifications are sent as
 `postmaster@` that name and signed with it. No application can use it as an
-envelope sender - the sender map is built from the registry - but the
-`From:` header is not held against the login, so an application can still
-have a message signed as the server ([security.md](security.md) § Accepted
-risks). A sending domain of the same name shares its key and selector with
+envelope sender - the sender map is built from the registry - and since
+`2.4.0` none can have a message signed as the server by writing it into
+`From:` either: the sender check holds the header against the login (§ Sender
+check). A sending domain of the same name shares its key and selector with
 the server; deleting that domain leaves the server signed under the default
 selector, which is the same key only if that was the domain's. At its start
 the notifier makes sure the tables have the line and name the selector the
@@ -219,7 +219,8 @@ domain is added or deleted.
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
-One process, five roles (six with the inbound relay on):
+One process, six roles (seven with the inbound relay on: its inbound journal
+milter, § Postfix above, port 25):
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
    proxy only. On start it runs `postconf -h -x` once for the deferred-mail retry
@@ -398,7 +399,8 @@ is sent; the operator's view is guide § Notifications.
   minutes after it - a count alone would let the last check before a restart
   and the first after it stand for "an hour apart"; back the same way. The
   certificate's row remembers which threshold was said for which expiry. A
-  deleted domain's row goes with it.
+  deleted domain's `dns:` row goes at the next check; its `limit:` row stays
+  until it was last said more than 48 hours ago (`CheckLimits`).
 - **Said means sent.** A problem that arises while no user can be told, or
   while Postfix does not take the message, stays unsaid and is told at a
   later check. Its ending, with nobody left to tell, is simply over.
@@ -675,6 +677,7 @@ only reads (the delete confirmation at `GET …/delete` renders a form).
 | Outbound › Log, Queue | `GET /outbound/log` · `/outbound/log/fragment` · `/outbound/log/{id}` · `GET /outbound/queue` · `/outbound/queue/fragment` |
 | Outbound › DMARC reports | `GET /outbound/dmarc` · `…/dmarc/domains/{id}` · `…/dmarc/reports/{id}` — registered only with `DMARC_REPORTS_ENABLE=true` |
 | Inbound › Domains | `GET, POST /inbound/domains` · `/inbound/domains/{id}` · `POST …/dns-recheck`, `…/upstream`, `…/recipients` · `GET, POST …/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
+| Inbound › Log, Filter lists | `GET /inbound/log` · `GET, POST /inbound/filter-lists` · `POST /inbound/filter-lists/{id}/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
 | Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `GET /server/components` |
 | Account | `GET /account` · `POST /account/profile`, `/account/password` |
 | User menu | `GET /help` · `POST /logout` (public mux) |
@@ -718,7 +721,11 @@ is not.
   ([handlers/handlers_inbound.go](../internal/web/handlers/handlers_inbound.go)):
   `requireInbound` (the list), `requireInboundDomain` (one domain — page,
   upstream, recipients, DNS re-check) and `requireInboundGlobal` (add, delete).
-  All three answer 404 alike.
+  All three answer 404 alike. The **Inbound log** (`/inbound/log`) is open to
+  anyone who reaches an inbound domain (`requireInbound`) and shows the rows
+  of their domains only; **Filter lists** (`/inbound/filter-lists`) are the
+  instance's and the global role's (`requireInboundGlobal`)
+  ([handlers/handlers_inbound_log.go](../internal/web/handlers/handlers_inbound_log.go)).
 - **The DMARC hub** is open to anyone with outbound reach for the reports of
   their own domains; the *Ingest* box (server-wide statistics) is rendered for
   the global role only.
@@ -796,8 +803,9 @@ is one layout and one way to render.
   `panel.css` (the mockups' stylesheet, rule for rule), `htmx.min.js`, `panel.js`,
   the IBM Plex subset and the logo files. Served with a content-derived `ETag`,
   and `/static/` does not list its files. The kit page
-  `GET /server/components` renders every partial in every state from fixtures
-  (global role only).
+  `GET /server/components` renders every partial in every state from the data
+  of `KitPage` ([kit.go](../internal/web/view/kit.go), production code that the
+  guard tests render too; global role only).
 
 **Guard tests** hold the design in place; they run in `go test ./...` and CI.
 They read their rules from the accepted mockups
@@ -958,9 +966,9 @@ flowchart TB
   dmarcSvc --> postfix
 ```
 
-The four roles inside the `panel` process (HTTP server, journal-milter,
-log-tailer, rate-limit recalc) share one binary and one SQLite handle on
-purpose — see
+The roles inside the `panel` process (HTTP server, sender check,
+journal-milter, log-tailer, rate-limit recalc, notifier) share one binary and
+one SQLite handle on purpose — see
 [Panel binary](#panel-binary-cmdpanel) for why, and *Persistence* below for the
 single-connection trade-off that follows from it.
 
@@ -993,8 +1001,9 @@ full backups also archive the operator's `./certs` PEM files when present.
 ### Database
 
 The schema is an embedded baseline, `internal/store/migrations/0001_init.sql`,
-and the migrations after it (`0002_inbound_spam_log.sql`), applied by
-`store.Open` in file order; `PRAGMA user_version` counts the files applied and
+and the migrations after it (`0002` to `0011` today; the next is `0012`),
+applied by `store.Open` in file order; `PRAGMA user_version` counts the files
+applied and
 `PRAGMA application_id` is `0x53503230` ("SP20"). There is no 1.x migration
 chain. **2.0 starts from an empty data directory:** a database with a schema
 version but without the 2.x `application_id` — what every 1.x file looks like —
@@ -1029,7 +1038,12 @@ The tables that carry the panel's model:
   `application_addresses`, `rate_limits` (no `allowed_ips` column), `send_log`,
   `send_log_lines` (what Postfix logged under a queue id — § Log tailer),
   `logtail_state`, `inbound_domains`, `inbound_transports`,
-  `inbound_recipients`, `dmarc_reports`, `dmarc_report_records`.
+  `inbound_recipients`, `inbound_spam_log` (port 25's decisions, § Postfix),
+  `inbound_spam_list` (the filter lists), `dmarc_reports`,
+  `dmarc_report_records`, `notify_state` and `notify_addressees` (what the
+  notifier has said and to whom, § Notifications), `sender_check_days` (the
+  sender check's downtime and the mail it deferred, per UTC day) and
+  `delivery_log_days` (the queue sweep's measurements, § Log tailer).
 
 Two processes write: the panel, on one connection, and `dmarc-ingest`, which
 Postfix starts per report. SQLite runs in WAL mode (see
@@ -1051,13 +1065,14 @@ under `/data`), `docker-compose.yml`, `.env`, and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
 first successful boot after restore, the panel runs one **Resync** — OpenDKIM's
-tables, Postfix's sender map, inbound relay maps (when
+tables, Postfix's sender map, inbound relay maps and the filter lists (when
 `INBOUND_RELAY_ENABLE=true`), and DMARC maps (when `DMARC_REPORTS_ENABLE=true`)
 are re-derived from SQLite and both daemons are reloaded, so drift between the
 extracted archive and the database is healed before mail flows. Manual
 `POST /server/health/reload` (the *Reload configuration* button on Server ›
-Health) runs the same Resync, the filter lists with it, since `2.5.4`.
-Stopped-container
+Health) writes the same files in the same order (`HandleReload`; before
+`2.5.4` it left out the filter lists and the DMARC maps), and on a failure
+stops at that step and names it on the page. Stopped-container
 `tar` of `./data` alone remains possible for state-only copies (see guide).
 
 **Optional encryption** of the two secret-bearing downloads
@@ -1095,7 +1110,10 @@ unsupported rather than as a missing doc:
   (`/data/selfpost.db`), `SELFPOST_SETUP_TOKEN_FILE`
   (`/data/setup-token`), `PANEL_HTTP_ADDR` (`:8080`),
   `JOURNAL_MILTER_SOCKET` (`/run/selfpost/journal.sock`),
-  `SENDER_CHECK_SOCKET` (`/run/selfpost/sender.sock`), `MAIL_LOG`
+  `SENDER_CHECK_SOCKET` (`/run/selfpost/sender.sock`),
+  `INBOUND_JOURNAL_MILTER_SOCKET` (`/run/selfpost/inbound-journal.sock` — the
+  inbound journal milter's socket, read by the panel, `build/postfix-config.sh`
+  and `build/postfix-wrapper.sh`, which must agree), `MAIL_LOG`
   (`/data/log/mail.log` — read by the panel and written by Postfix, so a change
   here has to be matched in `build/postfix-config.sh`),
   `PANEL_COOKIE_SECURE` (`true`), `OPENDKIM_SOCKET`

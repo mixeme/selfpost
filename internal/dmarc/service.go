@@ -3,7 +3,6 @@
 package dmarc
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -93,17 +92,4 @@ func recipientDomains(addrs []string) []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-// HostedSuggestion returns the address the panel should suggest for a domain.
-func (s *Service) HostedSuggestion(domain string) string {
-	return HostedReportAddress(s.hostname, domain)
-}
-
-// ValidateHostedAddress ensures addr is on this hostname before saving.
-func (s *Service) ValidateHostedAddress(addr string) error {
-	if !IsHostedOnHostname(addr, s.hostname) {
-		return fmt.Errorf("hosted report address must be on %s", s.hostname)
-	}
-	return nil
 }

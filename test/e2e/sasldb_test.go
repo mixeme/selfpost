@@ -23,7 +23,7 @@ import (
 // mode and group stay) and that nothing fails under the load; it cannot prove
 // a race absent.
 func testSASLDBChangedByRename(t *testing.T, sc *scenario) {
-	churnLogin, churnPassword, err := sc.panel.addApplication(sc.domainID, "churn", "wildcard", "")
+	churnLogin, _, err := sc.panel.addApplication(sc.domainID, "churn", "wildcard", "")
 	if err != nil {
 		t.Fatalf("add application: %v", err)
 	}
@@ -55,6 +55,7 @@ func testSASLDBChangedByRename(t *testing.T, sc *scenario) {
 	// while the old file still exists, so it cannot have the old file's
 	// number. (After many changes it may: a freed inode number is reused.)
 	before := strings.Fields(stat())
+	var churnPassword string
 	if churnPassword, err = newPassword(0); err != nil {
 		t.Fatal(err)
 	}

@@ -258,6 +258,8 @@ type captureStore struct {
 	missed     int64
 	stuckCount int64
 	stuck      []int64
+	// blind holds the stretches AddTailerBlind was given.
+	blind []time.Duration
 
 	// lines are the log lines kept for messages' pages; pruned is the cutoff of
 	// each PruneSendLogLines call.
@@ -357,7 +359,12 @@ func (c *captureStore) AddReconcileMissed(_ time.Time, n int64) error {
 	c.missed += n
 	return nil
 }
-func (c *captureStore) AddTailerBlind(time.Time, time.Duration) error { return nil }
+func (c *captureStore) AddTailerBlind(_ time.Time, d time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.blind = append(c.blind, d)
+	return nil
+}
 func (c *captureStore) AttachRefusalLine(string, string, string, time.Time, string) (bool, error) {
 	return true, nil
 }
@@ -447,6 +454,51 @@ func TestFollowTailsAndRotates(t *testing.T) {
 	}
 	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=5.1.1, status=bounced (nope)")
 	waitFor(t, func() bool { return contains(cs.snapshot(), "Q2|b@example.net|bounced") })
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+}
+
+// mail.log gone for longer than blindMin is a stretch the tailer could not
+// read, counted for Health; the file made again is read from its start. Like
+// TestFollowTailsAndRotates this runs on the server.
+func TestFollowCountsALogItCannotReadAndReadsItAgain(t *testing.T) {
+	old := pollInterval
+	pollInterval = 10 * time.Millisecond
+	t.Cleanup(func() { pollInterval = old })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatalf("seed log: %v", err)
+	}
+	cs := &captureStore{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- Run(ctx, path, cs, func() int { return 90 }, nil, nil) }()
+	time.Sleep(50 * time.Millisecond)
+	appendLine(t, path, "host postfix/smtp[1]: Q1: to=<a@example.net>, relay=x, dsn=2.0.0, status=sent (ok)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q1|a@example.net|sent") })
+
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	// blindness counts by the clock: the name must stay missing past blindMin.
+	time.Sleep(blindMin + 500*time.Millisecond)
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatalf("recreate: %v", err)
+	}
+	appendLine(t, path, "host postfix/smtp[1]: Q2: to=<b@example.net>, relay=x, dsn=5.1.1, status=bounced (nope)")
+	waitFor(t, func() bool { return contains(cs.snapshot(), "Q2|b@example.net|bounced") })
+	waitFor(t, func() bool {
+		cs.mu.Lock()
+		defer cs.mu.Unlock()
+		return len(cs.blind) == 1 && cs.blind[0] >= blindMin
+	})
 
 	cancel()
 	select {

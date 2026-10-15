@@ -91,10 +91,7 @@ func TestServiceResyncAndHostedAddress(t *testing.T) {
 	d, _ := st.AddDomain("example.org", "sel")
 	maps := &recordingMaps{}
 	s := NewService(st, maps, " Mail.Example.COM ", true)
-	if got := s.HostedSuggestion("example.org"); got != "dmarc-reports+example.org@mail.example.com" {
-		t.Errorf("suggestion = %q", got)
-	}
-	if err := st.SetDomainDMARCAddress(d.ID, s.HostedSuggestion("example.org")); err != nil {
+	if err := st.SetDomainDMARCAddress(d.ID, HostedReportAddress("mail.example.com", "example.org")); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Resync(); err != nil {
@@ -111,12 +108,5 @@ func TestServiceResyncAndHostedAddress(t *testing.T) {
 	}
 	if last := maps.got[len(maps.got)-1]; len(last.Recipients) != 0 || len(last.Domains) != 0 {
 		t.Errorf("switched off, the maps hold %+v", last)
-	}
-
-	if err := s.ValidateHostedAddress("dmarc-reports+example.org@mail.example.com"); err != nil {
-		t.Errorf("the hosted address refused: %v", err)
-	}
-	if err := s.ValidateHostedAddress("reports@elsewhere.example"); err == nil {
-		t.Error("an address on another host passed as hosted")
 	}
 }

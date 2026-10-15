@@ -135,12 +135,7 @@ func (s *Settings) WithInbound(days string) *Settings {
 // WithResult shows the result of the last action, or its refusal, between the
 // head and the form.
 func (s *Settings) WithResult(flash, formErr string) *Settings {
-	switch {
-	case formErr != "":
-		s.Flash = &Flash{Error: true, Text: Plain(formErr)}
-	case flash != "":
-		s.Flash = &Flash{Text: Plain(flash)}
-	}
+	s.Flash = resultFlash(flash, formErr)
 	return s
 }
 

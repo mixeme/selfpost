@@ -64,6 +64,30 @@ func TestOriginCheck(t *testing.T) {
 	}
 }
 
+// A panel on a port of its own: the browser's Origin carries the port, as the
+// Host the proxy passes on does, and the two compare whole (Fetch Standard
+// § 3.2: the serialised origin has the port when it is not the scheme's
+// default). The same host on another port is another origin.
+func TestOriginCheckComparesThePort(t *testing.T) {
+	tests := []struct {
+		host, origin string
+		wantRejected bool
+	}{
+		{"panel.example.com:8443", "https://panel.example.com:8443", false},
+		{"panel.example.com:8443", "https://panel.example.com", true},
+		{"panel.example.com", "https://panel.example.com:8443", true},
+		{"panel.example.com:8443", "https://panel.example.com:9443", true},
+	}
+	for _, tc := range tests {
+		r := post("", tc.origin)
+		r.Host = tc.host
+		rejected := serveSecured(true, r).Code == http.StatusForbidden
+		if rejected != tc.wantRejected {
+			t.Errorf("Host %s, Origin %s: rejected = %t, want %t", tc.host, tc.origin, rejected, tc.wantRejected)
+		}
+	}
+}
+
 // The proxy terminates TLS and forwards plain HTTP, so the panel never learns
 // its own external scheme: comparing it against the https in Origin would
 // reject every legitimate form submission in the documented deployment.

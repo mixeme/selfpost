@@ -228,7 +228,6 @@ expected to set; defaults match the code exactly.
 | `INBOUND_ANTISPAM_MILTER` | Optional milter on the inbound relay listener only (requires `INBOUND_RELAY_ENABLE=true`; not 465/587 or DMARC-only port 25). Empty = off. Format `inet:host:port` or `unix:/path`. Example with [deploy/antispam/docker-compose.antispam.yml](../deploy/antispam/docker-compose.antispam.yml): `inet:antispam:11332`. The panel reads it to report on the *Spam filter* box of the inbound pages and to check that the filter answers (Server › Health). | *(empty)* | `.env` |
 | `INBOUND_ANTISPAM_MILTER_ACTION` | What Postfix does if that milter is down: `accept` (fail-open) or `tempfail` (refuse with a temporary error). The *Spam filter* box states which. | `accept` | `.env` |
 | `INBOUND_SPAM_LOG_RETENTION_DAYS` | How long the inbound journal keeps a row, 7-365 days; it also never holds more than 10 000 rows. Seeds the setting on the first start with the inbound relay on. | `90` | `.env` |
-| `INBOUND_JOURNAL_MILTER_SOCKET` | Unix socket of the panel's inbound journal milter, the last milter on port 25 while the inbound relay is on. It records accepted inbound mail and never refuses any; there is no reason to change it. | `/run/selfpost/inbound-journal.sock` | compose |
 | `INBOUND_RATE_LIMIT_MESSAGES_PER_IP` | Coarse per-client-IP cap on port 25: how many times one client IP may start a message (`MAIL FROM`) per window, accepted or not (`smtpd_client_message_rate_limit`). Uses the same window as `RATE_LIMIT_WINDOW_SECONDS`. | `20` | `.env` |
 | `INBOUND_MESSAGE_SIZE_LIMIT` | Maximum message size in bytes on inbound smtpd (`message_size_limit`). When both inbound relay and DMARC ingest are on, the shared listener uses the **greater** of this and `DMARC_MESSAGE_SIZE_LIMIT`. This is port 25's whole limit; 465 and 587 keep Postfix's own, 10 240 000 bytes. | `26214400` (25 MiB) | `.env` |
 | `RATE_LIMIT_MESSAGES_PER_IP` | Level-1 backstop: how many times one client IP may start a message (`MAIL FROM`) on one listener per window, accepted or not; 465 and 587 count separately (Postfix `smtpd_client_message_rate_limit`). See [Rate limiting — level 1](#rate-limiting--level-1-ip-backstop). | `100` | `.env` |
@@ -1428,7 +1427,9 @@ with the *domain* role see them here because they cannot open the queue. Under
 both sit the `mail.log` lines for its queue id: the connection to the
 receiving server, the server's reply, and the status that reply was filed
 as. The lines are kept in the database with the row, so they stay on the
-page after `mail.log` has rotated and are deleted together with the row; a
+page after `mail.log` has rotated. They go at the next six-hourly prune after
+the row is deleted by retention, and not while another row carries the same
+queue id (Postfix reuses ids); a
 message accepted before `2.2.0` shows them only while they are still in the
 current file, and the page says so when there are none. Retention is set under **Server › Settings** (global
 role); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial default until it

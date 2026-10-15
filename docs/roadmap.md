@@ -46,7 +46,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`, 2c `2.5.2`, 3 `2.5.3`, 4 `2.5.4`, 5 `2.6.0`; next stage 6, docs only) | 77/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | done 2026-10-15 (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`, 2c `2.5.2`, 3 `2.5.3`, 4 `2.5.4`, 5 `2.6.0`; stage 6 docs and tests, no cut) | 81/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
@@ -57,9 +57,9 @@ shipped as `2.2.0` the same day, **panel-notifications** as `2.3.0` and
 [audit-2026-10-12](audit-2026-10-12.md) shipped as `2.4.2` (2026-10-14), its
 stages 1 and 2 as `2.5.0` the same day, stage 2b as `2.5.1`, stage 2c as
 `2.5.2` (2026-10-15), and stages 3, 4 and 5 as `2.5.3`, `2.5.4` and
-`2.6.0` the same day.
-Nothing is agreed after it: every remaining
-item is a candidate. panel-docs shipped in
+`2.6.0` the same day; stage 6 (documents and tests, no cut) closed the
+audit. What is agreed after it is marked so in the index; every other
+remaining item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
 [security.md](security.md)); domain-stats-auto-ratelimit in
@@ -67,17 +67,16 @@ item is a candidate. panel-docs shipped in
 queue-retries in `[1.3.1]`; the 2026-08-13 full-tree review follow-ups are in
 `[1.3.0]`. Candidates need explicit agreement before they join the queue.
 
-The 2026-08-19 full-tree code review is closed except for four items, all
-listed above and none of them urgent: [origin-strict](#origin-strict) (its
-"add CSRF tokens", decided otherwise on 2026-10-13),
-template-data-typing (done by `2.0.0`; its last map is a step of
-[audit-2026-10-12](audit-2026-10-12.md) stage 4),
-structured-logging ([dropped](#dropped-with-the-condition-for-return) on
-2026-10-13) and
-[review-2026-08-followups](#review-2026-08-followups). What that review
-produced is in [CHANGELOG.md](../CHANGELOG.md) `[1.9.2]`; its own document
-was removed once these four items carried everything still open, and stays in
-git history.
+The 2026-08-19 full-tree code review is closed except for one item, listed
+above and not urgent: [origin-strict](#origin-strict) (its "add CSRF tokens",
+decided otherwise on 2026-10-13). Of its other three,
+template-data-typing is done (the last untyped map, the health sampler's, went
+in [audit-2026-10-12](audit-2026-10-12.md) stage 4, `2.5.4`),
+structured-logging is [dropped](#dropped-with-the-condition-for-return)
+(2026-10-13) and [review-2026-08-followups](#review-2026-08-followups) is
+closed (2026-10-14). What that review produced is in
+[CHANGELOG.md](../CHANGELOG.md) `[1.9.2]`; its own document was removed once
+these four items carried everything still open, and stays in git history.
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above

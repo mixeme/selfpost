@@ -420,9 +420,14 @@ go test ./...
 
 ### Env documentation regression
 
-`go test ./cmd/panel -run 'TestLoadConfigKeysDocumented|TestBuildScriptKeysDocumented|TestDocumentedKeysAreRead'`
-— every new `loadConfig` key must appear in the env lists in [guide.md](guide.md)
-([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
+`go test ./cmd/panel -run 'TestEnvironment'` compares what the code reads with
+what the documents name ([cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)).
+Read: the `envDefault` / `envInt` / `envBool` / `envSeconds` / `envDuration` /
+`os.Getenv` / `os.LookupEnv` calls in `cmd/panel` and `internal` (tests aside),
+and `${VAR:-…}` in `build/*.sh`. Named: [guide.md](guide.md) § Environment
+variables (the table and the paragraph under it) and the internal list in
+[architecture.md](architecture.md) § Configuration. A variable read and named
+nowhere fails the first test; one named and read nowhere fails the second.
 
 ### Panel pages: the component kit and its guards
 
@@ -470,12 +475,16 @@ operator would actually use.
 
 **Coverage (summary):** bootstrap → SMTP AUTH → delivery → DKIM verify →
 send-log `queued → sent`; negatives (no AUTH, relay, sender/login mismatch,
-L1/L2 limits, milter fail-open, bad `SELFPOST_HOSTNAME`, session survives
-`docker restart`); startup checks that supervisord actually brought up
+L1/L2 limits, the panel down or hung mid-message (Postfix defers the mail
+rather than letting it through: `panel_down_defers_mail`,
+`panel_hung_mid_message_is_counted`), bad `SELFPOST_HOSTNAME`, session
+survives `docker restart`); startup checks that supervisord actually brought up
 OpenDKIM, the panel, and Postfix (`checkSupervisorProcesses`), plus logrotate
 config-mode and forced-rotation checks (`checkLogrotateConfigMode`,
 `checkLogrotateRotation` — [test/e2e/logrotate_check.go](../test/e2e/logrotate_check.go)).
-Polling with timeouts only — no fixed `sleep`.
+Waits poll with a timeout (`waitFor`); a fixed sleep is the exception and says
+why where it stands (`sender_check_test.go`: a downtime worth a second or two,
+and 35 s to show a row is not written again).
 
 Requires **Docker + Compose v2** on the machine running the suite.
 
@@ -573,7 +582,8 @@ Out of scope for v1.x: `CONTRIBUTING.md`, man pages, a separate docs site
    behaviour ships together with [guide.md](guide.md) / `.env.example` and a
    CHANGELOG entry (see [§ Commits and release build](#commits-and-release-build)).
 2. **Env regression:** [cmd/panel/envdoc_test.go](../cmd/panel/envdoc_test.go)
-   fails on an undocumented `loadConfig` or build-script key.
+   fails on a variable the code or a build script reads that no document names,
+and on one a document names that nothing reads.
 3. **New gaps** go into [roadmap.md](roadmap.md) (or the active plan file), not
    silent drive-by edits.
 4. **Schema changes:** update [schema-migrations.md](schema-migrations.md) in the

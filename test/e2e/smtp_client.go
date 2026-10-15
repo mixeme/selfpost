@@ -252,7 +252,7 @@ func waitForSenderMap(login, password, from string) error {
 			return nil
 		}
 		if replyIs(err, 553, "not owned by user "+login) != nil || time.Now().After(deadline) {
-			return fmt.Errorf("Postfix does not yet let %s send as %s: %w", login, from, err)
+			return fmt.Errorf("not yet: Postfix does not let %s send as %s: %w", login, from, err)
 		}
 		time.Sleep(300 * time.Millisecond)
 	}

@@ -449,16 +449,6 @@ type Fact struct {
 	Note  Text
 }
 
-// Facts is a shorthand for plain label / value pairs: Facts("Domain",
-// "example.org", "Port", "587").
-func Facts(pairs ...string) []Fact {
-	var out []Fact
-	for i := 0; i+1 < len(pairs); i += 2 {
-		out = append(out, Fact{Label: pairs[i], Value: Plain(pairs[i+1])})
-	}
-	return out
-}
-
 // SideMenu is the input of side_menu, the left column of a detail page: groups
 // of entries with icons and count tags.
 type SideMenu struct {

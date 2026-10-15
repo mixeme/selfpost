@@ -1,6 +1,7 @@
 package milter
 
 import (
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -301,15 +302,19 @@ func TestBindingsDuplicateKeyBreaksTheTable(t *testing.T) {
 	}
 }
 
-// A second message on the connection is judged by its own headers.
+// A second message on the connection is judged by its own headers - not by
+// the h go-milter passes, which still holds the earlier messages' From: (it
+// is emptied only on ABORT; audit 2026-10-12, L9).
 func TestSenderCheckResetsBetweenMessages(t *testing.T) {
 	bind := NewBindings(writeMaps(t, senderMaps))
 	s := &senderSession{bind: bind}
 	auth := mods(map[string]string{"{auth_authen}": "shop"})
+	h := textproto.MIMEHeader{}
 	for i, v := range []string{"director@example.org", "a@shop.example.org", "director@example.org"} {
 		_, _ = s.MailFrom("shop@shop.example.org", auth)
+		h.Add("From", v)
 		_, _ = s.Header("From", v, mods(nil))
-		resp, _ := s.Headers(nil, mods(nil))
+		resp, _ := s.Headers(h, mods(nil))
 		if passed := resp == milter.RespContinue; passed != (i == 1) {
 			t.Fatalf("message %d (From: %s): passed=%v", i, v, passed)
 		}

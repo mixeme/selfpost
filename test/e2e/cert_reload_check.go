@@ -87,10 +87,10 @@ func checkCertRenewalPickedUp(s *stack) error {
 		"postconf -h smtpd_tls_cert_file && cmp /etc/postfix/tls/fullchain.pem /etc/postfix/tls-internal/fullchain.pem && "+
 			"cmp /etc/postfix/tls/privkey.pem /etc/postfix/tls-internal/privkey.pem && stat -c '%a %U' /etc/postfix/tls-internal/privkey.pem")
 	if err != nil {
-		return fmt.Errorf("Postfix's copy of the certificate: %v\n%s", err, out)
+		return fmt.Errorf("the certificate Postfix reads: %v\n%s", err, out)
 	}
 	if !strings.Contains(out, "/etc/postfix/tls-internal/fullchain.pem\n") || !strings.Contains(out, "600 root") {
-		return fmt.Errorf("Postfix's copy of the certificate: %q, want Postfix reading it and the key 600 root", out)
+		return fmt.Errorf("the certificate Postfix reads: %q, want Postfix reading it and the key 600 root", out)
 	}
 	return nil
 }

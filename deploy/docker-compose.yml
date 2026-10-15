@@ -5,7 +5,7 @@
 # on the HOST (the target audience for this project typically runs Apache there
 # already) and reverse-proxies HTTPS for the panel; it is not containerised
 # here. See ../apache/selfpost-vhost.conf for a ready vhost fragment, and
-# docs/guide.md "Reverse proxy" for the certbot steps that produce the PEM files
+# docs/guide.md "Reverse proxy (mandatory)" for the certbot steps that produce the PEM files
 # this compose file mounts.
 #
 # Usage:
@@ -75,7 +75,7 @@ services:
       # ./certs holds fullchain.pem and privkey.pem: the files themselves, or
       # links to where your reverse proxy's certbot keeps them.
       - ./certs:/etc/postfix/tls:ro
-      # With certbot on the host (docs/guide.md, "Reverse proxy", Apache):
+      # With certbot on the host (docs/guide.md, "Reverse proxy (mandatory)", Apache):
       # certs/ holds links into /etc/letsencrypt/live/, and certbot's live/
       # files are themselves relative links into archive/ - so the whole
       # directory is mounted, at the same path, for the links to lead
@@ -90,7 +90,7 @@ services:
       # reachable from the internet without TLS.
       - "465:465"
       # 587 is mapped even when SUBMISSION_ENABLE=false; Postfix listens only
-      # when the variable is true — see docs/guide.md "Published ports".
+      # when the variable is true — see docs/guide.md "Ports".
       - "587:587"
       # 25 is mapped even when INBOUND_RELAY_ENABLE=false; Postfix listens only
       # when the variable is true.

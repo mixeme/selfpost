@@ -62,14 +62,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// senderDomain and recipient are fixed for the whole run: one sending domain
-// registered in the panel, and the sink-MX as the single recipient every
-// positive send targets.
-const (
-	senderDomain = "sender.e2e.test"
-	recipient    = "rcpt@sink.e2e.test"
-)
-
 // The one administrator of the run.
 const (
 	adminUser     = "e2eadmin"
