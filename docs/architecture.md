@@ -393,8 +393,15 @@ is sent; the operator's view is guide § Notifications.
   deleted domain's row goes with it.
 - **Said means sent.** A problem that arises while no user can be told, or
   while Postfix does not take the message, stays unsaid and is told at a
-  later check. Its ending, with nobody left to tell, is simply over. If one
-  recipient's copy fails and another's goes out, the subject is said.
+  later check. Its ending, with nobody left to tell, is simply over.
+- **Owed to each recipient** (since `2.5.4`, `notify_addressees`): the
+  subject's first message records who it was addressed to and who was
+  handed a copy; while the subject is open, every later check hands it to
+  those not told yet - a copy that failed, or that the ceiling held back -
+  who are still recipients. A user who comes to hear of a subject only while
+  it is open is not mailed about it, and its ending goes to those who were
+  told. A subject opened before `2.5.4` has no such record, and its ending
+  goes to every recipient, as it did.
 - **The notifier's own mail is not a subject.** A notification waiting for a
   mailbox that does not answer, or its bounce coming back to
   `postmaster@<hostname>` - which receives no mail - is left out of the

@@ -38,11 +38,14 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
+| notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
+| settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
+| dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
 | phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`, 2c `2.5.2`, 3 `2.5.3`; next stage 4 → `2.5.4`) | 62/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`, 2c `2.5.2`, 3 `2.5.3`; next stage 4 → `2.5.4`) | 64/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
@@ -697,3 +700,58 @@ joins the index only when the owner says so.
   [product.md](product.md). Notes and open questions:
   [plans/inbound-quarantine.md](plans/inbound-quarantine.md); the screens
   `in-quarantine` and `in-quarantine-message` are drawn and stay unbuilt.
+
+## dns-record-collapse
+
+**Problem (owner, 2026-10-15):** a DNS record block - the DKIM, SPF and
+DMARC records on an outbound domain's page, the server's records on
+Server › Settings, the MX of an inbound domain - shows the host, the type
+and the value to publish whether or not the record is already right. When
+DNS holds the record as it should be, the values are of no use on the page:
+they only push the records that need work further down.
+
+**Goal:** a record whose check is *ok* is drawn folded - its name and its
+tag, one line - and opens on request to show the host, type and value (to
+copy them again, or to compare). A record that is missing, wrong or not
+checked yet stays open, as it is now, with *In DNS now* where it differs.
+
+**Notes:** the block is the one `dns_record` partial (components.html), so
+the change is made once; it is a design change, mockup first (the kit's
+dns_record section and the four pages that draw records), wording
+included. No JavaScript needed for the folding itself: `<details>` opens
+and closes without it under the panel's CSP. Whether a fold remembers being
+opened across the polls of a page, and whether *Re-check DNS* folds a record
+that has just turned right, are for the mockup.
+
+## notification-mail-recheck
+
+**Problem (owner, 2026-10-15):** Server › Settings shows the DNS records of
+the server's own name in its *Notification mail* box (DKIM and SPF, with
+their tags), and nothing on that page says how to check them again after
+publishing. The way exists elsewhere: *Re-check DNS* on Server › Health
+re-runs the server's checks, these records' included
+(`HandleHealthRecheck` → `serverMail(true)`), and Health has a Notification
+mail card of its own - but from Settings it cannot be found.
+
+**Goal:** the records can be checked again from where they are shown - a
+*Re-check DNS* action in the box's head, or at least the box saying where
+the check is and how long a result is kept. Design change, mockup first;
+decide together with [dns-record-collapse](#dns-record-collapse) (a record
+that turns right on the re-check folds).
+
+## settings-save-row
+
+**Problem (owner, 2026-10-15, a screenshot of `selfpost.mixfed.ru`):** on
+Server › Settings the *Save settings* button sits under the two columns, at
+the left, after a long gap: the left column (retention, sending rate limits)
+is short, the right one (the notifications switch, then *Notification mail*
+with its records open) is long. The button saves the retention fields and
+the switch; the records under the switch are not fields, and they are what
+pushes the button down.
+
+**Goal:** the button reads as the save of the fields it saves. Either the
+gap goes by itself when [dns-record-collapse](#dns-record-collapse) folds
+the records that are right, or the page changes - the records out of the
+form's columns, or the button nearer its fields. Decide with the mockup,
+after dns-record-collapse, on a page whose records are missing as well as
+on one whose records are right.

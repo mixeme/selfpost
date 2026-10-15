@@ -73,6 +73,8 @@ type Store interface {
 	SetNotifyState(st store.NotifyState) error
 	DeleteNotifyState(key string) error
 	ListNotifyStateKeys(prefix string) ([]string, error)
+	NotifyAddressees(key string) (map[string]bool, error)
+	SetNotifyAddressees(key string, owed map[string]bool, at time.Time) error
 	LimitRefusalsSince(since time.Time) ([]store.LimitRefusal, error)
 	ListDomains() ([]store.Domain, error)
 }
@@ -175,24 +177,20 @@ const (
 	failed
 )
 
-// send writes one message to every recipient of a subject, each in a message
-// of their own - users are not shown each other's addresses.
-//
-// What the caller makes of the outcome is the rule that keeps a thing from
-// being said never: a problem counts as said only when it was sent, so one
-// that arose while nobody could be told, or while the mail system was down, is
-// told at a later check. A recipient whose copy failed while another's went
-// out is not tried again: the subject is said.
-func (n *Notifier) send(domainName string, m message) outcome {
-	to, err := n.st.NotifyRecipients(domainName)
-	if err != nil {
-		log.Printf("notify: recipients: %v", err)
-		return failed
-	}
-	if len(to) == 0 {
-		return nobody
-	}
-	handed := 0
+// A message is owed to each recipient, not to the subject (owner,
+// 2026-10-14). The first message of a subject goes to everyone who is to hear
+// of it then (open), and who was handed a copy is recorded; while the subject
+// is open, each later check hands it to those owed it who have not had it -
+// a copy that failed, or that the hourly ceiling held back - and who are
+// still to hear of it (followUp); a user who comes to hear of the subject
+// only while it is open is not mailed about it. That it is over goes to
+// those who were told (closed).
+
+// deliver hands m to each address, each in a message of its own - users are
+// not shown each other's addresses - under the hourly ceiling, and returns
+// those that were handed a copy.
+func (n *Notifier) deliver(to []string, m message) []string {
+	var handed []string
 	for _, addr := range to {
 		if !n.underCeiling() {
 			log.Printf("notify: more than %d messages in an hour; %q to %s is held back", hourlyCeiling, m.subject, addr)
@@ -203,13 +201,135 @@ func (n *Notifier) send(domainName string, m message) outcome {
 			continue
 		}
 		n.sentAt = append(n.sentAt, n.now())
-		handed++
+		handed = append(handed, addr)
 	}
-	if handed == 0 {
+	if len(to) > 0 {
+		log.Printf("notify: %q sent to %d of %d", m.subject, len(handed), len(to))
+	}
+	return handed
+}
+
+// recipients are who is to hear of a subject of domainName now ("" for the
+// server's own subjects).
+func (n *Notifier) recipients(domainName string) ([]string, bool) {
+	to, err := n.st.NotifyRecipients(domainName)
+	if err != nil {
+		log.Printf("notify: recipients: %v", err)
+		return nil, false
+	}
+	return to, true
+}
+
+// open says m, the first message of the subject key, to everyone who is to
+// hear of it, and records who was handed a copy.
+//
+// What the caller makes of the outcome is the rule that keeps a thing from
+// being said never: a problem counts as said only when it was sent, so one
+// that arose while nobody could be told, or while the mail system was down, is
+// told at a later check.
+func (n *Notifier) open(key, domainName string, m message) outcome {
+	to, ok := n.recipients(domainName)
+	if !ok {
 		return failed
 	}
-	log.Printf("notify: %q sent to %d of %d", m.subject, handed, len(to))
+	if len(to) == 0 {
+		return nobody
+	}
+	handed := n.deliver(to, m)
+	if len(handed) == 0 {
+		return failed
+	}
+	owed := make(map[string]bool, len(to))
+	for _, addr := range to {
+		owed[addr] = false
+	}
+	for _, addr := range handed {
+		owed[addr] = true
+	}
+	if err := n.st.SetNotifyAddressees(key, owed, n.now()); err != nil {
+		log.Printf("notify: %v", err)
+	}
 	return sent
+}
+
+// followUp hands m, the message of an open subject, to those it is owed to
+// who have not had it and are still to hear of it.
+func (n *Notifier) followUp(key, domainName string, m message) {
+	owed, err := n.st.NotifyAddressees(key)
+	if err != nil {
+		log.Printf("notify: %v", err)
+		return
+	}
+	var due []string
+	for addr, told := range owed {
+		if !told {
+			due = append(due, addr)
+		}
+	}
+	if len(due) == 0 {
+		return
+	}
+	now, ok := n.recipients(domainName)
+	if !ok {
+		return
+	}
+	due = intersect(due, now)
+	handed := n.deliver(due, m)
+	if len(handed) == 0 {
+		return
+	}
+	for _, addr := range handed {
+		owed[addr] = true
+	}
+	if err := n.st.SetNotifyAddressees(key, owed, n.now()); err != nil {
+		log.Printf("notify: %v", err)
+	}
+}
+
+// closed says m - the subject is over - to those who were told of it and are
+// still to hear of it. A subject said before 2.5.4 has no record of who was
+// told, and its end goes to everyone who is to hear of it, as it did then.
+func (n *Notifier) closed(key, domainName string, m message) outcome {
+	owed, err := n.st.NotifyAddressees(key)
+	if err != nil {
+		log.Printf("notify: %v", err)
+		return failed
+	}
+	to, ok := n.recipients(domainName)
+	if !ok {
+		return failed
+	}
+	if len(owed) > 0 {
+		var told []string
+		for addr, t := range owed {
+			if t {
+				told = append(told, addr)
+			}
+		}
+		to = intersect(told, to)
+	}
+	if len(to) == 0 {
+		return nobody
+	}
+	if len(n.deliver(to, m)) == 0 {
+		return failed
+	}
+	return sent
+}
+
+// intersect is the addresses of a that are in b, in b's order.
+func intersect(a, b []string) []string {
+	in := make(map[string]bool, len(a))
+	for _, x := range a {
+		in[x] = true
+	}
+	var out []string
+	for _, x := range b {
+		if in[x] {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // underCeiling reports whether one more message may go out this hour.
@@ -335,7 +455,7 @@ func (n *Notifier) dnsStep(name string, res dnscheck.Domain) {
 	case st.Phase == phasePending && bad:
 		st.Count++
 		if st.Count >= dnsChecks && now.Sub(st.Since) >= dnsApart {
-			if n.send(name, dnsProblem(n.hostname, name, faults, st.Since)) == sent {
+			if n.open(key, name, dnsProblem(n.hostname, name, faults, st.Since)) == sent {
 				st.Phase, st.Count, st.Mark, st.SentAt = phaseOpen, 0, "", now
 			}
 		}
@@ -346,6 +466,7 @@ func (n *Notifier) dnsStep(name string, res dnscheck.Domain) {
 			st.Count, st.Mark = 0, ""
 			n.save(st)
 		}
+		n.followUp(key, name, dnsProblem(n.hostname, name, faults, st.Since))
 	case st.Phase == phaseOpen && !bad:
 		st.Count++
 		if st.Count == 1 {
@@ -354,7 +475,7 @@ func (n *Notifier) dnsStep(name string, res dnscheck.Domain) {
 		firstGood, _ := time.Parse(time.RFC3339, st.Mark)
 		if st.Count >= dnsChecks && now.Sub(firstGood) >= dnsApart {
 			// With nobody to tell any more, the trouble is over all the same.
-			if n.send(name, dnsCleared(n.hostname, name, st.Since)) != failed {
+			if n.closed(key, name, dnsCleared(n.hostname, name, st.Since)) != failed {
 				n.forget(key)
 				return
 			}
@@ -394,10 +515,14 @@ func (n *Notifier) checkCertificate() {
 	case left <= certFirstDays*24*time.Hour:
 		level = "first"
 	}
-	if level == "" || (have && (st.Phase == level || st.Phase == "last")) {
+	if level == "" {
 		return
 	}
-	if n.send("", certExpiring(n.hostname, c.NotAfter, left)) != sent {
+	if have && (st.Phase == level || st.Phase == "last") {
+		n.followUp(key, "", certExpiring(n.hostname, c.NotAfter, left))
+		return
+	}
+	if n.open(key, "", certExpiring(n.hostname, c.NotAfter, left)) != sent {
 		return
 	}
 	n.save(store.NotifyState{Key: key, Phase: level, Mark: mark, Since: n.now(), SentAt: n.now()})
@@ -446,11 +571,13 @@ func (n *Notifier) checkQueue() {
 	}
 	switch {
 	case len(old) > 0 && !have:
-		if n.send("", queueStuck(n.hostname, old, now)) == sent {
+		if n.open(key, "", queueStuck(n.hostname, old, now)) == sent {
 			n.save(store.NotifyState{Key: key, Phase: phaseOpen, Since: now, SentAt: now})
 		}
+	case len(old) > 0 && have:
+		n.followUp(key, "", queueStuck(n.hostname, old, now))
 	case len(old) == 0 && have:
-		if n.send("", queueCleared(n.hostname, st.Since)) != failed {
+		if n.closed(key, "", queueCleared(n.hostname, st.Since)) != failed {
 			n.forget(key)
 		}
 	}
@@ -482,9 +609,10 @@ func (n *Notifier) CheckLimits() {
 		// told about, or more of the same. Told longer ago: everything in the
 		// window is new since then.
 		if have && now.Sub(st.SentAt) < limitRepeat {
+			n.followUp(key, r.Domain, limitRefused(n.hostname, r))
 			continue
 		}
-		if n.send(r.Domain, limitRefused(n.hostname, r)) == sent {
+		if n.open(key, r.Domain, limitRefused(n.hostname, r)) == sent {
 			n.save(store.NotifyState{Key: key, Phase: phaseOpen, Since: r.First, SentAt: now})
 		}
 	}

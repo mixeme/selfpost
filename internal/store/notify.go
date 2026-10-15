@@ -127,10 +127,68 @@ func (s *Store) SetNotifyState(st NotifyState) error {
 }
 
 // DeleteNotifyState forgets a subject: nothing is wrong with it any more, or
-// it no longer exists.
+// it no longer exists. Who it was owed to goes with it.
 func (s *Store) DeleteNotifyState(key string) error {
-	if _, err := s.db.Exec("DELETE FROM notify_state WHERE key = ?", key); err != nil {
+	tx, err := s.db.Begin()
+	if err != nil {
 		return fmt.Errorf("delete notify state %s: %w", key, err)
+	}
+	defer tx.Rollback()
+	for _, stmt := range []string{"DELETE FROM notify_addressees WHERE key = ?", "DELETE FROM notify_state WHERE key = ?"} {
+		if _, err := tx.Exec(stmt, key); err != nil {
+			return fmt.Errorf("delete notify state %s: %w", key, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete notify state %s: %w", key, err)
+	}
+	return nil
+}
+
+// NotifyAddressees returns who the subject's message is owed to, each with
+// whether they were handed a copy (migration 0011). None for a subject not
+// said yet, or said before 2.5.4.
+func (s *Store) NotifyAddressees(key string) (map[string]bool, error) {
+	rows, err := s.db.Query("SELECT address, told_at FROM notify_addressees WHERE key = ?", key)
+	if err != nil {
+		return nil, fmt.Errorf("notify addressees %s: %w", key, err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var addr, toldAt string
+		if err := rows.Scan(&addr, &toldAt); err != nil {
+			return nil, fmt.Errorf("notify addressees %s: %w", key, err)
+		}
+		out[addr] = toldAt != ""
+	}
+	return out, rows.Err()
+}
+
+// SetNotifyAddressees records who the subject's message is owed to: owed
+// maps an address to whether it was handed a copy, and replaces what was
+// recorded. The told are dated at, the time of this record: the date is
+// for a person reading the table, the code asks only whether.
+func (s *Store) SetNotifyAddressees(key string, owed map[string]bool, at time.Time) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("set notify addressees %s: %w", key, err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM notify_addressees WHERE key = ?", key); err != nil {
+		return fmt.Errorf("set notify addressees %s: %w", key, err)
+	}
+	for addr, told := range owed {
+		toldAt := ""
+		if told {
+			toldAt = at.UTC().Format(time.RFC3339)
+		}
+		if _, err := tx.Exec("INSERT INTO notify_addressees (key, address, told_at) VALUES (?, ?, ?)", key, addr, toldAt); err != nil {
+			return fmt.Errorf("set notify addressees %s: %w", key, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("set notify addressees %s: %w", key, err)
 	}
 	return nil
 }

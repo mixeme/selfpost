@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+Migration `0011` (a table, nothing existing changes).
+
 ### Added
 
 - **The Outbound log filters by status and by day**, beside domain and
@@ -65,6 +67,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   logins, and the page said "internal error". Every rebuild now runs, and
   the page says the domain is deleted and that Reload configuration
   finishes the rest (audit 2026-10-12, L17).
+- **A notification whose copy failed for one user was never sent to them**
+  once another user's copy had gone out, and a copy held back by the hourly
+  ceiling was dropped. A notification is now owed to each recipient: the
+  next check sends it to those who did not get it, once; a user added while
+  the problem is open is not mailed about it; "it is over" goes to those
+  who were told.
 
 ## [2.5.3] - 2026-10-15
 

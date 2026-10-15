@@ -60,6 +60,7 @@ func TestBaselineSchema(t *testing.T) {
 		"inbound_spam_list":     "id list_type entry_type value note created_at",
 		"send_log_lines":        "id queue_id logged_at line",
 		"notify_state":          "key phase count mark since sent_at",
+		"notify_addressees":     "key address told_at",
 		"sender_check_days":     "day down_seconds deferred messages estimated",
 		"delivery_log_days":     "day reconcile_closed reconcile_missed reconcile_contradicted tailer_blind_seconds queued_over_lifetime",
 	}
@@ -117,8 +118,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 10 {
-		t.Errorf("user_version = %d, %v; want 10", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 11 {
+		t.Errorf("user_version = %d, %v; want 11", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -194,8 +195,8 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 10 {
-		t.Errorf("user_version = %d, %v; want 10", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 11 {
+		t.Errorf("user_version = %d, %v; want 11", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)

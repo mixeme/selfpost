@@ -2,6 +2,7 @@ package notify
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,13 +16,14 @@ import (
 
 // outbox collects what would have been handed to Postfix.
 type outbox struct {
-	sent []string // "to|subject"
-	body []string
-	fail bool
+	sent   []string // "to|subject"
+	body   []string
+	fail   bool
+	failTo map[string]bool // addresses whose copy fails
 }
 
 func (o *outbox) Send(to, subject, body string) error {
-	if o.fail {
+	if o.fail || o.failTo[to] {
 		return errors.New("sendmail: queue file write error")
 	}
 	o.sent = append(o.sent, to+"|"+subject)
@@ -474,16 +476,16 @@ func TestQueueLeavesOutTheNotifiersOwnMail(t *testing.T) {
 func TestHourlyCeiling(t *testing.T) {
 	b := newBench(t)
 	for i := 0; i < hourlyCeiling+5; i++ {
-		b.n.send("", message{subject: "s", body: "b"})
+		b.n.open(fmt.Sprintf("test:%d", i), "", message{subject: "s", body: "b"})
 	}
 	if got := len(b.out.take()); got != hourlyCeiling {
 		t.Errorf("%d messages left in one hour, ceiling is %d", got, hourlyCeiling)
 	}
-	if b.n.send("", message{subject: "s", body: "b"}) != failed {
+	if b.n.open("test:x", "", message{subject: "s", body: "b"}) != failed {
 		t.Error("a message over the ceiling was counted as said")
 	}
 	b.now = b.now.Add(61 * time.Minute)
-	if b.n.send("", message{subject: "s", body: "b"}) != sent {
+	if b.n.open("test:y", "", message{subject: "s", body: "b"}) != sent {
 		t.Error("the ceiling did not lift after an hour")
 	}
 }
@@ -546,5 +548,74 @@ func TestMailerComposesAndRefuses(t *testing.T) {
 		if err := m.Send(bad, "s", "b"); err == nil {
 			t.Errorf("address %q was accepted", bad)
 		}
+	}
+}
+
+// A notification is owed to each recipient (owner, 2026-10-14): a copy that
+// failed goes out at the next check, once, and the subject's end goes to
+// those who were told.
+func TestACopyThatFailedGoesOutAtTheNextCheck(t *testing.T) {
+	b := newBench(t)
+	b.dns["example.com"] = badDKIM()
+	problem := "[SelfPost] example.com: DKIM does not match"
+	b.out.failTo = map[string]bool{"mine@example.org": true}
+	want(t, "first bad check", b.hour())
+	want(t, "said, one copy failing", b.hour(), "root@example.org|"+problem)
+	b.out.failTo = nil
+	want(t, "the next check", b.hour(), "mine@example.org|"+problem)
+	want(t, "and not again", b.hour())
+
+	b.dns["example.com"] = good()
+	want(t, "first good check", b.hour())
+	cleared := "[SelfPost] example.com: DNS records match again"
+	want(t, "over", b.hour(), "mine@example.org|"+cleared, "root@example.org|"+cleared)
+}
+
+// The hourly ceiling holds a copy back instead of dropping it: it goes out at
+// a check after the hour.
+func TestTheCeilingHoldsACopyBack(t *testing.T) {
+	b := newBench(t)
+	b.dns["example.com"] = badDKIM()
+	want(t, "first bad check", b.hour())
+	// All but one of the hour's messages are spent.
+	for i := 0; i < hourlyCeiling-1; i++ {
+		b.n.sentAt = append(b.n.sentAt, b.now)
+	}
+	problem := "[SelfPost] example.com: DKIM does not match"
+	got := b.hour()
+	if len(got) != 1 {
+		t.Fatalf("under the ceiling with room for one: sent %v", got)
+	}
+	want(t, "the next check, the hour over", b.hour(), map[string]string{
+		"mine@example.org|" + problem: "root@example.org|" + problem,
+		"root@example.org|" + problem: "mine@example.org|" + problem,
+	}[got[0]])
+	want(t, "and not again", b.hour())
+}
+
+// A user who comes to hear of a subject while it is open is not mailed about
+// it, nor about its end: the message was owed to those there when it was
+// said.
+func TestAUserAddedWhileASubjectIsOpenIsNotMailed(t *testing.T) {
+	b := newBench(t)
+	b.dns["example.com"] = badDKIM()
+	want(t, "first bad check", b.hour())
+	problem := "[SelfPost] example.com: DKIM does not match"
+	want(t, "said", b.hour(), "mine@example.org|"+problem, "root@example.org|"+problem)
+
+	id, err := b.st.CreateUser("late", "hash", store.RoleGlobal, store.Reach{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.st.UpdateUser(id, "late", "hash", "late@example.org"); err != nil {
+		t.Fatal(err)
+	}
+	want(t, "still wrong, a user added", b.hour())
+	b.dns["example.com"] = good()
+	want(t, "first good check", b.hour())
+	cleared := "[SelfPost] example.com: DNS records match again"
+	want(t, "over", b.hour(), "mine@example.org|"+cleared, "root@example.org|"+cleared)
+	if owed, _ := b.st.NotifyAddressees("dns:example.com"); len(owed) != 0 {
+		t.Errorf("who the subject was owed to outlived it: %v", owed)
 	}
 }

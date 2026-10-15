@@ -12,6 +12,7 @@ package view
 import (
 	"fmt"
 	"html/template"
+	"strconv"
 	"strings"
 )
 
@@ -301,6 +302,26 @@ type Box struct {
 	OOB bool
 	// DomainPick: see Box.
 	DomainPick bool
+	// InCards is a box of the cards layout, which orders its boxes on a
+	// phone by their numbers (Order).
+	InCards bool
+}
+
+// Order is a cards box's number as the layout orders it on a phone
+// (data-order, panel.css: the boxes come in the order of their numbers
+// whichever stack they stand in): "3" for "03", empty for a box with no
+// number or outside the layout. Before, the stylesheet ordered by a box's place in its stack and
+// knew four to a stack; a fifth landed out of place with nothing failing
+// (owner, 2026-10-13).
+func (b Box) Order() string {
+	if !b.InCards {
+		return ""
+	}
+	n, err := strconv.Atoi(b.No)
+	if err != nil || n < 1 {
+		return ""
+	}
+	return strconv.Itoa(n)
 }
 
 // HelpLink is a Box's link to its Help topic.

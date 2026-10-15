@@ -86,14 +86,14 @@ func KitPage() *Kit {
 			{Label: "signed out", Value: Rich("The split brand / form screen, no navbar. ", Link("/login", "Example"))},
 		},
 
-		Postmark: Box{No: "01", Title: "postmark", End: Plain("Worst status of the page's checks")},
+		Postmark: Box{No: "01", InCards: true, Title: "postmark", End: Plain("Worst status of the page's checks")},
 		Postmarks: []Postmark{
 			{Top: "SELFPOST", Word: "OK", Bottom: "6 OF 6 CHECKS", Level: LevelOK},
 			{Top: "SELFPOST", Word: "WARN", Bottom: "1 OF 6 CHECKS", Level: LevelWarn},
 			{Top: "DNS", Word: "FAIL", Bottom: "1 OF 3 RECORDS", Level: LevelFail},
 		},
 
-		StatusTag: Box{No: "03", Title: "status_tag", End: Plain("One mapping, one function")},
+		StatusTag: Box{No: "03", InCards: true, Title: "status_tag", End: Plain("One mapping, one function")},
 		Sheet: Sheet{ID: "kit-sheet", Tag: Tag{Status: "reject"}, Title: "sheet", Rows: []SheetRow{
 			{Label: "What it holds", Lines: []string{"What does not fit the row, as name and value"}},
 			{Label: "How it closes", Lines: []string{"Esc", "a click outside", "the cross"}, Mono: true},
@@ -106,7 +106,7 @@ func KitPage() *Kit {
 			{"held: quarantine · role: global", Tag{Status: "quarantine"}},
 		},
 
-		BoxHead: Box{No: "02", Title: "box · box_head",
+		BoxHead: Box{No: "02", InCards: true, Title: "box · box_head",
 			End:  Plain("The end slot: a note, a tag, a link or a filter form"),
 			Help: &HelpLink{Href: "/help#checks", Title: "Optional: the section's Help topic"}},
 		BoxFoot:    Foot{Text: Plain("box_foot — a legend, paging"), End: Plain("end slot")},
