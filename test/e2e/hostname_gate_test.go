@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,7 +15,7 @@ import (
 // build/entrypoint.sh runs and fails before anything else needs them) with
 // hostnameEnv substituted for SELFPOST_HOSTNAME, and returns its combined
 // output and whether it exited zero.
-func runEntrypoint(t *testing.T, hostnameEnv string) (output string, exitedZero bool) {
+func runEntrypoint(t *testing.T, hostnameEnv string, env ...string) (output string, exitedZero bool) {
 	t.Helper()
 	dataDir := t.TempDir()
 	// Entrypoint also chmod 755 /data; mirror that here so a pre-fix image
@@ -23,13 +25,19 @@ func runEntrypoint(t *testing.T, hostnameEnv string) (output string, exitedZero 
 		t.Fatalf("chmod data dir: %v", err)
 	}
 
-	args := []string{
-		"run", "--rm",
-		"-e", "SELFPOST_HOSTNAME=" + hostnameEnv,
-		"-v", dataDir + ":/data",
-		"selfpost:e2e",
+	// A name of its own, so a run that outlives its minute is removed.
+	name := fmt.Sprintf("selfpost-gate-%d", time.Now().UnixNano())
+	defer exec.Command("docker", "rm", "-f", name).Run()
+	args := []string{"run", "--rm", "--name", name, "-e", "SELFPOST_HOSTNAME=" + hostnameEnv}
+	for _, e := range env {
+		args = append(args, "-e", e)
 	}
-	cmd := exec.Command("docker", args...)
+	args = append(args, "-v", dataDir+":/data", "selfpost:e2e")
+	// A start that gets past every gate runs on: it is ended after a minute
+	// rather than holding the run until the test binary's own timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()
 	return string(out), err == nil
@@ -113,4 +121,34 @@ func runEntrypointBackground(t *testing.T, hostnameEnv string) (output string, s
 	})
 	logs, _ := exec.Command("docker", "logs", name).CombinedOutput()
 	return string(logs), err == nil
+}
+
+// A setting Postfix takes as a number or a time value stops the start when it
+// is neither, naming the variable: before, it passed `postfix check` and every
+// smtpd died at its first connection (audit 2026-10-12, L31). A sensible
+// value of the same form gets past the check (and the start fails later, for
+// what this bare run lacks).
+func TestNumericSettingsGate(t *testing.T) {
+	for _, c := range []struct{ env, want string }{
+		{"RATE_LIMIT_MESSAGES_PER_IP=100/h", "RATE_LIMIT_MESSAGES_PER_IP must be a whole number, got '100/h'"},
+		{"INBOUND_MESSAGE_SIZE_LIMIT=10MB", "INBOUND_MESSAGE_SIZE_LIMIT must be a whole number, got '10MB'"},
+		{"MILTER_CONTENT_TIMEOUT=thirty", "MILTER_CONTENT_TIMEOUT must be a time value"},
+		// Under the parameter's minimum: anvil and smtpd die on a zero.
+		{"RATE_LIMIT_WINDOW_SECONDS=0", "RATE_LIMIT_WINDOW_SECONDS must be from 1 to 2147483647, got '0'"},
+		{"MILTER_COMMAND_TIMEOUT=0s", "MILTER_COMMAND_TIMEOUT must be a time value"},
+		{"INBOUND_MESSAGE_SIZE_LIMIT=99999999999", "INBOUND_MESSAGE_SIZE_LIMIT must be from 0 to 2147483647"},
+	} {
+		t.Run(c.env, func(t *testing.T) {
+			out, ok := runEntrypoint(t, "mail.example.com", c.env)
+			if ok || !strings.Contains(out, c.want) {
+				t.Fatalf("%s: exited zero %v, want the refusal %q\noutput:\n%s", c.env, ok, c.want, out)
+			}
+		})
+	}
+	// Good values beside a bad one checked after them: the refusal names the
+	// bad one alone. (A start with good values only would run on.)
+	out, _ := runEntrypoint(t, "mail.example.com", "RATE_LIMIT_MESSAGES_PER_IP=50", "MILTER_CONNECT_TIMEOUT=2m", "MILTER_CONTENT_TIMEOUT=bad")
+	if !strings.Contains(out, "MILTER_CONTENT_TIMEOUT must be") || strings.Contains(out, "RATE_LIMIT_MESSAGES_PER_IP must") || strings.Contains(out, "MILTER_CONNECT_TIMEOUT must") {
+		t.Errorf("valid values refused:\n%s", out)
+	}
 }

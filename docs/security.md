@@ -572,7 +572,10 @@ deferred item from the roadmap.
   off by whoever can make the panel slow. Supervisord starts a panel that
   died again at once; one that dies within a second of starting is tried
   four times in a few seconds, and then SelfPost's `crashexit` listener takes
-  the container down (supervisor 4.2.5, `startretries=3`), so the outage is
+  the container down (supervisor 4.2.5, `startretries=3`); since `2.6.0` it
+  does so too when the panel exits unexpectedly five times in ten minutes,
+  however long each run lasted - so five malformed packets on a milter
+  socket (the next item) restart the whole container. The outage is
   seconds or the whole instance; Server › Health counts the
   downtime and the mail deferred for it. Trigger to revisit: those numbers
   not staying at nothing - then the check moves into a process of its own
@@ -585,6 +588,15 @@ deferred item from the roadmap.
   of the restart defer mail instead of passing it unjournalled (technical
   review, 2026-10-12). Trigger to revisit: anything untrusted able to open
   a Unix socket in the container.
+- **The container's `/dev/log` takes datagrams from any user in it** (since
+  `2.6.0`, for OpenDKIM's log): what is written there reaches the container
+  log, each line marked `syslog: `, control characters written out, at most
+  200 lines a second (the rest counted and dropped). A user who can write it
+  can add lines to `docker logs` under that mark and no other; the panel
+  reads only `mail.log`. logrotate's state file is under `/data/log`, the
+  `postfix` user's directory: that user could stop rotation through it -
+  as through the log itself, which it owns. Trigger to revisit: anything
+  untrusted able to run in the container.
 - **When the hostname is itself a sending domain,** the server's mail is
   signed with that domain's key. Whoever may export the domain has the key,
   and its applications may send as `postmaster@<hostname>` by right. The

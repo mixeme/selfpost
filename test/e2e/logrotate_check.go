@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // checkLogrotateConfigMode verifies the image pins /etc/logrotate.d/mail at 0644
@@ -21,7 +22,14 @@ func checkLogrotateConfigMode(s *stack) error {
 	if mode != "644" {
 		return fmt.Errorf("/etc/logrotate.d/mail mode is %q, want 644", mode)
 	}
-	return nil
+	// The state file is beside the log, under /data, so a recreated container
+	// keeps when mail.log was last rotated (audit 2026-10-12, M19); the loop
+	// runs logrotate at once when it starts.
+	return waitFor("logrotate's state under /data/log", 20*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out, _ := s.execIn("selfpost", "sh", "-c", "test -s /data/log/.logrotate.status && echo yes")
+		out = strings.TrimSpace(out)
+		return out == "yes", fmt.Errorf("state file: %q", out)
+	})
 }
 
 // checkLogrotateRotation forces a rotation and checks the recreated mail.log is

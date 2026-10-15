@@ -17,16 +17,21 @@
 # path anew (src/postlogd/postlogd.c, logwriter_open_or_die()).
 #
 # logrotate itself only rotates once the configured "daily" period has elapsed
-# (tracked in /var/lib/logrotate/status), so it is safe to invoke this more
-# often than daily — polling merely bounds how late a legitimate rotation runs.
-# (logrotate 3.21.0-1: debian/rules, --with-state-file-path=/var/lib/logrotate/
-# status. That file is in the container's own filesystem: a recreated container
-# starts without it, and logrotate.c, newState(), records a log it has no state
-# for as rotated today, so the first rotation after a recreate comes a day
-# later.)
+# (tracked in its state file), so it is safe to invoke this more often than
+# daily — polling merely bounds how late a legitimate rotation runs. The state
+# file is beside the log, under /data, not at the default
+# /var/lib/logrotate/status (logrotate 3.21.0-1: debian/rules,
+# --with-state-file-path) in the container's own filesystem: a recreated
+# container started without it, logrotate.c, newState(), records a log it has
+# no state for as rotated today, and so a host that recreates the container
+# daily - an .env change, an image bump - never rotated mail.log at all (audit
+# 2026-10-12, M19). (logrotate 3.21.0, logrotate.8.in: "-s, --state
+# statefile".) The directory is postfix:selfpost 2750 and logrotate runs as
+# root.
 set -eu
 
 CONFIG=/etc/logrotate.d/mail
+STATE=/data/log/.logrotate.status
 INTERVAL="${LOGROTATE_INTERVAL_SECONDS:-21600}"
 
 # logrotate refuses configs writable by group or others and exits 0 while
@@ -56,7 +61,7 @@ if ! logrotate_config_ok; then
 fi
 
 run_logrotate() {
-	out=$(logrotate "$CONFIG" 2>&1) || {
+	out=$(logrotate -s "$STATE" "$CONFIG" 2>&1) || {
 		echo "$out" >&2
 		return 1
 	}

@@ -18,7 +18,7 @@ import (
 // code cites (Postfix 3.7.11, src/global/log_adhoc.c and the others), unless a
 // comment says where one was seen; some carry no stamp, which the parsers
 // take as they come. One shape Postfix does not write here: opendkim lines in
-// mail.log (build/opendkim.conf has Syslog no).
+// mail.log (OpenDKIM logs through syslog(3), to the container log - build/opendkim.conf).
 
 // qmgr's expiry line, as Postfix 3.7.11 writes it (src/qmgr/qmgr_active.c,
 // qmgr_active_done_25_generic(): "%s: from=<%s>, status=%s, returned to

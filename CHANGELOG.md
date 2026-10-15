@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **Postfix and OpenDKIM could stop every program in the container.** The
+  supervisord control socket was open to the group the two share with the
+  panel for files under `/data`; it is now a group of its own, the panel's
+  alone (audit 2026-10-12, M17).
+- **Postfix accepted TLS 1.0, answered VRFY and named its distribution.**
+  It takes TLS 1.2 at least, opportunistic or required, and asks it of an
+  inbound domain's upstream where TLS is required; VRFY no longer says
+  which recipients port 25 accepts; the banner is `<hostname> ESMTP`
+  (audit 2026-10-12, L31).
+- **A From: added on the way could sit above the signed one.** OpenDKIM now
+  signs From: once more than it is present, so an added one breaks the
+  signature, and canonicalises the header fields relaxed, so a relay that
+  refolds them does not (audit 2026-10-12, L30).
+
+### Fixed
+
+- **OpenDKIM's errors went nowhere.** It logs through syslog(3) alone, and
+  nothing in the container listened on `/dev/log`. A small relay program
+  (the panel's binary, `-syslog-relay`) passes those lines to the container
+  log, marked `syslog:`, errors as such, at most 200 a second (audit
+  2026-10-12, L30).
+- **A non-numeric rate limit, size limit or milter timeout killed every
+  smtpd** at its first connection after `postfix check` had passed it, and a
+  zero window or timeout the rate limiter or smtpd. The start now stops with
+  the variable's name and what it must be (audit 2026-10-12, L31).
+- **`mail.log` was never rotated on a host that recreates the container
+  daily.** logrotate kept its state inside the container, so each new
+  container took the log for rotated today. The state is now under
+  `/data/log` (audit 2026-10-12, M19).
+- **A program that crashed after its first second was restarted for ever.**
+  supervisord gives up only on crashes during start-up; the container is now
+  restarted when a program of the mail path exits unexpectedly five times in
+  ten minutes, as it is when it gives up (audit 2026-10-12, L32).
+- **`deploy/traefik/extract-cert.sh` could replace the certificate with two
+  empty files** when `acme.json` did not hold the domain, and exited 0. It
+  now refuses anything that is not PEM, writes the new files beside the old
+  ones and renames them whole, owner-only until then, with the group the
+  old files had (audit 2026-10-12, M21). It needs bash.
+
 ## [2.5.4] - 2026-10-15
 
 Stage 4 of the 2026-10-12 audit: the panel's behaviour. Signing in tells

@@ -117,6 +117,64 @@ fi
 RATE_MSGS="${RATE_LIMIT_MESSAGES_PER_IP:-100}"
 RATE_WINDOW="${RATE_LIMIT_WINDOW_SECONDS:-3600}"
 
+# The settings below reach main.cf and master.cf as numbers or time values.
+# A value that is neither, or one under the parameter's minimum, passes
+# `postfix check` and kills the daemon that reads it - every smtpd at its
+# first connection, or anvil and with it the rate limit (audit 2026-10-12,
+# L31; review of stage 5) - so the start stops here, saying which and why.
+# Counts and sizes are whole numbers from min up to 2147483647, an int's top
+# (Postfix 3.7.11 reads them with get_mail_conf_int*, src/global/
+# mail_conf_int.c: an int, held to the parameter's own minimum). A time value
+# is a whole number from 1 with an optional unit, s m h d or w, at most
+# 2147483647 seconds
+# (proto/postconf.proto: "Specify a non-zero time value (an integral value
+# plus an optional one-letter suffix ...). Time units: s (seconds), m
+# (minutes), h (hours), d (days), w (weeks)"; one unit - "1h30m" is read as
+# 1h, src/global/conv_time.c - so it is refused here).
+need_number() {
+	case "$2" in
+	'' | *[!0-9]*)
+		echo "postfix-config: $1 must be a whole number, got '$2'" >&2
+		exit 1
+		;;
+	esac
+	if [ "${#2}" -gt 10 ] || [ "$2" -lt "$3" ] || [ "$2" -gt 2147483647 ]; then
+		echo "postfix-config: $1 must be from $3 to 2147483647, got '$2'" >&2
+		exit 1
+	fi
+}
+need_time() {
+	if ! printf '%s' "$2" | grep -Eq '^[1-9][0-9]{0,8}[smhdw]?$'; then
+		echo "postfix-config: $1 must be a time value - a whole number from 1 with an optional s, m, h, d or w - got '$2'" >&2
+		exit 1
+	fi
+	# conv_time multiplies by the unit and refuses what passes an int.
+	n=${2%[smhdw]}
+	case "$2" in
+	*w) n=$((n * 604800)) ;;
+	*d) n=$((n * 86400)) ;;
+	*h) n=$((n * 3600)) ;;
+	*m) n=$((n * 60)) ;;
+	esac
+	if [ "$n" -gt 2147483647 ]; then
+		echo "postfix-config: $1 is more than 2147483647 seconds, got '$2'" >&2
+		exit 1
+	fi
+}
+# A rate of 0 is no limit, a size of 0 none (proto/postconf.proto,
+# smtpd_client_message_rate_limit, message_size_limit); the window is
+# anvil_rate_time_unit, at least 1 second (src/anvil/anvil.c, main(): its
+# time table's minimum 1).
+need_number RATE_LIMIT_MESSAGES_PER_IP "$RATE_MSGS" 0
+need_number RATE_LIMIT_WINDOW_SECONDS "$RATE_WINDOW" 1
+need_number INBOUND_RATE_LIMIT_MESSAGES_PER_IP "${INBOUND_RATE_LIMIT_MESSAGES_PER_IP:-20}" 0
+need_number INBOUND_MESSAGE_SIZE_LIMIT "${INBOUND_MESSAGE_SIZE_LIMIT:-26214400}" 0
+need_number DMARC_RATE_LIMIT_MESSAGES_PER_IP "${DMARC_RATE_LIMIT_MESSAGES_PER_IP:-20}" 0
+need_number DMARC_MESSAGE_SIZE_LIMIT "${DMARC_MESSAGE_SIZE_LIMIT:-5242880}" 0
+need_time MILTER_CONNECT_TIMEOUT "${MILTER_CONNECT_TIMEOUT:-15s}"
+need_time MILTER_COMMAND_TIMEOUT "${MILTER_COMMAND_TIMEOUT:-15s}"
+need_time MILTER_CONTENT_TIMEOUT "${MILTER_CONTENT_TIMEOUT:-30s}"
+
 # Milter sockets: OpenDKIM (signing, strict), the panel's sender check
 # (strict) and its journal-milter (monitoring, fail-open). Fixed container
 # paths, matched by postfix-wrapper.sh.
@@ -235,6 +293,22 @@ postconf -e \
 	"smtpd_tls_security_level=may" \
 	"smtpd_tls_auth_only=yes" \
 	"smtpd_tls_loglevel=1"
+
+# TLS 1.2 at least, opportunistic or required - and the client's too where an
+# inbound domain requires TLS to its upstream (smtp_tls_mandatory_protocols,
+# the security review of stage 5) (audit 2026-10-12, L31; Postfix
+# 3.7.11, proto/postconf.proto, smtpd_tls_protocols: since 3.6 the default is
+# ">=TLSv1", and a lower bound is written ">=version"). A sender that offers
+# less on port 25 sends in the clear, as one without TLS does. VRFY answers
+# no question about who is accepted on port 25 (relay_recipient_maps), and
+# the banner names no distribution (Debian's adds "(Debian/GNU)"; the
+# upstream default is "$myhostname ESMTP $mail_name").
+postconf -e \
+	"smtpd_tls_protocols=>=TLSv1.2" \
+	"smtpd_tls_mandatory_protocols=>=TLSv1.2" \
+	"smtp_tls_mandatory_protocols=>=TLSv1.2" \
+	"disable_vrfy_command=yes" \
+	'smtpd_banner=$myhostname ESMTP'
 
 # SASL: Cyrus with the local sasldb2 the panel maintains. The realm is left
 # implicit (smtpd_sasl_local_domain empty) so the authenticated name Postfix

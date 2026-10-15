@@ -46,10 +46,17 @@ that will not start, is an exit supervisord counts as too quick: once
 each start it is STARTING.
 
 `crashexit` event listener exits the container when a program of the mail path
-is FATAL, so Docker `restart: unless-stopped` starts it again - the same
-container, not a new one: the entrypoint clears what the last run left in
-`/run` (the milter sockets, the sender check's alive mark). `logrotate`'s
-FATAL (a config logrotate would ignore) stays on Server › Health instead.
+is FATAL - it crashed before its `startsecs` four times running (the start
+and `startretries=3`) - or has
+exited unexpectedly five times in ten minutes, however long each run lasted
+(an exit after `startsecs` is EXITED and restarted, never FATAL; `2.6.0`), so
+Docker `restart: unless-stopped` starts it again - the same container, not a
+new one: the entrypoint clears what the last run left in `/run` (the milter
+sockets, the sender check's alive mark). Besides a stop, supervisord itself
+dying, or the entrypoint refusing a setting, nothing else exits the
+container. `logrotate`'s FATAL (a config logrotate would ignore),
+`postfix-reload`'s (reported to the page that asked), `cert-reload`'s and
+`syslog-relay`'s stay on Server › Health instead.
 The panel runs `postfix-reload` through supervisord's XML-RPC interface and
 waits for its exit status (`internal/supervisor`, `RunOnce`); the program
 rests EXITED after a run.
@@ -1110,7 +1117,9 @@ unsupported rather than as a missing doc:
   `POSTFIX_DMARC_RELAY_DOMAINS` (`/data/postfix/dmarc_relay_domains`),
   `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
   `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
-  full backups; mount `.:/selfpost-deploy:ro` in compose).
+  full backups; mount `.:/selfpost-deploy:ro` in compose), `ANTISPAM_DIR`
+  (`/data/antispam` — the filter lists and the filter's key, which the spam
+  filter's container mounts).
 - **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
   `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
   `MILTER_WAIT_TIMEOUT` (`30` seconds).

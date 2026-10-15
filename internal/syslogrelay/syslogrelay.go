@@ -17,6 +17,8 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 // stamp is the BSD syslog timestamp that follows the priority, "Oct 15
@@ -24,10 +26,17 @@ import (
 // space). The container's log has times of its own.
 var stamp = regexp.MustCompile(`^[A-Z][a-z]{2} [ 0-9][0-9] [0-9]{2}:[0-9]{2}:[0-9]{2} `)
 
+// Prefix begins every relayed line. The socket takes datagrams from any user
+// in the container, so a relayed line must not pass for one of the panel's
+// or supervisord's own (security review of audit stage 5).
+const Prefix = "syslog: "
+
 // Line turns one datagram into the line written out: the priority and the
 // timestamp taken off, trailing newlines too; what remains is "ident[pid]:
 // message". A severity of error or worse (RFC 3164 § 4.1.1: the priority is
-// facility*8 + severity, and 0-3 are emergency to error) is said in front.
+// facility*8 + severity, and 0-3 are emergency to error) is said in front. A
+// control character within it - a newline that would start a line of its own
+// - is written as \xNN.
 func Line(datagram []byte) string {
 	b := bytes.TrimRight(datagram, "\r\n\x00")
 	severity := -1
@@ -51,16 +60,36 @@ func Line(datagram []byte) string {
 	if loc := stamp.FindIndex(b); loc != nil {
 		b = b[loc[1]:]
 	}
-	line := string(b)
+	var out bytes.Buffer
+	out.WriteString(Prefix)
 	if severity >= 0 && severity <= 3 {
-		line = "error: " + line
+		out.WriteString("error: ")
 	}
-	return line
+	for _, c := range b {
+		if c < 0x20 || c == 0x7f {
+			fmt.Fprintf(&out, `\x%02x`, c)
+			continue
+		}
+		out.WriteByte(c)
+	}
+	return out.String()
 }
+
+// The relay keeps reading whatever it can write: a datagram is read at once
+// and queued, and dropped when the queue is full or more than ratePerSecond
+// came in the last second. A sender to a unix datagram socket waits while the
+// receiver's queue is full, so a relay that stopped reading would have held
+// OpenDKIM in syslog(3) - with mail waiting on it (review of audit stage 5) -
+// and a flood would have filled the container's log.
+const (
+	queueLen      = 1024
+	ratePerSecond = 200
+)
 
 // Run listens on a datagram socket at path, which anyone in the container may
 // write to, and writes each message to w as a line until the socket fails.
-// /dev/log is a link to path (build/entrypoint.sh).
+// /dev/log is a link to path (build/entrypoint.sh). What it drops it says,
+// once a second at most.
 func Run(path string, w io.Writer) error {
 	_ = os.Remove(path)
 	conn, err := net.ListenUnixgram("unixgram", &net.UnixAddr{Name: path, Net: "unixgram"})
@@ -73,15 +102,45 @@ func Run(path string, w io.Writer) error {
 	if err := os.Chmod(path, 0o666); err != nil {
 		return fmt.Errorf("syslog relay: %w", err)
 	}
+
+	lines := make(chan string, queueLen)
+	go func() {
+		for l := range lines {
+			fmt.Fprintln(w, l)
+		}
+	}()
+	defer close(lines)
+
 	buf := make([]byte, 64<<10)
+	var second time.Time
+	inSecond, dropped := 0, 0
 	for {
 		n, _, err := conn.ReadFromUnix(buf)
 		if err != nil {
 			return fmt.Errorf("syslog relay: read: %w", err)
 		}
+		now := time.Now()
+		if now.Sub(second) >= time.Second {
+			if dropped > 0 {
+				select {
+				case lines <- Prefix + "relay: dropped " + strconv.Itoa(dropped) + " lines - more than " + strconv.Itoa(ratePerSecond) + " a second, or the log was not taking them":
+				default:
+				}
+			}
+			second, inSecond, dropped = now, 0, 0
+		}
+		inSecond++
 		if n == 0 {
 			continue
 		}
-		fmt.Fprintln(w, Line(buf[:n]))
+		if inSecond > ratePerSecond {
+			dropped++
+			continue
+		}
+		select {
+		case lines <- Line(buf[:n]):
+		default:
+			dropped++
+		}
 	}
 }
