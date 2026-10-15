@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mixeme/selfpost/internal/store"
@@ -202,27 +203,40 @@ func (s *Service) Delete(id int64) error {
 	if err := s.store.DeleteDomain(id); err != nil {
 		return err
 	}
+	// From here the domain is deleted, whatever fails after: each rebuild
+	// runs - the sender map was left with the purged logins when OpenDKIM's
+	// failed first - and a failure says the domain is gone (audit
+	// 2026-10-12, L17).
+	var errs []error
+	tablesRebuilt := true
 	if err := s.resync(); err != nil {
-		return err
+		tablesRebuilt = false
+		errs = append(errs, fmt.Errorf("rebuild OpenDKIM's tables: %w", err))
 	}
 	if err := s.apps.Resync(); err != nil {
-		return fmt.Errorf("rebuild sender map after deleting %s: %w", d.Name, err)
+		errs = append(errs, fmt.Errorf("rebuild the sender map: %w", err))
 	}
 	// A sending domain named like the server shared its key with the server's
 	// own mail. The resync above kept the name in the tables under the default
 	// selector: the same key if that was the domain's selector, a new one -
 	// with a new record to publish, which Settings shows - if it was not.
-	// Either way the directory holds the key now in use.
-	if d.Name == s.serverName {
-		return nil
+	// Either way the directory holds the key now in use. And while the tables
+	// may still name the deleted domain's key, the key stays.
+	if d.Name != s.serverName && tablesRebuilt {
+		if err := s.odk.RemoveKey(d.Name); err != nil {
+			errs = append(errs, fmt.Errorf("remove its DKIM key: %w", err))
+		}
 	}
-	if err := s.odk.RemoveKey(d.Name); err != nil {
-		// The domain is gone from the registry and tables; a leftover key
-		// directory is harmless. Surface it so it is not silently ignored.
-		return fmt.Errorf("domain deleted but key cleanup failed: %w", err)
+	if len(errs) > 0 {
+		return fmt.Errorf("%w (%s): %w", ErrDeletedIncomplete, d.Name, errors.Join(errs...))
 	}
 	return nil
 }
+
+// ErrDeletedIncomplete is a domain deleted from the registry, with a step
+// after it that failed: the mail configuration still names it until a
+// rebuild succeeds (Reload configuration).
+var ErrDeletedIncomplete = errors.New("domain deleted, but the mail configuration was not fully rewritten after it")
 
 // DKIMRecord returns the DNS TXT record to publish for a domain (product.md).
 func (s *Service) DKIMRecord(d store.Domain) (DKIMRecord, error) {

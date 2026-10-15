@@ -3,8 +3,10 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -226,5 +228,60 @@ func TestMessagePageIsNotFoundForOtherTenants(t *testing.T) {
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("message %s for another tenant = %d, want 404", id, rec.Code)
 		}
+	}
+}
+
+// The status filter narrows to the statuses of a row, rejected being all
+// three refusals; the days narrow to the rows of those days; both survive
+// the paging, the poll and the way back from a message (owner, 2026-10-13).
+func TestOutLogFiltersByStatusAndDay(t *testing.T) {
+	h, _ := serverWithDelivery(t) // one sent row of bs.example.ru, by Queuer3C
+	for _, reason := range []string{store.ReasonLimit, store.ReasonClient, store.ReasonFrom} {
+		if err := h.store.InsertRejected(store.SendLogEntry{
+			Domain: "bs.example.ru", AppLogin: "Queuer3C", From: "noreply@bs.example.ru", To: "public@example.ru",
+			Subject: "Refused " + reason, Reason: reason,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rejected := getBody(t, h.HandleDeliveries, "/outbound/log?status=rejected")
+	for _, reason := range []string{store.ReasonLimit, store.ReasonClient, store.ReasonFrom} {
+		has(t, "rejected", rejected, "Refused "+reason)
+	}
+	has(t, "rejected", rejected, `<option value="rejected" selected>rejected</option>`)
+	if got := strings.Count(rejected, `">Details</a>`); got != 3 {
+		t.Errorf("status=rejected shows %d rows, want the three refusals", got)
+	}
+	sent := getBody(t, h.HandleDeliveries, "/outbound/log?status=sent")
+	if got := strings.Count(sent, `">Details</a>`); got != 1 {
+		t.Errorf("status=sent shows %d rows, want 1", got)
+	}
+	// A status that is not one is no narrowing, not an empty log.
+	if got := strings.Count(getBody(t, h.HandleDeliveries, "/outbound/log?status=rate-limited"), `">Details</a>`); got != 4 {
+		t.Errorf("status=rate-limited shows %d rows, want all 4", got)
+	}
+
+	today := time.Now().UTC().Format("2006-01-02")
+	tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+	if got := strings.Count(getBody(t, h.HandleDeliveries, "/outbound/log?from="+today+"&to="+today), `">Details</a>`); got != 4 {
+		t.Errorf("today shows %d rows, want 4", got)
+	}
+	for _, q := range []string{"from=" + tomorrow, "to=" + yesterday} {
+		if body := getBody(t, h.HandleDeliveries, "/outbound/log?"+q); strings.Contains(body, `">Details</a>`) {
+			t.Errorf("%s shows rows from today", q)
+		}
+	}
+	body := getBody(t, h.HandleDeliveries, "/outbound/log?status=rejected&from="+today)
+	has(t, "filtered", body, `name="from" value="`+today+`"`,
+		`hx-get="/outbound/log/fragment?from=`+today+`&amp;status=rejected"`,
+		`?from=`+today+`&amp;status=rejected">Details</a>`)
+	frag := getBody(t, h.HandleDeliveriesRows, "/outbound/log/fragment?status=rejected&from="+today)
+	if got := strings.Count(frag, `">Details</a>`); got != 3 {
+		t.Errorf("the poll of status=rejected shows %d rows, want 3", got)
+	}
+	// The message's way back keeps the filters.
+	if got := deliveriesBackURL(httptest.NewRequest("GET", "/outbound/log/1?status=rejected&from="+today+"&to="+today+"&p=2", nil)); got != "/outbound/log?from="+today+"&p=2&status=rejected&to="+today {
+		t.Errorf("way back = %q", got)
 	}
 }

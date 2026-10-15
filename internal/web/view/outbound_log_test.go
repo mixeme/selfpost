@@ -29,32 +29,41 @@ func TestOutLogShowsTheRowsAndTheirFilters(t *testing.T) {
 	pageLacks(t, "Outbound log", out, `← Newer`)
 
 	// Without the global role there is nowhere to change the retention.
-	p := NewOutLog(Meta{User: "ops", HasOutbound: true}, 7, false, []string{"example.org"}, nil, "", "")
+	p := NewOutLog(Meta{User: "ops", HasOutbound: true}, 7, false, []string{"example.org"}, nil, OutLogFilter{})
 	out = renderSignedIn(t, "out-log", p.WithRows(nil, 1, 1))
 	pageHas(t, "Outbound log", out, `Rows older than 7 days are deleted.`)
 	pageLacks(t, "Outbound log", out, `/server/settings`)
-	pageLacks(t, "Outbound log", renderSignedIn(t, "out-log", NewOutLog(Meta{User: "ops", HasOutbound: true}, 1, false, nil, nil, "", "").WithRows(nil, 1, 1)),
+	pageLacks(t, "Outbound log", renderSignedIn(t, "out-log", NewOutLog(Meta{User: "ops", HasOutbound: true}, 1, false, nil, nil, OutLogFilter{}).WithRows(nil, 1, 1)),
 		`older than 1 days`)
 }
 
 // The filter in force is the one selected, and the poll, the paging and the
 // links of the rows all carry it — and say nothing for a filter that is not set.
 func TestOutLogCarriesItsFilters(t *testing.T) {
-	p := NewOutLog(admin(), 30, true, []string{"example.org", "shop.example.org"}, []string{"alerts"}, "shop.example.org", "alerts")
+	p := NewOutLog(admin(), 30, true, []string{"example.org", "shop.example.org"}, []string{"alerts"}, OutLogFilter{Domain: "shop.example.org", App: "alerts", Status: "rejected", From: "2026-09-14", To: "2026-09-21"})
 	p.WithRows([]OutLogRow{{Time: "09-21 14:01:52", From: "a@example.org", To: "b@example.org", Subject: "Hi",
 		Status: Tag{Status: "sent"}, Href: p.DetailHref(7, 3)}}, 3, 5)
 	out := renderSignedIn(t, "out-log", p)
+	// The keys in order (url.Values.Encode sorts them), the page among them.
+	q := func(page string) string {
+		return `app=alerts&amp;domain=shop.example.org&amp;from=2026-09-14&amp;p=` + page + `&amp;status=rejected&amp;to=2026-09-21`
+	}
 	pageHas(t, "Outbound log", out,
 		`<option value="shop.example.org" selected>shop.example.org</option>`, `<option value="alerts" selected>alerts</option>`,
-		`hx-get="/outbound/log/fragment?app=alerts&amp;domain=shop.example.org&amp;p=3"`,
-		`href="/outbound/log/7?app=alerts&amp;domain=shop.example.org&amp;p=3"`,
-		`Page 3 of 5 · <a href="/outbound/log?app=alerts&amp;domain=shop.example.org&amp;p=2">← Newer</a>`,
-		`<a href="/outbound/log?app=alerts&amp;domain=shop.example.org&amp;p=4">Older →</a>`,
+		`<option value="rejected" selected>rejected</option>`, `<option value="queued">queued</option>`,
+		`name="from" value="2026-09-14"`, `name="to" value="2026-09-21"`,
+		`hx-get="/outbound/log/fragment?`+q("3")+`"`,
+		`href="/outbound/log/7?`+q("3")+`"`,
+		`Page 3 of 5 · <a href="/outbound/log?`+q("2")+`">← Newer</a>`,
+		`<a href="/outbound/log?`+q("4")+`">Older →</a>`,
 	)
-	if got := LogHref("", "", 1); got != "/outbound/log" {
+	// The status list is the statuses of a row, rejected the three refusals
+	// together; a reason is not a status (owner, 2026-10-13).
+	pageLacks(t, "Outbound log", out, `<option value="rate-limited"`)
+	if got := LogHref(OutLogFilter{}, 1); got != "/outbound/log" {
 		t.Errorf("the first unfiltered page is %q", got)
 	}
-	if got := LogHref("a b&c", "", 2); got != "/outbound/log?domain=a+b%26c&p=2" {
+	if got := LogHref(OutLogFilter{Domain: "a b&c"}, 2); got != "/outbound/log?domain=a+b%26c&p=2" {
 		t.Errorf("a filter is not encoded: %q", got)
 	}
 }
@@ -62,12 +71,12 @@ func TestOutLogCarriesItsFilters(t *testing.T) {
 // The last page has nothing older, and a page with no rows says so and still
 // polls: a log that is empty now is the one that fills while the page is open.
 func TestOutLogLastPageAndEmptyPage(t *testing.T) {
-	p := NewOutLog(admin(), 30, true, nil, nil, "", "")
+	p := NewOutLog(admin(), 30, true, nil, nil, OutLogFilter{})
 	out := renderSignedIn(t, "out-log", p.WithRows([]OutLogRow{{Subject: "x", Status: Tag{Status: "sent"}, Href: "/outbound/log/1"}}, 2, 2))
 	pageHas(t, "Outbound log", out, `Page 2 of 2`, `← Newer</a>`)
 	pageLacks(t, "Outbound log", out, `Older →`)
 
-	out = renderSignedIn(t, "out-log", NewOutLog(admin(), 30, true, nil, nil, "", "").WithRows(nil, 1, 1))
+	out = renderSignedIn(t, "out-log", NewOutLog(admin(), 30, true, nil, nil, OutLogFilter{}).WithRows(nil, 1, 1))
 	pageHas(t, "Outbound log", out, `No messages logged yet.`, `id="out-log-rows"`, `data-poll`, `id="out-log-foot"`, `New rows appear on their own`)
 	pageLacks(t, "Outbound log", out, `<table`, `Page 1`)
 }
@@ -87,7 +96,7 @@ func TestOutLogFragmentMarksOnlyTheFoot(t *testing.T) {
 }
 
 func TestOutLogEscapesWhatSendersWrote(t *testing.T) {
-	p := NewOutLog(admin(), 30, true, []string{`<b>d</b>`}, []string{`"><i>`}, "", "")
+	p := NewOutLog(admin(), 30, true, []string{`<b>d</b>`}, []string{`"><i>`}, OutLogFilter{})
 	p.WithRows([]OutLogRow{{Time: "t", From: `"><img src=x>@a`, To: `<u>@b`, Subject: `<script>alert(1)</script>`,
 		Status: Tag{Status: `<i>`}, Href: "/outbound/log/1"}}, 1, 1)
 	out := renderSignedIn(t, "out-log", p)

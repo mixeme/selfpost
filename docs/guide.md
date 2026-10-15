@@ -1389,9 +1389,12 @@ the only one of the two that does not depend on the panel process.
 ### Outbound log
 
 **Outbound › Log** (`/outbound/log`) is a searchable send log with server-side
-filters by domain and application; a user with the *domain* role sees only the
-rows of their domains. It refreshes its rows without resetting a filter being
-chosen. A row identifies its message and nothing more — time,
+filters by domain, application, status and day (from and to, UTC days, as on
+the Inbound log); the status *rejected* is the three kinds of refusal
+together, which the table tells apart by their tags. A user with the *domain*
+role sees only the rows of their domains. The filters are kept by the pages,
+the refresh and the way back from a message, and the log refreshes its rows
+without resetting a filter being chosen. A row identifies its message and nothing more — time,
 sender, recipient, subject and status `queued` (accepted, not yet
 delivered), `sent` (handed off successfully), `deferred` (Postfix is
 retrying), `bounced` (final failure: refused for good by the receiving server, or given

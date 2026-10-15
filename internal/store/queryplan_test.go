@@ -3,6 +3,7 @@ package store
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // explain returns SQLite's plan for query, one step a line.
@@ -109,5 +110,49 @@ func TestSendLogQueriesUseTheirIndexes(t *testing.T) {
 		if !strings.Contains(q, "status = '"+StatusRejected+"'") {
 			t.Errorf("a refusal query does not name status %q", StatusRejected)
 		}
+	}
+}
+
+// The Outbound log's days are whole UTC days: from the first's midnight up
+// to, not including, midnight after the last; the status is a row's.
+func TestSendLogFilterDaysAndStatus(t *testing.T) {
+	s := openTestStore(t)
+	stamps := []string{"2026-09-13T23:59:59Z", "2026-09-14T00:00:00Z", "2026-09-21T23:59:59Z", "2026-09-22T00:00:00Z"}
+	for i, at := range stamps {
+		if err := s.InsertQueued(SendLogEntry{QueueID: "Q" + at[:2] + string(rune('A'+i)), Domain: "d.example", From: "a@d.example", To: "b@x.example"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.db.Exec(`UPDATE send_log SET created_at = ? WHERE id = (SELECT MAX(id) FROM send_log)`, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.db.Exec(`UPDATE send_log SET status = 'sent' WHERE created_at = '2026-09-14T00:00:00Z'`); err != nil {
+		t.Fatal(err)
+	}
+	day := func(d int) time.Time { return time.Date(2026, 9, d, 15, 0, 0, 0, time.FixedZone("x", 3*3600)) }
+	got := func(f SendLogFilter) []string {
+		f.AllDomains = true
+		rows, err := s.QuerySendLog(f, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n, err := s.CountSendLog(f)
+		if err != nil || n != int64(len(rows)) {
+			t.Fatalf("count %d, %v; rows %d", n, err, len(rows))
+		}
+		var out []string
+		for _, r := range rows {
+			out = append(out, r.CreatedAt.UTC().Format(time.RFC3339))
+		}
+		return out
+	}
+	if g := got(SendLogFilter{Since: day(14), Until: day(21)}); strings.Join(g, " ") != "2026-09-21T23:59:59Z 2026-09-14T00:00:00Z" {
+		t.Errorf("14 to 21 = %v", g)
+	}
+	if g := got(SendLogFilter{Status: StatusSent}); strings.Join(g, " ") != "2026-09-14T00:00:00Z" {
+		t.Errorf("sent = %v", g)
+	}
+	if g := got(SendLogFilter{Status: StatusQueued, Until: day(13)}); strings.Join(g, " ") != "2026-09-13T23:59:59Z" {
+		t.Errorf("queued until 13 = %v", g)
 	}
 }

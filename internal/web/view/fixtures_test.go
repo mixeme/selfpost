@@ -252,7 +252,7 @@ func outDomainDeleteFixture() *OutDomainDelete {
 // the first of 412 pages, one deferred, one bounced, one refused by a rate limit.
 func outLogFixture() *OutLog {
 	p := NewOutLog(admin(), 30, true,
-		[]string{"example.org", "shop.example.org", "notify.acme.io"}, []string{"prod-server", "alerts"}, "", "")
+		[]string{"example.org", "shop.example.org", "notify.acme.io"}, []string{"prod-server", "alerts"}, OutLogFilter{})
 	// status is a row's status, or for a refused row "rejected:" and its reason.
 	row := func(id int64, at, from, to, subject, status string) OutLogRow {
 		status, reason, _ := strings.Cut(status, ":")

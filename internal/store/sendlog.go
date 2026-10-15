@@ -430,6 +430,11 @@ type SendLogFilter struct {
 	AppLogin   string
 	DomainIDs  []int64
 	AllDomains bool
+	// Status is a row's status, and Since and Until are days: from the
+	// first's midnight up to, not including, midnight after the last, UTC.
+	// Zero values do not narrow.
+	Status       string
+	Since, Until time.Time
 }
 
 // sendLogPageQuery is a page of the rows where selects, newest first. A page
@@ -507,6 +512,22 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 	if f.AppLogin != "" {
 		clauses = append(clauses, "app_login = ?")
 		args = append(args, f.AppLogin)
+	}
+	if f.Status != "" {
+		clauses = append(clauses, "status = ?")
+		args = append(args, f.Status)
+	}
+	// created_at is RFC3339 UTC, so comparing it as text against the same
+	// format is comparing moments (as InboundSpamFilter's days).
+	if !f.Since.IsZero() {
+		y, m, d := f.Since.UTC().Date()
+		clauses = append(clauses, "created_at >= ?")
+		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+	}
+	if !f.Until.IsZero() {
+		y, m, d := f.Until.UTC().Date()
+		clauses = append(clauses, "created_at < ?")
+		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
 	}
 	if len(clauses) == 0 {
 		return "", nil

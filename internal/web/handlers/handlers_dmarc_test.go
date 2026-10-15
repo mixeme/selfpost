@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -328,4 +329,26 @@ func TestReloadWritesTheDMARCMapsAndSaysWhereItFailed(t *testing.T) {
 		t.Fatalf("a failed reload = %d, want 500", rec.Code)
 	}
 	has(t, "failed reload", rec.Body.String(), "Reload failed at the DMARC report maps", "Reload configuration")
+}
+
+// A domain deleted with a rebuild failing after is said to be deleted, with
+// the way to finish, not "internal error" (audit 2026-10-12, L17).
+func TestDeleteDomainSaysItIsGoneWhenARebuildFails(t *testing.T) {
+	s, _ := hostedStand(t)
+	odk := domain.NewOpenDKIM(t.TempDir())
+	odk.SetReloadHook(func() error { return nil })
+	s.h.domains = domain.NewService(s.h.store, odk, s.h.apps, "mail")
+	d, err := s.h.domains.Add("gone.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	odk.SetReloadHook(func() error { return errors.New("supervisor away") })
+	rec := postFormAs(s.h.HandleDeleteDomain, globalPrincipal, "/outbound/domains/x/delete", map[string]string{"id": strconv.FormatInt(d.ID, 10)}, url.Values{})
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("delete with a failing rebuild = %d", rec.Code)
+	}
+	has(t, "delete", rec.Body.String(), "Domain gone.example deleted, but the mail configuration was not fully rewritten", "Reload configuration")
+	if _, err := s.h.store.GetDomain(d.ID); !errors.Is(err, store.ErrDomainNotFound) {
+		t.Errorf("the domain is still there: %v", err)
+	}
 }

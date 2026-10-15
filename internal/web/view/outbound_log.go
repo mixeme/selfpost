@@ -20,16 +20,32 @@ import (
 
 const outboundLog = "/outbound/log"
 
-// logQuery is the query string of a page of the log: the filters and the page,
+// OutLogFilter is what the filters of the Outbound log are set to, as the
+// strings the form sends: a domain, an application, a status of a row
+// (OutLogStatuses) and two days (2006-01-02). Empty means no narrowing.
+type OutLogFilter struct {
+	Domain string
+	App    string
+	Status string
+	From   string
+	To     string
+}
+
+// OutLogStatuses are the statuses a row of the log has, the choices of the
+// status filter: rejected is the three kinds of refusal together - a limit,
+// a client address, a From: line - which the table tells apart by their tags
+// (owner, 2026-10-13: the list without the split).
+var OutLogStatuses = []string{"queued", "sent", "deferred", "bounced", "rejected"}
+
+// query is the query string of a page of the log: the filters and the page,
 // each left out when it says nothing, so the first unfiltered page is the bare
 // path.
-func logQuery(domain, app string, page int) string {
+func (f OutLogFilter) query(page int) string {
 	q := url.Values{}
-	if domain != "" {
-		q.Set("domain", domain)
-	}
-	if app != "" {
-		q.Set("app", app)
+	for name, v := range map[string]string{"domain": f.Domain, "app": f.App, "status": f.Status, "from": f.From, "to": f.To} {
+		if v != "" {
+			q.Set(name, v)
+		}
 	}
 	if page > 1 {
 		q.Set("p", strconv.Itoa(page))
@@ -41,8 +57,8 @@ func logQuery(domain, app string, page int) string {
 }
 
 // LogHref is the address of a page of the Outbound log.
-func LogHref(domain, app string, page int) string {
-	return outboundLog + logQuery(domain, app, page)
+func LogHref(f OutLogFilter, page int) string {
+	return outboundLog + f.query(page)
 }
 
 // FormatLogTime is the time of a row of the log: month, day and the time of day
@@ -69,7 +85,7 @@ type OutLog struct {
 	Empty   EmptyState
 	Foot    Foot
 
-	domain, app string
+	filter OutLogFilter
 }
 
 // OutLogRow is one message of the table: when it was accepted, who it was from
@@ -85,10 +101,9 @@ type OutLogRow struct {
 }
 
 // NewOutLog builds the log for a viewer. domains and apps are the choices of
-// the two filters (only what the viewer reaches), domain and app the ones in
-// force. retentionDays is how long rows are kept; canSettings, the global role,
+// those two filters (only what the viewer reaches), f the filters in force. retentionDays is how long rows are kept; canSettings, the global role,
 // adds the way to change it.
-func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []string, domain, app string) *OutLog {
+func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []string, f OutLogFilter) *OutLog {
 	m.Title, m.Section, m.Page = "Outbound log", "outbound", "log"
 	lead := Rich("Every message an application handed to the relay. Rows older than " + plural(int64(retentionDays), "day", "days") + " are deleted")
 	if canSettings {
@@ -108,21 +123,26 @@ func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []stri
 		Messages: Box{No: "01", Title: "Messages", Help: topicLink(HelpLog, "What the statuses mean"), Filter: &Filter{
 			Action: outboundLog,
 			Selects: []Select{
-				{Name: "domain", Label: "Domain", Options: options("All domains", domains), Selected: domain},
-				{Name: "app", Label: "Application", Options: options("All applications", apps), Selected: app},
+				{Name: "domain", Label: "Domain", Options: options("All domains", domains), Selected: f.Domain},
+				{Name: "app", Label: "Application", Options: options("All applications", apps), Selected: f.App},
+				{Name: "status", Label: "Status", Options: options("Any status", OutLogStatuses), Selected: f.Status},
+			},
+			Dates: []DateInput{
+				{Name: "from", Label: "From date", Value: f.From},
+				{Name: "to", Label: "To date", Value: f.To},
 			},
 		}},
 		Empty:   EmptyState{Icon: "ti-list-details", Text: Plain("No messages logged yet.")},
-		PollURL: outboundLog + "/fragment" + logQuery(domain, app, 1),
+		PollURL: outboundLog + "/fragment" + f.query(1),
 		Foot:    Foot{ID: "out-log-foot", End: Plain("New rows appear on their own")},
-		domain:  domain, app: app,
+		filter:  f,
 	}
 }
 
 // DetailHref is the address of one message's page, carrying the filters and the
 // page it is opened from so that its way back returns to the same list.
 func (p *OutLog) DetailHref(id int64, page int) string {
-	return outboundLog + "/" + strconv.FormatInt(id, 10) + logQuery(p.domain, p.app, page)
+	return outboundLog + "/" + strconv.FormatInt(id, 10) + p.filter.query(page)
 }
 
 // WithRows sets the table for page of last, and the foot under it: where the
@@ -130,17 +150,17 @@ func (p *OutLog) DetailHref(id int64, page int) string {
 // page again.
 func (p *OutLog) WithRows(rows []OutLogRow, page, last int) *OutLog {
 	p.Rows = rows
-	p.PollURL = outboundLog + "/fragment" + logQuery(p.domain, p.app, page)
+	p.PollURL = outboundLog + "/fragment" + p.filter.query(page)
 	if len(rows) == 0 {
 		return p
 	}
 	text := Rich("Page " + strconv.Itoa(page) + " of " + strconv.Itoa(last))
 	if page > 1 {
-		text = append(text, Inline{Text: " · "}, Link(LogHref(p.domain, p.app, page-1), "← Newer"))
+		text = append(text, Inline{Text: " · "}, Link(LogHref(p.filter, page-1), "← Newer"))
 	}
 	p.Foot.Text = text
 	if page < last {
-		p.Foot.Link = &Anchor{Href: LogHref(p.domain, p.app, page+1), Label: "Older →"}
+		p.Foot.Link = &Anchor{Href: LogHref(p.filter, page+1), Label: "Older →"}
 	}
 	return p
 }

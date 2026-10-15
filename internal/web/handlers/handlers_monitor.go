@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -301,7 +302,7 @@ func logLines(lines []string) []view.LogLine {
 func deliveriesBackURL(r *http.Request) string {
 	q := r.URL.Query()
 	back := url.Values{}
-	for _, k := range []string{"domain", "app", "p"} {
+	for _, k := range []string{"domain", "app", "status", "from", "to", "p"} {
 		if v := q.Get(k); v != "" {
 			back.Set(k, v)
 		}
@@ -364,6 +365,7 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	filter := store.SendLogFilter{
 		Domain:   q.Get("domain"),
 		AppLogin: q.Get("app"),
+		Status:   outLogStatus(q.Get("status")),
 		// A global administrator reads the whole journal, including rows left
 		// behind by a domain that has since been deleted; anyone else the rows
 		// of the domains assigned to them, by id - not those an earlier domain
@@ -378,6 +380,15 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		if filter.AppLogin != "" && !loginSet[filter.AppLogin] {
 			filter.AppLogin = ""
 		}
+	}
+	form := view.OutLogFilter{Domain: filter.Domain, App: filter.AppLogin, Status: filter.Status}
+	// The days, as on the Inbound log: from the first's midnight to the end of
+	// the last, UTC; a day that does not parse is no narrowing.
+	if t, err := time.Parse(logDay, q.Get("from")); err == nil {
+		form.From, filter.Since = t.Format(logDay), t
+	}
+	if t, err := time.Parse(logDay, q.Get("to")); err == nil {
+		form.To, filter.Until = t.Format(logDay), t
 	}
 
 	total, err := h.store.CountSendLog(filter)
@@ -396,7 +407,7 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := view.NewOutLog(h.shellMeta(r), h.sendLogRetentionDays(), p.IsGlobal(), domainNames, logins, filter.Domain, filter.AppLogin)
+	out := view.NewOutLog(h.shellMeta(r), h.sendLogRetentionDays(), p.IsGlobal(), domainNames, logins, form)
 	table := make([]view.OutLogRow, len(rows))
 	for i, row := range rows {
 		table[i] = view.OutLogRow{
@@ -406,6 +417,15 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		}
 	}
 	return out.WithRows(table, page, lastPage), nil
+}
+
+// outLogStatus is the status filter of the Outbound log: one of the statuses
+// a row has, or none.
+func outLogStatus(v string) string {
+	if slices.Contains(view.OutLogStatuses, v) {
+		return v
+	}
+	return ""
 }
 
 // parsePage clamps the "p" query parameter to a valid page number, defaulting

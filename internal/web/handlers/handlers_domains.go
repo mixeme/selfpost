@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
@@ -147,7 +148,9 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	name := ""
 	if d, err := h.domains.Get(id); err == nil {
+		name = d.Name
 		defer h.dns.Forget(d.Name)
 	}
 	if err := h.domains.Delete(id); err != nil {
@@ -156,6 +159,11 @@ func (h *Handlers) HandleDeleteDomain(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		logf("panel: delete domain %d: %v", id, err)
+		if errors.Is(err, domain.ErrDeletedIncomplete) {
+			h.renderDashboard(w, r, http.StatusInternalServerError,
+				"Domain "+name+" deleted, but the mail configuration was not fully rewritten after it. Run Reload configuration on Server › Health; the panel's log says what failed.", "")
+			return
+		}
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

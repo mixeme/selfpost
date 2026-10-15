@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **The Outbound log filters by status and by day**, beside domain and
+  application: *queued*, *sent*, *deferred*, *bounced* or *rejected* (the
+  three kinds of refusal together), and from and to a day, as the Inbound
+  log does. The filters survive the pages, the refresh and the way back
+  from a message.
+
 ### Changed
 
 - **Reload configuration writes everything a restore's first start writes.**
@@ -51,6 +59,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Recalculate rate limit dropped what was typed on the page.** The button
   leaves the page; when a field holds an edit not saved yet, it now asks
   first (audit 2026-10-12, L19).
+- **Deleting a domain could leave its applications able to send.** When
+  OpenDKIM's tables failed to rebuild after the domain's row was gone, the
+  sender map was not rebuilt either and kept the deleted applications'
+  logins, and the page said "internal error". Every rebuild now runs, and
+  the page says the domain is deleted and that Reload configuration
+  finishes the rest (audit 2026-10-12, L17).
 
 ## [2.5.3] - 2026-10-15
 
