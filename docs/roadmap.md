@@ -42,7 +42,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
-| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`; next stage 2c → `2.5.2`) | 49/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
+| audit-2026-10-12 | Follow-ups of the 2026-10-12 full-tree code audit, seven stages | in progress (stage 0 shipped `2.4.2`, stages 1+2 `2.5.0`, 2b `2.5.1`, 2c `2.5.2`; next stage 3 → `2.5.3`) | 49/81 | [audit-2026-10-12.md](audit-2026-10-12.md) |
 
 **Recommended order** (not binding; owner, 2026-10-09: feature order follows
 development convenience): **panel-redesign** shipped as `2.0.0` (2026-10-11) and
@@ -51,7 +51,8 @@ kit — styling its two screens once instead of twice. **delivery-log-storage**
 shipped as `2.2.0` the same day, **panel-notifications** as `2.3.0` and
 **from-header-binding** as `2.4.0`. Stage 0 of
 [audit-2026-10-12](audit-2026-10-12.md) shipped as `2.4.2` (2026-10-14), its
-stages 1 and 2 as `2.5.0` the same day, and stage 2b as `2.5.1`.
+stages 1 and 2 as `2.5.0` the same day, stage 2b as `2.5.1`, and stage 2c as
+`2.5.2` (2026-10-15).
 Nothing is agreed after it: every remaining
 item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`

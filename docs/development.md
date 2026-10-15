@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `2.5.1`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `2.5.2`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|

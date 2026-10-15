@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-10-15
+
+Stage 2c of the 2026-10-12 audit: every place SelfPost relied on what Postfix,
+OpenDKIM, Cyrus SASL, supervisord, logrotate, rspamd, SQLite or a browser does
+was read in that program's source and is cited in the code; what the sources
+contradicted is fixed below. The sender check reads `From:` with OpenDKIM's own
+parser. No migration.
+
 ### Security
 
 - **A sender on a private address could have his own spam verdict signed.**
