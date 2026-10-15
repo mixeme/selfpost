@@ -41,6 +41,16 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 		t.Fatal(err)
 	}
 
+	// A map under data/postfix by a name the entrypoint does not list - the
+	// DMARC maps were such, with DMARC on (review of audit stage 3, H1). The
+	// archive records no owner, and the unpack below runs as root, as an
+	// operator's tar does: the entrypoint has to hand the file back to the
+	// panel, which reads every recorded file on the first start.
+	if out, err := h.execIn("selfpost", "sh", "-c",
+		"echo 'x OK' > /data/postfix/e2e_extra_map && chown panel:selfpost /data/postfix/e2e_extra_map && chmod 0640 /data/postfix/e2e_extra_map"); err != nil {
+		t.Fatalf("write an extra map: %v\n%s", err, out)
+	}
+
 	resp, archive, err := sc.panel.postForm("/server/backup", url.Values{})
 	if err != nil {
 		t.Fatalf("full backup: %v", err)
@@ -102,6 +112,10 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 		return strings.TrimSpace(out) == "", fmt.Errorf("still there: %s", strings.TrimSpace(out))
 	}); err != nil {
 		t.Fatalf("%v\n%s", err, logTail(h.logs("selfpost"), "backup"))
+	}
+
+	if out, _ := h.execIn("selfpost", "stat", "-c", "%U:%G %a", "/data/postfix/e2e_extra_map"); strings.TrimSpace(out) != "panel:selfpost 640" {
+		t.Errorf("the extra map after the restore is %q, want panel:selfpost 640", strings.TrimSpace(out))
 	}
 
 	p, err := newPanelClient()

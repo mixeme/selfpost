@@ -2,6 +2,7 @@ package secretfile
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"testing"
@@ -155,8 +156,71 @@ func TestEmptyPasswordRejected(t *testing.T) {
 func TestUnreasonableKDFParamsRejected(t *testing.T) {
 	enc := encrypt(t, TypeFullBackup, "password password", []byte("x"))
 	bad := bytes.Clone(enc)
-	bad[MagicLen+2] = 40 // logN far beyond maxLogN
+	bad[MagicLen+2] = 40 // logN far beyond the budget
 	if _, err := NewReader(bytes.NewReader(bad), "password password"); !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("err = %v, want ErrCorrupt", err)
+	}
+}
+
+// A header may ask for no more than the stated budget: 128·N·r bytes of
+// scrypt's array at most 128 MiB, r at most 64, p at most 2 (audit
+// 2026-10-12, M4; security review of stage 3). The writer's own parameters
+// are a quarter of it.
+func TestKDFBudget(t *testing.T) {
+	enc := encrypt(t, TypeFullBackup, "password password", []byte("x"))
+	header := func(logN uint8, r, p uint32) []byte {
+		h := bytes.Clone(enc[:headerLen])
+		h[MagicLen+2] = logN
+		binary.BigEndian.PutUint32(h[MagicLen+3:], r)
+		binary.BigEndian.PutUint32(h[MagicLen+7:], p)
+		return h
+	}
+	for _, c := range []struct {
+		logN uint8
+		r, p uint32
+		ok   bool
+	}{
+		{defaultLogN, defaultR, defaultP, true},
+		{17, 8, 2, true},        // 128 MiB, the budget
+		{20, 1, 1, true},        // 128 MiB another way
+		{18, 8, 1, false},       // 256 MiB
+		{15, 64, 1, false},      // 256 MiB
+		{20, 32, 16, false},     // what the old cap let through: 4 GiB
+		{15, 8, 3, false},       // p over 2
+		{0, 8, 1, false},        // N of 1
+		{31, 1, 1, false},       // past the shift
+		{1, 1 << 21, 1, false},  // r alone over the budget
+		{1, 1 << 19, 2, false},  // V small, B and XY 384 MiB
+		{11, 64, 2, true},       // r at its cap
+		{11, 65, 1, false},      // r past it
+		{30, 1 << 20, 1, false}, // the largest product, still refused
+		{15, 0, 1, false},
+		{15, 8, 0, false},
+	} {
+		_, err := parseHeader(header(c.logN, c.r, c.p))
+		if c.ok && err != nil {
+			t.Errorf("logN=%d r=%d p=%d refused: %v", c.logN, c.r, c.p, err)
+		}
+		if !c.ok && !errors.Is(err, ErrCorrupt) {
+			t.Errorf("logN=%d r=%d p=%d = %v, want ErrCorrupt", c.logN, c.r, c.p, err)
+		}
+	}
+}
+
+// Nothing may follow the last chunk: two envelopes end to end, or stray
+// bytes, are damage rather than the first file (audit 2026-10-12, L3).
+func TestBytesAfterTheLastChunkRejected(t *testing.T) {
+	first := encrypt(t, TypeFullBackup, "password password", []byte("first"))
+	second := encrypt(t, TypeFullBackup, "password password", []byte("second"))
+	for name, data := range map[string][]byte{
+		"two envelopes": append(bytes.Clone(first), second...),
+		"one byte":      append(bytes.Clone(first), 0),
+	} {
+		if _, _, err := decrypt(t, data, "password password"); !errors.Is(err, ErrCorrupt) {
+			t.Errorf("%s: err = %v, want ErrCorrupt", name, err)
+		}
+	}
+	if plain, _, err := decrypt(t, first, "password password"); err != nil || string(plain) != "first" {
+		t.Errorf("the envelope alone = %q, %v", plain, err)
 	}
 }

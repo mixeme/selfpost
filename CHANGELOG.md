@@ -18,7 +18,46 @@ Migration `0010` (indexes only).
   domain's rows; a page of a domain administrator's log sorted the domain's
   whole log. Migration `0010` adds four indexes, and a test now holds each
   of these statements to its index (audit 2026-10-12, M2).
-
+- **`selfpost-backup` with a wrong `SELFPOST_DB_PATH` made a backup of
+  nothing.** SQLite created an empty database where the path pointed, and
+  the archive of it passed as a backup - one that restores a server offering
+  its first-run setup while it holds live DKIM keys. A database that is not
+  there is now refused, and the snapshot opens it read-only (audit
+  2026-10-12, M3).
+- **The CLI encrypted a backup with any password.** It now holds the
+  password to the panel's floor of 12 characters (audit 2026-10-12, M5).
+  Decrypting takes any password, as before.
+- **`selfpost-backup -o FILE` left a half-written file** when it failed,
+  and `-decrypt -o FILE` with a wrong password emptied a file that may have
+  been a good archive. The output is written beside its name and takes it
+  only when whole; `-decrypt` checks the password on the first block before
+  it touches the output (audit 2026-10-12, L1).
+- **A backup left links out without a word, and an empty `certs/` passed.**
+  An entry a backup does not carry - a link under `data/`, a link under
+  `certs/` to a directory - is now named in a warning (the CLI's standard
+  error, the panel's log), and a `certs/` with no file in it is refused: the
+  archive would restore a server without its certificate (audit
+  2026-10-12, L2).
+- **`TRUSTED_PROXY_CIDR=::ffff:10.0.0.1` trusted the wrong addresses.** A
+  bare IPv4-mapped address written as IPv6 was given "/32", which made it
+  `::/32`: every address beginning with 32 zero bits, `::1` among them, and
+  not the proxy meant. A bare address is now one host however it is written
+  (audit 2026-10-12, L4).
+- **An encrypted file could make the panel allocate 4 GiB before its
+  password was checked.** The key-derivation parameters an encrypted backup
+  or export carries were capped so loosely that a crafted header, uploaded
+  to *Import a domain*, asked scrypt for 4 GiB and sixteen times the work.
+  A header may now ask for 128 MiB at most - four times what SelfPost
+  writes, with the rest of scrypt's memory under 32 KiB - and is refused as
+  damaged otherwise. Bytes after an envelope's
+  last block, such as a second file appended to it, are refused too (audit
+  2026-10-12, M4, L3).
+- **A power loss could bring back a map the panel had just replaced.** The
+  files the panel writes for Postfix and OpenDKIM were synced, but not the
+  directory their rename changed, so the old file could return while the
+  database said otherwise. The directory is synced after the rename now, as
+  `sasldb2` has been since 2.5.2, and the CLI's `-o` file too (audit
+  2026-10-12, L7).
 - **A restore whose first start failed never ran its Resync.** The panel
   removed the restore manifest as soon as it had checked the version, before
   it opened the database and regenerated the mail maps from it; a start that
@@ -31,9 +70,15 @@ Migration `0010` (indexes only).
   there. Every archive now ends with `data/contents.json`, the size and
   SHA-256 of each file under `data/`, and the first start after a restore
   compares `/data` with it before it opens anything: an archive unpacked in
-  part, or a file that differs, is refused with a message that names it, and
-  the directory is left as it was (guide § Restore). A damaged or cut domain
-  export was already refused before anything is created; a test now says so.
+  part, a file that differs, or a database journal file left beside the
+  database from before, is refused with a message that names it, and the
+  directory is left as it was (guide § Restore). The entrypoint now hands
+  every map under `data/postfix` to the panel, whatever its name - a restore
+  unpacked as root left the DMARC maps root's, and the comparison could not
+  read them. A damaged or cut domain export was already refused before
+  anything is created; a test now says so.
+- **The guide's in-place restore moved `.`**, which `mv` refuses; it now
+  steps out of the project directory first.
 
 ## [2.5.2] - 2026-10-15
 

@@ -114,9 +114,16 @@ mkdir -p /data/postfix/queue
 # Empty files keep postfix check happy if the flag is on before any domain exists.
 for f in relay_domains transport relay_recipients tls_policy; do
 	[ -e "/data/postfix/$f" ] || : > "/data/postfix/$f"
-	chown panel:selfpost "/data/postfix/$f"
-	chmod 0640 "/data/postfix/$f"
 done
+# Every map here is the panel's to write and Postfix's to read - the sender
+# map, the inbound and the DMARC maps alike - so each file beside queue/ is
+# handed to the panel, group selfpost, whatever its name. A restored archive's
+# files arrive owned by whoever unpacked them (a backup records no owner, and
+# tar run as root makes them root's), and the first start after a restore
+# reads every one of them to compare it with the archive's record: one left
+# to root alone is a restore refused on every start (review of audit stage 3,
+# H1 - the DMARC maps were not among the names listed here).
+find /data/postfix -mindepth 1 -maxdepth 1 -type f -exec chown panel:selfpost {} + -exec chmod 0640 {} +
 chown panel:selfpost /data/postfix
 chmod 2750 /data/postfix
 
@@ -128,8 +135,6 @@ chmod 2750 /data/postfix
 mkdir -p /data/antispam
 chown panel:selfpost /data/antispam
 chmod 0755 /data/antispam
-chown panel:selfpost /data/postfix/sender_login_maps
-chmod 0640 /data/postfix/sender_login_maps
 
 # Delivery log (architecture.md § Log tailer). postlogd writes it as user
 # `postfix`; the panel reads it for the log-tailer and the System log page. It

@@ -265,10 +265,17 @@ func parseTrustedProxies(raw string) []*net.IPNet {
 			continue
 		}
 		if !strings.Contains(cidr, "/") {
-			if ip := net.ParseIP(cidr); ip != nil && ip.To4() != nil {
-				cidr += "/32"
-			} else {
+			// The prefix length goes with how the address is written: an
+			// IPv4-mapped address written as IPv6 (::ffff:10.0.0.1) is a
+			// 128-bit address, and "/32" on it is ::/32 - every address
+			// whose first 32 bits are zero (::1 among them) trusted, and the
+			// host meant not at all (audit 2026-10-12, L4). Go 1.26
+			// net.IPNet.Contains compares an IPv4 client with the mapped
+			// /128 as with 10.0.0.1/32 (net/ip.go, networkNumberAndMask).
+			if strings.Contains(cidr, ":") {
 				cidr += "/128"
+			} else {
+				cidr += "/32"
 			}
 		}
 		_, n, err := net.ParseCIDR(cidr)

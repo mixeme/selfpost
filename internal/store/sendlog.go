@@ -328,6 +328,12 @@ const attachRefusalLineQuery = `UPDATE send_log SET refusal_line = ?1 WHERE id =
 // § 2); NOCASE folds ASCII only (datatype3.html § 7.1); ?1 is bound once and
 // used twice (lang_expr.html § 4).
 func (s *Store) AttachRefusalLine(clientIP, login, from string, at time.Time, line string) (bool, error) {
+	// An empty line is what "no line" is on a row; the statement's second
+	// term would let it through, the old statement did not (review of stage
+	// 3). No caller passes one.
+	if line == "" {
+		return false, nil
+	}
 	res, err := s.db.Exec(attachRefusalLineQuery,
 		line, ReasonLimit, ReasonClient, from, clientIP,
 		at.Add(-refusalLineWindow).UTC().Format(time.RFC3339),

@@ -162,3 +162,76 @@ func TestReadPassword(t *testing.T) {
 		t.Error("-decrypt without a password was accepted")
 	}
 }
+
+// An encrypted backup is held to the panel's password floor (audit
+// 2026-10-12, M5); a refused one writes nothing.
+func TestEncryptionPasswordFloor(t *testing.T) {
+	seedProject(t)
+	out := filepath.Join(t.TempDir(), "backup.spbk")
+	err := run(out, "eleven-char")
+	if err == nil || !strings.Contains(err.Error(), "at least 12 characters") {
+		t.Fatalf("an 11-character password = %v, want refused", err)
+	}
+	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+		t.Errorf("the refused backup wrote %s", out)
+	}
+}
+
+// A wrong SELFPOST_DB_PATH makes no backup and no database (audit
+// 2026-10-12, M3).
+func TestBackupOfAMissingDatabaseIsRefused(t *testing.T) {
+	_, dataDir := seedProject(t)
+	missing := filepath.Join(dataDir, "typo.db")
+	t.Setenv("SELFPOST_DB_PATH", missing)
+	out := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if err := run(out, ""); err == nil {
+		t.Fatal("a backup of a database that is not there was made")
+	}
+	for _, p := range []string{missing, out} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("the refused backup left %s (stat err = %v)", p, err)
+		}
+	}
+}
+
+// -decrypt -o writes its file whole or not at all: a wrong password or an
+// envelope cut short leaves the file that had the name before, and nothing
+// else in its directory (audit 2026-10-12, L1 and stage 3).
+func TestDecryptLeavesTheOutputAloneOnFailure(t *testing.T) {
+	seedProject(t)
+	dir := t.TempDir()
+	encrypted := filepath.Join(dir, "backup.spbk")
+	const password = "a long enough password"
+	if err := run(encrypted, password); err != nil {
+		t.Fatalf("create encrypted backup: %v", err)
+	}
+	sealed, err := os.ReadFile(encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cut := filepath.Join(dir, "cut.spbk")
+	writeFile(t, cut, string(sealed[:len(sealed)-100]))
+
+	outDir := t.TempDir()
+	out := filepath.Join(outDir, "backup.tar.gz")
+	const before = "the archive that was here"
+	for _, c := range []struct{ name, in, password, want string }{
+		{"wrong password", encrypted, "the wrong password", "wrong password"},
+		{"cut short", cut, password, "corrupted"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			writeFile(t, out, before)
+			err := runDecrypt(c.in, out, c.password)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("runDecrypt = %v, want %q", err, c.want)
+			}
+			if got, _ := os.ReadFile(out); string(got) != before {
+				t.Errorf("the failed decryption changed %s to %d bytes", out, len(got))
+			}
+			entries, _ := os.ReadDir(outDir)
+			if len(entries) != 1 {
+				t.Errorf("the failed decryption left files beside its output: %v", entries)
+			}
+		})
+	}
+}

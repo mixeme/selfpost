@@ -345,6 +345,10 @@ func unreadableBackupErr(err error, deployRoot string) string {
 		return "The panel is not allowed to read " + name + ", and a backup without it would not bring the server back. " +
 			"On the host, give the file to group 998 and make it group-readable (chgrp 998, chmod 640), then try again. Nothing was downloaded."
 	}
+	if errors.Is(err, backup.ErrNoCerts) {
+		return "The project's certs/ holds no certificate, so a backup would bring the server back without one. " +
+			"On the host, put fullchain.pem and privkey.pem - or links to certbot's - in certs/, then try again. Nothing was downloaded."
+	}
 	return "Could not read everything a backup holds. Nothing was downloaded; the reason is in the panel's log."
 }
 

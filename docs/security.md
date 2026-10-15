@@ -308,6 +308,23 @@ operator can act on it.
   that the panel's user may read. `certs/` is the operator's, mounted
   read-only; only someone who can write the project directory places a link
   there, and only a global user can download the archive (`2.5.2`).
+  What a backup still leaves out - a link under `data/`, a link under
+  `certs/` to a directory - it names in a warning, and a `certs/` with no
+  file in it is refused rather than archived empty (`2.5.3`).
+- A backup is made only of the database that is there: a wrong
+  `SELFPOST_DB_PATH` is refused, and the snapshot opens the source
+  read-only. An archive of an empty database would restore a server that
+  offers its first-run setup - a new global administrator - while it holds
+  live DKIM keys and `sasldb2` (`2.5.3`).
+- The first start after a restore opens nothing until `/data` matches the
+  archive's last entry, `data/contents.json` (size and SHA-256 of each file
+  under `data/`): an archive unpacked in part - its manifest there, half its
+  database - is refused (`2.5.3`). The check is integrity, not authenticity:
+  whoever can write the project directory can write that record too. It
+  reads only regular files at the recorded names (a link or a pipe there is
+  refused, not followed), refuses a database journal file beside the
+  restored database, and is made once per restore: a start after one that
+  passed it and failed is not compared again while the manifest is the same.
 - Since 2.2.0 a full backup also carries, in the database, what Postfix logged
   about each message still in the send log (`send_log_lines`): the submitting
   client's address and SASL login, the message id, the receiving server and
@@ -318,7 +335,12 @@ operator can act on it.
   scrypt (N=2¹⁵, r=8, p=1) → AES-256-GCM, streamed in 64 KiB chunks, each
   authenticated with the header, the chunk number, and an end-of-stream flag —
   a truncated or substituted file fails to open instead of silently restoring a
-  partial "tail". Format and wrapper:
+  partial "tail", and bytes after the last chunk are refused (`2.5.3`). The
+  key-derivation parameters travel in the header, so a reader is bounded in
+  what a header may ask before the password is checked: scrypt's array at
+  most 128 MiB (four times what SelfPost writes), r ≤ 64 so the rest stays
+  under 32 KiB, p ≤ 2 - *Import a domain* reads an uploaded file, and the
+  old cap let a header ask for 4 GiB (`2.5.3`). Format and wrapper:
   [internal/secretfile](../internal/secretfile/secretfile.go).
 - Extensions: `.spbk` (**S**elf**P**ost **b**ac**k**up — full backup), `.spde`
   (**S**elf**P**ost **d**omain **e**xport — domain export); unencrypted files
@@ -329,7 +351,13 @@ operator can act on it.
   `-password-file`, never as an argument (the process list is readable by any
   process in the container).
 - Minimum password length matches the administrator password (12): the file
-  sits offline and can be attacked without a time limit.
+  sits offline and can be attacked without a time limit. The panel's forms and,
+  since `2.5.3`, the CLI hold an encrypting password to it; decrypting takes
+  any.
+- The CLI's `-o FILE` is written beside its name and takes it only when
+  whole, so a failure - a wrong password to `-decrypt` among them, which is
+  checked on the first chunk before the output is touched - leaves the file
+  that was there (`2.5.3`).
 
 ---
 

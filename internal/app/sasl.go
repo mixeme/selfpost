@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/mixeme/selfpost/internal/atomicfile"
 )
 
 // SASLDB manages the Cyrus SASL account database (sasldb2) the panel maintains
@@ -118,10 +120,7 @@ func replaceSASLDB(path string, edit func(path string) error) error {
 	// loss may bring the old database back, out of step with the panel's
 	// records (review of stage 2c, F10). A directory that cannot be synced
 	// - not on every system - leaves the change as durable as before.
-	if dir, err := os.Open(filepath.Dir(path)); err == nil {
-		_ = dir.Sync()
-		dir.Close()
-	}
+	_ = atomicfile.SyncDir(filepath.Dir(path))
 	return nil
 }
 

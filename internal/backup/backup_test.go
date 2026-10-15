@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -520,5 +521,145 @@ func TestCertsLinksAreFollowed(t *testing.T) {
 	err := Check(p)
 	if err == nil || !strings.Contains(err.Error(), "certs/fullchain.pem is a link to a file this container cannot reach") {
 		t.Fatalf("Check with a dangling link: %v", err)
+	}
+}
+
+// A wrong SELFPOST_DB_PATH is refused, and nothing is created where it
+// points: SQLite makes a database of a path that is not one, and an archive
+// of that empty database restores a server that offers its first-run setup
+// (audit 2026-10-12, M3). The snapshot opens the source read-only, which is
+// what refuses it should the file go between the check and the open.
+func TestSnapshotRefusesAMissingDatabase(t *testing.T) {
+	dataDir, _, deployRoot := seedDataDir(t)
+	missing := filepath.Join(dataDir, "elsewhere.db")
+	var buf bytes.Buffer
+	err := Create(&buf, Params{DataDir: dataDir, DBPath: missing, Version: "1.0.0", DeployRoot: deployRoot})
+	if err == nil {
+		t.Fatal("a backup of a database that is not there was made")
+	}
+	if _, statErr := os.Stat(missing); !os.IsNotExist(statErr) {
+		t.Fatalf("the refused backup created %s (stat err = %v)", missing, statErr)
+	}
+
+	db, err := sql.Open("sqlite", "file:"+missing+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Ping(); err == nil {
+		t.Fatal("mode=ro opened a database that is not there")
+	}
+	if _, statErr := os.Stat(missing); !os.IsNotExist(statErr) {
+		t.Fatalf("mode=ro created %s (stat err = %v)", missing, statErr)
+	}
+}
+
+// certs/ there and empty is refused by Check and Create alike: the archive
+// would restore a server without its certificate (audit 2026-10-12, L2).
+func TestEmptyCertsIsRefused(t *testing.T) {
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	for _, f := range []string{"fullchain.pem", "privkey.pem"} {
+		os.Remove(filepath.Join(deployRoot, CertsDirName, f))
+	}
+	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.0.0", DeployRoot: deployRoot}
+	if err := Check(p); err == nil || !strings.Contains(err.Error(), "certs/ holds no file") {
+		t.Errorf("Check with an empty certs/ = %v", err)
+	}
+	if err := Create(io.Discard, p); err == nil || !strings.Contains(err.Error(), "certs/ holds no file") {
+		t.Errorf("Create with an empty certs/ = %v", err)
+	}
+}
+
+// What a backup leaves out it says it leaves out: a link under data/, and a
+// link under certs/ to a directory (audit 2026-10-12, L2).
+func TestBackupWarnsOfWhatItLeavesOut(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows; the container is Linux")
+	}
+	dataDir, dbPath, deployRoot := seedDataDir(t)
+	if err := os.Symlink("sasl/sasldb2", filepath.Join(dataDir, "a-link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), filepath.Join(deployRoot, CertsDirName, "a-directory")); err != nil {
+		t.Fatal(err)
+	}
+	var warnings []string
+	p := Params{DataDir: dataDir, DBPath: dbPath, Version: "1.0.0", DeployRoot: deployRoot,
+		OnWarn: func(s string) { warnings = append(warnings, s) }}
+	if err := Create(io.Discard, p); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	got := strings.Join(warnings, "\n")
+	for _, want := range []string{
+		"data/a-link is a link, not a file: the backup does not carry it",
+		"certs/a-directory is a link to a directory, not a file: the backup does not carry it",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no warning %q in:\n%s", want, got)
+		}
+	}
+}
+
+// A link or a pipe where the record names a file is refused, not followed or
+// read: a crafted archive must not make the start read outside /data, or
+// wait (security review of audit stage 3).
+func TestCheckRestoreReadsOnlyRegularFiles(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows; the container is Linux")
+	}
+	path := unpackData(t, createArchive(t, "1.0.0"))
+	dir := filepath.Dir(path)
+	sasl := filepath.Join(dir, "sasl", "sasldb2")
+	outside := filepath.Join(t.TempDir(), "outside")
+	writeFile(t, outside, "SASLDB")
+	os.Remove(sasl)
+	if err := os.Symlink(outside, sasl); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CheckRestore(path, "1.0.0"); err == nil || !strings.Contains(err.Error(), "data/sasl/sasldb2 is not the file") {
+		t.Fatalf("a link to a file of the same contents = %v, want refused", err)
+	}
+}
+
+// A journal file beside the restored database is from what the directory
+// held before; SQLite would take it up, so the restore is refused.
+func TestCheckRestoreRefusesAJournalBesideTheDatabase(t *testing.T) {
+	for _, side := range []string{"-wal", "-shm", "-journal"} {
+		path := unpackData(t, createArchive(t, "1.0.0"))
+		writeFile(t, filepath.Join(filepath.Dir(path), "selfpost.db"+side), "old")
+		if _, err := CheckRestore(path, "1.0.0"); err == nil || !strings.Contains(err.Error(), "selfpost.db"+side+" is beside the database") {
+			t.Errorf("%s beside the database = %v, want refused", side, err)
+		}
+	}
+}
+
+// The archive unpacked again after a start that checked it is checked again:
+// its record wins over the mark of the earlier check, and a file it cut short
+// is refused. A finished restore leaves neither record.
+func TestARecordUnpackedAgainIsChecked(t *testing.T) {
+	archive := createArchive(t, "1.0.0")
+	path := unpackData(t, archive)
+	dir := filepath.Dir(path)
+	if _, err := CheckRestore(path, "1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	files := readArchive(t, archive)
+	writeFile(t, filepath.Join(dir, ContentsName), files[DataArchivePrefix+ContentsName])
+	writeFile(t, filepath.Join(dir, "sasl", "sasldb2"), "SAS")
+	if _, err := CheckRestore(path, "1.0.0"); err == nil || !strings.Contains(err.Error(), "data/sasl/sasldb2 is not the file") {
+		t.Fatalf("a second unpack cut short = %v, want refused", err)
+	}
+	writeFile(t, filepath.Join(dir, "sasl", "sasldb2"), files[DataArchivePrefix+"sasl/sasldb2"])
+	if _, err := CheckRestore(path, "1.0.0"); err != nil {
+		t.Fatalf("the second unpack whole: %v", err)
+	}
+	writeFile(t, filepath.Join(dir, ContentsName), files[DataArchivePrefix+ContentsName])
+	if err := ConsumeRestore(path); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{ManifestName, ContentsName, contentsCheckedName} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s left after ConsumeRestore", name)
+		}
 	}
 }

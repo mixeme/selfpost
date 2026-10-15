@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mixeme/selfpost/internal/backup"
 	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/web/validate"
 )
@@ -121,5 +122,14 @@ func TestBackupPageOffersEncryption(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("backup page is missing %q", want)
 		}
+	}
+}
+
+// An empty certs/ is not "could not read": the page says what is missing and
+// where it goes (review of audit stage 3).
+func TestEmptyCertsMessage(t *testing.T) {
+	msg := unreadableBackupErr(fmt.Errorf("check: %w", backup.ErrNoCerts), "/selfpost-deploy")
+	if !strings.Contains(msg, "certs/ holds no certificate") || !strings.Contains(msg, "fullchain.pem") {
+		t.Errorf("message = %q", msg)
 	}
 }

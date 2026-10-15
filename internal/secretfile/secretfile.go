@@ -105,12 +105,19 @@ const (
 	defaultR    = 8
 	defaultP    = 1
 
-	// maxLogN caps what a file may ask for, so a hostile header cannot make the
-	// reader allocate its way to an out-of-memory kill before it ever fails
-	// authentication.
-	maxLogN = 20
-	maxR    = 32
-	maxP    = 16
+	// What a file may ask of the reader, so a hostile header cannot make it
+	// allocate its way to an out-of-memory kill, or spin, before it ever fails
+	// authentication (audit 2026-10-12, M4). golang.org/x/crypto v0.58.0,
+	// scrypt.Key, allocates V, 128·r·N bytes (make([]uint32, 32*N*r)), B,
+	// p·128·r bytes of PBKDF2 output, and XY, 256·r; its work is N·r·p. V is
+	// held to four times what the writer asks (128·2^15·8 = 32 MiB), r to 64
+	// - the writer's is 8 - so B and XY stay under 32 KiB together (a header
+	// with N=2 and a huge r asked for 384 MiB in B and XY: security review of
+	// stage 3), p to 2 - the writer's is 1. The domain import reads a file
+	// any global user uploads, the CLI a file of any origin.
+	maxScryptMemory = 128 << 20
+	maxR            = 64
+	maxP            = 2
 )
 
 var (
@@ -180,8 +187,11 @@ func parseHeader(buf []byte) (*header, error) {
 	h.salt = buf[i : i+saltLen]
 	h.noncePrefix = buf[i+saltLen : i+saltLen+noncePrefixLen]
 
-	// Reject absurd work factors before spending any memory on them.
-	if h.logN < 1 || h.logN > maxLogN || h.r < 1 || h.r > maxR || h.p < 1 || h.p > maxP {
+	// Reject absurd work factors before spending any memory on them. logN
+	// under 31 and r under 65 keep the shift and the product in range; then
+	// the product is held to the budget.
+	if h.logN < 1 || h.logN > 30 || h.r < 1 || h.r > maxR || h.p < 1 || h.p > maxP ||
+		128*(uint64(1)<<h.logN)*uint64(h.r) > maxScryptMemory {
 		return nil, fmt.Errorf("%w: unreasonable key-derivation parameters", ErrCorrupt)
 	}
 	return h, nil
@@ -449,6 +459,15 @@ func (d *Reader) next() error {
 		plain, err = d.aead.Open(nil, nc, d.sealed, chunkAAD(d.hdr.raw, d.counter, true))
 		if err != nil {
 			return ErrWrongPassword
+		}
+		// The last chunk ends the file: bytes after it - another envelope
+		// appended, say - are damage, not something to ignore (audit
+		// 2026-10-12, L3).
+		var more [1]byte
+		if n, err := io.ReadFull(d.r, more[:]); n > 0 {
+			return fmt.Errorf("%w: bytes after the last chunk", ErrCorrupt)
+		} else if err != nil && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("secretfile: read chunk: %w", err)
 		}
 		d.done = true
 	}

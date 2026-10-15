@@ -12,6 +12,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/mixeme/selfpost/internal/atomicfile"
 )
 
 // FormatContents identifies the record of what an archive's data directory
@@ -93,27 +95,39 @@ func errUnpackedPart(detail string) error {
 }
 
 // checkContents compares the data directory with the archive's record, once
-// per restore (see contentsCheckedName).
+// per restore (see contentsCheckedName). A record unpacked anew wins over the
+// mark of an earlier check: the archive was unpacked again, and that is what
+// the start runs on (review of audit stage 3).
 func checkContents(dataDir string) error {
-	checked := filepath.Join(dataDir, contentsCheckedName)
-	if c, err := readContents(checked); err == nil {
-		// A start before this one checked the files. It is the same restore
-		// when the manifest is still the one that record holds; a different
-		// archive unpacked over the directory since is checked anew.
-		if verifyFiles(dataDir, c, DataArchivePrefix+ManifestName) == nil {
-			return nil
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
 	path := filepath.Join(dataDir, ContentsName)
+	checked := filepath.Join(dataDir, contentsCheckedName)
 	c, err := readContents(path)
 	if errors.Is(err, os.ErrNotExist) {
+		prev, perr := readContents(checked)
+		if perr == nil && verifyFiles(dataDir, prev, DataArchivePrefix+ManifestName) == nil {
+			// A start before this one checked the files, and the manifest is
+			// still the one that record holds: the same restore, whose
+			// files that start may have changed since.
+			return nil
+		}
+		if perr != nil && !errors.Is(perr, os.ErrNotExist) {
+			return perr
+		}
 		return errUnpackedPart(DataArchivePrefix + ContentsName + ", its last entry, is not there")
 	}
 	if err != nil {
 		return err
+	}
+	// No backup carries the database's journal files. One beside the
+	// restored database is left from the database the directory held
+	// before, and opening this one would take it up: the first connection
+	// after a crash recovers from the WAL, and a checkpoint "takes content
+	// from the WAL file and transfers it back into the original database
+	// file" (https://sqlite.org/wal.html § 9, § 2.2).
+	for _, side := range []string{"-wal", "-shm", "-journal"} {
+		if _, err := os.Lstat(filepath.Join(dataDir, "selfpost.db"+side)); err == nil {
+			return errUnpackedPart("selfpost.db" + side + " is beside the database, and no archive holds one - it is left from what was in the directory before")
+		}
 	}
 	if err := verifyFiles(dataDir, c, ""); err != nil {
 		return err
@@ -121,6 +135,9 @@ func checkContents(dataDir string) error {
 	if err := os.Rename(path, checked); err != nil {
 		return fmt.Errorf("backup: mark the restored files checked: %w", err)
 	}
+	// The start goes on to change the files; the mark must not be lost to a
+	// power cut after that, or the next start compares changed files.
+	_ = atomicfile.SyncDir(dataDir)
 	return nil
 }
 
@@ -151,15 +168,27 @@ func verifyFiles(dataDir string, c Contents, only string) error {
 		if !ok || rel == "" || path.Clean(rel) != rel || rel == ".." || strings.HasPrefix(rel, "../") || path.IsAbs(rel) {
 			return errUnpackedPart("the record names " + f.Name + ", which is not a file of the data directory")
 		}
-		file, err := os.Open(filepath.Join(dataDir, filepath.FromSlash(rel)))
+		// The archive holds regular files only (archive.writeFile); a link
+		// or a pipe under the name is not followed or read - a crafted
+		// archive must not make the start read a file outside /data, or
+		// wait on a pipe (security review of audit stage 3).
+		full := filepath.Join(dataDir, filepath.FromSlash(rel))
+		info, err := os.Lstat(full)
 		if errors.Is(err, os.ErrNotExist) {
 			return errUnpackedPart(f.Name + " is missing")
 		}
 		if err != nil {
 			return fmt.Errorf("backup: check %s: %w", f.Name, err)
 		}
+		if !info.Mode().IsRegular() || info.Size() != f.Size {
+			return errUnpackedPart(f.Name + " is not the file the archive holds")
+		}
+		file, err := os.Open(full)
+		if err != nil {
+			return fmt.Errorf("backup: check %s: %w", f.Name, err)
+		}
 		h := sha256.New()
-		n, err := io.Copy(h, file)
+		n, err := io.Copy(h, io.LimitReader(file, f.Size+1))
 		file.Close()
 		if err != nil {
 			return fmt.Errorf("backup: check %s: %w", f.Name, err)

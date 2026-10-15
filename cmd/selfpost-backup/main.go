@@ -21,16 +21,21 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/mixeme/selfpost/internal/atomicfile"
 	"github.com/mixeme/selfpost/internal/backup"
 	"github.com/mixeme/selfpost/internal/buildinfo"
 	"github.com/mixeme/selfpost/internal/secretfile"
+	"github.com/mixeme/selfpost/internal/web/validate"
 )
 
 // passwordEnv names the environment variable holding the encryption password.
@@ -70,13 +75,20 @@ func run(outPath, password string) error {
 	dataDir := envDefault("SELFPOST_DATA_DIR", "/data")
 	dbPath := envDefault("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db"))
 
-	w, closeOut, err := openOutput(outPath)
+	// The floor the panel holds the same files to: an encrypted backup is
+	// attacked offline, at leisure (security.md; audit 2026-10-12, M5). An
+	// empty password is no encryption, by design.
+	if password != "" && utf8.RuneCountInString(password) < validate.MinSecretFilePasswordLen {
+		return fmt.Errorf("the encryption password must be at least %d characters", validate.MinSecretFilePasswordLen)
+	}
+
+	w, err := openOutput(outPath)
 	if err != nil {
 		return err
 	}
-	defer closeOut()
+	defer w.abort()
 
-	sink := w
+	var sink io.Writer = w
 	var env *secretfile.Writer
 	if password != "" {
 		env, err = secretfile.NewWriter(w, secretfile.TypeFullBackup, password)
@@ -101,6 +113,9 @@ func run(outPath, password string) error {
 		if err := env.Close(); err != nil {
 			return err
 		}
+	}
+	if err := w.commit(); err != nil {
+		return err
 	}
 	if outPath != "" {
 		kind := "plain"
@@ -133,17 +148,28 @@ func runDecrypt(inPath, outPath, password string) error {
 	if err != nil {
 		return err
 	}
+	// The first chunk is opened before anything is written: a wrong password
+	// is told before the output is touched, and the envelope's type is
+	// authenticated only once a chunk opens (secretfile.Reader.Type; audit
+	// 2026-10-12, L1).
+	plain := bufio.NewReaderSize(env, 64<<10)
+	if _, err := plain.Peek(1); err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
 	if env.Type() != secretfile.TypeFullBackup {
 		return fmt.Errorf("that file is a %s, not a full backup", env.Type())
 	}
 
-	w, closeOut, err := openOutput(outPath)
+	w, err := openOutput(outPath)
 	if err != nil {
 		return err
 	}
-	defer closeOut()
+	defer w.abort()
 
-	if _, err := io.Copy(w, env); err != nil {
+	if _, err := io.Copy(w, plain); err != nil {
+		return err
+	}
+	if err := w.commit(); err != nil {
 		return err
 	}
 	if outPath != "" {
@@ -152,17 +178,61 @@ func runDecrypt(inPath, outPath, password string) error {
 	return nil
 }
 
-// openOutput returns stdout, or a freshly created owner-only file: both plain
-// and encrypted backups are secret enough to keep off other users' eyes.
-func openOutput(outPath string) (io.Writer, func(), error) {
+// output is where the CLI writes: stdout, or a file that takes its name only
+// once it is whole. A backup or a decryption that fails half way - a wrong
+// password, an envelope cut short - leaves whatever had the name before, and
+// no half-written file under it (audit 2026-10-12, L1 and stage 3). The file
+// is the owner's alone (os.CreateTemp makes it 0600): plain and encrypted
+// backups are secret enough to keep off other users' eyes.
+type output struct {
+	io.Writer
+	tmp  *os.File // nil for stdout
+	path string
+}
+
+func openOutput(outPath string) (*output, error) {
 	if outPath == "" {
-		return os.Stdout, func() {}, nil
+		return &output{Writer: os.Stdout}, nil
 	}
-	f, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	f, err := os.CreateTemp(filepath.Dir(outPath), "."+filepath.Base(outPath)+".tmp-*")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return f, func() { _ = f.Close() }, nil
+	return &output{Writer: f, tmp: f, path: outPath}, nil
+}
+
+// commit puts the whole file under its name.
+func (o *output) commit() error {
+	if o.tmp == nil {
+		return nil
+	}
+	f := o.tmp
+	o.tmp = nil
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(f.Name())
+		return err
+	}
+	if err := os.Rename(f.Name(), o.path); err != nil {
+		os.Remove(f.Name())
+		return err
+	}
+	_ = atomicfile.SyncDir(filepath.Dir(o.path))
+	return nil
+}
+
+// abort removes a file that was not committed; after commit it does nothing.
+func (o *output) abort() {
+	if o.tmp == nil {
+		return
+	}
+	o.tmp.Close()
+	os.Remove(o.tmp.Name())
+	o.tmp = nil
 }
 
 // readPassword takes the password from the given file (first line) or, when no

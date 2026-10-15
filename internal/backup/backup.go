@@ -166,7 +166,7 @@ func Create(w io.Writer, p Params) error {
 		return err
 	}
 
-	if err := addTree(a, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
+	if _, err := addTree(a, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false, p.OnWarn); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func Check(p Params) error {
 	if err := ValidateDeployRoot(p.DeployRoot); err != nil {
 		return err
 	}
-	if err := addTree(nil, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false); err != nil {
+	if _, err := addTree(nil, p.DataDir, DataArchivePrefix, excludedFromArchive, skipQueue, false, nil); err != nil {
 		return err
 	}
 	return addDeployFiles(nil, p.DeployRoot, nil)
@@ -297,20 +297,43 @@ func addDeployFiles(a *archive, deployRoot string, onWarn func(string)) error {
 	// are links again, relative, into archive/ (eff-certbot docs, "Where are
 	// my certificates?"; assumptions C-Q4, C-A1). The archive carries the
 	// files they lead to, under the links' names.
-	return addTree(a, certsDir, CertsDirName+"/", nil, nil, true)
+	files, err := addTree(a, certsDir, CertsDirName+"/", nil, nil, true, onWarn)
+	if err != nil {
+		return err
+	}
+	// certs/ is what Postfix serves its certificate from (the compose file
+	// mounts it at /etc/postfix/tls). There and empty - or holding only what
+	// the archive cannot carry - it would give an archive that restores a
+	// server without its certificate, so there is none (audit 2026-10-12,
+	// L2).
+	if files == 0 {
+		return ErrNoCerts
+	}
+	return nil
 }
 
+// ErrNoCerts is a certs/ that is there with no file a backup can carry.
+var ErrNoCerts = errors.New("backup: " + CertsDirName + "/ holds no file this backup can carry, so the server it restores would have no certificate - put the PEM files (or links to them) there")
+
 // addTree walks root and adds every regular file (and directory, to preserve
-// empty ones and modes) to a under archivePrefix + path relative to root.
+// empty ones and modes) to a under archivePrefix + path relative to root, and
+// returns how many files it took.
 // When exclude is non-nil, top-level names relative to root are skipped; skip,
 // when non-nil, leaves out whatever it says. With a nil a nothing is written:
 // every file is opened and closed, which is how Check finds what cannot be read.
 // Non-regular, non-directory entries (symlinks, sockets) are skipped - except,
 // with follow, a symbolic link to a regular file, which is archived as that
 // file under the link's name; a link that leads nowhere this process can
-// reach is an error, as an unreadable file is.
-func addTree(a *archive, root, archivePrefix string, exclude map[string]bool, skip skipFunc, follow bool) error {
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+// reach is an error, as an unreadable file is. Each entry left out that way
+// is told to warn, when it is not nil: a backup does not leave something out
+// without saying so (audit 2026-10-12, L2).
+func addTree(a *archive, root, archivePrefix string, exclude map[string]bool, skip skipFunc, follow bool, warn func(string)) (files int, err error) {
+	skipped := func(name, what string) {
+		if warn != nil {
+			warn(name + " is " + what + ", not a file: the backup does not carry it")
+		}
+	}
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -362,6 +385,9 @@ func addTree(a *archive, root, archivePrefix string, exclude map[string]bool, sk
 				// the listing and the open: not part of /data's state.
 				return nil
 			}
+			if err == nil {
+				files++
+			}
 			return err
 		case follow && info.Mode()&fs.ModeSymlink != 0:
 			target, err := os.Stat(path)
@@ -369,13 +395,37 @@ func addTree(a *archive, root, archivePrefix string, exclude map[string]bool, sk
 				return fmt.Errorf("backup: %s is a link to a file this container cannot reach - with certbot, /etc/letsencrypt is mounted at the same path (guide § Reverse proxy): %w", name, err)
 			}
 			if !target.Mode().IsRegular() {
+				skipped(name, "a link to a directory")
 				return nil
 			}
-			return writeTarFile(a, name, target.Mode().Perm(), path)
+			if err := writeTarFile(a, name, target.Mode().Perm(), path); err != nil {
+				return err
+			}
+			files++
+			return nil
+		case info.Mode()&fs.ModeSymlink != 0:
+			skipped(name, "a link")
+			return nil
 		default:
+			skipped(name, kindOf(info.Mode()))
 			return nil
 		}
 	})
+	return files, err
+}
+
+// kindOf names what a non-regular, non-directory entry is, for a warning.
+func kindOf(m fs.FileMode) string {
+	switch {
+	case m&fs.ModeSocket != 0:
+		return "a socket"
+	case m&fs.ModeNamedPipe != 0:
+		return "a named pipe"
+	case m&fs.ModeDevice != 0:
+		return "a device"
+	default:
+		return "neither a file nor a directory"
+	}
 }
 
 // writeTarBytes writes an in-memory file entry.
@@ -430,6 +480,21 @@ func writeTarFile(a *archive, name string, mode fs.FileMode, srcPath string) err
 // applyQueryParams(): each _pragma is run as "pragma <value>" on connect,
 // busy_timeout first.)
 func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
+	// The database must be there: SQLite creates a file that is not, and an
+	// archive of that empty database restores a panel that offers its
+	// first-run setup on a server holding live keys (audit 2026-10-12, M3).
+	// mode=ro makes the open fail rather than create one, should the file go
+	// between the two: SQLite 3.53.4 creates a database only under "rwc", the
+	// default (https://sqlite.org/uri.html § 3.3), and VACUUM INTO is not a
+	// write to the source (lang_vacuum.html § 2.1, § 3) - both measured by
+	// TestSnapshotRefusesAMissingDatabase.
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("backup: the database: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", nil, fmt.Errorf("backup: the database %s is not a file", dbPath)
+	}
 	dir, err := os.MkdirTemp("", "selfpost-backup-")
 	if err != nil {
 		return "", nil, fmt.Errorf("backup: temp dir: %w", err)
@@ -439,7 +504,7 @@ func snapshotDB(dbPath string) (path string, cleanup func(), err error) {
 
 	// A short busy timeout lets VACUUM INTO wait out a brief writer rather than
 	// failing immediately if the panel happens to be mid-write.
-	db, err := sql.Open("sqlite", "file:"+dbPath+"?_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&_pragma=busy_timeout(5000)")
 	if err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("backup: open database: %w", err)
@@ -497,16 +562,18 @@ func CheckRestore(manifestPath, binaryVersion string) (restored bool, err error)
 
 // ConsumeRestore ends a restore once its first start has done what a restore
 // start does: the manifest is removed, so later starts (and in-place
-// upgrades) are not gated by it, and then the record of the checked files. A
-// start stopped between the two leaves the record alone, which nothing reads
-// without a manifest and no backup carries.
+// upgrades) are not gated by it, and then the record of the files, checked or
+// unpacked again since. A start stopped between the two leaves the record
+// alone, which nothing reads without a manifest and no backup carries.
 func ConsumeRestore(manifestPath string) error {
 	if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("backup: consume restore manifest: %w", err)
 	}
-	checked := filepath.Join(filepath.Dir(manifestPath), contentsCheckedName)
-	if err := os.Remove(checked); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("backup: consume restore manifest: %w", err)
+	for _, name := range []string{contentsCheckedName, ContentsName} {
+		err := os.Remove(filepath.Join(filepath.Dir(manifestPath), name))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("backup: consume restore manifest: %w", err)
+		}
 	}
 	return nil
 }

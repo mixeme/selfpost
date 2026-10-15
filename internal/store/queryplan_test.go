@@ -25,12 +25,15 @@ func explain(t *testing.T, s *Store, query string, args ...any) string {
 	return strings.Join(plan, "\n")
 }
 
-// The send log is the one table that grows with the mail, and every question
-// asked of it on a path that runs per message, per log line or every few
-// minutes is answered from an index: measured with EXPLAIN QUERY PLAN against
-// the statements the store runs, not copies of them (audit 2026-10-12, M2;
-// stage 3). SQLite chooses without statistics here, as it does on a server -
-// nothing runs ANALYZE.
+// The send log is the one table that grows with the mail. The questions
+// asked of it by time or by scope - per message (the level-2 count), per log
+// line (a refusal line), every few minutes (the sweep, the notifier), per
+// page and per statistics view - are answered from an index: measured with
+// EXPLAIN QUERY PLAN against the statements the store runs, not copies of
+// them (audit 2026-10-12, M2; stage 3). Those by queue id (UpdateStatus,
+// ExpireMessage, RecoverRefusal) go by idx_send_log_queue_id and are not
+// pinned here. SQLite chooses without statistics here, as it does on a
+// server - nothing runs ANALYZE.
 func TestSendLogQueriesUseTheirIndexes(t *testing.T) {
 	s := openTestStore(t)
 	const since = "2026-10-01T00:00:00Z"

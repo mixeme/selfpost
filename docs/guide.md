@@ -724,7 +724,10 @@ into `/etc/letsencrypt`, the commands of "Reverse proxy" above give certbot's
 own files the group). A key readable by root alone is enough for Postfix, but
 then the panel refuses to make a backup and names the file: it does not hand
 over an archive without the key. Links under `certs/` are followed: the
-archive holds the files they lead to.
+archive holds the files they lead to. A `certs/` that is there with no file
+in it is refused for the same reason; what a backup leaves out - a link to
+a directory under `certs/`, a link under `data/` - it names in a warning (the
+CLI's standard error, the panel's log).
 
 **2. `selfpost-backup` CLI — while the container is running (no downtime).**
 The panel button and this command call the same code path: a consistent SQLite
@@ -737,9 +740,12 @@ docker exec <container> selfpost-backup > selfpost-backup.tar.gz
 ```
 
 Use `-o /path/inside/container` to write inside the container instead of
-stdout. Optional encryption: set `SELFPOST_BACKUP_PASSWORD` or pass
-`-password-file` — see [Encrypting a backup or
-export](#encrypting-a-backup-or-export).
+stdout; the file is written beside that name and takes it only when it is
+whole, so a backup that fails leaves no half-written file and whatever had
+the name before. A database that is not where `SELFPOST_DB_PATH` points is
+refused, rather than archived empty. Optional encryption: set
+`SELFPOST_BACKUP_PASSWORD` or pass `-password-file` — see [Encrypting a
+backup or export](#encrypting-a-backup-or-export).
 
 **3. `tar` of the whole project directory — with the service stopped.** Stop
 the instance so nothing is writing to SQLite, then archive the operator
@@ -832,7 +838,7 @@ back after a bad change):
 docker compose down
 
 # 2. Move the current project aside rather than deleting it
-mv . ../selfpost.before-restore
+cd .. && mv selfpost selfpost.before-restore
 mkdir selfpost && cd selfpost
 
 # 3. Unpack the backup into the fresh directory
@@ -871,7 +877,15 @@ The last entry of every panel and CLI archive, `data/contents.json`, records
 each file under `data/` with its size and SHA-256, and the first start
 compares `/data` with it; a file that differs is named in the message.
 `docker-compose.yml`, `.env` and `certs/` are not compared — they are yours to
-edit before that start.
+edit before that start. A journal file beside the database
+(`selfpost.db-wal`, `-shm`, `-journal`) is refused too: no archive holds one,
+so it is left from what the directory held before, and SQLite would take it
+up. To unpack again, unpack into an **empty** directory.
+
+The files are compared once: a first start that gets past the comparison
+and then fails (its Resync, say) leaves the manifest, and the next
+`docker compose up -d` runs the Resync without comparing again - that start
+had the database open, so its files are no longer the archive's.
 
 **Moving to a different host** is the same flow: create an empty project
 directory, unpack the backup there, edit `.env` (and `docker-compose.yml` if
@@ -957,9 +971,22 @@ unpacked into `/data`, which the CLI does with the same password:
 docker exec -i <container> selfpost-backup -decrypt < backup.spbk > backup.tar.gz
 ```
 
+The password is checked on the file's first block, before the command
+writes anything - but the shell's `>` has already emptied `backup.tar.gz`
+before the command starts, so a wrong password leaves it empty; `-o` keeps
+a file that was there. A file cut short fails at its end, with the command's
+exit status non-zero, after what came before has been written: an archive
+cut so is refused at the restore when it lost any file (see
+[Restore](#restore) - the record is the archive's last entry). With `-o` the
+output takes its name only when it is whole; a command killed outright
+leaves a `.NAME.tmp-*` file beside it, readable by its owner alone, to
+remove by hand.
+
 The CLI also *writes* encrypted backups for scripted/cron use. The password
-comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>` (first line),
-never from a command-line argument, which would be visible in the process list.
+must be at least 12 characters, as on the panel's forms (decrypting takes
+any), and it comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>`
+(first line), never from a command-line argument, which would be visible in
+the process list.
 `-e` with the name only takes the value from your shell's environment, so it is
 not written on the command line:
 
