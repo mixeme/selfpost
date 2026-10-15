@@ -5,7 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-Migration `0010` (indexes only).
+## [2.5.3] - 2026-10-15
+
+Stage 3 of the 2026-10-12 audit: persistence and restore. A restore is
+ended by its Resync and refuses an archive unpacked in part; the send log
+answers its frequent questions from indexes; the backup CLI refuses a
+missing database and a short password and writes its file whole; an
+encrypted file is bounded in what it may ask before its password is
+checked. Migration `0010` (indexes only).
+
+### Security
+
+- **An encrypted file could make the panel allocate 4 GiB before its
+  password was checked.** The key-derivation parameters an encrypted backup
+  or export carries were capped so loosely that a crafted header, uploaded
+  to *Import a domain*, asked scrypt for 4 GiB and sixteen times the work.
+  A header may now ask for 128 MiB at most - four times what SelfPost
+  writes, with the rest of scrypt's memory under 32 KiB - and is refused as
+  damaged otherwise. Bytes after an envelope's
+  last block, such as a second file appended to it, are refused too (audit
+  2026-10-12, M4, L3).
+- **`TRUSTED_PROXY_CIDR=::ffff:10.0.0.1` trusted the wrong addresses.** A
+  bare IPv4-mapped address written as IPv6 was given "/32", which made it
+  `::/32`: every address beginning with 32 zero bits, `::1` among them, and
+  not the proxy meant. A bare address is now one host however it is written
+  (audit 2026-10-12, L4).
 
 ### Fixed
 
@@ -38,20 +62,6 @@ Migration `0010` (indexes only).
   error, the panel's log), and a `certs/` with no file in it is refused: the
   archive would restore a server without its certificate (audit
   2026-10-12, L2).
-- **`TRUSTED_PROXY_CIDR=::ffff:10.0.0.1` trusted the wrong addresses.** A
-  bare IPv4-mapped address written as IPv6 was given "/32", which made it
-  `::/32`: every address beginning with 32 zero bits, `::1` among them, and
-  not the proxy meant. A bare address is now one host however it is written
-  (audit 2026-10-12, L4).
-- **An encrypted file could make the panel allocate 4 GiB before its
-  password was checked.** The key-derivation parameters an encrypted backup
-  or export carries were capped so loosely that a crafted header, uploaded
-  to *Import a domain*, asked scrypt for 4 GiB and sixteen times the work.
-  A header may now ask for 128 MiB at most - four times what SelfPost
-  writes, with the rest of scrypt's memory under 32 KiB - and is refused as
-  damaged otherwise. Bytes after an envelope's
-  last block, such as a second file appended to it, are refused too (audit
-  2026-10-12, M4, L3).
 - **A power loss could bring back a map the panel had just replaced.** The
   files the panel writes for Postfix and OpenDKIM were synced, but not the
   directory their rename changed, so the old file could return while the

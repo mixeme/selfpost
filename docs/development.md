@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `2.5.2`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `2.5.3`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -134,7 +134,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 21 | audit-2026-10-12 stages 1 and 2 | `2.5.0` |
 | 22 | audit-2026-10-12 stage 2b: the log tailer | `2.5.1` |
 | 23 | audit-2026-10-12 stage 2c: the sender check reads From: as OpenDKIM does | `2.5.2` |
-| 24 | audit-2026-10-12 stage 3 | `2.5.3` |
+| 24 | audit-2026-10-12 stage 3: persistence and restore | `2.5.3` |
 | 25 | audit-2026-10-12 stage 4 | `2.5.4` |
 | 26 | audit-2026-10-12 stage 5 | `2.6.0` |
 
