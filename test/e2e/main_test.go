@@ -113,6 +113,9 @@ func TestE2E(t *testing.T) {
 		if err := checkSupervisorProcesses(h); err != nil {
 			t.Fatal(err)
 		}
+		if err := checkOpenDKIMLogs(h); err != nil {
+			t.Fatal(err)
+		}
 		if err := checkInboundRelayOff(h); err != nil {
 			t.Fatal(err)
 		}

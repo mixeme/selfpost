@@ -70,8 +70,8 @@ RUN useradd --system --no-create-home --shell /usr/sbin/nologin panel
 # sender map, while OpenDKIM and Postfix (different users) must read them.
 # Membership in this group — plus setgid dirs under /data (set up in
 # entrypoint.sh) — lets OpenDKIM read the panel-owned keys and lets Postfix read
-# the sasldb2/sender map, and lets the panel reach the supervisor control socket
-# to signal OpenDKIM/Postfix reloads without any process running as root.
+# the sasldb2/sender map. (The supervisor control socket has a group of its
+# own, `supervisor`, below.)
 # The id is fixed, and it is the one the group has always had: an operator
 # gives the TLS private key on the host to this group by number, so that the
 # panel can put it into a full backup (guide § Taking a full backup).
@@ -97,6 +97,11 @@ RUN groupadd --system --gid 998 selfpost \
 # root:$setgid_group 2755. Linux, Documentation/userspace-api/no_new_privs.rst:
 # with no_new_privs, execve() no longer changes the gid for a setgid file.)
 RUN usermod -aG postdrop panel
+# The supervisord control socket's group (supervisord.conf, [unix_http_server]):
+# the panel alone - not OpenDKIM's or Postfix's users, which share `selfpost`
+# for the files under /data.
+RUN groupadd --system supervisor \
+ && usermod -aG supervisor panel
 
 # Runtime directories: milter sockets and the consolidated persistent root.
 RUN mkdir -p /run/opendkim /run/selfpost /data \

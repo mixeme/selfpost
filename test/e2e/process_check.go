@@ -14,7 +14,7 @@ import (
 // excluded: autostart=false, so it rests STOPPED until its first run and
 // EXITED after it (supervisor 4.2.5, supervisor/process.py,
 // Subprocess.finish(); assumptions C-V10).
-var wantRunning = []string{"opendkim", "panel", "postfix", "cert-reload", "logrotate"}
+var wantRunning = []string{"syslog-relay", "opendkim", "panel", "postfix", "cert-reload", "logrotate"}
 
 // checkSupervisorProcesses shells into the container directly (not through the
 // panel's /overview page) so it works before an administrator account even
@@ -128,4 +128,16 @@ func checkCitedPackageVersions(s *stack) error {
 		return fmt.Errorf("packages changed under the citations - re-read them (docs/development.md):\n%s", strings.Join(diffs, "\n"))
 	}
 	return nil
+}
+
+// checkOpenDKIMLogs waits for OpenDKIM's start line in the container's log:
+// OpenDKIM logs through syslog(3) only, and /dev/log is the syslog-relay
+// program's (audit 2026-10-12, L30). OpenDKIM 2.11.0~beta2,
+// opendkim/opendkim.c: syslog(LOG_INFO, "%s v%s starting%s%s%s",
+// DKIMF_PRODUCT, ...), DKIMF_PRODUCT "OpenDKIM Filter" (opendkim.h).
+func checkOpenDKIMLogs(s *stack) error {
+	return waitFor("OpenDKIM's start line in the container log", 20*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out := s.logs("selfpost")
+		return strings.Contains(out, "opendkim[") && strings.Contains(out, "OpenDKIM Filter v"), fmt.Errorf("no OpenDKIM line in the log")
+	})
 }

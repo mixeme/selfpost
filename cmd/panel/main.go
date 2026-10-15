@@ -28,6 +28,7 @@ import (
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/syslogrelay"
 )
 
 func main() {
@@ -47,10 +48,19 @@ func main() {
 	}
 
 	showVersion := flag.Bool("version", false, "print version and exit")
+	relay := flag.String("syslog-relay", "", "relay syslog(3) datagrams sent to this socket path to stdout, and do nothing else")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println(buildinfo.Version)
+		return
+	}
+	if *relay != "" {
+		// The container's /dev/log, for OpenDKIM (internal/syslogrelay;
+		// build/supervisord.conf, [program:syslog-relay]).
+		if err := syslogrelay.Run(*relay, os.Stdout); err != nil {
+			log.Fatal(err)
+		}
 		return
 	}
 

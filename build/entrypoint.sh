@@ -180,6 +180,17 @@ chmod 2750 /run/opendkim /run/selfpost
 # (test(1), -S: true for any socket file, whether or not anything listens.)
 rm -f /run/opendkim/*.sock /run/selfpost/*.sock /run/selfpost/*.alive
 
+# The container's /dev/log: a link to the socket the syslog-relay program (the
+# panel's binary, as `panel`) listens on, so what OpenDKIM logs through
+# syslog(3) reaches the container's log (build/supervisord.conf; audit
+# 2026-10-12, L30). The directory is the relay's and reachable by all: the
+# socket is the container's local log, as /dev/log is on a host.
+mkdir -p /run/syslog
+chown panel:panel /run/syslog
+chmod 0755 /run/syslog
+rm -f /run/syslog/log
+ln -sfn /run/syslog/log /dev/log
+
 # Generate the outbound-relay Postfix configuration from the environment (spec
 # 5). Kept out of the image build so cert paths, rate limits, hostname and the
 # optional 587 service are all driven by env at run time, and re-derived on every

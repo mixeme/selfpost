@@ -209,7 +209,10 @@ operator can act on it.
 - Rendering goes through `html/template` with auto-escaping (queue, log,
   journal, themes).
 - The panel process is **not root** (`user=panel` in supervisord); path access
-  is granted through the `selfpost` group with minimal permissions.
+  is granted through the `selfpost` group with minimal permissions. The
+  supervisord control socket, which can stop or restart any program, is the
+  `supervisor` group's, whose one member is the panel; OpenDKIM and Postfix
+  share `selfpost` for files and do not reach it (`2.6.0`).
 
 ### Mail path (security-relevant)
 

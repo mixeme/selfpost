@@ -26,6 +26,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
 | Program | User | Priority | Role |
 |---|---|---|---|
+| `syslog-relay` | panel | 50 | The container's `/dev/log`: passes what OpenDKIM logs through syslog(3) to the container's log (`panel -syslog-relay`) |
 | `opendkim` | root → `opendkim` (`UserID` in opendkim.conf) | 100 | DKIM signing milter |
 | `panel` | panel | 200 | HTTP UI + sender check + journal-milter + log-tailer + rate-limit recalc; with the inbound relay on also the inbound journal milter |
 | `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (OpenDKIM's, the sender check's, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
@@ -33,7 +34,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
-Start order: OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
+Start order: syslog-relay → OpenDKIM → panel (opens the sender check's and the journal-milter's sockets) → Postfix wrapper
 polls unix sockets (timeout `MILTER_WAIT_TIMEOUT`, default 30s) then runs
 `postfix start-fg` and stays its parent: on TERM it runs `postfix stop`, so a
 stop of the program or of the container stops Postfix as Postfix means it to
