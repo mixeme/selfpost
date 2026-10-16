@@ -33,7 +33,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | agreed (2026-10-13) | — | — |
-| backup-reauth | Ask for the account password before a backup or a domain export is downloaded | done 2026-10-16, unreleased | — | — |
+| backup-reauth | Ask for the account password before a backup or a domain export is downloaded | shipped `2.10.3` | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |

@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.10.3] - 2026-10-16
+
+The backup asks for your password. No migration; schema 12.
+
 ### Changed
 
 - **A backup and a domain's export ask for your password** (backup-reauth):
