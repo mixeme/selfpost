@@ -190,8 +190,8 @@
 {{/* log_pane is a dark block of log lines (input: []LogLine). The time is
      dimmed, a warning amber, an error red. The newline between lines is part of
      the text: the pane is a pre. */}}
-{{define "log_pane"}}<pre class="sp-log">{{range $i, $l := .}}{{if $i}}
-{{end}}{{if $l.Time}}<span class="sp-d">{{$l.Time}}</span> {{end}}{{if eq $l.Level "warn"}}<span class="sp-w">{{$l.Text}}</span>{{else if eq $l.Level "error"}}<span class="sp-e">{{$l.Text}}</span>{{else}}{{$l.Text}}{{end}}{{end}}</pre>{{end}}
+{{define "log_pane"}}<pre class="sp-log">{{range .}}<span class="sp-ll">{{if .Time}}<span class="sp-d">{{.Time}}</span> {{end}}{{if eq .Level "warn"}}<span class="sp-w">{{.Text}}</span>{{else if eq .Level "error"}}<span class="sp-e">{{.Text}}</span>{{else}}{{.Text}}{{end}}
+</span>{{end}}</pre>{{end}}
 
 {{/* empty_state says what is absent and why that is fine (input: EmptyState). */}}
 {{define "empty_state"}}<div class="sp-empty"><i class="ti {{.Icon}}"></i>{{template "inline" .Text}}</div>{{end}}

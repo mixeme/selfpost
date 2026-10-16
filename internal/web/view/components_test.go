@@ -364,17 +364,19 @@ func TestTimelineLevels(t *testing.T) {
 		`<li class="sp-pending"><time>next attempt</time>Still queued</li>`)
 }
 
-// The log is a pre: its lines are separated by a newline of their own, not by
-// the template's layout whitespace, and a line is escaped.
+// The log is a pre of lines: each a block of its own (sp-ll), which wraps
+// under its start rather than scrolling sideways, ended by a newline inside it
+// so copied text keeps one line per line - and nothing of the template's
+// layout whitespace between them. A line is escaped.
 func TestLogPaneIsAPreWithEscapedLines(t *testing.T) {
 	out := partial(t, "log_pane", []LogLine{
 		{Time: "13:58:07", Text: "message-id=<a81f0c@alertmanager>"},
 		{Time: "13:58:09", Text: "status=deferred", Level: "warn"},
 		{Text: "no time on this one", Level: "error"},
 	})
-	want := `<pre class="sp-log"><span class="sp-d">13:58:07</span> message-id=&lt;a81f0c@alertmanager&gt;` + "\n" +
-		`<span class="sp-d">13:58:09</span> <span class="sp-w">status=deferred</span>` + "\n" +
-		`<span class="sp-e">no time on this one</span></pre>`
+	want := `<pre class="sp-log"><span class="sp-ll"><span class="sp-d">13:58:07</span> message-id=&lt;a81f0c@alertmanager&gt;` + "\n</span>" +
+		`<span class="sp-ll"><span class="sp-d">13:58:09</span> <span class="sp-w">status=deferred</span>` + "\n</span>" +
+		`<span class="sp-ll"><span class="sp-e">no time on this one</span>` + "\n</span></pre>"
 	if out != want {
 		t.Errorf("log_pane =\n%s\nwant\n%s", out, want)
 	}

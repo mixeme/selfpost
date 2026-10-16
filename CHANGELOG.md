@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **Log panes wrap their lines instead of scrolling sideways**: a phone drew
+  two scroll bars over the Delivery log of a message, and the end of a
+  delivery line - `status=` and the reply - was out of sight. A long line
+  wraps, the rest indented under its start; copied text keeps one line per
+  line. The Delivery log, System log and the queue's listing.
+
 ## [2.9.0] - 2026-10-16
 
 The panel's DNS records read faster: a record DNS already holds as shown

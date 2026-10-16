@@ -295,8 +295,12 @@ details.sp-record[open] .sp-record-toggle span + span { display: inline; }
 /* ---- logs, timeline, help */
 .sp-log {
   margin: 0; padding: 1rem 1.25rem; background: #191c21; color: #d9d5cc; border-radius: 0;
-  font-family: var(--sp-mono); font-size: var(--sp-fs-s); line-height: 1.6; overflow-x: auto; white-space: pre;
+  font-family: var(--sp-mono); font-size: var(--sp-fs-s); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+/* One line of a log: long ones wrap inside the pane, the rest of the line
+   indented under its start, so nothing scrolls sideways - a phone drew the
+   scroll bars over the text (owner, 2026-10-16). */
+.sp-log .sp-ll { display: block; padding-left: 4ch; text-indent: -4ch; }
 .sp-log .sp-w { color: #e0b15c; } .sp-log .sp-e { color: #ef8f82; } .sp-log .sp-d { color: #7f8894; }
 .sp-timeline { list-style: none; margin: 0; padding: 0; }
 .sp-timeline li { position: relative; padding: 0 0 1.1rem 1.6rem; border-left: 2px solid var(--sp-rule); margin-left: .4rem; }
