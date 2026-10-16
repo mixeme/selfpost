@@ -107,7 +107,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
 
-**Planned version cuts** (from pin `2.9.1`; adjust if semver changes mid-track):
+**Planned version cuts** (from pin `2.10.0`; adjust if semver changes mid-track):
 
 | Stage | ID | Cut |
 |---|---|---|
@@ -142,6 +142,7 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 | 29 | panel-dkim-signing | `2.8.0` |
 | 30 | dns-record-collapse, settings-save-row, notification-mail-recheck; `/data/opendkim` removed | `2.9.0` |
 | 31 | log panes wrap on a phone | `2.9.1` (PATCH) |
+| 32 | inbound-upstream-result | `2.10.0` |
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.

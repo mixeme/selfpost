@@ -1,6 +1,6 @@
 # inbound-upstream-result
 
-**Status:** agreed 2026-10-16; one stage, `2.10.0`.
+**Status:** shipped `2.10.0` (2026-10-16).
 
 ## Problem
 
@@ -94,4 +94,7 @@ finding became:
 - [x] e2e: a relayed message's row shows `sent` with the sink's `250`; an
   upstream that refuses connections shows `deferred` with the reason.
 - [x] Docs. *Done (2026-10-16), with the reviews' findings above.*
-- [ ] Roll out, read the server's journal; cut `2.10.0`.
+- [x] Roll out, read the server's journal; cut `2.10.0`. *Done (2026-10-16): on the
+  test server as 2.9.1-post.d515493, a message to selfpost@dev.mixdep.ru through
+  port 25 - its row sent, mc-ent.mixfed.ru's "250 2.0.0 Ok: queued as
+  04F0D1023EF" on it.*

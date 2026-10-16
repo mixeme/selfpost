@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-10-16
+
+Inbound › Log says what became of accepted mail: the upstream's answer,
+its last reply and the host that gave it. Migration `0012`; schema 12.
+Nothing for an operator to do.
+
 ### Added
 
 - **Inbound › Log shows what the upstream answered** (inbound-upstream-result,

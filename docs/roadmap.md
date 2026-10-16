@@ -28,7 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | agreed (2026-10-16); built, unreleased | 6/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
+| inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | shipped `2.10.0` | 7/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
 | health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | agreed (2026-10-13) | — | — |
 | test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
@@ -65,7 +65,7 @@ stages 1 and 2 as `2.5.0` the same day, stage 2b as `2.5.1`, stage 2c as
 `2.6.0` the same day; stage 6 (documents and tests, no cut) closed the
 audit. Of the three rows from [own-mta-builds](#own-mta-builds),
 **port25-bare-newline** shipped as `2.6.1` the same day and
-**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). **dns-record-collapse**, **settings-save-row** and **notification-mail-recheck** shipped together as `2.9.0` the same day, with `/data/opendkim` removed as panel-dkim-signing planned. What is agreed after it is marked so in the index; every other
+**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). **dns-record-collapse**, **settings-save-row** and **notification-mail-recheck** shipped together as `2.9.0` the same day, with `/data/opendkim` removed as panel-dkim-signing planned, then `2.9.1` (log panes on a phone) and **inbound-upstream-result** as `2.10.0`. What is agreed after it is marked so in the index; every other
 remaining item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
