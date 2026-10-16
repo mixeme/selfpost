@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-10-16
+
+Log panes read on a phone. No migration; schema 11.
+
 ### Fixed
 
 - **Log panes wrap their lines instead of scrolling sideways**: a phone drew
