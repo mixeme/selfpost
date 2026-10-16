@@ -41,6 +41,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
+| go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | agreed (2026-10-16) | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
 | base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | shipped `2.7.0` | — | — |
@@ -875,3 +876,32 @@ the records that are right, or the page changes - the records out of the
 form's columns, or the button nearer its fields. Decide with the mockup,
 after dns-record-collapse, on a page whose records are missing as well as
 on one whose records are right.
+
+## go-milter-upstream
+
+**Problem (owner, 2026-10-16):** the panel builds go-milter v0.4.1 patched
+(`third_party/go-milter`, its `PATCHES.md`): upstream adds every header of
+a session to a map it hands to `Headers` and empties only on ABORT. Two
+things follow, for every user of the library: the map of a second message
+on one connection still holds the first message's headers (SelfPost met it
+as audit 2026-10-12, L9, and keeps its own headers since), and the map is
+bounded by no limit of its own - a message of nothing but headers, up to
+the MTA's message size limit, is held whole in each milter. Upstream had no
+issue about it on 2026-10-16; its last commit was 2026-04-04.
+
+**Goal:** an issue and a PR, prepared here and posted by the owner from his
+GitHub account (nothing is sent from this side):
+
+- the issue: both effects, each with a reproduction through the library's
+  own client (two messages on one connection; the map's size at EOH);
+- the PR, small and compatible: the map emptied when a message starts
+  (`CodeMail`), as it is on ABORT - this fixes the first effect and bounds
+  the second to one message;
+- in the issue, as a proposal: an option of `Server` not to keep the map,
+  for a milter that reads headers through `Header` alone - what SelfPost's
+  patch does unconditionally, which upstream cannot take as it is (it would
+  break backends that read the map).
+
+**Done when:** the texts and the branch are ready for the owner to post.
+When upstream releases a version that does not keep the map (or offers the
+option), `third_party/go-milter` goes and `go.mod`'s `replace` with it.
