@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-10-17
+
+The documents and the panel's words checked against the code. No migration;
+schema 12.
+
 ### Fixed
 
 - **A panel password's twelve characters are characters**: the minimum
