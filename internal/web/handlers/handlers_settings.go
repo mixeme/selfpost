@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
@@ -57,14 +58,18 @@ func (h *Handlers) renderServerSettings(w http.ResponseWriter, r *http.Request, 
 		on = true
 	}
 	page.WithNotifications(on, notify.From(h.cfg.Hostname))
-	page.WithMail(h.serverMail(false).records)
+	mail := h.serverMail(false)
+	page.WithMail(mail.records, view.FormatAge(mail.checked, time.Now()))
 	// The inbound field exists while there is an inbound journal to keep.
 	if h.cfg.InboundEnabled {
 		page.WithInbound(strconv.Itoa(form.inbound))
 	}
 	flash := ""
-	if r.URL.Query().Has("saved") {
+	switch {
+	case r.URL.Query().Has("saved"):
 		flash = "Settings saved."
+	case r.URL.Query().Has("rechecked"):
+		flash = "DNS re-checked."
 	}
 	page.WithResult(flash, formErr)
 	h.view.Render(w, status, "settings", page)
@@ -147,6 +152,8 @@ func (h *Handlers) sendLogRetentionDays() int {
 type serverMailState struct {
 	records []view.Record
 	rows    []view.MailRow
+	// checked is when the records were looked up; zero when they were not.
+	checked time.Time
 	// status is the verdict of Health's card: ok, warn or unknown. A record
 	// that is not in place is a warning, never an error: without them the
 	// notifications are still sent.
@@ -183,5 +190,19 @@ func (h *Handlers) serverMail(force bool) serverMailState {
 		records: []view.Record{view.ServerMailDKIM(mail.Selector, mail.Record.Name, mail.Record.Value, dkim), spfRec},
 		rows:    []view.MailRow{view.NewMailRow("DKIM", mail.Record.Name, dkim), spfRow},
 		status:  string(status),
+		checked: check.CheckedAt,
 	}
+}
+
+// HandleSettingsDNSRecheck re-checks the records of the server's own name
+// from Server › Settings, where they are shown, and returns there (global
+// role). The server's address is looked up again too: the SPF check reads it.
+// The same lookups as Re-check DNS on Health.
+func (h *Handlers) HandleSettingsDNSRecheck(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
+	h.dns.Server(h.cfg.Hostname, true)
+	h.serverMail(true)
+	http.Redirect(w, r, "/server/settings?rechecked=1", http.StatusSeeOther)
 }

@@ -38,7 +38,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
-| notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
+| notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | done 2026-10-16, unreleased | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | done 2026-10-16, unreleased | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | done 2026-10-16, unreleased | — | — |
 | go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
@@ -756,6 +756,15 @@ the check is and how long a result is kept. Design change, mockup first;
 decide together with [dns-record-collapse](#dns-record-collapse) (a record
 that turns right on the re-check folds).
 
+**Done (2026-10-16, the owner: "Да, бери notification-mail-recheck"):**
+*Re-check DNS* in the page head of Settings - where an outbound domain's
+page and Health put the same action; a box head holds a note, a tag, a
+link or a filter form - posting to `POST /server/settings/dns-recheck`
+(global role), which re-runs Health's lookups (the server's address and
+`serverMail(true)`) and returns to Settings with "DNS re-checked."; the
+Notification mail box's end slot reads "The server's own name · checked
+3 min ago". A record that has turned right comes back folded.
+
 ## own-mta-builds
 
 **Question (owner, 2026-10-15):** is it worth patching Postfix and OpenDKIM
@@ -892,9 +901,7 @@ on one whose records are right.
 closed the gap only while the records are right. The form is now the left
 column - 01 Log retention, 02 Notifications, *Save settings* - and the
 right column, outside it, holds 03 Notification mail and 04 Sending rate
-limits. It also leaves room for
-[notification-mail-recheck](#notification-mail-recheck): a *Re-check DNS*
-form in the Notification mail box is no longer a form inside a form.
+limits.
 
 ## go-milter-upstream
 

@@ -294,6 +294,7 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	server("POST /server/users/{uid}/delete", h.HandleUserDelete)
 	server("GET /server/settings", h.HandleServerSettings)
 	server("POST /server/settings", h.HandleServerSettings)
+	server("POST /server/settings/dns-recheck", h.HandleSettingsDNSRecheck)
 	server("GET /server/components", h.HandleComponents)
 
 	return mux, authed

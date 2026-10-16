@@ -368,11 +368,32 @@ func TestSettingsNotificationsSwitchAndRecords(t *testing.T) {
 	s.WithMail([]Record{
 		ServerMailDKIM("sp2026", mailFixtureDKIMHost, "v=DKIM1; k=rsa; p=AAAA", DNSCheck{Status: "ok"}),
 		ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "ok"}),
-	})
+	}, "")
 	out = renderSignedIn(t, "settings", s)
 	pageHas(t, "Settings", out, `<input type="checkbox" name="notify"> Send notification e-mails`,
-		`<h3>SPF</h3><span class="tag is-success is-light">published</span>`)
-	pageLacks(t, "Settings", out, `name="notify" checked`, `a receiver may file them as spam`)
+		`<h3>SPF</h3><span class="tag is-success is-light">published</span>`,
+		`<div class="sp-end">DNS records of the server&#39;s own name</div>`)
+	pageLacks(t, "Settings", out, `name="notify" checked`, `a receiver may file them as spam`, `· checked`)
+}
+
+// The records of the server's own name can be checked again from Settings,
+// where they are shown: Re-check DNS in the page head, outside the form, and
+// the box says when they were checked.
+func TestSettingsRechecksTheMailRecords(t *testing.T) {
+	out := renderSignedIn(t, "settings", settingsFixture())
+	pageHas(t, "Settings", out,
+		`<div class="buttons"><form method="post" action="/server/settings/dns-recheck"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form></div>`,
+		`<div class="sp-end">The server&#39;s own name · checked 3 min ago</div>`)
+	form := out[strings.Index(out, `<form class="sp-form" method="post" action="/server/settings">`):]
+	form = form[:strings.Index(form, "</form>")]
+	for _, outside := range []string{"dns-recheck", `id="notification-mail"`, `id="rate-limits"`} {
+		if strings.Contains(form, outside) {
+			t.Errorf("the Settings form holds %s; only the fields and Save settings belong in it", outside)
+		}
+	}
+	if !strings.Contains(form, `name="notify"`) || !strings.Contains(form, `Save settings`) {
+		t.Errorf("the Settings form lost its switch or its button:\n%s", form)
+	}
 }
 
 // A record of the server's own name that is wrong or missing is a warning, never

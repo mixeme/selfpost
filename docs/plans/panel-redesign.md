@@ -182,7 +182,7 @@ list, an action under the thing it changes.
 | system-log | `GET /server/log` | `/system-log` |
 | backup | `GET, POST /server/backup` · `POST /server/backup/import` | `/backup` · `POST /domains/import` |
 | users · user · user-delete | `/server/users` · `…/new` · `…/{uid}` · `…/{uid}/delete` | `/users/…` |
-| settings | `GET, POST /server/settings` | the instance half of `/settings`: log retention, rate limits |
+| settings | `GET, POST /server/settings` · `POST …/dns-recheck` | the instance half of `/settings`: log retention, rate limits |
 | account | `GET /account` · `POST /account/profile`, `/password` | `/settings`: credentials and the DMARC default (today `/account` redirects there) |
 | help · components | `GET /help` · `GET /server/components` | `/help` · — |
 

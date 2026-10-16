@@ -551,7 +551,9 @@ prune cycle without a container restart), and, read-only, the level-1 rate
 limit that comes from `.env` ([Rate limiting — level 1](#rate-limiting--level-1-ip-backstop)).
 There is no panel-wide DMARC report address: each domain has its own. The page
 also has the switch for [notifications](#notifications) and the two DNS records
-that make them arrive.
+that make them arrive, with when they were last checked; **Re-check DNS** at
+the top of the page checks them again once they are published (results are
+otherwise kept a few minutes).
 
 ### Notifications
 

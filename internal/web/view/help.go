@@ -256,7 +256,7 @@ var serverTopics = []HelpTopic{
 			Br(), Br(),
 			"Each user turns notifications on or off under Account and needs an e-mail there; Server › Settings turns them off for everyone. They are the panel's own mail: not rows of the Outbound log, and not counted against any limit.",
 			Br(), Br(),
-			"For that mail to arrive, the server's own name needs two DNS records of its own, as each of your domains does: a DKIM key, which the panel generates and signs notifications with, and an SPF record, ", Code("v=spf1 a -all"), ". Server › Settings gives both with the values to publish, and Server › Health shows whether they are in place. Without them notifications are still sent, and a receiver may file them as spam. Mail of your domains does not depend on either."),
+			"For that mail to arrive, the server's own name needs two DNS records of its own, as each of your domains does: a DKIM key, which the panel generates and signs notifications with, and an SPF record, ", Code("v=spf1 a -all"), ". Server › Settings gives both with the values to publish and whether they are in place, and its Re-check DNS checks them again once they are published; Server › Health shows them too. Without them notifications are still sent, and a receiver may file them as spam. Mail of your domains does not depend on either."),
 	}},
 }
 

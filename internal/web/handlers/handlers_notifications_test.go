@@ -176,7 +176,7 @@ func TestSettingsMailRecordsPublished(t *testing.T) {
 
 	out := getBody(t, h.HandleServerSettings, "/server/settings")
 	for _, want := range []string{
-		`id="notification-mail"`, `DNS records of the server&#39;s own name`,
+		`id="notification-mail"`, `The server&#39;s own name · checked just now`,
 		`<h3>DKIM</h3><span class="tag is-success is-light">published</span>`,
 		`selector <code>sp2026</code>`, `value="sp2026._domainkey.mail.example.org"`,
 		`<h3>SPF</h3><span class="tag is-success is-light">published</span>`,
@@ -311,5 +311,31 @@ func TestHealthRecheckAsksForNotificationMailAgain(t *testing.T) {
 	}
 	if out := getBody(t, h.HandleHealth, "/server/health"); strings.Count(out, `is-success is-light">published`) != 2 {
 		t.Errorf("after Re-check DNS both records should be published:\n%s", out)
+	}
+}
+
+// Re-check DNS on Settings asks for the same records again and returns to
+// Settings, where a record that has just been published comes back folded.
+func TestSettingsRecheckAsksForNotificationMailAgain(t *testing.T) {
+	h, zone, mail := serverMailStand(t)
+	if out := getBody(t, h.HandleServerSettings, "/server/settings"); strings.Count(out, `is-warning is-light">missing`) != 2 {
+		t.Fatalf("before publishing, both records should be missing:\n%s", out)
+	}
+
+	publishMail(zone, mail)
+	if out := getBody(t, h.HandleServerSettings, "/server/settings"); strings.Contains(out, `is-success is-light">published`) {
+		t.Fatal("the cached answer was not used: the test cannot tell a re-check from a fresh read")
+	}
+
+	rec := postFormAs(h.HandleSettingsDNSRecheck, globalPrincipal, "/server/settings/dns-recheck", nil, url.Values{})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/server/settings?rechecked=1" {
+		t.Fatalf("POST /server/settings/dns-recheck = %d to %q, want 303 to /server/settings?rechecked=1", rec.Code, rec.Header().Get("Location"))
+	}
+	out := getBody(t, h.HandleServerSettings, "/server/settings?rechecked=1")
+	if n := strings.Count(out, `<details class="sp-record">`); n != 2 {
+		t.Errorf("after Re-check DNS both records should be published and folded, %d are:\n%s", n, out)
+	}
+	if !strings.Contains(out, "DNS re-checked.") || !strings.Contains(out, "· checked just now") {
+		t.Errorf("Settings does not say the records were just re-checked:\n%s", out)
 	}
 }

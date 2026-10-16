@@ -92,6 +92,7 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 			Title:  "Settings",
 			Lead: Rich("What holds for the whole instance, whoever is signed in. Your own name, e-mail and password are under ",
 				Link("/account", "Account"), "."),
+			Actions: []Action{{Label: "Re-check DNS", Icon: "ti-refresh", Post: settingsDNSRecheck}},
 		},
 		Retention:     Box{No: "01", Title: "Log retention", Help: topicLink(HelpSettings, "How long rows are kept")},
 		RetentionDays: retention,
@@ -117,10 +118,18 @@ func (s *Settings) WithNotifications(on bool, from string) *Settings {
 	return s
 }
 
+// settingsDNSRecheck is where Re-check DNS on Settings posts.
+const settingsDNSRecheck = "/server/settings/dns-recheck"
+
 // WithMail sets the records of the server's own name, in the order they are
-// shown (ServerMailDKIM, ServerMailSPF).
-func (s *Settings) WithMail(records []Record) *Settings {
+// shown (ServerMailDKIM, ServerMailSPF), and how long ago they were checked
+// (FormatAge; "" when they were not).
+func (s *Settings) WithMail(records []Record, checked string) *Settings {
 	s.MailRecords = records
+	s.Mail.End = Plain("DNS records of the server's own name")
+	if checked != "" {
+		s.Mail.End = Plain("The server's own name · checked " + checked)
+	}
 	return s
 }
 

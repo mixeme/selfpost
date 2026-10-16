@@ -22,6 +22,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the button stood under both columns, after a long gap whenever the
   records of the server's own name were open.
 
+### Added
+
+- **Re-check DNS on Server › Settings** (notification-mail-recheck): the
+  records of the server's own name can be checked again where they are
+  shown, as a domain's can on its page; the Notification mail box says when
+  they were checked. Before, the only way was Re-check DNS on Server ›
+  Health, which nothing on Settings pointed to. `POST
+  /server/settings/dns-recheck`, global role.
+
 ## [2.8.0] - 2026-10-16
 
 The panel signs outgoing mail with DKIM itself, and OpenDKIM - a 2018 beta

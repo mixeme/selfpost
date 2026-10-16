@@ -158,7 +158,7 @@ func settingsFixture() *Settings {
 		WithMail([]Record{
 			ServerMailDKIM("sp2026", mailFixtureDKIMHost, key, DNSCheck{Status: "ok"}),
 			ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "error", Detail: "No SPF record is published for mail.example.org."}),
-		})
+		}, "3 min ago")
 }
 
 // outDomainsFixture is the mockup's Outbound domains: three domains, the first

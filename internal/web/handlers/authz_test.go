@@ -43,6 +43,7 @@ var globalOnlyRoutes = []route{
 	{"GET", "/server/health/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleHealthFragment }, nil},
 	{"GET", "/overview/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleOverviewFragment }, nil},
 	{"POST", "/server/health/recheck", func(h *Handlers) http.HandlerFunc { return h.HandleHealthRecheck }, nil},
+	{"POST", "/server/settings/dns-recheck", func(h *Handlers) http.HandlerFunc { return h.HandleSettingsDNSRecheck }, nil},
 
 	{"GET", "/outbound/queue", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueue }, nil},
 	{"GET", "/outbound/queue/fragment", func(h *Handlers) http.HandlerFunc { return h.HandleMailQueueBody }, nil},
