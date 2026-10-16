@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.10.2] - 2026-10-16
+
+The panel on a phone. No migration; schema 12.
+
 ### Changed
 
 - **A narrow screen gets a Menu** (phone-desktop-mode): below 1024 px - a

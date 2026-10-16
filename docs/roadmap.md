@@ -47,7 +47,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
 | base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | shipped `2.7.0` | — | — |
 | panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | shipped `2.8.0` | 14/14 | [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md) |
-| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | done 2026-10-16, unreleased | — | — |
+| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | shipped `2.10.2` | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
