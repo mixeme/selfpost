@@ -387,24 +387,24 @@
  "settings": [
   "head",
   {
-   "form": [
+   "columns": [
     {
-     "columns": [
+     "is-6": [
       {
-       "is-6": [
+       "form": [
         "box[Log retention]:body",
-        "box[Sending rate limits]:body"
-       ]
-      },
-      {
-       "is-6": [
         "box[Notifications]:body",
-        "box[Notification mail]:record×2"
+        "submit_row"
        ]
       }
      ]
     },
-    "submit_row"
+    {
+     "is-6": [
+      "box[Notification mail]:record×2",
+      "box[Sending rate limits]:body"
+     ]
+    }
    ]
   }
  ],
