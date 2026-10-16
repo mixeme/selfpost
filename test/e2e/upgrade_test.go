@@ -64,7 +64,10 @@ for d in active bounce corrupt defer deferred flush hold incoming private saved 
 done
 mkdir -p $q/maildrop $q/public $q/pid
 chown 4242:4244 $q/maildrop $q/public; chmod 730 $q/maildrop; chmod 710 $q/public
-chown root:root $q $q/pid; chmod 755 $q $q/pid`
+chown root:root $q $q/pid; chmod 755 $q $q/pid
+mkdir -p /data/log
+echo "Oct 14 00:00:00 mail postfix/master[1]: daemon started" > /data/log/mail.log
+printf 'logrotate state -- version 2\n"/data/log/mail.log" 2026-10-14-0:0:0\n' > /data/log/.logrotate.status`
 	if out, err := exec.Command("docker", "run", "--rm", "--entrypoint", "sh",
 		"-v", dataDir+":/data", "selfpost:e2e", "-c", layout).CombinedOutput(); err != nil {
 		t.Fatalf("lay out the 2.7 /data: %v\n%s", err, out)
@@ -117,5 +120,15 @@ chown root:root $q $q/pid; chmod 755 $q $q/pid`
 	}
 	if !strings.Contains(logs(), "the DKIM keys were copied from /data/opendkim to /data/dkim") {
 		t.Errorf("the entrypoint did not say it copied the keys:\n%s", logs())
+	}
+	// A rotation due at the start runs before Postfix does: it rotates, and
+	// its postrotate asks no reload of a Postfix not running yet (the test
+	// server's rollout of 2026-10-16 logged "fatal: the Postfix mail system
+	// is not running"; build/logrotate-mail.conf).
+	if got := exec1(`test -f /data/log/mail.log.1 && echo rotated`); got != "rotated" {
+		t.Errorf("the rotation due at the start did not run: %q", got)
+	}
+	if l := logs(); strings.Contains(l, "error running non-shared postrotate script") || strings.Contains(l, "logrotate failed") {
+		t.Errorf("the rotation at the start failed:\n%s", l)
 	}
 }
