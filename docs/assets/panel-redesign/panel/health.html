@@ -108,6 +108,7 @@
             <dl class="sp-facts">
               <div><dt>Hostname</dt><dd class="sp-mono">mail.example.org</dd></div>
               <div><dt>Lookup</dt><dd class="sp-mono">→ 203.0.113.25<br>← mail.example.org</dd></div>
+              <div><dt>Greeting</dt><dd class="sp-mono">220 mail.example.org ESMTP Postfix (Debian/GNU)</dd></div>
             </dl>
           </div>
         </div>
@@ -143,6 +144,7 @@
             <dl class="sp-facts">
               <div><dt>Expires</dt><dd class="sp-mono">2026-11-02 09:14 UTC</dd></div>
               <div><dt>Names</dt><dd class="sp-mono">mail.example.org</dd></div>
+              <div><dt>Matches the hostname</dt><dd>yes</dd></div>
               <div><dt>Renewal expires</dt><dd class="sp-mono">2027-01-31 08:02 UTC</dd></div>
               <div><dt>Renewal mounted</dt><dd class="sp-mono">2026-10-15 03:12 UTC</dd></div>
             </dl>
@@ -165,6 +167,9 @@
         <div class="box" id="configuration" data-order="8">
           <div class="sp-box-head"><span class="sp-no">08</span><h2>Configuration</h2><div class="sp-end">Safe to run at any time</div></div>
           <div class="sp-box-body">
+            <dl class="sp-facts mb-3">
+              <div><dt>Your address</dt><dd class="sp-mono">198.51.100.7</dd><dd class="sp-muted">From X-Forwarded-For, which the trusted proxy 172.18.0.1 set</dd></div>
+            </dl>
             <p class="mb-3">Regenerates the Postfix configuration and the spam filter's lists from the database, removes the keys of deleted domains, and reloads Postfix. Use it after editing the files by hand, after restoring a backup, or when the running configuration looks out of step with the domain and application lists. It does not touch the queue or the TLS certificate.</p>
             <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-reload"></i>Reload configuration</button></form>
           </div>
