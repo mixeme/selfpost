@@ -385,7 +385,7 @@
   "box[Send a test e-mail]:body"
  ],
  "settings": [
-  "head",
+  "head+actions",
   {
    "columns": [
     {
