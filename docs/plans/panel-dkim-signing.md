@@ -171,6 +171,9 @@ dropped connection (a one-hour watchdog closes the signer).
 - [x] Keys: `/data/opendkim/keys` -> `/data/dkim/keys` (Q2): the entrypoint
   copies the tree once and leaves the old one for a rollback to 2.7.x until
   the next release; KeyTable and SigningTable go with the new layout.
+  *2.9.0:* the entrypoint removes the old tree once `/data/dkim` holds a
+  key, and stops on a `/data` with keys under the old tree only; the copy
+  and the backup exclusion are gone.
 - [x] Tests: `test/upstream/*.sh`, e2e's OpenDKIM log and process checks,
   the 256-byte test rewritten for the new rule.
 

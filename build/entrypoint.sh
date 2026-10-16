@@ -87,7 +87,7 @@ drop_links() {
 	done
 }
 drop_links /data/dkim /data/dkim.new /data/opendkim /data/sasl /data/postfix /data/antispam /data/log \
-	/data/dkim/keys /data/dkim/selectors /data/opendkim/keys \
+	/data/dkim/keys /data/dkim/selectors \
 	/data/sasl/sasldb2 /data/postfix/queue \
 	/data/postfix/sender_login_maps /data/postfix/relay_domains \
 	/data/postfix/transport /data/postfix/relay_recipients /data/postfix/tls_policy \
@@ -96,51 +96,37 @@ drop_links /data/dkim /data/dkim.new /data/opendkim /data/sasl /data/postfix /da
 # under /data; make sure they stay writable without disturbing anything that a
 # later phase deliberately hands to another service. /data/log is exempt: it is
 # deliberately owned by postfix (postlogd writes the delivery log there) and is
-# normalised on its own below, as are the trees shared through group selfpost
-# and the one OpenDKIM read until 2.8.0, which is left as it was (below).
+# normalised on its own below, as are the trees shared through group selfpost.
 # A file's owner is a number: an entry whose user or group is not the panel's
 # by that number - unpacked by root, or written under another image whose
 # image gave the panel other ids (999:999 until 2.7.0, 10999:10999 since) - is
 # handed over whole.
-find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name opendkim ! -name sasl ! -name antispam \
+find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name sasl ! -name antispam \
 	\( ! -user panel -o ! -group panel \) -exec chown -R panel:panel {} +
 
 # DKIM keys and the selector table, /data/dkim: the panel's alone - it makes
 # the keys, writes the table and signs (internal/domain, Keys; internal/milter,
-# sign.go). Until 2.8.0 the keys were under /data/opendkim, shared with
-# OpenDKIM through group selfpost. That tree is kept for an image of 2.7.x
-# rolled back to (docs/plans/panel-dkim-signing.md, Q2), but nothing of
-# 2.8.0 reads it beyond the copy below: it is the panel's alone like the new
-# one - a 2.7.x start gives it back to group selfpost itself - and a backup
-# leaves it out (internal/backup, excludedFromArchive). While /data/dkim
-# holds no key and the old tree does, the keys are copied over. The copy is
-# made as the panel user, which can read nothing there the panel could not,
-# into a directory beside, renamed into place when it is whole: a start that
-# stops midway copies again. A copy that fails stops the start (set -e) - the
-# panel would otherwise make the server's own name a new key, and its
-# published record would no longer match. The selector table is written by
-# the panel before its signer serves (cmd/panel/signer.go). After a rollback
-# to 2.7.x, a domain added there has its key only in the old tree: its
-# directory is copied into /data/dkim/keys by hand (guide § Upgrading).
-# (util-linux 2.41, setpriv(1): --reuid, --regid, --clear-groups; cp(1)
-# -P: never follow a symbolic link in the source; chown -R and find never
-# follow one either. GNU chmod keeps a directory's set-group-ID bit under a
-# numeric mode unless it is cleared by name - "g-s" - and 2.7.x set it on
-# the old tree: e2e TestStartsOnA27Data.)
+# sign.go). The selector table is written by the panel before its signer
+# serves (cmd/panel/signer.go). Until 2.8.0 the keys were under
+# /data/opendkim, shared with OpenDKIM; 2.8.x copied them to /data/dkim at its
+# first start and kept the old tree for a rollback to 2.7.x until the next
+# release, this one (docs/plans/panel-dkim-signing.md, Q2). It is removed
+# once /data/dkim holds a key. A /data that never ran 2.8.x - keys under the
+# old tree only - stops the start instead: the panel would make the server's
+# own name a new key, and its published record would no longer match; 2.8.x
+# copies them (guide § Upgrading). rm -rf removes a link, not what it points
+# to, and follows none inside (GNU coreutils rm(1)); a link at the path is
+# gone already (drop_links). (e2e TestStartsOnA28Data, TestRefusesA27Data.)
 has_keys() { [ -d "$1" ] && [ -n "$(find "$1" -type f -name '*.private' | head -n 1)" ]; }
 if [ -d /data/opendkim ]; then
-	chown -R panel:panel /data/opendkim
-	find /data/opendkim -type d -exec chmod 0700 {} + -exec chmod g-s {} +
-	find /data/opendkim -type f -exec chmod 0600 {} +
+	if ! has_keys /data/dkim/keys && has_keys /data/opendkim/keys; then
+		echo "entrypoint: the DKIM keys are only under /data/opendkim, as 2.7.x kept them; start 2.8.x once first - it copies them to /data/dkim - then this image (guide, § Upgrading)" >&2
+		exit 1
+	fi
+	rm -rf /data/opendkim
+	echo "entrypoint: removed /data/opendkim, the key tree of 2.7.x; the keys are under /data/dkim" >&2
 fi
 rm -rf /data/dkim.new
-if ! has_keys /data/dkim/keys && has_keys /data/opendkim/keys; then
-	setpriv --reuid=panel --regid=panel --clear-groups -- \
-		sh -c 'mkdir /data/dkim.new && cp -RP /data/opendkim/keys /data/dkim.new/keys'
-	rm -rf /data/dkim
-	mv /data/dkim.new /data/dkim
-	echo "entrypoint: the DKIM keys were copied from /data/opendkim to /data/dkim; /data/opendkim is left for a rollback" >&2
-fi
 mkdir -p /data/dkim/keys
 chown -R panel:panel /data/dkim
 find /data/dkim -type d -exec chmod 0700 {} + -exec chmod g-s {} +

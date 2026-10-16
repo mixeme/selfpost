@@ -44,9 +44,6 @@ func seedDataDir(t *testing.T) (dataDir, dbPath, deployRoot string) {
 	}
 
 	writeFile(t, filepath.Join(dataDir, "dkim", "keys", "example.com", "selfpost.private"), "PRIVATE KEY")
-	// The key tree OpenDKIM read until 2.8.0, left on disk for a rollback.
-	writeFile(t, filepath.Join(dataDir, "opendkim", "keys", "example.com", "selfpost.private"), "OLD KEY")
-	writeFile(t, filepath.Join(dataDir, "opendkim", "KeyTable"), "example.com example.com:selfpost:/data/opendkim/keys/example.com/selfpost.private")
 	writeFile(t, filepath.Join(dataDir, "sasl", "sasldb2"), "SASLDB")
 	writeFile(t, filepath.Join(dataDir, "postfix", "sender_login_maps"), "@example.com login")
 	writeFile(t, filepath.Join(dataDir, "antispam", "deny_domain.map"), "evil.example\n")
@@ -144,8 +141,6 @@ func TestCreateIncludesStateExcludesTransient(t *testing.T) {
 		DataArchivePrefix + "log/mail.log",
 		DataArchivePrefix + "log/mail.log.1",
 		DataArchivePrefix + "postfix/queue/deferred/sample",
-		DataArchivePrefix + "opendkim/keys/example.com/selfpost.private",
-		DataArchivePrefix + "opendkim/KeyTable",
 	} {
 		if _, ok := files[name]; ok {
 			t.Errorf("archive should not contain %s", name)

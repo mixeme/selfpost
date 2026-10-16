@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -13,51 +14,53 @@ import (
 	"time"
 )
 
-// TestStartsOnA27Data: the image starts on a /data an earlier image left -
-// the DKIM keys under /data/opendkim, as 2.7.x kept them, and a Postfix queue
-// owned by numbers that are not this image's postfix and postdrop. Without
-// opendkim installed the package accounts get other numbers (postfix 101 ->
-// 100, postdrop 103 -> 102 in 2.8.0), and the first rollout of 2.8.0 to the
-// test server crash-looped on "postfix check" (2026-10-16): the queue is
-// handed to Postfix's users by name before the check now. And the old key is
-// the one signing: copied, not made anew, so the published record holds
-// (build/entrypoint.sh; review of panel-dkim-signing, F5 - no test ran the
-// copy).
-func TestStartsOnA27Data(t *testing.T) {
-	const host = "mail.example.test"
+// upgradeData is a /data an earlier image left, laid out for host: the
+// server's key under /data/dkim as 2.8.x keeps it (unless only27), the old
+// key tree /data/opendkim as 2.7.x kept it - 2.8.x left it for a rollback -
+// and, with a queue, a Postfix queue owned by numbers that are not this
+// image's postfix and postdrop, and a log rotation due at the start. It
+// returns the directory and the key's PEM.
+func upgradeData(t *testing.T, host string, only27 bool) (string, []byte) {
+	t.Helper()
 	dataDir := t.TempDir()
 	if err := os.Chmod(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	certDir := t.TempDir()
-	if err := writeSelfSignedCert(certDir+"/fullchain.pem", certDir+"/privkey.pem"); err != nil {
-		t.Fatalf("generate throwaway TLS cert: %v", err)
-	}
-
-	// The server's key as 2.7.x kept it, and its KeyTable.
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
 	pemKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	keyFile := filepath.Join(dataDir, "opendkim", "keys", host, "selfpost.private")
-	if err := os.MkdirAll(filepath.Dir(keyFile), 0o755); err != nil {
-		t.Fatal(err)
+	write := func(rel string, data []byte) {
+		p := filepath.Join(dataDir, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := os.WriteFile(keyFile, pemKey, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dataDir, "opendkim", "KeyTable"),
-		[]byte(host+" "+host+":selfpost:/data/opendkim/keys/"+host+"/selfpost.private\n"), 0o644); err != nil {
-		t.Fatal(err)
+	write(filepath.Join("opendkim", "keys", host, "selfpost.private"), pemKey)
+	write(filepath.Join("opendkim", "KeyTable"), []byte(host+" "+host+":selfpost:/data/opendkim/keys/"+host+"/selfpost.private\n"))
+	if !only27 {
+		write(filepath.Join("dkim", "keys", host, "selfpost.private"), pemKey)
+		write(filepath.Join("dkim", "selectors"), []byte(host+" selfpost\n"))
 	}
 
-	// The owners and modes 2.7.x left, and a queue of foreign numbers, laid
-	// out as root in a throwaway container of the image.
+	// The owners and modes the earlier images left - 2.8.x made both key
+	// trees the panel's alone, 2.7.x the old one group selfpost's with the
+	// set-group-ID bit - and a queue of foreign numbers, laid out as root in
+	// a throwaway container of the image.
 	layout := `set -e
-chown -R 10999:10998 /data/opendkim
-find /data/opendkim -type d -exec chmod 2750 {} +
-find /data/opendkim -type f -exec chmod 0640 {} +
+if [ -d /data/dkim ]; then
+	chown -R 10999:10999 /data/dkim /data/opendkim
+	find /data/dkim /data/opendkim -type d -exec chmod 0700 {} +
+	find /data/dkim /data/opendkim -type f -exec chmod 0600 {} +
+else
+	chown -R 10999:10998 /data/opendkim
+	find /data/opendkim -type d -exec chmod 2750 {} +
+	find /data/opendkim -type f -exec chmod 0640 {} +
+fi
 q=/data/postfix/queue
 for d in active bounce corrupt defer deferred flush hold incoming private saved trace; do
 	mkdir -p $q/$d; chown 4242:4243 $q/$d; chmod 700 $q/$d
@@ -70,7 +73,26 @@ echo "Oct 14 00:00:00 mail postfix/master[1]: daemon started" > /data/log/mail.l
 printf 'logrotate state -- version 2\n"/data/log/mail.log" 2026-10-14-0:0:0\n' > /data/log/.logrotate.status`
 	if out, err := exec.Command("docker", "run", "--rm", "--entrypoint", "sh",
 		"-v", dataDir+":/data", "selfpost:e2e", "-c", layout).CombinedOutput(); err != nil {
-		t.Fatalf("lay out the 2.7 /data: %v\n%s", err, out)
+		t.Fatalf("lay out the earlier /data: %v\n%s", err, out)
+	}
+	return dataDir, pemKey
+}
+
+// TestStartsOnA28Data: the image starts on a /data 2.8.x left - the keys
+// under /data/dkim, the old tree /data/opendkim still there for a rollback to
+// 2.7.x, which 2.9.0 ends - and a Postfix queue owned by numbers that are not
+// this image's postfix and postdrop. The old tree is removed and the key
+// under /data/dkim is the one kept, unchanged, so the published record holds.
+// The queue is handed to Postfix's users by name before "postfix check": the
+// first rollout of 2.8.0 crash-looped on it when removing opendkim shifted
+// the package accounts' numbers (2026-10-16); a removed package can shift
+// them again.
+func TestStartsOnA28Data(t *testing.T) {
+	const host = "mail.example.test"
+	dataDir, pemKey := upgradeData(t, host, false)
+	certDir := t.TempDir()
+	if err := writeSelfSignedCert(certDir+"/fullchain.pem", certDir+"/privkey.pem"); err != nil {
+		t.Fatalf("generate throwaway TLS cert: %v", err)
 	}
 
 	name := "selfpost-e2e-upgrade"
@@ -106,20 +128,20 @@ printf 'logrotate state -- version 2\n"/data/log/mail.log" 2026-10-14-0:0:0\n' >
 		t.Fatalf("%v\n%s", err, logs())
 	}
 
-	if got := exec1(`cmp /data/opendkim/keys/` + host + `/selfpost.private /data/dkim/keys/` + host + `/selfpost.private && echo same`); got != "same" {
-		t.Errorf("the key under /data/dkim is not the one copied: %s", got)
+	if got := exec1(`test -e /data/opendkim && echo there || echo gone`); got != "gone" {
+		t.Errorf("/data/opendkim is %s after the start", got)
+	}
+	if got := exec1(`cat /data/dkim/keys/` + host + `/selfpost.private`); got != strings.TrimSpace(string(pemKey)) {
+		t.Error("the key under /data/dkim is not the one 2.8.x left")
 	}
 	if got := exec1(`cat /data/dkim/selectors`); got != host+" selfpost" {
 		t.Errorf("selector table = %q", got)
 	}
-	if got := exec1(`stat -c '%U:%G %a' /data/opendkim/keys/` + host + `/selfpost.private /data/opendkim/keys`); got != "panel:panel 600\npanel:panel 700" {
-		t.Errorf("the old tree is not the panel's alone: %q", got)
-	}
 	if got := exec1(`stat -c '%U:%G' /data/postfix/queue/active /data/postfix/queue/maildrop /data/postfix/queue/pid`); got != "postfix:postfix\npostfix:postdrop\nroot:postfix" {
 		t.Errorf("the queue is not Postfix's by name: %q", got)
 	}
-	if !strings.Contains(logs(), "the DKIM keys were copied from /data/opendkim to /data/dkim") {
-		t.Errorf("the entrypoint did not say it copied the keys:\n%s", logs())
+	if !strings.Contains(logs(), "entrypoint: removed /data/opendkim") {
+		t.Errorf("the entrypoint did not say it removed the old tree:\n%s", logs())
 	}
 	// A rotation due at the start runs before Postfix does: it rotates, and
 	// its postrotate asks no reload of a Postfix not running yet (the test
@@ -130,5 +152,34 @@ printf 'logrotate state -- version 2\n"/data/log/mail.log" 2026-10-14-0:0:0\n' >
 	}
 	if l := logs(); strings.Contains(l, "error running non-shared postrotate script") || strings.Contains(l, "logrotate failed") {
 		t.Errorf("the rotation at the start failed:\n%s", l)
+	}
+}
+
+// TestRefusesA27Data: a /data that never ran 2.8.x keeps the keys under
+// /data/opendkim only. The start stops and says to run 2.8.x first, which
+// copies them, rather than let the panel make the server's own name a new key
+// that its published record would not match; the old tree is left as it was.
+func TestRefusesA27Data(t *testing.T) {
+	const host = "mail.example.test"
+	dataDir, _ := upgradeData(t, host, true)
+
+	name := "selfpost-e2e-upgrade-27"
+	_ = exec.Command("docker", "rm", "-f", name).Run()
+	defer exec.Command("docker", "rm", "-f", name).Run()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "--name", name,
+		"-e", "SELFPOST_HOSTNAME="+host, "-v", dataDir+":/data", "selfpost:e2e").CombinedOutput()
+	if err == nil || ctx.Err() != nil {
+		t.Fatalf("the image started on a 2.7 /data (err %v, %v):\n%s", err, ctx.Err(), out)
+	}
+	if !strings.Contains(string(out), "the DKIM keys are only under /data/opendkim") {
+		t.Errorf("the refusal does not say why:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "opendkim", "keys", host, "selfpost.private")); err != nil {
+		t.Errorf("the old key is gone after the refusal: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "dkim", "keys", host)); err == nil {
+		t.Error("a key directory was made under /data/dkim before the refusal")
 	}
 }

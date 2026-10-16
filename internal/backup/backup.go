@@ -105,11 +105,10 @@ const QueueDir = "postfix/queue"
 // fresh one is written instead); a "tls" directory under /data is skipped when
 // an operator pointed TLS_CERT_FILE inside /data; and "log" is Postfix's raw
 // delivery log plus its fourteen rotated files, which is diagnostic output, not
-// state to restore, and by far the largest thing under /data. "opendkim" is the
-// key tree OpenDKIM read until 2.8.0, kept on disk only for a rollback to 2.7.x:
-// an archive restores into its own version alone, which reads the keys from
-// /data/dkim, and a second copy of every key - one that outlives a deleted
-// domain's - has no place in it.
+// state to restore, and by far the largest thing under /data. (Until 2.9.0
+// "opendkim" was left out too: the key tree OpenDKIM read until 2.8.0, kept on
+// disk for a rollback to 2.7.x; the entrypoint removes it before the panel
+// starts since.)
 var excludedFromArchive = map[string]bool{
 	"selfpost.db":         true,
 	"selfpost.db-wal":     true,
@@ -118,7 +117,6 @@ var excludedFromArchive = map[string]bool{
 	"setup-token":         true,
 	"tls":                 true,
 	"log":                 true,
-	"opendkim":            true,
 	ManifestName:          true,
 	ContentsName:          true,
 	contentsCheckedName:   true,

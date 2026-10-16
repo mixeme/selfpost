@@ -410,11 +410,10 @@ operator can act on it.
   private key from `certs/` when present; a domain export carries the DKIM key
   and **working** application passwords in the clear (otherwise a transfer
   without recreating credentials would be impossible). The keys a backup
-  carries are those of `/data/dkim`; `/data/opendkim`, the tree 2.7.x read
-  and kept for a rollback, is left out (`internal/backup`,
-  `excludedFromArchive`, `2.8.0`): an archive restores into its own version
-  alone, and a second copy of every key - one that outlives a deleted
-  domain's - has no place in it.
+  carries are those of `/data/dkim`. `/data/opendkim`, the tree 2.7.x read,
+  was left out while 2.8.x kept it for a rollback (`2.8.0`); since `2.9.0`
+  the entrypoint removes it before the panel starts, so no second copy of
+  every key - one that outlived a deleted domain's - is left on disk.
 - Links under `certs/` (and `certs` itself as a link) are followed, in the
   container's view: the archive carries whatever regular file they lead to
   that the panel's user may read. `certs/` is the operator's, mounted

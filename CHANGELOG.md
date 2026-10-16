@@ -31,6 +31,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   Health, which nothing on Settings pointed to. `POST
   /server/settings/dns-recheck`, global role.
 
+### Removed
+
+- **`/data/opendkim`, the key tree of 2.7.x** (panel-dkim-signing, as
+  planned for the release after 2.8.0): 2.8.x copied its keys to
+  `/data/dkim` and kept it for a rollback to 2.7.x; the first start of
+  this image removes it once `/data/dkim` holds a key, and says so. A
+  `/data` whose keys are under the old tree only - one that never ran
+  2.8.x - stops the start rather than give the server's own name a new
+  key: start 2.8.x once first (guide, § Upgrading). The copy and the
+  backup's exclusion of the tree went with it. A rollback from here goes
+  to 2.8.x; to 2.7.x only through a 2.7.x backup.
+
 ## [2.8.0] - 2026-10-16
 
 The panel signs outgoing mail with DKIM itself, and OpenDKIM - a 2018 beta

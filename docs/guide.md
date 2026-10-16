@@ -684,7 +684,17 @@ was, for a rollback, until the next release, and which a full backup leaves
 out. The selector table, `data/dkim/selectors`, is written from the database
 at every start, before the signer serves.
 
-**Rolling back to 2.7.x** after that: the 2.7.x image signs with OpenDKIM
+**To 2.9.0** from 2.8.x there is nothing to do: the first start removes
+`data/opendkim`, the key tree 2.7.x read, which 2.8.x kept for a rollback,
+and says so (`entrypoint: removed /data/opendkim, the key tree of 2.7.x;
+the keys are under /data/dkim`); the keys under `data/dkim` stay as they
+are. From 2.7.x, start 2.8.x once first: an image of 2.9.0 on a `data`
+whose keys are under `data/opendkim` only stops at the start and says so,
+rather than give the server's own name a new key. Rolling back from 2.9.x
+to 2.8.x needs nothing; to 2.7.x, the old tree is gone - only a full backup
+of 2.7.x brings it back.
+
+**Rolling back to 2.7.x** from 2.8.x (only): the 2.7.x image signs with OpenDKIM
 from `data/opendkim`, which holds the keys as they were at the upgrade. A
 domain added under 2.8.x has no key there, and 2.7.x sends its mail
 unsigned; one deleted and added again under 2.8.x has its old key there,
@@ -771,9 +781,7 @@ as themselves, the host's IPv6 address and `127.0.0.1` as `172.18.0.1`.
 domains' DKIM keys under `data/dkim/`, all applications' SASL credentials,
 `manifest.json` with the version that created it), plus `docker-compose.yml`,
 `.env`, and `certs/` from the operator directory next to `./data`. Delivery
-logs under `data/log/` are excluded, so is `data/opendkim/` (the key tree an
-installation upgraded from 2.7.x keeps for a rollback, see
-[Upgrading](#upgrading)), and so is the Postfix queue: the archive is taken while the
+logs under `data/log/` are excluded, and so is the Postfix queue: the archive is taken while the
 instance runs, and a copy of a queue Postfix is working on can hold a message
 twice or not at all. Mail still waiting for delivery is therefore not carried
 over, and a restored instance starts with an empty queue; to keep the queue,

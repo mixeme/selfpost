@@ -503,12 +503,13 @@ record as a receiver would. `signature_over_awkward_headers`
 ([test/e2e/dkim_shapes_test.go](../test/e2e/dkim_shapes_test.go)) sends the
 header shapes Postfix hands a milter in its own way - folded, tab-led, no
 space after the colon, two `To:` - and an 8-bit body, and dkimpy verifies
-what was delivered. `TestStartsOnA27Data`
+what was delivered. `TestStartsOnA28Data`
 ([test/e2e/upgrade_test.go](../test/e2e/upgrade_test.go)) starts the image on
-a `/data` a 2.7.x image left: the key under `/data/opendkim` is copied to
-`/data/dkim` unchanged and the selector table names it, the old tree becomes
-the panel's alone, and a queue owned by other uids is handed to Postfix's
-users by name.
+a `/data` a 2.8.x image left: the old key tree `/data/opendkim` is removed,
+the key under `/data/dkim` is kept unchanged and the selector table names
+it, and a queue owned by other uids is handed to Postfix's users by name;
+`TestRefusesA27Data` has the start stop on a `/data` whose keys are under
+the old tree only, which is left as it was.
 Waits poll with a timeout (`waitFor`); a fixed sleep is the exception and says
 why where it stands (`sender_check_test.go`: a downtime worth a second or two,
 and 35 s to show a row is not written again).

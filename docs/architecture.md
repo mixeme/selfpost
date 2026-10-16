@@ -309,14 +309,13 @@ then OpenDKIM did, in a program of its own
   lines; nothing is written to `mail.log` (nor did OpenDKIM write there).
 - **The old tree,** `/data/opendkim` - the keys, `KeyTable` and
   `SigningTable` until `2.8.0`, shared with OpenDKIM through group
-  `selfpost`. While `/data/dkim` holds no key and the old tree does, the
-  entrypoint copies `/data/opendkim/keys` to `/data/dkim/keys` as the panel
-  user (`setpriv`), into `/data/dkim.new`, renamed when whole; a copy that
-  fails stops the start - the server's name would otherwise get a new key
-  and its published record would no longer match. Keys, selectors and DNS
-  records do not change. The old tree is left for a rollback to a 2.7.x
-  image until the next release, made the panel's alone at every start like
-  the new one, and left out of backups (§ Persistence).
+  `selfpost`. `2.8.x` copied its keys to `/data/dkim/keys` at its first
+  start and kept it for a rollback to a 2.7.x image; since `2.9.0` the
+  entrypoint removes it once `/data/dkim` holds a key, and a `/data` with
+  keys under the old tree only - one that never ran 2.8.x - stops the start
+  (the server's name would otherwise get a new key and its published record
+  would no longer match). Under 2.8.x it was the panel's alone, like the
+  new one, and left out of backups.
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
@@ -1100,7 +1099,6 @@ single-connection trade-off that follows from it.
 | `selfpost.db` | SQLite panel state (users, sessions, domains, apps, send log, L2 limits, log-tailer offset, inbound relay, DMARC reports) — see [Database](#database) and [schema-migrations.md](schema-migrations.md) |
 | `setup-token` | First-run setup token file |
 | `dkim/` | DKIM keys (`keys/<name>/<selector>.private`) and the selector table (`selectors`) the signer reads; the panel's alone, `0700` / `0600` — § DKIM signing |
-| `opendkim/` | The key tree OpenDKIM read until `2.8.0` (keys, `KeyTable`, `SigningTable`): copied to `dkim/` once, then kept only for a rollback to 2.7.x until the next release; the panel's alone, excluded from backups |
 | `sasl/sasldb2` | Application SASL credentials |
 | `postfix/sender_login_maps` | Login → From binding |
 | `postfix/relay_domains` | Inbound domains accepted on port 25 |
@@ -1180,8 +1178,8 @@ the stored log lines follow;
 `postfix reload` in `postrotate` — see § Log tailer above).
 
 **Restore:** panel button or `selfpost-backup` CLI — self-contained archive:
-`data/` (SQLite snapshot + tree minus `log/`, the setup token, the old
-`opendkim/` tree and any `tls/` under `/data`), `docker-compose.yml`, `.env`,
+`data/` (SQLite snapshot + tree minus `log/`, the setup token and any
+`tls/` under `/data`), `docker-compose.yml`, `.env`,
 and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
