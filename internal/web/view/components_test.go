@@ -169,7 +169,7 @@ func TestPageHeadStates(t *testing.T) {
 		Crumbs:   []Crumb{{Href: "/outbound/domains", Label: "Outbound domains"}, {Label: "Applications"}},
 		Title:    "New password for", Code: "prod-server",
 		Lead:    Rich("Lead with ", Code("code")),
-		Note:    []string{"Updated 14:02:31 UTC", "refreshes every 10 s"},
+		Note:    []string{"Updated 14:02:31", "refreshes every 10 s"},
 		Actions: []Action{{Label: "Re-check DNS", Icon: "ti-refresh", Post: "/x/dns-recheck"}, {Label: "Add", Icon: "ti-plus", Href: "/x/new", Primary: true}, {Label: "Delete", Href: "/x/delete", Danger: true}},
 	}))
 	mustContain(t, out,
@@ -177,7 +177,7 @@ func TestPageHeadStates(t *testing.T) {
 		`<p class="sp-kicker"><a href="/outbound/domains">Outbound domains</a> / Applications /</p>`,
 		`<h1 class="title is-3">New password for <span class="sp-mono">prod-server</span></h1>`,
 		`<p class="sp-lead">Lead with <code>code</code></p>`,
-		`<div class="sp-muted sp-small">Updated 14:02:31 UTC<br>refreshes every 10 s</div>`,
+		`<div class="sp-muted sp-small">Updated 14:02:31<br>refreshes every 10 s</div>`,
 		`<form method="post" action="/x/dns-recheck"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form>`,
 		`<a class="button is-primary" href="/x/new"><i class="ti ti-plus"></i>Add</a>`,
 		`<a class="button is-danger is-light" href="/x/delete">Delete</a>`)
@@ -352,15 +352,15 @@ func TestSideMenu(t *testing.T) {
 
 func TestTimelineLevels(t *testing.T) {
 	out := squash(partial(t, "timeline", []Step{
-		{Time: "13:58:07 UTC", Strong: "Accepted", Text: Rich(" from ", Mono("alerts"))},
-		{Time: "13:58:09 UTC", Strong: "Deferred", Text: Plain(" — later"), Level: LevelWarn},
-		{Time: "14:40:00 UTC", Strong: "Bounced", Level: LevelFail},
+		{Time: "13:58:07", Strong: "Accepted", Text: Rich(" from ", Mono("alerts"))},
+		{Time: "13:58:09", Strong: "Deferred", Text: Plain(" — later"), Level: LevelWarn},
+		{Time: "14:40:00", Strong: "Bounced", Level: LevelFail},
 		{Time: "next attempt", Text: Plain("Still queued"), Level: LevelPending},
 	}))
 	mustContain(t, out,
-		`<ol class="sp-timeline"><li><time>13:58:07 UTC</time><strong>Accepted</strong> from <span class="sp-mono">alerts</span></li>`,
-		`<li class="sp-warn"><time>13:58:09 UTC</time><strong>Deferred</strong> — later</li>`,
-		`<li class="sp-fail"><time>14:40:00 UTC</time><strong>Bounced</strong></li>`,
+		`<ol class="sp-timeline"><li><time>13:58:07</time><strong>Accepted</strong> from <span class="sp-mono">alerts</span></li>`,
+		`<li class="sp-warn"><time>13:58:09</time><strong>Deferred</strong> — later</li>`,
+		`<li class="sp-fail"><time>14:40:00</time><strong>Bounced</strong></li>`,
 		`<li class="sp-pending"><time>next attempt</time>Still queued</li>`)
 }
 

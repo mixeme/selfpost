@@ -100,6 +100,9 @@ type config struct {
 	// smtpBanner is Postfix's smtpd_banner, expanded, read from postconf at
 	// the start: Health shows the greeting it makes.
 	smtpBanner string
+	// timeZone is TZ as the container was started with ("" for none): the
+	// zone of every time and day the panel shows, which Settings names.
+	timeZone string
 
 	dkimDir         string
 	dkimSelectorDef string
@@ -150,6 +153,7 @@ func loadConfig() config {
 		manifestPath:   filepath.Join(dataDir, backup.ManifestName),
 		setupTokenPath: envDefault("SELFPOST_SETUP_TOKEN_FILE", filepath.Join(dataDir, "setup-token")),
 		hostname:       os.Getenv("SELFPOST_HOSTNAME"),
+		timeZone:       os.Getenv("TZ"),
 		// Secure cookies by default (security.md); PANEL_COOKIE_SECURE=false is a
 		// development-only escape hatch for testing over plain HTTP.
 		cookieSecure: envDefault("PANEL_COOKIE_SECURE", "true") != "false",

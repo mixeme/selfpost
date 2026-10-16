@@ -529,7 +529,7 @@ func TestFilterListsWhereTheyGo(t *testing.T) {
 	}
 	body = s.get(s.h.HandleFilterLists, "/inbound/filter-lists", globalPrincipal).Body.String()
 	has(t, "filter on", body, `<span class="tag is-success is-light">applied</span>`,
-		`rspamd, from map files it rereads within seconds of a change`, `<dt>Last written</dt><dd>2026-09-11 08:40 UTC</dd>`,
+		`rspamd, from map files it rereads within seconds of a change`, `<dt>Last written</dt><dd>2026-09-11 08:40</dd>`,
 		`/data/antispam/`)
 	lacks(t, "filter on", body, `not applied`, `Nothing — the spam filter is off`, `INBOUND_ANTISPAM_MILTER`)
 }

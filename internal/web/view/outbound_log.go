@@ -62,11 +62,11 @@ func LogHref(f OutLogFilter, page int) string {
 }
 
 // FormatLogTime is the time of a row of the log: month, day and the time of day
-// in UTC, as the table's "Time, UTC" column shows it.
-func FormatLogTime(t time.Time) string { return t.UTC().Format("01-02 15:04:05") }
+// in the container's zone, as the table's "Time" column shows it.
+func FormatLogTime(t time.Time) string { return t.Local().Format("01-02 15:04:05") }
 
-// formatStamp is a moment on the page of one message, with its zone.
-func formatStamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04:05") + " UTC" }
+// formatStamp is a moment on the page of one message, in the container's zone.
+func formatStamp(t time.Time) string { return t.Local().Format("2006-01-02 15:04:05") }
 
 // ---- The log
 

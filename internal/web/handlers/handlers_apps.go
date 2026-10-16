@@ -316,7 +316,7 @@ func formatAutoUpdated(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
-	return t.UTC().Format("2006-01-02 15:04 UTC")
+	return t.Local().Format("2006-01-02 15:04")
 }
 
 // detailFlash maps a fixed redirect flag to a fixed message, so status text

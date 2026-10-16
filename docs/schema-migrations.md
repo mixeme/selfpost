@@ -119,8 +119,8 @@ for operators upgrading from older 2.x images.
 | `inbound_spam_log` | Inbound antispam journal: one row per recipient of a message offered on port 25, with the decision (`accept`, `reject`, `tempfail`, `quarantine`) and who made it (`rspamd`, `postfix`, `selfpost`). Metadata only. `inbound_domain_id` (v8) ties a row to its domain by id (v2) |
 | `inbound_spam_list` | Allow / deny entries for the external filter (`address`, `domain`, `ip`), instance-wide; unique per list (v2) |
 | `notify_state` | What the panel has already written to its users about, one row per subject (`dns:<domain>`, `cert`, `queue`, `limit:<domain>`), so that each thing is said once and a restart says nothing again (v4) |
-| `sender_check_days` | What the sender check costs, a row per UTC day that has something to say: seconds the panel did not answer while Postfix ran, connections turned away (`deferred`), messages deferred mid-message (`messages`), and whether the day's downtime is an upper bound (`estimated`). Kept a year (v6, v9) |
-| `delivery_log_days` | What the reconcile sweep and the log tailer did, a row per UTC day, kept a year. Read off a copy of the database; no page shows it (v7) |
+| `sender_check_days` | What the sender check costs, a row per day of the container's zone (`TZ`) that has something to say: seconds the panel did not answer while Postfix ran, connections turned away (`deferred`), messages deferred mid-message (`messages`), and whether the day's downtime is an upper bound (`estimated`). Kept a year (v6, v9) |
+| `delivery_log_days` | What the reconcile sweep and the log tailer did, a row per day of the container's zone, kept a year. Read off a copy of the database; no page shows it (v7) |
 | `notify_addressees` | Who a subject's notification is owed to and whether each was handed it; goes with the subject's `notify_state` row (v11) |
 | `send_log_lines` | The `mail.log` lines Postfix wrote under a queue id, with the line's own time; what a message's page shows once the log has rotated. No reference to `send_log`: a line belongs to a row by queue id and time, and goes when no row carries its id (v3) |
 

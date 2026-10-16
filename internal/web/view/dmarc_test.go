@@ -12,8 +12,8 @@ func TestDMARCHubShowsIngestAndTheLatestReports(t *testing.T) {
 	pageHas(t, "DMARC reports", out,
 		`<h1 class="title is-3">DMARC reports</h1>`, `<code>rua=</code>`,
 		`<h2>Ingest</h2>`, `<span class="tag is-success is-light">ok</span>`,
-		`<dd>2026-09-21 06:12 UTC</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dt>Hosted addresses</dt>`, `<dd class="sp-mono sp-small">dmarc-reports&#43;&lt;domain&gt;@mail.example.org</dd>`, `<dd>500 reports a domain or 90 days</dd>`,
-		`<th>Received, UTC</th>`, `09-21 06:12`, `<a href="/outbound/dmarc/domains/1">example.org</a>`,
+		`<dd>2026-09-21 06:12</dd>`, `<dd>14 kept · 0 parse failures</dd>`, `<dt>Hosted addresses</dt>`, `<dd class="sp-mono sp-small">dmarc-reports&#43;&lt;domain&gt;@mail.example.org</dd>`, `<dd>500 reports a domain or 90 days</dd>`,
+		`<th>Received</th>`, `09-21 06:12`, `<a href="/outbound/dmarc/domains/1">example.org</a>`,
 		"<td>1 903</td>", `<span class="tag is-warning is-light">7</span>`, `<td>0</td><td class="sp-actions"><a href="/outbound/dmarc/reports/41">View</a>`,
 	)
 }
@@ -98,7 +98,7 @@ func TestDMARCReportShowsTheReportItsPolicyAndRecords(t *testing.T) {
 		`<h1 class="title is-4">Outlook.com · 20 Sep</h1>`,
 		`<a href="/outbound/dmarc">DMARC reports</a> / <a href="/outbound/dmarc/domains/2">shop.example.org</a> /`,
 		"<span>shop.example.org</span><span class=\"tag is-success is-light\">1 903 pass</span><span class=\"tag is-warning is-light\">7 fail</span>",
-		`<h2>Report</h2>`, `<dd class="sp-mono sp-small">5f1c9a0e7b2d4e61a3</dd>`, `<dd>20 Sep 00:00 – 21 Sep 00:00 UTC</dd>`, `<dd>2026-09-21 04:40 UTC</dd>`,
+		`<h2>Report</h2>`, `<dd class="sp-mono sp-small">5f1c9a0e7b2d4e61a3</dd>`, `<dd>20 Sep 00:00 – 21 Sep 00:00</dd>`, `<dd>2026-09-21 04:40</dd>`,
 		`<h2>Published policy</h2>`, `<dd class="sp-mono">none / none / 100</dd>`, `<dd class="sp-mono">r / r</dd>`, `<dd class="sp-mono sp-small">dmarc@mail.example.org</dd>`,
 		`<h2>Records</h2>`, `Parsed from the aggregate XML`,
 		`203.0.113.25 <span class="tag is-light">this relay</span>`, "<td>1 903</td>",
@@ -111,7 +111,7 @@ func TestDMARCReportShowsTheReportItsPolicyAndRecords(t *testing.T) {
 // nothing failed, and a report with no records says so.
 func TestDMARCReportOmitsWhatItDoesNotHold(t *testing.T) {
 	p := NewDMARCReport(admin(), ReportInput{ID: 1, Reporter: "google.com", ReportID: "r1", Domain: "example.org", DomainID: 1, Pass: 5,
-		Period: "20 Sep 00:00 – 20 Sep 23:59 UTC", Received: "2026-09-21 04:40 UTC", PolicyP: "none", PolicySP: "none", PolicyPct: 100, PolicyADKIM: "r", PolicyASPF: "r"})
+		Period: "20 Sep 00:00 – 20 Sep 23:59", Received: "2026-09-21 04:40", PolicyP: "none", PolicySP: "none", PolicyPct: 100, PolicyADKIM: "r", PolicyASPF: "r"})
 	out := renderSignedIn(t, "dmarc-report", p.WithRecords(nil))
 	pageHas(t, "DMARC report", out, `<h1 class="title is-4">google.com</h1>`, `<span class="tag is-success is-light">5 pass</span>`, `This report holds no records.`)
 	pageLacks(t, "DMARC report", out, `fail</span>`, `Contact`, `<dt>rua</dt>`, `<table`, `<a href="/outbound/dmarc">`)

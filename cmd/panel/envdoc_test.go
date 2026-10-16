@@ -22,7 +22,7 @@ import (
 var (
 	goEnvRead     = regexp.MustCompile(`(?:envDefault|envInt|envBool|envSeconds|envDuration|os\.Getenv|os\.LookupEnv)\("([A-Z][A-Z0-9_]+)"`)
 	scriptEnvRead = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]+):[-?=]`)
-	docEnvName    = regexp.MustCompile("`([A-Z][A-Z0-9_]{2,})`")
+	docEnvName    = regexp.MustCompile("`([A-Z][A-Z0-9_]+)`")
 )
 
 func readFile(t *testing.T, path string) string {

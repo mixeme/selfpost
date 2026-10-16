@@ -1,8 +1,8 @@
 {{/* Server > Settings (mockup settings.html): what holds for the whole instance.
      One form, in the left column, with its Save button under its fields; the
      right column holds what is not a field - the records of the server's own
-     name, the ones notifications are signed and authorised with, and the
-     read-only rate limits. A user's own name, e-mail, password and DMARC
+     name, the ones notifications are signed and authorised with, the
+     read-only rate limits and the read-only time zone. A user's own name, e-mail, password and DMARC
      address are on Account (account.html). */}}
 {{define "content"}}
 {{template "page_head" .Head}}
@@ -41,6 +41,13 @@
     {{template "box_open" .RateLimits}}
     {{template "body_open"}}
     {{template "facts" .RateFacts}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+
+    {{template "box_open" .TimeZone}}
+    {{template "body_open"}}
+    {{template "facts" .ZoneFacts}}
+    <p class="mt-4 sp-muted">Every time the panel shows, and every day it counts - today on Health, the days of the statistics - is this zone's, and so are the stamps of <code>mail.log</code>.</p>
     {{template "body_close"}}
     {{template "box_close"}}
   </div>

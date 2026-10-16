@@ -231,7 +231,8 @@ type InboundSpamRow struct {
 //
 // Domain, Decision, Since and Until are the operator's own filters, chosen in
 // the UI: an empty field matches everything. Since and Until are days, both
-// inclusive and read as UTC days whatever the time of day they carry.
+// inclusive and read as days of the container's zone whatever the time of
+// day they carry.
 //
 // DomainIDs is the authorization scope, which no query parameter may widen:
 // the exhaustive set of inbound domains the caller may read, by id - a row of
@@ -325,17 +326,17 @@ func inboundSpamWhere(f InboundSpamFilter) (string, []any) {
 		args = append(args, f.Decision)
 	}
 	// created_at is RFC3339 UTC, so comparing it as text against the same
-	// format is comparing moments: from midnight of the first day up to, not
-	// including, midnight after the last.
+	// format is comparing moments: from the container zone's midnight of the
+	// first day up to, not including, its midnight after the last.
 	if !f.Since.IsZero() {
-		y, m, d := f.Since.UTC().Date()
+		y, m, d := f.Since.Date()
 		clauses = append(clauses, "created_at >= ?")
-		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.Local).UTC().Format(time.RFC3339))
 	}
 	if !f.Until.IsZero() {
-		y, m, d := f.Until.UTC().Date()
+		y, m, d := f.Until.Date()
 		clauses = append(clauses, "created_at < ?")
-		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.Local).UTC().Format(time.RFC3339))
 	}
 	if len(clauses) == 0 {
 		return "", nil

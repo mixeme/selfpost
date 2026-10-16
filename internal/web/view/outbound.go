@@ -63,7 +63,7 @@ func FormatAge(t, now time.Time) string {
 	case d < 48*time.Hour:
 		return fmt.Sprintf("%d h ago", int(d/time.Hour))
 	default:
-		return t.UTC().Format("2006-01-02")
+		return t.Local().Format("2006-01-02")
 	}
 }
 

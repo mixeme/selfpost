@@ -16,7 +16,7 @@
 {{template "box_open" .Recent}}
 {{if .Rows}}
 <div class="table-container"><table class="table is-fullwidth is-hoverable">
-  <thead><tr><th>Received, UTC</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
+  <thead><tr><th>Received</th><th>Domain</th><th>Reporter</th><th>Window</th><th>Pass</th><th>Fail</th><th></th></tr></thead>
   <tbody>{{range .Rows}}
     <tr><td class="sp-mono sp-muted sp-nowrap sp-small">{{.Received}}</td><td>{{if .DomainHref}}<a href="{{.DomainHref}}">{{.Domain}}</a>{{else}}{{.Domain}}{{end}}</td><td class="sp-muted">{{.Reporter}}</td><td>{{.Window}}</td><td>{{.PassText}}</td><td>{{if .Fail}}{{template "tag" .FailTag}}{{else}}0{{end}}</td><td class="sp-actions"><a href="{{.Href}}">View</a></td></tr>{{end}}
   </tbody>

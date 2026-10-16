@@ -26,7 +26,7 @@ const (
 
 // Settings keys of the sender check's statistics.
 const (
-	// settingSenderCheckSince is the first UTC day the statistics cover.
+	// settingSenderCheckSince is the first day (of the container's zone) the statistics cover.
 	settingSenderCheckSince = "sender_check_since"
 	// settingSenderCheckDeferredAt is when a message was last deferred because
 	// the check did not answer (RFC3339 UTC).
@@ -66,7 +66,7 @@ func (s *Store) StartSenderCheckStats(now time.Time) error {
 	if err != nil || v != "" {
 		return err
 	}
-	return s.SetSetting(settingSenderCheckSince, now.UTC().Format(dayLayout))
+	return s.SetSetting(settingSenderCheckSince, now.Local().Format(dayLayout))
 }
 
 // AddSenderCheckDown adds to the day of at the time the panel did not answer
@@ -81,7 +81,7 @@ func (s *Store) AddSenderCheckDown(at time.Time, d time.Duration, estimated bool
 		`INSERT INTO sender_check_days (day, down_seconds, estimated) VALUES (?, ?, ?)
 		 ON CONFLICT (day) DO UPDATE SET down_seconds = down_seconds + excluded.down_seconds,
 			estimated = MAX(estimated, excluded.estimated)`,
-		at.UTC().Format(dayLayout), secs, estimated,
+		at.Local().Format(dayLayout), secs, estimated,
 	)
 	if err != nil {
 		return fmt.Errorf("sender check downtime: %w", err)
@@ -114,7 +114,7 @@ func (s *Store) AddSenderCheckDeferred(at time.Time, n int64, place string, mess
 	if _, err := tx.Exec(fmt.Sprintf(
 		`INSERT INTO sender_check_days (day, %[1]s) VALUES (?, ?)
 		 ON CONFLICT (day) DO UPDATE SET %[1]s = %[1]s + excluded.%[1]s`, column),
-		at.UTC().Format(dayLayout), n,
+		at.Local().Format(dayLayout), n,
 	); err != nil {
 		return fmt.Errorf("sender check deferred: %w", err)
 	}
@@ -163,7 +163,7 @@ func (s *Store) SenderCheckDeferredAt() (time.Time, error) {
 // SenderCheckStats sums the days up to now: today, the last 30 days and the
 // last 12 months, each including today.
 func (s *Store) SenderCheckStats(now time.Time) (SenderCheckStats, error) {
-	now = now.UTC()
+	now = now.Local()
 	var out SenderCheckStats
 	sum := func(days int) (SenderCheckTotals, error) {
 		var secs, deferred, messages, estimated int64
@@ -193,7 +193,7 @@ func (s *Store) SenderCheckStats(now time.Time) (SenderCheckStats, error) {
 	if err != nil {
 		return out, err
 	}
-	out.Since, _ = time.Parse(dayLayout, since)
+	out.Since, _ = time.ParseInLocation(dayLayout, since, time.Local)
 	deferredAt, err := s.GetSetting(settingSenderCheckDeferredAt)
 	if err != nil {
 		return out, err
@@ -205,7 +205,7 @@ func (s *Store) SenderCheckStats(now time.Time) (SenderCheckStats, error) {
 // PruneSenderCheckDays deletes the days older than a year.
 func (s *Store) PruneSenderCheckDays(now time.Time) error {
 	_, err := s.db.Exec(`DELETE FROM sender_check_days WHERE day < ?`,
-		now.UTC().AddDate(0, 0, -senderCheckKeepDays).Format(dayLayout))
+		now.Local().AddDate(0, 0, -senderCheckKeepDays).Format(dayLayout))
 	if err != nil {
 		return fmt.Errorf("prune sender check days: %w", err)
 	}

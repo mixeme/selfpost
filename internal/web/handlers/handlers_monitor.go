@@ -387,7 +387,8 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 	}
 	form := view.OutLogFilter{Domain: filter.Domain, App: filter.AppLogin, Status: filter.Status}
 	// The days, as on the Inbound log: from the first's midnight to the end of
-	// the last, UTC; a day that does not parse is no narrowing.
+	// the last, in the container's zone; a day that does not parse is no
+	// narrowing.
 	if t, err := time.Parse(logDay, q.Get("from")); err == nil {
 		form.From, filter.Since = t.Format(logDay), t
 	}

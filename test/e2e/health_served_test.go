@@ -87,8 +87,8 @@ func testHealthShowsWhatIsServed(t *testing.T, sc *scenario) {
 	}
 	cert := box(health(), "certificate")
 	for _, want := range []string{
-		"<dt>Expires</dt><dd class=\"sp-mono\">" + served.UTC().Format("2006-01-02 15:04 UTC"),
-		"<dt>Renewal expires</dt><dd class=\"sp-mono\">" + renewalNotAfter.Format("2006-01-02 15:04 UTC"),
+		"<dt>Expires</dt><dd class=\"sp-mono\">" + served.UTC().Format("2006-01-02 15:04"),
+		"<dt>Renewal expires</dt><dd class=\"sp-mono\">" + renewalNotAfter.Format("2006-01-02 15:04"),
 		"<dt>Renewal mounted</dt>",
 		"Postfix still serves the certificate above.",
 	} {

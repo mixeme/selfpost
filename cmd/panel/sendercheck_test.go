@@ -62,3 +62,15 @@ func TestByDay(t *testing.T) {
 		t.Errorf("no time: %+v", none)
 	}
 }
+
+// In a container with TZ=Europe/Moscow a day is Moscow's: an outage from
+// 20:50 to 21:10 UTC crosses its midnight (21:00 UTC).
+func TestByDayInTheContainersZone(t *testing.T) {
+	inZone(t, "Europe/Moscow")
+	from := time.Date(2026, 10, 12, 20, 50, 0, 0, time.UTC)
+	got := byDay(from, from.Add(20*time.Minute))
+	if len(got) != 2 || got[0].down != 10*time.Minute || got[1].down != 10*time.Minute ||
+		got[1].day.Format("2006-01-02 15:04") != "2026-10-13 00:00" {
+		t.Errorf("parts = %+v, want ten minutes on the 12th and ten from Moscow's midnight", got)
+	}
+}

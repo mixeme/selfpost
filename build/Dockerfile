@@ -64,6 +64,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 # than with the whole of systemd, the first alternative of its "Depends:
 # systemd | systemd-standalone-sysusers | systemd-sysusers" (dpkg -s in the
 # image, 2026-10-15). Nothing here runs systemd.
+# tzdata is named for TZ (local-time): the zone of every time the panel shows
+# and of the stamps Postfix writes in mail.log. supervisor's python3.13 brings
+# it today (apt-cache rdepends --installed tzdata in the image, 2026-10-17);
+# a TZ the image did not have would leave both in UTC without a word.
 RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
  && echo "postfix postfix/main_mailer_type string Internet Site" | debconf-set-selections \
  && apt-get update \
@@ -78,6 +82,7 @@ RUN echo "postfix postfix/mailname string localhost" | debconf-set-selections \
       openssl \
       curl \
       systemd-standalone-sysusers \
+      tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 # Debian's postfix runs its chroot sync on every "postfix check" and "postfix

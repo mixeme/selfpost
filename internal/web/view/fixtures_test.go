@@ -113,7 +113,7 @@ func healthFixture(refresh bool) *Health {
 	}
 	h.Certificate.End = Verdict("warn")
 	h.CertFacts = []Fact{
-		{Label: "Expires", Value: Plain("2026-10-21 09:14 UTC"), Mono: true},
+		{Label: "Expires", Value: Plain("2026-10-21 09:14"), Mono: true},
 		{Label: "Names", Value: Plain("mail.example.org"), Mono: true},
 	}
 	h.CertDetail, h.CertProblem = "Expires in 12 day(s). Check that renewal on the host still works.", true
@@ -149,16 +149,21 @@ func accountFixture() *Account {
 const mailFixtureDKIMHost = "sp2026._domainkey.mail.example.org"
 
 // settingsFixture is the mockup's Settings: thirty days of log, a limit of 600
-// messages an hour, notifications on, and the records of the server's own name
-// with the DKIM one published and the SPF one missing.
+// messages an hour, notifications on, the records of the server's own name
+// with the DKIM one published and the SPF one missing, and Moscow's time.
 func settingsFixture() *Settings {
+	msk, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		msk = time.FixedZone("Europe/Moscow", 3*3600)
+	}
 	key := "v=DKIM1; k=rsa; p=" + strings.Repeat("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A", 10) + "IDAQAB"
 	return NewSettings(admin(), "30", FormatRate(600, 3600)).WithInbound("90").
 		WithNotifications(true, "postmaster@mail.example.org").
 		WithMail([]Record{
 			ServerMailDKIM("sp2026", mailFixtureDKIMHost, key, DNSCheck{Status: "ok"}),
 			ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "error", Detail: "No SPF record is published for mail.example.org."}),
-		}, "3 min ago")
+		}, "3 min ago").
+		WithTimeZone("Europe/Moscow", msk, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC))
 }
 
 // outDomainsFixture is the mockup's Outbound domains: three domains, the first
@@ -220,7 +225,7 @@ func outDomainSettingsFixture() *OutDomainSettings {
 	p.WithExport(12)
 	return p.WithRateLimit(DomainRateLimit{
 		Active: true, Auto: true, MaxMessages: "288", Window: "3600", Multiplier: "2.5",
-		Computed: "288", Peak: 96, Updated: "2026-10-09 03:00 UTC",
+		Computed: "288", Peak: 96, Updated: "2026-10-09 03:00",
 		L1Messages: 600, L1Window: 3600, MinMultiplier: "1.5", MaxMultiplier: "5", DefaultMultiplier: "2.5",
 	})
 }
@@ -338,7 +343,7 @@ func dmarcDomainFixture() *DMARCDomain {
 func dmarcReportFixture() *DMARCReport {
 	return NewDMARCReport(admin(), ReportInput{
 		ID: 40, Reporter: "Outlook.com", ReportID: "5f1c9a0e7b2d4e61a3", Domain: "shop.example.org", DomainID: 2,
-		Pass: 1903, Fail: 7, Window: "20 Sep", Period: "20 Sep 00:00 – 21 Sep 00:00 UTC", Received: "2026-09-21 04:40 UTC",
+		Pass: 1903, Fail: 7, Window: "20 Sep", Period: "20 Sep 00:00 – 21 Sep 00:00", Received: "2026-09-21 04:40",
 		PolicyP: "none", PolicySP: "none", PolicyPct: 100, PolicyADKIM: "r", PolicyASPF: "r",
 		Recipient: "dmarc@mail.example.org", Hub: true,
 	}).WithRecords([]DMARCRecordRow{

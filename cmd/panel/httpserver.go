@@ -113,6 +113,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		TLSCertFile:                cfg.tlsCertFile,
 		TLSServedCertFile:          cfg.tlsServedCertFile,
 		SMTPBanner:                 cfg.smtpBanner,
+		TimeZone:                   cfg.timeZone,
 		TLSReloadInterval:          cfg.tlsReloadInterval,
 		SignSocket:                 cfg.signSocket,
 		SignLocalSocket:            cfg.signLocalSocket,

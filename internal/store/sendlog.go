@@ -224,7 +224,7 @@ func (s *Store) UpdateStatus(queueID, recipient, status string) (int64, error) {
 		if _, err := tx.Exec(
 			`INSERT INTO delivery_log_days (day, reconcile_contradicted) VALUES (?, ?)
 			 ON CONFLICT (day) DO UPDATE SET reconcile_contradicted = reconcile_contradicted + excluded.reconcile_contradicted`,
-			now.Format(dayLayout), contradicted,
+			now.Local().Format(dayLayout), contradicted,
 		); err != nil {
 			return 0, fmt.Errorf("update send_log status: count the contradicted sweep: %w", err)
 		}
@@ -500,7 +500,8 @@ type SendLogFilter struct {
 	DomainIDs  []int64
 	AllDomains bool
 	// Status is a row's status, and Since and Until are days: from the
-	// first's midnight up to, not including, midnight after the last, UTC.
+	// first's midnight up to, not including, midnight after the last, in the
+	// container's zone.
 	// Zero values do not narrow.
 	Status       string
 	Since, Until time.Time
@@ -589,14 +590,14 @@ func sendLogWhere(f SendLogFilter) (string, []any) {
 	// created_at is RFC3339 UTC, so comparing it as text against the same
 	// format is comparing moments (as InboundSpamFilter's days).
 	if !f.Since.IsZero() {
-		y, m, d := f.Since.UTC().Date()
+		y, m, d := f.Since.Date()
 		clauses = append(clauses, "created_at >= ?")
-		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+		args = append(args, time.Date(y, m, d, 0, 0, 0, 0, time.Local).UTC().Format(time.RFC3339))
 	}
 	if !f.Until.IsZero() {
-		y, m, d := f.Until.UTC().Date()
+		y, m, d := f.Until.Date()
 		clauses = append(clauses, "created_at < ?")
-		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
+		args = append(args, time.Date(y, m, d+1, 0, 0, 0, 0, time.Local).UTC().Format(time.RFC3339))
 	}
 	if len(clauses) == 0 {
 		return "", nil

@@ -194,9 +194,9 @@ func (h *Handlers) HandleTestMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	const subject = "SelfPost test message"
-	now := time.Now().UTC()
+	now := time.Now()
 	body := "A test message from SelfPost at " + h.cfg.Hostname + ", sent from Server › Health on " +
-		now.Format("2006-01-02 at 15:04 UTC") + ".\n\nIt came from this server, signed with the DKIM key of its own name. " +
+		now.Format("2006-01-02 at 15:04 MST") + ".\n\nIt came from this server, signed with the DKIM key of its own name. " +
 		"Its page in the panel's Outbound log shows what this mail server answered.\n"
 	row, err := h.store.InsertTestMessage(h.cfg.Hostname, from, to, subject)
 	if err != nil {
@@ -290,7 +290,7 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 	cert := c.Cert
 	page.Certificate.End = view.Verdict(string(cert.Status))
 	if !cert.NotAfter.IsZero() {
-		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Expires", Value: view.Plain(cert.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
+		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Expires", Value: view.Plain(cert.NotAfter.Local().Format("2006-01-02 15:04")), Mono: true})
 	}
 	if len(cert.Names) > 0 {
 		names := view.Fact{Label: "Names", Value: view.Plain(strings.Join(cert.Names, ", ")), Mono: true}
@@ -304,8 +304,8 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 	}
 	if r := cert.Renewal; r != nil {
 		page.CertFacts = append(page.CertFacts,
-			view.Fact{Label: "Renewal expires", Value: view.Plain(r.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true},
-			view.Fact{Label: "Renewal mounted", Value: view.Plain(r.Mounted.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
+			view.Fact{Label: "Renewal expires", Value: view.Plain(r.NotAfter.Local().Format("2006-01-02 15:04")), Mono: true},
+			view.Fact{Label: "Renewal mounted", Value: view.Plain(r.Mounted.Local().Format("2006-01-02 15:04")), Mono: true})
 	}
 	page.CertDetail, page.CertProblem = cert.Detail, cert.Status != health.StatusOK
 

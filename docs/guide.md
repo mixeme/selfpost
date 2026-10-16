@@ -249,6 +249,7 @@ expected to set; defaults match the code exactly.
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). Each is given 2 seconds to answer before the next is asked, and the one that answered last is asked first; a lookup none of them answered shows as not known, never as a wrong record. | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
+| `TZ` | Time zone of the container, an IANA name such as `Europe/Moscow`: every time the panel shows, every day it counts (today on Health, the days of the statistics, the days of the log filters) and the stamps Postfix writes in `mail.log`, so the two agree. Stored times stay UTC, so changing it is only a restart. *Server › Settings* shows the zone in use, and says so when the image does not know the name (the times are then UTC). | UTC | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
@@ -488,7 +489,7 @@ readings, in the order of what stops mail first:
   connects during an outage is counted too; a message refused in the middle
   is one the panel stopped answering for after it had begun. A time marked ≈
   is at most what it shows: at that start supervisord could not say since
-  when Postfix ran. Days are UTC days. The card warns when
+  when Postfix ran. Days are those of the container's zone (`TZ`). The card warns when
   a connection was turned away or a message refused in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
@@ -574,6 +575,18 @@ also has the switch for [notifications](#notifications) and the two DNS records
 that make them arrive, with when they were last checked; **Re-check DNS** at
 the top of the page checks them again once they are published (results are
 otherwise kept a few minutes).
+
+The last box, **Time zone**, names the zone the panel is in: `TZ` in `.env`
+([Environment variables](#environment-variables)), UTC when it is not set,
+with its offset from UTC. Every time the panel shows is in that zone, and no
+time on the screens says which - this box is where it is said. Every day it
+counts is that zone's too: *today* on Health, the days of the statistics,
+the days of the log filters. Postfix runs in the same zone, so the stamps of
+the `mail.log` lines on Server › System log and on a message's page read the
+same clock as the rest of the page. The database keeps its times in UTC, so
+changing the zone is a restart and nothing more; the days counted before it
+stay days of the old zone, a shift of a few hours in the statistics. A name
+the image does not know leaves everything in UTC, and the box says so.
 
 ### Notifications
 
@@ -1544,7 +1557,7 @@ the only one of the two that does not depend on the panel process.
 ### Outbound log
 
 **Outbound › Log** (`/outbound/log`) is a searchable send log with server-side
-filters by domain, application, status and day (from and to, UTC days, as on
+filters by domain, application, status and day (from and to, days of the container's zone, as on
 the Inbound log); the status *rejected* is the three kinds of refusal
 together, which the table tells apart by their tags. A user with the *domain*
 role sees only the rows of their domains. The filters are kept by the pages,

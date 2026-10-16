@@ -151,9 +151,9 @@ func KitPage() *Kit {
 
 		Timeline: Box{No: "08", Title: "timeline"},
 		Steps: []Step{
-			{Time: "13:58:07 UTC", Strong: "Done", Text: Plain(" — default")},
-			{Time: "13:58:09 UTC", Strong: "Deferred", Text: Plain(" — sp-warn"), Level: LevelWarn},
-			{Time: "14:40:00 UTC", Strong: "Bounced", Text: Plain(" — sp-fail"), Level: LevelFail},
+			{Time: "13:58:07", Strong: "Done", Text: Plain(" — default")},
+			{Time: "13:58:09", Strong: "Deferred", Text: Plain(" — sp-warn"), Level: LevelWarn},
+			{Time: "14:40:00", Strong: "Bounced", Text: Plain(" — sp-fail"), Level: LevelFail},
 			{Time: "not yet", Text: Plain("Expected next — sp-pending"), Level: LevelPending},
 		},
 

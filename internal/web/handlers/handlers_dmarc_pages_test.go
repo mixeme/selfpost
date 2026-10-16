@@ -133,10 +133,12 @@ func TestDMARCReportShowsPolicyAndRecords(t *testing.T) {
 	has(t, "report", body,
 		`<h1 class="title is-4">Outlook.com · `, `<a href="/outbound/dmarc">DMARC reports</a> /`, `<a href="/outbound/dmarc/domains/1">example.org</a> /`,
 		"<span class=\"tag is-success is-light\">1\u00a0903 pass</span>", `<span class="tag is-warning is-light">7 fail</span>`,
-		`5f1c9a0e7b2d4e61a3`, `noreply-dmarc@outlook.example`, ` UTC</dd>`,
+		`5f1c9a0e7b2d4e61a3`, `noreply-dmarc@outlook.example`,
 		`none / none / 100`, `<dd class="sp-mono">r / r</dd>`, `dmarc-reports@mail.example.org`,
 		`<h2>Records</h2>`, `Parsed from the aggregate XML`, `203.0.113.25`, `198.51.100.44`,
 		`<span class="tag is-danger is-light">fail</span>`, `<span class="tag is-success is-light">pass</span>`)
+	// The times are the container's zone's, and say no zone (local-time).
+	lacks(t, "report", body, ` UTC</dd>`)
 }
 
 // DMARC is a feature of the deployment: with ingest off none of its pages

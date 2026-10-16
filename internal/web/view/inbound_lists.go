@@ -141,7 +141,7 @@ func (p *FilterLists) setWhere(in FilterListsInput) {
 	}
 	written := "never"
 	if !in.LastWritten.IsZero() {
-		written = in.LastWritten.UTC().Format("2006-01-02 15:04") + " UTC"
+		written = in.LastWritten.Local().Format("2006-01-02 15:04")
 	}
 	p.WhereFacts = []Fact{
 		{Label: "Applied by", Value: applied},
@@ -159,7 +159,7 @@ func (p *FilterLists) WithEntries(entries []FilterEntryInput) *FilterLists {
 		window := "in the last " + plural(int64(p.retentionDays), "day", "days")
 		sheet := []SheetRow{
 			{Label: "Note", Lines: []string{orDash(e.Note)}},
-			{Label: "Added", Lines: []string{e.Added.UTC().Format("2006-01-02")}, Mono: true},
+			{Label: "Added", Lines: []string{e.Added.Local().Format("2006-01-02")}, Mono: true},
 		}
 		row := FilterRow{
 			Value:  e.Value,
@@ -169,7 +169,7 @@ func (p *FilterLists) WithEntries(entries []FilterEntryInput) *FilterLists {
 			row.Matched = strconv.Itoa(e.Hits)
 			sheet = append(sheet,
 				SheetRow{Label: "Matched", Lines: []string{row.Matched + " " + window}},
-				SheetRow{Label: "Last match", Lines: []string{e.LastHit.UTC().Format("2006-01-02 15:04")}, Mono: true})
+				SheetRow{Label: "Last match", Lines: []string{e.LastHit.Local().Format("2006-01-02 15:04")}, Mono: true})
 		} else {
 			sheet = append(sheet, SheetRow{Label: "Matched", Lines: []string{"never " + window}})
 		}

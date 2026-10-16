@@ -227,7 +227,7 @@ func TestOutDomainSettingsHasAFormPerBox(t *testing.T) {
 		`name="password"`, `name="password_confirm"`, `minlength="12"`, `at least 12 characters`,
 		`action="/outbound/domains/1/settings/ratelimit"`, `name="mode"`, `data-ratelimit-mode`, `data-manual-fields`, `data-auto-fields`,
 		`name="max_messages"`, `max="600"`, `name="window_seconds"`, `name="auto_multiplier"`, `min="1.5" max="5"`, `Multiplier (1.5–5, default 2.5)`,
-		`Computed limit: <strong>288</strong> messages / 3600 s. Peak was 96 msg/h. Last recalculated 2026-10-09 03:00 UTC.`,
+		`Computed limit: <strong>288</strong> messages / 3600 s. Peak was 96 msg/h. Last recalculated 2026-10-09 03:00.`,
 		`<option value="auto" selected>`, `<span class="tag is-success is-light">active</span>`, `class="sp-help" href="/help#limits"`,
 		`600 messages / 3600 s per client IP, set in <code>.env</code>`,
 		`action="/outbound/domains/1/settings/ratelimit/recalc"`, `name="clear" value="1"`, `data-confirm="Remove the domain rate limit?`,
@@ -375,7 +375,7 @@ func TestOutAppAutoLimitHasRecalculate(t *testing.T) {
 	p := outAppFixture().WithForm(OutAppForm{Login: "prod-server", Mode: AddressWildcard, LimitMode: LimitAuto, Window: "3600", Multiplier: "2.5"},
 		OutAppState{Limit: true, Auto: true},
 		AppRateLimit{L1Messages: 600, L1Window: 3600, MinMultiplier: "1.5", MaxMultiplier: "5", DefaultMultiplier: "2.5",
-			Computed: "288", Peak: 96, Updated: "2026-10-09 03:00 UTC"})
+			Computed: "288", Peak: 96, Updated: "2026-10-09 03:00"})
 	out := renderSignedIn(t, "out-app", p)
 	pageHas(t, "Application", out, `formaction="/outbound/domains/1/applications/1/ratelimit/recalc"`, `Recalculate rate limit`,
 		`Computed limit: <strong>288</strong> messages / 3600 s.`)

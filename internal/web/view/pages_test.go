@@ -63,7 +63,7 @@ func TestOverviewHeadFollowsTheCards(t *testing.T) {
 		`<h1 class="title is-3">Running, with warnings.</h1>`,
 		`class="sp-postmark sp-warn"`, `<b>WARN</b>`, `1 OF 6 CHECKS`,
 		`Needs attention: <a href="/server/health">TLS certificate</a> (Expires in 12 days).`,
-		`Updated 14:02:31 UTC`, `<p class="sp-kicker">mail.example.org</p>`,
+		`Updated 14:02:31`, `<p class="sp-kicker">mail.example.org</p>`,
 		`class="sp-warn"`, // the certificate card
 		`href="/server/health"`, `>All details</a>`,
 	)
@@ -154,7 +154,7 @@ func TestHealthShowsEveryCheckAndBothActions(t *testing.T) {
 		`<progress class="progress is-small is-success mb-1" value="12" max="100">`, `value="41"`,
 		`↓ 18.0 KiB/s`, `eth0: 2.1 GiB in, 6.4 GiB out`,
 		`pid 41, uptime 18 days`, `<span class="tag is-success is-light">running</span>`,
-		`2026-10-21 09:14 UTC`, `class="mt-4 has-text-danger"`, `Check that renewal on the host still works.`,
+		`2026-10-21 09:14`, `class="mt-4 has-text-danger"`, `Check that renewal on the host still works.`,
 		`dkim-signer <span class="sp-muted">· notifications</span>`, `unix:/run/selfpost/sign-local.sock`, `→ 203.0.113.25<br>← mail.example.org`,
 		`hx-get="/server/health/fragment"`,
 	)
@@ -346,6 +346,42 @@ func TestSettingsIsOneFormWithOneSaveButton(t *testing.T) {
 	pageHas(t, "Settings", out, `Save settings`, `<h1 class="title is-3">Settings</h1>`, `href="/account"`)
 }
 
+// The time zone is shown, not set: its name and offset, and a TZ the image
+// does not know is said to give UTC rather than named as the zone in use.
+func TestSettingsShowsTheTimeZone(t *testing.T) {
+	pageHas(t, "Settings", renderSignedIn(t, "settings", settingsFixture()),
+		`<h2>Time zone</h2>`, `<dd class="sp-mono">Europe/Moscow</dd>`, `UTC&#43;03:00. Set in <code>.env</code> (<code>TZ</code>); restart to change.`,
+		`and so are the stamps of <code>mail.log</code>.`)
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	pageHas(t, "Settings without TZ", renderSignedIn(t, "settings", NewSettings(admin(), "30", "600 / h").WithTimeZone("", time.UTC, now)),
+		`<dd class="sp-mono">UTC</dd>`, `UTC&#43;00:00. Set in`)
+	pageHas(t, "Settings with a wrong TZ", renderSignedIn(t, "settings", NewSettings(admin(), "30", "600 / h").WithTimeZone("Mars/Olympus", time.UTC, now)),
+		`<dd class="sp-mono">Mars/Olympus</dd>`, `Not a zone this image knows, so the times are UTC.`)
+	ny, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("no zone America/New_York here: %v", err)
+	}
+	pageHas(t, "Settings in New York", renderSignedIn(t, "settings", NewSettings(admin(), "30", "600 / h").WithTimeZone("America/New_York", ny, now)),
+		`UTC-04:00. Set in`)
+}
+
+// The panel shows times in the container's zone, with no zone written
+// beside them (local-time): the row of a log, a message's page, the head
+// of Overview.
+func TestTimesAreTheContainersZone(t *testing.T) {
+	inZone(t, "Europe/Moscow")
+	at := time.Date(2026, 9, 21, 22, 30, 5, 0, time.UTC)
+	if got := FormatLogTime(at); got != "09-22 01:30:05" {
+		t.Errorf("FormatLogTime = %q, want the 22nd at 01:30:05 in Moscow", got)
+	}
+	if got := formatStamp(at); got != "2026-09-22 01:30:05" {
+		t.Errorf("formatStamp = %q", got)
+	}
+	if got := FormatReceived(at); got != "09-22 01:30" {
+		t.Errorf("FormatReceived = %q", got)
+	}
+}
+
 // Notifications are one switch for the instance, saved with the rest of the
 // page, and the records of the server's own name are drawn like a domain's.
 func TestSettingsNotificationsSwitchAndRecords(t *testing.T) {
@@ -477,7 +513,7 @@ func TestOverviewPageHasThePollAttributesAndNoOOBMark(t *testing.T) {
 func TestOverviewFragmentIsTheBoxAndTheHeadOutOfBand(t *testing.T) {
 	frag := renderFragment(t, "overview_poll", overviewFixture())
 	pageHas(t, "fragment", frag,
-		`<div class="sp-head" id="overview-head" hx-swap-oob="true">`, `class="sp-postmark sp-warn"`, `Updated 14:02:31 UTC`,
+		`<div class="sp-head" id="overview-head" hx-swap-oob="true">`, `class="sp-postmark sp-warn"`, `Updated 14:02:31`,
 		`<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`,
 		`Expires in 12 days`)
 	pageLacks(t, "fragment", frag, `<html`, `<body`, `navbar`, `<table`, `Outbound domains`)

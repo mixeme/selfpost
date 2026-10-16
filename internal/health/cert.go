@@ -151,8 +151,8 @@ func CheckServedCertificate(served, mounted string, interval time.Duration, now 
 	switch {
 	case r.Late:
 		c.Status = Worst(c.Status, StatusWarn)
-		c.Detail = fmt.Sprintf("A renewed certificate has been in the mounted file since %s UTC, longer than Postfix's check for a renewal allows, and Postfix still serves the one above. cert-reload's lines in the container log say why.",
-			r.Mounted.UTC().Format("2006-01-02 15:04"))
+		c.Detail = fmt.Sprintf("A renewed certificate has been in the mounted file since %s, longer than Postfix's check for a renewal allows, and Postfix still serves the one above. cert-reload's lines in the container log say why.",
+			r.Mounted.Local().Format("2006-01-02 15:04"))
 	case c.Status == StatusError:
 		c.Detail += " A renewed one is waiting in the mounted file; Postfix takes it up at its next check for a renewal, at most " + intervalText(interval) + " after it was mounted."
 	default:

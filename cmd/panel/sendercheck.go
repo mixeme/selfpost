@@ -104,19 +104,21 @@ func senderCheckDowntime(markAt, now time.Time, ask func() postfixState) (down t
 	return 0, false
 }
 
-// dayPart is the part of a stretch of downtime that fell on one UTC day.
+// dayPart is the part of a stretch of downtime that fell on one day of the
+// container's zone.
 type dayPart struct {
 	day  time.Time
 	down time.Duration
 }
 
-// byDay cuts the time from 'from' to 'to' at the UTC midnights between them,
-// so that a night's outage is not all booked on the morning it ended.
+// byDay cuts the time from 'from' to 'to' at the midnights of the container's
+// zone between them, so that a night's outage is not all booked on the morning
+// it ended.
 func byDay(from, to time.Time) []dayPart {
-	from, to = from.UTC(), to.UTC()
+	from, to = from.Local(), to.Local()
 	var parts []dayPart
 	for from.Before(to) {
-		next := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
+		next := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, 1)
 		if next.After(to) {
 			next = to
 		}

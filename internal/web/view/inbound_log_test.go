@@ -22,7 +22,7 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">`,
 		`<input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">`,
 		`href="/help#inbound-log" title="What the decisions mean"`,
-		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Upstream</th><th></th></tr>`,
+		`<th>Time</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Upstream</th><th></th></tr>`,
 		// what the upstream answered: a tag that opens its last reply, a
 		// plain tag while not tried, "—" for refused mail
 		`<button type="button" class="tag is-success is-light" popovertarget="up-1">sent</button><div class="sp-sheet" id="up-1" popover>`,
@@ -219,7 +219,7 @@ func TestFilterListsShowsTheFormTheListsAndWhereTheyGo(t *testing.T) {
 		`<h2>Where the lists go</h2><div class="sp-end"><span class="tag is-success is-light">applied</span></div>`,
 		`rspamd, from map files it rereads within seconds of a change`,
 		`<span class="sp-mono">/data/antispam/</span> — six, one for each list and kind of entry`,
-		`2026-09-11 08:40 UTC`, `Deny wins, whichever entries they are.`,
+		`2026-09-11 08:40`, `Deny wins, whichever entries they are.`,
 	)
 	if got := strings.Count(out, `<table class="table is-fullwidth is-hoverable">`); got != 2 {
 		t.Errorf("%d list tables, want the two lists", got)

@@ -74,7 +74,7 @@ func TestHealthPageRendersEveryCheck(t *testing.T) {
 	out := renderHealth(t, h, healthReading(), "")
 	for _, want := range []string{
 		"panel", "fatal", "exited too quickly",
-		"mail.example.com", "203.0.113.10 → no PTR record", "2026-11-08 09:14 UTC",
+		"mail.example.com", "203.0.113.10 → no PTR record", "2026-11-08 09:14",
 		`action="/server/health/reload"`, `action="/server/health/recheck"`,
 		`hx-get="/server/health/fragment"`,
 		`<span class="tag is-danger is-light">error</span>`, // postfix, and the reverse DNS box
@@ -164,9 +164,9 @@ func TestHealthPageNamesARenewalWaiting(t *testing.T) {
 	c.Cert = cert
 	out := renderHealth(t, h, c, "")
 	for _, want := range []string{
-		"<dt>Expires</dt>", "2026-11-08 09:14 UTC",
-		"<dt>Renewal expires</dt>", "2027-01-31 08:02 UTC",
-		"<dt>Renewal mounted</dt>", "2026-10-15 03:12 UTC",
+		"<dt>Expires</dt>", "2026-11-08 09:14",
+		"<dt>Renewal expires</dt>", "2027-01-31 08:02",
+		"<dt>Renewal mounted</dt>", "2026-10-15 03:12",
 		"Postfix still serves the certificate above.",
 	} {
 		if !strings.Contains(out, want) {

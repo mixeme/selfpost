@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **The panel in your time zone** (local-time): set `TZ` in `.env` (an IANA
+  name, e.g. `Europe/Moscow`) and every time the panel shows, every day it
+  counts - today on Health, the statistics' days, the days of the log
+  filters - and the stamps of `mail.log` are that zone's. The screens no
+  longer write "UTC" beside a time; **Server › Settings** names the zone in
+  a new read-only box. Unset, it is UTC as before. Changing it is a
+  restart; days counted before stay the old zone's.
+
 ## [2.12.0] - 2026-10-17
 
 A test message from Server › Health. No migration; schema 12.

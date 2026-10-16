@@ -31,6 +31,7 @@ type Config struct {
 	TLSServedCertFile string
 	TLSReloadInterval time.Duration
 	SMTPBanner        string
+	TimeZone          string
 	SignSocket        string
 	SignLocalSocket   string
 	JournalSocket     string

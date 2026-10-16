@@ -263,7 +263,9 @@ var serverTopics = []HelpTopic{
 			" on either list. The only global user cannot be demoted or deleted, and you cannot delete the account you are signed in with. A new password set here signs that user out of their other sessions."),
 	}},
 	{ID: HelpSettings, Title: "Settings", Body: []Text{
-		Rich("Settings holds what is true of the whole instance. Log retention is how many days the Outbound log keeps its rows, from 7 to 365 and 90 by default; a sweep every six hours deletes older ones, and it is the main driver of how fast ",
+		Rich("Settings holds what is true of the whole instance. The time zone is the container's, ", Code("TZ"), " in ", Code(".env"),
+			" (UTC when it is not set): every time the panel shows and every day it counts is that zone's, as are the stamps Postfix writes in ", Code("mail.log"),
+			", so the two always agree; changing it is a restart of the container. Log retention is how many days the Outbound log keeps its rows, from 7 to 365 and 90 by default; a sweep every six hours deletes older ones, and it is the main driver of how fast ",
 			Code("/data"), " grows. With the inbound relay on there is a second number, for the Inbound log, with the same range. It does not change the rotation of ", Code("mail.log"),
 			", which is daily with about two weeks kept. The sending rate limit shown under it is level 1, the per-client-IP ceiling set in ",
 			Code(".env"), ": changing it needs a restart, and no level-2 limit can exceed it. Notifications are turned on or off here for everyone."),

@@ -25,7 +25,7 @@ func DMARCDomainHref(id int64) string { return outboundDMARC + "/domains/" + str
 func DMARCReportHref(id int64) string { return outboundDMARC + "/reports/" + strconv.FormatInt(id, 10) }
 
 // FormatReceived is the time a report was received, as the tables show it.
-func FormatReceived(t time.Time) string { return t.UTC().Format("01-02 15:04") }
+func FormatReceived(t time.Time) string { return t.Local().Format("01-02 15:04") }
 
 // ---- The hub
 
@@ -97,7 +97,7 @@ func NewDMARCHub(m Meta, in IngestInput) *DMARCHub {
 	if in.Last.IsZero() {
 		last.Note = Rich("Set a domain to SelfPost hosted in its Domain settings, publish the DMARC record it then shows, and publish MX for ", Mono(in.Host), " pointing at this server.")
 	} else {
-		last.Value = Plain(in.Last.UTC().Format("2006-01-02 15:04") + " UTC")
+		last.Value = Plain(in.Last.Local().Format("2006-01-02 15:04"))
 	}
 	return &DMARCHub{
 		Meta: m,
@@ -329,8 +329,8 @@ type ReportInput struct {
 	Contact     string
 	Pass, Fail  int
 	Window      string // the window in the title: "20 Sep"
-	Period      string // the window with its times: "20 Sep 00:00 – 21 Sep 00:00 UTC"
-	Received    string // "2026-09-21 04:40 UTC"
+	Period      string // the window with its times: "20 Sep 00:00 – 21 Sep 00:00"
+	Received    string // "2026-09-21 04:40"
 	PolicyP     string
 	PolicySP    string
 	PolicyPct   int

@@ -60,6 +60,7 @@ func (h *Handlers) renderServerSettings(w http.ResponseWriter, r *http.Request, 
 	page.WithNotifications(on, notify.From(h.cfg.Hostname))
 	mail := h.serverMail(false)
 	page.WithMail(mail.records, view.FormatAge(mail.checked, time.Now()))
+	page.WithTimeZone(h.cfg.TimeZone, time.Local, time.Now())
 	// The inbound field exists while there is an inbound journal to keep.
 	if h.cfg.InboundEnabled {
 		page.WithInbound(strconv.Itoa(form.inbound))

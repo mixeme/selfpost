@@ -6,7 +6,7 @@ import (
 )
 
 // The counters of delivery_log_days (migration 0007): what the reconcile sweep
-// and the log tailer did, a row per UTC day, read off a copy of the database
+// and the log tailer did, a row per day of the container's zone, read off a copy of the database
 // to decide the sweep's fate (audit 2026-10-12, stage 1). No page shows them.
 
 // deliveryLogKeepDays is how long a day of the counters is kept.
@@ -29,7 +29,7 @@ func (s *Store) addDeliveryLogDay(at time.Time, column string, n int64) error {
 	_, err := s.db.Exec(fmt.Sprintf(
 		`INSERT INTO delivery_log_days (day, %[1]s) VALUES (?, ?)
 		 ON CONFLICT (day) DO UPDATE SET %[1]s = %[1]s + excluded.%[1]s`, column),
-		at.UTC().Format(dayLayout), n,
+		at.Local().Format(dayLayout), n,
 	)
 	if err != nil {
 		return fmt.Errorf("delivery log day, %s: %w", column, err)
@@ -61,7 +61,7 @@ func (s *Store) SetQueuedOverLifetime(at time.Time, n int64) error {
 	_, err := s.db.Exec(
 		`INSERT INTO delivery_log_days (day, queued_over_lifetime) VALUES (?, ?)
 		 ON CONFLICT (day) DO UPDATE SET queued_over_lifetime = excluded.queued_over_lifetime`,
-		at.UTC().Format(dayLayout), n,
+		at.Local().Format(dayLayout), n,
 	)
 	if err != nil {
 		return fmt.Errorf("delivery log day, queued_over_lifetime: %w", err)
@@ -113,7 +113,7 @@ func (s *Store) DeliveryLogDays() ([]DeliveryLogDay, error) {
 // PruneDeliveryLogDays deletes the days older than a year.
 func (s *Store) PruneDeliveryLogDays(now time.Time) error {
 	_, err := s.db.Exec(`DELETE FROM delivery_log_days WHERE day < ?`,
-		now.UTC().AddDate(0, 0, -deliveryLogKeepDays).Format(dayLayout))
+		now.Local().AddDate(0, 0, -deliveryLogKeepDays).Format(dayLayout))
 	if err != nil {
 		return fmt.Errorf("prune delivery log days: %w", err)
 	}

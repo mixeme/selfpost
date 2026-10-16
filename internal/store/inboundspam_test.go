@@ -215,7 +215,8 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 	if got := to(InboundSpamFilter{Decision: SpamDecisionReject}); got != "25" {
 		t.Errorf("decision = %q, want 25", got)
 	}
-	// Days are whole UTC days and both ends are in: 21 st is 00:00 up to 23:59.
+	// Days are whole days of the container's zone (UTC here, TestMain) and
+	// both ends are in: 21 st is 00:00 up to 23:59.
 	if got := to(InboundSpamFilter{Since: day(21, 15), Until: day(21, 3)}); got != "32" {
 		t.Errorf("one day = %q, want 32", got)
 	}
@@ -225,10 +226,11 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 	if got := to(InboundSpamFilter{Until: day(20, 0)}); got != "15" {
 		t.Errorf("until = %q, want 15", got)
 	}
-	// A time in another zone is read as the UTC day it falls on.
+	// A day is the date it carries, whatever zone the time is in: the 22nd at
+	// 02:00 in Moscow is the 22nd.
 	msk := time.FixedZone("msk", 3*3600)
-	if got := to(InboundSpamFilter{Since: time.Date(2026, 9, 22, 2, 0, 0, 0, msk)}); got != "432" {
-		t.Errorf("since in another zone = %q, want 432 (it is the 21st in UTC)", got)
+	if got := to(InboundSpamFilter{Since: time.Date(2026, 9, 22, 2, 0, 0, 0, msk)}); got != "4" {
+		t.Errorf("since in another zone = %q, want 4 (the 22nd)", got)
 	}
 	if got := to(InboundSpamFilter{Domain: "b.example", Decision: SpamDecisionAccept, Since: day(21, 0), Until: day(21, 0)}); got != "3" {
 		t.Errorf("all filters = %q, want 3", got)
@@ -259,6 +261,14 @@ func TestQueryInboundSpamFilters(t *testing.T) {
 	// A value is data, not SQL.
 	if got := to(InboundSpamFilter{Domain: "a.example' OR '1'='1"}); got != "" {
 		t.Errorf("injected domain = %q", got)
+	}
+
+	// In a container with TZ=Europe/Moscow the 21st is that zone's: from 20 Sep
+	// 21:00 UTC, so it takes the row of the 20th at 23:00 UTC and leaves the
+	// 22nd's at 00:00 UTC, which is 03:00 there.
+	inZone(t, "Europe/Moscow")
+	if got := to(InboundSpamFilter{Since: day(21, 0), Until: day(21, 0)}); got != "321" {
+		t.Errorf("one day in Moscow = %q, want 321", got)
 	}
 }
 

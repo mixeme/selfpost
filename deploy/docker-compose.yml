@@ -56,6 +56,9 @@ services:
       # report what the internet sees rather than what this host's own stub
       # resolver synthesises. Empty uses public defaults.
       SELFPOST_DNS_RESOLVERS: "${SELFPOST_DNS_RESOLVERS:-}"
+      # The zone of every time the panel shows and of mail.log's stamps, e.g.
+      # Europe/Moscow. Empty is UTC.
+      TZ: "${TZ:-}"
       # Reverse-proxy CIDRs allowed to supply X-Forwarded-For for login/setup
       # rate-limiting. See docs/guide.md "Environment variables" — wrong value lets a
       # client spoof its rate-limit key.

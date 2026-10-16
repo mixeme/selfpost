@@ -475,10 +475,10 @@ the hole it closed was the same.
   cleanup process serves message after message, so each such warning is
   counted as a message. The two are counted apart (the owner, 2026-10-14):
   connections turned away in `deferred`, messages deferred mid-message in
-  `messages` of `sender_check_days`, a row per UTC day kept a year, and
+  `messages` of `sender_check_days`, a row per day of the container's zone (`TZ`) kept a year, and
   Server › Health shows today, 30 days and 12 months in a column each. The
   counts also see a panel that is running and not answering, which the mark
-  does not. Downtime is cut at the UTC midnights it crossed. A log read again
+  does not. Downtime is cut at the midnights of that zone it crossed. A log read again
   after an unclean stop does not count again: the count and the place in the
   log it reached (the file's fingerprint and the offset past the line) are
   saved in one transaction, and while the tailer catches up a warning at or
@@ -712,7 +712,7 @@ lines are gone for good — rotated past fourteen files while the panel was down
 or deleted — or that the tailer was not reading.
 
 Whether the sweep earns its place is measured, not argued (audit 2026-10-12,
-H3). `delivery_log_days` (migration `0007`) keeps, per UTC day for a year:
+H3). `delivery_log_days` (migration `0007`) keeps, per day of the container's zone for a year:
 `reconcile_closed`, the rows the sweep closed; `reconcile_missed`, those of
 them whose final line - sent, bounced, or the message's expiry - was in
 `mail.log` or `mail.log.1` when the sweep closed them - the tailer did not
@@ -1203,7 +1203,7 @@ The tables that carry the panel's model:
   `inbound_spam_list` (the filter lists), `dmarc_reports`,
   `dmarc_report_records`, `notify_state` and `notify_addressees` (what the
   notifier has said and to whom, § Notifications), `sender_check_days` (the
-  sender check's downtime and the mail it deferred, per UTC day) and
+  sender check's downtime and the mail it deferred, per day of the container's zone) and
   `delivery_log_days` (the queue sweep's measurements, § Log tailer).
 
 Two processes write: the panel, on one connection, and `dmarc-ingest`, which

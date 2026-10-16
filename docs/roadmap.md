@@ -38,7 +38,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
-| local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
+| local-time | The panel shows time, and counts its days, in a time zone other than UTC | done 2026-10-17, unreleased | — | — |
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | shipped `2.9.0` | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | shipped `2.9.0` | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | shipped `2.9.0` | — | — |
@@ -524,6 +524,26 @@ that show a date show the year.
 the database's stored instants and the e2e stay as they are.
 
 **Version:** `2.x` MINOR; `agreed`; the plan is written when it is taken up.
+
+**Where the zone comes from, changed (owner, 2026-10-17):** not a setting
+in the panel but the container's own zone, `TZ` in `.env`; Settings only
+shows it ("Да" to "пояс в `.env`, на Settings только показ?"). His reason
+was the trap above: a container cannot change its zone without a restart,
+and only the container's zone moves Postfix's stamps with the rest. So the
+trap is closed by the third way - the container runs in the zone, Postfix
+stamps `mail.log` in it (`TZ` is in Postfix's `import_environment`), and the
+tailer reads the stamps in the same zone, as it always did (`lineTime`,
+`time.Local`).
+
+**Done (2026-10-17):** design c205106 (no "UTC" on any screen, Settings box
+05 *Time zone*, read-only, the help topic). The panel formats every time in
+`time.Local`; the day tables key their rows by the local date, the sender
+check cuts downtime at local midnights, the log filters' days run from local
+midnight; stored instants stay UTC. Notification mail and the test message
+write the zone's abbreviation after a time (they are read away from the
+panel). The year question settled as the mockups have it. `tzdata` is named
+in the image. Tests run in UTC (a `TestMain` in each package that formats
+or counts days) and in Moscow where the zone is the point.
 
 ---
 

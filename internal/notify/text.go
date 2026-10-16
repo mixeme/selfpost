@@ -33,7 +33,7 @@ func compose(hostname, subject string, paragraphs ...string) message {
 	}
 }
 
-func stamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") }
+func stamp(t time.Time) string { return t.Local().Format("2006-01-02 15:04 MST") }
 
 // plain makes text that came from outside fit for a message body: a queued
 // message's sender is whatever its sender wrote, and a DNS finding may quote a

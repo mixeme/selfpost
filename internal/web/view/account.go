@@ -6,7 +6,12 @@ package view
 // user's own — who they are to the panel and their password — and every role
 // has it. Settings is the instance's.
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+)
 
 // Account is the data of the Account page. Two forms, each its own POST: the
 // profile (Username, Email) and the password. The fields hold what was stored,
@@ -78,6 +83,11 @@ type Settings struct {
 	// are signed and authorised with, drawn like a domain's.
 	Mail        Box
 	MailRecords []Record
+
+	// TimeZone names the container's zone, which every time and day the
+	// panel shows is in; it is set in .env, so the box only shows it.
+	TimeZone  Box
+	ZoneFacts []Fact
 }
 
 // NewSettings builds the page. retention is what the field shows (the stored
@@ -106,6 +116,7 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 		Notifications: Box{No: "02", Title: "Notifications", ID: "notifications", Help: topicLink(HelpNotifications, "What is sent and when")},
 		Mail: Box{No: "03", Title: "Notification mail", ID: "notification-mail", End: Plain("DNS records of the server's own name"),
 			Help: topicLink(HelpNotifications, "What the panel sends and what makes it arrive")},
+		TimeZone: Box{No: "05", Title: "Time zone", ID: "time-zone", End: Plain("Read-only"), Help: topicLink(HelpSettings, "Times and days of the panel")},
 	}
 }
 
@@ -130,6 +141,29 @@ func (s *Settings) WithMail(records []Record, checked string) *Settings {
 	if checked != "" {
 		s.Mail.End = Plain("The server's own name · checked " + checked)
 	}
+	return s
+}
+
+// WithTimeZone names the zone: tz is TZ as the container has it ("" is UTC,
+// Go's and the C library's default), loc the zone the process took from it
+// (time.Local), at now for its offset. A TZ Go cannot load leaves time.Local
+// UTC (time/zoneinfo_unix.go, initLocal), and the box says so rather than name
+// a zone the times are not in.
+func (s *Settings) WithTimeZone(tz string, loc *time.Location, now time.Time) *Settings {
+	name := strings.TrimPrefix(tz, ":")
+	if name == "" {
+		name = "UTC"
+	}
+	_, offset := now.In(loc).Zone()
+	sign := "+"
+	if offset < 0 {
+		sign, offset = "-", -offset
+	}
+	note := Rich(fmt.Sprintf("UTC%s%02d:%02d. Set in ", sign, offset/3600, offset%3600/60), Code(".env"), " (", Code("TZ"), "); restart to change.")
+	if name != "UTC" && loc.String() != name {
+		note = Rich("Not a zone this image knows, so the times are UTC. Set in ", Code(".env"), " (", Code("TZ"), "); restart to change.")
+	}
+	s.ZoneFacts = []Fact{{Label: "Zone", Value: Plain(name), Mono: true, Note: note}}
 	return s
 }
 
