@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-10-16
+
+Postfix's queue ids no longer repeat. No migration; schema 12.
+
 ### Fixed
 
 - **Queue ids no longer repeat**: Postfix makes long, non-repeating queue ids
