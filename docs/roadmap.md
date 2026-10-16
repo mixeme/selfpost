@@ -41,7 +41,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
-| go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | agreed (2026-10-16) | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
+| go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
 | base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | shipped `2.7.0` | — | — |
@@ -903,5 +903,15 @@ GitHub account (nothing is sent from this side):
   break backends that read the map).
 
 **Done when:** the texts and the branch are ready for the owner to post.
+
+*Prepared (2026-10-16):* in `dev/upstream-pr` (not in git): `ISSUE.md`,
+`PR.md`, a README with the steps, and a clone of go-milter on branch
+`reset-headers-per-message` - one commit over `master` (0277691) that
+empties the map on SMFIC_MAIL, with `TestMilterClient_HeadersPerMessage`,
+which fails on `master` (the second message sees both `From` values)
+and passes with it. Read for the issue: Postfix carries every message of
+one SMTP session over the one milter connection smtpd opened (Postfix
+3.10.13, src/milter/milter8.c:2723, LOCAL_SEND_FD of the milter socket to
+cleanup; src/smtpd/smtpd.c:3475, milter_send()).
 When upstream releases a version that does not keep the map (or offers the
 option), `third_party/go-milter` goes and `go.mod`'s `replace` with it.
