@@ -23,7 +23,7 @@ var routes = struct{ always, inbound, dmarc []string }{
 		"GET /{$}",
 		"GET /overview", "GET /overview/fragment",
 		"GET /server/health", "GET /server/health/fragment",
-		"POST /server/health/recheck", "POST /server/health/reload",
+		"POST /server/health/recheck", "POST /server/health/reload", "POST /server/health/test-message",
 		"GET /outbound/domains", "POST /outbound/domains",
 		"GET /outbound/domains/{id}", "POST /outbound/domains/{id}/dns-recheck",
 		"GET /outbound/domains/{id}/settings",
