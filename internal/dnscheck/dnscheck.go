@@ -264,6 +264,19 @@ func (c *Checker) InboundMX(name, hostname string, force bool) Result {
 	return result
 }
 
+// InboundMXCheckedAt is when the MX of name was last looked up for
+// hostname, zero when it has not been: the cache is filled when it is, and
+// keeps the result domainTTL.
+func (c *Checker) InboundMXCheckedAt(name, hostname string) time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.inbound[name+"\x00"+hostname]
+	if !ok {
+		return time.Time{}
+	}
+	return entry.expires.Add(-c.domainTTL)
+}
+
 func (c *Checker) checkInboundMX(ctx context.Context, name, hostname string) Result {
 	mxs, err := c.resolver.LookupMX(ctx, name)
 	if err != nil {

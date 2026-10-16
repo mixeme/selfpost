@@ -187,7 +187,7 @@ func NewHealth(m Meta, flash string) *Health {
 		Head: Head{
 			Kicker:  "Server",
 			Title:   "Health",
-			Lead:    Plain("Everything behind the cards on Overview. Refreshes automatically."),
+			Lead:    Plain("Everything behind the six cards on Overview. Refreshes automatically."),
 			Actions: []Action{{Label: "Re-check DNS", Icon: "ti-refresh", Post: "/server/health/recheck"}},
 		},
 		// Numbered by importance; the odd ones are the left stack.

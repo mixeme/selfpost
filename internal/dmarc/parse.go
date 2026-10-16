@@ -255,7 +255,7 @@ func TightenPolicyHint(pass, fail int, sources []SourceHint) string {
 	if fail > 0 {
 		for _, s := range sources {
 			if s.FailCount > 0 && !s.ThisRelay {
-				return "A third-party source is not aligned. Do not tighten p= until that sender is fixed or removed."
+				return "Failures come from a source that is not this relay — review before tightening p=."
 			}
 		}
 	}

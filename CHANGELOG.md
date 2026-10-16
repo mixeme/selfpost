@@ -12,6 +12,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   It counts characters now, as the backup password always did. Passwords
   already set are not affected.
 
+### Changed
+
+- **The panel and its mockups say the same** (docs-audit): an inbound
+  domain's MX box says when it was checked and its side menu links the
+  domain's Inbound log; a deferred message's history ends with the wait in
+  the queue; Overview says it refreshes on its own; DMARC's hint for an
+  unaligned third party reads as the mockup. Help says what the code does:
+  an application's password is kept by the server so an export can carry
+  it, every password check of a backup counts, a password set for another
+  user signs them out everywhere, the limit mail is daily per sending
+  domain, and a domain administrator is no longer shown the Filter lists
+  topic (their page is the global role's).
+
 ### Documentation
 
 - The documents checked against the code (docs-audit, 2026-10-17): the

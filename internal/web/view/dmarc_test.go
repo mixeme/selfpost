@@ -50,7 +50,7 @@ func TestDMARCDomainStampAndLead(t *testing.T) {
 	pageHas(t, "DMARC domain", out,
 		`<h1 class="title is-3">shop.example.org</h1>`, `<a href="/outbound/dmarc">DMARC reports</a> /`,
 		`class="sp-postmark sp-warn"`, `<span>DMARC</span><b>99.6%</b><span>PASS · 7 DAYS</span>`,
-		"11 204 pass · 41 fail in the last 7 days. A third-party source is not aligned. Do not tighten <code>p=</code> until that sender is fixed or removed.",
+		"11 204 pass · 41 fail in the last 7 days. Failures come from a source that is not this relay — review before tightening <code>p=</code>.",
 		`<a class="button" href="/outbound/domains/2"><i class="ti ti-world-upload"></i>Domain page</a>`,
 		`<h2>Sources · 7 days</h2>`, `203.0.113.25 <span class="tag is-light">this relay</span>`,
 		`<td>0</td><td>41</td><td><span class="tag is-warning is-light">none</span></td>`,

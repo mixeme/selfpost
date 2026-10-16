@@ -109,12 +109,12 @@ func TestDMARCDomainShowsSourcesAndWhatToDoAboutThem(t *testing.T) {
 	has(t, "domain", body,
 		`<h1 class="title is-3">example.org</h1>`, `<a href="/outbound/dmarc">DMARC reports</a> /`,
 		`class="sp-postmark sp-warn"`, `<b>99.6%</b>`, `PASS · 7 DAYS`,
-		"1\u00a0903 pass · 7 fail in the last 7 days. A third-party source is not aligned. Do not tighten <code>p=</code>",
+		"1\u00a0903 pass · 7 fail in the last 7 days. Failures come from a source that is not this relay — review before tightening <code>p=</code>",
 		`href="/outbound/domains/1"`, `<h2>Sources · 7 days</h2>`, `198.51.100.44`, `203.0.113.25`, `<h2>Reports</h2>`,
 		`href="/outbound/dmarc/reports/`+idStr(s.reportID)+`">View</a>`)
 	// 198.51.100.44 passed nothing, so its disposition is amber.
 	has(t, "domain", body, `<td>0</td><td>7</td><td><span class="tag is-warning is-light">none</span></td>`)
-	lacks(t, "domain", body, `this relay`)
+	lacks(t, "domain", body, `>this relay</span>`)
 }
 
 func TestDMARCDomainWithoutReportsSaysSo(t *testing.T) {

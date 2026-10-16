@@ -565,6 +565,9 @@ func TestDeliveryPageDeferredUsesRetryPolicy(t *testing.T) {
 		"first after 10 minutes",
 		"up to about 1 hour 7 minutes",
 		"for up to 2 days",
+		// And the wait after it, an open dot with no time (mockup
+		// out-message.html).
+		`<li class="sp-pending"><time>not yet</time>Still in the queue; the next attempt is Postfix&#39;s own, and after 2 days it is bounced.</li>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("deferred history is missing %q:\n%s", want, out)

@@ -186,6 +186,12 @@ func TestHelpHasTheInboundLogAndFilterListsTopics(t *testing.T) {
 		if want := v.inbound && (v.meta.IsGlobal || v.meta.HasInbound); shown != want {
 			t.Errorf("%s: inbound log topic shown = %v, want %v", v.name, shown, want)
 		}
+		// The filter lists' page is the global role's alone (404 to anyone
+		// else), and so is their topic and its menu entry.
+		lists := strings.Contains(out, `id="filter-lists"`) || strings.Contains(out, `href="#filter-lists"`)
+		if want := v.inbound && v.meta.IsGlobal; lists != want {
+			t.Errorf("%s: filter lists topic shown = %v, want %v", v.name, lists, want)
+		}
 	}
 	if HelpInboundLog != "inbound-log" || HelpFilterLists != "filter-lists" {
 		t.Errorf("anchors %q and %q", HelpInboundLog, HelpFilterLists)

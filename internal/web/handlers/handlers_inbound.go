@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
@@ -201,8 +202,12 @@ type inboundDetailView struct {
 
 func (h *Handlers) renderInboundDetail(w http.ResponseWriter, r *http.Request, status int, d store.InboundDomain, extra inboundDetailView) {
 	mx := dnscheck.Result{Status: health.StatusUnknown}
+	var checked string
 	if h.dns != nil && h.cfg.Hostname != "" {
 		mx = h.dns.InboundMX(d.Name, h.cfg.Hostname, false)
+		if at := h.dns.InboundMXCheckedAt(d.Name, h.cfg.Hostname); !at.IsZero() {
+			checked = view.FormatAge(at, time.Now())
+		}
 	}
 	on, milter, action := h.inboundFilter()
 	page := view.NewInDomain(h.shellMeta(r), view.InDomainInput{
@@ -210,6 +215,8 @@ func (h *Handlers) renderInboundDetail(w http.ResponseWriter, r *http.Request, s
 		RecipientMode: d.RecipientMode, RecipientCount: d.RecipientCount, Addresses: d.Recipients,
 	}).
 		WithMX(h.cfg.Hostname, view.DNSCheck{Status: string(mx.Status), Detail: mx.Detail, Found: mx.Records}).
+		WithChecked(checked).
+		WithLog(view.InLogHref(view.InLogFilter{Domain: d.Name}, 1)).
 		WithFilter(on, milter, action).
 		WithResult(inboundFlash(r), firstNonEmpty(extra.FormErr, extra.TransportErr, extra.RecipientErr))
 	h.view.Render(w, status, "in-domain", page)

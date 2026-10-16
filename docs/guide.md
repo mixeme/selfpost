@@ -84,8 +84,9 @@ Since `2.7.0` a message sent on 465 or 587 does not tell its recipients
 where the application runs: the `Received:` header SelfPost adds reads
 `Received: by mail.example.com (Postfix) id 4AbC12xyz for <...>; <date>`,
 without the application's address, host name or login. To trace a message
-someone complains about, take that queue id to *Outbound › Log*; mail.log
-keeps the client address on smtpd's `client=` line for the same id.
+someone complains about, find its row in *Outbound › Log* (by domain,
+application and day; the message's page shows its queue id); mail.log keeps
+the client address on smtpd's `client=` line for the same id.
 
 ### Local trial
 
@@ -250,7 +251,7 @@ expected to set; defaults match the code exactly.
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). Each is given 2 seconds to answer before the next is asked, and the one that answered last is asked first; a lookup none of them answered shows as not known, never as a wrong record. | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
 | `TZ` | Time zone of the container, an IANA name such as `Europe/Moscow`: every time the panel shows, every day it counts (today on Health, the days of the statistics, the days of the log filters) and the stamps Postfix writes in `mail.log`, so the two agree. Stored times stay UTC, so changing it is only a restart. *Server › Settings* shows the zone in use, and says so when the image does not know the name (the times are then UTC). | UTC | `.env` |
-| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for login, setup, and account-change rate-limiting. **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
+| `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for sign-in and setup rate-limiting (account-change attempts are counted per user, whatever the address). **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
 [deploy/docker-compose.yml](../deploy/docker-compose.yml) to match the `./certs`
@@ -422,7 +423,7 @@ changes.
 |---|---|---|
 | Overview | Overview | `/overview` |
 | Outbound | Domains · Log · Queue · DMARC reports | `/outbound/domains`, `/outbound/log`, `/outbound/queue`, `/outbound/dmarc` |
-| Inbound | Domains | `/inbound/domains` |
+| Inbound | Domains · Log · Filter lists (global role) | `/inbound/domains`, `/inbound/log`, `/inbound/filter-lists` |
 | Server | Health · System log · Backup · Users · Settings | `/server/health`, `/server/log`, `/server/backup`, `/server/users`, `/server/settings` |
 | User menu (your name) | Account · Help · Sign out | `/account`, `/help`, `POST /logout` |
 
@@ -460,19 +461,9 @@ their helpers), TLS certificate, queue, milter sockets and reverse DNS. A
 check the panel could not run shows as a warning, never as fine. Below the cards are the outbound domain list and, with the inbound relay
 on, the inbound one. Each card leads to its table on **Server › Health**
 (`/server/health`) — the queue card to the Outbound queue — and Health has the
-readings, in the order of what stops mail first:
+readings, numbered in the order of what stops mail first:
 
-- **Machine** — processor (core and thread counts), memory and swap of the
-  host (a memory limit set on the container is not reflected), and
-  per-interface network throughput and totals of the container's own network
-  interfaces, read from the kernel's counters; CPU and throughput are measured between refreshes, so they appear
-  one refresh after the page opens. A fully busy processor or a machine out of
-  memory is a warning, because both delay or kill the mail path; throughput is
-  only reported.
-- **Processes**, **TLS certificate** (validity and expiry, and whether its
-  names cover `SELFPOST_HOSTNAME` - the tag beside *Names*; a certificate for
-  another name fails, as a client that checks the name refuses it) and
-  **Milter sockets**: the DKIM signer's two - `dkim-signer · applications` for what
+- **Processes** and **Milter sockets**: the DKIM signer's two - `dkim-signer · applications` for what
   applications send on 465/587, `dkim-signer · notifications` for the
   panel's own mail - the sender check, the send log (the journal-milter)
   and, with one configured, the spam filter. Postfix attaches the signer
@@ -493,12 +484,24 @@ readings, in the order of what stops mail first:
   a connection was turned away or a message refused in the last 24 hours. If these numbers do not stay
   at nothing, the panel is in the way of your mail more than it should be -
   report it.
+- **TLS certificate** — validity and expiry, and whether its names cover
+  `SELFPOST_HOSTNAME` (the tag beside *Names*); a certificate for another
+  name fails, as a client that checks the name refuses it.
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
   record the internet publishes for this server's IP (forward-confirmed
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
   *Re-check DNS* after changing DNS. *Greeting* is the `220` line Postfix
   opens every connection with; it must name the hostname, and another name
   there is a warning.
+- **Notification mail** — whether the DNS records the panel's own mail is
+  signed and authorised with are in place (see [Notifications](#notifications)).
+- **Machine** — processor (core and thread counts), memory and swap of the
+  host (a memory limit set on the container is not reflected), and
+  per-interface network throughput and totals of the container's own network
+  interfaces, read from the kernel's counters; CPU and throughput are measured between refreshes, so they appear
+  one refresh after the page opens. A fully busy processor or a machine out of
+  memory is a warning, because both delay or kill the mail path; throughput is
+  only reported.
 - **Your address** (in the Configuration card) — the address the panel sees
   your browser at, and whether it took it from `X-Forwarded-For`. Behind a
   reverse proxy that the panel does not trust it is the proxy's own: every
@@ -606,7 +609,9 @@ assigned to them. A message goes to the e-mail on the user's
 [Account](#account) page and only while *Send me notifications* is ticked
 there; a user without an e-mail gets none. **Server › Settings** has one switch
 that turns notifications off for everyone. With it off nothing is checked, so
-what is wrong when it is turned on again is reported then.
+what is wrong when it is turned on again is reported then. The first check runs
+three minutes after the panel starts, then every hour; the panel sends at
+most 60 notifications an hour, a ceiling nothing should come near.
 
 Notifications are the panel's own mail. They are sent from
 `postmaster@<SELFPOST_HOSTNAME>`, one message per recipient, are not rows of
@@ -662,7 +667,8 @@ What the *domain* role reaches inside what is assigned:
 | Overview, Server, the Outbound queue | yes | no (404) |
 | Outbound: domain page, applications, Domain settings, log | every domain | assigned domains |
 | Outbound › DMARC reports | every report, with the ingest statistics | reports of assigned domains, without the ingest box |
-| Inbound: domain page, upstream, recipients | every domain | assigned inbound domains |
+| Inbound: domain page, upstream, recipients, log | every domain | assigned inbound domains |
+| Inbound › Filter lists | yes | no (404) |
 | Add or delete a domain, either direction | yes | no |
 | Export a domain (Domain settings) | yes | assigned domains |
 | Import a domain (Server › Backup) | yes | no |
@@ -1256,7 +1262,8 @@ inbound mail is being refused with a temporary error (`tempfail`) or going throu
 (`accept`).
 
 **Inbound mail is not in the Outbound log.** Port 25 runs its own milter chain:
-the optional anti-spam milter, and nothing else. The DKIM signer does not sign relayed
+the optional anti-spam milter and the panel's inbound journal (Inbound › Log,
+fail-open), not the signer, the sender check or the outbound journal. The DKIM signer does not sign relayed
 mail (and a signing outage therefore cannot hold it up), and the journal-milter
 does not file it — the [Outbound log](#outbound-log) stays a record of what
 *you* sent.
@@ -1521,9 +1528,10 @@ gateway, not its own address (see [Rate limiting — level
 1](#rate-limiting--level-1-ip-backstop)).
 
 It is **not an authentication boundary.** The SASL login itself still succeeds;
-the check runs in the journal-milter, on the same fail-open path as level 2
-(below), so if that milter does not answer the restriction is skipped rather
-than enforced. Use it to narrow where an application may send from, not to contain a
+the check runs in the journal-milter and is fail-open like level 2 (below):
+if that milter does not answer, or its lookup hits a store error, the
+restriction is skipped rather than enforced. A message whose client address
+Postfix did not pass is refused, not let through. Use it to narrow where an application may send from, not to contain a
 leaked password — for that, regenerate the password.
 
 **Level 2 — application** — optional override of the domain limit for one
@@ -1544,8 +1552,9 @@ hours and on demand via **Recalculate now**.
 
 **Level 2 is best-effort, not a guarantee.** It runs inside the
 journal-milter and is deliberately fail-open: if the rate-limit lookup hits
-a store error, or the connecting client's IP is not available to the
-milter, level 2 is skipped and the message is accepted rather than held up.
+a store error, level 2 is skipped and the message is accepted rather than
+held up. The client address plays no part: a ceiling is on a domain or an
+application, wherever its mail comes from.
 The same applies if the journal-milter itself does not answer — Postfix is
 configured to accept rather than refuse it when it cannot reach it. (Since
 `2.4.0` a panel that is down altogether makes Postfix refuse mail with a
@@ -1556,9 +1565,9 @@ the only one of the two that does not depend on the panel process.
 
 ### Outbound log
 
-**Outbound › Log** (`/outbound/log`) is a searchable send log with server-side
+**Outbound › Log** (`/outbound/log`) is the send log, with server-side
 filters by domain, application, status and day (from and to, days of the container's zone, as on
-the Inbound log); the status *rejected* is the three kinds of refusal
+the Inbound log); the status *rejected* is the four kinds of refusal
 together, which the table tells apart by their tags. A user with the *domain*
 role sees only the rows of their domains. The filters are kept by the pages,
 the refresh and the way back from a message, and the log refreshes its rows
@@ -1575,19 +1584,20 @@ the row as a failure rather than show a delivery it cannot evidence, and
 counts that it did. A
 refused row says why in its tag: `rate-limited` (a [level-2 rate
 limit](#rate-limiting--level-2-domain-and-application)), `wrong client` (the
-application's client IP list) or `wrong From` (see [Who an application may
-send as](#who-an-application-may-send-as)); a row refused before `2.4.0`
+application's client IP list), `wrong From` or `wrong Sender` (see [Who an
+application may send as](#who-an-application-may-send-as)); a row refused before `2.4.0`
 says `rejected`. A refused message's page shows what Postfix wrote about the
-refusal: for `wrong From` the lines of the queue id the message had, for the
-other two the one `NOQUEUE` line; a row refused before `2.5.1` says the line
+refusal: for `wrong From` and `wrong Sender` the lines of the queue id the
+message had, for the other two the one `NOQUEUE` line; a row refused before `2.5.1` says the line
 was not kept, and one the panel wrote from `mail.log` after a restart - it
 had stopped before writing the refusal itself - says so;
 *Details* opens that row's own page (`/outbound/log/{id}`). That page carries
 the sending domain, the application it was submitted under, the Postfix
 queue id and the journal id, beside the message's history — when it was
 accepted and what Postfix later reported for the recipient. A `deferred`
-or `bounced` row includes this Postfix's retry intervals (first delay,
-backoff cap, queue lifetime), the same numbers the Outbound queue shows; users
+row includes this Postfix's retry intervals (first delay, backoff cap, queue
+lifetime), a `bounced` one the queue lifetime, the same numbers the Outbound
+queue shows; users
 with the *domain* role see them here because they cannot open the queue. Under
 both sit the `mail.log` lines for its queue id: the connection to the
 receiving server, the server's reply, and the status that reply was filed

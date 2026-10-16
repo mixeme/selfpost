@@ -212,9 +212,13 @@ func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy, sendsAs vi
 		return append(events, step(row.UpdatedAt, "ok", "Delivered",
 			"The receiving server accepted the message. That is as far as this server can see — what the recipient's mailbox then did with it is not reported back."))
 	case store.StatusDeferred:
+		// And the wait that follows, as an open dot: the next attempt is
+		// Postfix's, at a time the panel does not know.
 		return append(events, step(row.UpdatedAt, "warn", "Deferred, will be retried",
 			fmt.Sprintf("The receiving server could not take the message yet. Postfix retries: first after %s, then with increasing gaps up to %s, for up to %s. There is no fixed attempt count — a deferred message stays in the queue until it is delivered or that lifetime runs out.",
-				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime())))
+				policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime())),
+			view.Step{Time: view.StepTime(time.Time{}), Level: view.StepLevel("", false),
+				Text: view.Plain(fmt.Sprintf("Still in the queue; the next attempt is Postfix's own, and after %s it is bounced.", policy.QueueLifetime()))})
 	case store.StatusBounced:
 		if row.Reason == store.ReasonReconcile {
 			// Neither the receiving server nor Postfix said so: the panel

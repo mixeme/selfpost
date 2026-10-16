@@ -290,8 +290,8 @@ func outMessageFixture() *OutMessage {
 		{Time: StepTime(at), Strong: "Accepted and queued", Text: Plain(" — Postfix accepted the message over an authenticated submission and the journal-milter recorded it.")},
 		{Time: StepTime(at.Add(2 * time.Second)), Strong: "Deferred, will be retried", Level: LevelWarn,
 			Text: Plain(" — the receiving server could not take the message yet. Postfix retries: first after 5 minutes, then with increasing gaps up to 1 hour 7 minutes, for up to 5 days.")},
-		{Time: StepTime(time.Time{}), Strong: "Waiting for a delivery report", Level: LevelPending,
-			Text: Plain(" — the next attempt is made by Postfix on its own; the queue shows what it is still holding.")},
+		{Time: StepTime(time.Time{}), Level: LevelPending,
+			Text: Plain("Still in the queue; the next attempt is Postfix's own, and after 5 days it is bounced.")},
 	})
 	return p.WithDeliveryLog([]LogLine{
 		{Time: "13:58:07", Text: "postfix/smtpd[2114]: 4XcB7k2Jm9z1: client=unknown[198.51.100.7], sasl_username=alerts"},
@@ -324,7 +324,7 @@ func dmarcHubFixture() *DMARCHub {
 // with one source that is not this relay failing, and three reports.
 func dmarcDomainFixture() *DMARCDomain {
 	p := NewDMARCDomain(admin(), 2, "shop.example.org", true, 11204, 41, 7,
-		"A third-party source is not aligned. Do not tighten p= until that sender is fixed or removed.")
+		"Failures come from a source that is not this relay — review before tightening p=.")
 	row := func(id int64, at, reporter, window string, pass, fail int) DMARCReportRow {
 		return DMARCReportRow{Received: at, Reporter: reporter, Window: window, Pass: pass, Fail: fail, Href: DMARCReportHref(id)}
 	}
@@ -379,6 +379,7 @@ func inDomainFixture() *InDomain {
 		TLSMode: "encrypt", RecipientMode: "list", RecipientCount: 4,
 		Addresses: []string{"announce@lists.example.org", "dev@lists.example.org", "owner@lists.example.org", "security@lists.example.org"}})
 	p.WithMX("mail.example.org", DNSCheck{Status: "ok", Found: []string{"10 mail.example.org."}})
+	p.WithChecked("1 min ago").WithLog("/inbound/log?domain=lists.example.org")
 	p.WithFilter(true, "inet:antispam:11332", "accept")
 	return p
 }

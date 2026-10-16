@@ -75,6 +75,23 @@ func topicLink(topic, title string) *HelpLink {
 	return &HelpLink{Href: "/help#" + topic, Title: title}
 }
 
+// withoutTopic is a group's topics and menu without the topic id.
+func withoutTopic(topics []HelpTopic, menu []MenuItem, id string) ([]HelpTopic, []MenuItem) {
+	var t []HelpTopic
+	for _, x := range topics {
+		if x.ID != id {
+			t = append(t, x)
+		}
+	}
+	var m []MenuItem
+	for _, x := range menu {
+		if x.Href != "#"+id {
+			m = append(m, x)
+		}
+	}
+	return t, m
+}
+
 // reachesOutbound is whether the viewer has anything in Outbound: the global
 // role, or a domain administrator with an outbound domain.
 func (m Meta) reachesOutbound() bool { return m.IsGlobal || m.HasOutbound }
@@ -116,14 +133,21 @@ func NewHelp(m Meta, inbound bool) *Help {
 		})
 	}
 	if inbound && (m.IsGlobal || m.HasInbound) {
-		add("Inbound", inboundTopics, []MenuItem{
+		topics, menu := inboundTopics, []MenuItem{
 			{Label: "Backup-MX and forwarding", Icon: "ti-inbox", Href: "#" + HelpInbound},
 			{Label: "Upstream", Icon: "ti-arrow-forward-up", Href: "#" + HelpUpstream},
 			{Label: "Valid recipients", Icon: "ti-address-book", Href: "#" + HelpRecipients},
 			{Label: "Spam filter", Icon: "ti-shield-check", Href: "#" + HelpFilter},
 			{Label: "Inbound log", Icon: "ti-list-details", Href: "#" + HelpInboundLog},
 			{Label: "Filter lists", Icon: "ti-filter", Href: "#" + HelpFilterLists},
-		})
+		}
+		// The filter lists are the whole server's and their page is 404 to
+		// a domain administrator (requireInboundGlobal), so their topic is
+		// not shown to one either.
+		if !m.IsGlobal {
+			topics, menu = withoutTopic(topics, menu, HelpFilterLists)
+		}
+		add("Inbound", topics, menu)
 	}
 	if m.IsGlobal {
 		add("Server", serverTopics, []MenuItem{
@@ -174,7 +198,7 @@ var outboundTopics = []HelpTopic{
 			", once the reports look clean. A domain's report address is set in its Domain settings."),
 	}},
 	{ID: HelpApps, Title: "Applications", Body: []Text{
-		Plain("An application is one SASL login, unique across all domains. It may send as any address of its domain or only as listed addresses, and, with a list of client IPs set, only from those addresses. The password is shown once at creation or regeneration and is not stored in readable form."),
+		Plain("An application is one SASL login, unique across all domains. It may send as any address of its domain or only as listed addresses, and, with a list of client IPs set, only from those addresses. The password is shown once, at creation or regeneration, and the panel does not show it again; the server keeps it, so a domain export can carry it."),
 	}},
 	{ID: HelpSenderCheck, Title: "Sender check", Body: []Text{
 		Rich("An application sends only as itself, and that holds for every sender a message names. The envelope sender is held against the login by Postfix. The ",
@@ -188,7 +212,7 @@ var outboundTopics = []HelpTopic{
 		Rich("Level 1 is a per-IP ceiling set in ", Code(".env"), ". Level 2 is optional, per domain and per application, entered by hand or computed from the last 30 days of sending, and can never exceed level 1. An application's own limit replaces its domain's."),
 	}},
 	{ID: HelpLog, Title: "Outbound log", Body: []Text{
-		Rich("One row per message and recipient, with the status Postfix last reported: queued (accepted, nothing reported yet), sent (the receiving server took it; what the mailbox does next is not reported back), deferred (not taken yet, Postfix tries again), bounced (failed for good, or the queue lifetime ran out; or closed by the panel when Postfix no longer held the message and ", Code("mail.log"), " never said what became of it) and rejected (refused before queueing, so it never reached the queue: under a level-2 rate limit, from a client address the application does not allow, or for a ", Code("From:"), " or ", Code("Sender:"), " line that is not the application's - the message's page says which). A message's page lists these steps and the lines Postfix wrote about it in ",
+		Rich("One row per message and recipient (a message refused for its From: or Sender: line is one row, however many recipients it had), with the status Postfix last reported: queued (accepted, nothing reported yet), sent (the receiving server took it; what the mailbox does next is not reported back), deferred (not taken yet, Postfix tries again), bounced (failed for good, or the queue lifetime ran out; or closed by the panel when Postfix no longer held the message and ", Code("mail.log"), " never said what became of it) and rejected (refused before queueing, so it never reached the queue: under a level-2 rate limit, from a client address the application does not allow, or for a ", Code("From:"), " or ", Code("Sender:"), " line that is not the application's - the message's page says which). A message's page lists these steps and the lines Postfix wrote about it in ",
 			Code("mail.log"), ", found by queue id - and for a message refused before it had one, Postfix's one line about the refusal. The lines are kept with the row: they stay on the page after that file has rotated, for as long as the row does. A message accepted before version 2.2.0 shows them only while they are still in the current file. Rows are deleted after the retention set in Server › Settings, 90 days by default, and their lines with them. A domain administrator sees only the rows of their own domains."),
 	}},
 	{ID: HelpQueue, Title: "Queue and retries", Body: []Text{
@@ -245,7 +269,7 @@ var serverTopics = []HelpTopic{
 	{ID: HelpBackup, Title: "Backup and moving a domain", Body: []Text{
 		Rich("Full backup downloads one archive of the whole instance: ", Code("data/"), " (the database, DKIM keys and application credentials), ",
 			Code("docker-compose.yml"), ", ", Code(".env"), " and ", Code("certs/"),
-			". Both it and a domain's export ask for your account password - the one you sign in with - at every download, so a session left open is not enough to take them; wrong guesses count against the same limit as a password change."+
+			". Both it and a domain's export ask for your account password - the one you sign in with - at every download, so a session left open is not enough to take them; every attempt, right or wrong, counts against the limit of a password change, ten in 15 minutes."+
 				" The Postfix queue is not in it. The backup is taken while the server is running, and Postfix keeps moving messages through the queue, "+
 				"so a copy could hold a message twice or miss it; mail still waiting for delivery is therefore not carried over, and a restored server "+
 				"starts with an empty queue. To keep the queue, stop the container and archive the project directory instead. The private key in ", Code("certs/"),
@@ -260,7 +284,7 @@ var serverTopics = []HelpTopic{
 	{ID: HelpUsers, Title: "Users and roles", Body: []Text{
 		Rich("The two roles are a reach, not a rank: every user is an administrator and signs in with a username and password. Global reaches the whole server — Overview, Server, the queue and every domain — and is the only role that adds or deletes domains and users. Domain reaches only the domains assigned to it, outbound and inbound separately (the same name on both lists is two assignments); ",
 			Em("All"), " includes domains added later, and a domain user needs at least one domain or ", Em("All"),
-			" on either list. The only global user cannot be demoted or deleted, and you cannot delete the account you are signed in with. A new password set here signs that user out of their other sessions."),
+			" on either list. The only global user cannot be demoted or deleted, and you cannot delete the account you are signed in with. A new password set here signs that user out everywhere; set for yourself, it keeps the session you set it from."),
 	}},
 	{ID: HelpSettings, Title: "Settings", Body: []Text{
 		Rich("Settings holds what is true of the whole instance. The time zone is the container's, ", Code("TZ"), " in ", Code(".env"),
@@ -271,7 +295,7 @@ var serverTopics = []HelpTopic{
 			Code(".env"), ": changing it needs a restart, and no level-2 limit can exceed it. Notifications are turned on or off here for everyone."),
 	}},
 	{ID: HelpNotifications, Title: "Notifications", Body: []Text{
-		Rich("The panel writes to its users when something needs them, from ", Code("postmaster@"), " the server's hostname. Four things are reported. A sending domain's SPF, DKIM or DMARC record stops matching: sent once two hourly checks in a row have found it so, and once more when the record matches again. A level-2 rate limit refuses mail: sent at the first refusal, then at most once a day for the same limit. The TLS certificate is 14 days from expiry, and again at 3 days if it is still the same certificate. A message has waited in the queue for more than three days, with one more message when none is left. A global user is told all of it; a domain administrator is told about the DNS records and limits of their own domains.",
+		Rich("The panel writes to its users when something needs them, from ", Code("postmaster@"), " the server's hostname. Four things are reported. A sending domain's SPF, DKIM or DMARC record stops matching: sent once two hourly checks in a row have found it so, and once more when the record matches again. A level-2 rate limit refuses mail: sent at the first refusal, then at most once a day for the same sending domain. The TLS certificate is 14 days from expiry, and again at 3 days if it is still the same certificate. A message has waited in the queue for more than three days, with one more message when none is left. A global user is told all of it; a domain administrator is told about the DNS records and limits of their own domains.",
 			Br(), Br(),
 			"Each user turns notifications on or off under Account and needs an e-mail there; Server › Settings turns them off for everyone. They are the panel's own mail: not rows of the Outbound log, and not counted against any limit.",
 			Br(), Br(),

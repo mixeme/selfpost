@@ -118,7 +118,7 @@ func overviewHead(host string, cards []HealthCard, updated time.Time) Head {
 		Kicker:   host,
 		Title:    title,
 		ID:       "overview-head",
-		Note:     []string{"Updated " + updated.Local().Format("15:04:05")},
+		Note:     []string{"Updated " + updated.Local().Format("15:04:05"), "refreshes on its own"},
 	}
 	if len(bad) > 0 {
 		lead := Text{{Text: "Needs attention: "}}

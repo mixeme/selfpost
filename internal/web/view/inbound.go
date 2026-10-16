@@ -257,6 +257,7 @@ type InDomain struct {
 	recipientCount int
 	recipientMode  string
 	filterOn       bool
+	logHref        string
 
 	DNS    Box
 	Record Record
@@ -395,6 +396,22 @@ func (p *InDomain) WithFilter(on bool, milter, action string) *InDomain {
 	return p
 }
 
+// WithChecked says, as the MX box's end slot, how long ago the record was
+// checked (FormatAge; "" says nothing), as a sending domain's records do.
+func (p *InDomain) WithChecked(checked string) *InDomain {
+	if checked != "" {
+		p.DNS.End = Plain("Checked " + checked)
+	}
+	return p
+}
+
+// WithLog links the domain's rows of the Inbound log from the side menu's
+// See also, as a sending domain's page links its own log.
+func (p *InDomain) WithLog(href string) *InDomain {
+	p.logHref = href
+	return p
+}
+
 // WithResult shows the result of the last action, or its refusal, between the
 // head and the boxes.
 func (p *InDomain) WithResult(flash, formErr string) *InDomain {
@@ -420,6 +437,11 @@ func (p *InDomain) Menu() SideMenu {
 		{Label: "Spam filter", Icon: "ti-shield-check", Href: "#filter", Tag: filterTag(p.filterOn).Tag},
 	}}
 	menu := SideMenu{Groups: []MenuGroup{here}}
+	if p.logHref != "" {
+		menu.Groups = append(menu.Groups, MenuGroup{Label: "See also", Items: []MenuItem{
+			{Label: "Log for this domain", Icon: "ti-list-details", Href: p.logHref},
+		}})
+	}
 	if p.IsGlobal {
 		menu.Groups = append(menu.Groups, MenuGroup{Label: "Rarely changed", Items: []MenuItem{
 			{Label: "Delete domain", Icon: "ti-trash", Href: InboundDomainHref(p.id) + "/delete", Danger: true},
