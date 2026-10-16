@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-10-16
+
+The panel signs outgoing mail with DKIM itself, and OpenDKIM - a 2018 beta
+with open 2026 CVEs - has left the image. Keys, selectors and DNS records do
+not change; the first start copies the keys to `/data/dkim`. The sender
+check holds a `Sender:` line too. Nothing for an operator to do; a rollback
+to 2.7.x needs one command first (guide, § Upgrading). No migration;
+schema 11.
+
 ### Added
 
 - **The panel signs outgoing mail with DKIM itself** (panel-dkim-signing,

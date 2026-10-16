@@ -1,6 +1,6 @@
 # Plan: panel-dkim-signing
 
-**Status:** agreed, 2026-10-15 - the row is agreed (owner, 2026-10-15, the
+**Status:** shipped `2.8.0` (2026-10-16); agreed 2026-10-15 - the row is agreed (owner, 2026-10-15, the
 order port25-bare-newline -> base-trixie -> panel-dkim-signing); three
 questions below were settled one at a time the same day.  
 **Date:** 2026-10-15  
@@ -214,10 +214,23 @@ documents in the commit after it. `Sender:` is held to the login like
 v0.4.1 kept every header in a map of its own per session, on 465/587 and on
 port 25 alike: the panel builds it patched not to
 (`third_party/go-milter/PATCHES.md`; the owner's decision, 2026-10-16).
-- [ ] On the test server: a day of the owner's mail; one message from an
+- [x] On the test server: a day of the owner's mail; one message from an
   application through 465 and one notification to a real mailbox, the
   headers read (dkim=pass with the panel's `d=`).
-- [ ] Cut `2.8.0`.
+- [x] Cut `2.8.0`.
+
+*Done (2026-10-16):* the owner's message through 465 (`dev/send-check.ps1`)
+arrived at Gmail with `dkim=pass header.i=@carrel.mixfed.ru
+header.s=selfpost`, `spf=pass`, `dmarc=pass`, and at Yandex with
+`dkim=pass` and `X-Yandex-Spam: 1`; its `h=` over-signs the shown headers.
+His `dev/from-check.ps1` sent thirteen `From:`/`Sender:` cases: four
+accepted and delivered, nine refused as expected, each a send-log row of
+reason `from` or `sender`. The notification to a real mailbox was not
+sent - nothing raised one; its signature is verified by dkimpy on every e2e
+run, and the server name's key, unchanged by the move (digests compared),
+matched its published record on 2026-10-15. The day of mail was cut short
+at the owner's word ("Выпускай", 2026-10-16), the test server having run
+the stage's code since 2026-10-15 22:48 UTC. Cut as `2.8.0`, no tag.
 
 ## Risks
 
