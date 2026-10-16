@@ -95,15 +95,15 @@ func NewSettings(m Meta, retention, level1 string) *Settings {
 		},
 		Retention:     Box{No: "01", Title: "Log retention", Help: topicLink(HelpSettings, "How long rows are kept")},
 		RetentionDays: retention,
-		RateLimits:    Box{No: "02", Title: "Sending rate limits", ID: "rate-limits", End: Plain("Read-only"), Help: topicLink(HelpLimits, "Levels 1 and 2")},
+		RateLimits:    Box{No: "04", Title: "Sending rate limits", ID: "rate-limits", End: Plain("Read-only"), Help: topicLink(HelpLimits, "Levels 1 and 2")},
 		RateFacts: []Fact{
 			{Label: "Level 1 · per client IP", Value: Plain(level1), Big: true,
 				Note: Rich("Set in ", Code(".env"), "; restart to change. Nothing below may exceed it.")},
 			{Label: "Level 2 · domain, application",
 				Value: Rich("Set on each ", Link("/outbound/domains", "domain"), " and on each application of a domain.")},
 		},
-		Notifications: Box{No: "03", Title: "Notifications", ID: "notifications", Help: topicLink(HelpNotifications, "What is sent and when")},
-		Mail: Box{No: "04", Title: "Notification mail", ID: "notification-mail", End: Plain("DNS records of the server's own name"),
+		Notifications: Box{No: "02", Title: "Notifications", ID: "notifications", Help: topicLink(HelpNotifications, "What is sent and when")},
+		Mail: Box{No: "03", Title: "Notification mail", ID: "notification-mail", End: Plain("DNS records of the server's own name"),
 			Help: topicLink(HelpNotifications, "What the panel sends and what makes it arrive")},
 	}
 }

@@ -39,7 +39,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
-| settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
+| settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | done 2026-10-16, unreleased | — | — |
 | dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | done 2026-10-16, unreleased | — | — |
 | go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
@@ -886,6 +886,15 @@ the records that are right, or the page changes - the records out of the
 form's columns, or the button nearer its fields. Decide with the mockup,
 after dns-record-collapse, on a page whose records are missing as well as
 on one whose records are right.
+
+**Done (2026-10-16):** shown both layouts in both states, the owner chose
+"Вариант 2: форма в левой колонке, кнопка под своими полями." Folding alone
+closed the gap only while the records are right. The form is now the left
+column - 01 Log retention, 02 Notifications, *Save settings* - and the
+right column, outside it, holds 03 Notification mail and 04 Sending rate
+limits. It also leaves room for
+[notification-mail-recheck](#notification-mail-recheck): a *Re-check DNS*
+form in the Notification mail box is no longer a form inside a form.
 
 ## go-milter-upstream
 

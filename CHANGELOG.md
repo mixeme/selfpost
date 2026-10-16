@@ -15,6 +15,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   stays open as before, with *In DNS now* where it differs. A `<details>`
   block, no script; *Re-check DNS* draws the page again, so a record that
   has just turned right comes back folded.
+- **Server › Settings: *Save settings* sits under the fields it saves**
+  (settings-save-row): the form is the left column - Log retention,
+  Notifications, the button - and the right column holds what is not a
+  field, Notification mail and the read-only Sending rate limits. Before,
+  the button stood under both columns, after a long gap whenever the
+  records of the server's own name were open.
 
 ## [2.8.0] - 2026-10-16
 

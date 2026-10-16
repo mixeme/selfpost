@@ -1,15 +1,16 @@
 {{/* Server > Settings (mockup settings.html): what holds for the whole instance.
-     One form, one Save button; the rate limits are read-only facts, and the
-     records of the server's own name are the ones notifications are signed and
-     authorised with. A user's own name, e-mail, password and DMARC address are on
-     Account (account.html). */}}
+     One form, in the left column, with its Save button under its fields; the
+     right column holds what is not a field - the records of the server's own
+     name, the ones notifications are signed and authorised with, and the
+     read-only rate limits. A user's own name, e-mail, password and DMARC
+     address are on Account (account.html). */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 {{if .Flash}}{{template "flash" .Flash}}{{end}}
 
-<form class="sp-form" method="post" action="/server/settings">
-  <div class="columns">
-    <div class="column is-6">
+<div class="columns">
+  <div class="column is-6">
+    <form class="sp-form" method="post" action="/server/settings">
       {{template "box_open" .Retention}}
       {{template "body_open"}}
       <div class="field"><label class="label" for="send_log_retention_days">Keep outbound log rows, days</label>
@@ -22,26 +23,26 @@
       {{template "body_close"}}
       {{template "box_close"}}
 
-      {{template "box_open" .RateLimits}}
-      {{template "body_open"}}
-      {{template "facts" .RateFacts}}
-      {{template "body_close"}}
-      {{template "box_close"}}
-    </div>
-
-    <div class="column is-6">
       {{template "box_open" .Notifications}}
       {{template "body_open"}}
       <div class="field"><label class="checkbox"><input type="checkbox" name="notify"{{if .Notify}} checked{{end}}> Send notification e-mails</label>
         <p class="help">{{template "inline" .NotifyNote}}</p></div>
       {{template "body_close"}}
       {{template "box_close"}}
-
-      {{template "box_open" .Mail}}
-      {{range .MailRecords}}{{template "dns_record" .}}
-      {{end}}{{template "box_close"}}
-    </div>
+      <div class="buttons"><button type="submit" class="button is-primary">Save settings</button></div>
+    </form>
   </div>
-  <div class="buttons"><button type="submit" class="button is-primary">Save settings</button></div>
-</form>
+
+  <div class="column is-6">
+    {{template "box_open" .Mail}}
+    {{range .MailRecords}}{{template "dns_record" .}}
+    {{end}}{{template "box_close"}}
+
+    {{template "box_open" .RateLimits}}
+    {{template "body_open"}}
+    {{template "facts" .RateFacts}}
+    {{template "body_close"}}
+    {{template "box_close"}}
+  </div>
+</div>
 {{end}}
