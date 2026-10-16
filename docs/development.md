@@ -483,7 +483,8 @@ make e2e
 **Stack:** [deploy/docker-compose.yml](../deploy/docker-compose.yml) +
 [test/e2e/compose.override.yml](../test/e2e/compose.override.yml) — same
 `cap_drop`/`cap_add`/`no-new-privileges` as production. Override: high ports
-(`20465`/`20587`/`20080`), test hostname, self-signed TLS,
+(`20465`/`20587`/`20080`, port 25 at `20025`, the stand's CoreDNS at
+`20053/udp`), test hostname, self-signed TLS,
 `PANEL_COOKIE_SECURE=false`, isolated compose project, and the image's
 `VERSION` from `SELFPOST_E2E_VERSION` (unset locally: `e2e`). Mail is hermetic:
 CoreDNS (fake zone) + Postfix `smtp-sink` as sink-MX; DKIM TXT is scraped from
@@ -536,10 +537,10 @@ Workflows in [.github/workflows/](../.github/workflows/). What each job runs —
 ### `test.yml` — every push and PR to `main`
 
 `design-first` (needs the full history) → `gofmt -l` → `go vet ./...` →
-`go test ./...` (main module, no e2e; includes the panel guard tests, see
+Staticcheck 2026.1 → `go test ./...` (main module, no e2e; includes the panel guard tests, see
 [§ Panel pages](#panel-pages-the-component-kit-and-its-guards)) → the e2e
-module compiled, not run (`go vet ./...` and `go test -c -o /dev/null .` in
-`test/e2e`).
+module compiled, not run (`go vet ./...`, Staticcheck and
+`go test -c -o /dev/null .` in `test/e2e`).
 
 ### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
 

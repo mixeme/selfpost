@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A panel password's twelve characters are characters**: the minimum
+  counted bytes, so six letters of a non-Latin alphabet passed for twelve.
+  It counts characters now, as the backup password always did. Passwords
+  already set are not affected.
+
+### Documentation
+
+- The documents checked against the code (docs-audit, 2026-10-17): the
+  guide, architecture, schema-migrations, security, development, README and
+  product say what the code does.
+
 ## [2.13.0] - 2026-10-17
 
 The panel in the container's time zone. No migration; schema 12.

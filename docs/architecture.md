@@ -135,9 +135,10 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   Refusals come from `mail.log`: this listener logs as `postfix/inbound`
   (`syslog_name`), and the log tailer turns a `reject:` line of
   `postfix/inbound/smtpd` (Postfix's own policy) and a `milter-reject` /
-  `milter-hold` / `milter-discard` line of `cleanup` (the filter's verdict,
-  counted only for a queue id that listener opened) into a row, dated by the
-  line, when the recipient is at an inbound domain
+  `milter-discard` line of `cleanup` (the filter's verdict, counted only for
+  a queue id that listener opened) into a row, dated by the line, when the
+  recipient is at an inbound domain; a message the filter holds goes on to
+  the inbound journal milter, which writes its row as `held`
   ([internal/logtail/inbound.go](../internal/logtail/inbound.go)). A line
   names one recipient (the last), so a message refused at end-of-message is
   one row whatever its recipient count. The tailer saves its place every five seconds,
@@ -183,8 +184,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   an empty upstream host are omitted from the maps. Optional
   `INBOUND_ANTISPAM_MILTER` only when inbound relay is enabled (not on
   DMARC-only port 25); it is attached with its own `default_action`,
-  `INBOUND_ANTISPAM_MILTER_ACTION`, which is `accept` (fail-open) unless set
-  to `tempfail` (main.cf's `milter_default_action` is `tempfail`).
+  `INBOUND_ANTISPAM_MILTER_ACTION`, `accept` (fail-open, the default) or
+  `tempfail`, any other value stopping the start (main.cf's
+  `milter_default_action` is `tempfail`).
   **DMARC ingest** (`DMARC_REPORTS_ENABLE=true`): allow-listed
   report addresses via `check_recipient_access` on `postfix/dmarc_recipients`;
   messages pipe to `dmarc-ingest` (symlink to `panel`). When both flags are
@@ -217,8 +219,8 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   and to smtpd's `client=` line in mail.log.
 - **Chroot disabled** for all services (DNS/TLS inside container).
 - **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
-  at start into `/etc/postfix/tls-internal`, owned by root and `0600` as
-  Postfix's TLS_README advises (Postfix itself reads the key as root and does
+  at start into `/etc/postfix/tls-internal`, owned by root, the key `0600`
+  (the certificate `0644`) as Postfix's TLS_README advises (Postfix itself reads the key as root and does
   not check its mode), which the mount cannot give; Postfix reads the copy.
   `cert-reload` compares the mount with the copy daily; when they differ and
   the certificate and key belong together it renews the copy (each file
@@ -310,8 +312,8 @@ then OpenDKIM did, in a program of its own
   message has an hour from the end of its headers to its end - go-milter
   v0.4.1 tells a session nothing of a dropped connection - after which it is
   deferred, never signed over part of its body.
-- **Logs** go to the panel's stdout, the container's log, as `dkim-signer:`
-  lines; nothing is written to `mail.log` (nor did OpenDKIM write there).
+- **Logs** go to the panel's stderr, the container's log, as
+  `panel: … dkim-signer:` lines; nothing is written to `mail.log` (nor did OpenDKIM write there).
 - **The old tree,** `/data/opendkim` - the keys, `KeyTable` and
   `SigningTable` until `2.8.0`, shared with OpenDKIM through group
   `selfpost`. `2.8.x` copied its keys to `/data/dkim/keys` at its first
@@ -574,9 +576,12 @@ and `MAIL_LOG` in [cmd/panel/main.go](../cmd/panel/main.go). Backups exclude
 Rotation uses rename + `postfix reload`
 ([build/logrotate-mail.conf](../build/logrotate-mail.conf)), not `copytruncate` —
 the latter can drop `status=sent` lines and leave send-log rows stuck at
-`queued`. After rename, logrotate runs `create 0640 postfix selfpost` (postlogd
-recreates the file on its first line after the reload, as root and mode
-`0600`, which the unprivileged panel user cannot read). `follow()` drains the
+`queued`. After rename, logrotate runs `create 0640 postfix selfpost`, so the
+file is there, readable by the panel through group `selfpost`, before postlogd
+writes its first line after the reload; a file postlogd makes itself (one
+removed while the container runs) is `0640` too, through
+`maillog_file_permissions=0640` - Postfix's default is `0600`, which the
+unprivileged panel user could not read. `follow()` drains the
 old inode once more before switching descriptors, and keeps it open and reads
 it for a minute after: postlogd keeps writing to the renamed file until the
 reload makes it exit, seconds later (Postfix 3.10.13, src/postlogd/postlogd.c;
@@ -625,8 +630,9 @@ is mail of its own queue id and matches no row.
 
 **Read offset is persisted** (`logtail_state` table, in the baseline schema): the
 tailer stores its position plus a fingerprint of the log - the hash of its first
-512 bytes and the file's device and inode, so two logs that begin alike are two
-files and a renamed file keeps its fingerprint - and on start resumes from it,
+512 bytes and the file's inode (not the device, which can change across a
+host's reboot), so two logs that begin alike are two files and a renamed file
+keeps its fingerprint - and on start resumes from it,
 parsing the tail written while the panel was down. If the fingerprint no longer
 matches, the log was rotated in the meantime: the tailer first opens
 `mail.log.1` (left plain by `delaycompress`), and if that is the file the saved
@@ -635,7 +641,7 @@ start - what Postfix wrote between the stop and the rotation is not lost. A
 `mail.log.1` that is another file (rotated twice) is logged with the time from
 which nothing was read. Re-parsing lines is harmless because `UpdateStatus`
 writes the same status onto the same row. Only a first-ever start, with nothing
-stored, begins at end-of-file, so installing the panel does not replay a
+stored (or a stored place that cannot be read), begins at end-of-file, so installing the panel does not replay a
 pre-existing log.
 
 **A refusal's line, and a refusal the panel did not write.** A message refused
@@ -838,7 +844,7 @@ only reads (the delete confirmation at `GET …/delete` renders a form).
 | Outbound › DMARC reports | `GET /outbound/dmarc` · `…/dmarc/domains/{id}` · `…/dmarc/reports/{id}` — registered only with `DMARC_REPORTS_ENABLE=true` |
 | Inbound › Domains | `GET, POST /inbound/domains` · `/inbound/domains/{id}` · `POST …/dns-recheck`, `…/upstream`, `…/recipients` · `GET, POST …/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
 | Inbound › Log, Filter lists | `GET /inbound/log` · `GET, POST /inbound/filter-lists` · `POST /inbound/filter-lists/{id}/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
-| Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `POST /server/settings/dns-recheck` · `GET /server/components` |
+| Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload`, `/server/health/test-message` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `POST /server/settings/dns-recheck` · `GET /server/components` |
 | Account | `GET /account` · `POST /account/profile`, `/account/password` |
 | User menu | `GET /help` · `POST /logout` (public mux) |
 
@@ -940,9 +946,8 @@ is one layout and one way to render.
   package (`NewOutDomain`, `NewHelp`, …) that the handler fills. The shell is
   derived from `Meta` and the feature flags (`SetInboundEnabled`,
   `SetDMARCEnabled`) in one place, `Engine.shell`, so which entries the menu
-  has is decided once. No template reads a `map[string]any`; the one map left
-  in the handlers is the health sampler's, which is turned into a typed
-  `Health` before rendering.
+  has is decided once. No page's data is a map: the health sampler too
+  returns a typed `health.Machine`.
 - **The component kit.** [components.html](../internal/web/view/templates/components.html)
   holds one `{{define}}` per partial (page head, postmark, box and its head and
   foot, flash, health card, DNS record, facts, side menu, timeline, log pane,
@@ -982,8 +987,8 @@ has the component skeleton of its mockup), `TestRedesignedPagesLoadOnlyTheKit`,
 ratchet list `internal/web/view/legacy_pages.txt` is empty and can only shrink;
 the CI step
 [design-first](../.github/scripts/design-first.sh) rejects a commit that
-changes a guard together with the code it judges, and a template that is a
-byte-for-byte return of one from history. The design contract and the process
+changes a guard together with the code it judges, and a template that is
+the same as one from history, whitespace aside. The design contract and the process
 are in [plans/panel-redesign.md](plans/panel-redesign.md) § Enforcement.
 
 ### Security headers, CSP and scripts
@@ -1151,8 +1156,9 @@ single-connection trade-off that follows from it.
 | `postfix/dmarc_recipients` | Allow-listed DMARC aggregate report addresses |
 | `postfix/dmarc_transport` | Pipe transport for report ingest |
 | `postfix/dmarc_relay_domains` | Domains accepted for DMARC report delivery |
-| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate. Handed to `postfix` / `postdrop` by name at every start, before `postfix check` (`own_queue` in `build/entrypoint.sh`): the package accounts' numbers moved in `2.8.0` (postfix 101 → 100, postdrop 103 → 102) |
+| `postfix/queue/` | Postfix transit mail (deferred/active); survives container recreate; excluded from backups. Handed to `postfix` / `postdrop` by name at every start, before `postfix check` (`own_queue` in `build/entrypoint.sh`): the package accounts' numbers moved in `2.8.0` (postfix 101 → 100, postdrop 103 → 102) |
 | `log/mail.log` | Postfix delivery log + rotated copies (excluded from backups) |
+| `antispam/` | The filter lists (six `.map` files) and the filter's key `filter.key`, which the spam filter's container mounts (`ANTISPAM_DIR`) |
 | `manifest.json` | Backup version stamp; removed by the first start after a restore once its Resync is done |
 | `contents.json` | A backup's last entry: the size and SHA-256 of each file under `data/`, compared by the first start after a restore before it opens the database (renamed `contents.checked.json` once compared, removed with the manifest) |
 
@@ -1221,8 +1227,9 @@ the stored log lines follow;
 `postfix reload` in `postrotate` — see § Log tailer above).
 
 **Restore:** panel button or `selfpost-backup` CLI — self-contained archive:
-`data/` (SQLite snapshot + tree minus `log/`, the setup token and any
-`tls/` under `/data`), `docker-compose.yml`, `.env`,
+`data/` (SQLite snapshot + tree minus `log/`, the Postfix queue
+`postfix/queue`, the copy `sasl/sasldb2.new` a password change is made on, the
+setup token and any `tls/` under `/data`), `docker-compose.yml`, `.env`,
 and `certs/` when present;
 version check on restore. Requires the project directory mounted read-only at
 `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` in the default compose file). On the
@@ -1299,11 +1306,15 @@ unsupported rather than as a missing doc:
   `POSTFIX_DMARC_RECIPIENTS` (`/data/postfix/dmarc_recipients`),
   `POSTFIX_DMARC_TRANSPORT` (`/data/postfix/dmarc_transport`),
   `POSTFIX_DMARC_RELAY_DOMAINS` (`/data/postfix/dmarc_relay_domains`),
-  `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — set in `build/postfix-config.sh`),
+  `POSTFIX_QUEUE_DIR` (`/data/postfix/queue` — read in `build/postfix-config.sh`
+  for `queue_directory`; `build/entrypoint.sh` hands `/data/postfix/queue` to
+  Postfix by that path, so overriding it desyncs the queue's ownership),
   `SELFPOST_DEPLOY_ROOT` (`/selfpost-deploy` — operator project directory for
   full backups; mount `.:/selfpost-deploy:ro` in compose), `ANTISPAM_DIR`
   (`/data/antispam` — the filter lists and the filter's key, which the spam
-  filter's container mounts).
+  filter's container mounts). `SELFPOST_BACKUP_PASSWORD` is read by the
+  `selfpost-backup` CLI, not the panel: the encryption password, the other
+  way being `-password-file` (guide § Encrypting a backup).
 - **Milter and Postfix startup:** `MILTER_CONNECT_TIMEOUT` (`15s`),
   `MILTER_COMMAND_TIMEOUT` (`15s`), `MILTER_CONTENT_TIMEOUT` (`30s`),
   `MILTER_WAIT_TIMEOUT` (`30` seconds).

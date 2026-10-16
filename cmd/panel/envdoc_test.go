@@ -14,13 +14,15 @@ import (
 // are compared as they are, not as lists kept by hand beside them (audit
 // 2026-10-12, stage 5 - the three lists this file held were compared with each
 // other and with nothing else). Read: what the panel's code asks of the
-// environment (cmd/panel and internal, tests aside) and what the start-up
+// environment (cmd/panel, cmd/selfpost-backup and internal, tests aside) and what the start-up
 // scripts take with a default (build/*.sh, "${VAR:-…}"). Documented: the
 // operator's table in guide.md § Environment variables, with the paragraph
 // under it, and the internal list in architecture.md § Configuration.
 
 var (
-	goEnvRead     = regexp.MustCompile(`(?:envDefault|envInt|envBool|envSeconds|envDuration|os\.Getenv|os\.LookupEnv)\("([A-Z][A-Z0-9_]+)"`)
+	goEnvRead = regexp.MustCompile(`(?:envDefault|envInt|envBool|envSeconds|envDuration|os\.Getenv|os\.LookupEnv)\("([A-Z][A-Z0-9_]+)"`)
+	// A name kept in a constant, as the backup CLI keeps its password's.
+	goEnvConst    = regexp.MustCompile(`\w+Env\s*=\s*"([A-Z][A-Z0-9_]+)"`)
 	scriptEnvRead = regexp.MustCompile(`\$\{([A-Z][A-Z0-9_]+):[-?=]`)
 	docEnvName    = regexp.MustCompile("`([A-Z][A-Z0-9_]+)`")
 )
@@ -38,12 +40,16 @@ func readFile(t *testing.T, path string) string {
 func envRead(t *testing.T) map[string]bool {
 	t.Helper()
 	keys := map[string]bool{}
-	for _, root := range []string{".", filepath.Join("..", "..", "internal")} {
+	for _, root := range []string{".", filepath.Join("..", "selfpost-backup"), filepath.Join("..", "..", "internal")} {
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return err
 			}
-			for _, m := range goEnvRead.FindAllStringSubmatch(readFile(t, path), -1) {
+			text := readFile(t, path)
+			for _, m := range goEnvRead.FindAllStringSubmatch(text, -1) {
+				keys[m[1]] = true
+			}
+			for _, m := range goEnvConst.FindAllStringSubmatch(text, -1) {
 				keys[m[1]] = true
 			}
 			return nil

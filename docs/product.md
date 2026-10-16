@@ -62,8 +62,9 @@ Explicitly excluded to prevent scope creep:
 - Organisations / tenancy beyond the `global` and `domain` roles; managing
   **multiple sending domains** under one global administrator is in scope (see
   below)
-- Inbound antispam/antivirus engines (rspamd, ClamAV, etc.) — SelfPost may
-  expose a milter hook; it does not ship or start a filter
+- Inbound antispam/antivirus engines (rspamd, ClamAV, etc.) — the image
+  ships no filter, only a milter hook; `deploy/antispam` offers an optional
+  rspamd sidecar that the panel's filter lists feed
 - A custom MTA — Postfix is used as-is
 - Dovecot or a full mail stack for SASL — Cyrus SASL (`sasldb2`) only
 

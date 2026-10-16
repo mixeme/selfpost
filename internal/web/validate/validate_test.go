@@ -65,3 +65,14 @@ func TestValidateDomainLongLabelRejected(t *testing.T) {
 		t.Error("expected error for over-long label")
 	}
 }
+
+// The minimum counts characters, not bytes: six Cyrillic letters are twelve
+// bytes and six characters.
+func TestAdminPasswordCountsCharacters(t *testing.T) {
+	if err := AdminPassword("пароль"); err == nil {
+		t.Error("six Cyrillic letters passed for twelve characters")
+	}
+	if err := AdminPassword("парольпароль"); err != nil {
+		t.Errorf("twelve Cyrillic letters: %v", err)
+	}
+}

@@ -229,8 +229,8 @@ operator can act on it.
   `selfpost` for files and does not reach it (`2.6.0`; OpenDKIM shared
   `selfpost` too until `2.8.0`).
 - **Group `selfpost` (gid 10998) has two members, `panel` and `postfix`.**
-  Through it Postfix reads what the panel writes - `sasldb2` and the maps
-  under `/data/postfix` (2750, files 0640) - and connects to the panel's
+  Through it Postfix reads what the panel writes - `sasldb2` under
+  `/data/sasl` and the maps under `/data/postfix` (both 2750, files 0640) - and connects to the panel's
   milter sockets in `/run/selfpost` (2750, sockets 0660); the panel reads
   `mail.log`, which `postfix` writes, through it the other way
   ([build/Dockerfile](../build/Dockerfile), `build/entrypoint.sh`). The DKIM
@@ -286,14 +286,12 @@ operator can act on it.
   signer reads them and never the database. The entrypoint sets these modes
   at every start (e2e `checkDKIMTree` holds the tree to them). Until `2.8.0`
   the keys were under `/data/opendkim`, 2750/0640 in group `selfpost` so
-  that OpenDKIM could read them - and so could every `postfix` process. That
-  tree is kept for a rollback to 2.7.x until the next release; since `2.8.0`
-  the entrypoint makes it the panel's alone as well (0700/0600, panel:panel)
-  at every start, copies its keys as the panel user (`setpriv`) while
-  `/data/dkim` holds none, and a backup leaves it out (§ Backup and domain
-  export). A root step of the entrypoint follows no symbolic link the panel
-  could plant in either tree (`drop_links`; `cp -RP`; `chown -R` and `find`
-  do not follow one).
+  that OpenDKIM could read them - and so could every `postfix` process.
+  2.8.x kept that tree, the panel's alone, for a rollback to 2.7.x and copied
+  its keys over; since `2.9.0` the entrypoint removes it at start, and refuses
+  to start when the keys are only there (start 2.8.x once first). A root step
+  of the entrypoint follows no symbolic link the panel could plant in the
+  tree (`drop_links`; `rm -rf`, `chown -R` and `find` do not follow one).
 - **An application signs only as itself (`2.4.0`).** The signature's `d=` is
   the login's domain, and a receiver holds it to the domain of the `From:`
   line (DMARC, RFC 7489 § 3.1.1): without a check of that line an
@@ -498,7 +496,8 @@ operator can act on it.
   CLI the password comes only from `SELFPOST_BACKUP_PASSWORD` or
   `-password-file`, never as an argument (the process list is readable by any
   process in the container).
-- Minimum password length matches the administrator password (12): the file
+- Minimum password length matches the administrator password (12
+  characters, counted as characters, not bytes, in both): the file
   sits offline and can be attacked without a time limit. The panel's forms and,
   since `2.5.3`, the CLI hold an encrypting password to it; decrypting takes
   any.
@@ -550,8 +549,9 @@ deferred item from the roadmap.
   keep a password would lose the ability to take a backup at all, and a
   permanently undecryptable archive is worse than an unencrypted one:
   SelfPost does not store the password. The trigger to make encryption
-  mandatory is a second administrator (at which point "who downloaded it"
-  stops being one person).
+  mandatory is a second person who takes backups or exports - a second
+  global user, or a domain user exporting their domain - at which point "who
+  downloaded it" stops being one person.
 - **A journal row left without delivery lines is closed as `bounced` rather
   than left as it is.** The "forever `queued`" risk is gone: `mail.log` moved to
   `/data/log/` and survives container recreation, and the log tailer keeps its

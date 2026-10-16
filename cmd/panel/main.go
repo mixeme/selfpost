@@ -330,8 +330,8 @@ func openData(cfg config, resync func(*store.Store) error) (st *store.Store, res
 	return st, restored, nil
 }
 
-// run starts the panel's three roles and blocks until a shutdown signal or the
-// first fatal error from any role. A signal triggers a clean stop of all
+// run starts the panel's roles (the list below) and blocks until a shutdown
+// signal or the first fatal error from any role. A signal triggers a clean stop of all
 // roles; a role error cancels the others and is returned so the process exits
 // non-zero (letting supervisord/Docker see the failure — architecture.md §
 // Image and processes).

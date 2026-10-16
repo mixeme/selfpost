@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // MinAdminPasswordLen is the floor for the administrator password. The panel is
@@ -39,7 +40,10 @@ func Username(u string) error {
 // AdminPassword enforces a minimum length. Composition rules beyond length tend
 // to reduce entropy in practice, so length is the sole gate.
 func AdminPassword(p string) error {
-	if len(p) < MinAdminPasswordLen {
+	// Characters, as the message says and as the backup password counts
+	// them (secretFilePassword, cmd/selfpost-backup): len would let six
+	// Cyrillic letters, twelve bytes, pass for twelve.
+	if utf8.RuneCountInString(p) < MinAdminPasswordLen {
 		return fmt.Errorf("password must be at least %d characters", MinAdminPasswordLen)
 	}
 	return nil
