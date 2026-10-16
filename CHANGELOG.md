@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-17
+
+A test message from Server › Health. No migration; schema 12.
+
 ### Added
 
 - **A test message from Server › Health** (test-email): one message to an
