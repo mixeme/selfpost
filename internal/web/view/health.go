@@ -59,6 +59,25 @@ type Health struct {
 	// reverse proxy's own.
 	ConfigFacts   []Fact
 	ConfigProblem Text
+
+	// TestMessage is the card that sends the panel's test message
+	// (test-email): TestFrom is its sender, TestTo the address typed and
+	// TestErr why it was not sent, both kept when the form comes back.
+	TestMessage Box
+	TestAction  string
+	TestFrom    string
+	TestTo      string
+	TestErr     string
+}
+
+// TestMessageAction is where the Test message card posts.
+const TestMessageAction = "/server/health/test-message"
+
+// WithTestMessage fills the Test message card: from is the sender, to and
+// problem what the form comes back with when it was refused.
+func (h *Health) WithTestMessage(from, to, problem string) *Health {
+	h.TestFrom, h.TestTo, h.TestErr = from, to, problem
+	return h
 }
 
 // WithClientAddress says where the panel sees the viewer's request from:
@@ -184,6 +203,9 @@ func NewHealth(m Meta, flash string) *Health {
 		Configuration: Box{No: "08", InCards: true, Title: "Configuration", ID: "configuration",
 			End: Plain("Safe to run at any time")},
 		Reload: Action{Label: "Reload configuration", Icon: "ti-reload", Post: "/server/health/reload"},
+		TestMessage: Box{No: "09", InCards: true, Title: "Test message", ID: "test-message",
+			End: Plain("Shows what the receiving server answers"), Help: topicLink(HelpTestMessage, "What the test proves")},
+		TestAction: TestMessageAction,
 	}
 	if flash != "" {
 		h.Flash = &Flash{Text: Plain(flash)}

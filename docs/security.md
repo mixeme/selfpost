@@ -686,6 +686,22 @@ deferred item from the roadmap.
   a dozen times a day at most by someone who flaps the zone; a domain's
   limits once a day; and no more than 60 messages leave in any hour whatever
   the rules arrive at.
+- **The test message is a form that sends mail** (test-email, `2.12.0`):
+  Server › Health sends one message to an address a global user types. It is
+  bounded as notifications are - the same `sendmail(1)` call, a fixed argument
+  list, the address after `--` - and further: the global role only; one
+  address, held by `validate.AccountEmail` (no list, no separator, nothing
+  that reads as an option, any public host); a fixed subject and body the
+  panel composes; ten an hour, counted from the send log whoever asks; the
+  origin check of every form. It is written to the Outbound log before it
+  goes, so each one is on record with its recipient and who asked is in the
+  panel's log. It cannot be made to say anything but the panel's own text,
+  and the sender is always `postmaster@` the hostname. Its row learns its
+  queue id from the head of cleanup's `message-id=` line; cleanup logs a
+  client's own Message-ID the same way, but the panel's is 96 random bits,
+  known to nobody before the line is read, taken once and not after ten
+  minutes - a message of someone else's cannot take the row (security
+  review, 2026-10-17).
 - **Whatever is submitted with sendmail(1) is signed as the server.** The
   signer's local socket, the whole of `non_smtpd_milters`, signs every
   message submitted locally with the key of the server's own name, whatever

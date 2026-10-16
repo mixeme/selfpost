@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -12,8 +13,10 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/validate"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
 
@@ -139,12 +142,94 @@ func (h *Handlers) HandleHealthRecheck(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/server/health?rechecked=1", http.StatusSeeOther)
 }
 
+// testMessagesPerHour is how many test messages the panel sends in an hour,
+// counted from the send log, whoever asked: a form that sends mail must not
+// become a way to send a lot of it.
+const testMessagesPerHour = 10
+
+// HandleTestMessage sends the panel's test message (test-email; owner
+// 2026-10-13, its sender his choice of 2026-10-16): from postmaster@ the
+// hostname to the one address typed, as notifications go - through
+// sendmail, signed by the signer's local socket with the key of the
+// server's own name. The row is written first, with the Message-ID the
+// tailer awaits to give it its queue id, and the browser goes to it: its
+// page follows the message to the receiving server. Global role only; one
+// address (validate.AccountEmail refuses a list, as it does a name that
+// reads as an option); ten an hour.
+func (h *Handlers) HandleTestMessage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.requireGlobal(w, r)
+	if !ok {
+		return
+	}
+	from := notify.From(h.cfg.Hostname)
+	to := ""
+	fail := func(status int, msg string) {
+		page := h.healthView(r, "")
+		page.WithTestMessage(from, to, msg)
+		h.view.Render(w, status, "health", page)
+	}
+	if err := r.ParseForm(); err != nil {
+		fail(http.StatusBadRequest, "Invalid form submission.")
+		return
+	}
+	to = strings.TrimSpace(r.PostFormValue("recipient"))
+	if to == "" || validate.AccountEmail(to) != nil {
+		fail(http.StatusBadRequest, "Enter one e-mail address.")
+		return
+	}
+	n, err := h.store.CountTestMessagesSince(from, time.Now().Add(-time.Hour))
+	if err != nil {
+		logf("panel: test message: %v", err)
+		fail(http.StatusInternalServerError, "Internal error. Please try again.")
+		return
+	}
+	if n >= testMessagesPerHour {
+		fail(http.StatusTooManyRequests, "Ten test messages have gone in the last hour. Please try again later.")
+		return
+	}
+	id, err := notify.NewMessageID(h.cfg.Hostname)
+	if err != nil {
+		logf("panel: test message: %v", err)
+		fail(http.StatusInternalServerError, "Internal error. Please try again.")
+		return
+	}
+	const subject = "SelfPost test message"
+	now := time.Now().UTC()
+	body := "A test message from SelfPost at " + h.cfg.Hostname + ", sent from Server › Health on " +
+		now.Format("2006-01-02 at 15:04 UTC") + ".\n\nIt came from this server, signed with the DKIM key of its own name. " +
+		"Its page in the panel's Outbound log shows what this mail server answered.\n"
+	row, err := h.store.InsertTestMessage(h.cfg.Hostname, from, to, subject)
+	if err != nil {
+		logf("panel: test message: %v", err)
+		fail(http.StatusInternalServerError, "Internal error. Please try again.")
+		return
+	}
+	logtail.AwaitMessageID(id, row)
+	if err := h.testMail.SendWithID(to, subject, body, id); errors.Is(err, notify.ErrTimeout) {
+		// postdrop may have queued it after all: the row and the awaited id
+		// stay, and the row's page shows what became of it - or the sweep
+		// closes the row once the id is no longer awaited.
+		logf("panel: test message to %s (send log %d): %v", to, row, err)
+	} else if err != nil {
+		logtail.ForgetMessageID(id)
+		if derr := h.store.DeleteSendLogRow(row); derr != nil {
+			logf("panel: test message: %v", derr)
+		}
+		logf("panel: test message to %s: %v", to, err)
+		fail(http.StatusBadGateway, "Postfix did not take the message; the container log says why.")
+		return
+	}
+	logf("panel: user %d sent a test message to %s (send log %d)", p.ID, to, row)
+	http.Redirect(w, r, "/outbound/log/"+strconv.FormatInt(row, 10), http.StatusSeeOther)
+}
+
 // healthView is the Health page for the request: the checks behind the cards
 // of Overview and the Notification mail card, which only Health shows.
 func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 	page := healthPage(h.shellMeta(r), h.healthChecks(), flash)
 	seen := h.auth.Seen(r)
 	page.WithClientAddress(seen.Client, seen.Peer, seen.FromHeader, seen.HeaderIgnored)
+	page.WithTestMessage(notify.From(h.cfg.Hostname), "", "")
 	mail := h.serverMail(false)
 	page.WithNotificationMail(notify.From(h.cfg.Hostname), mail.rows, mail.status)
 	stats, err := h.store.SenderCheckStats(time.Now())

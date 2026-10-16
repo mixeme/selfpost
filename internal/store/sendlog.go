@@ -76,6 +76,71 @@ func (s *Store) InsertQueued(e SendLogEntry) error {
 	return nil
 }
 
+// InsertTestMessage records the panel's own test message (Server › Health,
+// test-email) as queued, before it is handed to Postfix: from postmaster@ the
+// hostname, under the hostname as its domain, with no application and no
+// queue id yet - cleanup assigns one, and SetSendLogQueueID puts it on the
+// row once the tailer reads it. It returns the row's id.
+func (s *Store) InsertTestMessage(domain, from, to, subject string) (int64, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`INSERT INTO send_log (queue_id, domain, app_login, from_addr, to_addr, subject, status, created_at, updated_at)
+		 VALUES ('', ?, '', ?, ?, ?, ?, ?, ?)`,
+		domain, from, to, subject, StatusQueued, now, now,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert test message: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// SetSendLogQueueID gives a row that has none the queue id Postfix assigned
+// its message. A row that has one keeps it.
+func (s *Store) SetSendLogQueueID(id int64, queueID string) error {
+	if _, err := s.db.Exec(`UPDATE send_log SET queue_id = ? WHERE id = ? AND queue_id = ''`, queueID, id); err != nil {
+		return fmt.Errorf("set queue id of send_log %d: %w", id, err)
+	}
+	return nil
+}
+
+// CloseUnmatchedTestMessages closes the test messages written before then
+// that never learned a queue id - the panel restarted between the hand-over
+// and cleanup's line, or the line was missed: nothing will ever report on
+// them. They are closed as the sweep closes a row (bounced, reason
+// reconcile), so their page says the panel decided it.
+func (s *Store) CloseUnmatchedTestMessages(before time.Time) (int64, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.Exec(
+		`UPDATE send_log SET status = ?, reason = ?, updated_at = ?
+		 WHERE queue_id = '' AND app_login = '' AND status = ? AND created_at < ?`,
+		StatusBounced, ReasonReconcile, now, StatusQueued, before.UTC().Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("close test messages with no queue id: %w", err)
+	}
+	return res.RowsAffected()
+}
+
+// DeleteSendLogRow removes one row: a test message Postfix did not take.
+func (s *Store) DeleteSendLogRow(id int64) error {
+	if _, err := s.db.Exec(`DELETE FROM send_log WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete send_log %d: %w", id, err)
+	}
+	return nil
+}
+
+// CountTestMessagesSince counts the test messages sent from addr since then:
+// rows from that address with no application, the shape InsertTestMessage
+// writes.
+func (s *Store) CountTestMessagesSince(addr string, since time.Time) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM send_log WHERE from_addr = ? AND app_login = '' AND created_at >= ?`,
+		addr, since.UTC().Format(time.RFC3339)).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count test messages: %w", err)
+	}
+	return n, nil
+}
+
 // InsertRejected records a refused message (StatusRejected), so the refusal is
 // visible in the send-log UI with its reason. The journal-milter writes its
 // MAIL FROM refusals with only the fields known there (domain, sender, app

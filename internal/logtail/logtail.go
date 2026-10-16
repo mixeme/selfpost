@@ -30,6 +30,11 @@ import (
 // far into mail.log it has read. *store.Store satisfies it.
 type StatusStore interface {
 	UpdateStatus(queueID, recipient, status string) (int64, error)
+	// SetSendLogQueueID gives the panel's test message its queue id
+	// (awaited.go); CloseUnmatchedTestMessages closes the test messages
+	// that never got one.
+	SetSendLogQueueID(id int64, queueID string) error
+	CloseUnmatchedTestMessages(before time.Time) (int64, error)
 	ExpireMessage(queueID string) (int64, error)
 	ListOpenOlderThan(cutoff time.Time) ([]store.QueuedDelivery, error)
 	CloseUnreported(id int64) (int64, error)
@@ -256,6 +261,14 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		}
 		keeper.add(line, now, catchingUp)
 		refusals.handle(line, now, Place{FP: tr.line.FP, End: tr.lineStart})
+		// The panel's test message learns its queue id from cleanup's line.
+		if _, rest := SplitTimestamp(line); rest != "" {
+			if qid, row, ok := takeAwaited(rest); ok {
+				if err := st.SetSendLogQueueID(row, qid); err != nil {
+					log.Printf("log-tailer: test message %d -> %s: %v", row, qid, err)
+				}
+			}
+		}
 		// A delivery or expiry line no send-log row takes may be of mail
 		// accepted on port 25: the inbound journal's rows take its result.
 		queueID, recipient, status, ok := parseDelivery(line)
@@ -313,6 +326,9 @@ func reconcileLoop(ctx context.Context, st StatusStore, caughtUp <-chan struct{}
 			now := time.Now().UTC()
 			reconcile(st, now.Add(-reconcileGrace), path)
 			countStuck(st, now, overLifetime)
+			if _, err := st.CloseUnmatchedTestMessages(now.Add(-awaitedTTL)); err != nil {
+				log.Printf("log-tailer: close test messages with no queue id: %v", err)
+			}
 		}
 	}
 }

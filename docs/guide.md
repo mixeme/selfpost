@@ -514,6 +514,14 @@ readings, in the order of what stops mail first:
   if the daemons drifted from what the panel shows after manual edits under
   `/data`. A step that fails is named on the page, and the panel's log says
   why.
+- **Test message** — sends one message to an address you type, from
+  `postmaster@` the hostname, the way notifications go (through Postfix,
+  signed with the key of the server's own name). The page that opens is its
+  row in **Outbound › Log**, which follows it to the receiving server: sent,
+  put off or refused, with the lines of `mail.log`. It tests the server's
+  own path - TLS, its address, the records of its name - not a domain's,
+  which only an application's mail does; and whether it reached the inbox
+  only the mailbox can say. Ten an hour, global role.
 
 ### Queue and System log
 

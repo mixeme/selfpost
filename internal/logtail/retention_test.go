@@ -19,6 +19,10 @@ func (s *retentionProbeStore) UpdateStatus(string, string, string) (int64, error
 	return 0, nil
 }
 
+func (s *retentionProbeStore) SetSendLogQueueID(int64, string) error { return nil }
+
+func (s *retentionProbeStore) CloseUnmatchedTestMessages(time.Time) (int64, error) { return 0, nil }
+
 func (s *retentionProbeStore) ListOpenOlderThan(time.Time) ([]store.QueuedDelivery, error) {
 	return nil, nil
 }

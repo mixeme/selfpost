@@ -500,3 +500,63 @@ func TestALoginTakenAgainStartsWithNoNumbers(t *testing.T) {
 		t.Fatalf("level-2 count of the new news = %d, want its own one", n)
 	}
 }
+
+// The test message's row: written queued with no queue id, given the one
+// cleanup assigned (and only once), counted per sender and hour, removed
+// when Postfix did not take it.
+func TestTestMessageRows(t *testing.T) {
+	st := openTestStore(t)
+	from := "postmaster@mail.example.org"
+	id, err := st.InsertTestMessage("mail.example.org", from, "ops@elsewhere.example", "SelfPost test message")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSendLogQueueID(id, "4j5qN53nwRz791P4"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSendLogQueueID(id, "other"); err != nil {
+		t.Fatal(err)
+	}
+	row, err := st.GetSendLog(id)
+	if err != nil || row.QueueID != "4j5qN53nwRz791P4" || row.Status != StatusQueued || row.AppLogin != "" || row.Domain != "mail.example.org" {
+		t.Fatalf("row = %+v, %v", row, err)
+	}
+	if n, err := st.UpdateStatus("4j5qN53nwRz791P4", "ops@elsewhere.example", StatusSent); err != nil || n != 1 {
+		t.Fatalf("its delivery line = %d, %v", n, err)
+	}
+	if n, err := st.CountTestMessagesSince(from, time.Now().Add(-time.Hour)); err != nil || n != 1 {
+		t.Fatalf("count = %d, %v", n, err)
+	}
+	if n, _ := st.CountTestMessagesSince(from, time.Now().Add(time.Minute)); n != 0 {
+		t.Fatalf("count from the future = %d", n)
+	}
+	if err := st.DeleteSendLogRow(id); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := st.CountTestMessagesSince(from, time.Now().Add(-time.Hour)); n != 0 {
+		t.Fatalf("a deleted row is counted")
+	}
+}
+
+// A test message that never learned its queue id is closed by the sweep once
+// it is no longer awaited; one that did, and any application's row, is not.
+func TestCloseUnmatchedTestMessages(t *testing.T) {
+	st := openTestStore(t)
+	lost, _ := st.InsertTestMessage("mail.example.org", "postmaster@mail.example.org", "a@elsewhere.example", "SelfPost test message")
+	found, _ := st.InsertTestMessage("mail.example.org", "postmaster@mail.example.org", "b@elsewhere.example", "SelfPost test message")
+	if err := st.SetSendLogQueueID(found, "Q1"); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.CloseUnmatchedTestMessages(time.Now().Add(-time.Hour)); err != nil || n != 0 {
+		t.Fatalf("a fresh row was closed: %d, %v", n, err)
+	}
+	if n, err := st.CloseUnmatchedTestMessages(time.Now().Add(time.Minute)); err != nil || n != 1 {
+		t.Fatalf("closed %d, %v; want the one with no queue id", n, err)
+	}
+	if r, _ := st.GetSendLog(lost); r.Status != StatusBounced || r.Reason != ReasonReconcile {
+		t.Errorf("the lost row = %+v", r)
+	}
+	if r, _ := st.GetSendLog(found); r.Status != StatusQueued {
+		t.Errorf("the row with a queue id = %+v", r)
+	}
+}

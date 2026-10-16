@@ -345,6 +345,16 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 	return 1, nil
 }
 
+func (c *captureStore) CloseUnmatchedTestMessages(time.Time) (int64, error) { return 0, nil }
+
+// SetSendLogQueueID records a test message's queue id as "row|queue-id|queue-id".
+func (c *captureStore) SetSendLogQueueID(id int64, queueID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.calls = append(c.calls, strconv.FormatInt(id, 10)+"|"+queueID+"|queue-id")
+	return nil
+}
+
 // ExpireMessage records an expiry line's close as "queue-id|*|expired".
 func (c *captureStore) ExpireMessage(queueID string) (int64, error) {
 	c.mu.Lock()

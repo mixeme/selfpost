@@ -346,3 +346,16 @@ func TestHealthSaysWhereItSeesTheViewer(t *testing.T) {
 	out = renderSignedIn(t, "health", NewHealth(admin(), "").WithClientAddress("fd00::1", "fd00::1", false, true))
 	pageHas(t, "Health", out, `<code>fd00::1/128</code>`)
 }
+
+// Health's Test message card posts one address and keeps it, with the reason,
+// when it comes back refused.
+func TestHealthTestMessageCard(t *testing.T) {
+	out := renderSignedIn(t, "health", NewHealth(admin(), "").WithTestMessage("postmaster@mail.example.org", "", ""))
+	pageHas(t, "Health", out, `<form class="sp-form" method="post" action="/server/health/test-message">`,
+		`name="recipient" type="email" placeholder="you@elsewhere.example" value="" required>`,
+		`From <span class="sp-mono">postmaster@mail.example.org</span>, signed with the server's own key`)
+	pageLacks(t, "Health", out, `help is-danger`)
+
+	out = renderSignedIn(t, "health", NewHealth(admin(), "").WithTestMessage("postmaster@mail.example.org", "a@x, b@y", "Enter one e-mail address."))
+	pageHas(t, "Health", out, `class="input is-danger" id="rcpt"`, `value="a@x, b@y"`, `<p class="help is-danger">Enter one e-mail address.</p>`)
+}

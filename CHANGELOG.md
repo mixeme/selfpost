@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **A test message from Server › Health** (test-email): one message to an
+  address you type, from `postmaster@` the hostname, the way notifications
+  go. The page that opens is its row in the Outbound log, which follows it
+  to the receiving server. It tests the server's own path, not a domain's.
+  Global role, ten an hour.
+
 ## [2.11.0] - 2026-10-16
 
 Health checks the certificate's name, Postfix's greeting and the reverse

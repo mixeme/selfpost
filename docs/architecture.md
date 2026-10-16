@@ -590,6 +590,19 @@ inbound journal's. The tail of a line is the far end's words (a reply, a HELO
 name), and a pattern that could start there let a stranger's HELO name file a
 delivery (audit 2026-10-12, M12).
 
+**The test message** (test-email, `2.12.0`) is the one row the panel writes
+itself: Server › Health hands it to `sendmail(1)`, which tells nothing of the
+queue id, and the journal-milter does not see local mail. The row is written
+first, queued and with no queue id, and its Message-ID is awaited
+(`logtail.AwaitMessageID`, in memory, ten minutes); cleanup's line
+`<id>: message-id=<…>` (Postfix 3.10.13, `src/cleanup/cleanup_message.c:639`)
+gives the row its queue id, and from then on its delivery lines update it as
+any row's. A restart in the second between leaves it without one, and the
+reconcile sweep closes it once the id is no longer awaited
+(`CloseUnmatchedTestMessages`); an id awaited longer than that is not taken
+any more. sendmail out of time keeps the row and the id - postdrop may have
+queued the message all the same.
+
 **The upstream's answer** on the inbound journal (inbound-upstream-result,
 `2.10.0`). Mail accepted on port 25 is handed to its upstream by the same
 `smtp` client as outbound mail, and its delivery lines look alike; what tells

@@ -51,7 +51,7 @@ func TestCardsBoxesCarryTheirNumberAsTheirOrder(t *testing.T) {
 				t.Errorf("%s: panel.css has no rule for data-order %s", name, order)
 			}
 		}
-		if want := map[string]int{"health": 8, "kit": 3}[name]; found != want {
+		if want := map[string]int{"health": 9, "kit": 3}[name]; found != want {
 			t.Errorf("%s: %d numbered boxes found in the cards layout, want %d", name, found, want)
 		}
 	}

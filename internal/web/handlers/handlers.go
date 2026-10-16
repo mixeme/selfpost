@@ -11,6 +11,7 @@ import (
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/inbound"
+	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -74,6 +75,14 @@ type Handlers struct {
 	dns     *dnscheck.Checker
 	machine *health.MachineSampler
 	auth    *auth.Module
+	// testMail sends the panel's test message (notify.Mailer; tests
+	// substitute one that records).
+	testMail testMailer
+}
+
+// testMailer is what sends the test message: notify.Mailer.SendWithID.
+type testMailer interface {
+	SendWithID(to, subject, body, id string) error
 }
 
 // New builds authenticated panel handlers.
@@ -102,6 +111,8 @@ func New(
 		dns:     dns,
 		machine: machine,
 		auth:    a,
+		// The test message goes as notifications go (test-email).
+		testMail: notify.NewMailer(cfg.Hostname),
 	}
 }
 

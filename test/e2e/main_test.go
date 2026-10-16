@@ -377,6 +377,9 @@ func TestE2E(t *testing.T) {
 	run("expired_message_is_closed", func(t *testing.T) {
 		testExpiredMessageIsClosed(t, sc)
 	})
+	run("test_message_reaches_the_sink", func(t *testing.T) {
+		testTestMessage(t, sc)
+	})
 	run("full_backup_restore", func(t *testing.T) {
 		testFullBackupRestore(t, sc)
 	})

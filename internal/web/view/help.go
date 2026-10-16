@@ -40,6 +40,7 @@ const (
 	HelpChecks      = "checks"
 	HelpCertificate = "certificate"
 	HelpRDNS        = "rdns"
+	HelpTestMessage = "test-message"
 	// Outbound
 	HelpDNS  = "dns"
 	HelpApps = "apps"
@@ -99,6 +100,7 @@ func NewHelp(m Meta, inbound bool) *Help {
 		add("Overview", overviewTopics, []MenuItem{
 			{Label: "Health checks", Icon: "ti-activity-heartbeat", Href: "#" + HelpChecks},
 			{Label: "TLS certificate", Icon: "ti-certificate", Href: "#" + HelpCertificate},
+			{Label: "Test message", Icon: "ti-send", Href: "#" + HelpTestMessage},
 			{Label: "Reverse DNS", Icon: "ti-arrows-exchange", Href: "#" + HelpRDNS},
 		})
 	}
@@ -152,6 +154,10 @@ var overviewTopics = []HelpTopic{
 	{ID: HelpCertificate, Title: "TLS certificate", Body: []Text{
 		Rich("The certificate Postfix presents on 465 and 587. The reverse proxy or the image mounts it, the panel does not issue it. Postfix serves its own copy of the mounted file and looks for a renewed one once a day by default; until it takes one up, the card shows it as a renewal waiting, and warns once it has waited longer than that check allows - the container log's cert-reload lines say why. It warns 14 days before expiry unless a renewal is already waiting, and fails once expired, or when the file is missing or unreadable — clients that verify certificates then refuse to connect. It also fails when none of its names is the hostname (",
 			Code("SELFPOST_HOSTNAME"), ") - the tag beside ", Em("Names"), " says which: a client that verifies the name refuses it however valid it is."),
+	}},
+	{ID: HelpTestMessage, Title: "Test message", Body: []Text{
+		Rich("A message from ", Code("postmaster@"), " the server's hostname to one address you type, sent the way notifications are: through Postfix, signed with the DKIM key of the server's own name. It proves the path from this server - TLS, its address's reputation, the SPF and DKIM records of its name - not your domains', which only mail from an application does. The page that opens is its row in the Outbound log: it shows whether the receiving server took it, put it off or refused it, with the lines of ",
+			Code("mail.log"), ". Whether it then reached the inbox or the spam folder only the mailbox can say. The global role sends it, at most ten an hour."),
 	}},
 	{ID: HelpRDNS, Title: "Hostname and reverse DNS", Body: []Text{
 		Rich("The hostname (", Code("SELFPOST_HOSTNAME"), ") must resolve to this server's address, and that address must resolve back to the hostname. Large receivers reject or spam-folder mail from hosts where the two disagree. The PTR record is set at your hosting provider, not in your DNS zone. ",

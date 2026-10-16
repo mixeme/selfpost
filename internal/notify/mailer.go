@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"mime"
 	"os/exec"
@@ -38,6 +39,21 @@ func From(hostname string) string { return "postmaster@" + hostname }
 
 // Send submits one message to one recipient.
 func (m *Mailer) Send(to, subject, body string) error {
+	id, err := NewMessageID(m.hostname)
+	if err != nil {
+		return err
+	}
+	return m.SendWithID(to, subject, body, id)
+}
+
+// NewMessageID makes a Message-ID of the server's own name, for a message the
+// caller wants to know again in mail.log (the panel's test message).
+func NewMessageID(hostname string) (string, error) { return messageID(hostname) }
+
+// SendWithID is Send with the Message-ID given: cleanup logs it with the
+// message's queue id, which is how the panel finds its test message in
+// mail.log (logtail.AwaitMessageID).
+func (m *Mailer) SendWithID(to, subject, body, id string) error {
 	// The address is a panel user's, validated when it was saved. It goes into
 	// a header and onto a command line all the same, so what cannot be part of
 	// an address is refused here as well (security.md).
@@ -47,10 +63,6 @@ func (m *Mailer) Send(to, subject, body string) error {
 		return fmt.Errorf("not an address a notification can go to: %q", to)
 	}
 	from := From(m.hostname)
-	id, err := messageID(m.hostname)
-	if err != nil {
-		return err
-	}
 
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "From: SelfPost <%s>\r\n", from)
@@ -81,6 +93,10 @@ func messageID(hostname string) (string, error) {
 	return fmt.Sprintf("<%s.%d@%s>", hex.EncodeToString(raw[:]), time.Now().Unix(), hostname), nil
 }
 
+// ErrTimeout is sendmail not answering in time: postdrop may have queued the
+// message all the same.
+var ErrTimeout = errors.New("sendmail timed out")
+
 // sendmail submits msg through Postfix's sendmail command. The argument list is
 // fixed apart from the two addresses, which follow "--" so that neither can be
 // read as an option; nothing goes through a shell (security.md). -i keeps a
@@ -95,7 +111,7 @@ func sendmail(from, to string, msg []byte) error {
 	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
-		return fmt.Errorf("sendmail timed out after %s", sendmailTimeout)
+		return fmt.Errorf("%w after %s", ErrTimeout, sendmailTimeout)
 	}
 	if err != nil {
 		return fmt.Errorf("sendmail: %w: %s", err, strings.TrimSpace(string(out)))

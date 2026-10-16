@@ -30,7 +30,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 |---|---|---|---|---|
 | inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | shipped `2.10.0` | 7/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
 | health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | shipped `2.11.0` | — | — |
-| test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
+| test-email | Send a test message from the panel (was preflight) | done 2026-10-17, unreleased | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | shipped `2.10.4` | — | — |
 | backup-reauth | Ask for the account password before a backup or a domain export is downloaded | shipped `2.10.3` | — | — |
@@ -210,6 +210,13 @@ the mockup; mockup-first.
 **Done when:** the form sends, the row appears in the log, the form is
 rate-limited and refuses a recipient list, and it passes a security review -
 a form that sends mail is a new surface.
+
+**Done (2026-10-17):** from `postmaster@` the hostname (the owner,
+2026-10-16: "Да, адрес годится"), card 09 on Health in the static stack
+(mockups `e92769f`, `e3b2501`, `8f0ccf9`). The row is written before the
+hand-over and learns its queue id from cleanup's Message-ID line
+(`logtail.AwaitMessageID`); the browser lands on it. One address
+(`validate.AccountEmail`), ten an hour from the send log, global role.
 
 **Version:** `2.x` MINOR; `agreed`.
 

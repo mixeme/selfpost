@@ -284,6 +284,7 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	server("GET /server/health/fragment", h.HandleHealthFragment)
 	server("POST /server/health/recheck", h.HandleHealthRecheck)
 	server("POST /server/health/reload", h.HandleReload)
+	server("POST /server/health/test-message", h.HandleTestMessage)
 	server("GET /server/log", h.HandleSystemLog)
 	server("GET /server/log/fragment", h.HandleSystemLogBody)
 	server("GET /server/backup", h.HandleBackupPage)
