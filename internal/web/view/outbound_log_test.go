@@ -176,6 +176,7 @@ func TestSendLogTag(t *testing.T) {
 		{"rejected", "", Tag{Status: "rejected"}},
 		{"rejected", "limit", Tag{Status: "rate-limited"}},
 		{"rejected", "from", Tag{Status: "reject", Label: "wrong From"}},
+		{"rejected", "sender", Tag{Status: "reject", Label: "wrong Sender"}},
 		{"rejected", "client", Tag{Status: "reject", Label: "wrong client"}},
 	} {
 		if got := SendLogTag(c.status, c.reason); got != c.want {

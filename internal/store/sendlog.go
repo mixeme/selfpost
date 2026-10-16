@@ -20,8 +20,8 @@ const (
 	// refusal. The journal-milter refuses at MAIL FROM with a 4xx when a level-2
 	// rate limit or the application's client-address list says no (Reason is
 	// ReasonLimit or ReasonClient; such a row has no queue-id). The sender check
-	// refuses a From: line that is not the application's with a 550 (ReasonFrom;
-	// its row has the queue-id). Every refused row is left out of the level-2
+	// refuses a From: or Sender: line that is not the application's with a
+	// 550 (ReasonFrom, ReasonSender; its row has the queue-id). Every refused row is left out of the level-2
 	// message count (it was never sent).
 	StatusRejected = "rejected"
 )
@@ -38,7 +38,8 @@ type SendLogEntry struct {
 	To       string
 	Subject  string
 	// Reason and HeaderFrom are set on refused rows only: why the message
-	// was refused (Reason*), and for ReasonFrom what its From: line said.
+	// was refused (Reason*), and for ReasonFrom and ReasonSender the address
+	// of the line refused (the column's name is from before Sender: was).
 	Reason     string
 	HeaderFrom string
 	// ClientIP is the client a refusal at MAIL FROM came from (InsertRejected

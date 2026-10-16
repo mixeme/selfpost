@@ -42,6 +42,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   OpenDKIM did: the line must be one address at a domain the application
   may send as, and the 256-byte limit of OpenDKIM's buffer goes. The key is
   the login's, so no `From:` line can choose another tenant's.
+- **A `Sender:` line is held to the same rule as `From:`** when a message
+  has one - the address a mail program shows as "on behalf of". A message
+  with another domain's address there, or with two `Sender:` lines, is
+  refused with `550 5.7.1 Sender: …`, tagged `wrong Sender` in the
+  Outbound log. A system writing for people outside your domains puts its
+  own address in `From:` and theirs in `Reply-To:`.
 
 ### Fixed
 

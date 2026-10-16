@@ -1345,6 +1345,17 @@ is permanent, so the application does not send the message again; it is a
 row of the [Outbound log](#outbound-log) tagged `wrong From`, and the row's
 page shows what the line said.
 
+Since `2.8.0` a **`Sender:` line** - the one a mail program shows beside
+`From:` as "on behalf of" - is held to the same rule when the message has
+one: one address, one the application may send as, and no more than one
+such line. Otherwise the message is refused the same way, `550 5.7.1
+Sender: …`, tagged `wrong Sender`. Most mail libraries write no `Sender:`;
+one that writes the application's own address passes. A system that writes
+for people outside your domains - a ticket system, a CRM - puts its own
+address in `From:` with the person's name (`"Jane via Support"
+<support@…>`) and the person's address in `Reply-To:`: their domain in
+`From:` would fail DMARC at the receiver anyway.
+
 What this stops working when you upgrade from an earlier version:
 
 - an application that sends with the `From:` of another of your domains -
@@ -1353,7 +1364,10 @@ What this stops working when you upgrade from an earlier version:
   differ - add the second address to the list;
 - a contact form that puts its visitor's address into `From:` - put it into
   `Reply-To:` and send from an address of your own, which is also what
-  DMARC requires.
+  DMARC requires;
+- (`2.8.0`) a message with a `Sender:` of another domain, or of an address
+  the application is not listed for - drop the line or write the
+  application's own address there.
 
 The check is strict: while the panel does not answer, Postfix answers with a
 temporary error (`451`, and `454` to the login): an application that queues

@@ -214,6 +214,25 @@ func TestMessagePageOfARefusedMessage(t *testing.T) {
 	lacks(t, "refused message", body, `<pre`)
 }
 
+// A message refused for its Sender: line says so - which line, and whose
+// address it is not - and the log tags it apart from a From: refusal.
+func TestMessagePageOfASenderRefusal(t *testing.T) {
+	h, _ := serverWithDelivery(t)
+	if err := h.store.InsertRejected(store.SendLogEntry{
+		Domain: "bs.example.ru", AppLogin: "Queuer3C", From: "noreply@bs.example.ru", To: "late@example.ru", Subject: "On behalf",
+		Reason: store.ReasonSender, HeaderFrom: "ceo@bank.example",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := h.store.QuerySendLog(store.SendLogFilter{AllDomains: true}, 1, 0)
+	if err != nil || len(rows) != 1 || rows[0].Reason != store.ReasonSender {
+		t.Fatalf("query: %v (%+v)", err, rows)
+	}
+	body := getBody(t, h.HandleDelivery, "/outbound/log/"+itoa(rows[0].ID))
+	has(t, "Sender refusal", body, `Refused before queueing`, `<code>Sender: ceo@bank.example</code> is not an address of application`, `wrong Sender`)
+	has(t, "log", getBody(t, h.HandleDeliveries, "/outbound/log"), `">wrong Sender</span>`)
+}
+
 // Whatever the viewer reaches, another tenant's message is a 404 on its own
 // page whether the row exists or not.
 func TestMessagePageIsNotFoundForOtherTenants(t *testing.T) {

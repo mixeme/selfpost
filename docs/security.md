@@ -61,9 +61,10 @@ bounded only by `message_size_limit` (now 1 MiB, refused above it); the old
 key tree stayed readable by group `selfpost` and went into every backup (now
 the panel's alone and left out); a hostname with capitals deferred every
 notification (the server's name is kept in lower case for DKIM); only `From`
-was over-signed (now the shown headers too) - all fixed. `Sender:` is now
-signed but not held to the login, which waits for the owner; that and what the
-header cap leaves are under Accepted risks.
+was over-signed (now the shown headers too) - all fixed. `Sender:`, which
+the review found neither held nor signed (F1), is now both: signed, and held
+to the login like `From:` (the owner's decision, 2026-10-16). What the header
+cap leaves is under Accepted risks.
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -318,7 +319,10 @@ operator can act on it.
   What this does not promise is what a display name looks like to a person:
   a name of another sender in it passes, signed with the application's own
   key - a forged display name is as old as mail, and no key of another's is
-  involved. Nor does it look at `Sender:` (Accepted risks). What the client
+  involved. Since `2.8.0` a `Sender:` line - shown beside `From:` as "on
+  behalf of" - is held to the same rule when there is one, and refused as
+  `550 5.7.1 Sender: ...`; `Resent-From:` is signed but not judged
+  (Accepted risks). What the client
   wrote reaches the reply, the log and the send log only as printable ASCII,
   cut, and a refused message is one row of the log whatever its recipient
   count. Until `2.4.0` nothing held the header: OpenDKIM chose the key by it
@@ -715,25 +719,16 @@ deferred item from the roadmap.
   signed with that domain's key. Whoever may export the domain has the key,
   and its applications may send as `postmaster@<hostname>` by right. The
   guide says so; a hostname that is nobody's sending domain avoids it.
-- **`Sender:` is signed but not held to the login** (open: the owner's
-  decision). Since `2.8.0` the signer signs `Sender:` and `Resent-From:`
-  and over-signs `Sender:`, so neither can be added or changed after the
-  message leaves without breaking the signature; the sender check judges
-  `From:` alone (`senderSession.Header` keeps `From` and `Subject`). An
-  application of `mine.com` can write `From: billing@mine.com` and
-  `Sender: ceo@bank.com`: the check passes it, the signature is
-  `d=mine.com`, DMARC aligns on `From:` and passes, and a mail program that
-  shows `Sender:` beside `From:` - Outlook as "on behalf of", by the
-  review's account, not tried on this build - shows the other address. No
-  key of another's is involved, as with a display name; until `2.8.0` the
-  header was neither checked nor signed. The fix the security review of
-  2026-10-16 (F1) gives, and recommends: the check also reads `Sender:` and
-  `Resent-From:` and refuses one whose single address the application may
-  not send as, under the rule `From:` is held to - a few lines in
-  `internal/milter/sender.go` and their tests. It changes what is refused
-  (an application whose mail program writes a `Sender:` of another domain
-  today would be refused), hence the owner's decision; this item goes when
-  it is taken.
+- **`Resent-From:` is signed but not held to the login.** Since `2.8.0`
+  the sender check holds `Sender:` to the rule `From:` is held to (the
+  owner's decision, 2026-10-16; security review F1), and the signer signs
+  both `Sender:` and `Resent-From:`. `Resent-From:` - written when a
+  message is passed on again (RFC 5322 § 3.6.6) - is not judged: an
+  application of `mine.com` could write `Resent-From: ceo@bank.com` beside
+  its own `From:`, signed `d=mine.com`. Few mail programs show it, and no
+  key of another's is involved, as with a display name. Holding it too is a
+  few lines in `internal/milter/sender.go` (`judge()`); the trigger to do it
+  is a mail program that shows it in place of `From:`.
 - **A header section is bounded at 1 MiB by the signer, not by the milter
   library.** The signer counts a message's headers as Postfix hands them
   over and refuses a section of more than 1 MiB with `552 5.3.4`

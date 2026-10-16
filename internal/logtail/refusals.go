@@ -59,7 +59,10 @@ type RefusalStore interface {
 // src/cleanup/cleanup_milter.c, cleanup_milter_apply(): "%s: %s: %s from
 // %s[%s]: %s;" with the reply from its fifth byte (the "550 " dropped), then
 // " from=<..>", " to=<..>" - the last recipient only (assumptions A-15).
-var fromRefusalRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?cleanup\[\d+\]: ([0-9A-Za-z]+): milter-reject: END-OF-MESSAGE from \S+: 5\.7\.1 From: ([^;]*) - ([^;]*); from=<([^>]*)> to=<([^>]*)>`)
+//
+// Since 2.8.0 the check refuses for a Sender: line too, "5.7.1 Sender: ..."
+// in the same form; the second group says which.
+var fromRefusalRe = regexp.MustCompile(`^\S+ postfix/(?:[a-z0-9-]+/)?cleanup\[\d+\]: ([0-9A-Za-z]+): milter-reject: END-OF-MESSAGE from \S+: 5\.7\.1 (From|Sender): ([^;]*) - ([^;]*); from=<([^>]*)> to=<([^>]*)>`)
 
 // clientLoginRe is smtpd's line naming the login a queue id was submitted
 // under: "<id>: client=host[addr], sasl_method=PLAIN, sasl_username=<login>".
@@ -137,10 +140,14 @@ func (r *refusalLines) handle(line string, now time.Time, start Place) {
 		if ok && login.start.FP == start.FP && login.start.End < start.End {
 			from = login.start
 		}
+		reason := store.ReasonFrom
+		if m[2] == "Sender" {
+			reason = store.ReasonSender
+		}
 		r.recover = append(r.recover, pendingRecovery{
 			e: store.SendLogEntry{
-				QueueID: m[1], AppLogin: login.login, From: m[4], To: m[5], Domain: domainOf(m[4]),
-				Reason: store.ReasonFrom, HeaderFrom: m[2],
+				QueueID: m[1], AppLogin: login.login, From: m[5], To: m[6], Domain: domainOf(m[5]),
+				Reason: reason, HeaderFrom: m[3],
 			},
 			at: at, until: now.Add(refusalLineWait), start: from,
 		})

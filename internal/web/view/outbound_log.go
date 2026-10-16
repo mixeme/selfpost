@@ -237,6 +237,8 @@ func SendLogTag(status, reason string) Tag {
 	switch reason {
 	case "from":
 		return Tag{Status: "reject", Label: "wrong From"}
+	case "sender":
+		return Tag{Status: "reject", Label: "wrong Sender"}
 	case "client":
 		return Tag{Status: "reject", Label: "wrong client"}
 	case "limit":

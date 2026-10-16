@@ -177,10 +177,14 @@ func deliveryEvents(row store.SendLogRow, policy postfix.RetryPolicy, sendsAs vi
 	// acceptance: the journal-milter refused it, so Postfix never queued it.
 	if row.Status == store.StatusRejected {
 		switch row.Reason {
-		case store.ReasonFrom:
+		case store.ReasonFrom, store.ReasonSender:
 			// The one step that names things: which line, whose, and what that
 			// application may write instead.
-			text := view.Rich(" — ", view.Code("From: "+row.HeaderFrom), " is not an address of application ", view.Mono(row.AppLogin))
+			field := "From: "
+			if row.Reason == store.ReasonSender {
+				field = "Sender: "
+			}
+			text := view.Rich(" — ", view.Code(field+row.HeaderFrom), " is not an address of application ", view.Mono(row.AppLogin))
 			if len(sendsAs) > 0 {
 				text = append(append(text, view.Inline{Text: ", which sends as "}), sendsAs...)
 			}

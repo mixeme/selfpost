@@ -209,8 +209,9 @@ libmilter1.0.1.
 *Done (2026-10-16):* help and Health went with stage 2 (design `005922b`);
 the reviews ran on stages 1-2 and their findings are fixed in `c2f63d2`,
 with the first rollout's incident (the queue's owner numbers); the
-documents in the commit after it. Open: holding `Sender:` to the login
-(security review F1, the owner's decision), and go-milter v0.4.1 keeping
+documents in the commit after it. `Sender:` is held to the login like
+`From:` (security review F1; the owner's decision, 2026-10-16). Open:
+go-milter v0.4.1 keeping
 every header in a map of its own per session (security.md, accepted risks)
 - a header section the signer refuses past 1 MiB is still held by the
 library, on 465/587 and on port 25 alike, as before 2.8.0.

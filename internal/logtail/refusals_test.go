@@ -98,6 +98,18 @@ func TestFromRefusalIsRecoveredAfterTheWait(t *testing.T) {
 	if e != want {
 		t.Fatalf("recovered %+v, want %+v", e, want)
 	}
+
+	// A refusal for the Sender: line (2.8.0) is recovered as one: composed
+	// after the From: line above, with the check's reply as sender.go writes
+	// it.
+	st = &refusalProbe{}
+	r = &refusalLines{st: st}
+	r.handle(`Oct 14 12:00:00 mail postfix/smtpd[11]: F1A2B3C4D5E6: client=unknown[10.77.0.1], sasl_method=PLAIN, sasl_username=app1`, now, Place{})
+	r.handle(`Oct 14 12:00:01 mail postfix/cleanup[13]: F1A2B3C4D5E6: milter-reject: END-OF-MESSAGE from unknown[10.77.0.1]: 5.7.1 Sender: ceo@bank.example - not an address this application sends as; from=<alerts@sender.e2e.test> to=<rcpt@sink.e2e.test> proto=ESMTP helo=<x>`, now, Place{})
+	r.retry(now.Add(refusalLineWait + time.Second))
+	if len(st.recovered) != 1 || st.recovered[0].Reason != store.ReasonSender || st.recovered[0].HeaderFrom != "ceo@bank.example" || st.recovered[0].From != "alerts@sender.e2e.test" {
+		t.Fatalf("recovered %+v, want one Sender: refusal", st.recovered)
+	}
 }
 
 // While a line or a recovery waits, the offset saved for its file stays at the

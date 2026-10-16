@@ -284,6 +284,7 @@ type senderSession struct {
 	rcpts   []string
 	subject string
 	froms   []string // the value of every From: field of the message
+	senders []string // and of every Sender: field
 }
 
 // MailFrom starts a message and forgets the one before it: a connection may
@@ -297,7 +298,7 @@ type senderSession struct {
 func (s *senderSession) MailFrom(from string, m *milter.Modifier) (milter.Response, error) {
 	s.from = cleanAddress(from)
 	s.login = macro(m, "auth_authen")
-	s.rcpts, s.subject, s.froms = nil, "", nil
+	s.rcpts, s.subject, s.froms, s.senders = nil, "", nil, nil
 	return milter.RespContinue, nil
 }
 
@@ -311,6 +312,8 @@ func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.R
 	switch textproto.CanonicalMIMEHeaderKey(strings.TrimSpace(name)) {
 	case "From":
 		s.froms = append(s.froms, value)
+	case "Sender":
+		s.senders = append(s.senders, value)
 	case "Subject":
 		if s.subject == "" {
 			s.subject = mailhdr.DecodeSubject(value)
@@ -333,7 +336,7 @@ func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.R
 // second message it can still hold the first one's From:. The session keeps
 // its own, emptied at each MAIL FROM (audit 2026-10-12, L9).
 func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milter.Response, error) {
-	shown, why, err := s.judge()
+	field, shown, why, err := s.judge()
 	if err != nil {
 		// Strict: what cannot be checked is not let through.
 		log.Printf("sender-check: %v - deferring mail of %q", err, s.login)
@@ -342,27 +345,41 @@ func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (mil
 	if why == "" {
 		return milter.RespContinue, nil
 	}
-	log.Printf("sender-check: application %q refused: %s (From: %s)", s.login, why, shown)
+	log.Printf("sender-check: application %q refused: %s (%s: %s)", s.login, why, field, shown)
 	// cleanup has given the message a queue id by the end of its headers
 	// (milter_end_of_header_macros has {i}); Postfix's lines about it - the
 	// refusal among them - are found by it on the message's page.
 	// Postfix 3.10.13, src/global/mail_params.h: DEF_MILT_EOH_MACROS "i",
 	// answered by src/cleanup/cleanup_milter.c, cleanup_milter_eval().
-	s.record(shown, macro(m, "i"))
+	reason := store.ReasonFrom
+	if field == "Sender" {
+		reason = store.ReasonSender
+	}
+	s.record(reason, shown, macro(m, "i"))
 	// A reply code of its own, so that the application is told what is wrong
 	// and, the refusal being permanent, does not send the message again.
-	return milter.NewResponseStr('y', "550 5.7.1 From: "+shown+" - "+why), nil
+	return milter.NewResponseStr('y', "550 5.7.1 "+field+": "+shown+" - "+why), nil
 }
 
 func (s *senderSession) Abort(m *milter.Modifier) error {
-	s.rcpts, s.subject, s.froms = nil, "", nil
+	s.rcpts, s.subject, s.froms, s.senders = nil, "", nil, nil
 	return nil
 }
 
 // judge decides about the message at hand. why is empty when it may pass;
-// otherwise it says what is wrong, and shown is the From: line in a form that
-// is safe to print - both go into the reply to the client.
-func (s *senderSession) judge() (shown, why string, err error) {
+// otherwise it says what is wrong, field is the header it is about ("From"
+// or "Sender"), and shown is that line in a form that is safe to print - all
+// go into the reply to the client.
+//
+// A Sender: line - the agent that sent a message written by the From:
+// line's author (RFC 5322 § 3.6.2), which a mail program shows beside From:
+// as "on behalf of" - is held to the same rule as From: when the message has
+// one, and at most one is allowed (§ 3.6, its table). The panel's signer
+// signs it (sign.go), so an address of another sender there would be shown
+// under this server's signature (security review of panel-dkim-signing, F1;
+// the owner's decision, 2026-10-16).
+func (s *senderSession) judge() (field, shown, why string, err error) {
+	field = "From"
 	if s.login == "" {
 		// Not reachable while the submission ports demand authentication; a
 		// message nobody answers for is not signed either way.
@@ -370,15 +387,32 @@ func (s *senderSession) judge() (shown, why string, err error) {
 		// smtpd_delay_reject (default yes) smtpd_client_restrictions
 		// (permit_sasl_authenticated,reject on 465 and 587) refuse every RCPT;
 		// src/smtpd/smtpd.c, data_cmd(): no valid recipients, no message.
-		return "(none)", "no authenticated application", nil
+		return field, "(none)", "no authenticated application", nil
 	}
 	switch len(s.froms) {
 	case 0:
-		return "(none)", "the message has no From: line", nil
+		return field, "(none)", "the message has no From: line", nil
 	case 1:
 	default:
-		return printable(strings.Join(s.froms, " | ")), "the message has more than one From: line", nil
+		return field, printable(strings.Join(s.froms, " | ")), "the message has more than one From: line", nil
 	}
+	if shown, why, err = s.judgeLine(s.froms[0]); err != nil || why != "" {
+		return field, shown, why, err
+	}
+	field = "Sender"
+	switch len(s.senders) {
+	case 0:
+		return field, "", "", nil
+	case 1:
+	default:
+		return field, printable(strings.Join(s.senders, " | ")), "the message has more than one Sender: line", nil
+	}
+	shown, why, err = s.judgeLine(s.senders[0])
+	return field, shown, why, err
+}
+
+// judgeLine holds one From: or Sender: line against the application.
+func (s *senderSession) judgeLine(raw string) (shown, why string, err error) {
 	// The line must be one address in RFC 5322's grammar (net/mail), the
 	// address a mail program shows; a display name may say anything. A line
 	// a lenient program could show as another address - "ceo@bank.com
@@ -389,7 +423,6 @@ func (s *senderSession) judge() (shown, why string, err error) {
 	// 3.10.13, src/global/tok822_parse.c), is the one held against the
 	// bindings: "x"@mine.com is x@mine.com, which may be another
 	// application's (F2).
-	raw := s.froms[0]
 	shown = printable(raw)
 	list, perr := fromParser.ParseList(unfold(raw))
 	if perr != nil || len(list) != 1 {
@@ -439,7 +472,7 @@ func asciiLower(v string) string {
 // each recipient as an accepted message has: nothing was sent to anybody, and
 // a refused message with a thousand recipients would otherwise be a thousand
 // rows at the price of one.
-func (s *senderSession) record(shown, queueID string) {
+func (s *senderSession) record(reason, shown, queueID string) {
 	if s.refused == nil {
 		return
 	}
@@ -457,7 +490,7 @@ func (s *senderSession) record(shown, queueID string) {
 		From:       s.from,
 		To:         to,
 		Subject:    s.subject,
-		Reason:     store.ReasonFrom,
+		Reason:     reason,
 		HeaderFrom: shown,
 	}
 	select {

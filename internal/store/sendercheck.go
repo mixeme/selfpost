@@ -11,6 +11,7 @@ const (
 	ReasonLimit  = "limit"  // a level-2 rate limit
 	ReasonClient = "client" // the application's list of client addresses
 	ReasonFrom   = "from"   // the From: line is not the application's
+	ReasonSender = "sender" // the Sender: line is not the application's (2.8.0)
 )
 
 // Who decided a "bounced" row the log did not (send_log.reason).

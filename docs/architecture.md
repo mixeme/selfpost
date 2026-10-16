@@ -418,7 +418,11 @@ the hole it closed was the same.
   `<b@evil.com, a@mine.com>` - is refused. That address, its local part
   unquoted as Postfix holds the envelope's, is what the bindings are asked
   about, folded to lower case in ASCII only: a Unicode fold would make the
-  Kelvin sign a `k` and let a look-alike pass. The check asks Postfix for
+  Kelvin sign a `k` and let a look-alike pass. Since `2.8.0` a `Sender:`
+  line - the sending agent's, shown beside `From:` as "on behalf of" - is
+  held to the same rule when the message has one (at most one; the owner's
+  decision, 2026-10-16): the reply says `Sender:` instead of `From:` and the
+  row's reason is `sender`. `From:` is judged first. The check asks Postfix for
   header values with their leading space (`SMFIP_HDR_LEADSPC`), as the
   signer does, so both read the same bytes. Until `2.8.0` the line was also
   read with a port of OpenDKIM's own parser, so that the address judged was

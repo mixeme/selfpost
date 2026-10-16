@@ -415,3 +415,48 @@ func TestSenderCheckPassesTheSharedLines(t *testing.T) {
 		}
 	}
 }
+
+// A Sender: line, when the message has one, is held to the rule From: is
+// held to; the From: line is judged first (the owner's decision, 2026-10-16).
+func TestSenderLineHeldToTheSameRule(t *testing.T) {
+	bind := NewBindings(writeMaps(t, senderMaps))
+	from := [2]string{"From", "a@shop.example.org"}
+	sender := func(v string) [2]string { return [2]string{"Sender", v} }
+	for _, c := range []struct {
+		name     string
+		headers  [][2]string
+		field    string // the line refused; "" when the message passes
+		wantText string
+	}{
+		{"no Sender: line", [][2]string{from}, "", ""},
+		{"its own address", [][2]string{from, sender("shop@shop.example.org")}, "", ""},
+		{"its own address, with a name", [][2]string{from, sender(`"The Shop's mailer" <mailer@shop.example.org>`)}, "", ""},
+		{"header name in another case", [][2]string{from, {"SENDER", "ceo@bank.example"}}, "Sender", "not an address this application sends as"},
+		{"a stranger's address", [][2]string{from, sender("ceo@bank.example")}, "Sender", "not an address this application sends as"},
+		{"another application's address", [][2]string{from, sender("desk@shop.example.org")}, "Sender", "not an address this application sends as"},
+		{"two addresses", [][2]string{from, sender("a@shop.example.org, ceo@bank.example")}, "Sender", "one address"},
+		{"two Sender: lines", [][2]string{from, sender("a@shop.example.org"), sender("b@shop.example.org")}, "Sender", "more than one Sender: line"},
+		{"a wrong From: and a wrong Sender:", [][2]string{{"From", "ceo@bank.example"}, sender("x@bank.example")}, "From", "not an address this application sends as"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			resp, rows := offer(t, bind, "shop", "shop@shop.example.org", c.headers...)
+			if c.field == "" {
+				if resp != milter.RespContinue || len(rows) != 0 {
+					t.Fatalf("refused: %s", replyText(resp))
+				}
+				return
+			}
+			text := replyText(resp)
+			if !strings.HasPrefix(text, "y 550 5.7.1 "+c.field+": ") || !strings.Contains(text, c.wantText) {
+				t.Fatalf("reply %q, want a 550 5.7.1 about %s: saying %q", text, c.field, c.wantText)
+			}
+			reason := store.ReasonFrom
+			if c.field == "Sender" {
+				reason = store.ReasonSender
+			}
+			if len(rows) != 1 || rows[0].Reason != reason {
+				t.Fatalf("log rows: %+v, want one of reason %q", rows, reason)
+			}
+		})
+	}
+}
