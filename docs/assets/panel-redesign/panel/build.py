@@ -52,7 +52,7 @@ HEAD = """<!DOCTYPE html>
 </head>
 """
 
-FOOT = ('<footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a>'
+FOOT = ('<footer class="sp-foot">SelfPost 1.8.0 · Copyright © 2026 Mikhail Yenuchenko · <a href="#">License (AGPL-3.0)</a>'
         ' · <a href="#">Source</a> · No warranty</footer>')
 
 

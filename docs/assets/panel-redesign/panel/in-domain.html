@@ -142,7 +142,7 @@
 dev@lists.example.org
 owner@lists.example.org
 security@lists.example.org</textarea></div>
-                    <p class="help">Unknown recipients are rejected at RCPT, so this relay generates no backscatter. Prefer a list unless the upstream itself rejects unknowns.</p></div>
+                    <p class="help">One per line or comma-separated. Unknown recipients are rejected at RCPT, so this relay generates no backscatter. Prefer a list unless the upstream itself rejects unknowns.</p></div>
                   <button type="submit" class="button is-primary">Save recipients</button>
                 </form>
               </div>
@@ -154,17 +154,16 @@ security@lists.example.org</textarea></div>
           <div class="sp-box-head"><span class="sp-no">04</span><h2>Spam filter</h2><div class="sp-end"><span class="tag is-success is-light">on</span></div><a class="sp-help" href="help.html#filter" title="A server setting"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <dl class="sp-facts">
-              <div><dt>Engine</dt><dd>rspamd, for every inbound domain of this server</dd></div>
-              <div><dt>Suspicious mail</dt><dd>Held — <a href="in-quarantine.html">1 message in quarantine</a> for this domain</dd></div>
-              <div><dt>Spam</dt><dd>Refused at the door; see <em>reject</em> in the <a href="in-log.html">log</a></dd></div>
-              <div><dt>Allow and deny lists</dt><dd class="sp-muted">Kept by the global administrator, one pair for the whole server</dd></div>
+              <div><dt>Applies to</dt><dd>Every inbound domain of this server</dd></div>
+              <div><dt>Filter</dt><dd class="sp-mono">inet:antispam:11332</dd></div>
+              <div><dt>If the filter is down</dt><dd>Mail is accepted unfiltered</dd></div>
             </dl>
           </div>
         </div>
       </div>
     </div>
 
-    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+    <footer class="sp-foot">SelfPost 1.8.0 · Copyright © 2026 Mikhail Yenuchenko · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
   </div>
 </main>
 </body>

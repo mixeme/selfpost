@@ -94,9 +94,9 @@
           <div class="sp-box-head"><span class="sp-no">02</span><h2>History</h2><a class="sp-help" href="help.html#log" title="What the statuses mean"><i class="ti ti-help-circle"></i></a></div>
           <div class="sp-box-body">
             <ol class="sp-timeline">
-              <li><time>13:58:07</time><strong>Accepted</strong> from <span class="sp-mono">alerts</span> at 198.51.100.7</li>
-              <li class="sp-warn"><time>13:58:09</time><strong>Deferred</strong> — the receiving server asked to retry later</li>
-              <li class="sp-pending"><time>next attempt ≈ 14:08</time>Still in the <a href="out-queue.html">queue</a>; kept for 5 days, then bounced</li>
+              <li><time>2026-09-21 13:58:07</time><strong>Accepted and queued</strong> — Postfix accepted the message over an authenticated submission and the journal-milter recorded it.</li>
+              <li class="sp-warn"><time>2026-09-21 13:58:09</time><strong>Deferred, will be retried</strong> — the receiving server could not take the message yet. Postfix retries: first after 5 minutes, then with increasing gaps up to 1 hour 7 minutes, for up to 5 days.</li>
+              <li class="sp-pending"><time>not yet</time>Still in the queue; the next attempt is Postfix's own, and after 5 days it is bounced.</li>
             </ol>
           </div>
         </div>
@@ -112,7 +112,7 @@
 </span></pre>
     </div>
 
-    <footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
+    <footer class="sp-foot">SelfPost 1.8.0 · Copyright © 2026 Mikhail Yenuchenko · <a href="#">License (AGPL-3.0)</a> · <a href="#">Source</a> · No warranty</footer>
   </div>
 </main>
 </body>
