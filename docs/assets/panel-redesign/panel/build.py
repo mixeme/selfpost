@@ -56,11 +56,35 @@ FOOT = ('<footer class="sp-foot">SelfPost 1.8.0 · © 2026 Mix · <a href="#">Li
         ' · <a href="#">Source</a> · No warranty</footer>')
 
 
+def touchnav(section, page):
+    """The navigation below 1024 px: a Menu that opens over the page, its
+    sections folded but the current one - details elements, no script."""
+    out = ['<details class="sp-touchnav"><summary>Menu</summary><div class="sp-touchnav-panel">']
+    for key, label, href, _icon, pages in NAV:
+        if not pages:
+            cur = ' aria-current="page"' if key == section else ""
+            out.append(f'<a href="{href}"{cur}>{label}</a>')
+            continue
+        opened = " open" if key == section else ""
+        out.append(f'<details class="sp-touchnav-group"{opened}><summary>{label}</summary>')
+        for pkey, plabel, phref, picon in pages:
+            cur = ' aria-current="page"' if key == section and pkey == page else ""
+            out.append(f'<a href="{phref}"{cur}><i class="ti {picon}"></i>{plabel}</a>')
+        out.append('</details>')
+    opened = " open" if section == "user" else ""
+    out += [f'<details class="sp-touchnav-group"{opened}><summary><i class="ti ti-user-circle"></i>admin</summary>',
+            '<a href="account.html"><i class="ti ti-key"></i>Account</a>',
+            '<a href="help.html"><i class="ti ti-help"></i>Help</a>',
+            '<form method="post" action="login.html"><button type="submit"><i class="ti ti-logout"></i>Sign out</button></form>',
+            '</details>', '</div></details>']
+    return "".join(out)
+
+
 def navbar(section, page):
     out = ['<nav class="navbar is-primary" aria-label="main navigation">', '  <div class="container">',
            '    <div class="navbar-brand"><a class="navbar-item" href="overview.html">'
-           '<img src="../../selfpost-wordmark.svg" alt="SelfPost"></a></div>',
-           '    <div class="navbar-menu is-active">', '      <div class="navbar-start">']
+           '<img src="../../selfpost-wordmark.svg" alt="SelfPost"></a>' + touchnav(section, page) + '</div>',
+           '    <div class="navbar-menu">', '      <div class="navbar-start">']
     for key, label, href, _icon, pages in NAV:
         cur = " sp-current" if key == section else ""
         if not pages:
