@@ -403,7 +403,8 @@
     {
      "is-6": [
       "box[Notification mail]:record×2",
-      "box[Sending rate limits]:body"
+      "box[Sending rate limits]:body",
+      "box[Time zone]:body"
      ]
     }
    ]
