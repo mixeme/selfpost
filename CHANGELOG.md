@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-16
+
+Health checks the certificate's name, Postfix's greeting and the reverse
+proxy. No migration; schema 12.
+
 ### Added
 
 - **Server › Health checks three things it did not** (health-setup-checks):

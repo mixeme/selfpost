@@ -112,8 +112,8 @@ outbound mail will not reach the real internet without DNS, PTR, and port 25.
 > local image and pulls nothing:
 >
 > ```sh
-> docker build -f build/Dockerfile --build-arg VERSION=2.10.4 \
->   -t ghcr.io/mixeme/selfpost:2.10.4 .
+> docker build -f build/Dockerfile --build-arg VERSION=2.11.0 \
+>   -t ghcr.io/mixeme/selfpost:2.11.0 .
 > ```
 
 ```sh
@@ -122,7 +122,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:2.10.4
+  ghcr.io/mixeme/selfpost:2.11.0
 ```
 
 **Get the setup URL** (pick one):
