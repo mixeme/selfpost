@@ -36,6 +36,8 @@
     </div>
     <p class="help mb-3">Keep this password: SelfPost does not store it, and the file cannot be opened without it.</p>
   </div>
+  <div class="field"><label class="label" for="acpw">Your account password</label><div class="control"><input class="input" id="acpw" name="account_password" type="password" autocomplete="current-password" required></div>
+    <p class="help">The one you sign in with, asked at every export: the file holds the domain's DKIM key and its applications' credentials.</p></div>
   <button type="submit" class="button"><i class="ti ti-download"></i>Export domain</button>
 </form>
 {{template "body_close"}}

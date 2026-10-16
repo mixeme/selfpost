@@ -17,7 +17,7 @@ func TestPanelJS(t *testing.T) {
 	if err != nil {
 		t.Skip("node is not installed")
 	}
-	for _, script := range []string{"poll_test.js", "unsaved_test.js"} {
+	for _, script := range []string{"poll_test.js", "unsaved_test.js", "filename_test.js"} {
 		t.Run(script, func(t *testing.T) {
 			out, err := exec.Command(node, filepath.Join("testdata", script), filepath.Join("static", "panel.js")).CombinedOutput()
 			if err != nil {

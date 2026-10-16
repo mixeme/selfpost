@@ -234,7 +234,8 @@ var serverTopics = []HelpTopic{
 	{ID: HelpBackup, Title: "Backup and moving a domain", Body: []Text{
 		Rich("Full backup downloads one archive of the whole instance: ", Code("data/"), " (the database, DKIM keys and application credentials), ",
 			Code("docker-compose.yml"), ", ", Code(".env"), " and ", Code("certs/"),
-			". The Postfix queue is not in it. The backup is taken while the server is running, and Postfix keeps moving messages through the queue, "+
+			". Both it and a domain's export ask for your account password - the one you sign in with - at every download, so a session left open is not enough to take them; wrong guesses count against the same limit as a password change."+
+				" The Postfix queue is not in it. The backup is taken while the server is running, and Postfix keeps moving messages through the queue, "+
 				"so a copy could hold a message twice or miss it; mail still waiting for delivery is therefore not carried over, and a restored server "+
 				"starts with an empty queue. To keep the queue, stop the container and archive the project directory instead. The private key in ", Code("certs/"),
 			" has to be readable by the panel: give it to group 10998 on the host (", Code("chgrp 10998"), ", ", Code("chmod 640"),

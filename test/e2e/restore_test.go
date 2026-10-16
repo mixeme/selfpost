@@ -30,7 +30,19 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if err := os.Chmod(keyPath, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	resp, body, err := sc.panel.postForm("/server/backup", url.Values{})
+	// A session is not enough (backup-reauth): without the account password,
+	// or with a wrong one, nothing is sent.
+	for _, pw := range []string{"", "not-the-password"} {
+		resp, body, err := sc.panel.postForm("/server/backup", url.Values{"account_password": {pw}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != 401 || resp.Header.Get("Content-Disposition") != "" || !strings.Contains(body, "Your account password is incorrect.") {
+			t.Fatalf("full backup with account password %q: status %d, want a refusal:\n%.600s", pw, resp.StatusCode, body)
+		}
+	}
+
+	resp, body, err := sc.panel.postForm("/server/backup", url.Values{"account_password": {adminPassword}})
 	if err != nil {
 		t.Fatalf("full backup with an unreadable key: %v", err)
 	}
@@ -51,7 +63,7 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 		t.Fatalf("write an extra map: %v\n%s", err, out)
 	}
 
-	resp, archive, err := sc.panel.postForm("/server/backup", url.Values{})
+	resp, archive, err := sc.panel.postForm("/server/backup", url.Values{"account_password": {adminPassword}})
 	if err != nil {
 		t.Fatalf("full backup: %v", err)
 	}

@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A backup and a domain's export ask for your password** (backup-reauth):
+  both downloads take the signed-in user's account password, checked like a
+  password change and under its limit, so a stolen session or a panel left
+  open no longer hands over the server's every secret.
+
+### Fixed
+
+- **The file field of a domain's import is drawn as designed**: Bulma's
+  file button and the name of the file chosen, not the browser's own
+  "Browse…".
+
 ## [2.10.2] - 2026-10-16
 
 The panel on a phone. No migration; schema 12.

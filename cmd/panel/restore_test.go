@@ -360,10 +360,11 @@ func signIn(t *testing.T, h http.Handler) *http.Cookie {
 
 // downloadBackup takes a backup through the panel's own /backup route, the way
 // the operator does. An empty password downloads the plain archive; otherwise
-// the response is a .spbk envelope, which is decrypted here.
+// the response is a .spbk envelope, which is decrypted here. The account
+// password goes with it, as the form asks for it (backup-reauth).
 func downloadBackup(t *testing.T, h http.Handler, session *http.Cookie, password string) []byte {
 	t.Helper()
-	form := url.Values{}
+	form := url.Values{"account_password": {restorePassword}}
 	if password != "" {
 		form.Set("encrypt", "1")
 		form.Set("password", password)

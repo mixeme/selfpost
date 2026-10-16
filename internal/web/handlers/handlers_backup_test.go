@@ -133,3 +133,42 @@ func TestEmptyCertsMessage(t *testing.T) {
 		t.Errorf("message = %q", msg)
 	}
 }
+
+// A session is not enough for a secret download (backup-reauth): the full
+// backup and a domain's export ask for the signed-in user's own password.
+// Wrong or missing, nothing is sent and the page says so; right, the request
+// goes on to its own checks. Guesses share the password change's limiter.
+func TestSecretDownloadsAskForTheAccountPassword(t *testing.T) {
+	s := newAppStand(t)
+	exportPath := "/outbound/domains/" + idStr(s.d.ID) + "/settings/export"
+	for _, pw := range []string{"", "wrong-password-entirely"} {
+		rec := postFormAs(s.h.HandleExportDomain, globalPrincipal, exportPath, s.paths, url.Values{"account_password": {pw}})
+		if rec.Code != http.StatusUnauthorized || rec.Header().Get("Content-Disposition") != "" ||
+			!strings.Contains(rec.Body.String(), "Your account password is incorrect.") {
+			t.Fatalf("export with account password %q = %d, %q:\n%.600s", pw, rec.Code, rec.Header().Get("Content-Disposition"), rec.Body.String())
+		}
+		rec = postFormAs(s.h.HandleBackup, globalPrincipal, "/server/backup", nil, url.Values{"account_password": {pw}})
+		if rec.Code != http.StatusUnauthorized || rec.Header().Get("Content-Disposition") != "" ||
+			!strings.Contains(rec.Body.String(), "Your account password is incorrect.") ||
+			!strings.Contains(rec.Body.String(), `name="account_password" type="password" autocomplete="current-password" required`) {
+			t.Fatalf("backup with account password %q = %d:\n%.600s", pw, rec.Code, rec.Body.String())
+		}
+	}
+
+	// The right password lets the export through: a plain JSON download.
+	rec := postFormAs(s.h.HandleExportDomain, globalPrincipal, exportPath, s.paths, url.Values{"account_password": {"correct-password-here!"}})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Disposition"), "selfpost-domain-example.org.json") {
+		t.Fatalf("export with the right password = %d, %q:\n%.600s", rec.Code, rec.Header().Get("Content-Disposition"), rec.Body.String())
+	}
+
+	// Five checks were made above, and the limiter allows ten in its window:
+	// after six more, a check is refused before the password is looked at,
+	// the right one included.
+	for i := 0; i < 6; i++ {
+		postFormAs(s.h.HandleBackup, globalPrincipal, "/server/backup", nil, url.Values{"account_password": {"guess"}})
+	}
+	rec = postFormAs(s.h.HandleExportDomain, globalPrincipal, exportPath, s.paths, url.Values{"account_password": {"correct-password-here!"}})
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), "Too many attempts.") {
+		t.Fatalf("after ten checks = %d:\n%.600s", rec.Code, rec.Body.String())
+	}
+}

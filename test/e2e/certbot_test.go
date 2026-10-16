@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,7 +77,7 @@ func testCertbotLayout(t *testing.T, sc *scenario) {
 		t.Fatalf("Health names a renewal waiting, but Postfix serves what certs/ leads to")
 	}
 
-	resp, archived, err := sc.panel.postForm("/server/backup", nil)
+	resp, archived, err := sc.panel.postForm("/server/backup", url.Values{"account_password": {adminPassword}})
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatalf("full backup over certbot's layout: %v, status %v\n%.600s", err, resp, archived)
 	}

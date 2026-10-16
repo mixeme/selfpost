@@ -189,12 +189,12 @@ func TestDomainSettingsRefusalsStayOnTheSettingsPage(t *testing.T) {
 	}
 	has(t, "report address refusal", body, `Choose how aggregate reports are addressed for this domain.`)
 
-	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"short"}, "password_confirm": {"short"}})
+	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"short"}, "password_confirm": {"short"}, "account_password": {"correct-password-here!"}})
 	if code != http.StatusBadRequest {
 		t.Fatalf("a short export password = %d", code)
 	}
 	has(t, "export refusal", body, `The encryption password must be at least 12 characters.`, `<h1 class="title is-3">Domain settings</h1>`)
-	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"long-enough-password"}, "password_confirm": {"another-one-entirely"}})
+	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"long-enough-password"}, "password_confirm": {"another-one-entirely"}, "account_password": {"correct-password-here!"}})
 	if code != http.StatusBadRequest {
 		t.Fatalf("export passwords that differ = %d", code)
 	}

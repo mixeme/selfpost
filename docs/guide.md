@@ -777,6 +777,12 @@ as themselves, the host's IPv6 address and `127.0.0.1` as `172.18.0.1`.
 
 ### Full backup and restore
 
+Both downloads - the full backup on **Server › Backup** and a domain's
+export on its settings - ask for your account password, the one you sign in
+with, every time: a session left open is not enough to take them. Wrong
+guesses count against the same limit as a password change (ten in fifteen
+minutes).
+
 **Full backup** is a self-contained project archive: `data/` (SQLite, all
 domains' DKIM keys under `data/dkim/`, all applications' SASL credentials,
 `manifest.json` with the version that created it), plus `docker-compose.yml`,

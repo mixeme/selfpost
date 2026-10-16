@@ -428,6 +428,18 @@ operator can act on it.
 
 ### Backup and domain export
 
+- **A session is not enough to take them** (backup-reauth, owner
+  2026-10-13; built 2026-10-16). The full backup and a domain's export ask
+  for the signed-in user's own account password at every download, checked
+  with bcrypt as a password change checks it and under the same limiter -
+  ten checks in fifteen minutes per user, shared with the Account form -
+  so a stolen session cookie or a panel left open no longer hands over a
+  copy of the server, and the field is no place to guess a password from.
+  A wrong one is refused with 401 and logged; nothing is sent
+  (`internal/web/handlers`, `reauth`). *Encrypt with a password* is the
+  file's own protection, not this one: whoever downloads it chooses that
+  password. The import and the `selfpost-backup` CLI, which runs inside the
+  container, are not asked.
 - Both files are secrets: a full backup carries DKIM keys, `sasldb2`, the
   panel users' password hashes, `docker-compose.yml`, `.env`, and the TLS
   private key from `certs/` when present; a domain export carries the DKIM key

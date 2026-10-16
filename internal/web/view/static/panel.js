@@ -245,16 +245,34 @@
     });
   }
 
+  // A file field drawn as Bulma's .file (the import of a domain, mockup
+  // backup.html): the input lies transparent over "Choose a file…", and the
+  // name of the file chosen is written into .file-name, which says "No file
+  // chosen" until then. Without this script the field still works; only the
+  // name is not shown.
+  function syncFileName(input) {
+    var box = input.closest(".file");
+    var name = box && box.querySelector(".file-name");
+    if (name) {
+      name.textContent = input.files && input.files[0] ? input.files[0].name : "No file chosen";
+    }
+  }
+
   // One listener for the document rather than one per control: a form that
   // arrives in an htmx swap is covered without being wired up again.
   document.addEventListener("change", function (ev) {
     if (ev.target && ev.target.matches) {
       syncShowWhen(ev.target);
+      if (ev.target.matches("input.file-input")) {
+        syncFileName(ev.target);
+      }
     }
   });
 
+  // A page the browser restores from its history may keep the file chosen.
   document.addEventListener("DOMContentLoaded", function () {
     initShowWhen(document);
+    document.querySelectorAll("input.file-input").forEach(syncFileName);
   });
 
   // htmx:load fires for each top-level element htmx puts into the page, so

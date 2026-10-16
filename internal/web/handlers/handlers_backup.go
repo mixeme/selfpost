@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
 	"github.com/mixeme/selfpost/internal/web/view"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // maxImportBytes caps a domain-import upload. A domain export is a small JSON
@@ -63,6 +65,10 @@ func (h *Handlers) renderBackupPageWith(w http.ResponseWriter, r *http.Request, 
 // afterwards — is useless without the password.
 func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
+		return
+	}
+	if status, msg := h.reauth(r, "full backup"); status != 0 {
+		h.renderBackupPageWith(w, r, status, "", msg)
 		return
 	}
 	password, pwErr := secretFilePassword(r)
@@ -159,6 +165,10 @@ func (h *Handlers) HandleBackup(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleExportDomain(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.lookupDomain(w, r)
 	if !ok {
+		return
+	}
+	if status, msg := h.reauth(r, "export of domain "+strconv.FormatInt(d.ID, 10)); status != 0 {
+		h.renderDomainSettings(w, r, status, d, settingsView{Err: msg})
 		return
 	}
 	password, pwErr := secretFilePassword(r)
@@ -314,6 +324,38 @@ func (h *Handlers) HandleImportDomain(w http.ResponseWriter, r *http.Request) {
 // form. The confirmation field is checked here rather than in the browser
 // because a typo in an encryption password is unrecoverable: the archive would
 // be sealed with a secret the operator does not know.
+// reauth checks the account password a secret download asks for
+// (backup-reauth): the full backup holds the whole database - the panel's
+// password hashes, every application's SASL password, the DKIM keys - and a
+// domain's export its key and its applications' credentials, so a session
+// alone, stolen or left open, must not be enough to take them. The password
+// is the signed-in user's own, checked as a password change checks it and
+// under the same limiter (auth.AllowPasswordChange), so the form is no place
+// to guess one. It returns 0 when it holds, else the status and the message
+// for the form. what names the download in the log.
+func (h *Handlers) reauth(r *http.Request, what string) (int, string) {
+	p, ok := h.principal(r)
+	if !ok {
+		return http.StatusUnauthorized, "Sign in again."
+	}
+	if !h.auth.AllowPasswordChange(p.ID) {
+		return http.StatusTooManyRequests, "Too many attempts. Please wait and try again."
+	}
+	if err := r.ParseForm(); err != nil {
+		return http.StatusBadRequest, "Invalid form submission."
+	}
+	u, err := h.store.GetUser(p.ID)
+	if err != nil {
+		logf("panel: %s: get user %d: %v", what, p.ID, err)
+		return http.StatusInternalServerError, "Internal error. Please try again."
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(r.PostFormValue("account_password"))); err != nil {
+		logf("panel: %s: user %d gave a wrong account password", what, p.ID)
+		return http.StatusUnauthorized, "Your account password is incorrect."
+	}
+	return 0, ""
+}
+
 func secretFilePassword(r *http.Request) (password, errMsg string) {
 	if err := r.ParseForm(); err != nil {
 		return "", "Invalid form submission."
