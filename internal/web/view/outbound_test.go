@@ -408,9 +408,10 @@ func TestOutAppCreatedShowsLoginAndPasswordOnce(t *testing.T) {
 	if got := strings.Count(out, `data-copy`); got != 2 {
 		t.Errorf("%d copy buttons, want one for the login and one for the password", got)
 	}
-	// nothing on the page changes anything: Done is a link, so the only form is the shell's Sign out
-	if got := strings.Count(out, `<form`); got != 1 || !strings.Contains(out, `action="/logout"`) {
-		t.Errorf("%d forms on the password page, want the shell's Sign out alone", got)
+	// nothing on the page changes anything: Done is a link, so the only forms
+	// are the shell's Sign out - in the bar and in the Menu of a narrow screen
+	if got := strings.Count(out, `<form`); got != 2 || strings.Count(out, `<form method="post" action="/logout">`) != 2 {
+		t.Errorf("%d forms on the password page, want the shell's two Sign outs alone", got)
 	}
 
 	// An application created just now had no password before.

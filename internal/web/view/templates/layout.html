@@ -92,11 +92,13 @@
 
 {{/* nav is the navbar and the perforated edge under it (input: Shell). A group
      with nothing in it for this user is absent; the group of the current page
-     carries sp-current and its current entry is-active. */}}
+     carries sp-current and its current entry is-active. The bar's menu shows
+     from 1024 px (Bulma hides a navbar-menu without is-active below it);
+     below, touchnav takes its place. */}}
 {{define "nav"}}<nav class="navbar is-primary" aria-label="main navigation">
   <div class="container">
-    <div class="navbar-brand"><a class="navbar-item" href="{{.Home}}"><img src="/static/wordmark.svg" alt="SelfPost"></a></div>
-    <div class="navbar-menu is-active">
+    <div class="navbar-brand"><a class="navbar-item" href="{{.Home}}"><img src="/static/wordmark.svg" alt="SelfPost"></a>{{template "touchnav" .}}</div>
+    <div class="navbar-menu">
       <div class="navbar-start">
 {{if .ShowOverview}}        <a class="navbar-item{{if eq .Section "overview"}} sp-current{{end}}" href="/overview">Overview</a>
 {{end}}{{if .ShowOutbound}}        <div class="navbar-item has-dropdown is-hoverable{{if eq .Section "outbound"}} sp-current{{end}}">
@@ -148,6 +150,18 @@
   </div>
 </nav>
 <div class="sp-perf" aria-hidden="true"></div>{{end}}
+
+{{/* touchnav is the navigation below 1024 px (input: Shell; mockup
+     build.py, touchnav()): Menu opens a panel over the page with the same
+     groups as the bar, each a fold - the current one open - and the user's
+     last. <details> all through, so it works without a script. */}}
+{{define "touchnav"}}<details class="sp-touchnav"><summary>Menu</summary><div class="sp-touchnav-panel">
+{{if .ShowOverview}}<a href="/overview"{{if eq .Section "overview"}} aria-current="page"{{end}}>Overview</a>
+{{end}}{{if .ShowOutbound}}<details class="sp-touchnav-group"{{if eq .Section "outbound"}} open{{end}}><summary>Outbound</summary><a href="/outbound/domains"{{if and (eq .Section "outbound") (eq .Page "domains")}} aria-current="page"{{end}}><i class="ti ti-world-upload"></i>Domains</a><a href="/outbound/log"{{if and (eq .Section "outbound") (eq .Page "log")}} aria-current="page"{{end}}><i class="ti ti-list-details"></i>Log</a>{{if .ShowQueue}}<a href="/outbound/queue"{{if and (eq .Section "outbound") (eq .Page "queue")}} aria-current="page"{{end}}><i class="ti ti-stack-2"></i>Queue</a>{{end}}{{if .ShowDMARC}}<a href="/outbound/dmarc"{{if and (eq .Section "outbound") (eq .Page "dmarc")}} aria-current="page"{{end}}><i class="ti ti-report-analytics"></i>DMARC reports</a>{{end}}</details>
+{{end}}{{if .ShowInbound}}<details class="sp-touchnav-group"{{if eq .Section "inbound"}} open{{end}}><summary>Inbound</summary><a href="/inbound/domains"{{if and (eq .Section "inbound") (eq .Page "domains")}} aria-current="page"{{end}}><i class="ti ti-world-download"></i>Domains</a><a href="/inbound/log"{{if and (eq .Section "inbound") (eq .Page "log")}} aria-current="page"{{end}}><i class="ti ti-list-details"></i>Log</a>{{if .ShowFilterLists}}<a href="/inbound/filter-lists"{{if and (eq .Section "inbound") (eq .Page "filter-lists")}} aria-current="page"{{end}}><i class="ti ti-filter"></i>Filter lists</a>{{end}}</details>
+{{end}}{{if .ShowServer}}<details class="sp-touchnav-group"{{if eq .Section "server"}} open{{end}}><summary>Server</summary><a href="/server/health"{{if and (eq .Section "server") (eq .Page "health")}} aria-current="page"{{end}}><i class="ti ti-heartbeat"></i>Health</a><a href="/server/log"{{if and (eq .Section "server") (eq .Page "log")}} aria-current="page"{{end}}><i class="ti ti-file-text"></i>System log</a><a href="/server/backup"{{if and (eq .Section "server") (eq .Page "backup")}} aria-current="page"{{end}}><i class="ti ti-archive"></i>Backup</a><a href="/server/users"{{if and (eq .Section "server") (eq .Page "users")}} aria-current="page"{{end}}><i class="ti ti-users"></i>Users</a><a href="/server/settings"{{if and (eq .Section "server") (eq .Page "settings")}} aria-current="page"{{end}}><i class="ti ti-settings"></i>Settings</a></details>
+{{end}}<details class="sp-touchnav-group"{{if eq .Section "user"}} open{{end}}><summary><i class="ti ti-user-circle"></i>{{.User}}</summary><a href="/account"><i class="ti ti-key"></i>Account</a><a href="/help"><i class="ti ti-help"></i>Help</a><form method="post" action="/logout"><button type="submit"><i class="ti ti-logout"></i>Sign out</button></form></details>
+</div></details>{{end}}
 
 {{/* subnav is the strip of sibling pages under the edge (input: Shell): the
      pages of the current group, the current one marked. A page outside every

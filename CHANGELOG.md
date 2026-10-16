@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A narrow screen gets a Menu** (phone-desktop-mode): below 1024 px - a
+  phone, a phone in "desktop site" mode, a tablet, a narrow window - the
+  navigation was a sheet of every section and page, always open, filling
+  the first screen. It is now *Menu* at the right of the header, which opens
+  the sections as folds, the current one open, the account's entries last;
+  no script. The page no longer meets the screen's edge. From 1024 px
+  nothing changes.
+
 ## [2.10.1] - 2026-10-16
 
 Postfix's queue ids no longer repeat. No migration; schema 12.

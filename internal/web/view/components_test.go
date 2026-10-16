@@ -496,9 +496,18 @@ func TestMenuHighlightsTheCurrentGroupEntryAndSibling(t *testing.T) {
 	if n := strings.Count(out, "sp-current"); n != 1 {
 		t.Errorf("%d current groups, want 1", n)
 	}
-	if n := strings.Count(out, "aria-current"); n != 1 {
-		t.Errorf("%d current siblings, want 1", n)
+	// The current page is marked twice: in the strip of siblings and in the
+	// Menu of a narrow screen, whose current group is the one open.
+	if n := strings.Count(out, "aria-current"); n != 2 {
+		t.Errorf("%d current entries, want the sibling strip's and the Menu's", n)
 	}
+	mustContain(t, out,
+		`<details class="sp-touchnav"><summary>Menu</summary>`,
+		`<details class="sp-touchnav-group" open><summary>Outbound</summary>`,
+		`<a href="/outbound/log" aria-current="page"><i class="ti ti-list-details"></i>Log</a>`,
+		`<details class="sp-touchnav-group"><summary>Inbound</summary>`,
+		`<div class="navbar-menu">`)
+	mustNotContain(t, out, `navbar-menu is-active`)
 
 	// The user menu is a group of its own and has no sibling strip.
 	out = renderShell(t, kitEngine(t), Meta{Title: "t", User: "admin", IsGlobal: true, Section: "user", Page: "account"})
@@ -612,4 +621,19 @@ func TestPollAndOOBAttributes(t *testing.T) {
 	mustContain(t, got, `<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`)
 	got = partial(t, "page_head", Head{Title: "T", ID: "h", OOB: true})
 	mustContain(t, got, `<div class="sp-head" id="h" hx-swap-oob="true">`)
+}
+
+// The Menu of a narrow screen offers what the bar offers, no more: a domain
+// administrator has no Server group and no Overview there either.
+func TestTouchMenuFollowsTheBar(t *testing.T) {
+	out := renderShell(t, kitEngine(t), Meta{Title: "t", User: "ops", Section: "outbound", Page: "domains"})
+	for _, group := range []string{"Overview", "Server", "Queue", "DMARC reports"} {
+		inBar := strings.Contains(out, `">`+group+`</a>`) || strings.Contains(out, `>`+group+`</a>`)
+		inMenu := strings.Contains(out, `<summary>`+group+`</summary>`) || strings.Contains(out, `></i>`+group+`</a>`) || strings.Contains(out, `<a href="/overview">`+group)
+		if inMenu && !inBar {
+			t.Errorf("the Menu offers %s, which the bar does not", group)
+		}
+	}
+	mustContain(t, out, `<summary><i class="ti ti-user-circle"></i>ops</summary>`, `<form method="post" action="/logout"><button type="submit"><i class="ti ti-logout"></i>Sign out</button></form>`)
+	mustNotContain(t, out, `<summary>Server</summary>`)
 }

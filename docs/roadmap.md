@@ -47,7 +47,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
 | base-trixie | The image's base from Debian bookworm (LTS since 2026-07-12) to trixie: Postfix 3.10 with the 2026 security batches | shipped `2.7.0` | — | — |
 | panel-dkim-signing | DKIM signing in the panel's own milter; OpenDKIM, the syslog relay and the parser port removed | shipped `2.8.0` | 14/14 | [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md) |
-| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | agreed (2026-10-13: after stages 1 and 2 of audit-2026-10-12) | — | — |
+| phone-desktop-mode | A phone browser in "desktop site" mode gets the phone navigation | done 2026-10-16, unreleased | — | — |
 | from-header-binding | Hold a message's `From:` header against the application that sends it | shipped `2.4.0` | 9/9 | [plans/from-header-binding.md](plans/from-header-binding.md) |
 | panel-redesign | Panel redesign (accepted mockups, design contract) | shipped `2.0.0` | 27/27 | [plans/panel-redesign.md](plans/panel-redesign.md) |
 | schema-squash | Squash SQLite migrations into a 2.x baseline | built in panel-redesign (stage 1) | — | [plans/panel-redesign.md](plans/panel-redesign.md) |
@@ -525,6 +525,23 @@ expected there. A design change is mockup-first
 **Done when:** the cause is written down here, and the panel at that width
 has one coherent layout, checked on a phone in "desktop site" mode and in a
 980 px window.
+
+**Cause (2026-10-16):** not the mode - every width under 1024 px. The bar's
+menu was always open (`navbar-menu is-active`, and no burger to close it),
+and Bulma lays a navbar menu out below 1024 px as a block with every
+dropdown open: on any phone the sections and all their pages filled the
+first screen. "Desktop site" makes the page about 980 px wide, where Bulma
+already puts columns side by side (from 769 px) but not yet the bar - the
+mix in the screenshot. And a Bulma `.container` has side margins only from
+1024 px, so below it the page met the screen's edge.
+
+**Done (2026-10-16):** the owner chose "Вариант 1" - a menu behind a button
+- with "сворачивание разделов". Below 1024 px the bar's menu is hidden and
+*Menu* at the right of the brand opens a panel over the page: Overview, each
+section a fold with the current one open, the user's last (Account, Help,
+Sign out); `<details>` all through, no script. The page and the strip of
+sibling pages have a 1rem gutter. From 1024 px nothing changed. Mockup
+`e0e30e2`.
 
 **Version:** `2.x` PATCH or MINOR; `agreed` (owner, 2026-10-13), taken up
 after stages 1 and 2 of [audit-2026-10-12](audit-2026-10-12.md) - mail shown

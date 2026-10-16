@@ -130,6 +130,27 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .navbar-dropdown button.navbar-item:hover, .navbar-dropdown button.navbar-item:focus { --bulma-navbar-item-background-l-delta: var(--bulma-navbar-item-hover-background-l-delta); }
 .navbar-dropdown button.navbar-item:active { --bulma-navbar-item-background-l-delta: var(--bulma-navbar-item-active-background-l-delta); }
 .navbar.is-primary .sp-current > .navbar-link, .navbar.is-primary a.navbar-item.sp-current { background: rgb(0 0 0 / .18); }
+/* Below 1024 px Bulma hides the bar's menu (navbar-menu without is-active)
+   and the touch navigation takes its place: Menu at the right of the brand
+   opens a panel over the page, its sections folded but the current one.
+   <details> all through, so it needs no script (owner, 2026-10-16: the menu
+   had been a sheet of every section open, filling the first screen). */
+.sp-touchnav { display: none; }
+.sp-touchnav summary { list-style: none; cursor: pointer; }
+.sp-touchnav summary::-webkit-details-marker { display: none; }
+.sp-touchnav summary::after { content: "›"; display: inline-block; margin-left: .5rem; font-size: 1.3rem; line-height: 1; transform: rotate(90deg); transition: transform .15s; }
+.sp-touchnav[open] > summary::after, .sp-touchnav-group[open] > summary::after { transform: rotate(-90deg); }
+.sp-touchnav > summary { display: flex; align-items: center; padding: 0 1rem; color: var(--sp-on-brick); font-weight: 500; }
+.sp-touchnav-panel { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--sp-brick); box-shadow: 0 12px 28px rgb(18 22 28 / .22); padding-bottom: .4rem; }
+.sp-touchnav-panel > a, .sp-touchnav-group > summary { display: flex; align-items: center; gap: .45rem; padding: .75rem 1rem; color: var(--sp-on-brick); font-weight: 500; }
+.sp-touchnav-group > summary::after { margin-left: auto; }
+.sp-touchnav-panel > a[aria-current], .sp-touchnav-group[open] > summary { background: rgb(0 0 0 / .18); }
+.sp-touchnav-group a, .sp-touchnav-group button { display: flex; align-items: center; gap: .6rem; padding: .65rem 1rem .65rem 2rem; background: #fff; color: var(--sp-ink); border: 0; font: inherit; text-align: left; cursor: pointer; }
+.sp-touchnav-group form { display: flex; }
+.sp-touchnav-group button { flex: 1; }
+.sp-touchnav-group .ti { color: var(--sp-muted); }
+.sp-touchnav-group a[aria-current] { color: var(--sp-brick); font-weight: 600; background: var(--sp-brick-tint); }
+.sp-touchnav-group a[aria-current] .ti { color: var(--sp-brick); }
 /* The header is built like the mark: a brick field, then the stamp's paper
    margin, and the perforation runs along the outer edge of that margin — round
    holes, flat teeth, the mark's ink hairline (perf-edge.svg is one tooth and
@@ -334,7 +355,13 @@ details.sp-record[open] .sp-record-toggle span + span { display: inline; }
 .sp-signin-form .sp-foot { text-align: center; margin-top: 2.5rem; }
 
 @media (max-width: 1407px) { .sp-health { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 1023px) { .sp-box-head form.sp-end { flex-wrap: wrap; } }
+@media (max-width: 1023px) {
+  .sp-box-head form.sp-end { flex-wrap: wrap; }
+  .sp-touchnav { display: flex; margin-left: auto; }
+  /* Bulma gives a container side margins only from 1024 px: below it the
+     page met the screen's edge. */
+  .sp-subnav .container, .container.sp-page { padding-inline: 1rem; }
+}
 @media (max-width: 768px) {
   .sp-health { grid-template-columns: repeat(2, 1fr); }
   .sp-row, .sp-pair { grid-template-columns: 1fr; }
