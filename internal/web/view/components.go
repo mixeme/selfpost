@@ -413,6 +413,11 @@ type Record struct {
 	Problem   Text
 }
 
+// Folded says the record is drawn folded to its head: DNS holds it as shown,
+// so its values are of use only to copy again. A record that is missing,
+// weak, wrong or not checked stays open.
+func (r Record) Folded() bool { return r.Status.Status == "published" && r.InDNS == "" }
+
 // HostField is the Copy field of the record's host.
 func (r Record) HostField() CopyField { return CopyField{Label: "Host / name", Value: r.Host} }
 

@@ -265,7 +265,7 @@ func TestDNSRecordShowsInDNSNowOnlyOnAMismatch(t *testing.T) {
 		Host: "sp2026._domainkey.example.org", Type: "TXT", Value: "v=DKIM1; p=AAA", ValueRows: 3,
 	}))
 	mustContain(t, ok,
-		`<div class="sp-record"><div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>selector</small></div>`,
+		`<details class="sp-record"><summary class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>selector</small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>`,
 		`<div class="sp-row">`, `<input class="input" readonly value="sp2026._domainkey.example.org">`,
 		`<label class="label">Type</label><div class="control"><input class="input" readonly value="TXT">`,
 		`<textarea class="textarea" rows="3" readonly>v=DKIM1; p=AAA</textarea>`)
@@ -279,6 +279,28 @@ func TestDNSRecordShowsInDNSNowOnlyOnAMismatch(t *testing.T) {
 		`<input class="input is-danger" readonly value="v=spf1 include:_spf.google.com ~all">`,
 		`<p class="help is-danger">Add <code>ip4:203.0.113.25</code> before ~all.</p>`,
 		`<input class="input" readonly value="v=spf1 ip4:203.0.113.25 ~all">`)
+}
+
+// Only a record DNS holds as shown is folded; one that needs work stays open
+// with its values in view, and the fold closes where it opened.
+func TestDNSRecordFoldsOnlyWhenPublished(t *testing.T) {
+	for _, status := range []string{"mismatch", "fail", "warn", "unknown"} {
+		out := squash(partial(t, "dns_record", Record{Name: "SPF", Status: Tag{Status: status},
+			Host: "example.org", Type: "TXT", Value: "v=spf1 a -all"}))
+		mustContain(t, out, `<div class="sp-record"><div class="sp-record-head"><h3>SPF</h3>`, `value="v=spf1 a -all"`)
+		mustNotContain(t, out, "<details", "<summary", "sp-record-toggle")
+	}
+	ok := squash(partial(t, "dns_record", Record{Name: "MX", Status: Tag{Status: "published"},
+		Host: "example.org", Type: "MX", Value: "10 mail.example.org."}))
+	if !strings.HasPrefix(ok, `<details class="sp-record">`) || !strings.HasSuffix(ok, `</details>`) {
+		t.Errorf("a published record is not one <details> block:\n%s", ok)
+	}
+	if strings.Contains(ok, "<details open") {
+		t.Errorf("a published record is drawn open:\n%s", ok)
+	}
+	if (Record{Status: Tag{Status: "published"}, InDNS: "x"}).Folded() {
+		t.Error("a record with an In DNS now value is folded")
+	}
 }
 
 func TestCopyFieldSingleLineAndMultiLine(t *testing.T) {

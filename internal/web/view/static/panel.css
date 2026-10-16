@@ -269,6 +269,17 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .sp-record-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .75rem; }
 .sp-record-head h3 { font-size: 1rem; font-weight: 600; margin: 0; }
 .sp-record-head small { margin-left: auto; color: var(--sp-muted); text-align: right; }
+/* A record DNS already holds as shown is folded to its head: a <details>
+   whose summary is the head, opened without script. */
+details.sp-record > summary { list-style: none; cursor: pointer; }
+details.sp-record > summary::-webkit-details-marker { display: none; }
+details.sp-record:not([open]) > summary { margin-bottom: 0; }
+details.sp-record:not([open]) > summary small { display: none; }
+details.sp-record[open] .sp-record-head small + .sp-record-toggle { margin-left: 0; }
+.sp-record-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: .3rem; color: var(--sp-brick); font-size: var(--sp-fs-s); white-space: nowrap; }
+.sp-record-toggle span + span { display: none; }
+details.sp-record[open] .sp-record-toggle span { display: none; }
+details.sp-record[open] .sp-record-toggle span + span { display: inline; }
 .sp-record .label, .sp-form .label { font-weight: 500; color: var(--sp-ink-2); margin-bottom: .25rem; }
 .sp-record .label { font-weight: 400; color: var(--sp-muted); }
 .input[readonly], .textarea[readonly] { font-family: var(--sp-mono); font-size: var(--sp-fs-s); background: var(--sp-well); box-shadow: none; }
@@ -324,7 +335,8 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
   .sp-health { grid-template-columns: repeat(2, 1fr); }
   .sp-row, .sp-pair { grid-template-columns: 1fr; }
   .sp-record-head { flex-wrap: wrap; }
-  .sp-record-head small { margin-left: 0; text-align: left; flex-basis: 100%; }
+  .sp-record-head small { margin-left: 0; text-align: left; flex-basis: 100%; order: 1; }
+  details.sp-record[open] .sp-record-head small + .sp-record-toggle { margin-left: auto; }
   .sp-postmark { display: none; }
   .sp-cards { display: flex; flex-direction: column; padding-inline: .75rem; }
   .sp-cards > .column { display: contents; }

@@ -40,7 +40,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | agreed (2026-10-15) | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | agreed (2026-10-15) | — | — |
-| dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | agreed (2026-10-15) | — | — |
+| dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | done 2026-10-16, unreleased | — | — |
 | go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
@@ -729,6 +729,16 @@ included. No JavaScript needed for the folding itself: `<details>` opens
 and closes without it under the panel's CSP. Whether a fold remembers being
 opened across the polls of a page, and whether *Re-check DNS* folds a record
 that has just turned right, are for the mockup.
+
+**Done (2026-10-16):** a record whose tag is *published* and that has no
+*In DNS now* is a `<details>` whose summary is the head: name, tag and
+*Show values* (the eye of the icon subset - it has no chevron), the
+values behind it. The head's note is hidden while folded, or a long one
+(the server's SPF in a half column) wraps the fold to two lines; it shows
+when opened. The two questions answered themselves: no page that draws
+records polls them, and *Re-check DNS* posts and draws the page again, so a
+fold is never kept across a refresh and a record that has just turned
+right comes back folded.
 
 ## notification-mail-recheck
 

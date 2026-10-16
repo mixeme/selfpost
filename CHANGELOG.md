@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A DNS record DNS already holds as shown is folded** (dns-record-collapse):
+  on an outbound domain's page, an inbound domain's and in Server ›
+  Settings › Notification mail, a *published* record is one line - its
+  name, its tag and *Show values*, which opens the host, type and value to
+  copy them again. A record that is missing, weak, wrong or not checked
+  stays open as before, with *In DNS now* where it differs. A `<details>`
+  block, no script; *Re-check DNS* draws the page again, so a record that
+  has just turned right comes back folded.
+
 ## [2.8.0] - 2026-10-16
 
 The panel signs outgoing mail with DKIM itself, and OpenDKIM - a 2018 beta

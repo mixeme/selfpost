@@ -131,10 +131,14 @@
 {{define "health_card"}}<a href="{{.Href}}"{{if eq .Level "warn"}} class="sp-warn"{{else if eq .Level "fail"}} class="sp-fail"{{end}}><span class="sp-h-icon"><i class="ti {{.Icon}}"></i></span><span><span class="sp-h-name">{{.Name}}</span><span class="sp-h-value">{{.Value}}</span><span class="sp-h-sub">{{.Sub}}</span></span></a>{{end}}
 
 {{/* dns_record is one DNS record (input: Record): its status, what to publish
-     with a Copy button, and "In DNS now" only when it differs. */}}
-{{define "dns_record"}}<div class="sp-record">
-<div class="sp-record-head"><h3>{{.Name}}</h3>{{if .Status.Status}}{{template "tag" .Status}}{{end}}{{if .Note}}<small>{{template "inline" .Note}}</small>{{end}}</div>
-{{if .Host}}<div class="sp-row">
+     with a Copy button, and "In DNS now" only when it differs. A record DNS
+     already holds as shown is Folded: a <details> whose summary is the head,
+     the values behind Show values. */}}
+{{define "dns_record"}}{{if .Folded}}<details class="sp-record">
+<summary class="sp-record-head">{{template "dns_record_head" .}}<span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
+{{else}}<div class="sp-record">
+<div class="sp-record-head">{{template "dns_record_head" .}}</div>
+{{end}}{{if .Host}}<div class="sp-row">
 {{template "copy_field" .HostField}}
 <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="{{.Type}}"></div></div>
 </div>
@@ -143,7 +147,8 @@
 <div class="control"><input class="input is-danger" readonly value="{{.InDNS}}"></div>
 {{if .Problem}}<p class="help is-danger">{{template "inline" .Problem}}</p>
 {{end}}</div>
-{{end}}</div>{{end}}
+{{end}}{{if .Folded}}</details>{{else}}</div>{{end}}{{end}}
+{{define "dns_record_head"}}<h3>{{.Name}}</h3>{{if .Status.Status}}{{template "tag" .Status}}{{end}}{{if .Note}}<small>{{template "inline" .Note}}</small>{{end}}{{end}}
 
 {{/* record_open starts the padded block a record sits in and record_close ends
      it, for what is not a DNS record but is laid out like one: the fields of a

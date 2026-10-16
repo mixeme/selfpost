@@ -157,7 +157,7 @@ var overviewTopics = []HelpTopic{
 
 var outboundTopics = []HelpTopic{
 	{ID: HelpDNS, Title: "DNS records", Body: []Text{
-		Rich("DKIM proves the message was signed by this relay, SPF lists the addresses allowed to send for the domain, DMARC tells receivers what to do when both fail and where to report. Publish all three exactly as shown; merge SPF into an existing record rather than adding a second one. A domain's status is the worst of its three records, and results are cached for a few minutes, so use Re-check DNS after publishing. The SPF check is shallow: it looks for this server's address in the record itself and does not follow ",
+		Rich("DKIM proves the message was signed by this relay, SPF lists the addresses allowed to send for the domain, DMARC tells receivers what to do when both fail and where to report. Publish all three exactly as shown; merge SPF into an existing record rather than adding a second one. A domain's status is the worst of its three records, and results are cached for a few minutes, so use Re-check DNS after publishing. A record DNS already holds as shown is folded to its name and status; Show values opens it to copy them again. The SPF check is shallow: it looks for this server's address in the record itself and does not follow ",
 			Code("include:"), " or ", Code("redirect="), ", so a record that relies on them is reported as a warning, not a failure. ",
 			Code("p=none"), " does not affect delivery; tighten to ", Code("quarantine"), ", then ", Code("reject"),
 			", once the reports look clean. A domain's report address is set in its Domain settings."),
