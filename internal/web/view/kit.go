@@ -145,6 +145,8 @@ func KitPage() *Kit {
 			{Label: "Label", Value: Plain("Value")},
 			{Label: "Mono value", Value: Plain("4XcB7k2Jm9z1"), Mono: true},
 			{Label: "sp-big", Value: Plain("5 days"), Big: true, Note: Plain("a supporting line")},
+			{Label: "Label with a tag", Value: Plain("a verdict on the value"), LabelTag: &Tag{Status: "ok", Label: "matches"}},
+			{Label: "sp-wide", Value: Plain("a value that takes the whole row, a line of a server's own"), Mono: true, Wide: true},
 		},
 
 		Timeline: Box{No: "08", Title: "timeline"},

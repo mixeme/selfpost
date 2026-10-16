@@ -112,6 +112,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		TrustedProxyCIDRs:          cfg.trustedProxies,
 		TLSCertFile:                cfg.tlsCertFile,
 		TLSServedCertFile:          cfg.tlsServedCertFile,
+		SMTPBanner:                 cfg.smtpBanner,
 		TLSReloadInterval:          cfg.tlsReloadInterval,
 		SignSocket:                 cfg.signSocket,
 		SignLocalSocket:            cfg.signLocalSocket,

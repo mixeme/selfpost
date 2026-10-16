@@ -97,6 +97,9 @@ type config struct {
 	// how often build/postfix-cert-reload.sh looks for a renewal.
 	tlsServedCertFile string
 	tlsReloadInterval time.Duration
+	// smtpBanner is Postfix's smtpd_banner, expanded, read from postconf at
+	// the start: Health shows the greeting it makes.
+	smtpBanner string
 
 	dkimDir         string
 	dkimSelectorDef string
@@ -333,6 +336,7 @@ func run() error {
 	// postfix-config.sh has written main.cf before supervisord started the
 	// panel (build/entrypoint.sh), and nothing rewrites it after.
 	cfg.tlsServedCertFile = health.ServedCertPath()
+	cfg.smtpBanner = health.SMTPBanner()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

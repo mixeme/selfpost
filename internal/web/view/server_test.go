@@ -331,3 +331,18 @@ func TestUserDeleteSaysNothingOfReportAddresses(t *testing.T) {
 		pageLacks(t, "Delete user", out, `report address`, `will have no`, `The domains`)
 	}
 }
+
+// The Configuration card says where the panel sees the viewer from, and what
+// to set when it is the reverse proxy's own address.
+func TestHealthSaysWhereItSeesTheViewer(t *testing.T) {
+	out := renderSignedIn(t, "health", NewHealth(admin(), "").WithClientAddress("198.51.100.7", "172.18.0.1", true, false))
+	pageHas(t, "Health", out, `<div><dt>Your address</dt><dd class="sp-mono">198.51.100.7</dd><dd class="sp-muted">From X-Forwarded-For, which the trusted proxy 172.18.0.1 set</dd></div>`)
+	pageLacks(t, "Health", out, `TRUSTED_PROXY_CIDR`)
+
+	out = renderSignedIn(t, "health", NewHealth(admin(), "").WithClientAddress("172.18.0.1", "172.18.0.1", false, true))
+	pageHas(t, "Health", out, `The proxy&#39;s own: its X-Forwarded-For is not read`,
+		`<p class="mb-3 has-text-danger">Every visitor reaches the panel as <span class="sp-mono">172.18.0.1</span>, the reverse proxy, and they all share one sign-in limit. Set <code>TRUSTED_PROXY_CIDR</code> to <code>172.18.0.1/32</code>`)
+
+	out = renderSignedIn(t, "health", NewHealth(admin(), "").WithClientAddress("fd00::1", "fd00::1", false, true))
+	pageHas(t, "Health", out, `<code>fd00::1/128</code>`)
+}

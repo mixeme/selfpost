@@ -169,7 +169,7 @@
 {{/* facts is a label / value grid (input: []Fact); Big is for a headline
      number, with its supporting line under it. */}}
 {{define "facts"}}<dl class="sp-facts">{{range .}}
-<div><dt>{{.Label}}</dt><dd{{if and .Mono .Small}} class="sp-mono sp-small"{{else if .Mono}} class="sp-mono"{{else if .Big}} class="sp-big"{{end}}>{{template "inline" .Value}}</dd>{{if .Note}}<dd class="sp-muted">{{template "inline" .Note}}</dd>{{end}}</div>{{end}}
+<div{{if .Wide}} class="sp-wide"{{end}}><dt>{{.Label}}{{with .LabelTag}} {{template "tag" .}}{{end}}</dt><dd{{if and .Mono .Small}} class="sp-mono sp-small"{{else if .Mono}} class="sp-mono"{{else if .Big}} class="sp-big"{{end}}>{{template "inline" .Value}}</dd>{{if .Note}}<dd class="sp-muted">{{template "inline" .Note}}</dd>{{end}}</div>{{end}}
 </dl>{{end}}
 
 {{/* side_menu is the Bulma menu of a detail page (input: SideMenu): icons,

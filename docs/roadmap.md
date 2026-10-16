@@ -29,7 +29,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
 | inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | shipped `2.10.0` | 7/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
-| health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | agreed (2026-10-13) | — | — |
+| health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | done 2026-10-16, unreleased | — | — |
 | test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
 | origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | shipped `2.10.4` | — | — |
@@ -175,6 +175,18 @@ mockup `preflight` stays drawn and unbuilt.
 **Done when:** each line is shown wrong on the e2e stand or in a test with a
 wrong certificate name, a wrong greeting and an untrusted proxy, and right on
 the test server.
+
+**Done (2026-10-16):** mockups `b2dcefc`, `cc33890`, `0feaa55` (the owner:
+the greeting on a row of its own, the name check a tag beside *Names*).
+The certificate: `health.Certificate.ForHost` - DNS names as a TLS client
+matches them, the CN only without any, as OpenSSL and so a sending Postfix
+still does - fails a certificate for another name. The greeting:
+`postconf -x -h smtpd_banner`, read once at the start (main.cf is not
+rewritten after), is what smtpd writes after `220`
+(src/smtpd/smtpd.c:5979); a first word other than the hostname warns. The
+proxy: `auth.Module.Seen` - an `X-Forwarded-For` left unread because the
+peer is not trusted warns, with the `/32` (or `/128`) to set. Wrong cases in
+unit tests, right ones in e2e (`testFormPostWithTheBrowsersOrigin`).
 
 **Version:** `2.x` MINOR; `agreed`.
 

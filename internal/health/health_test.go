@@ -286,3 +286,48 @@ func TestIntervalText(t *testing.T) {
 		}
 	}
 }
+
+// A certificate for another name is no certificate for this server: a client
+// that checks the name refuses it however valid it is. Its DNS names are
+// matched as a TLS client matches them, a wildcard for one label; with none,
+// its common name, as OpenSSL - and so a sending Postfix - still does.
+func TestCertificateForHost(t *testing.T) {
+	dir := t.TempDir()
+	cnOnly := filepath.Join(dir, "cn.pem")
+	writeCert(t, cnOnly, "mail.example.org", 90*24*time.Hour)
+	if c := CheckCertificate(cnOnly).ForHost("MAIL.example.org"); c.Status != StatusOK || c.MatchesHost == nil || !*c.MatchesHost {
+		t.Errorf("a CN-only certificate for the hostname: %+v", c)
+	}
+	if c := CheckCertificate(cnOnly).ForHost("other.example.org"); c.Status != StatusError || *c.MatchesHost ||
+		!strings.Contains(c.Detail, "None of the certificate's names is other.example.org") {
+		t.Errorf("a certificate for another name: %+v", c)
+	}
+
+	san := filepath.Join(dir, "san.pem")
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "mail.example.org"},
+		DNSNames: []string{"*.example.net", "relay.example.org"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(90 * 24 * time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(san, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := CheckCertificate(san)
+	if strings.Join(c.Names, " ") != "*.example.net relay.example.org" {
+		t.Errorf("names = %q, want the DNS names", c.Names)
+	}
+	for host, want := range map[string]bool{"mail.example.net": true, "relay.example.org": true, "a.b.example.net": false,
+		"mail.example.org": false /* the CN does not count beside DNS names */} {
+		if got := c.ForHost(host); *got.MatchesHost != want {
+			t.Errorf("ForHost(%s) matches = %v, want %v", host, *got.MatchesHost, want)
+		}
+	}
+	if c := (Certificate{Status: StatusError}).ForHost("mail.example.org"); c.MatchesHost != nil {
+		t.Error("a certificate that was not read was matched")
+	}
+}

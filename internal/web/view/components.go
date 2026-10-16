@@ -452,6 +452,12 @@ type Fact struct {
 	Small bool
 	Big   bool
 	Note  Text
+	// Wide takes the whole row of the grid (sp-wide): a line a server wrote,
+	// read as one - Postfix's greeting.
+	Wide bool
+	// LabelTag is a verdict on the value, beside the label: the
+	// certificate's names against the hostname.
+	LabelTag *Tag
 }
 
 // SideMenu is the input of side_menu, the left column of a detail page: groups

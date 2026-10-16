@@ -37,8 +37,60 @@ type Certificate struct {
 	DaysLeft int
 	Status   Status
 	Detail   string
+	// Names are the names the certificate is for: its DNS names, or its
+	// common name when it has none. MatchesHost says whether one of them is
+	// the server's (ForHost); nil until that is asked.
+	Names       []string
+	MatchesHost *bool
 	// Renewal is the mounted certificate while Postfix serves an older one.
 	Renewal *Renewal
+
+	leaf *x509.Certificate
+}
+
+// ForHost holds the certificate to the server's own name, SELFPOST_HOSTNAME:
+// a client that verifies the name - Go's crypto/tls does by default, so does
+// any MTA under DANE or MTA-STS - refuses a certificate for another however
+// valid it is, so one that is not for host is a failure. The name is matched
+// against the DNS names as a TLS client matches it (crypto/x509,
+// Certificate.VerifyHostname: a wildcard for one label), and against the
+// common name only when there are none - which Go refuses but a sending
+// Postfix still takes: its TLS client names the host with SSL_add1_host()
+// and only X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS (Postfix 3.10.13,
+// src/tls/tls_client.c:439, 513), and OpenSSL's X509_check_host() checks the
+// subject CN when there is no DNS subjectAltName unless told
+// X509_CHECK_FLAG_NEVER_CHECK_SUBJECT (OpenSSL 3.5, X509_check_host(3)).
+// Nothing is said with no certificate read or no host.
+func (c Certificate) ForHost(host string) Certificate {
+	if c.leaf == nil || host == "" {
+		return c
+	}
+	var ok bool
+	if len(c.leaf.DNSNames) > 0 {
+		ok = c.leaf.VerifyHostname(host) == nil
+	} else {
+		ok = strings.EqualFold(strings.TrimSuffix(c.leaf.Subject.CommonName, "."), strings.TrimSuffix(host, "."))
+	}
+	c.MatchesHost = &ok
+	if !ok {
+		c.Status = StatusError
+		c.Detail = fmt.Sprintf("None of the certificate's names is %s (SELFPOST_HOSTNAME): a client that verifies the name refuses the connection, however valid the certificate is. Mount a certificate for %s.", host, host)
+	}
+	return c
+}
+
+// SMTPBanner is Postfix's smtpd_banner with its parameters expanded, as
+// postconf -x prints it: what smtpd puts after "220 " when a client connects
+// (Postfix 3.10.13, src/smtpd/smtpd.c:5979, smtpd_chat_reply(state, "220
+// %s", var_smtpd_banner); postconf(1) -x expands $name). build/postfix-
+// config.sh sets it to "$myhostname ESMTP". It is read once, at the start,
+// as ServedCertPath is; "" when postconf fails.
+func SMTPBanner() string {
+	out, err := exec.Command("postconf", "-x", "-h", "smtpd_banner").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // Renewal is a renewed certificate in the mounted file that Postfix has not
@@ -155,6 +207,11 @@ func CheckCertificate(path string) Certificate {
 	}
 
 	c.Subject = leaf.Subject.CommonName
+	c.Names = leaf.DNSNames
+	if len(c.Names) == 0 && c.Subject != "" {
+		c.Names = []string{c.Subject}
+	}
+	c.leaf = leaf
 	c.NotAfter = leaf.NotAfter
 	c.DaysLeft = int(time.Until(leaf.NotAfter).Hours() / 24)
 	switch {

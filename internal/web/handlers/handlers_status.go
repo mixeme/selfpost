@@ -143,6 +143,8 @@ func (h *Handlers) HandleHealthRecheck(w http.ResponseWriter, r *http.Request) {
 // of Overview and the Notification mail card, which only Health shows.
 func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 	page := healthPage(h.shellMeta(r), h.healthChecks(), flash)
+	seen := h.auth.Seen(r)
+	page.WithClientAddress(seen.Client, seen.Peer, seen.FromHeader, seen.HeaderIgnored)
 	mail := h.serverMail(false)
 	page.WithNotificationMail(notify.From(h.cfg.Hostname), mail.rows, mail.status)
 	stats, err := h.store.SenderCheckStats(time.Now())
@@ -205,8 +207,15 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 	if !cert.NotAfter.IsZero() {
 		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Expires", Value: view.Plain(cert.NotAfter.UTC().Format("2006-01-02 15:04 UTC")), Mono: true})
 	}
-	if cert.Subject != "" {
-		page.CertFacts = append(page.CertFacts, view.Fact{Label: "Names", Value: view.Plain(cert.Subject), Mono: true})
+	if len(cert.Names) > 0 {
+		names := view.Fact{Label: "Names", Value: view.Plain(strings.Join(cert.Names, ", ")), Mono: true}
+		if m := cert.MatchesHost; m != nil {
+			names.LabelTag = &view.Tag{Status: "ok", Label: "matches"}
+			if !*m {
+				names.LabelTag = &view.Tag{Status: "fail", Label: "not for the hostname"}
+			}
+		}
+		page.CertFacts = append(page.CertFacts, names)
 	}
 	if r := cert.Renewal; r != nil {
 		page.CertFacts = append(page.CertFacts,
@@ -225,7 +234,7 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 	}
 
 	ptr := c.PTR
-	page.Hostname.End = view.Verdict(string(ptr.Status))
+	hostStatus := ptr.Status
 	host := c.Hostname
 	if host == "" {
 		host = "(SELFPOST_HOSTNAME is not set)"
@@ -241,6 +250,18 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 		}
 		page.HostFacts = append(page.HostFacts, view.Fact{Label: "Lookup", Value: lookup, Mono: true})
 	}
+	// The greeting must name the hostname: a receiver compares it with the
+	// name it looked up, and a container id or localhost there reads as a
+	// misconfigured host. A banner that could not be read says nothing.
+	if c.Banner != "" {
+		fact := view.Fact{Label: "Greeting", Value: view.Plain("220 " + c.Banner), Mono: true, Wide: true}
+		if f := strings.Fields(c.Banner); c.Hostname != "" && (len(f) == 0 || !strings.EqualFold(f[0], c.Hostname)) {
+			hostStatus = health.Worst(hostStatus, health.StatusWarn)
+			fact.Note = view.Plain("Postfix greets with another name than " + c.Hostname + ": set myhostname to it (build/postfix-config.sh does, from SELFPOST_HOSTNAME).")
+		}
+		page.HostFacts = append(page.HostFacts, fact)
+	}
+	page.Hostname.End = view.Verdict(string(hostStatus))
 	return page
 }
 
@@ -439,6 +460,8 @@ type healthReadings struct {
 	SocketStatus  health.Status
 	Hostname      string
 	PTR           dnscheck.Result
+	// Banner is Postfix's smtpd_banner, expanded: the greeting after "220".
+	Banner string
 }
 
 // healthChecks runs every server check once.
@@ -459,7 +482,7 @@ func (h *Handlers) healthChecks() healthReadings {
 		queueStatus = health.StatusWarn
 	}
 
-	cert := health.CheckServedCertificate(h.cfg.TLSServedCertFile, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now())
+	cert := health.CheckServedCertificate(h.cfg.TLSServedCertFile, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now()).ForHost(h.cfg.Hostname)
 	sockets := []health.Socket{
 		signerSocket(h.cfg.SignSocket, "applications"),
 		signerSocket(h.cfg.SignLocalSocket, "notifications"),
@@ -490,6 +513,7 @@ func (h *Handlers) healthChecks() healthReadings {
 		SocketStatus:  socketStatus,
 		Hostname:      h.cfg.Hostname,
 		PTR:           srv.PTR,
+		Banner:        h.cfg.SMTPBanner,
 	}
 }
 

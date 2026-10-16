@@ -2,6 +2,7 @@ package view
 
 import (
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -53,6 +54,38 @@ type Health struct {
 
 	Configuration Box
 	Reload        Action
+	// ConfigFacts is the address the panel sees the viewer at
+	// (WithClientAddress); ConfigProblem says what to do when it is the
+	// reverse proxy's own.
+	ConfigFacts   []Fact
+	ConfigProblem Text
+}
+
+// WithClientAddress says where the panel sees the viewer's request from:
+// client is the address it counts sign-ins against, peer the connection's,
+// fromHeader that client came from X-Forwarded-For of a trusted proxy, and
+// ignored that the header was there but peer is no trusted proxy - then
+// every visitor has the proxy's address and shares one sign-in limit, which
+// nothing else shows (auth.Module.Seen; guide § TRUSTED_PROXY_CIDR).
+func (h *Health) WithClientAddress(client, peer string, fromHeader, ignored bool) *Health {
+	f := Fact{Label: "Your address", Value: Plain(client), Mono: true}
+	switch {
+	case fromHeader:
+		f.Note = Plain("From X-Forwarded-For, which the trusted proxy " + peer + " set")
+	case ignored:
+		f.Note = Plain("The proxy's own: its X-Forwarded-For is not read")
+		mask := "/32"
+		if strings.Contains(peer, ":") {
+			mask = "/128"
+		}
+		h.ConfigProblem = Rich("Every visitor reaches the panel as ", Mono(peer),
+			", the reverse proxy, and they all share one sign-in limit. Set ", Code("TRUSTED_PROXY_CIDR"),
+			" to ", Code(peer+mask), " - or the proxy's network - and restart the container.")
+	default:
+		f.Note = Plain("The connection's own; no proxy in between said otherwise")
+	}
+	h.ConfigFacts = []Fact{f}
+	return h
 }
 
 // SenderCheckRow is one period of the Sender check table.

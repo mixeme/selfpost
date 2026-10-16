@@ -125,6 +125,32 @@ func clientIP(r *http.Request, trustedProxies []*net.IPNet) string {
 	return host
 }
 
+// SeenAddress is how the panel sees a request's address, for Health: the
+// address it counts sign-ins against (Client), the transport peer (Peer),
+// and whether Client came from X-Forwarded-For (FromHeader) or the header
+// was there and left unread because the peer is not a trusted proxy
+// (HeaderIgnored) - the case where every visitor shares the proxy's address
+// and one sign-in limit.
+type SeenAddress struct {
+	Client        string
+	Peer          string
+	FromHeader    bool
+	HeaderIgnored bool
+}
+
+// Seen reads a request's address as clientIP does.
+func (m *Module) Seen(r *http.Request) SeenAddress {
+	peer, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		peer = r.RemoteAddr
+	}
+	s := SeenAddress{Client: clientIP(r, m.trustedProxies), Peer: peer}
+	hasHeader := r.Header.Get("X-Forwarded-For") != ""
+	s.FromHeader = hasHeader && s.Client != peer
+	s.HeaderIgnored = hasHeader && !s.FromHeader
+	return s
+}
+
 func ipInAny(ip net.IP, nets []*net.IPNet) bool {
 	for _, n := range nets {
 		if n.Contains(ip) {

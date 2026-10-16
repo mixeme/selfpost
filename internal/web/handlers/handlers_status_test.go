@@ -6,6 +6,7 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/web/view"
 )
 
 // checksFixture is one reading of every server check, shaped as healthChecks
@@ -125,5 +126,46 @@ func TestProcessRowOfAnIdleOneShotSaysOnDemand(t *testing.T) {
 	daemon := processRow(health.Process{Name: "postfix", State: "STOPPED", Detail: "Oct 10 08:42 PM", Status: health.StatusError})
 	if daemon.State.Label != "stopped" || daemon.State.Status != "error" {
 		t.Errorf("stopped daemon = %+v", daemon)
+	}
+}
+
+// Health's Hostname card shows Postfix's greeting on a row of its own, and
+// warns when it names another host; the certificate's names carry whether
+// they are the hostname's.
+func TestHealthGreetingAndCertificateName(t *testing.T) {
+	c := checksFixture()
+	c.Banner = "mail.example.org ESMTP"
+	matches := true
+	c.Cert.Names, c.Cert.MatchesHost = []string{"mail.example.org"}, &matches
+	page := healthPage(view.Meta{}, c, "")
+	var greeting *view.Fact
+	for i := range page.HostFacts {
+		if page.HostFacts[i].Label == "Greeting" {
+			greeting = &page.HostFacts[i]
+		}
+	}
+	if greeting == nil || greeting.Value[0].Text != "220 mail.example.org ESMTP" || !greeting.Wide || greeting.Note != nil {
+		t.Fatalf("greeting = %+v", greeting)
+	}
+	names := func(p *view.Health) *view.Tag {
+		for _, f := range p.CertFacts {
+			if f.Label == "Names" {
+				return f.LabelTag
+			}
+		}
+		return nil
+	}
+	if tag := names(page); tag == nil || tag.Label != "matches" {
+		t.Errorf("names = %+v", page.CertFacts)
+	}
+
+	c.Banner = "3f2a9c1d0e7b ESMTP"
+	matches = false
+	page = healthPage(view.Meta{}, c, "")
+	if end := page.Hostname.End; len(end) == 0 || end[0].Tag == nil || end[0].Tag.Status != "warn" {
+		t.Errorf("a greeting with a container id: card %+v, want warn", page.Hostname.End)
+	}
+	if tag := names(page); tag == nil || tag.Status != "fail" || tag.Label != "not for the hostname" {
+		t.Errorf("a certificate for another name: %+v", tag)
 	}
 }

@@ -66,6 +66,9 @@ type Config struct {
 	TLSCertFile       string
 	TLSServedCertFile string
 	TLSReloadInterval time.Duration
+	// SMTPBanner is Postfix's smtpd_banner as postconf expands it, "" when
+	// it could not be read (health.SMTPBanner).
+	SMTPBanner string
 	// SignSocket and SignLocalSocket are the DKIM signer's two milter
 	// sockets, applications' mail and the panel's own; JournalSocket is the
 	// journal-milter's. The status page dials them: the signer's are required
@@ -146,6 +149,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		Version:                    cfg.Version,
 		TLSCertFile:                cfg.TLSCertFile,
 		TLSServedCertFile:          cfg.TLSServedCertFile,
+		SMTPBanner:                 cfg.SMTPBanner,
 		TLSReloadInterval:          cfg.TLSReloadInterval,
 		SignSocket:                 cfg.SignSocket,
 		SignLocalSocket:            cfg.SignLocalSocket,

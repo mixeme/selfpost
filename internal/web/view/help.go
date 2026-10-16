@@ -145,13 +145,18 @@ var overviewTopics = []HelpTopic{
 		Rich("Six checks, and the worst of them is the postmark. ", TagOf("ok", ""), " needs nothing; ",
 			TagOf("warn", ""), " still delivers mail but will stop doing so if ignored; ",
 			TagOf("fail", ""), " means mail is being lost or refused now. ", Link("/server/health", "Health"),
-			" shows the readings behind them: CPU and memory are the container's own, not the host's spare capacity, and network is a short window, not a daily total."),
+			" shows the readings behind them: CPU and memory are the container's own, not the host's spare capacity, and network is a short window, not a daily total. ",
+			Em("Your address"), ", in the Configuration card, is the address the panel sees your browser at: behind a reverse proxy it must be your own, taken from ", Code("X-Forwarded-For"),
+			"; when it is the proxy's, every visitor shares one sign-in limit, and Health warns and names the address to put in ", Code("TRUSTED_PROXY_CIDR"), "."),
 	}},
 	{ID: HelpCertificate, Title: "TLS certificate", Body: []Text{
-		Plain("The certificate Postfix presents on 465 and 587. The reverse proxy or the image mounts it, the panel does not issue it. Postfix serves its own copy of the mounted file and looks for a renewed one once a day by default; until it takes one up, the card shows it as a renewal waiting, and warns once it has waited longer than that check allows - the container log's cert-reload lines say why. It warns 14 days before expiry unless a renewal is already waiting, and fails once expired, or when the file is missing or unreadable — clients that verify certificates then refuse to connect."),
+		Rich("The certificate Postfix presents on 465 and 587. The reverse proxy or the image mounts it, the panel does not issue it. Postfix serves its own copy of the mounted file and looks for a renewed one once a day by default; until it takes one up, the card shows it as a renewal waiting, and warns once it has waited longer than that check allows - the container log's cert-reload lines say why. It warns 14 days before expiry unless a renewal is already waiting, and fails once expired, or when the file is missing or unreadable — clients that verify certificates then refuse to connect. It also fails when none of its names is the hostname (",
+			Code("SELFPOST_HOSTNAME"), ") - the tag beside ", Em("Names"), " says which: a client that verifies the name refuses it however valid it is."),
 	}},
 	{ID: HelpRDNS, Title: "Hostname and reverse DNS", Body: []Text{
-		Rich("The hostname (", Code("SELFPOST_HOSTNAME"), ") must resolve to this server's address, and that address must resolve back to the hostname. Large receivers reject or spam-folder mail from hosts where the two disagree. The PTR record is set at your hosting provider, not in your DNS zone."),
+		Rich("The hostname (", Code("SELFPOST_HOSTNAME"), ") must resolve to this server's address, and that address must resolve back to the hostname. Large receivers reject or spam-folder mail from hosts where the two disagree. The PTR record is set at your hosting provider, not in your DNS zone. ",
+			Em("Greeting"), " is the line Postfix opens every connection with, ", Code("220"), " and its banner; it must name the hostname too - a receiver compares it with the name it looked up - and a container id or ",
+			Code("localhost"), " there is a warning."),
 	}},
 }
 

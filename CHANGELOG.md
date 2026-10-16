@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Server › Health checks three things it did not** (health-setup-checks):
+  whether the TLS certificate is for the server's own name - a tag beside
+  its names, and a failure when it is not, since a client that checks the
+  name refuses it however valid it is; Postfix's greeting, the `220` line,
+  which must name the hostname; and the address the panel sees your browser
+  at, warning when a reverse proxy it does not trust stands in front - every
+  visitor then shares one sign-in limit - and naming what to put in
+  `TRUSTED_PROXY_CIDR`.
+
 ## [2.10.4] - 2026-10-16
 
 The origin check is strict. No migration; schema 12.

@@ -468,8 +468,10 @@ readings, in the order of what stops mail first:
   one refresh after the page opens. A fully busy processor or a machine out of
   memory is a warning, because both delay or kill the mail path; throughput is
   only reported.
-- **Processes**, **TLS certificate** (validity and expiry) and **Milter
-  sockets**: the DKIM signer's two - `dkim-signer · applications` for what
+- **Processes**, **TLS certificate** (validity and expiry, and whether its
+  names cover `SELFPOST_HOSTNAME` - the tag beside *Names*; a certificate for
+  another name fails, as a client that checks the name refuses it) and
+  **Milter sockets**: the DKIM signer's two - `dkim-signer · applications` for what
   applications send on 465/587, `dkim-signer · notifications` for the
   panel's own mail - the sender check, the send log (the journal-milter)
   and, with one configured, the spam filter. Postfix attaches the signer
@@ -493,7 +495,14 @@ readings, in the order of what stops mail first:
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
   record the internet publishes for this server's IP (forward-confirmed
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
-  *Re-check DNS* after changing DNS.
+  *Re-check DNS* after changing DNS. *Greeting* is the `220` line Postfix
+  opens every connection with; it must name the hostname, and another name
+  there is a warning.
+- **Your address** (in the Configuration card) — the address the panel sees
+  your browser at, and whether it took it from `X-Forwarded-For`. Behind a
+  reverse proxy that the panel does not trust it is the proxy's own: every
+  visitor then shares one sign-in limit, and the card says what to set in
+  `TRUSTED_PROXY_CIDR`.
 - **Configuration** — the **Reload configuration** button writes again, from
   the database, every file the panel keeps for the mail path - the DKIM
   selector table (`/data/dkim/selectors`), the Postfix sender map, the

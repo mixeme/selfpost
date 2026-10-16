@@ -148,12 +148,25 @@ func writeCertWithoutItsKey(certPath string, notAfter time.Time) error {
 // panel sent until 2.5.2 and which the origin check refuses (assumptions
 // D-B3). The client here is not a browser: it sends what one would.
 func testFormPostWithTheBrowsersOrigin(t *testing.T, sc *scenario) {
-	resp, _, err := sc.panel.get("/server/health")
+	resp, page, err := sc.panel.get("/server/health")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := resp.Header.Get("Referrer-Policy"); got != "same-origin" {
 		t.Fatalf("Referrer-Policy %q, want same-origin", got)
+	}
+	// The setup checks of health-setup-checks, on a stand that passes them:
+	// the stand's certificate is for its hostname, Postfix greets with it
+	// (postconf -x smtpd_banner, read at the panel's start), and the client
+	// reaches the panel directly, with no proxy in between.
+	for _, want := range []string{
+		`<dt>Names <span class="tag is-success is-light">matches</span></dt>`,
+		`<div class="sp-wide"><dt>Greeting</dt><dd class="sp-mono">220 ` + selfpostHostname + ` ESMTP</dd>`,
+		`<dt>Your address</dt>`, `The connection&#39;s own; no proxy in between said otherwise`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("Server › Health lacks %q:\n%.3000s", want, page)
+		}
 	}
 	post := func(origin string) int {
 		t.Helper()

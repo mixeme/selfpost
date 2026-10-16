@@ -278,6 +278,11 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .sp-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem 1.5rem; margin: 0; }
 .sp-facts dt { font-family: var(--sp-mono); font-size: var(--sp-fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--sp-muted); }
 .sp-facts dd { margin: 0; overflow-wrap: anywhere; }
+/* A label may carry a tag, the verdict on its value (the certificate's
+   names against the hostname); it keeps the tag's own type. */
+.sp-facts dt .tag { margin-left: .4rem; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+/* A fact that takes the whole row: a line a server wrote, read as one. */
+.sp-facts .sp-wide { grid-column: 1 / -1; }
 .sp-facts dd.sp-big { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
 .sp-side { position: sticky; top: 1.5rem; }
 .menu-label { font-family: var(--sp-mono); letter-spacing: .1em; }
