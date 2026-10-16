@@ -38,9 +38,9 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
 | password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | agreed (2026-10-13; design questions open) | — | — |
-| notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | done 2026-10-16, unreleased | — | — |
-| settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | done 2026-10-16, unreleased | — | — |
-| dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | done 2026-10-16, unreleased | — | — |
+| notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | shipped `2.9.0` | — | — |
+| settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | shipped `2.9.0` | — | — |
+| dns-record-collapse | A DNS record that is right is shown folded: its name and its tag, the values on request | shipped `2.9.0` | — | — |
 | go-milter-upstream | Prepare an issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
 | own-mta-builds | Analysis: build Postfix and OpenDKIM ourselves, patched, instead of Debian's packages | analysed 2026-10-15: no own builds; three rows proposed instead | — | [own-mta-builds-2026-10-15.md](own-mta-builds-2026-10-15.md) |
 | port25-bare-newline | The inbound relay's port 25 refuses bare newlines in DATA (`smtpd_forbid_bare_newline=normalize`) | shipped `2.6.1` | — | — |
@@ -64,7 +64,7 @@ stages 1 and 2 as `2.5.0` the same day, stage 2b as `2.5.1`, stage 2c as
 `2.6.0` the same day; stage 6 (documents and tests, no cut) closed the
 audit. Of the three rows from [own-mta-builds](#own-mta-builds),
 **port25-bare-newline** shipped as `2.6.1` the same day and
-**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). What is agreed after it is marked so in the index; every other
+**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). **dns-record-collapse**, **settings-save-row** and **notification-mail-recheck** shipped together as `2.9.0` the same day, with `/data/opendkim` removed as panel-dkim-signing planned. What is agreed after it is marked so in the index; every other
 remaining item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see

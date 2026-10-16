@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-16
+
+The panel's DNS records read faster: a record DNS already holds as shown
+is one line, its values on request. Server › Settings puts its Save button
+under its own fields and can re-check the records of the server's own
+name. `/data/opendkim`, which 2.8.x kept for a rollback to 2.7.x, is
+removed at the first start; an installation still on 2.7.x goes through
+2.8.x first (guide, § Upgrading). No migration; schema 11.
+
 ### Changed
 
 - **A DNS record DNS already holds as shown is folded** (dns-record-collapse):
