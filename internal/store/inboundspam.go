@@ -135,11 +135,12 @@ const (
 
 // ForgetInboundQueueID detaches the journal rows of a queue id from it: those
 // still open lose their result too, as nothing will ever report it. The
-// milter calls it before it writes a new message's rows - Postfix reuses
-// queue ids (enable_long_queue_ids=no, the default: microseconds and the
-// queue file's inode, src/global/mail_queue.h), and only one live queue file
-// has an id, so older rows of it are of a message that is gone and must not
-// take the new one's results. The tailer calls it when cleanup removes a
+// milter calls it before it writes a new message's rows - a short queue id
+// repeats (microseconds and the queue file's inode, src/global/mail_queue.h;
+// the image has made long, non-repeating ones since 2.10.1, but a queue file
+// from before keeps its short name), and only one live queue file has an id,
+// so older rows of it are of a message that is gone and must not take the
+// new one's results. The tailer calls it when cleanup removes a
 // queue file it did not queue ("removed (canceled)"): the milter had written
 // the rows, but the message was never queued.
 func (s *Store) ForgetInboundQueueID(queueID string) error {

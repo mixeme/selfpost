@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+// longQueueID is the shape of a long queue id: six or more characters of the
+// time in seconds and four of the microseconds, base 52 without vowels, "z",
+// the inode in base 51, which has no "z" (Postfix 3.10.13,
+// src/global/mail_queue.h, MQID_LG_*).
+var longQueueID = regexp.MustCompile(`^[0-9B-DF-HJ-NP-TV-Zb-df-hj-np-tv-z]{10,}z[0-9B-DF-HJ-NP-TV-Zb-df-hj-np-tv-y]+$`)
+
 // testInboundUpstreamDown: an inbound domain whose upstream refuses
 // connections (the sink's address, a port nothing listens on). Port 25 takes
 // the message; Postfix cannot hand it on and logs "relay=none ...
@@ -65,6 +71,11 @@ print("" if r is None else "|".join(r))`, token)
 				return false, fmt.Errorf("deferred with host %q, reply %q", f[2], f[3])
 			}
 			queueID = f[0]
+			// A long queue id (enable_long_queue_ids=yes,
+			// build/postfix-config.sh): the time, "z", the inode.
+			if !longQueueID.MatchString(queueID) {
+				return false, fmt.Errorf("queue id %q is not a long one", queueID)
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("row %q\n%s", out, mailLogTail(h, "postfix/"))

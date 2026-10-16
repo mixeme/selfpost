@@ -68,6 +68,7 @@ to the days the row's own message could still be in the queue; this is the
 bound the roadmap item asked for. The search of the current file that the
 page did before had the same exposure for a day. `enable_long_queue_ids`
 would end it and is a change to the mail path, not part of this item.
+*It was made in `2.10.1` (owner, 2026-10-16).*
 
 ### Retention
 

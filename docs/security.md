@@ -384,10 +384,11 @@ operator can act on it.
   quoted RCPT TO holding `>`, `,` or `status=` cannot end the address early
   and pass fields of its own for another recipient's row - and one holding an
   `@` is a routed address, which port 25 refuses as relaying
-  (`allow_untrusted_routing=no`). Short queue ids repeat (Postfix's default
-  `enable_long_queue_ids=no`): before writing a message's rows the milter
-  detaches older rows of its queue id, so a message that is gone cannot take
-  a new one's results. Accepted: a row whose insert waited longer than the
+  (`allow_untrusted_routing=no`). Queue ids do not repeat since `2.10.1`
+  (`enable_long_queue_ids=yes`, below); for a queue file from before, which
+  keeps its short name, the milter detaches older rows of a queue id before
+  writing a message's rows, so a message that is gone cannot take a new
+  one's results. Accepted: a row whose insert waited longer than the
   milter's 30 s timeout - the database held - can miss its first delivery
   line and stay `queued`.
 - **The inbound journal is written from what strangers send.** The inbound
@@ -765,8 +766,13 @@ deferred item from the roadmap.
   `deploy/docker-compose.yml` sets no memory limit: what is left - many
   messages at once, each held to the bounds above - is the host's to
   size.
-- **A message's page can show another message's log lines after a queue-id
-  collision.** Postfix's short queue ids repeat: the id is the microsecond of
+- **A message's page could show another message's log lines after a
+  queue-id collision - until `2.10.1`.** Since then the image makes long,
+  non-repeating queue ids (`enable_long_queue_ids=yes`,
+  `build/postfix-config.sh`; owner, 2026-10-16), which ends it, and with it a
+  delivery line of a later message rewriting an older send-log row of the
+  same id and recipient. What follows is the exposure of rows from before,
+  whose ids are short. Postfix's short queue ids repeat: the id is the microsecond of
   arrival and the queue file's inode, and inodes come round within seconds.
   The page takes the stored lines of the row's queue id dated within the
   row's own queue lifetime (about six days), so a second message has to get
@@ -774,9 +780,9 @@ deferred item from the roadmap.
   million per reuse of the inode, and not something a sender can aim. When it
   happens, a `domain` user could read the log lines of a message that is not
   theirs. The search of the current `mail.log` that the page did before
-  2.2.0 had the same exposure over a day. Trigger to revisit: a report of
-  foreign lines on a page, or a reason to turn on `enable_long_queue_ids`,
-  which ends it.
+  2.2.0 had the same exposure over a day. It lasts for a short-id row only
+  as long as the row's queue lifetime, so it is gone from the server some
+  six days after `2.10.1`.
 - **A `domain` user may point an inbound domain's upstream at any host and
   port.** The upstream form checks that the host is a well-formed name or IP
   and the port is 1–65535; loopback, private and link-local addresses are

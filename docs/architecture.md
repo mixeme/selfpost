@@ -687,7 +687,11 @@ folding case). A delivery line names it in `orig_to=` when Postfix rewrote
 the address, in `to=` otherwise (`log_adhoc.c` writes `orig_to=` only then),
 and is matched without regard to case. It updates only the newest row of its
 queue id and recipient: Postfix reuses a short queue id once the message has
-left the queue, and an old row must not be rewritten. `UpdateStatus`'s transaction
+left the queue, and an old row must not be rewritten. Since `2.10.1` the
+image makes long, non-repeating queue ids (`enable_long_queue_ids=yes`,
+[build/postfix-config.sh](../build/postfix-config.sh)): the time in seconds,
+then the microseconds, `z` and the inode; a queue file from before keeps its
+short name, and every pattern of the panel takes both. `UpdateStatus`'s transaction
 starts with a write, so a commit by the `dmarc-ingest` process in between
 cannot fail it with `database is locked`.
 Now that the log survives the container, reaching this path should mean the

@@ -126,6 +126,9 @@ print("" if r is None else r[0]+" "+r[1])`, token)
 		}
 		if f := strings.Fields(out); len(f) == 2 && f[1] == "deferred" {
 			queueID = f[0]
+			if !longQueueID.MatchString(queueID) {
+				return false, fmt.Errorf("queue id %q is not a long one (enable_long_queue_ids)", queueID)
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("row %q", out)

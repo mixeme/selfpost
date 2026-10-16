@@ -440,6 +440,19 @@ postconf -e \
 # panel's, were exposed to it as well.
 postconf -e "disable_mime_output_conversion=yes"
 
+# Long, non-repeating queue ids (owner, 2026-10-16). The panel finds a
+# message's rows, its stored lines and the inbound journal's upstream result
+# by the queue id of mail.log; a short id is the microsecond of arrival and
+# the queue file's inode in hex and repeats once the inode comes round, so a
+# later message could meet an earlier one's rows. A long id adds the time in
+# seconds and does not repeat. Postfix 3.10.13, src/global/mail_params.h:1010,
+# DEF_LONG_QUEUE_IDS 0; src/global/mail_queue.h, MQID_SH_* and MQID_LG_*;
+# proto/postconf.proto, enable_long_queue_ids: "Enable long, non-repeating,
+# queue IDs", existing queue files keep their names, postqueue -p gets a
+# wider Queue ID column. Every pattern of the panel takes both shapes
+# (internal/logtail, internal/postfix/queue.go).
+postconf -e "enable_long_queue_ids=yes"
+
 # What Postfix tells a milter with MAIL FROM: its defaults plus the client's
 # address. The panel's milters judge every message by that address (an
 # application's client-address list) and record it (the inbound journal), and

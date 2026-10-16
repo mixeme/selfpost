@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **Queue ids no longer repeat**: Postfix makes long, non-repeating queue ids
+  (`enable_long_queue_ids=yes`). A short id - the microsecond of arrival and
+  the queue file's inode - came round once the inode did, and a later message
+  could then rewrite an older row of the Outbound log with the same id and
+  recipient, put its lines on that row's page, or reach the Inbound log's
+  row of an earlier message. New ids read like `3Pt2mN2VXxznjll`; mail
+  already in the queue keeps its short id; Outbound › Queue's Queue ID
+  column is wider.
+
 ## [2.10.0] - 2026-10-16
 
 Inbound › Log says what became of accepted mail: the upstream's answer,
