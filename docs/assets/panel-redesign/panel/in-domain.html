@@ -101,8 +101,8 @@
       <div class="column is-9">
         <div class="box" id="dns">
           <div class="sp-box-head"><span class="sp-no">01</span><h2>MX record</h2><div class="sp-end">Checked 1 min ago</div><a class="sp-help" href="help.html#inbound" title="Backup-MX and forwarding"><i class="ti ti-help-circle"></i></a></div>
-          <div class="sp-record">
-            <div class="sp-record-head"><h3>MX</h3><span class="tag is-success is-light">published</span><small>Keep any existing primary MX if this is a backup-MX</small></div>
+          <details class="sp-record">
+            <summary class="sp-record-head"><h3>MX</h3><span class="tag is-success is-light">published</span><small>Keep any existing primary MX if this is a backup-MX</small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
             <div class="sp-row">
               <div class="field"><label class="label">Host / name</label>
                 <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="lists.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
@@ -110,7 +110,7 @@
             </div>
             <div class="field"><label class="label">Value to publish</label>
               <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="10 mail.example.org."></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
-          </div>
+          </details>
         </div>
 
         <div class="columns">

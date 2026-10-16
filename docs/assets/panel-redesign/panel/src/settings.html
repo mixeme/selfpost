@@ -45,8 +45,8 @@
           <div class="box" id="notification-mail">
             <div class="sp-box-head"><span class="sp-no">04</span><h2>Notification mail</h2><div class="sp-end">DNS records of the server's own name</div><a class="sp-help" href="help.html#notifications" title="What the panel sends and what makes it arrive"><i class="ti ti-help-circle"></i></a></div>
 
-            <div class="sp-record">
-              <div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+            <details class="sp-record">
+              <summary class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
               <div class="sp-row">
                 <div class="field"><label class="label">Host / name</label>
                   <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="sp2026._domainkey.mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
@@ -54,7 +54,7 @@
               </div>
               <div class="field"><label class="label">Value to publish</label>
                 <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="5" readonly>v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq7n2Lw0c5vXeR1dYt8uJb3mKs6pHf9aZoWg4iNy2TqCx0lVjE7rUh5sBk1dMa8fPz3oGc6yXw9tIe4nQv2uL…IDAQAB</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
-            </div>
+            </details>
 
             <div class="sp-record">
               <div class="sp-record-head"><h3>SPF</h3><span class="tag is-warning is-light">missing</span><small>For the server's own name, not for your domains</small></div>

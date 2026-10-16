@@ -106,8 +106,8 @@
         <div class="box" id="dns">
           <div class="sp-box-head"><span class="sp-no">01</span><h2>DNS records</h2><div class="sp-end">Checked 3 min ago</div><a class="sp-help" href="help.html#dns" title="What to publish and why"><i class="ti ti-help-circle"></i></a></div>
 
-          <div class="sp-record">
-            <div class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small></div>
+          <details class="sp-record">
+            <summary class="sp-record-head"><h3>DKIM</h3><span class="tag is-success is-light">published</span><small>Not a secret · selector <code>sp2026</code></small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
             <div class="sp-row">
               <div class="field"><label class="label">Host / name</label>
                 <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="sp2026._domainkey.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
@@ -115,7 +115,7 @@
             </div>
             <div class="field"><label class="label">Value to publish</label>
               <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="3" readonly>v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3kqV0mJd8e2f1Yb7Qw5uT9sLr4nHc6pZaXo1vKe0yWm2gBt8RjN5dCq3hUf7lPs9aEi4oMz6xTb1kGv0nYw…IDAQAB</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
-          </div>
+          </details>
 
           <div class="sp-record">
             <div class="sp-record-head"><h3>SPF</h3><span class="tag is-danger is-light">mismatch</span><small>Merge into the existing record — never publish a second one</small></div>
@@ -131,8 +131,8 @@
               <p class="help is-danger">The published record does not authorize 203.0.113.25. Add <code>ip4:203.0.113.25</code> before <code>~all</code>. Shallow check: <code>include:</code> is not followed.</p></div>
           </div>
 
-          <div class="sp-record">
-            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address: <a href="out-domain-settings.html">example.org@dmarc.mail.example.org</a></small></div>
+          <details class="sp-record">
+            <summary class="sp-record-head"><h3>DMARC</h3><span class="tag is-success is-light">published</span><small>Report address: <a href="out-domain-settings.html">example.org@dmarc.mail.example.org</a></small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
             <div class="sp-row">
               <div class="field"><label class="label">Host / name</label>
                 <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="_dmarc.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
@@ -141,7 +141,7 @@
             <div class="field"><label class="label">Value to publish</label>
               <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=none; rua=mailto:example.org@dmarc.mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div>
               <p class="help"><code>p=none</code> does not affect delivery. Tighten to <code>quarantine</code>, then <code>reject</code>, once the <a href="dmarc-domain.html">reports</a> look clean.</p></div>
-          </div>
+          </details>
         </div>
 
         <div class="box" id="apps">

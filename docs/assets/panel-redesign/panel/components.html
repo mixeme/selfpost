@@ -150,9 +150,9 @@
     <div class="columns">
       <div class="column is-7">
         <div class="box">
-          <div class="sp-box-head"><span class="sp-no">05</span><h2>dns_record · copy_field</h2><div class="sp-end">One block per record</div></div>
-          <div class="sp-record">
-            <div class="sp-record-head"><h3>Record</h3><span class="tag is-success is-light">published</span><small>A one-line note</small></div>
+          <div class="sp-box-head"><span class="sp-no">05</span><h2>dns_record · copy_field</h2><div class="sp-end">One block per record · folded when DNS holds it as shown</div></div>
+          <details class="sp-record">
+            <summary class="sp-record-head"><h3>Record</h3><span class="tag is-success is-light">published</span><small>A one-line note</small><span class="sp-record-toggle"><i class="ti ti-eye"></i><span>Show values</span><span>Hide values</span></span></summary>
             <div class="sp-row">
               <div class="field"><label class="label">Host / name</label>
                 <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="copy_field — single line"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
@@ -160,7 +160,7 @@
             </div>
             <div class="field"><label class="label">Value to publish</label>
               <div class="field has-addons"><div class="control is-expanded"><textarea class="textarea" rows="2" readonly>copy_field — multi-line, for a DKIM key</textarea></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
-          </div>
+          </details>
           <div class="sp-record">
             <div class="sp-record-head"><h3>Record</h3><span class="tag is-danger is-light">mismatch</span><small>"In DNS now" appears only when it differs</small></div>
             <div class="field"><label class="label">In DNS now</label>
