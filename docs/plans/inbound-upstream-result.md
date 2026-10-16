@@ -54,13 +54,44 @@ every line, is for later, if the result is not enough.
   architecture (journal and tailer), security (what is stored from the
   upstream and at what rate), CHANGELOG.
 
+## Reviews (2026-10-16)
+
+A technical and a security review of the tree before the commit; what each
+finding became:
+
+- *A quoted RCPT TO* (both): the milter kept `"owner"@x` as given, every line
+  says `owner@x` - the row never matched. Now `recipientAsLogged`, as the
+  outbound milter does.
+- *A forged line through a quoted local part* (security, medium): `to=<…>`
+  was read up to its first `>`; a local part in quotes may hold `>`, `,`,
+  `status=`. Port 25 refuses the one that would reach another row (an `@` in
+  the local part is a routed address: `src/trivial-rewrite/resolve.c:467`,
+  `src/smtpd/smtpd_check.c:1724`, `allow_untrusted_routing=no`), and the
+  pattern now reads addresses by Postfix's quoting all the same
+  (`loggedAddress`).
+- *Held mail* (technical): a message the filter had held showed `queued`,
+  "not tried yet", for as long as it stayed held. Now `held`, a status of its
+  own (the CHECK of 0012, not shipped yet).
+- *Rows that never close, and queue ids that repeat* (both): before writing
+  a message's rows the milter detaches older rows of its queue id; cleanup's
+  `removed (canceled)` detaches rows of a message never queued; an empty
+  `{i}` writes no result.
+- *A bounce of null-sender mail* (technical): "The sender was sent a
+  bounce" is wrong there - Postfix does not bounce a bounce. The sheet says
+  so.
+- Accepted, said in security.md: a row whose insert waited past the milter's
+  30 s timeout can miss its first line and stay `queued`. Not of this row:
+  an old send-log row of a reused queue id and the same recipient takes the
+  line first (sendlog.go, as before).
+
 ## Steps
 
-- [ ] Migration 0012, store: write the queue id, update by queue id and
+- [x] Migration 0012, store: write the queue id, update by queue id and
   recipient, read the result back.
-- [ ] Milter: the queue id and `queued` on accepted rows.
-- [ ] Tailer: delivery and expiry lines of port-25 mail to the journal.
-- [ ] View, template, help; tests (store, milter, tailer, view).
-- [ ] e2e: a relayed message's row shows `sent` with the sink's `250`; an
+- [x] Milter: the queue id and `queued` on accepted rows.
+- [x] Tailer: delivery and expiry lines of port-25 mail to the journal.
+- [x] View, template, help; tests (store, milter, tailer, view).
+- [x] e2e: a relayed message's row shows `sent` with the sink's `250`; an
   upstream that refuses connections shows `deferred` with the reason.
-- [ ] Docs; roll out, read the server's journal; cut `2.10.0`.
+- [x] Docs. *Done (2026-10-16), with the reviews' findings above.*
+- [ ] Roll out, read the server's journal; cut `2.10.0`.

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -342,5 +343,145 @@ func TestInsertInboundSpamOnce(t *testing.T) {
 	}
 	if n, err := st.CountInboundSpam(InboundSpamFilter{}); err != nil || n != 3 {
 		t.Errorf("rows = %d, %v; want 3", n, err)
+	}
+}
+
+// Accepted mail starts queued with its queue id; each delivery line moves it
+// on until sent or bounced, which no later or repeated line undoes. A
+// refusal, which has no queue id, and another recipient of the message are
+// left alone; the queue id goes by its own index.
+func TestInboundUpstream(t *testing.T) {
+	st := openTestStore(t)
+	accepted := InboundSpamEntry{
+		InboundDomain: "in.example.com", ClientIP: "203.0.113.7", From: "s@example.net", To: "a@in.example.com",
+		Decision: SpamDecisionAccept, Engine: SpamEngineSelfPost, QueueID: "4A1B2C3D", Upstream: UpstreamQueued,
+	}
+	other := accepted
+	other.To = "b@in.example.com"
+	refused := InboundSpamEntry{InboundDomain: "in.example.com", From: "s@example.net", To: "a@in.example.com",
+		Decision: SpamDecisionReject, Engine: SpamEnginePostfix, Detail: "550 5.1.1 unknown"}
+	for _, e := range []InboundSpamEntry{accepted, other, refused} {
+		if err := st.InsertInboundSpam(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := func(to string) InboundSpamRow {
+		t.Helper()
+		rows, err := st.QueryInboundSpam(InboundSpamFilter{}, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rows {
+			if r.To == to && r.Decision == SpamDecisionAccept {
+				return r
+			}
+		}
+		t.Fatalf("no accepted row for %s", to)
+		return InboundSpamRow{}
+	}
+	if r := result("a@in.example.com"); r.Upstream != UpstreamQueued || !r.UpstreamAt.IsZero() {
+		t.Errorf("a new row = %q at %v, want queued and no time", r.Upstream, r.UpstreamAt)
+	}
+
+	at := time.Date(2026, 10, 16, 10, 16, 42, 0, time.UTC)
+	step := func(status, reply string, want int64) {
+		t.Helper()
+		n, err := st.UpdateInboundUpstream("4A1B2C3D", "A@IN.example.com", status, "mx.up.example[198.51.100.5]:25", reply, at)
+		if err != nil || n != want {
+			t.Fatalf("UpdateInboundUpstream(%s) = %d, %v; want %d", status, n, err, want)
+		}
+		at = at.Add(time.Minute)
+	}
+	step(UpstreamDeferred, "451 4.7.1 Greylisted", 1)
+	if r := result("a@in.example.com"); r.Upstream != UpstreamDeferred || r.UpstreamReply != "451 4.7.1 Greylisted" ||
+		r.UpstreamRelay != "mx.up.example[198.51.100.5]:25" || !r.UpstreamAt.Equal(time.Date(2026, 10, 16, 10, 16, 42, 0, time.UTC)) {
+		t.Errorf("after a deferral: %+v", r)
+	}
+	step(UpstreamSent, "250 2.0.0 Ok: queued as CE05D10261D", 1)
+	step(UpstreamDeferred, "451 4.7.1 Greylisted", 0) // read again after a restart
+	if r := result("a@in.example.com"); r.Upstream != UpstreamSent || r.UpstreamReply != "250 2.0.0 Ok: queued as CE05D10261D" {
+		t.Errorf("a sent row was moved back: %+v", r)
+	}
+	if r := result("b@in.example.com"); r.Upstream != UpstreamQueued {
+		t.Errorf("another recipient took the result: %+v", r)
+	}
+	if n, err := st.UpdateInboundUpstream("9999", "a@in.example.com", UpstreamSent, "", "250 ok", at); err != nil || n != 0 {
+		t.Errorf("an unknown queue id = %d, %v; want 0 (outbound mail)", n, err)
+	}
+	if n, err := st.UpdateInboundUpstream("", "a@in.example.com", UpstreamSent, "", "250 ok", at); err != nil || n != 0 {
+		t.Errorf("an empty queue id took %d rows, %v - a refusal has none", n, err)
+	}
+
+	// Expiry: the other recipient, still queued, bounces, and says so.
+	if _, err := st.UpdateInboundUpstream("4A1B2C3D", "b@in.example.com", UpstreamDeferred, "", "connect to mx.up.example[198.51.100.5]:25: Connection refused", at); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.ExpireInboundUpstream("4A1B2C3D", at); err != nil || n != 1 {
+		t.Fatalf("ExpireInboundUpstream = %d, %v; want 1 (the sent row stays)", n, err)
+	}
+	if r := result("b@in.example.com"); r.Upstream != UpstreamBounced ||
+		r.UpstreamReply != "expired in the queue; last reply: connect to mx.up.example[198.51.100.5]:25: Connection refused" {
+		t.Errorf("after the expiry: %+v", r)
+	}
+	if err := st.InsertInboundSpam(InboundSpamEntry{InboundDomain: "in.example.com", To: "c@in.example.com",
+		Decision: SpamDecisionAccept, Engine: SpamEngineSelfPost, Upstream: "lost"}); err == nil {
+		t.Error("an unknown upstream status was stored")
+	}
+
+	for name, q := range map[string]string{"update": updateUpstreamQuery, "expire": expireUpstreamQuery} {
+		args := []any{"sent", "", "", "", "4A1B2C3D", "a@in.example.com"}
+		if name == "expire" {
+			args = []any{"", 255, "4A1B2C3D"}
+		}
+		if plan := explain(t, st, q, args...); !strings.Contains(plan, "USING INDEX idx_inbound_spam_log_queue_id") {
+			t.Errorf("%s does not use idx_inbound_spam_log_queue_id:\n%s", name, plan)
+		}
+	}
+}
+
+// A held message takes its result once released; a queue id Postfix uses
+// again detaches the rows of the message that had it - the open ones lose
+// their result, nothing reports it now - so the new message's lines and its
+// expiry reach only its own rows.
+func TestInboundUpstreamHeldAndReusedQueueID(t *testing.T) {
+	st := openTestStore(t)
+	old := InboundSpamEntry{InboundDomain: "in.example.com", To: "a@in.example.com",
+		Decision: SpamDecisionQuarantine, Engine: SpamEngineRspamd, QueueID: "4A1B", Upstream: UpstreamHeld}
+	if err := st.InsertInboundSpam(old); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 10, 16, 10, 0, 0, 0, time.UTC)
+	if n, err := st.UpdateInboundUpstream("4A1B", "a@in.example.com", UpstreamDeferred, "", "451 later", at); err != nil || n != 1 {
+		t.Fatalf("a released held message: %d, %v", n, err)
+	}
+	if err := st.ForgetInboundQueueID("4A1B"); err != nil {
+		t.Fatal(err)
+	}
+	fresh := InboundSpamEntry{InboundDomain: "in.example.com", To: "a@in.example.com",
+		Decision: SpamDecisionAccept, Engine: SpamEngineSelfPost, QueueID: "4A1B", Upstream: UpstreamQueued}
+	if err := st.InsertInboundSpam(fresh); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.ExpireInboundUpstream("4A1B", at); err != nil || n != 1 {
+		t.Fatalf("expiry of the reused id took %d rows, %v; want the new message's one", n, err)
+	}
+	rows, err := st.QueryInboundSpam(InboundSpamFilter{}, 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		switch r.Decision {
+		case SpamDecisionQuarantine:
+			if r.Upstream != "" || r.UpstreamReply != "451 later" {
+				t.Errorf("the detached row = %+v, want no result and its last reply kept", r)
+			}
+		case SpamDecisionAccept:
+			if r.Upstream != UpstreamBounced {
+				t.Errorf("the new row = %+v, want bounced", r)
+			}
+		}
+	}
+	if plan := explain(t, st, forgetQueueIDQuery, "4A1B"); !strings.Contains(plan, "USING INDEX idx_inbound_spam_log_queue_id") {
+		t.Errorf("ForgetInboundQueueID does not use idx_inbound_spam_log_queue_id:\n%s", plan)
 	}
 }

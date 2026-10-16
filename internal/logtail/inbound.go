@@ -11,13 +11,47 @@ import (
 )
 
 // InboundStore is what the tailer needs of the inbound antispam journal:
-// writing the rows for refused mail, knowing which domains are inbound, and
-// pruning. *store.Store satisfies it.
+// writing the rows for refused mail, knowing which domains are inbound,
+// putting the upstream's answers on the rows of accepted mail, and pruning.
+// *store.Store satisfies it.
 type InboundStore interface {
 	InsertInboundSpam(e store.InboundSpamEntry) error
 	InsertInboundSpamOnce(e store.InboundSpamEntry) (bool, error)
 	IsInboundDomain(name string) (bool, error)
 	PruneInboundSpam(cutoff time.Time, keep int) (int64, error)
+	UpdateInboundUpstream(queueID, recipient, status, relay, reply string, at time.Time) (int64, error)
+	ExpireInboundUpstream(queueID string, at time.Time) (int64, error)
+	ForgetInboundQueueID(queueID string) error
+}
+
+// upstream puts a delivery line's result on the journal rows of a message
+// accepted on port 25 (inbound-upstream-result). The tailer offers it every
+// delivery line no send-log row took: the rows of that queue id and recipient
+// take it, and a line of any other mail - the panel's own, a bounce Postfix
+// sends back to a stranger - matches none. relay "none" is a line written
+// without a session (Postfix 3.10.13, src/smtp/smtp_trouble.c:273, 421: the
+// host is then only in the reply), kept as "". The reply is the upstream's
+// text, or Postfix's own about a host it could not reach, cut and made
+// printable like a refusal's reason. One update per attempt, never a row of
+// its own: the journal's caps stand.
+func (j *inboundJournal) upstream(line string, now time.Time, queueID, recipient, status string) {
+	at, rest := lineTime(line, now)
+	relay, reply := deliveryReply(rest)
+	if relay == "none" {
+		relay = ""
+	}
+	if _, err := j.st.UpdateInboundUpstream(queueID, recipient, status, printable(relay, inboundDetailMax),
+		printable(reply, store.UpstreamReplyMax), at); err != nil {
+		log.Printf("log-tailer: inbound journal: upstream %s/%s -> %s: %v", queueID, recipient, status, err)
+	}
+}
+
+// expired makes the rows of a port-25 message Postfix gave up on bounced.
+func (j *inboundJournal) expired(line string, now time.Time, queueID string) {
+	at, _ := lineTime(line, now)
+	if _, err := j.st.ExpireInboundUpstream(queueID, at); err != nil {
+		log.Printf("log-tailer: inbound journal: expire %s: %v", queueID, err)
+	}
 }
 
 // Inbound turns on the inbound half of the tailer: journal rows for mail that
@@ -153,6 +187,13 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 	}
 	if m := inboundForgetRe.FindStringSubmatch(rest); m != nil {
 		delete(j.port25, m[1]+m[2]+m[3])
+		// A queue file cleanup removed was never queued: rows the milter wrote
+		// for it will get no delivery line (store.ForgetInboundQueueID).
+		if m[3] != "" {
+			if err := j.st.ForgetInboundQueueID(m[3]); err != nil {
+				log.Printf("log-tailer: inbound journal: forget %s: %v", m[3], err)
+			}
+		}
 		return
 	}
 	m := inboundRejectRe.FindStringSubmatch(rest)

@@ -94,6 +94,7 @@ func (h *Handlers) HandleInboundLog(w http.ResponseWriter, r *http.Request) {
 		table[i] = out.NewRow(view.InLogRowInput{
 			ID: row.ID, Listable: inbound.Listable(store.SpamEntryAddress, row.From), At: row.CreatedAt, From: row.From, Client: row.ClientIP, To: row.To, Subject: row.Subject,
 			Decision: row.Decision, Engine: row.Engine, Detail: row.Detail,
+			Upstream: row.Upstream, UpstreamRelay: row.UpstreamRelay, UpstreamReply: row.UpstreamReply, UpstreamAt: row.UpstreamAt,
 		})
 	}
 	h.view.Render(w, http.StatusOK, "in-log", out.WithRows(table, page, lastPage))

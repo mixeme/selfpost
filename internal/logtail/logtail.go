@@ -85,8 +85,8 @@ const (
 // calls it on every prune cycle so a panel change takes effect without restart.
 type RetentionDays func() int
 
-// deliveryRe matches a Postfix delivery line and captures queue-id, recipient
-// and status, e.g.
+// deliveryRe matches a Postfix delivery line and captures queue-id, recipient,
+// orig_to, relay and status, e.g.
 //
 //	postfix/smtp[26]: 41E862C00D9E: to=<a@example.net>, relay=…, dsn=2.0.0, status=sent (250 OK)
 //
@@ -116,7 +116,19 @@ type RetentionDays func() int
 // controls. A bounce whose reply quoted "status=sent" would then be filed as a
 // success. The real field is always the first one after to=<…>: in
 // log_adhoc() the reply is the "(%s)" after status=.
-var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(.*?)>, (?:orig_to=<(.*?)>, )?relay=.*?\bstatus=(\w+)`)
+var deliveryRe = regexp.MustCompile(`^\S+ [^\s\[]+\[\d+\]: ([0-9A-Za-z]+): to=<(` + loggedAddress + `)>, (?:orig_to=<(` + loggedAddress + `)>, )?relay=([^,\s]*).*?\bstatus=(\w+)`)
+
+// loggedAddress is an address as Postfix logs it, external form: a local part
+// in quotes when it is not a plain dot-string - and then it may hold "<", ">",
+// "," and "=", with only '"' and '\' escaped - or one with none of '"' and
+// '>' (Postfix 3.10.13, src/global/quote_822_local.c,
+// src/global/info_log_addr_form.c). Read by that grammar, a stranger's quoted
+// RCPT TO cannot end the address early and pass "orig_to=<…>, relay=…,
+// status=…" of his own as the line's fields (security review of
+// inbound-upstream-result, 2026-10-16; a local part with "@" is a routed
+// address, which port 25 refuses as relaying anyway: src/trivial-rewrite/
+// resolve.c:467, src/smtpd/smtpd_check.c:1724, allow_untrusted_routing=no).
+const loggedAddress = `"(?:[^"\\]|\\.)*"@[^>]*|[^>"]*`
 
 // parseDelivery extracts (queue-id, recipient, status) from a mail.log line.
 // ok is false for lines that are not recognised delivery results. The
@@ -133,7 +145,7 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 	if m[3] != "" {
 		recipient = m[3]
 	}
-	switch m[4] {
+	switch m[5] {
 	case "sent":
 		status = store.StatusSent
 	case "deferred":
@@ -144,6 +156,25 @@ func parseDelivery(line string) (queueID, recipient, status string, ok bool) {
 		return "", "", "", false
 	}
 	return m[1], recipient, status, true
+}
+
+// deliveryReply returns the host and the reply of a delivery line (the line
+// after its time stamp): relay= - which log_adhoc() writes right after to=
+// and orig_to=, followed by a comma - and the "(%s)" after the first status=,
+// to the end of the line (Postfix 3.10.13, src/global/log_adhoc.c). Taking the
+// first status= keeps the reply whole when the far end's text holds one of
+// its own. A line that is not a delivery line gives "", "".
+func deliveryReply(rest string) (relay, reply string) {
+	loc := deliveryRe.FindStringSubmatchIndex(rest)
+	if loc == nil {
+		return "", ""
+	}
+	relay = rest[loc[8]:loc[9]]
+	tail := strings.TrimSpace(rest[loc[1]:])
+	if strings.HasPrefix(tail, "(") && strings.HasSuffix(tail, ")") {
+		reply = tail[1 : len(tail)-1]
+	}
+	return relay, reply
 }
 
 // expiryRe matches qmgr's line for a message it gave up on:
@@ -225,17 +256,27 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 		}
 		keeper.add(line, now, catchingUp)
 		refusals.handle(line, now, Place{FP: tr.line.FP, End: tr.lineStart})
+		// A delivery or expiry line no send-log row takes may be of mail
+		// accepted on port 25: the inbound journal's rows take its result.
 		queueID, recipient, status, ok := parseDelivery(line)
 		if !ok {
 			if queueID, ok := parseExpiry(line); ok {
-				if _, err := st.ExpireMessage(queueID); err != nil {
+				n, err := st.ExpireMessage(queueID)
+				if err != nil {
 					log.Printf("log-tailer: expire %s: %v", queueID, err)
+				}
+				if n == 0 && journal != nil {
+					journal.expired(line, now, queueID)
 				}
 			}
 			return
 		}
-		if _, err := st.UpdateStatus(queueID, recipient, status); err != nil {
+		n, err := st.UpdateStatus(queueID, recipient, status)
+		if err != nil {
 			log.Printf("log-tailer: update %s/%s -> %s: %v", queueID, recipient, status, err)
+		}
+		if n == 0 && journal != nil {
+			journal.upstream(line, now, queueID, recipient, status)
 		}
 	})
 }

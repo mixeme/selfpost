@@ -448,29 +448,50 @@ func inLogFixture() *InLog {
 	p := NewInLog(admin(), 90, []string{"lists.example.org", "acme.io"},
 		InLogFilter{From: "2026-09-14", To: "2026-09-21"})
 	var id int64
-	row := func(clock, from, client, to, subject, decision, engine, detail string) InLogRow {
-		at, err := time.Parse("2006-01-02 15:04:05", "2026-09-21 "+clock)
+	clock := func(c string) time.Time {
+		at, err := time.Parse("2006-01-02 15:04:05", "2026-09-21 "+c)
 		if err != nil {
 			panic(err)
 		}
-		id++
-		return p.NewRow(InLogRowInput{ID: id, Listable: true, At: at, From: from, Client: client, To: to, Subject: subject,
-			Decision: decision, Engine: engine, Detail: detail})
+		return at
 	}
-	return p.WithRows([]InLogRow{
-		row("14:00:18", "t.berg@uni.example", "192.0.2.77", "dev@lists.example.org", "Re: [dev] patch series v3",
-			"accept", "rspamd", "no action, score 0.40 / 15.00"),
-		row("13:59:02", "invoice@partner-billing.example", "203.0.113.140", "owner@lists.example.org", "Outstanding invoice — action required",
-			"accept", "rspamd", "add header, score 9.80 / 15.00; PHISHING(5.00) FORGED_SENDER(3.00) R_SPF_FAIL(1.00)"),
+	// up is what the upstream answered: status, host, reply, when.
+	type up struct{ status, relay, reply, at string }
+	upRow := func(c, from, client, to, subject, decision, engine, detail string, u up) InLogRow {
+		id++
+		in := InLogRowInput{ID: id, Listable: true, At: clock(c), From: from, Client: client, To: to, Subject: subject,
+			Decision: decision, Engine: engine, Detail: detail,
+			Upstream: u.status, UpstreamRelay: u.relay, UpstreamReply: u.reply}
+		if u.at != "" {
+			in.UpstreamAt = clock(u.at)
+		}
+		return p.NewRow(in)
+	}
+	row := func(c, from, client, to, subject, decision, engine, detail string) InLogRow {
+		return upRow(c, from, client, to, subject, decision, engine, detail, up{})
+	}
+	const host = "mx.upstream.example[198.51.100.5]:25"
+	sent := upRow("14:00:18", "t.berg@uni.example", "192.0.2.77", "dev@lists.example.org", "Re: [dev] patch series v3",
+		"accept", "rspamd", "no action, score 0.40 / 15.00",
+		up{"sent", host, "250 2.0.0 Ok: queued as CE05D10261D", "14:00:19"})
+	bounced := upRow("13:59:02", "invoice@partner-billing.example", "203.0.113.140", "owner@lists.example.org", "Outstanding invoice — action required",
+		"accept", "rspamd", "add header, score 9.80 / 15.00; PHISHING(5.00) FORGED_SENDER(3.00) R_SPF_FAIL(1.00)",
+		up{"bounced", host, "550 5.7.1 Message rejected as spam by the upstream filter", "13:59:04"})
+	rest := []InLogRow{
 		row("13:57:41", "promo@bulk.example", "198.51.100.90", "sales@lists.example.org", "",
 			"reject", "postfix", "550 5.1.1 <sales@lists.example.org>: Recipient address rejected: User unknown in relay recipient table"),
 		row("13:51:30", "billing@partner.example", "198.51.100.12", "owner@lists.example.org", "",
 			"reject", "rspamd", "5.7.1 Spam message rejected"),
 		row("13:44:02", "hr@partner.example", "192.0.2.31", "jobs@acme.io", "",
 			"tempfail", "rspamd", "4.7.1 Try again later"),
-		row("13:30:55", "noreply@github.example", "192.0.2.200", "security@lists.example.org", "[advisory] new report",
-			"accept", "rspamd", "no action, score -98.10 / 15.00; SELFPOST_ALLOW_FROM(-100.00) R_DKIM_ALLOW(-0.20)"),
-	}, 1, 38)
+		upRow("13:30:55", "noreply@github.example", "192.0.2.200", "security@lists.example.org", "[advisory] new report",
+			"accept", "rspamd", "no action, score -98.10 / 15.00; SELFPOST_ALLOW_FROM(-100.00) R_DKIM_ALLOW(-0.20)",
+			up{"deferred", "", "connect to mx.upstream.example[198.51.100.5]:25: Connection refused", "13:45:12"}),
+	}
+	// The newest row is a message not tried yet; it is the seventh written.
+	queued := upRow("14:00:31", "ci@builds.example", "192.0.2.90", "dev@lists.example.org", "[ci] nightly build passed",
+		"accept", "rspamd", "no action, score 1.10 / 15.00", up{status: "queued"})
+	return p.WithRows(append([]InLogRow{queued, sent, bounced}, rest...), 1, 38)
 }
 
 // inFilterListsFixture is the mockup's Filter lists: three senders denied, two

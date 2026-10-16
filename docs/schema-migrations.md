@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 11` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql`, `0010_send_log_indexes.sql`, `0011_notify_addressees.sql` |
+| Chain head | `user_version = 12` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql`, `0010_send_log_indexes.sql`, `0011_notify_addressees.sql`, `0012_inbound_upstream.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -69,7 +69,8 @@ delivery-log-storage (`2.2.0`), `0004_notifications.sql` and
 `0007_delivery_log_days.sql` and `0008_tenant_boundary.sql` of the 2026-10-12
 audit (`2.5.0`), `0009_refusal_line.sql` (`2.5.1`) and
 `0010_send_log_indexes.sql` (`2.5.3`) and `0011_notify_addressees.sql`
-(`2.5.4`).
+(`2.5.4`), and `0012_inbound_upstream.sql` of inbound-upstream-result
+(`2.10.0`).
 
 ---
 
@@ -88,6 +89,7 @@ audit (`2.5.0`), `0009_refusal_line.sql` (`2.5.1`) and
 | 9 | `0009_refusal_line.sql` | 2.5.1 | DDL | `send_log.refusal_line`: Postfix's line about a refusal at MAIL FROM (a level-2 limit, a client address off the list), which has no queue id; the log tailer puts it on the row; `send_log.recovered`, a refusal row the tailer wrote from `mail.log` because the panel stopped before writing it; `sender_check_days.messages` (messages deferred mid-message, counted apart from the connections turned away) and `sender_check_days.estimated` (a day whose downtime is an upper bound) (audit 2026-10-12, stage 2b) |
 | 10 | `0010_send_log_indexes.sql` | 2.5.3 | DDL | Four indexes of `send_log`, each for a question that walked the table or sorted a domain's log (audit 2026-10-12, M2, stage 3): `idx_send_log_open`, partial, the queued and deferred rows by time (the tailer's sweep every 5 min); `idx_send_log_domain_id` and `idx_send_log_app_login`, a page of one domain's or one application's log in id order; `idx_send_log_refusal_line`, partial, whether a refusal line is already on a row. `TestSendLogQueriesUseTheirIndexes` checks the plans of these and of the other by-time and by-scope statements the store runs |
 | 11 | `0011_notify_addressees.sql` | 2.5.4 | DDL | `notify_addressees (key, address, told_at)`: who a subject's notification is owed to and who was handed it, so a copy that failed or was held back by the hourly ceiling goes out at a later check and a subject's end goes to those told (audit 2026-10-12, stage 4); deleted with its `notify_state` row |
+| 12 | `0012_inbound_upstream.sql` | 2.10.0 | DDL | `inbound_spam_log` gains `queue_id`, `upstream_status` (`''`, `queued`, `held`, `sent`, `deferred`, `bounced`; CHECK), `upstream_relay`, `upstream_reply` and `upstream_at`, and the partial index `idx_inbound_spam_log_queue_id` on rows that have a queue id: what the upstream answered about mail accepted on port 25, put on the row by the log tailer (inbound-upstream-result). Rows from before have none |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.

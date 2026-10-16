@@ -17,6 +17,7 @@ type fakeInbound struct {
 	rows      []store.InboundSpamEntry
 	insertErr error
 	lookupErr error
+	forgot    []string
 }
 
 func (f *fakeInbound) InsertInboundSpam(e store.InboundSpamEntry) error {
@@ -24,6 +25,11 @@ func (f *fakeInbound) InsertInboundSpam(e store.InboundSpamEntry) error {
 		return f.insertErr
 	}
 	f.rows = append(f.rows, e)
+	return nil
+}
+
+func (f *fakeInbound) ForgetInboundQueueID(queueID string) error {
+	f.forgot = append(f.forgot, queueID)
 	return nil
 }
 
@@ -100,6 +106,8 @@ func TestInboundRecordsAcceptedMessage(t *testing.T) {
 		InboundDomain: "in.example.com", ClientIP: "203.0.113.7",
 		From: "sender@example.net", To: "a@in.example.com", Subject: "Schön",
 		Decision: store.SpamDecisionAccept, Engine: store.SpamEngineSelfPost,
+		// The queue id of end-of-message, for the delivery lines to come.
+		QueueID: "ABC123", Upstream: store.UpstreamQueued,
 	}
 	if rec.rows[0] != want {
 		t.Errorf("row = %+v\nwant  %+v", rec.rows[0], want)
@@ -204,6 +212,7 @@ func TestInboundResetsBetweenMessages(t *testing.T) {
 		InboundDomain: "in.example.com", ClientIP: "203.0.113.7",
 		From: "two@example.net", To: "b@in.example.com",
 		Decision: store.SpamDecisionAccept, Engine: store.SpamEngineSelfPost,
+		QueueID: "ABC123", Upstream: store.UpstreamQueued,
 	}
 	if rec.rows[1] != want {
 		t.Errorf("second row = %+v\nwant         %+v", rec.rows[1], want)
@@ -352,5 +361,42 @@ func TestInboundReadsAVerdictOnlyWithTheFiltersSignature(t *testing.T) {
 func TestFilterSignatureIsWhatTheFilterWrites(t *testing.T) {
 	if got := FilterSignature(testKey, "4A1B2C3D5E"); got != "2aa1ca6dd1545d3f16c8c0c29ba59bfc28c050224ac2c5c953bd2617f73b6de2" {
 		t.Errorf("FilterSignature = %s", got)
+	}
+}
+
+// The row is the delivery lines' to find: a recipient is kept as Postfix logs
+// it, a held message starts held, older rows of a reused queue id are
+// detached first - once per message - and a message with no queue id has no
+// result, since nothing could ever report one.
+func TestInboundRowsMeetTheirDeliveryLines(t *testing.T) {
+	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s := inboundSessionFor(t, rec, true)
+	message(t, s, "sender@example.net", []string{`<"owner"@in.example.com>`, "b@in.example.com"}, nil)
+	if len(rec.rows) != 2 || rec.rows[0].To != "owner@in.example.com" {
+		t.Fatalf("rows = %+v, want the quoted recipient as logged", rec.rows)
+	}
+	if len(rec.forgot) != 1 || rec.forgot[0] != "ABC123" {
+		t.Errorf("detached %q, want ABC123 once", rec.forgot)
+	}
+
+	rec.rows = nil
+	message(t, s, "sender@example.net", []string{"a@in.example.com"},
+		[][2]string{{"X-Rspamd-Action", "quarantine"}, testSig})
+	if len(rec.rows) != 1 || rec.rows[0].Upstream != store.UpstreamHeld {
+		t.Errorf("a held message's row = %+v, want held", rec.rows)
+	}
+
+	rec.rows, rec.forgot = nil, nil
+	if _, err := s.MailFrom("sender@example.net", mods(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RcptTo("a@in.example.com", mods(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Body(mods(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.rows) != 1 || rec.rows[0].QueueID != "" || rec.rows[0].Upstream != "" || len(rec.forgot) != 0 {
+		t.Errorf("with no queue id: rows %+v, detached %q", rec.rows, rec.forgot)
 	}
 }

@@ -339,6 +339,9 @@ func (c *captureStore) UpdateStatus(queueID, recipient, status string) (int64, e
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.calls = append(c.calls, queueID+"|"+recipient+"|"+status)
+	if strings.HasPrefix(queueID, "P25") {
+		return 0, nil // mail accepted on port 25: no send-log row
+	}
 	return 1, nil
 }
 
@@ -347,6 +350,9 @@ func (c *captureStore) ExpireMessage(queueID string) (int64, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.calls = append(c.calls, queueID+"|*|expired")
+	if strings.HasPrefix(queueID, "P25") {
+		return 0, nil
+	}
 	return 1, nil
 }
 

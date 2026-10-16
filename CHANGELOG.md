@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Inbound › Log shows what the upstream answered** (inbound-upstream-result,
+  [the plan](docs/plans/inbound-upstream-result.md)): an *Upstream* column
+  beside the decision - *queued*, *held*, *sent*, *deferred* (a greylisting, an
+  upstream that cannot be reached), *bounced* (refused, or expired in the
+  queue) - opening the last reply, the host that gave it and when. Read from
+  the delivery lines of `mail.log`, one update of the row per attempt; the
+  lines of port-25 mail are still not stored. Rows logged before have no
+  result. Migration `0012`, schema 12.
+
 ## [2.9.1] - 2026-10-16
 
 Log panes read on a phone. No migration; schema 11.

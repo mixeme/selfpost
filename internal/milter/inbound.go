@@ -23,6 +23,7 @@ import (
 type InboundStore interface {
 	InsertInboundSpam(e store.InboundSpamEntry) error
 	IsInboundDomain(name string) (bool, error)
+	ForgetInboundQueueID(queueID string) error
 }
 
 // inboundSession is the inbound journal milter: the last milter on port 25,
@@ -79,8 +80,11 @@ func (s *inboundSession) MailFrom(from string, m *milter.Modifier) (milter.Respo
 	return milter.RespContinue, nil
 }
 
+// RcptTo keeps the recipient as Postfix logs it, so that the delivery lines
+// that carry the upstream's answer find the row (recipientAsLogged): a quoted
+// local part that needs no quotes is written without them.
 func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Response, error) {
-	s.rcpts = append(s.rcpts, cleanAddress(rcpt))
+	s.rcpts = append(s.rcpts, recipientAsLogged(rcpt))
 	return milter.RespContinue, nil
 }
 
@@ -156,11 +160,13 @@ func (s *inboundSession) signed(queueID string) bool {
 // rest as session.Body in milter.go.
 func (s *inboundSession) Body(m *milter.Modifier) (milter.Response, error) {
 	// The queue id is known only now, and with it whether the verdict headers
-	// read on the way here are the filter's.
-	if !s.signed(macro(m, "i")) {
+	// read on the way here are the filter's. The rows keep it: the delivery
+	// lines that put the upstream's answer on them name it (logtail).
+	queueID := macro(m, "i")
+	if !s.signed(queueID) {
 		s.seen = false
 	}
-	s.record()
+	s.record(queueID)
 	s.reset()
 	return milter.RespContinue, nil
 }
@@ -175,10 +181,17 @@ func (s *inboundSession) reset() {
 	s.action, s.result, s.seen, s.sig = "", "", false, ""
 }
 
-// record writes one row per recipient at an inbound domain. Other recipients
-// of port 25 (a DMARC report address at the server's own name) are not the
-// relay's mail and get no row. Failures are logged, never propagated.
-func (s *inboundSession) record() {
+// record writes one row per recipient at an inbound domain, with the queue id
+// of the message and "queued" - "held" when the filter's verdict had Postfix
+// hold it (src/cleanup/cleanup_milter.c: a milter's HOLD puts the message in
+// the hold queue, which qmgr does not schedule). The message is about to be
+// queued for its upstream, and the rows are written before Postfix goes on,
+// so before any delivery line of it; older rows of a queue id Postfix uses
+// again are detached first. With no queue id (none came) the rows have no
+// result: nothing could report one. Other recipients of port 25 (a DMARC
+// report address at the server's own name) are not the relay's mail and get
+// no row. Failures are logged, never propagated.
+func (s *inboundSession) record(queueID string) {
 	e := store.InboundSpamEntry{
 		ClientIP: s.clientIP,
 		From:     s.from,
@@ -191,6 +204,15 @@ func (s *inboundSession) record() {
 		e.Engine, e.Detail = store.SpamEngineRspamd, detail
 		if action == "quarantine" {
 			e.Decision = store.SpamDecisionQuarantine
+		}
+	}
+	if queueID != "" {
+		e.QueueID, e.Upstream = queueID, store.UpstreamQueued
+		if e.Decision == store.SpamDecisionQuarantine {
+			e.Upstream = store.UpstreamHeld
+		}
+		if err := s.rec.ForgetInboundQueueID(queueID); err != nil {
+			log.Printf("inbound-journal: detach older rows of %s: %v", queueID, err)
 		}
 	}
 	for _, to := range s.rcpts {

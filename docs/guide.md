@@ -1188,7 +1188,12 @@ anyone on the host; they hold addresses, not secrets.
 
 In the panel the lists are **Inbound › Filter lists** (global role), and what
 port 25 decided about each message is **Inbound › Log**: accepted mail with the
-filter's verdict, refused mail with the reply it was given. A row of the log
+filter's verdict, refused mail with the reply it was given. For accepted mail
+its *Upstream* column says what the upstream made of it - *queued* (not tried
+yet), *held* (in the queue by the filter's verdict, until released), *sent*,
+*deferred* (a greylisting, an upstream that cannot be reached: Postfix tries
+again) or *bounced* (refused for good, or expired in the queue; the sender
+was sent a bounce) - and opens the last reply and the host that gave it. Rows logged before 2.10.0 have no upstream result. A row of the log
 leads to the lists with its sender filled in. Beside each entry of a list is
 how often it decided a message, counted from the log - so over the days the
 log keeps - and *never* marks an entry that may have outlived its use. The

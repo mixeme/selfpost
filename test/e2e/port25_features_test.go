@@ -399,6 +399,24 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 		t.Fatalf("the Inbound log holds %d rows, want the two relayed messages and one refusal:\n%s", len(rows), strings.Join(rows, "\n"))
 	}
 
+	// What the upstream answered (inbound-upstream-result): both relayed
+	// messages are sent, with the host and the sink's reply.
+	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Second) {
+		rows = logRows(`>sent</button>`)
+		if n := strings.Count(strings.Join(rows, "\n"), `>sent</button>`); n == 2 {
+			break
+		} else if time.Now().After(deadline) {
+			t.Fatalf("%d relayed messages show sent, want 2:\n%s\n%s", n, strings.Join(rows, "\n"), mailLogTail(h, "postfix/"))
+		}
+	}
+	rowWith(rows, "e2e "+token, `<span class="tag is-success is-light">sent</span><h2>Upstream</h2>`,
+		`<tr><th>Host</th><td class="sp-mono sp-small">10.77.0.11[10.77.0.11]:25</td></tr>`,
+		`<tr><th>Reply</th><td class="sp-mono sp-small">250 2.0.0 Ok`)
+	if row := rowWith(rows, "nobody@<wbr>"+inboundDomain); !strings.Contains(row, `<td class="sp-muted">—</td>`) {
+		t.Fatalf("the refused row has an upstream result:\n%s", row)
+	}
+	testInboundUpstreamDown(t, sc, message)
+
 	// The filter lists: an entry added in the panel is in the map file the
 	// filter reads, and one removed is gone from it. Nothing reads the file on
 	// this stand (no filter is attached), so the file is the whole effect.

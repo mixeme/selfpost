@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +16,39 @@ type fakeInboundStore struct {
 	rows      []store.InboundSpamEntry
 	lookupErr error
 	pruned    []int
+
+	// upstream records the results put on rows, as
+	// "queue-id|recipient|status|relay|reply|time" or "queue-id|expired|time";
+	// Run writes it from its own goroutine.
+	mu       sync.Mutex
+	upstream []string
+}
+
+func (f *fakeInboundStore) UpdateInboundUpstream(queueID, recipient, status, relay, reply string, at time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upstream = append(f.upstream, strings.Join([]string{queueID, recipient, status, relay, reply, at.Format(time.RFC3339)}, "|"))
+	return 1, nil
+}
+
+func (f *fakeInboundStore) ExpireInboundUpstream(queueID string, at time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upstream = append(f.upstream, queueID+"|expired|"+at.Format(time.RFC3339))
+	return 1, nil
+}
+
+func (f *fakeInboundStore) ForgetInboundQueueID(queueID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upstream = append(f.upstream, queueID+"|forgot")
+	return nil
+}
+
+func (f *fakeInboundStore) upstreamCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.upstream...)
 }
 
 func (f *fakeInboundStore) InsertInboundSpam(e store.InboundSpamEntry) error {

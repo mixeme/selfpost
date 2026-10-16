@@ -22,7 +22,18 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">`,
 		`<input class="input" type="date" name="to" value="2026-09-21" aria-label="To date">`,
 		`href="/help#inbound-log" title="What the decisions mean"`,
-		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th></th></tr>`,
+		`<th>Time, UTC</th><th>From</th><th>To</th><th>Subject</th><th>Decision</th><th>Upstream</th><th></th></tr>`,
+		// what the upstream answered: a tag that opens its last reply, a
+		// plain tag while not tried, "—" for refused mail
+		`<button type="button" class="tag is-success is-light" popovertarget="up-1">sent</button><div class="sp-sheet" id="up-1" popover>`,
+		`<span class="tag is-success is-light">sent</span><h2>Upstream</h2>`,
+		`<tr><th>Host</th><td class="sp-mono sp-small">mx.upstream.example[198.51.100.5]:25</td></tr><tr><th>Reply</th><td class="sp-mono sp-small">250 2.0.0 Ok: queued as CE05D10261D</td></tr><tr><th>At</th><td class="sp-mono sp-small">09-21 14:00:19</td></tr></tbody>`,
+		`<button type="button" class="tag is-danger is-light" popovertarget="up-2">bounced</button>`,
+		`<tr><th>Then</th><td>The sender was sent a bounce</td></tr>`,
+		`<button type="button" class="tag is-warning is-light" popovertarget="up-6">deferred</button>`,
+		`<tbody><tr><th>Reply</th><td class="sp-mono sp-small">connect to mx.upstream.example[198.51.100.5]:25: Connection refused</td></tr><tr><th>At</th><td class="sp-mono sp-small">09-21 13:45:12</td></tr><tr><th>Then</th><td>Postfix tries again; the message is in the queue</td></tr></tbody>`,
+		`<td><span class="tag is-light">queued</span></td>`,
+		`</div></div></div></div></td><td class="sp-muted">—</td><td class="sp-actions">`,
 		`09-21 14:00:18`,
 		`t.berg@<wbr>uni.example<br><span class="sp-mono sp-muted sp-small">192.0.2.77</span>`,
 		`dev@<wbr>lists.example.org`, `title="Re: [dev] patch series v3"`,
@@ -36,14 +47,17 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`<tr><th>Verdict</th><td>add header, score 9.80 / 15.00</td></tr><tr><th>Symbols</th><td class="sp-mono sp-small">PHISHING(5.00)<br>FORGED_SENDER(3.00)<br>R_SPF_FAIL(1.00)</td></tr>`,
 		`<tr><th>Decided by</th><td>postfix</td></tr><tr><th>Reply</th><td class="sp-mono sp-small">550 5.1.1 &lt;sales@lists.example.org&gt;: Recipient address rejected: User unknown in relay recipient table</td></tr></tbody>`,
 		`Page 1 of 38`, `<a href="/inbound/log?from=2026-09-14&amp;p=2&amp;to=2026-09-21">Older →</a>`,
-		`A decision opens its reason · Allow / Deny sender opens <a href="/inbound/filter-lists">Filter lists</a> with the entry filled in`,
+		`A decision opens its reason, an upstream result its last reply · Allow / Deny sender opens <a href="/inbound/filter-lists">Filter lists</a> with the entry filled in`,
 	)
 	pageLacks(t, "Inbound log", out, `← Newer`, `data-poll`, `hx-get`, `<th>Why</th>`)
 	// A message Postfix itself refused offers no way into the lists: one Deny
-	// for each of the three accepted messages, one Allow for each the filter
+	// for each of the four accepted messages, one Allow for each the filter
 	// refused or put off.
-	if deny, allow := strings.Count(out, `>Deny sender</a>`), strings.Count(out, `>Allow sender</a>`); deny != 3 || allow != 2 {
-		t.Errorf("the fixture's six rows offer Deny %d times and Allow %d times, want 3 and 2", deny, allow)
+	if deny, allow := strings.Count(out, `>Deny sender</a>`), strings.Count(out, `>Allow sender</a>`); deny != 4 || allow != 2 {
+		t.Errorf("the fixture's seven rows offer Deny %d times and Allow %d times, want 4 and 2", deny, allow)
+	}
+	if n := strings.Count(out, `<td class="sp-muted">—</td>`); n != 3 {
+		t.Errorf("%d rows have no upstream result, want the three refused", n)
 	}
 
 	// Without the global role there is nowhere to change the retention, and
@@ -307,4 +321,19 @@ func TestWhyRows(t *testing.T) {
 			t.Errorf("whyRows(%q, %q, %q, %q)\n got: %s\nwant: %s", c.decision, c.engine, c.detail, c.subject, got, c.want)
 		}
 	}
+}
+
+// A message the filter had held is a plain tag until it is released, and a
+// bounce of mail from the null sender says none went back.
+func TestInLogHeldAndABounceWithNoReturnAddress(t *testing.T) {
+	p := NewInLog(admin(), 90, nil, InLogFilter{})
+	at := time.Date(2026, 9, 21, 14, 0, 0, 0, time.UTC)
+	out := renderSignedIn(t, "in-log", p.WithRows([]InLogRow{
+		p.NewRow(InLogRowInput{ID: 1, At: at, From: "a@example.net", To: "b@acme.io", Decision: "quarantine", Engine: "rspamd", Upstream: "held"}),
+		p.NewRow(InLogRowInput{ID: 2, At: at, To: "b@acme.io", Decision: "accept", Engine: "selfpost",
+			Upstream: "bounced", UpstreamReply: "550 5.1.1 no such user", UpstreamAt: at}),
+	}, 1, 1))
+	pageHas(t, "Inbound log", out, `<td><span class="tag is-primary is-light">held</span></td>`,
+		`<tr><th>Then</th><td>No bounce: the message had no return address</td></tr>`)
+	pageLacks(t, "Inbound log", out, `The sender was sent a bounce`, `<th>Host</th>`)
 }

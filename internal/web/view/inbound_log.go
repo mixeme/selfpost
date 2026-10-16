@@ -68,9 +68,9 @@ type InLog struct {
 
 // InLogRow is one recipient of one message: when it was decided, who the mail
 // was from (and the address of the server that offered it) and for, its subject,
-// the decision as a tag that opens the sheet saying who decided and why, and —
-// for the global role, who alone edits the filter lists — the way to correct
-// the decision.
+// the decision as a tag that opens the sheet saying who decided and why, what
+// the upstream made of it, and — for the global role, who alone edits the
+// filter lists — the way to correct the decision.
 type InLogRow struct {
 	Time    string
 	From    string
@@ -78,7 +78,13 @@ type InLogRow struct {
 	To      string
 	Subject string
 	Why     Sheet
-	Action  *Anchor
+	// Upstream is the upstream's answer, a tag that opens a sheet with the
+	// last reply; Pending is a message not tried yet - queued, or held by the
+	// filter - a plain tag. Neither for refused mail and rows from before
+	// 2.10.0, which show "—".
+	Upstream *Sheet
+	Pending  *Tag
+	Action   *Anchor
 }
 
 // InLogRowInput is what the journal holds about one row. Subject, Detail and
@@ -97,6 +103,12 @@ type InLogRowInput struct {
 	Decision string
 	Engine   string
 	Detail   string
+	// The upstream's answer (store.Upstream…): its status, "" for none, the
+	// host that gave it ("" when Postfix had no session), the reply and when.
+	Upstream      string
+	UpstreamRelay string
+	UpstreamReply string
+	UpstreamAt    time.Time
 }
 
 // NewInLog builds the log for a viewer. domains are the choices of the domain
@@ -105,7 +117,7 @@ type InLogRowInput struct {
 // change it and who edits the lists, is read from m.
 func NewInLog(m Meta, retentionDays int, domains []string, filter InLogFilter) *InLog {
 	m.Title, m.Section, m.Page = "Inbound log", "inbound", "log"
-	lead := Rich("What port 25 decided about each message, one row per recipient. Accepted mail is recorded as it passes, refused mail is read from ",
+	lead := Rich("What port 25 decided about each message and what the upstream answered, one row per recipient. Accepted mail is recorded as it passes, refused mail is read from ",
 		Code("mail.log"), "; the filter's verdict appears when the spam filter is on. Rows older than "+plural(int64(retentionDays), "day", "days")+" are deleted")
 	if m.IsGlobal {
 		lead = append(lead, Inline{Text: " — change that in "}, Link("/server/settings", "Settings"))
@@ -152,10 +164,48 @@ func (p *InLog) NewRow(in InLogRowInput) InLogRow {
 			Rows: whyRows(in.Decision, in.Engine, in.Detail, in.Subject),
 		},
 	}
+	switch in.Upstream {
+	case "queued", "held":
+		r.Pending = &Tag{Status: in.Upstream}
+	case "sent", "deferred", "bounced":
+		r.Upstream = &Sheet{
+			ID: "up-" + strconv.FormatInt(in.ID, 10), Tag: Tag{Status: in.Upstream}, Title: "Upstream",
+			Rows: upstreamRows(in),
+		}
+	}
 	if p.IsGlobal && in.Listable {
 		r.Action = senderAction(in.Decision, in.Engine, in.From)
 	}
 	return r
+}
+
+// upstreamRows is the content of the Upstream sheet: the host that answered
+// (none when Postfix could not open a session: the reply names the host
+// then), the last reply, when it came, and what follows a deferral or a
+// bounce - a bounce to the sender, unless the message had none to return to
+// (Postfix does not bounce mail from the null sender).
+func upstreamRows(in InLogRowInput) []SheetRow {
+	var rows []SheetRow
+	if in.UpstreamRelay != "" {
+		rows = append(rows, SheetRow{Label: "Host", Lines: []string{in.UpstreamRelay}, Mono: true})
+	}
+	if in.UpstreamReply != "" {
+		rows = append(rows, SheetRow{Label: "Reply", Lines: []string{in.UpstreamReply}, Mono: true})
+	}
+	if !in.UpstreamAt.IsZero() {
+		rows = append(rows, SheetRow{Label: "At", Lines: []string{FormatLogTime(in.UpstreamAt)}, Mono: true})
+	}
+	switch in.Upstream {
+	case "deferred":
+		rows = append(rows, SheetRow{Label: "Then", Lines: []string{"Postfix tries again; the message is in the queue"}})
+	case "bounced":
+		then := "The sender was sent a bounce"
+		if in.From == "" {
+			then = "No bounce: the message had no return address"
+		}
+		rows = append(rows, SheetRow{Label: "Then", Lines: []string{then}})
+	}
+	return rows
 }
 
 // whyRows is the content of a row's sheet: who decided, what they said, and
@@ -226,9 +276,9 @@ func (p *InLog) WithRows(rows []InLogRow, page, last int) *InLog {
 		p.Foot.Link = &Anchor{Href: InLogHref(p.filter, page+1), Label: "Older →"}
 	}
 	if p.IsGlobal {
-		p.Foot.End = Rich("A decision opens its reason · Allow / Deny sender opens ", Link(inboundFilterLists, "Filter lists"), " with the entry filled in")
+		p.Foot.End = Rich("A decision opens its reason, an upstream result its last reply · Allow / Deny sender opens ", Link(inboundFilterLists, "Filter lists"), " with the entry filled in")
 	} else {
-		p.Foot.End = Plain("A decision opens its reason")
+		p.Foot.End = Plain("A decision opens its reason, an upstream result its last reply")
 	}
 	return p
 }

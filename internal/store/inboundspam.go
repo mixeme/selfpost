@@ -25,6 +25,18 @@ const (
 	SpamEngineSelfPost = "selfpost" // nobody: relayed with no filter attached
 )
 
+// What the upstream made of a message accepted on port 25, on its journal
+// rows (migration 0012). Kept in sync with the CHECK constraint of
+// inbound_spam_log; "" is a row with no result (refused mail, or written
+// before 2.10.0). sent and bounced are final.
+const (
+	UpstreamQueued   = "queued"   // accepted, not tried yet
+	UpstreamHeld     = "held"     // accepted into the hold queue by the filter's verdict, not tried until released
+	UpstreamSent     = "sent"     // the upstream took it
+	UpstreamDeferred = "deferred" // put off or not reached; Postfix tries again
+	UpstreamBounced  = "bounced"  // refused for good, or expired in the queue
+)
+
 // InboundSpamEntry is one row of the inbound antispam journal: what happened
 // to a message offered on port 25 for one recipient. Metadata only - the
 // message itself is relayed, not stored. Subject and Detail may be empty.
@@ -37,6 +49,11 @@ type InboundSpamEntry struct {
 	Decision      string
 	Engine        string
 	Detail        string
+	// QueueID and Upstream are set on mail that was accepted: the queue id
+	// the delivery lines will name, and UpstreamQueued (UpstreamHeld for a
+	// message the filter had held).
+	QueueID  string
+	Upstream string
 	// At is when it happened; zero means now. The log tailer dates a refusal
 	// by its mail.log line, which it may read long after.
 	At time.Time
@@ -56,10 +73,11 @@ func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 	}
 	_, err := s.db.Exec(
 		`INSERT INTO inbound_spam_log
-			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at, inbound_domain_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, `+inboundDomainID+`)`,
+			(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at, inbound_domain_id,
+			 queue_id, upstream_status)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, `+inboundDomainID+`, ?, ?)`,
 		e.InboundDomain, e.ClientIP, e.From, e.To, e.Subject, e.Decision, e.Engine, e.Detail,
-		at.UTC().Format(time.RFC3339), e.InboundDomain,
+		at.UTC().Format(time.RFC3339), e.InboundDomain, e.QueueID, e.Upstream,
 	)
 	if err != nil {
 		return fmt.Errorf("insert inbound_spam_log: %w", err)
@@ -92,6 +110,74 @@ func (s *Store) InsertInboundSpamOnce(e InboundSpamEntry) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// updateUpstreamQuery puts one delivery attempt's result on the rows of a
+// queue id and recipient whose result is not final; expireUpstreamQuery makes
+// those of a queue id bounced, saying it expired after the last reply. Both
+// read the queue id through idx_inbound_spam_log_queue_id
+// (TestInboundUpstreamUsesItsIndex).
+const (
+	updateUpstreamQuery = `UPDATE inbound_spam_log
+		SET upstream_status = ?, upstream_relay = ?, upstream_reply = ?, upstream_at = ?
+		WHERE queue_id = ? AND queue_id <> '' AND to_addr = ? COLLATE NOCASE
+		  AND upstream_status IN ('queued', 'held', 'deferred')`
+	expireUpstreamQuery = `UPDATE inbound_spam_log
+		SET upstream_status = 'bounced', upstream_at = ?,
+		    upstream_reply = substr(CASE WHEN upstream_reply = '' THEN 'expired in the queue'
+		                                 ELSE 'expired in the queue; last reply: ' || upstream_reply END, 1, ?)
+		WHERE queue_id = ? AND queue_id <> '' AND upstream_status IN ('queued', 'held', 'deferred')`
+	forgetQueueIDQuery = `UPDATE inbound_spam_log
+		SET queue_id = '',
+		    upstream_status = CASE WHEN upstream_status IN ('queued', 'held', 'deferred') THEN '' ELSE upstream_status END
+		WHERE queue_id = ? AND queue_id <> ''`
+)
+
+// ForgetInboundQueueID detaches the journal rows of a queue id from it: those
+// still open lose their result too, as nothing will ever report it. The
+// milter calls it before it writes a new message's rows - Postfix reuses
+// queue ids (enable_long_queue_ids=no, the default: microseconds and the
+// queue file's inode, src/global/mail_queue.h), and only one live queue file
+// has an id, so older rows of it are of a message that is gone and must not
+// take the new one's results. The tailer calls it when cleanup removes a
+// queue file it did not queue ("removed (canceled)"): the milter had written
+// the rows, but the message was never queued.
+func (s *Store) ForgetInboundQueueID(queueID string) error {
+	if _, err := s.db.Exec(forgetQueueIDQuery, queueID); err != nil {
+		return fmt.Errorf("forget inbound queue id %s: %w", queueID, err)
+	}
+	return nil
+}
+
+// UpstreamReplyMax is how much of an upstream's reply a row keeps.
+const UpstreamReplyMax = 255
+
+// UpdateInboundUpstream puts the result of one attempt to hand a message to
+// its upstream on its journal rows - those of queueID and recipient (case
+// folded, as Postfix logs the address it was given) - unless they hold a
+// final one already: a line read twice after a restart, or an older one read
+// after a newer, does not undo a sent. relay is the host that answered, ""
+// when there was no session; reply is cut to UpstreamReplyMax by the caller.
+// It returns how many rows took it: 0 for mail that is not port 25's. A
+// message the filter had held takes its results once it is released.
+func (s *Store) UpdateInboundUpstream(queueID, recipient, status, relay, reply string, at time.Time) (int64, error) {
+	res, err := s.db.Exec(updateUpstreamQuery, status, relay, reply, at.UTC().Format(time.RFC3339), queueID, recipient)
+	if err != nil {
+		return 0, fmt.Errorf("update inbound upstream %s: %w", queueID, err)
+	}
+	return res.RowsAffected()
+}
+
+// ExpireInboundUpstream makes the rows of a message Postfix gave up on
+// bounced (qmgr's "status=expired, returned to sender", which names no
+// recipient): the sender was sent a bounce. The last reply stays, after a
+// note that the message expired.
+func (s *Store) ExpireInboundUpstream(queueID string, at time.Time) (int64, error) {
+	res, err := s.db.Exec(expireUpstreamQuery, at.UTC().Format(time.RFC3339), UpstreamReplyMax, queueID)
+	if err != nil {
+		return 0, fmt.Errorf("expire inbound upstream %s: %w", queueID, err)
+	}
+	return res.RowsAffected()
 }
 
 // PruneInboundSpam deletes journal rows older than cutoff and then, if more
@@ -130,6 +216,12 @@ type InboundSpamRow struct {
 	Engine        string
 	Detail        string
 	CreatedAt     time.Time
+	// The upstream's answer: its status ("" for none), the host that gave
+	// it, the reply and when.
+	Upstream      string
+	UpstreamRelay string
+	UpstreamReply string
+	UpstreamAt    time.Time
 }
 
 // InboundSpamFilter narrows QueryInboundSpam and CountInboundSpam. Like
@@ -166,7 +258,8 @@ func (s *Store) QueryInboundSpam(filter InboundSpamFilter, limit, offset int) ([
 	where, args := inboundSpamWhere(filter)
 	args = append(args, limit, offset)
 	rows, err := s.db.Query(
-		`SELECT id, inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at
+		`SELECT id, inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at,
+		        upstream_status, upstream_relay, upstream_reply, upstream_at
 		 FROM inbound_spam_log`+where+`
 		 ORDER BY created_at DESC, id DESC
 		 LIMIT ? OFFSET ?`,
@@ -180,14 +273,18 @@ func (s *Store) QueryInboundSpam(filter InboundSpamFilter, limit, offset int) ([
 	var out []InboundSpamRow
 	for rows.Next() {
 		var (
-			row     InboundSpamRow
-			created string
+			row          InboundSpamRow
+			created, upd string
 		)
 		if err := rows.Scan(&row.ID, &row.InboundDomain, &row.ClientIP, &row.From, &row.To,
-			&row.Subject, &row.Decision, &row.Engine, &row.Detail, &created); err != nil {
+			&row.Subject, &row.Decision, &row.Engine, &row.Detail, &created,
+			&row.Upstream, &row.UpstreamRelay, &row.UpstreamReply, &upd); err != nil {
 			return nil, fmt.Errorf("scan inbound_spam_log row: %w", err)
 		}
 		row.CreatedAt, _ = time.Parse(time.RFC3339, created)
+		if upd != "" {
+			row.UpstreamAt, _ = time.Parse(time.RFC3339, upd)
+		}
 		out = append(out, row)
 	}
 	return out, rows.Err()

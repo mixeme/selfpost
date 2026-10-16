@@ -113,7 +113,12 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   verdict headers (`X-Rspamd-Action`, `X-Spamd-Result`) off it. It writes one
   `inbound_spam_log` row per recipient at an inbound domain - a DMARC report
   address is not one - and never refuses anything
-  ([internal/milter/inbound.go](../internal/milter/inbound.go)). The headers
+  ([internal/milter/inbound.go](../internal/milter/inbound.go)). The row
+  keeps the message's queue id (`{i}` at end-of-message) and starts
+  `queued` - `held` when the filter had Postfix hold it - and the recipient
+  as Postfix logs it (`recipientAsLogged`); the log tailer puts the
+  upstream's answer on it (§ Log tailer, *The upstream's answer*). Older
+  rows of a queue id Postfix uses again are detached first. The headers
   are read only while a filter is attached, and only next to the filter's
   signature: a third header, `X-SelfPost-Filter`, the HMAC-SHA256 of the
   message's queue id under the key in `/data/antispam/filter.key`
@@ -584,6 +589,26 @@ host name and `program[pid]:`, at the queue id - like the stored lines' and the
 inbound journal's. The tail of a line is the far end's words (a reply, a HELO
 name), and a pattern that could start there let a stranger's HELO name file a
 delivery (audit 2026-10-12, M12).
+
+**The upstream's answer** on the inbound journal (inbound-upstream-result,
+`2.10.0`). Mail accepted on port 25 is handed to its upstream by the same
+`smtp` client as outbound mail, and its delivery lines look alike; what tells
+them apart is the row. A delivery line no send-log row takes (`UpdateStatus`
+changed nothing) is offered to the journal: the rows of its queue id and
+recipient take the status, the host (`relay=`, `""` for `none` - a line
+written without a session, Postfix 3.10.13, `src/smtp/smtp_trouble.c:273,
+421`), the reply - the `(%s)` after the first `status=`, made printable and
+cut to 255 bytes - and the line's time (`store.UpdateInboundUpstream`). Only
+a `queued`, `held` or `deferred` row moves: `sent` and `bounced` are final, so
+a line read twice after a restart changes nothing. The addresses are read by
+Postfix's quoting (`loggedAddress`), so a quoted local part cannot end one
+early. cleanup's `removed (canceled)` - a queue file never queued - detaches
+the rows the milter had written for it. qmgr's expiry line, which names no
+recipient, makes the rows of its queue id `bounced`, keeping the last reply
+after "expired in the queue" (`ExpireInboundUpstream`). It is an update per
+attempt, never a row: the journal's caps stand, and port-25 mail's lines are
+still not stored (delivery-log-storage). A bounce Postfix sends to a stranger
+is mail of its own queue id and matches no row.
 
 **Read offset is persisted** (`logtail_state` table, in the baseline schema): the
 tailer stores its position plus a fingerprint of the log - the hash of its first
@@ -1119,7 +1144,7 @@ full backups also archive the operator's `./certs` PEM files when present.
 ### Database
 
 The schema is an embedded baseline, `internal/store/migrations/0001_init.sql`,
-and the migrations after it (`0002` to `0011` today; the next is `0012`),
+and the migrations after it (`0002` to `0012` today; the next is `0013`),
 applied by `store.Open` in file order; `PRAGMA user_version` counts the files
 applied and
 `PRAGMA application_id` is `0x53503230` ("SP20"). There is no 1.x migration

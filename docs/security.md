@@ -368,6 +368,28 @@ operator can act on it.
   ask for it at all, an application with a client-address list is refused when
   no address is known, and neither milter replies anything but "continue" to a
   message it lets through. `test/e2e` sends two `MAIL FROM` on one connection.
+- **The upstream's answer is an update of a row, not a row**
+  (inbound-upstream-result, `2.10.0`). A delivery line of mail accepted on
+  port 25 changes the result of that message's journal rows and adds
+  nothing: a stranger who sends more mail gets more rows from the milter, as
+  before, and each row at most one update per delivery attempt, at Postfix's
+  retry pace. The lines themselves of port-25 mail are still not kept. What
+  is written: the status and the time are Postfix's fields; the host is
+  Postfix's `relay=`, the reply the upstream's words - which may quote the
+  stranger's address - or Postfix's own about a host it could not reach, both
+  printable and cut to 255 bytes, shown in `sp-mono` cells like a refusal's
+  reply (escaped by html/template). The stranger's own text reaches the line
+  only as its `to=` and `orig_to=`, which is the key and nothing else: they
+  are read by Postfix's quoting (`loggedAddress`, `internal/logtail`), so a
+  quoted RCPT TO holding `>`, `,` or `status=` cannot end the address early
+  and pass fields of its own for another recipient's row - and one holding an
+  `@` is a routed address, which port 25 refuses as relaying
+  (`allow_untrusted_routing=no`). Short queue ids repeat (Postfix's default
+  `enable_long_queue_ids=no`): before writing a message's rows the milter
+  detaches older rows of its queue id, so a message that is gone cannot take
+  a new one's results. Accepted: a row whose insert waited longer than the
+  milter's 30 s timeout - the database held - can miss its first delivery
+  line and stay `queued`.
 - **The inbound journal is written from what strangers send.** The inbound
   journal milter is the last on port 25, read-only and attached fail-open; it
   keeps of the filter's verdict only what its patterns recognise. **A verdict
