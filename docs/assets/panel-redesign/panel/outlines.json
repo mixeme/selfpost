@@ -82,8 +82,7 @@
       "box[Processes]:table",
       "box[Sender check]:table+body",
       "box[Hostname and reverse DNS]:body",
-      "box[Machine]:table",
-      "box[Test message]:body"
+      "box[Machine]:table"
      ]
     },
     {
@@ -91,7 +90,8 @@
       "box[Milter sockets]:table",
       "box[TLS certificate]:body",
       "box[Notification mail]:table+body",
-      "box[Configuration]:body"
+      "box[Configuration]:body",
+      "box[Test message]:body"
      ]
     }
    ]
