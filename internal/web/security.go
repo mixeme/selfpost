@@ -146,14 +146,14 @@ func originAllowed(r *http.Request) bool {
 	// https.
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		// Neither header. A client this old cannot be checked at all; it is
-		// let through as the risk consciously accepted (single-admin panel,
-		// the administrator picks the browser). Turning this return into
-		// false is the whole of the stricter policy. By Fetch § 3.2 a browser
-		// that follows it never sends a POST without Origin; Firefox did for a
-		// same-origin form before 70 (MDN browser-compat-data 6.0.0,
-		// http.headers.Origin).
-		return true
+		// Neither header: nothing says where the request came from, so it is
+		// refused (origin-strict, owner 2026-10-13; until 2.10.4 it was let
+		// through as an accepted risk). By Fetch § 3.2 a browser that follows
+		// it never sends a POST without Origin; Firefox did for a same-origin
+		// form before 70 (MDN browser-compat-data 6.0.0, http.headers.Origin),
+		// and such a browser can no longer save anything here. A script that
+		// posts to the panel sends Origin itself (test/e2e, panelClient).
+		return false
 	}
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" {

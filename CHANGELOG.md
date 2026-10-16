@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **A change with no word of where it came from is refused**
+  (origin-strict): a `POST` that carries neither `Sec-Fetch-Site` nor
+  `Origin` is answered 403, as a cross-origin one is. It was let through
+  before, as an accepted risk, which left a browser that sends neither open
+  to a request forged by any site. Every current browser sends `Origin` with
+  a form; a browser too old to (Firefox before 70) can no longer save
+  anything in the panel.
+
 ## [2.10.3] - 2026-10-16
 
 The backup asks for your password. No migration; schema 12.

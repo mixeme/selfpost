@@ -42,7 +42,7 @@ func TestOriginCheck(t *testing.T) {
 		req          *http.Request
 		wantRejected bool
 	}{
-		{"no headers at all is let through (accepted risk)", post("", ""), false},
+		{"no headers at all is refused (origin-strict)", post("", ""), true},
 		{"same-origin", post("same-origin", "https://panel.example.com"), false},
 		{"same-site, i.e. a neighbouring subdomain", post("same-site", ""), true},
 		{"cross-site", post("cross-site", "https://evil.example.net"), true},

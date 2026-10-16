@@ -162,7 +162,9 @@ func testFormPostWithTheBrowsersOrigin(t *testing.T, sc *scenario) {
 			t.Fatal(err)
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("Origin", origin)
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
 		resp, err := sc.panel.http.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -175,5 +177,10 @@ func testFormPostWithTheBrowsersOrigin(t *testing.T, sc *scenario) {
 	}
 	if code := post("null"); code != http.StatusForbidden {
 		t.Fatalf("POST with Origin: null: status %d, want 403", code)
+	}
+	// Neither Sec-Fetch-Site nor Origin: nothing says where it came from, and
+	// it is refused (origin-strict, 2.10.4; allowed before as an accepted risk).
+	if code := post(""); code != http.StatusForbidden {
+		t.Fatalf("POST with neither header: status %d, want 403", code)
 	}
 }

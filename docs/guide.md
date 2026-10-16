@@ -295,6 +295,9 @@ browser that does not send `Sec-Fetch-Site` (Safari before 16.4, or any
 browser on a panel served over plain HTTP at a name): there the panel compares
 `Origin` with `Host` and refuses every change as cross-origin - the log says
 so explicitly, printing the `Sec-Fetch-Site`, `Origin` and `Host` it compared.
+A request that carries neither header - a browser too old to send `Origin`,
+or a script posting to the panel without one - is refused the same way
+since 2.10.4.
 
 In every case the proxy terminates HTTPS for the panel; the resulting
 certificate must end up under `./certs` as `fullchain.pem` and `privkey.pem` —

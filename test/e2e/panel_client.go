@@ -85,8 +85,17 @@ func readSetupToken(s *stack) (string, error) {
 	return strings.TrimPrefix(u.Path, "/setup/"), nil
 }
 
+// postForm posts a form as the panel's own page would: with the Origin a
+// browser sends, which the panel requires of every state-changing request
+// (origin-strict; internal/web/security.go, originAllowed).
 func (c *panelClient) postForm(path string, form url.Values) (*http.Response, string, error) {
-	resp, err := c.http.PostForm(panelBaseURL+path, form)
+	req, err := http.NewRequest(http.MethodPost, panelBaseURL+path, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", panelBaseURL)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, "", err
 	}

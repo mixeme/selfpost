@@ -32,7 +32,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | agreed (2026-10-13) | — | — |
 | test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
-| origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | agreed (2026-10-13) | — | — |
+| origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | done 2026-10-16, unreleased | — | — |
 | backup-reauth | Ask for the account password before a backup or a domain export is downloaded | shipped `2.10.3` | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
@@ -223,6 +223,12 @@ panel without a browser (the e2e stand, scripts) and make it send `Origin`.
 **Done when:** a `POST` with neither header is refused with a test that proves
 it, the e2e stand passes, the accepted risk about header-less requests is
 struck from [security.md](security.md) and its ADR states the strict rule.
+
+**Done (2026-10-16):** `originAllowed` returns false in the "neither
+header" branch; the unit test's case is refused, e2e posts with neither
+header and gets 403, and the e2e suite's client sends `Origin` on every
+form it posts. The accepted risk is struck from security.md and the ADR's
+decision says refused; architecture and the guide say so.
 
 **Dependencies / risks:** a browser that sends neither header can no longer
 save anything in the panel - accepted, the panel's users pick their own

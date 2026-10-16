@@ -994,7 +994,8 @@ send it (an older one, or a current one over plain HTTP at a name other than
 `localhost`), `Origin` must name the panel's host - which a form of the panel
 carries under its `Referrer-Policy: same-origin`, the page's own origin (under
 `no-referrer` it would be `null` and refused); a request with neither header
-is let through (an accepted risk). A refusal logs the `Sec-Fetch-Site`,
+is refused too (origin-strict, `2.10.4`; it was let through before, as an
+accepted risk). A refusal logs the `Sec-Fetch-Site`,
 `Origin` and `Host` it compared.
 There are no CSRF tokens — see [security.md](security.md).
 

@@ -204,6 +204,8 @@ assigned outbound domains and inbound domains **separately**, each list with
   host (the panel's `Referrer-Policy` is `same-origin`, so a browser puts the
   panel's own origin on a form post of the panel); the session cookie is
   `SameSite` as well.
+- A request with neither header is refused as well (origin-strict,
+  `2.10.4`).
 - There are **no CSRF tokens**. The decision, its price and the conditions
   for revisiting it are in the accepted risks and the ADR below.
 
@@ -512,17 +514,6 @@ operator can act on it.
 An accepted risk is a decision with a condition for revisiting it, not a
 deferred item from the roadmap.
 
-- **A `POST` with neither `Sec-Fetch-Site` nor `Origin` is allowed through.**
-  A client that sends neither — a genuinely old browser, or a webview with a
-  frozen engine — stays vulnerable to CSRF from any site. Accepted
-  deliberately: every panel user (role `global` or `domain`) is an operator who
-  picks their own browser, not an untrusted party the panel needs to defend
-  against, and a strict mode would not "protect" such a client, it would
-  simply break the panel in it. Tightening is one line in `originAllowed`
-  ([internal/web/security.go](../internal/web/security.go)): return `false`
-  instead of `true` in the "neither header present" branch. That tightening
-  is agreed (owner, 2026-10-13) as
-  [origin-strict](roadmap.md#origin-strict); this bullet goes when it ships.
 - **Session-bound CSRF tokens are not implemented.** The origin check closes the
   neighbouring-subdomain case but depends on browser behaviour; a token does
   not. The price is a hidden field in roughly two dozen forms. The trigger to
@@ -844,7 +835,8 @@ through the browser.
 **Decision.** `originAllowed` in
 [internal/web/security.go](../internal/web/security.go) checks `Sec-Fetch-Site`
 (when the browser sends it) or `Origin` (fallback) against the panel's host; a
-request carrying neither header is **allowed through** rather than rejected.
+request carrying neither header is **refused** (403), since `2.10.4`
+(origin-strict; until then it was let through as an accepted risk).
 There are no session-bound tokens embedded in forms. The check applies the same
 way regardless of the requesting user's role.
 
@@ -864,9 +856,11 @@ and sends the request itself. XSS is handled by `html/template` auto-escaping
 and CSP, so that is a separate line of defence, not a CSRF token.
 
 **Trade-off.** A client that sends neither `Sec-Fetch-Site` nor `Origin` (a
-genuinely old browser, or a webview with a frozen engine) stays vulnerable — see
-"Accepted risks" above. This is a deliberate choice not to break the panel in
-such a client, at the price of a narrow residual surface.
+genuinely old browser - Firefox before 70 sent no Origin with a same-origin
+form - or a webview with a frozen engine) can no longer save anything in the
+panel: refused rather than left open to a request forged by any site. Until
+`2.10.4` the choice was the other way round, as an accepted risk. A script
+that posts to the panel sends `Origin` itself (the e2e suite's client does).
 
 **Revisit if:** a requirement appears for protection that does not depend on
 browser behaviour, or `domain` accounts stop being trusted operators (for
