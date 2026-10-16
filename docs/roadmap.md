@@ -32,7 +32,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | agreed (2026-10-13) | — | — |
 | test-email | Send a test message from the panel (was preflight) | agreed (2026-10-13) | — | — |
 | inbound-antispam-panel | Inbound antispam journal + allow/deny lists | shipped `2.1.0` | 12/12 | [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) |
-| origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | done 2026-10-16, unreleased | — | — |
+| origin-strict | Refuse a state-changing request that carries neither `Sec-Fetch-Site` nor `Origin` (was csrf-tokens) | shipped `2.10.4` | — | — |
 | backup-reauth | Ask for the account password before a backup or a domain export is downloaded | shipped `2.10.3` | — | — |
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |

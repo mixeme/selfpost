@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.10.4] - 2026-10-16
+
+The origin check is strict. No migration; schema 12.
+
 ### Security
 
 - **A change with no word of where it came from is refused**
