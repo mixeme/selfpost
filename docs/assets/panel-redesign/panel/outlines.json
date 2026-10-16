@@ -82,7 +82,8 @@
       "box[Processes]:table",
       "box[Sender check]:table+body",
       "box[Hostname and reverse DNS]:body",
-      "box[Machine]:table"
+      "box[Machine]:table",
+      "box[Test message]:body"
      ]
     },
     {
@@ -107,7 +108,7 @@
     },
     {
      "is-9": [
-      "box[Overview]:help×3",
+      "box[Overview]:help×4",
       "box[Outbound]:help×7",
       "box[Inbound]:help×6",
       "box[Server]:help×4",

@@ -57,6 +57,19 @@
             </tbody>
           </table></div>
         </div>
+        <div class="box" id="test-message" data-order="9">
+          <div class="sp-box-head"><span class="sp-no">09</span><h2>Test message</h2><div class="sp-end">Shows what the receiving server answers</div><a class="sp-help" href="help.html#test-message" title="What the test proves"><i class="ti ti-help-circle"></i></a></div>
+          <div class="sp-box-body">
+            <form class="sp-form" method="post" action="out-message.html">
+              <div class="field"><label class="label" for="rcpt">Recipient</label>
+                <div class="field has-addons">
+                  <div class="control is-expanded has-icons-left"><input class="input" id="rcpt" name="recipient" type="email" placeholder="you@elsewhere.example" required><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
+                  <div class="control"><button type="submit" class="button is-primary"><i class="ti ti-send"></i>Send</button></div>
+                </div>
+                <p class="help">From <span class="sp-mono">postmaster@mail.example.org</span>, signed with the server's own key, through Postfix as its notifications go. It opens in the <a href="out-log.html">Outbound log</a>, where its page follows it to the receiving server. Ten an hour.</p></div>
+            </form>
+          </div>
+        </div>
       </div>
       <div class="column is-6">
         <div class="box" id="sockets" data-order="2">
