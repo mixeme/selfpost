@@ -55,6 +55,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   it as quoted-printable for a server that does not announce 8BITMIME, after
   it was signed; `disable_mime_output_conversion=yes` now delivers it as
   signed. OpenDKIM's signatures were exposed to this too.
+- **A message of nothing but headers was held whole by every milter.** The
+  milter library (go-milter v0.4.1) kept each header of a message in a map
+  of its own that no milter of the panel read - up to the message size
+  limit, on port 25 from strangers too. The panel builds it patched not to
+  (`third_party/go-milter`).
 - **A rotation of `mail.log` due at the container's start logged an error.**
   It runs before Postfix does, and its `postfix reload` failed ("the Postfix
   mail system is not running"); nothing was lost - the Postfix starting

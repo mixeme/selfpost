@@ -331,10 +331,11 @@ func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.R
 // message, and src/smtpd/smtpd.c, common_post_message_handling(), says that
 // reply to the client.
 //
-// h is not read: go-milter v0.4.1 adds every header of the connection to it
-// and empties it only on ABORT (session.go, CodeHeader, CodeAbort), so on a
-// second message it can still hold the first one's From:. The session keeps
-// its own, emptied at each MAIL FROM (audit 2026-10-12, L9).
+// h is not read, and is empty: upstream go-milter v0.4.1 added every header
+// of the connection to it and emptied it only on ABORT, so on a second
+// message it could still hold the first one's From: (audit 2026-10-12, L9);
+// the copy SelfPost builds keeps none (third_party/go-milter/PATCHES.md). The
+// session keeps its own, emptied at each MAIL FROM.
 func (s *senderSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milter.Response, error) {
 	field, shown, why, err := s.judge()
 	if err != nil {

@@ -276,8 +276,7 @@ func (s *signSession) Header(name, value string, m *milter.Modifier) (milter.Res
 // What cannot be signed is deferred: the socket is attached with
 // default_action=tempfail, and so is every refusal here.
 //
-// h is not read: go-milter v0.4.1 keeps every header of the connection in it
-// (see senderSession.Headers).
+// h is not read, and is empty (see senderSession.Headers).
 func (s *signSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milter.Response, error) {
 	if s.tooBig {
 		log.Printf("dkim-signer: login %q: a header section of more than %d bytes - refused", s.login, headerLimit)

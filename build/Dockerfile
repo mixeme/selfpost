@@ -13,8 +13,11 @@ WORKDIR /src
 # Version stamped into both binaries; MUST match the image tag.
 ARG VERSION=dev
 
-# Module metadata first for layer caching.
+# Module metadata first for layer caching. third_party/go-milter is a module
+# go.mod replaces go-milter with (third_party/go-milter/PATCHES.md): the
+# download needs it.
 COPY go.mod go.sum ./
+COPY third_party ./third_party
 RUN go mod download
 
 COPY cmd ./cmd

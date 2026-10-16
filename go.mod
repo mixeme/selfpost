@@ -21,3 +21,6 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
+
+// go-milter with its header map dropped: third_party/go-milter/PATCHES.md.
+replace github.com/emersion/go-milter => ./third_party/go-milter

@@ -729,34 +729,21 @@ deferred item from the roadmap.
   key of another's is involved, as with a display name. Holding it too is a
   few lines in `internal/milter/sender.go` (`judge()`); the trigger to do it
   is a mail program that shows it in place of `From:`.
-- **A header section is bounded at 1 MiB by the signer, not by the milter
-  library.** The signer counts a message's headers as Postfix hands them
-  over and refuses a section of more than 1 MiB with `552 5.3.4`
-  (`internal/milter/sign.go`, `headerLimit`; `2.8.0`): it keeps no more
-  than that and drops its list once the block it signs is built, so its own
-  memory per message is a few mebibytes at most. No mail program writes such
-  a section, and the refusal is permanent, so a sender is told rather than
-  retried. What the cap does not bound: go-milter v0.4.1 adds every header
-  of a message to a map of its own in each milter it is sent to (session.go,
-  `CodeHeader`), which none of SelfPost's milters reads - the sender check,
-  the signer and the journal milter on 465/587, the inbound journal milter
-  on port 25 - and that copy is bounded only by the port's message size
-  limit (Postfix's default 10 240 000 bytes on 465/587;
-  `INBOUND_MESSAGE_SIZE_LIMIT` or `DMARC_MESSAGE_SIZE_LIMIT` on port 25,
-  from strangers), since a refusal at the end of the headers comes after
-  they are all in. A message of nothing but headers still costs the panel
-  about its size once per milter while it is in the milters, times the
-  messages Postfix runs at once (as many as its cleanup processes,
-  `default_process_limit`, 100), and `deploy/docker-compose.yml` sets no
-  memory limit, so the host's out-of-memory killer chooses what goes; a
-  panel killed is started again, and submissions wait meanwhile. The
-  library's copy is older than `2.8.0`: every milter of the panel has had
-  it. The fix, priced: a go-milter patched not to keep the map (vendored;
-  SelfPost reads headers only through `Header`), or a memory limit in the
-  compose file, which makes an exhausted panel a restart of the panel alone
-  rather than a victim the host picks. Trigger to revisit: the inbound relay
-  on an address strangers send to in volume, or a panel seen near the
-  host's memory.
+- **A header section costs the signer up to 1 MiB.** The signer counts a
+  message's headers as Postfix hands them over and refuses a section of
+  more than 1 MiB with `552 5.3.4` (`internal/milter/sign.go`,
+  `headerLimit`; `2.8.0`): it keeps no more than that and drops its list
+  once the block it signs is built. No mail program writes such a section,
+  and the refusal is permanent, so a sender is told rather than retried.
+  The other milters keep a few headers each (From, Sender, Subject).
+  Until `2.8.0` the milter library itself added every header of a message
+  to a map of its own in each milter - up to the port's message size limit,
+  from strangers on port 25 - which none of the milters read; the panel
+  builds go-milter v0.4.1 patched not to keep it
+  (`third_party/go-milter/PATCHES.md`; the owner's decision, 2026-10-16).
+  `deploy/docker-compose.yml` sets no memory limit: what is left - many
+  messages at once, each held to the bounds above - is the host's to
+  size.
 - **A message's page can show another message's log lines after a queue-id
   collision.** Postfix's short queue ids repeat: the id is the microsecond of
   arrival and the queue file's inode, and inodes come round within seconds.

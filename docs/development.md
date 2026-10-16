@@ -182,7 +182,7 @@ dependencies must be permissive or GPL-family (see
 
 | Package | Version | Repository | License |
 |---|---|---|---|
-| `github.com/emersion/go-milter` | v0.4.1 | <https://github.com/emersion/go-milter> | BSD-2-Clause |
+| `github.com/emersion/go-milter` | v0.4.1, patched in `third_party/go-milter` (its `PATCHES.md`; `replace` in `go.mod`) | <https://github.com/emersion/go-milter> | BSD-2-Clause |
 | `github.com/emersion/go-msgauth` | v0.7.0 (`dkim`, the signer) | <https://github.com/emersion/go-msgauth> | MIT |
 | `golang.org/x/crypto` | v0.58.0 | <https://github.com/golang/crypto> | BSD-3-Clause |
 | `modernc.org/sqlite` | v1.60.1 | <https://gitlab.com/cznic/sqlite> (mirror: <https://github.com/modernc-org/sqlite>) | BSD-3-Clause |
