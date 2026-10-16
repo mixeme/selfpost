@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-17
+
+The panel in the container's time zone. No migration; schema 12.
+
 ### Added
 
 - **The panel in your time zone** (local-time): set `TZ` in `.env` (an IANA
