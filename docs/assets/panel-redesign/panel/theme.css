@@ -224,6 +224,12 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 /* A label may carry a tag, the verdict on its value (the certificate's
    names against the hostname); it keeps the tag's own type. */
 .sp-facts dt .tag { margin-left: .4rem; text-transform: none; letter-spacing: 0; vertical-align: 1px; }
+/* A tag beside a label's text (a field's or a fact's) is no taller than the
+   text's line: Bulma's tag is 2em high, which made the line taller and left
+   less room under the label than under one without a tag (an e-mail's
+   "not confirmed" on Account, the owner's phone, 2026-10-17). */
+.label .tag, .sp-facts dt .tag { height: auto; padding-top: 0; padding-bottom: 0; line-height: 1.5; }
+.label .tag { margin-left: .25rem; vertical-align: 1px; }
 /* A fact that takes the whole row: a line a server wrote, read as one. */
 .sp-facts .sp-wide { grid-column: 1 / -1; }
 .sp-facts dd.sp-big { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
