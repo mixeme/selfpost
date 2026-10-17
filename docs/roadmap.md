@@ -561,6 +561,13 @@ panel). The year question settled as the mockups have it. `tzdata` is named
 in the image. Tests run in UTC (a `TestMain` in each package that formats
 or counts days) and in Moscow where the zone is the point.
 
+**The one exception (owner, 2026-10-17):** "Показ времени отчёта по UTC
+принимаем. Это не проблема. Пояснения добавь." The day a DMARC report
+covers stays the reporter's, in UTC (RFC 7489 counts its date range in UTC):
+the lists and a report's title name it, the report's page gives its window
+in the panel's zone with a line naming that day, and Settings and Help say
+it is the exception (2.14.2).
+
 ---
 
 ## phone-desktop-mode
