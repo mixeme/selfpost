@@ -294,8 +294,10 @@ then OpenDKIM did, in a program of its own
 - **What is signed** — `relaxed/simple`, `rsa-sha256`, with
   `github.com/emersion/go-msgauth` v0.7.0 (`dkim`). `h=`: every header of
   the message whose name is in RFC 6376 § 5.4.1's list as OpenDKIM's
-  `dkim_should_signhdrs[]` held it, and `Sender` and `List-Unsubscribe-Post`
-  besides (`signHeaders`), each occurrence, in message order; then, once
+  `dkim_should_signhdrs[]` held it, and `Sender`, `List-Unsubscribe-Post`,
+  `Content-Type`, `MIME-Version` and `Message-ID` besides (`signHeaders`;
+  `Message-ID` is not over-signed: cleanup adds one a message lacks after the
+  milters), each occurrence, in message order; then, once
   more, each of `Subject`, `Date`, `To`, `Cc`, `Reply-To` and `Sender` the
   message has (`overSign` - only those present: Postfix's cleanup adds a
   missing `Date:` after the milters, out of their sight, and a name in `h=`

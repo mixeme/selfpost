@@ -59,7 +59,7 @@ func testSignatureOverAwkwardHeaders(t *testing.T, sc *scenario) {
 	// Both To: lines, the one Cc:, the Subject and List-Unsubscribe-Post are
 	// signed, the shown ones once more.
 	signedNames := strings.ToLower(dkimTagsOf(t, delivered)["h"])
-	for _, want := range []string{"to:to:", "cc:", "subject:", "list-unsubscribe-post:"} {
+	for _, want := range []string{"to:to:", "cc:", "subject:", "list-unsubscribe-post:", "content-type:"} {
 		if !strings.Contains(signedNames, want) {
 			t.Errorf("h=%s lacks %q", signedNames, want)
 		}

@@ -1529,12 +1529,13 @@ DMARC counts that signature only when its domain aligns with the domain of
 signature as another of its domains, or as the server itself.
 
 **Lines of more than 998 bytes.** The signer signs the message as the
-application handed it over. Postfix's SMTP client breaks a body line longer
-than 998 bytes when it delivers the message (`smtp_line_length_limit`),
+application handed it over. Postfix's SMTP client breaks a line longer
+than 998 bytes, in the body or in a header, when it delivers the message (`smtp_line_length_limit`),
 after the signature was made, and the receiver's check of the signature
 then fails. Such a message is still sent; the container log names its
 domain and login (`dkim-signer: example.com (login "shop"): a body line
-longer than 998 bytes - ...`). Mail libraries keep lines short with
+longer than 998 bytes - ...`, or `a line of the Subject header is longer
+than 998 bytes - ...`). Mail libraries keep lines short with
 quoted-printable or base64; an application that writes its own body has to
 as well. A message whose header section is over 1 MiB is refused,
 `552 5.3.4`.

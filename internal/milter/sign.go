@@ -30,9 +30,14 @@ import (
 // signHeaders is the set of header names signed when present: RFC 6376
 // § 5.4.1's list, as OpenDKIM's dkim_should_signhdrs[] held it (OpenDKIM
 // 2.11.0~beta2, libopendkim/dkim.c:223-246), which SelfPost signed with until
-// 2.8.0; and two that list leaves out: Sender, which a mail program shows
-// beside From ("on behalf of"), and List-Unsubscribe-Post, which RFC 8058
-// § 4 wants signed for a one-click unsubscribe to be honoured. Every
+// 2.8.0; and those that list leaves out: Sender, which a mail program shows
+// beside From ("on behalf of"), List-Unsubscribe-Post, which RFC 8058 § 4
+// wants signed for a one-click unsubscribe to be honoured, and since 2.14.4
+// Content-Type, MIME-Version and Message-ID (security audit 2026-10-17, M6):
+// unsigned, a relay could change a MIME boundary or the type and the
+// signature still verified. Message-ID is not over-signed: cleanup adds one a
+// message lacks after the milters, and a name in h= that is absent would
+// refuse it. Every
 // occurrence is signed, in message order, and the shown ones once more
 // (signLines).
 var signHeaders = map[string]bool{
@@ -41,6 +46,7 @@ var signHeaders = map[string]bool{
 	"in-reply-to": true, "references": true,
 	"list-id": true, "list-help": true, "list-unsubscribe": true, "list-unsubscribe-post": true,
 	"list-subscribe": true, "list-post": true, "list-owner": true, "list-archive": true,
+	"content-type": true, "mime-version": true, "message-id": true,
 }
 
 // overSign are the signed headers a mail program shows: each that the message
@@ -292,6 +298,9 @@ func (s *signSession) Headers(h textproto.MIMEHeader, m *milter.Modifier) (milte
 		log.Printf("dkim-signer: %v - deferring", err)
 		return milter.RespTempFail, nil
 	}
+	if name := longHeaderLine(s.headers); name != "" {
+		log.Printf("dkim-signer: %s (login %q): a line of the %s header is longer than %d bytes - Postfix breaks it on delivery and the signature will not verify", s.domain, s.login, name, smtpLineLimit)
+	}
 	keys, block := signLines(s.headers)
 	s.headers = nil // the block is what is kept now
 	signer, err := dkim.NewSigner(&dkim.SignOptions{
@@ -360,6 +369,27 @@ func signLines(headers []field) ([]string, []byte) {
 	b.WriteString("\r\n")
 	keys = append(keys, again...)
 	return append(keys, "From"), []byte(b.String())
+}
+
+// longHeaderLine names the first header with a line longer than
+// smtpLineLimit, "" when none has: Postfix's SMTP client breaks such a line
+// on the way out, after it was signed whole, as it breaks a body line
+// (security audit 2026-10-17, M8: only body lines were logged). A header's
+// first line is "Name:" and the value with its leading space; its folded
+// lines come as "\n"-separated parts of the value (Header).
+func longHeaderLine(headers []field) string {
+	for _, h := range headers {
+		lines := strings.Split(h.value, "\n")
+		if len(h.name)+1+len(lines[0]) > smtpLineLimit {
+			return h.name
+		}
+		for _, l := range lines[1:] {
+			if len(strings.TrimRight(l, "\r")) > smtpLineLimit {
+				return h.name
+			}
+		}
+	}
+	return ""
 }
 
 // BodyChunk hashes the body as it comes. Postfix 3.10.13,

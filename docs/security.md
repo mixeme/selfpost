@@ -324,8 +324,10 @@ operator can act on it.
   server's key may sign it. What cannot be signed (a login with no domain, a
   name with no key, a read error) is deferred, never sent unsigned. Port 25
   has no signer. `relaxed/simple`, rsa-sha256; `h=` names every header of
-  RFC 6376 § 5.4.1's list the message has, and `Sender` and
-  `List-Unsubscribe-Post`, then once more each of the shown ones present
+  RFC 6376 § 5.4.1's list the message has, and `Sender`,
+  `List-Unsubscribe-Post`, `Content-Type`, `MIME-Version` and `Message-ID`
+  (the last three since `2.14.4`, audit M6: unsigned, a relay could change a
+  MIME boundary and the signature still verified), then once more each of the shown ones present
   (Subject, Date, To, Cc, Reply-To, Sender) and `From` last, so one of those
   added after signing breaks the signature. Until `2.8.0` OpenDKIM signed - a
   2018 beta with three 2026 CVEs open and nobody upstream to fix them

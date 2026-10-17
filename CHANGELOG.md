@@ -46,6 +46,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   on the image's binaries before a release is pushed; a weekly check says
   when a Debian package the mail path runs on has moved, so that a patch
   release follows.
+- **The signature covers `Content-Type`, `MIME-Version` and `Message-ID`**
+  when the message has them (audit M6), and a header line too long to be
+  delivered unbroken is named in the log as a body line is (M8).
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to

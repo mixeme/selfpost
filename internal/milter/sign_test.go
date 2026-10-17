@@ -193,7 +193,7 @@ func TestSignerSignsWithTheLoginsDomain(t *testing.T) {
 	if !strings.HasPrefix(sig.HeaderValue, " ") {
 		t.Errorf("the signature's value does not bring its space: %q", sig.HeaderValue)
 	}
-	for _, want := range []string{"c=relaxed/simple;", "s=sel;", "h=From:To:Subject:Date:To:Subject:Date:From;"} {
+	for _, want := range []string{"c=relaxed/simple;", "s=sel;", "h=From:To:Subject:Date:Message-ID:To:Subject:Date:From;"} {
 		if !strings.Contains(strings.Join(strings.Fields(sig.HeaderValue), ""), want) {
 			t.Errorf("signature lacks %q: %s", want, sig.HeaderValue)
 		}
@@ -354,7 +354,7 @@ func TestSignerRefusesAHugeHeaderSection(t *testing.T) {
 // signLines writes the block Postfix will deliver and names what is signed.
 func TestSignLines(t *testing.T) {
 	keys, block := signLines(testHeaders)
-	if got := strings.Join(keys, ":"); got != "From:To:Subject:Date:To:Subject:Date:From" {
+	if got := strings.Join(keys, ":"); got != "From:To:Subject:Date:Message-ID:To:Subject:Date:From" {
 		t.Errorf("keys %s", got)
 	}
 	// Every occurrence is signed; a shown one is named once more, once.
@@ -372,5 +372,26 @@ func TestSignLines(t *testing.T) {
 		"X-Mailer:no space after the colon\r\n\r\n"
 	if string(block) != want {
 		t.Errorf("block\n%q\nwant\n%q", block, want)
+	}
+}
+
+// Content-Type, MIME-Version and Message-ID are signed when present and not
+// over-signed (security audit 2026-10-17, M6); a header line past the SMTP
+// client's limit is named in the log (M8).
+func TestSignLinesCoverTheMIMEHeadersAndLongHeaderLinesAreNamed(t *testing.T) {
+	keys, _ := signLines([]field{
+		{"From", " a@example.org"}, {"MIME-Version", " 1.0"}, {"Content-Type", " text/plain"}, {"Message-ID", " <x@example.org>"},
+	})
+	if got := strings.Join(keys, ":"); got != "From:MIME-Version:Content-Type:Message-ID:From" {
+		t.Errorf("h= %s", got)
+	}
+	if got := longHeaderLine([]field{{"Subject", " " + strings.Repeat("x", 998)}}); got != "Subject" {
+		t.Errorf("a 1007-byte Subject line: %q", got)
+	}
+	if got := longHeaderLine([]field{{"To", " a@example.org,\n " + strings.Repeat("b", 999)}}); got != "To" {
+		t.Errorf("a long folded line: %q", got)
+	}
+	if got := longHeaderLine([]field{{"Subject", " short"}, {"To", " a,\n b"}}); got != "" {
+		t.Errorf("short lines named %q", got)
 	}
 }
