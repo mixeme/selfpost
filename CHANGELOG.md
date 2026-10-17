@@ -52,6 +52,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **A session made under a longer `PANEL_SESSION_IDLE_DAYS` is cut to the
   current window** at its next request (audit A10), not kept until its old
   expiry.
+- **The antispam sidecar runs rspamd 4.2.2, hardened** (audit S4): from
+  3.11.1 (December 2024; the line between fixed a heap overflow, a
+  use-after-free on reload and parser crashes), with no Linux capability,
+  `no-new-privileges`, and only the milter on the compose network - the
+  scanner and the controller, whose default password is public, stay on the
+  sidecar's loopback. A third file, `antispam/rspamd/worker-proxy.inc`, is
+  mounted; copy it with the fragment.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to

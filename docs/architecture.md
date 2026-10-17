@@ -130,7 +130,7 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   rspamd removes a sender's own copies of the three headers and writes and
   signs its own for every message it lets through: `skip_local` and
   `skip_authenticated` are off in that file, so this holds whatever the
-  sender's address (rspamd 3.11.1, `src/plugins/lua/milter_headers.lua`,
+  sender's address (rspamd 4.2.2 (as 3.11.1), `src/plugins/lua/milter_headers.lua`,
   `skip_wanted()`).
   With the filter down - it is attached fail-open - a sender's own verdict
   headers carry no signature and the row is that of mail nobody judged.
@@ -171,7 +171,7 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   allowed IP with a denied address were all `reject` (assumptions
   D-arch:121). A sender entry is matched against
   the envelope sender only (`extract_from = "smtp"`; by default rspamd takes
-  a bounce's `From:` header instead - rspamd 3.11.1,
+  a bounce's `From:` header instead - rspamd 4.2.2 (as 3.11.1),
   `src/plugins/lua/multimap.lua`, the `from` callback).
   How often an entry decided a message is not stored: `Lists.Usage` reads it
   off the journal on each view of Filter lists - the rows a list decided (the

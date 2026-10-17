@@ -1300,6 +1300,13 @@ rereads the list files by itself and reads the key anew for every message. A
 restart is needed only for a change of its own configuration - the files of
 `antispam/rspamd/`.
 
+The third file there, [worker-proxy.inc](../deploy/antispam/rspamd/worker-proxy.inc),
+keeps rspamd's scanner and its controller - whose default password is public -
+on the sidecar's own loopback and puts only the milter on the compose network;
+the fragment runs rspamd with no Linux capability. Upgrading SelfPost to
+`2.14.4` brings rspamd 4.2.2 with it: copy `antispam/` again, then
+`docker compose ... up -d` recreates the sidecar.
+
 The same directory holds
 [multimap.conf](../deploy/antispam/rspamd/multimap.conf), the rules for the
 **allow and deny lists** kept in the panel. SelfPost does not apply the lists

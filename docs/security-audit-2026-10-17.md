@@ -817,10 +817,20 @@ the argument.
   **Sonnet**, 1.5 h. *Done 2026-10-17:*
   TestImportKeyRefusesAnOversizedKey and the import cases (a key under
   1024 bits the parser already refuses).
-- [ ] **S4.** rspamd pin → `4.2.x` after reading `milter_headers`/`multimap`
+- [x] **S4.** rspamd pin → `4.2.x` after reading `milter_headers`/`multimap`
   against the 4.x docs and one e2e run (`inbound_upstream_test`,
   `antispam_test`); `cap_drop: [ALL]`, `no-new-privileges`, `pids_limit` on
-  the sidecar. — **Opus**, 1.5 h.
+  the sidecar. — **Opus**, 1.5 h. *Done 2026-10-17:* rspamd
+  4.2.2 and 3.11.1 read side by side (the functions SelfPost relies on are
+  unchanged); `rspamd/rspamd:4.2.2-0` with `cap_drop: [ALL]`,
+  `no-new-privileges`, and - recommended by that reading - the normal
+  worker and the controller (default password "q1") kept on loopback, the
+  proxy alone on the network (`worker-proxy.inc`, `RSPAMD_LOCAL_ADDR`). The
+  e2e has no rspamd, so a throwaway container on the test server with our
+  three files checked it: the listeners, a sender's own verdict headers
+  removed from a private address, rspamd's added, the signature equal to
+  openssl's HMAC, the deny list's 554 message, healthy. The live sidecar at
+  the rollout.
 
 ### Stage 5 — supply chain and currency (~2.5 h)
 

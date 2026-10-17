@@ -9,10 +9,11 @@
 # Requires INBOUND_RELAY_ENABLE=true in .env. The milter sees the real client
 # IP, HELO and PTR — unlike the upstream, which only sees SelfPost's address.
 #
-# The rspamd image is pinned to one build, 3.11.1-3 - "3.11" and "3.11.1"
-# move with each rebuild (Docker Hub rspamd/rspamd tags 3.11.1-0 ... -3) -
-# and it is the build the comments in antispam/rspamd/ were read against;
-# bump it deliberately, and read them again. Default milter action is fail-open (accept) so a down sidecar
+# The rspamd image is pinned to one build, 4.2.2-0 - "4.2", "4" and "latest"
+# are rebuilt every night - and it is the build the comments in
+# antispam/rspamd/ were read against (rspamd 4.2.2, rspamd-docker v4.2.2+0;
+# 3.11.1-3 until 2.14.4, security audit 2026-10-17, S4); bump it
+# deliberately, and read them again. Default milter action is fail-open (accept) so a down sidecar
 # does not block backup-MX. Set INBOUND_ANTISPAM_MILTER_ACTION=tempfail to
 # defer instead.
 
@@ -26,12 +27,21 @@ services:
       - antispam
 
   antispam:
-    # The milter: rspamd 3.11.1, conf/worker-proxy.inc, "milter = yes" for the
-    # rspamd_proxy worker, which the image binds to *:11332 (rspamd-docker
-    # v3.11.1+3, patches/rspamd-docker-config.diff), and runs as uid 11333
-    # (its Dockerfile, USER 11333:11333).
-    image: rspamd/rspamd:3.11.1-3
+    # The milter: rspamd 4.2.2, conf/worker-proxy.inc, "milter = yes" for the
+    # rspamd_proxy worker, bound to *:11332 by antispam/rspamd/worker-proxy.inc
+    # while every other worker stays on loopback (RSPAMD_LOCAL_ADDR below);
+    # it runs as uid 11333 (rspamd-docker v4.2.2+0, Dockerfile, USER
+    # 11333:11333) and needs no capability: it starts unprivileged, binds
+    # ports above 1024 and runs nothing setuid (src/rspamd.c, detect_priv()).
+    image: rspamd/rspamd:4.2.2-0
     restart: unless-stopped
+    environment:
+      # Workers on loopback; the proxy alone is put back on every address.
+      RSPAMD_LOCAL_ADDR: localhost
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     # A ceiling on processes and threads (security audit 2026-10-17, I3).
     pids_limit: 256
     # No host ports: only SelfPost talks to the milter on the compose network.
@@ -41,4 +51,6 @@ services:
       # The allow and deny lists kept in the panel: the rules, and the files
       # SelfPost writes them to.
       - ./antispam/rspamd/multimap.conf:/etc/rspamd/local.d/multimap.conf:ro
+      # The proxy (the milter) on the compose network, nothing else.
+      - ./antispam/rspamd/worker-proxy.inc:/etc/rspamd/local.d/worker-proxy.inc:ro
       - ./data/antispam:/etc/rspamd/selfpost:ro

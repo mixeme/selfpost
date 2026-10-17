@@ -111,7 +111,7 @@ func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Respons
 // milter8_message(), reads it with rec_get(), which follows the pointer
 // records src/cleanup/cleanup_milter.c, cleanup_add_header(), leaves after
 // the last header for a header the milter before added.
-// rspamd 3.11.0, src/plugins/lua/milter_headers.lua, routines x-spamd-result
+// rspamd 4.2.2 (as 3.11.0), src/plugins/lua/milter_headers.lua, routines x-spamd-result
 // and x-rspamd-action: remove = 0, every instance
 // (src/libserver/milter.c, rspamd_milter_remove_header_safe()), and the new
 // one added at the end (order -1, ADDHEADER) - when skip_wanted() does not
@@ -146,7 +146,8 @@ var signatureHeader = textproto.CanonicalMIMEHeaderKey(SignatureHeader)
 //
 // Measured, not read: what rspamd 3.11 writes for a key and a queue id was
 // taken in a throwaway container on 2026-10-12
-// (TestFilterSignatureIsWhatTheFilterWrites).
+// (TestFilterSignatureIsWhatTheFilterWrites); rspamd 4.2.2-0 wrote the
+// HMAC-SHA256 openssl computes, on 2026-10-17 (security audit, S4).
 func FilterSignature(key, queueID string) string {
 	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write([]byte(queueID))
@@ -253,7 +254,7 @@ const (
 // (deploy/antispam/rspamd/multimap.conf): SELFPOST_ALLOW_IP, _FROM, _DOMAIN.
 const ListSymbolPrefix = "SELFPOST_"
 
-// rspamd 3.11.0, src/plugins/lua/milter_headers.lua, routine x-spamd-result:
+// rspamd 4.2.2 (as 3.11.0), src/plugins/lua/milter_headers.lua, routine x-spamd-result:
 // string.format('default: %s [%.2f / %.2f]', ...), then one
 // '%s(%.2f)[%s]' per symbol, joined by '; '.
 var (
