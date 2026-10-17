@@ -25,6 +25,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   as it already did out of the origin check's.
 - **ETRN is refused and no longer offered** (audit S6): Postfix's default
   let anyone on port 25 flush the queue toward an inbound domain's upstream.
+- **SECURITY.md names the 2.x line as the supported one** (audit X1); its
+  table still said 1.x.
 - **The entrypoint follows no link at the DMARC maps** (audit I2): the
   three `dmarc_*` maps root creates at the start were missing from the list
   of paths where a symbolic link is removed first.

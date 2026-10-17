@@ -3,13 +3,14 @@
 ## Supported versions
 
 SelfPost follows SemVer. Fixes are issued for the **latest minor release of the
-1.x line** only; there is no backporting to earlier minors. Upgrade before
+2.x line** only; there is no backporting to earlier minors or to 1.x. Upgrade before
 reporting if you are behind — the image tag is `ghcr.io/mixeme/selfpost:X.Y.Z`.
 
 | Version | Supported |
 |---|---|
-| latest 1.x | yes |
-| earlier 1.x | no — upgrade first |
+| latest 2.x | yes |
+| earlier 2.x | no — upgrade first |
+| 1.x | no — upgrade to 2.x (guide § Upgrading) |
 | 0.x | no (pre-release) |
 
 ## Reporting a vulnerability

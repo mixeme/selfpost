@@ -714,8 +714,8 @@ the argument.
   an e2e `ETRN` on 25 gets `554`. — **Opus**, 0.5 h. *Done 2026-10-17:*
   testInboundRelay sends ETRN for the inbound domain; checkPostfixHardening
   reads both settings back.
-- [ ] **X1.** SECURITY.md's table: `latest 2.x` supported, `1.x` not. —
-  **Sonnet**, 0.25 h.
+- [x] **X1.** SECURITY.md's table: `latest 2.x` supported, `1.x` not. —
+  **Sonnet**, 0.25 h. *Done 2026-10-17.*
 
 ### Stage 1 — the tenant boundary in the mail path (~7 h) → patch release
 
