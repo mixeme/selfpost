@@ -380,7 +380,7 @@ func signLines(headers []field) ([]string, []byte) {
 func longHeaderLine(headers []field) string {
 	for _, h := range headers {
 		lines := strings.Split(h.value, "\n")
-		if len(h.name)+1+len(lines[0]) > smtpLineLimit {
+		if len(h.name)+1+len(strings.TrimRight(lines[0], "\r")) > smtpLineLimit {
 			return h.name
 		}
 		for _, l := range lines[1:] {

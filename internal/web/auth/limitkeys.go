@@ -35,10 +35,24 @@ func limitAddr(r *http.Request, trusted []*net.IPNet) string {
 }
 
 // userKey is a limiter key for one username tried from one address. The
-// name is folded as the store folds it (usernames are matched without
-// regard to case).
+// name is the stranger's text, of any length a form carries: the key holds
+// its hash, not the name (the review of stages 2-6 kept a 5 MB name for
+// fifteen minutes per request). Case is folded, so "Admin" and "admin" share
+// a bucket - stricter than the store, which matches names exactly.
 func userKey(addr, username string) string {
-	return addr + "|" + strings.ToLower(strings.TrimSpace(username))
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(username))))
+	return addr + "|" + hex.EncodeToString(sum[:12])
+}
+
+// maxPublicForm bounds the body of a form a stranger can send - sign-in,
+// reset, a link's page, setup - far below net/http's 10 MiB for a parsed
+// form (net/http, parsePostForm: 10 << 20 when the body is not already a
+// MaxBytesReader).
+const maxPublicForm = 64 << 10
+
+// limitForm caps the body ParseForm will read on a public form.
+func limitForm(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxPublicForm)
 }
 
 // tokenKey is a limiter key for one link: its hash, so a limiter's map holds

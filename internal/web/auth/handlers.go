@@ -115,6 +115,7 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 		m.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return
 	}
+	limitForm(w, r)
 	if err := r.ParseForm(); err != nil {
 		m.renderLogin(w, http.StatusBadRequest, "Invalid form submission.")
 		return
@@ -250,6 +251,7 @@ func (m *Module) renderSetupForm(w http.ResponseWriter, status int, token, formE
 }
 
 func (m *Module) submitSetup(w http.ResponseWriter, r *http.Request, token string) {
+	limitForm(w, r)
 	if err := r.ParseForm(); err != nil {
 		m.renderSetupForm(w, http.StatusBadRequest, token, "Invalid form submission.")
 		return

@@ -132,3 +132,19 @@ func TestDNSRechecksArePerUser(t *testing.T) {
 		t.Error("another user's first re-check was refused")
 	}
 }
+
+// A sign-in form past 64 KiB is refused before it is parsed, and the limiter
+// keeps a short hash of a typed name, not the name (the review of stages
+// 2-6: a 5 MB username stayed in the map for fifteen minutes).
+func TestPublicFormsAreBoundedAndKeysShort(t *testing.T) {
+	m := moduleWithAdmin(t)
+	if rec := postLogin(m, "203.0.113.70:1", strings.Repeat("a", maxPublicForm), "x"); rec.Code != http.StatusBadRequest {
+		t.Errorf("a sign-in form past the bound = %d, want 400", rec.Code)
+	}
+	if k := userKey("203.0.113.70", strings.Repeat("a", 1<<20)); len(k) > 64 {
+		t.Errorf("the key of a 1 MiB name is %d bytes", len(k))
+	}
+	if userKey("a", "Admin") != userKey("a", " admin ") || userKey("a", "admin") == userKey("a", "admin2") {
+		t.Error("userKey does not fold case and space, or merges two names")
+	}
+}

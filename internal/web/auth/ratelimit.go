@@ -75,12 +75,14 @@ func (r *rateLimiter) Allow(key string) bool {
 }
 
 // Refund gives back the attempt Allow took for key, for an attempt that
-// turned out not to be a guess (a right password). A bucket already at its
-// limit stays there: a refund never unblocks.
+// turned out not to be a guess (a right password). It is called only after
+// an Allow that admitted the attempt, so it undoes that one: the request that
+// filled the bucket gives its own place back too (the review of stages 2-6:
+// a right password at the ceiling used to leave the address blocked).
 func (r *rateLimiter) Refund(key string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if b := r.buckets[key]; b != nil && b.count > 0 && b.count < r.max {
+	if b := r.buckets[key]; b != nil && b.count > 0 {
 		b.count--
 	}
 }

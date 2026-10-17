@@ -154,7 +154,9 @@ The panel is exposed to the internet — the items below are **not optional**.
   security audit 2026-10-17, A1, A9). When the first requests after a start
   all come from one private peer with `X-Forwarded-For` and no proxy is
   trusted, the log says so with the value to set. A refused sign-in and a
-  lockout are logged, five lines per address in 15 minutes (A8). The Account form's
+  lockout are logged, five lines per address in 15 minutes (A8). A public
+  form - sign-in, reset, a link's page, setup - is read only up to 64 KiB,
+  and the limiters keep a hash of a typed name, not the name. The Account form's
   current-password check has a limit of its own, ten in 15 minutes per user,
   so guesses there do not lock the address out of signing in (`2.5.4`).
 - An unknown username is refused in the time a wrong password is: the sign-in
@@ -200,7 +202,11 @@ The panel is exposed to the internet — the items below are **not optional**.
   hour per account and five reset links a day - after which the owner is
   told once that further requests are ignored for 24 hours, and nothing
   more is sent (`2.14.4`; audit A3: anyone who knew a username kept a live
-  link in that mailbox five times an hour) - and a link's page to 30 requests in 15 minutes per link
+  link in that mailbox five times an hour). The price is recorded: whoever
+  knows a username can spend those five links and so pause the owner's own
+  reset for a day; signing in, and a global administrator setting a
+  password on Server › Users, still work, and only a link that went out
+  counts - and a link's page to 30 requests in 15 minutes per link
   (300 per address alone), so one stranger behind a shared proxy cannot stop
   the others asking for or opening a link (`2.14.4`; audit A1). A link's page changes nothing
   on `GET` (a mail scanner opens links): the button does. Setting a password

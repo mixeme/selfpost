@@ -150,12 +150,14 @@ func (m *Module) HandleReset(w http.ResponseWriter, r *http.Request) {
 			tooMany()
 			return
 		}
+		limitForm(w, r)
 		if err := r.ParseForm(); err != nil {
 			m.view.Render(w, http.StatusBadRequest, "login-reset", view.NewReset(m.cfg.Hostname, "Invalid form submission."))
 			return
 		}
 		username := strings.TrimSpace(r.PostFormValue("username"))
 		if !m.resetLimiter.Allow(userKey(addr, username)) {
+			m.resetAddrLimiter.Refund(addr) // counted once, against the name
 			tooMany()
 			return
 		}
@@ -204,6 +206,14 @@ func (m *Module) sendReset(username string) {
 		}
 		return
 	}
+	// A day's place is spent only on a link that goes out (the review of
+	// stages 2-6).
+	sent := false
+	defer func() {
+		if !sent {
+			m.resetDayLimiter.Refund(key)
+		}
+	}()
 	if !m.mailLimiter.Allow(key) {
 		logf("panel: user %d: reset links asked for too often; none was sent", u.ID)
 		return
@@ -221,6 +231,7 @@ func (m *Module) sendReset(username string) {
 		logf("panel: user %d: reset link not sent: %v", u.ID, err)
 		return
 	}
+	sent = true
 	logf("panel: user %d: a reset link was sent", u.ID)
 }
 
@@ -307,6 +318,7 @@ func (m *Module) setPasswordFromLink(w http.ResponseWriter, r *http.Request, tok
 	fail := func(status int, msg string) {
 		m.view.Render(w, status, "login-reset-set", view.NewResetSet(m.cfg.Hostname, u.Username, token, msg))
 	}
+	limitForm(w, r)
 	if err := r.ParseForm(); err != nil {
 		fail(http.StatusBadRequest, "Invalid form submission.")
 		return

@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# The job reads the repository and nothing else (security audit 2026-10-17,
+# review of stages 2-6).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
