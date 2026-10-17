@@ -750,8 +750,8 @@ the argument.
   **Sonnet**, 0.5 h. *Done 2026-10-17:* in `store.DeleteDomain`, one
   transaction with the domain; TestDeletingADomainDeletesItsReports. (The `domain_id` form is better and 2 h; take it if
   stage 1 is split across two sittings.)
-- [ ] **W3.** A mutex around `Resync`'s read + write + reload. — **Sonnet**,
-  0.5 h.
+- [x] **W3.** A mutex around `Resync`'s read + write + reload. — **Sonnet**,
+  0.5 h. *Done 2026-10-17:* TestResyncRunsOneAtATime.
 
 ### Stage 2 — the key group (~2.5 h) → patch release, then the test server's `certs/`
 

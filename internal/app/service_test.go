@@ -3,7 +3,10 @@ package app
 import (
 	"errors"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
@@ -503,5 +506,46 @@ func TestSaveSettingsIsAllOrNothing(t *testing.T) {
 
 	if err := svc.SaveSettings(a.ID+100, change, nil); !errors.Is(err, store.ErrApplicationNotFound) {
 		t.Errorf("unknown application = %v, want ErrApplicationNotFound", err)
+	}
+}
+
+// overlapMaps counts rebuilds that run at once.
+type overlapMaps struct {
+	inside, most atomic.Int32
+}
+
+func (o *overlapMaps) RebuildSenderLoginMaps([]postfix.Binding) error {
+	n := o.inside.Add(1)
+	for {
+		m := o.most.Load()
+		if n <= m || o.most.CompareAndSwap(m, n) {
+			break
+		}
+	}
+	time.Sleep(5 * time.Millisecond)
+	o.inside.Add(-1)
+	return nil
+}
+
+// Resync's read of the bindings and its write of the map are one step: two
+// at once would write in the order opposite to their reads and leave the
+// older set in the map (security audit 2026-10-17, W3).
+func TestResyncRunsOneAtATime(t *testing.T) {
+	svc, _, _, _ := newServiceHarness(t)
+	maps := &overlapMaps{}
+	svc.pf = maps
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := svc.Resync(); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := maps.most.Load(); got != 1 {
+		t.Errorf("%d rebuilds ran at once, want 1", got)
 	}
 }

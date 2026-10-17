@@ -6,6 +6,8 @@
 package app
 
 import (
+	"sync"
+
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 )
@@ -25,6 +27,12 @@ type Service struct {
 	store *store.Store
 	sasl  *SASLDB
 	pf    SenderMaps
+
+	// resyncMu makes Resync's read of the bindings and its write of the map
+	// one step: two application changes at once could otherwise write the
+	// map in the order opposite to their reads, leaving the older set until
+	// the next change (security audit 2026-10-17, W3).
+	resyncMu sync.Mutex
 }
 
 // NewService builds the application service over the shared store, the sasldb2
@@ -227,6 +235,8 @@ func (s *Service) PurgeDomainSASL(domainID int64) error {
 // from the manual reload button; it doubles as recovery if the map ever drifts
 // from the database.
 func (s *Service) Resync() error {
+	s.resyncMu.Lock()
+	defer s.resyncMu.Unlock()
 	bindings, err := s.store.ListBindings()
 	if err != nil {
 		return err
