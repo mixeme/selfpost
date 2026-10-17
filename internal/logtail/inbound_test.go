@@ -305,7 +305,7 @@ func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 func TestInboundRecipientCannotWriteTheRow(t *testing.T) {
 	forged := `; from=<ceo@example.net> to=<board@in.example.com> proto=ESMTP helo=<x>; `
 	for name, line := range map[string]string{
-		"recipient unknown": head + `postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <` + forged + `@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<probe@example.net> to=<"` + forged + `"@in.example.com> proto=ESMTP helo=<audit.example>`,
+		"recipient unknown":               head + `postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <` + forged + `@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<probe@example.net> to=<"` + forged + `"@in.example.com> proto=ESMTP helo=<audit.example>`,
 		"forged sender also in MAIL FROM": head + `postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <` + forged + `@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<"x; from=<ceo@example.net"@a.example> to=<"` + forged + `"@in.example.com> proto=ESMTP helo=<audit.example>`,
 	} {
 		j, st := inboundFixture()
@@ -359,18 +359,6 @@ func TestInboundStaleArrivalDoesNotDropALiveID(t *testing.T) {
 	j.remember("LAST")
 	if _, ok := j.port25["Q1"]; !ok {
 		t.Error("the live Q1 was dropped by its stale arrival")
-	}
-}
-
-// Between the six-hourly prunes the tailer has the journal cut to its cap
-// itself, every so many rows: refusals come at the rate strangers send them.
-func TestInboundCutsTheJournalAsItWrites(t *testing.T) {
-	j, st := inboundFixture()
-	for i := 0; i < inboundPruneEvery*2+10; i++ {
-		j.handle(unknownRcp, tailNow, false)
-	}
-	if len(st.pruned) != 2 || st.pruned[0] != inboundSpamLogMaxRows {
-		t.Errorf("cuts = %v, want two, to %d rows", st.pruned, inboundSpamLogMaxRows)
 	}
 }
 

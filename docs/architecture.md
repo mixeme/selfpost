@@ -149,7 +149,8 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   start are written only if the same row is not there already. The
   journal is pruned every six hours: rows
   older than the `inbound_spam_log_retention_days` setting, then down to
-  10 000.
+  10 000 - and down to 10 000 every 500 rows either writer adds in between
+  (the store counts them, `countInboundWrites`).
   **Filter lists** (`inbound_spam_list`): allow and deny entries for the
   external filter - sender address, sender domain, client address or network -
   validated and normalised by `internal/inbound` (`lists.go`) and written as

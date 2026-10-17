@@ -21,7 +21,7 @@ import (
 // and the list of inbound domains, since port 25 also takes mail that is not
 // the relay's. *store.Store satisfies it; tests substitute a fake.
 type InboundStore interface {
-	InsertInboundSpam(e store.InboundSpamEntry) error
+	InsertInboundSpamMessage(e store.InboundSpamEntry, rcpts []store.InboundRecipient) error
 	IsInboundDomain(name string) (bool, error)
 	ForgetInboundQueueID(queueID string) error
 }
@@ -83,8 +83,19 @@ func (s *inboundSession) MailFrom(from string, m *milter.Modifier) (milter.Respo
 // RcptTo keeps the recipient as Postfix logs it, so that the delivery lines
 // that carry the upstream's answer find the row (recipientAsLogged): a quoted
 // local part that needs no quotes is written without them.
+//
+// A recipient given twice - in any case - is one row, as on the outbound side
+// (session.RcptTo): Postfix accepts a repeated RCPT up to
+// smtpd_recipient_limit and sends the milter each, and one message used to be
+// a thousand rows (security audit 2026-10-17, M3).
 func (s *inboundSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Response, error) {
-	s.rcpts = append(s.rcpts, recipientAsLogged(rcpt))
+	to := recipientAsLogged(rcpt)
+	for _, have := range s.rcpts {
+		if strings.EqualFold(have, to) {
+			return milter.RespContinue, nil
+		}
+	}
+	s.rcpts = append(s.rcpts, to)
 	return milter.RespContinue, nil
 }
 
@@ -215,6 +226,7 @@ func (s *inboundSession) record(queueID string) {
 			log.Printf("inbound-journal: detach older rows of %s: %v", queueID, err)
 		}
 	}
+	var rows []store.InboundRecipient
 	for _, to := range s.rcpts {
 		domain := domainOf(to)
 		ok, err := s.rec.IsInboundDomain(domain)
@@ -222,13 +234,12 @@ func (s *inboundSession) record(queueID string) {
 			log.Printf("inbound-journal: look up %s: %v", domain, err)
 			continue
 		}
-		if !ok {
-			continue
+		if ok {
+			rows = append(rows, store.InboundRecipient{Domain: domain, To: to})
 		}
-		e.InboundDomain, e.To = domain, to
-		if err := s.rec.InsertInboundSpam(e); err != nil {
-			log.Printf("inbound-journal: record %s -> %s: %v", s.from, to, err)
-		}
+	}
+	if err := s.rec.InsertInboundSpamMessage(e, rows); err != nil {
+		log.Printf("inbound-journal: record %s -> %d recipients: %v", s.from, len(rows), err)
 	}
 }
 

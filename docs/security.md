@@ -463,7 +463,13 @@ operator can act on it.
   `2.14.4` the reply ended at the *first* `; from=<`, which a stranger's
   recipient could supply - security audit 2026-10-17, M2.)
   Only a recipient at an inbound domain makes a row. The journal is cut to
-  10 000 rows every 500 rows the tailer writes, and by age every six hours.
+  10 000 rows every 500 rows written - the tailer's refusals and the journal
+  milter's accepted recipients together, counted in the store - and by age
+  every six hours. The journal milter writes a recipient given twice, in any
+  case, once, and a message's rows in one transaction. (Until `2.14.4` it
+  wrote every repeated RCPT and its rows were not counted toward the cut:
+  one message could be a thousand rows, uncut for six hours - security
+  audit 2026-10-17, M3.)
 - **Filter lists** reach another container as files: values are whitelisted on
   the way in (address, domain, canonical IP or network; no `/0`, no
   IPv4-mapped network), the writer refuses a stored value with whitespace, a

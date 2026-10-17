@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"sort"
+	"sync/atomic"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo), keeps the static build
 )
@@ -23,6 +24,10 @@ var migrationsFS embed.FS
 // Store wraps the database connection pool.
 type Store struct {
 	db *sql.DB
+
+	// inboundWrites counts journal rows written since the journal was last
+	// cut to its row cap, by both of its writers (countInboundWrites).
+	inboundWrites atomic.Int64
 }
 
 // Open opens (creating if needed) the SQLite database at path, enables WAL and

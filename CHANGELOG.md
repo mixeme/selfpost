@@ -18,6 +18,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   milter before Postfix holds it to the login, so a client that never
   signed in, or another tenant's application, could use up a domain's
   limit. It is now the signed-in application's domain.
+- **One accepted message is one Inbound › Log row per recipient** (audit
+  M3): a recipient repeated in RCPT TO, up to Postfix's thousand, was a row
+  each, and the journal milter's rows did not count toward the 10 000-row
+  cut between the six-hourly prunes. Repeats are one row, a message's rows
+  are written in one transaction, and both writers count toward the cut.
 - **A stranger's recipient no longer writes an Inbound › Log row** (audit
   M2): Postfix quotes a refused recipient in its reply with the quotes
   removed, so `RCPT TO:<"; from=<x> to=<y> …"@domain>` spelled a second

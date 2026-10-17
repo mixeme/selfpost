@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -493,5 +494,61 @@ func TestInboundUpstreamHeldAndReusedQueueID(t *testing.T) {
 	}
 	if plan := explain(t, st, forgetQueueIDQuery, "4A1B"); !strings.Contains(plan, "USING INDEX idx_inbound_spam_log_queue_id") {
 		t.Errorf("ForgetInboundQueueID does not use idx_inbound_spam_log_queue_id:\n%s", plan)
+	}
+}
+
+// The journal is cut to its cap every so many rows, whichever writer wrote
+// them: the journal milter's rows of accepted mail count as the tailer's
+// refusals do (security audit 2026-10-17, M3). One message's rows are one
+// call. Here the cap is 5 rows and the cut every 4.
+func TestInboundJournalIsCutWhicheverWriterWrites(t *testing.T) {
+	st := openTestStore(t)
+	rowsBefore, everyBefore := inboundCapRows, inboundCapEvery
+	inboundCapRows, inboundCapEvery = 5, 4
+	t.Cleanup(func() { inboundCapRows, inboundCapEvery = rowsBefore, everyBefore })
+	if _, err := st.AddInboundDomain("in.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	count := func() int {
+		var n int
+		if err := st.db.QueryRow("SELECT COUNT(*) FROM inbound_spam_log").Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	accepted := InboundSpamEntry{ClientIP: "203.0.113.7", From: "a@example.net", Decision: SpamDecisionAccept, Engine: SpamEngineSelfPost}
+	var rcpts []InboundRecipient
+	for i := 0; i < 3; i++ {
+		rcpts = append(rcpts, InboundRecipient{Domain: "in.example.com", To: fmt.Sprintf("r%d@in.example.com", i)})
+	}
+	// Three rows of one message, then two refusals: the fourth row crosses
+	// the mark, and the journal is cut to five.
+	if err := st.InsertInboundSpamMessage(accepted, rcpts); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := st.InsertInboundSpam(InboundSpamEntry{InboundDomain: "in.example.com", ClientIP: "203.0.113.9", To: "x@in.example.com",
+			Decision: SpamDecisionReject, Engine: SpamEnginePostfix}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := count(); n != 5 {
+		t.Fatalf("after 5 rows, %d (no cut yet past the cap)", n)
+	}
+	// A message of six more crosses the mark again: cut to five.
+	rcpts = nil
+	for i := 0; i < 6; i++ {
+		rcpts = append(rcpts, InboundRecipient{Domain: "in.example.com", To: fmt.Sprintf("m%d@in.example.com", i)})
+	}
+	if err := st.InsertInboundSpamMessage(accepted, rcpts); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(); n != 5 {
+		t.Errorf("after a message of six over the mark, %d rows, want the cap of 5", n)
+	}
+	// The message's rows carry the domain by id, like the tailer's.
+	var missing int
+	if err := st.db.QueryRow("SELECT COUNT(*) FROM inbound_spam_log WHERE inbound_domain_id IS NULL").Scan(&missing); err != nil || missing != 0 {
+		t.Errorf("%d rows without a domain id (%v)", missing, err)
 	}
 }

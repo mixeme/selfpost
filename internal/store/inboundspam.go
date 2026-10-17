@@ -63,9 +63,86 @@ type InboundSpamEntry struct {
 // inbound domain registered under the row's name now (audit 2026-10-12, L12).
 const inboundDomainID = `(SELECT d.id FROM inbound_domains d WHERE d.name = ?)`
 
-// InsertInboundSpam records one journal row. It is called from the inbound
-// journal milter's hot path and from the log tailer, so it returns any error
-// for the caller to log; neither of them may hold up mail over it.
+// InboundSpamLogMaxRows is how many rows the journal keeps whatever their
+// age: refusals are written at the rate strangers knock on port 25, and
+// accepted mail at the rate they send recipients.
+const InboundSpamLogMaxRows = 10000
+
+// inboundCapRows and inboundCapEvery are the cap and how many rows - from
+// either writer - are written before the journal is cut back to it, without
+// waiting for the six-hourly prune. Postfix's one limit on the rate of RCPT
+// TO, smtpd_client_recipient_rate_limit, is per client address and off by
+// default (postconf(5), Postfix 3.10.13) and not set here. Until 2.14.4 only
+// the log tailer counted its rows; the journal milter's - one per accepted
+// recipient - were cut only every six hours (security audit 2026-10-17, M3).
+// Variables so that a test can make them small.
+var (
+	inboundCapRows  = InboundSpamLogMaxRows
+	inboundCapEvery = int64(500)
+)
+
+// countInboundWrites adds n written rows to the count and, once it reaches
+// inboundCapEvery, cuts the journal to its cap. Two writers crossing the mark
+// together may both cut; the second finds nothing to do.
+func (s *Store) countInboundWrites(n int) error {
+	if n <= 0 || s.inboundWrites.Add(int64(n)) < inboundCapEvery {
+		return nil
+	}
+	s.inboundWrites.Store(0)
+	// The zero time removes nothing by age: this is the cap alone.
+	if _, err := s.PruneInboundSpam(time.Time{}, inboundCapRows); err != nil {
+		return fmt.Errorf("cut inbound_spam_log to %d rows: %w", inboundCapRows, err)
+	}
+	return nil
+}
+
+// InboundRecipient is one recipient of an accepted message at an inbound
+// domain: a row of InsertInboundSpamMessage.
+type InboundRecipient struct {
+	Domain string
+	To     string
+}
+
+// InsertInboundSpamMessage records the rows of one accepted message, one per
+// recipient, e with InboundDomain and To taken from each, in one transaction:
+// the journal milter writes inside Postfix's end-of-message callback on the
+// panel's one connection, and a thousand recipients are one commit, not a
+// thousand. It returns any error for the caller to log.
+func (s *Store) InsertInboundSpamMessage(e InboundSpamEntry, rcpts []InboundRecipient) error {
+	if len(rcpts) == 0 {
+		return nil
+	}
+	at := e.At
+	if at.IsZero() {
+		at = time.Now()
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("insert inbound_spam_log: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // a no-op after Commit
+	for _, r := range rcpts {
+		if _, err := tx.Exec(
+			`INSERT INTO inbound_spam_log
+				(inbound_domain, client_ip, from_addr, to_addr, subject, decision, engine, detail, created_at, inbound_domain_id,
+				 queue_id, upstream_status)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, `+inboundDomainID+`, ?, ?)`,
+			r.Domain, e.ClientIP, e.From, r.To, e.Subject, e.Decision, e.Engine, e.Detail,
+			at.UTC().Format(time.RFC3339), r.Domain, e.QueueID, e.Upstream,
+		); err != nil {
+			return fmt.Errorf("insert inbound_spam_log: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("insert inbound_spam_log: commit: %w", err)
+	}
+	return s.countInboundWrites(len(rcpts))
+}
+
+// InsertInboundSpam records one journal row. It is called from the log
+// tailer (and was from the journal milter, which now writes a message's rows
+// at once), so it returns any error for the caller to log; it may not hold up
+// mail over it.
 func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 	at := e.At
 	if at.IsZero() {
@@ -82,7 +159,7 @@ func (s *Store) InsertInboundSpam(e InboundSpamEntry) error {
 	if err != nil {
 		return fmt.Errorf("insert inbound_spam_log: %w", err)
 	}
-	return nil
+	return s.countInboundWrites(1)
 }
 
 // InsertInboundSpamOnce records a journal row unless the same row is there
@@ -109,7 +186,10 @@ func (s *Store) InsertInboundSpamOnce(e InboundSpamEntry) (bool, error) {
 		return false, fmt.Errorf("insert inbound_spam_log once: %w", err)
 	}
 	n, _ := res.RowsAffected()
-	return n > 0, nil
+	if n == 0 {
+		return false, nil
+	}
+	return true, s.countInboundWrites(1)
 }
 
 // updateUpstreamQuery puts one delivery attempt's result on the rows of a

@@ -146,15 +146,6 @@ const inboundDetailMax = 255
 // cap bounds what is left - messages the client abandoned - and a flood.
 const inboundQueueIDs = 4096
 
-// inboundPruneEvery is how many rows the tailer writes before it has the
-// journal cut back to its row cap, without waiting for the six-hourly prune.
-// Refusals are written at the rate strangers send RCPT TO. Postfix's one
-// limit on that, smtpd_client_recipient_rate_limit, is per client address and
-// off by default (postconf(5), Postfix 3.10.13) and not set here, so between
-// two prunes the journal would otherwise grow as fast as someone cared to
-// make it.
-const inboundPruneEvery = 500
-
 // inboundJournal is the per-run state of the inbound half.
 type inboundJournal struct {
 	st InboundStore
@@ -166,8 +157,6 @@ type inboundJournal struct {
 	port25 map[string]uint64
 	order  []queued
 	seq    uint64
-	// written counts the rows since the journal was last cut to its cap.
-	written int
 }
 
 type queued struct {
@@ -287,13 +276,9 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 		log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
 		return
 	}
-	if j.written++; j.written >= inboundPruneEvery {
-		j.written = 0
-		// The zero time removes nothing by age: this is the cap alone.
-		if _, err := j.st.PruneInboundSpam(time.Time{}, inboundSpamLogMaxRows); err != nil {
-			log.Printf("log-tailer: inbound journal: cut to %d rows: %v", inboundSpamLogMaxRows, err)
-		}
-	}
+	// Between the six-hourly prunes the store cuts the journal to its cap
+	// every so many rows, the journal milter's and these together
+	// (store.InboundSpamLogMaxRows).
 }
 
 func (j *inboundJournal) remember(queueID string) {
@@ -354,9 +339,8 @@ func lineTime(line string, now time.Time) (time.Time, string) {
 	return now, line
 }
 
-// The journal keeps at most this many rows whatever their age: refusals are
-// written at the rate strangers knock on port 25.
-const inboundSpamLogMaxRows = 10000
+// The journal keeps at most this many rows whatever their age.
+const inboundSpamLogMaxRows = store.InboundSpamLogMaxRows
 
 // inboundRetentionLoop prunes the inbound journal at once and then on the
 // cadence of the send log.

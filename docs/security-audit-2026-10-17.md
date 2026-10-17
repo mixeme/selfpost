@@ -727,13 +727,16 @@ the argument.
   that an unauthenticated session reserves nothing. — **Opus**, 2 h.
   *Done 2026-10-17:* TestRateLimitIsNotReservedByAnotherSendersMailFrom;
   e2e `domain_limit_not_reserved_by_a_stranger`.
-- [ ] **M3.** De-duplicate recipients in `inboundSession.RcptTo` (case-folded,
+- [x] **M3.** De-duplicate recipients in `inboundSession.RcptTo` (case-folded,
   as the outbound session does); the milter's inserts count toward the prune
   trigger (a counter in the store beside `InsertInboundSpam`, the prune
   called from whichever side crosses 500); one transaction per message.
   Done when a unit test sends one message with the same recipient 1 000
   times and sees one row, and 600 milter rows with no refusal trigger the
-  cut. — **Opus**, 2 h.
+  cut. — **Opus**, 2 h. *Done 2026-10-17:* the counter and the cut moved
+  into the store (`countInboundWrites`, both writers),
+  `InsertInboundSpamMessage`; TestInboundRecipientRepeatedIsOneRow,
+  TestInboundJournalIsCutWhicheverWriterWrites.
 - [ ] **W1.** Refuse a custom report address on the hostname; exact hosted
   address only in `AllowedRecipients`; a tag required for every recipient on
   the hostname in `checkReportDomain`; the existing test inverted; the

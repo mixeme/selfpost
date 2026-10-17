@@ -20,11 +20,14 @@ type fakeInbound struct {
 	forgot    []string
 }
 
-func (f *fakeInbound) InsertInboundSpam(e store.InboundSpamEntry) error {
+func (f *fakeInbound) InsertInboundSpamMessage(e store.InboundSpamEntry, rcpts []store.InboundRecipient) error {
 	if f.insertErr != nil {
 		return f.insertErr
 	}
-	f.rows = append(f.rows, e)
+	for _, r := range rcpts {
+		e.InboundDomain, e.To = r.Domain, r.To
+		f.rows = append(f.rows, e)
+	}
 	return nil
 }
 
@@ -398,5 +401,25 @@ func TestInboundRowsMeetTheirDeliveryLines(t *testing.T) {
 	}
 	if len(rec.rows) != 1 || rec.rows[0].QueueID != "" || rec.rows[0].Upstream != "" || len(rec.forgot) != 0 {
 		t.Errorf("with no queue id: rows %+v, detached %q", rec.rows, rec.forgot)
+	}
+}
+
+// A recipient given again - in any case - is one row: Postfix accepts a
+// repeated RCPT up to smtpd_recipient_limit (1 000) and sends each, and one
+// message used to be a thousand rows (security audit 2026-10-17, M3).
+func TestInboundRecipientRepeatedIsOneRow(t *testing.T) {
+	rec := &fakeInbound{domains: map[string]bool{"in.example.com": true}}
+	s := inboundSessionFor(t, rec, false)
+	rcpts := make([]string, 0, 1000)
+	for i := 0; i < 1000; i++ {
+		if i%2 == 0 {
+			rcpts = append(rcpts, "listed@in.example.com")
+		} else {
+			rcpts = append(rcpts, "LISTED@in.example.com")
+		}
+	}
+	message(t, s, "sender@example.net", rcpts, nil)
+	if len(rec.rows) != 1 || rec.rows[0].To != "listed@in.example.com" {
+		t.Errorf("rows = %d (%+v), want one, spelt as first given", len(rec.rows), rec.rows)
 	}
 }
