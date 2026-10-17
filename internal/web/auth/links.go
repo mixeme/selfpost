@@ -132,8 +132,16 @@ func (m *Module) HandleReset(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		m.view.Render(w, http.StatusOK, "login-reset", view.NewReset(m.cfg.Hostname, ""))
 	case http.MethodPost:
-		if !m.resetLimiter.Allow(clientIP(r, m.trustedProxies)) {
+		// Per address and username, and per address alone at ten times
+		// that: one stranger behind a shared proxy cannot stop everyone
+		// asking for a link (security audit 2026-10-17, A1).
+		m.proxyWatch.see(r, m.trustedProxies)
+		addr := limitAddr(r, m.trustedProxies)
+		tooMany := func() {
 			m.view.Render(w, http.StatusTooManyRequests, "login-reset", view.NewReset(m.cfg.Hostname, "Too many attempts. Please wait and try again."))
+		}
+		if !m.resetAddrLimiter.Allow(addr) {
+			tooMany()
 			return
 		}
 		if err := r.ParseForm(); err != nil {
@@ -141,6 +149,10 @@ func (m *Module) HandleReset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		username := strings.TrimSpace(r.PostFormValue("username"))
+		if !m.resetLimiter.Allow(userKey(addr, username)) {
+			tooMany()
+			return
+		}
 		m.later(func() { m.sendReset(username) })
 		http.Redirect(w, r, "/login?reset=sent", http.StatusSeeOther)
 	default:
@@ -201,15 +213,26 @@ func linkToken(path, prefix string) string {
 
 const deadLink = "This link has expired or was already used."
 
+// allowLink is the limit of a link's page: per link, so that nobody can use up
+// another's, and per address at a ceiling high enough for everyone behind one
+// proxy (security audit 2026-10-17, A1).
+func (m *Module) allowLink(r *http.Request, token string) bool {
+	m.proxyWatch.see(r, m.trustedProxies)
+	if !m.linkAddrLimiter.Allow(limitAddr(r, m.trustedProxies)) {
+		return false
+	}
+	return token == "" || m.linkLimiter.Allow(tokenKey(token))
+}
+
 // HandleResetLink serves /login/reset/<token>: the new password's form (GET)
 // and setting it (POST). Setting it takes the link, ends every session of the
 // account and every other reset link, and leaves the person at sign-in.
 func (m *Module) HandleResetLink(w http.ResponseWriter, r *http.Request) {
-	if !m.linkLimiter.Allow(clientIP(r, m.trustedProxies)) {
+	token := linkToken(r.URL.Path, "/login/reset/")
+	if !m.allowLink(r, token) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}
-	token := linkToken(r.URL.Path, "/login/reset/")
 	if token == "" {
 		http.NotFound(w, r)
 		return
@@ -305,11 +328,11 @@ func (m *Module) setPasswordFromLink(w http.ResponseWriter, r *http.Request, tok
 // a mistyped address would hand the account to whoever reads it, by a reset
 // link (security review, 2026-10-17).
 func (m *Module) HandleConfirm(w http.ResponseWriter, r *http.Request) {
-	if !m.linkLimiter.Allow(clientIP(r, m.trustedProxies)) {
+	token := linkToken(r.URL.Path, "/confirm/")
+	if !m.allowLink(r, token) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}
-	token := linkToken(r.URL.Path, "/confirm/")
 	if token == "" {
 		http.NotFound(w, r)
 		return

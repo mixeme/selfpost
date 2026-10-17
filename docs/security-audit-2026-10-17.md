@@ -762,21 +762,31 @@ the argument.
   cannot read `/etc/postfix/tls/privkey.pem`; security.md § Output and
   process lists the three groups and who is in each. Rollout: `chgrp 10997
   /root/selfpost-deploy/certs/privkey.pem` and the same in
-  `cert-deploy-hook.sh` on the test server. — **Opus**, 2.5 h.
+  `cert-deploy-hook.sh` on the test server. — **Opus**, 2.5 h. *Done
+  2026-10-17:* the e2e stage gives its key to 10997 at 0640 when the runner
+  is root and `testFullBackupRestore` checks both uids; the test server's
+  key at the rollout.
 
 ### Stage 3 — limits and defaults (~7 h)
 
-- [ ] **A1.** (a) Compose and guide set `TRUSTED_PROXY_CIDR` for the
+- [x] **A1.** (a) Compose and guide set `TRUSTED_PROXY_CIDR` for the
   Apache-on-host scenario (the Docker gateway, with the command that prints
   it) and the panel logs a warning at start when the first N requests all
   come from one private peer carrying XFF and the list is empty; (b) the
   login limiter also keyed by username with its own window, the link-page
   limiters by token hash; (c) successful sign-ins not counted. security.md
   records (a)-(c). Done when the reader's test passes with two clients
-  behind one untrusted peer. — **Opus**, 4 h.
-- [ ] **A8.** One log line per refused sign-in or lockout, rate-limited per
-  key. — **Sonnet**, 0.5 h.
-- [ ] **A9.** IPv6 keyed by /64. — **Sonnet**, 0.5 h.
+  behind one untrusted peer. — **Opus**, 4 h. *Done 2026-10-17:* (a) as a
+  runtime warning (`proxyWatch`) and the guide's install step with the
+  command - the shipped compose cannot know the gateway, so it is not set
+  there; (b) per address and username, per link, the address alone at ten
+  times that; (c) a right password gives its attempt back.
+  TestLoginBehindOneUntrustedProxyKeepsOthersIn, TestLoginSuccessesDoNotCount,
+  TestProxyWatchAndRefusalsAreLogged.
+- [x] **A8.** One log line per refused sign-in or lockout, rate-limited per
+  key. — **Sonnet**, 0.5 h. *Done 2026-10-17* (`refusalLog`).
+- [x] **A9.** IPv6 keyed by /64. — **Sonnet**, 0.5 h. *Done 2026-10-17:*
+  TestIPv6IsLimitedPerSlash64.
 - [ ] **A3.** After five unsolicited reset links in a day, one mail saying
   further requests are ignored for 24 h, then silence. — **Opus**, 1.5 h.
 - [ ] **I6.** `/healthz` answered only to loopback and trusted-proxy peers;

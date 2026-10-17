@@ -89,7 +89,8 @@ The panel is exposed to the internet — the items below are **not optional**.
 - Token ≥128 bits (`crypto/rand`); mirrored to `/data/setup-token`.
 - Token lifetime — **10 minutes**; after expiry, or after a restart with setup
   unfinished, it is regenerated and logged again.
-- Rate limiting on `/setup/<token>` per IP, separate from login.
+- Rate limiting on `/setup/<token>` per client address (an IPv6 one per
+  /64), separate from login.
 - Token comparison is **constant-time** (`subtle.ConstantTimeCompare`).
 - Failed attempts do **not** invalidate the token early (protects setup from
   being DoS-ed).
@@ -123,7 +124,18 @@ The panel is exposed to the internet — the items below are **not optional**.
 
 ### Authentication and sessions
 
-- Rate limiting on login (per IP, with lockout or delay). The Account form's
+- Rate limiting on login: ten failures in 15 minutes per client address and
+  username, and a hundred per address alone; a right password gives its
+  attempt back, so only failures count. An IPv6 client is one address per
+  /64. Behind a reverse proxy the panel does not trust (`TRUSTED_PROXY_CIDR`
+  empty) every visitor has the proxy's address: a stranger there can then
+  lock one name, or spray a hundred, but not lock everyone out at the
+  per-name size (until `2.14.4` the one key was the address, successes
+  counted, and ten requests of any body locked every administrator out -
+  security audit 2026-10-17, A1, A9). When the first requests after a start
+  all come from one private peer with `X-Forwarded-For` and no proxy is
+  trusted, the log says so with the value to set. A refused sign-in and a
+  lockout are logged, five lines per address in 15 minutes (A8). The Account form's
   current-password check has a limit of its own, ten in 15 minutes per user,
   so guesses there do not lock the address out of signing in (`2.5.4`).
 - An unknown username is refused in the time a wrong password is: the sign-in
@@ -163,8 +175,10 @@ The panel is exposed to the internet — the items below are **not optional**.
   token. The request form answers the same for every name and sends the mail
   after answering, so neither the words nor the time tell whether a name
   exists or is confirmed; requests are limited to five in 15 minutes per
-  client address, mails to five an hour per account, and a link's page to 30
-  requests in 15 minutes per client address. A link's page changes nothing
+  client address and username (fifty per address alone), mails to five an
+  hour per account, and a link's page to 30 requests in 15 minutes per link
+  (300 per address alone), so one stranger behind a shared proxy cannot stop
+  the others asking for or opening a link (`2.14.4`; audit A1). A link's page changes nothing
   on `GET` (a mail scanner opens links): the button does. Setting a password
   from a link ends every session of the account and every other reset link.
   Changing the account e-mail asks for the current password, as the password

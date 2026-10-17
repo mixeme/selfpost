@@ -101,8 +101,17 @@ func (m *Module) renderLogin(w http.ResponseWriter, status int, formErr string) 
 	m.view.Render(w, status, "login", view.NewLogin(m.cfg.Hostname, formErr))
 }
 
+// submitLogin checks a sign-in. Its limits are per address and username,
+// and per address alone at ten times that, and only a failure counts: one
+// stranger behind the proxy everyone shares no longer locks every
+// administrator out, nor does a day of signing in (security audit
+// 2026-10-17, A1). A refusal and a lockout are logged, a few lines per
+// address in a window (A8).
 func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
-	if !m.loginLimiter.Allow(clientIP(r, m.trustedProxies)) {
+	m.proxyWatch.see(r, m.trustedProxies)
+	addr := limitAddr(r, m.trustedProxies)
+	if !m.loginAddrLimiter.Allow(addr) {
+		m.refusals.printf(addr, "panel: sign-in from %s refused: too many attempts from the address", addr)
 		m.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
 		return
 	}
@@ -112,6 +121,17 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	username := strings.TrimSpace(r.PostFormValue("username"))
 	password := r.PostFormValue("password")
+	key := userKey(addr, username)
+	if !m.loginLimiter.Allow(key) {
+		m.loginAddrLimiter.Refund(addr) // counted once, against the name
+		m.refusals.printf(addr, "panel: sign-in as %q from %s refused: too many attempts", logName(username), addr)
+		m.renderLogin(w, http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
+		return
+	}
+	refused := func() {
+		m.refusals.printf(addr, "panel: sign-in as %q from %s refused: wrong username or password", logName(username), addr)
+		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
+	}
 
 	user, err := m.store.GetUserByUsername(username)
 	if err != nil {
@@ -122,14 +142,17 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 		// a wrong password is: the answer's delay told which names exist
 		// (audit 2026-10-12, M8).
 		_ = bcrypt.CompareHashAndPassword(noSuchUserHash(), []byte(password))
-		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
+		refused()
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		m.renderLogin(w, http.StatusUnauthorized, "Invalid username or password.")
+		refused()
 		return
 	}
+	// A right password is no guess: its attempts are given back.
+	m.loginLimiter.Refund(key)
+	m.loginAddrLimiter.Refund(addr)
 
 	// The session the browser presents, if any, ends here: a sign-in issues
 	// a new token and leaves no other behind it - one planted before the
@@ -195,7 +218,8 @@ func (m *Module) HandleLogout(w http.ResponseWriter, r *http.Request) {
 // HandleSetup serves the one-time administrator creation flow at
 // /setup/<token> (security.md).
 func (m *Module) HandleSetup(w http.ResponseWriter, r *http.Request) {
-	if !m.setupLimiter.Allow(clientIP(r, m.trustedProxies)) {
+	m.proxyWatch.see(r, m.trustedProxies)
+	if !m.setupLimiter.Allow(limitAddr(r, m.trustedProxies)) {
 		http.Error(w, "too many requests", http.StatusTooManyRequests)
 		return
 	}

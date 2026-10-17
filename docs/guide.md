@@ -183,6 +183,19 @@ docker compose up -d
 The nginx/Caddy/Traefik fragments already include `docker compose up -d` —
 skip this if you ran one of those.
 
+With Apache on the host, the panel sees every visitor at the Docker
+network's gateway. Tell it that address is your proxy, so that each visitor
+has a sign-in limit of their own, and recreate the container:
+
+```sh
+docker network inspect "$(basename "$PWD")_default" -f '{{(index .IPAM.Config 0).Gateway}}'
+```
+
+Put what it prints into `.env` as `TRUSTED_PROXY_CIDR=` and run `docker
+compose up -d` again. Until then the panel's log says, after the first
+requests, that every visitor shares one limit and what to set; Server ›
+Health shows the same under *Your address*.
+
 **Get the setup URL** — open it in a browser to create the admin account (see
 [Initial setup](#initial-setup)):
 
