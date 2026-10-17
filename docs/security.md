@@ -64,7 +64,22 @@ notification (the server's name is kept in lower case for DKIM); only `From`
 was over-signed (now the shown headers too) - all fixed. `Sender:`, which
 the review found neither held nor signed (F1), is now both: signed, and held
 to the login like `From:` (the owner's decision, 2026-10-16). What the header
-cap leaves is under Accepted risks.
+cap leaves is under Accepted risks. The 2026-10-17 security audit
+([security-audit-2026-10-17.md](security-audit-2026-10-17.md); four zone
+readers, the live server, probes from outside) found no Critical. Its High,
+A2: a stolen `global` session could set its own password on the user form
+and so pass the backup's password check - the user form now asks for the
+signed-in password to add a user or to change a password, an e-mail or a
+role, and to delete one. Its seven Mediums: a stranger reserving a domain's
+level-2 slots through `MAIL FROM` (M1, now the login's domain), a refused
+recipient writing an Inbound log row in a stranger's words (M2, now
+Postfix's own tail), one message as a thousand journal rows uncut (M3), a
+custom DMARC address on the server's name opening an untagged mailbox (W1),
+the TLS key readable by Postfix through group 10998 (I1, now group 10997),
+a link the entrypoint could follow at the DMARC maps (I2), and every
+visitor sharing one sign-in limit behind an untrusted proxy (A1) - all fixed
+in `2.14.4`, with the lows the plan named; two reviews (Fable) of the fixes
+found nothing above low, and their lows were fixed too.
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
