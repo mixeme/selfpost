@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.4] - 2026-10-17
+
+The follow-ups of the security audit of 2026-10-17
+([docs/security-audit-2026-10-17.md](docs/security-audit-2026-10-17.md)),
+stages 0-6: its one high (A2), its seven mediums and the lows. No migration;
+schema 13. Read *Upgrading* below: the TLS key's group, and copy
+`antispam/` again where the sidecar runs.
+
 ### Upgrading
 
 - **Give the TLS private key to group 10997** (audit I1): `chgrp 10997
@@ -12,9 +20,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   same in whatever renews it. Group 10998, which the guide named until now,
   has Postfix in it; the backup keeps working with either, but only 10997
   keeps the key from Postfix's daemons.
+- **With the antispam sidecar, copy `antispam/` again** (audit S4): rspamd
+  4.2.2, and a third file, `antispam/rspamd/worker-proxy.inc`, that the
+  fragment now mounts; `docker compose ... up -d` recreates the sidecar.
+- **Behind Apache on the host, set `TRUSTED_PROXY_CIDR`** if it is not set
+  (audit A1): the guide's install step prints the gateway to put there; the
+  panel's log says so after the first requests when it is missing.
 
 ### Security
 
+- **A stolen `global` session no longer takes a full backup** (security
+  audit 2026-10-17, A2, high): the user form set the signed-in user's own
+  password without the current one, which then passed the backup's password
+  check. Adding a user, setting a password, changing an e-mail or a role on
+  the user form, and deleting a user now ask for your own account password,
+  as a backup does, under the same limit on wrong guesses - which now
+  counts wrong passwords only.
 - **One stranger behind a shared proxy no longer locks everyone out of
   signing in** (audit A1, A8, A9): sign-in counts failures per address and
   username (a hundred per address alone), a right password no longer
@@ -65,13 +86,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   the internet included - could read it. A new group, `backupkey` (10997),
   holds the panel alone; the guide, Help and the backup's refusal name it.
 
-- **A stolen `global` session no longer takes a full backup** (security
-  audit 2026-10-17, A2, high): the user form set the signed-in user's own
-  password without the current one, which then passed the backup's password
-  check. Adding a user, setting a password, changing an e-mail or a role on
-  the user form, and deleting a user now ask for your own account password,
-  as a backup does, under the same limit on wrong guesses - which now
-  counts wrong passwords only.
 - **A domain's rate limit is taken only by its own applications** (audit
   M1): the level-2 domain limit was read from `MAIL FROM`, which reaches the
   milter before Postfix holds it to the login, so a client that never

@@ -683,7 +683,7 @@ the argument.
   "letsencrypt.org"`. Done when `dig +short TXT _dmarc.selfpost.mixfed.ru`
   answers.
 
-### Stage 0 — the high and the cheap guards (~5 h) → patch release
+### Stage 0 — the high and the cheap guards (~5 h) → patch release (shipped `2.14.4`, 2026-10-17)
 
 - [x] **A2.** `reauth` on user create, on a user update that carries
   `password` or changes `role`, and on user delete; the user form gets the
@@ -717,7 +717,7 @@ the argument.
 - [x] **X1.** SECURITY.md's table: `latest 2.x` supported, `1.x` not. —
   **Sonnet**, 0.25 h. *Done 2026-10-17.*
 
-### Stage 1 — the tenant boundary in the mail path (~7 h) → patch release
+### Stage 1 — the tenant boundary in the mail path (~7 h) → patch release (shipped `2.14.4`, 2026-10-17)
 
 - [x] **M1.** `overLimit` and `recordRejected` take the domain from the login
   (`ApplicationByLogin`), return early on an empty login; the reader's two
@@ -753,7 +753,7 @@ the argument.
 - [x] **W3.** A mutex around `Resync`'s read + write + reload. — **Sonnet**,
   0.5 h. *Done 2026-10-17:* TestResyncRunsOneAtATime.
 
-### Stage 2 — the key group (~2.5 h) → patch release, then the test server's `certs/`
+### Stage 2 — the key group (~2.5 h) → patch release, then the test server's `certs/` (shipped `2.14.4`, 2026-10-17)
 
 - [x] **I1.** `groupadd --system --gid 10997 backupkey; usermod -aG backupkey
   panel` in the Dockerfile; the guide's two `chgrp 10998` become `10997`
@@ -767,7 +767,7 @@ the argument.
   is root and `testFullBackupRestore` checks both uids; the test server's
   key at the rollout.
 
-### Stage 3 — limits and defaults (~7 h)
+### Stage 3 — limits and defaults (~7 h) (shipped `2.14.4`, 2026-10-17)
 
 - [x] **A1.** (a) Compose and guide set `TRUSTED_PROXY_CIDR` for the
   Apache-on-host scenario (the Docker gateway, with the command that prints
@@ -797,7 +797,7 @@ the argument.
   private address - a trusted proxy's peer would have let the internet in
   again through that proxy; TestHealthzAnswersOnlyLocalProbes.
 
-### Stage 4 — resources and imports (~5 h)
+### Stage 4 — resources and imports (~5 h) (shipped `2.14.4`, 2026-10-17)
 
 - [x] **I3.** `pids_limit: 512` in every compose fragment; the comment
   corrected; one e2e run. — **Sonnet**, 0.5 h. *Done 2026-10-17:* 1024 for
@@ -832,7 +832,7 @@ the argument.
   openssl's HMAC, the deny list's 554 message, healthy. The live sidecar at
   the rollout.
 
-### Stage 5 — supply chain and currency (~2.5 h)
+### Stage 5 — supply chain and currency (~2.5 h) (shipped `2.14.4`, 2026-10-17)
 
 - [x] **I4.** Actions pinned by SHA with the version in a comment;
   `govulncheck ./...` in `test.yml` and in `release.yml` before the push (a
@@ -855,7 +855,7 @@ the argument.
   test server both ways.
   1.5 h.
 
-### Stage 6 — the rest, and what to accept (~3 h)
+### Stage 6 — the rest, and what to accept (~3 h) (shipped `2.14.4`, 2026-10-17)
 
 - [x] **M7.** guide: upstream `encrypt` checks no certificate. — **Sonnet**,
   0.25 h. *Done 2026-10-17:* guide and Help. (Offering `secure` is hours and a `domain`-user-facing choice;

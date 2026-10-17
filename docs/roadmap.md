@@ -28,7 +28,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
-| security-audit-2026-10-17 | Follow-ups of the 2026-10-17 security audit: A2 (high), seven mediums, the lows | stages 0-6 built 2026-10-17 for `2.14.4`; stage H (the host, S1-S3, S5) the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) |
+| security-audit-2026-10-17 | Follow-ups of the 2026-10-17 security audit: A2 (high), seven mediums, the lows | stages 0-6 shipped `2.14.4` (2026-10-17); stage H (the host, S1-S3, S5) the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) |
 | upstream-tls-verify | Inbound: offer "Verified" TLS to the upstream (Postfix `secure`, the upstream's name checked), beside Required, which checks no certificate (audit M7) | proposed | — | — |
 | server-dmarc-hint | Server › Settings lists a DMARC record for the server's own name beside its DKIM and SPF (audit S3, product side) | proposed | — | — |
 | inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | shipped `2.10.0` | 7/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
@@ -68,7 +68,7 @@ stages 1 and 2 as `2.5.0` the same day, stage 2b as `2.5.1`, stage 2c as
 `2.6.0` the same day; stage 6 (documents and tests, no cut) closed the
 audit. Of the three rows from [own-mta-builds](#own-mta-builds),
 **port25-bare-newline** shipped as `2.6.1` the same day and
-**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). **dns-record-collapse**, **settings-save-row** and **notification-mail-recheck** shipped together as `2.9.0` the same day, with `/data/opendkim` removed as panel-dkim-signing planned, then `2.9.1` (log panes on a phone) and **inbound-upstream-result** as `2.10.0`. What is agreed after it is marked so in the index; every other
+**base-trixie** as `2.7.0`, and **panel-dkim-signing** as `2.8.0` (2026-10-16). **dns-record-collapse**, **settings-save-row** and **notification-mail-recheck** shipped together as `2.9.0` the same day, with `/data/opendkim` removed as panel-dkim-signing planned, then `2.9.1` (log panes on a phone) and **inbound-upstream-result** as `2.10.0`. The follow-ups of the [security audit of 2026-10-17](security-audit-2026-10-17.md) shipped together as `2.14.4`, stages 0-6 in one cut; its stage H is the owner's host. What is agreed after it is marked so in the index; every other
 remaining item is a candidate. panel-docs shipped in
 [CHANGELOG.md](../CHANGELOG.md) `[1.8.0]`; dmarc-reports in `[1.7.0]`
 (its ingest path first ran in `2.0.0` and was reviewed on 2026-10-11, see
