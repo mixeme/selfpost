@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A tag beside a label no longer squeezes the field under it**: the
+  e-mail's "not confirmed" on Account made its label taller and left less
+  room above the field than Username has (the owner's phone).
+
 ## [2.14.2] - 2026-10-17
 
 The last small items of the day. No migration; schema 13.
