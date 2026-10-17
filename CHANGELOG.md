@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-10-17
+
+Overview's head in the mockup's words. No migration; schema 13.
+
 ### Changed
 
 - **Overview's head says it as the mockup does** (overview-head): "Mail is
