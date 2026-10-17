@@ -327,14 +327,17 @@ postconf -e \
 # client flush the queue toward an inbound domain's upstream
 # (fast_flush_domains = $relay_domains), and nothing here needs it (security
 # audit 2026-10-17, S6; Postfix 3.10.13, src/smtpd/smtpd.c, etrn_cmd() asks
-# smtpd_check_etrn(), whose "reject" answers reject_code, 554).
+# smtpd_check_etrn(), whose "reject" answers reject_code, 554). The discard is
+# silent: without the pseudo keyword smtpd logs "discarding EHLO keywords:
+# ETRN" for every connection (src/smtpd/smtpd.c:2016, EHLO_MASK_SILENT;
+# src/global/ehlo_mask.c:88; seen on the test server after 2.14.4).
 postconf -e \
 	"smtpd_tls_protocols=>=TLSv1.2" \
 	"smtpd_tls_mandatory_protocols=>=TLSv1.2" \
 	"smtp_tls_mandatory_protocols=>=TLSv1.2" \
 	"disable_vrfy_command=yes" \
 	"smtpd_etrn_restrictions=reject" \
-	"smtpd_discard_ehlo_keywords=etrn" \
+	"smtpd_discard_ehlo_keywords=silent-discard,etrn" \
 	'smtpd_banner=$myhostname ESMTP'
 
 # SASL: Cyrus with the local sasldb2 the panel maintains. The realm is left

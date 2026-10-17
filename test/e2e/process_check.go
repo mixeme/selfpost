@@ -168,7 +168,7 @@ func checkPostfixHardening(s *stack) error {
 		return fmt.Errorf("postconf: %v\n%s", err, out)
 	}
 	got := strings.Split(strings.TrimSpace(out), "\n")
-	want := []string{">=TLSv1.2", ">=TLSv1.2", "yes", "$myhostname ESMTP", "reject", "etrn"}
+	want := []string{">=TLSv1.2", ">=TLSv1.2", "yes", "$myhostname ESMTP", "reject", "silent-discard,etrn"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		return fmt.Errorf("postconf -h of the hardened settings = %q, want %q", got, want)
 	}

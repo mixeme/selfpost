@@ -104,7 +104,7 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   submission chain would otherwise let a signing outage defer relayed mail and
   would file inbound mail into the outbound send log under the sender's
   domain. `ETRN` is refused on every listener and not offered in the EHLO
-  reply (`smtpd_etrn_restrictions=reject`, `smtpd_discard_ehlo_keywords=etrn`):
+  reply (`smtpd_etrn_restrictions=reject`, `smtpd_discard_ehlo_keywords=silent-discard,etrn`):
   Postfix's default lets any client flush the queue toward an inbound
   domain's upstream. With the inbound relay on the chain is the optional antispam milter,
   then the panel's **inbound journal milter** (unix socket

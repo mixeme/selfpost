@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **ETRN is discarded from the EHLO reply silently**: since `2.14.4` Postfix
+  logged "discarding EHLO keywords: ETRN" for every connection on every port
+  (seen on the test server after the rollout); `silent-discard` keeps the
+  discard and drops the line.
+
 ## [2.14.4] - 2026-10-17
 
 The follow-ups of the security audit of 2026-10-17
