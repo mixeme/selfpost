@@ -3,9 +3,11 @@ package auth
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,6 +87,24 @@ func TestSessionTokenRejectsDuplicates(t *testing.T) {
 
 	if token, ok := m.sessionToken(r); ok {
 		t.Fatalf("duplicate cookies accepted, token = %q", token)
+	}
+}
+
+// The duplicate-cookie line names the request's path, and a link's token is
+// not written to the log with it (audit 2026-10-17, A4).
+func TestDuplicateCookieLineHidesALinksToken(t *testing.T) {
+	m := testModule(t, false)
+	var buf strings.Builder
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	r := httptest.NewRequest(http.MethodGet, "http://panel.example.com/confirm/the-secret-token-of-a-link", nil)
+	r.AddCookie(&http.Cookie{Name: "selfpost_session", Value: "planted-by-a-neighbour"})
+	r.AddCookie(&http.Cookie{Name: "selfpost_session", Value: "the-real-session"})
+	if _, ok := m.sessionToken(r); ok {
+		t.Fatal("duplicate cookies accepted")
+	}
+	if got := buf.String(); strings.Contains(got, "the-secret-token-of-a-link") || !strings.Contains(got, "GET /confirm/… carries 2 cookies") {
+		t.Errorf("logged %q", got)
 	}
 }
 

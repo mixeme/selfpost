@@ -1,4 +1,4 @@
-package web
+package auth
 
 import "testing"
 
@@ -12,8 +12,8 @@ func TestLoggedPathHidesTokens(t *testing.T) {
 		"/confirm/":              "/confirm/",
 		"/account/profile":       "/account/profile",
 	} {
-		if got := loggedPath(in); got != want {
-			t.Errorf("loggedPath(%q) = %q, want %q", in, got, want)
+		if got := LoggedPath(in); got != want {
+			t.Errorf("LoggedPath(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

@@ -400,3 +400,17 @@ func loginInfo(r *http.Request) string {
 	}
 	return ""
 }
+
+// LoggedPath is a request's path as the log may hold it: the token of a
+// password-reset or confirmation link is a secret, and the log is read by
+// more than the person the link went to (security review, 2026-10-17).
+// Every log line that names a request's path goes through it: the origin
+// check's refusal and the duplicate-cookie line (audit 2026-10-17, A4).
+func LoggedPath(p string) string {
+	for _, prefix := range []string{"/login/reset/", "/confirm/"} {
+		if strings.HasPrefix(p, prefix) && len(p) > len(prefix) {
+			return prefix + "…"
+		}
+	}
+	return p
+}

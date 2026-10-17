@@ -706,7 +706,9 @@ the argument.
   tail); TestInboundRecipientCannotWriteTheRow.
 - [x] **M5.** Keep at most two `From:`/`Sender:` values; security.md:810
   reworded. — **Opus**, 0.5 h. *Done 2026-10-17:* TestSenderKeepsTwoFromAndSenderLines.
-- [ ] **A4.** Duplicate-cookie line through `loggedPath`. — **Sonnet**, 0.25 h.
+- [x] **A4.** Duplicate-cookie line through `loggedPath`. — **Sonnet**, 0.25 h.
+  *Done 2026-10-17:* `loggedPath` moved to `auth.LoggedPath`, used by both
+  lines; TestDuplicateCookieLineHidesALinksToken.
 - [ ] **S6.** `smtpd_etrn_restrictions = reject`, `smtpd_discard_ehlo_keywords
   = etrn` in postfix-config.sh; architecture.md § Postfix one line. Done when
   an e2e `ETRN` on 25 gets `554`. — **Opus**, 0.5 h.

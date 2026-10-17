@@ -21,6 +21,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The sender check keeps two `From:` and two `Sender:` lines** (audit M5),
   not every one an application sends: the judgement needs no more, and a
   hundred long lines were megabytes held per connection.
+- **A link's token stays out of the duplicate-cookie log line** (audit A4),
+  as it already did out of the origin check's.
 - **The entrypoint follows no link at the DMARC maps** (audit I2): the
   three `dmarc_*` maps root creates at the start were missing from the list
   of paths where a symbolic link is removed first.

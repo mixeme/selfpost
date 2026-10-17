@@ -55,7 +55,7 @@ func (m *Module) sessionToken(r *http.Request) (string, bool) {
 		// name cannot be planted that way (see sessionCookiePrefixed).
 		logf("panel: %s %s carries %d cookies named %q — treating the request as signed out; "+
 			"another host on this domain is overwriting the session cookie, clear the cookies for the parent domain",
-			r.Method, r.URL.Path, n, name)
+			r.Method, LoggedPath(r.URL.Path), n, name)
 		return "", false
 	}
 }
