@@ -440,12 +440,27 @@ func importErrorMessage(err error) (int, string) {
 // 2026-10-12, M10). Client addresses are written back as the form would store
 // them. The login, the addresses an application may send as and the password
 // are checked where the application is created (app.ImportApplication).
+// maxImportApplications is how many applications a domain import takes.
+const maxImportApplications = 500
+
 func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
 	invalid := func(what string, err error) string {
 		return "Invalid " + what + " in export file: " + err.Error()
 	}
 	if err := validate.Selector(exp.DKIMSelector); err != nil {
 		return invalid("DKIM selector", err)
+	}
+	// The server's own name is not a domain to import: its key signs the
+	// panel's own mail, and an import would replace it while DNS still
+	// holds the old record (security audit 2026-10-17, W8).
+	if h.cfg.Hostname != "" && strings.EqualFold(strings.TrimSpace(exp.Domain), h.cfg.Hostname) {
+		return "The export is of this server's own name, whose key signs the panel's own mail. It cannot be imported as a domain."
+	}
+	// Each application is a copy of sasldb2 and a saslpasswd2 run, all on
+	// the panel's one connection: an export is held to what a domain plainly
+	// needs (security audit 2026-10-17, W5).
+	if n := len(exp.Applications); n > maxImportApplications {
+		return fmt.Sprintf("The export holds %d applications; an import takes at most %d.", n, maxImportApplications)
 	}
 	if exp.DMARCRua != "" {
 		if err := validate.Email(exp.DMARCRua); err != nil {

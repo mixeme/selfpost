@@ -120,6 +120,12 @@ func (o *Keys) ExportKey(domainName, selector string) ([]byte, error) {
 	return pem.EncodeToMemory(block), nil
 }
 
+// The sizes of an imported DKIM key ImportKey takes.
+const (
+	MinImportKeyBits = 1024
+	MaxImportKeyBits = 4096
+)
+
 // ImportKey writes an imported DKIM private key to disk for a domain
 // (architecture.md § Persistence). The PEM is parsed and re-marshalled through
 // the same writer used for generated keys, so only a well-formed PKCS#1 RSA
@@ -137,6 +143,12 @@ func (o *Keys) ImportKey(domainName, selector string, pemKey []byte) error {
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		return fmt.Errorf("import dkim key for %s: %w", domainName, err)
+	}
+	// Within what receivers verify and what signing can afford: RFC 8301 §
+	// 3.2 asks for at least 1024 bits, and a key far above 4096 makes every
+	// signature of the domain cost seconds (security audit 2026-10-17, W4).
+	if bits := key.N.BitLen(); bits < MinImportKeyBits || bits > MaxImportKeyBits {
+		return fmt.Errorf("import dkim key for %s: a %d-bit key; SelfPost signs with keys of %d to %d bits", domainName, bits, MinImportKeyBits, MaxImportKeyBits)
 	}
 	path := o.keyPath(domainName, selector)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

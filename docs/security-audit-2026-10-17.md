@@ -812,9 +812,11 @@ the argument.
   real changes, each of which Postfix must see; twenty re-checks in 15
   minutes per user, then the cached result. TestARebuildThatChangesNothingDoesNotReload,
   TestDNSRechecksArePerUser.
-- [ ] **W4/W5/W8.** Key size 1024-4096 on import; ≤ 500 applications per
+- [x] **W4/W5/W8.** Key size 1024-4096 on import; ≤ 500 applications per
   export; an import named as the hostname refused with a sentence. —
-  **Sonnet**, 1.5 h.
+  **Sonnet**, 1.5 h. *Done 2026-10-17:*
+  TestImportKeyRefusesAnOversizedKey and the import cases (a key under
+  1024 bits the parser already refuses).
 - [ ] **S4.** rspamd pin → `4.2.x` after reading `milter_headers`/`multimap`
   against the 4.x docs and one e2e run (`inbound_upstream_test`,
   `antispam_test`); `cap_drop: [ALL]`, `no-new-privileges`, `pids_limit` on

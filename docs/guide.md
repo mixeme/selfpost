@@ -1159,7 +1159,10 @@ the file is unrecoverable, which is the entire point.
 *Import a domain* takes an encrypted export directly: choose a `.spde` file and
 the password field appears (driven by the file extension in the browser; the
 server also detects the envelope by its magic bytes). A plain `.json` export
-needs no password.
+needs no password. An import is refused, and says why, for a DKIM key outside
+1024-4096 bits, more than 500 applications, a domain named as the server
+itself (its key signs the panel's own mail), and a report address on the
+server's name other than the domain's own hosted one.
 
 A full backup has to be turned back into a plain archive before it can be
 unpacked into `/data`, which the CLI does with the same password:

@@ -71,6 +71,14 @@ func TestDomainImportIsCheckedLikeTheForms(t *testing.T) {
 		{"report address", func(e *domain.DomainExport) { e.DMARCRua = "not an address" },
 			"Invalid report address in export file: "},
 		// As on Domain settings (security audit 2026-10-17, W1).
+		// Security audit 2026-10-17, W8 and W5.
+		{"the server's own name", func(e *domain.DomainExport) { e.Domain = "MAIL.example.org" },
+			"The export is of this server's own name"},
+		{"too many applications", func(e *domain.DomainExport) {
+			for i := 0; i < 500; i++ {
+				e.Applications = append(e.Applications, e.Applications[0])
+			}
+		}, "The export holds 501 applications; an import takes at most 500."},
 		{"report address on the hostname", func(e *domain.DomainExport) { e.DMARCRua = "ops@MAIL.example.org" },
 			"The export's report address is on this server's own name"},
 		{"another domain's hosted address", func(e *domain.DomainExport) { e.DMARCRua = "dmarc-reports+victim.example@mail.example.org" },
