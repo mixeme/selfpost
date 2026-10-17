@@ -84,6 +84,8 @@
             </ul>
             <p class="sp-muted mb-4">Applications and their passwords, upstreams and recipients are not affected.</p>
             <form method="post" action="users.html">
+              <div class="field"><label class="label" for="acpw">Your account password</label><div class="control"><input class="input" id="acpw" name="account_password" type="password" autocomplete="current-password" required></div>
+                <p class="help">The one you sign in with: a session left open must not be enough to remove an administrator.</p></div>
               <div class="buttons">
                 <button type="submit" class="button is-danger"><i class="ti ti-trash"></i>Delete acme-ops</button>
                 <a class="button is-text" href="user.html">Keep it</a>
