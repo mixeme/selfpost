@@ -15,6 +15,7 @@
             <ul class="sp-list-check">
               <li><i class="ti ti-x"></i>permanently delete its DKIM signing key;</li>
               <li><i class="ti ti-x"></i>delete <strong>both applications</strong> (<span class="sp-mono">prod-server</span>, <span class="sp-mono">alerts</span>) with their credentials and sender bindings;</li>
+              <li><i class="ti ti-x"></i>delete the <strong>12 DMARC reports</strong> received for it;</li>
               <li><i class="ti ti-x"></i>stop signing mail as the domain.</li>
             </ul>
             <p class="sp-muted mb-4">The published DKIM record becomes invalid — remove it from DNS unless you plan to re-add the domain. Inbound domains are not touched.</p>
