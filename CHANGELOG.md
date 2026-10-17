@@ -49,6 +49,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The signature covers `Content-Type`, `MIME-Version` and `Message-ID`**
   when the message has them (audit M6), and a header line too long to be
   delivered unbroken is named in the log as a body line is (M8).
+- **A session made under a longer `PANEL_SESSION_IDLE_DAYS` is cut to the
+  current window** at its next request (audit A10), not kept until its old
+  expiry.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to
@@ -102,6 +105,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   of paths where a symbolic link is removed first.
 
 ### Documentation
+
+- security.md says what the code does where it said more (audit A6, A7,
+  W7): a wrong method answers `405` before the role is looked at; the setup
+  token is made anew at the first request after it expired; two GETs make
+  the server's own DKIM key on first view. The README's local trial says
+  that the compose file is the hardened deployment.
 
 - **The upstream's "Required" TLS checks no certificate**, and the guide and
   Help now say so (audit M7): it guards against a listener, not against one

@@ -850,8 +850,11 @@ the argument.
 - [x] **M7.** guide: upstream `encrypt` checks no certificate. — **Sonnet**,
   0.25 h. *Done 2026-10-17:* guide and Help. (Offering `secure` is hours and a `domain`-user-facing choice;
   propose it on the roadmap, not here.)
-- [ ] **A6, A7, A10, W7, M6, M8** and the README note — half an hour each,
-  or the wording change named under each. — **Sonnet**, 2 h.
+- [x] **A6, A7, A10, W7, M6, M8** and the README note — half an hour each,
+  or the wording change named under each. — **Sonnet**, 2 h. *Done 2026-10-17:* A10 and
+  M6, M8 in code (a session from a longer window is cut at the next check;
+  three headers signed; a long header line logged); A6, A7, W7 by wording
+  in security.md - each is what the code should do; the README note.
 - [ ] **Doc drift sweep** — every line under "Doc and comment drift" above.
   — **Sonnet**, 1 h.
 - **Accept, with the argument:** *the setuid/setgid binaries of the base

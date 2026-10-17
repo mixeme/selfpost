@@ -379,3 +379,22 @@ func TestRequireAuthDoesNotRenewASessionWhoseUserIsGone(t *testing.T) {
 		t.Errorf("expiry of a missing user's session moved to %v", row.ExpiresAt)
 	}
 }
+
+// A session made under a longer idle window is cut to the current one at its
+// next renewal check, not kept until its old expiry (security audit
+// 2026-10-17, A10).
+func TestSessionMadeUnderALongerWindowIsCut(t *testing.T) {
+	s := newTestSessionStore(t) // seven days
+	token := mustCreate(t, s, "admin")
+	s.idle = 24 * time.Hour // PANEL_SESSION_IDLE_DAYS lowered to one
+	if !s.Touch(token) {
+		t.Fatal("the session from the longer window was not cut")
+	}
+	row, _, err := s.store.LookupSession(hashToken(token))
+	if err != nil || row.ExpiresAt.After(time.Now().Add(24*time.Hour+time.Minute)) {
+		t.Errorf("expires %v (%v), want within a day", row.ExpiresAt, err)
+	}
+	if s.Touch(token) {
+		t.Error("a session within the window was renewed again at once")
+	}
+}

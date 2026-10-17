@@ -87,8 +87,12 @@ The panel is exposed to the internet — the items below are **not optional**.
 - A one-time secret link `/setup/<token>`, **not** an env variable holding a
   ready-made password hash.
 - Token ≥128 bits (`crypto/rand`); mirrored to `/data/setup-token`.
-- Token lifetime — **10 minutes**; after expiry, or after a restart with setup
-  unfinished, it is regenerated and logged again.
+- Token lifetime — **10 minutes**; a restart with setup unfinished makes a
+  new one, and so does the first `/setup/` request after it expired - any
+  request, a stranger's `GET /setup/x` included, which then logs the new
+  token in the container log, where only the operator reads it (audit
+  2026-10-17, A7: nothing reaches the requester; the wording said "after
+  expiry").
 - Rate limiting on `/setup/<token>` per client address (an IPv6 one per
   /64), separate from login.
 - Token comparison is **constant-time** (`subtle.ConstantTimeCompare`).
@@ -220,7 +224,10 @@ assigned outbound domains and inbound domains **separately**, each list with
 - A path a user may not reach, a domain or application that does not exist,
   and one that belongs to another tenant answer the **same 404**, so the panel
   does not confirm what exists. A group with nothing assigned is absent from
-  the user's menu.
+  the user's menu. A route asked with a method it does not take answers
+  `405` with `Allow`, from the router, before the role is looked at: the
+  routes are the public source's, so that says nothing the code does not
+  (audit 2026-10-17, A6).
 - `/server/` is guarded once, by `globalOnly` where its routes are registered
   (a route outside the subtree cannot be added through that helper), and every
   handler checks again. Outbound and inbound handlers check per object
@@ -244,8 +251,11 @@ assigned outbound domains and inbound domains **separately**, each list with
 
 ### State-changing requests
 
-- Every state change is a `POST`; a `GET` never changes state (the delete
-  confirmation pages only render a form).
+- Every state change is a `POST`; a `GET` changes no state a user chose
+  (the delete confirmation pages only render a form). Two make what has to
+  exist when it does not: Server › Settings and Health generate the server's
+  own DKIM key on their first view, and the first `/setup/` request after
+  the token expired makes a new one (audit 2026-10-17, W7, A7).
 - Every non-read request first passes the origin check
   (`originAllowed`, [internal/web/security.go](../internal/web/security.go)):
   `Sec-Fetch-Site` must be `same-origin`, or `Origin` must name the panel's own

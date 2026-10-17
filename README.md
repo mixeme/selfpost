@@ -125,6 +125,11 @@ docker run --rm -d --name selfpost-try \
   ghcr.io/mixeme/selfpost:2.14.3
 ```
 
+This trial runs with Docker's default capabilities and no
+`no-new-privileges`; the compose file of a real deployment
+(`deploy/docker-compose.yml`) drops every capability but the few it names,
+sets `no-new-privileges` and a process ceiling.
+
 **Get the setup URL** (pick one):
 
 ```sh

@@ -98,8 +98,19 @@ func (s *sessionStore) Touch(token string) bool {
 	if !found {
 		return false
 	}
-	lastRenewal := row.ExpiresAt.Add(-s.idle)
 	now := time.Now()
+	// A session made under a longer PANEL_SESSION_IDLE_DAYS expires later
+	// than today's window allows: it is cut to the window at once, rather
+	// than keep the old expiry until it passes (security audit 2026-10-17,
+	// A10).
+	if row.ExpiresAt.After(now.Add(s.idle)) {
+		if err := s.store.RenewSession(hash, now.Add(s.idle)); err != nil {
+			logf("panel: session: shorten failed: %v", err)
+			return false
+		}
+		return true
+	}
+	lastRenewal := row.ExpiresAt.Add(-s.idle)
 	if now.Sub(lastRenewal) < renewThreshold {
 		return false
 	}
