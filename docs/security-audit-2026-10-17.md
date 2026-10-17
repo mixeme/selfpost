@@ -719,12 +719,14 @@ the argument.
 
 ### Stage 1 — the tenant boundary in the mail path (~7 h) → patch release
 
-- [ ] **M1.** `overLimit` and `recordRejected` take the domain from the login
+- [x] **M1.** `overLimit` and `recordRejected` take the domain from the login
   (`ApplicationByLogin`), return early on an empty login; the reader's two
   tests (stranger; other tenant) become the regression tests; an e2e sends an
   unauthenticated `MAIL FROM` for a domain with a limit of 1 and then the
   domain's own message, which must pass. security.md § Mail path records
   that an unauthenticated session reserves nothing. — **Opus**, 2 h.
+  *Done 2026-10-17:* TestRateLimitIsNotReservedByAnotherSendersMailFrom;
+  e2e `domain_limit_not_reserved_by_a_stranger`.
 - [ ] **M3.** De-duplicate recipients in `inboundSession.RcptTo` (case-folded,
   as the outbound session does); the milter's inserts count toward the prune
   trigger (a counter in the store beside `InsertInboundSpam`, the prune

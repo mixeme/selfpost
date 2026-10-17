@@ -221,6 +221,11 @@ func TestBracedMacros(t *testing.T) {
 	}
 }
 
+// app1AtExample is the application the rate-limit tests sign in as: the
+// domain limit is its login's domain's, whatever MAIL FROM says (audit
+// 2026-10-17, M1).
+var app1AtExample = map[string]store.Application{"app1": {Login: "app1", DomainName: "example.com"}}
+
 // limitIP is the client IP rate-limit tests connect from.
 const limitIP = "203.0.113.7"
 
@@ -249,6 +254,7 @@ func mailFrom(t *testing.T, rec Store, ip, from, login string) milter.Response {
 
 func TestRateLimitRefusesWhenDomainOverLimit(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -276,6 +282,7 @@ func TestRateLimitRefusesWhenAppOverLimit(t *testing.T) {
 
 func TestRateLimitAllowsUnderLimit(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -291,6 +298,7 @@ func TestRateLimitAllowsUnderLimit(t *testing.T) {
 
 func TestRateLimitDomainAppliesToAnyIP(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -304,6 +312,7 @@ func TestRateLimitDomainAppliesToAnyIP(t *testing.T) {
 
 func TestRateLimitAppSkipsDomainWhenActive(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": {MaxMessages: 1, WindowSeconds: 3600},
 			store.RateLimitScopeApp + "|app1":           appLimit(),
@@ -364,6 +373,7 @@ func TestAuthIPRestrictOffAllowsAnyIP(t *testing.T) {
 
 func TestRateLimitInactiveWithoutCeiling(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": {}, // no max/window
 		},
@@ -383,6 +393,7 @@ func TestRateLimitFailsOpenOnLookupError(t *testing.T) {
 
 func TestRateLimitFailsOpenOnCountError(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -398,6 +409,7 @@ func TestRateLimitFailsOpenOnCountError(t *testing.T) {
 // through, which is how the second MAIL FROM of a connection got past a limit.
 func TestRateLimitAppliesWithoutAClientIP(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -484,6 +496,7 @@ func mailFromIn(t *testing.T, rec Store, fl *inflight, ip, from, login string) (
 
 func limitedRecorder(count int64) *fakeRecorder {
 	return &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 		},
@@ -603,6 +616,7 @@ func TestReservationReleasedOnAbort(t *testing.T) {
 // no domain reservation should linger after the refusal.
 func TestRefusalDoesNotLeaveDomainReservation(t *testing.T) {
 	rec := &fakeRecorder{
+		apps: app1AtExample,
 		limits: map[string]store.RateLimit{
 			store.RateLimitScopeDomain + "|example.com": domainLimit(),
 			store.RateLimitScopeApp + "|app1":           appLimit(),
@@ -715,5 +729,48 @@ func TestRateLimitHoldsTheNullSenderToItsLoginsDomain(t *testing.T) {
 	}
 	if resp := mailFrom(t, rec, limitIP, "<>", "app1"); resp != milter.RespTempFail {
 		t.Fatalf("a null sender over its domain's limit = %v, want TempFail (4xx)", resp)
+	}
+}
+
+// The domain limit is the login's domain's. MAIL FROM reaches the milter
+// before Postfix holds it to the login, so a stranger with no login, or
+// another tenant's application, naming a victim's domain there must take
+// none of its slots, and write no refusal under it (security audit
+// 2026-10-17, M1).
+func TestRateLimitIsNotReservedByAnotherSendersMailFrom(t *testing.T) {
+	victim := func() *fakeRecorder {
+		return &fakeRecorder{
+			apps: map[string]store.Application{
+				"victim-app": {Login: "victim-app", DomainName: "victim.example"},
+				"tenant-a":   {Login: "tenant-a", DomainName: "tenant-a.example"},
+			},
+			limits: map[string]store.RateLimit{
+				store.RateLimitScopeDomain + "|victim.example": {MaxMessages: 1, WindowSeconds: 3600},
+			},
+			counts: map[string]int64{},
+		}
+	}
+	for name, login := range map[string]string{"a stranger with no login": "", "another tenant's application": "tenant-a"} {
+		t.Run(name, func(t *testing.T) {
+			rec := victim()
+			fl := &inflight{}
+			for i := 0; i < 5; i++ {
+				if _, resp := mailFromIn(t, rec, fl, limitIP, "x@victim.example", login); resp != milter.RespContinue {
+					t.Fatalf("MAIL FROM %d = %v, want Continue", i, resp)
+				}
+			}
+			if n := fl.count(store.RateLimitScopeDomain+"|victim.example", time.Now().Add(-time.Hour)); n != 0 {
+				t.Errorf("%d slots of victim.example taken", n)
+			}
+			// The victim's own application still has its one message.
+			if _, resp := mailFromIn(t, rec, fl, limitIP, "news@victim.example", "victim-app"); resp != milter.RespContinue {
+				t.Errorf("the victim's own message = %v, want Continue", resp)
+			}
+			for _, r := range rec.rejected {
+				if r.Domain == "victim.example" {
+					t.Errorf("a refusal was written under the victim's domain: %+v", r)
+				}
+			}
+		})
 	}
 }

@@ -315,6 +315,9 @@ func TestE2E(t *testing.T) {
 	run("rate_limit_refusal_is_notified", func(t *testing.T) {
 		testRateLimitRefusalIsNotified(t, sc)
 	})
+	run("domain_limit_not_reserved_by_a_stranger", func(t *testing.T) {
+		testDomainLimitNotReservedByAStranger(t, sc)
+	})
 	run("negative_sender_login_mismatch", func(t *testing.T) {
 		testSenderLoginMismatch(t, sc)
 	})

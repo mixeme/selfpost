@@ -399,6 +399,16 @@ operator can act on it.
   ask for it at all, an application with a client-address list is refused when
   no address is known, and neither milter replies anything but "continue" to a
   message it lets through. `test/e2e` sends two `MAIL FROM` on one connection.
+- **A level-2 limit is reserved only by its own senders.** The domain limit
+  is the domain of the signed-in application, never the `MAIL FROM`
+  domain, and a session with no login reserves nothing. `MAIL FROM` reaches
+  the journal milter before Postfix holds it to the login (with
+  `smtpd_delay_reject` at its default no sender restriction runs at MAIL),
+  so until `2.14.4` a stranger on 465/587 who never signed in, or another
+  tenant's application, could name a domain there and take its slots for
+  the in-flight TTL - and have a `limit` refusal written under it (security
+  audit 2026-10-17, M1). `test/e2e` names a limited domain in a stranger's
+  `MAIL FROM` and then sends the domain's own message.
 - **The upstream's answer is an update of a row, not a row**
   (inbound-upstream-result, `2.10.0`). A delivery line of mail accepted on
   port 25 changes the result of that message's journal rows and adds

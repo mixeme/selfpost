@@ -13,6 +13,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   check. Adding a user, setting a password, changing an e-mail or a role on
   the user form, and deleting a user now ask for your own account password,
   as a backup does, under the same limit on wrong guesses.
+- **A domain's rate limit is taken only by its own applications** (audit
+  M1): the level-2 domain limit was read from `MAIL FROM`, which reaches the
+  milter before Postfix holds it to the login, so a client that never
+  signed in, or another tenant's application, could use up a domain's
+  limit. It is now the signed-in application's domain.
 - **A stranger's recipient no longer writes an Inbound › Log row** (audit
   M2): Postfix quotes a refused recipient in its reply with the quotes
   removed, so `RCPT TO:<"; from=<x> to=<y> …"@domain>` spelled a second
