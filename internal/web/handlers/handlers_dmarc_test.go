@@ -356,3 +356,23 @@ func TestDeleteDomainSaysItIsGoneWhenARebuildFails(t *testing.T) {
 		t.Errorf("the domain is still there: %v", err)
 	}
 }
+
+// A typed report address on the server's own name is refused: the hosted
+// choice is the one way to a mailbox here, tagged with the domain - a typed
+// one opened an untagged mailbox, or another domain's, to the internet
+// (security audit 2026-10-17, W1).
+func TestCustomReportAddressOnTheHostnameIsRefused(t *testing.T) {
+	s, _ := hostedStand(t)
+	for _, addr := range []string{"ops@mail.example.org", "dmarc-reports+victim.example@MAIL.example.org", hostedForExample} {
+		rec := s.saveReports(url.Values{"dmarc_rua_mode": {"custom"}, "dmarc_rua_email": {addr}})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "choose SelfPost hosted") {
+			t.Errorf("custom %s = %d:\n%.600s", addr, rec.Code, rec.Body.String())
+		}
+		if got := s.reportAddress(t); got != "" {
+			t.Errorf("custom %s stored %q", addr, got)
+		}
+	}
+	if rec := s.saveReports(url.Values{"dmarc_rua_mode": {"custom"}, "dmarc_rua_email": {"reports@hub.example"}}); rec.Code != http.StatusSeeOther {
+		t.Errorf("an address elsewhere = %d", rec.Code)
+	}
+}

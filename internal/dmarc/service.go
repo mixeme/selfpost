@@ -63,17 +63,20 @@ func (s *Service) AllowedRecipients() ([]string, error) {
 		seen[addr] = true
 		out = append(out, addr)
 	}
-	// Only what a domain has chosen is open: its report address opens the
-	// mailbox it names, if that is on this host. There is no mailbox for the
-	// server as a whole.
+	// Only what a domain has chosen is open, and only the one mailbox that is
+	// its own: the hosted address tagged with its name. A stored address on
+	// this host that is anything else - typed before 2.14.4, when the form
+	// still took one - opens nothing: it was an untagged mailbox, or another
+	// domain's, open to the internet (security audit 2026-10-17, W1). There
+	// is no mailbox for the server as a whole.
 	domains, err := s.store.ListDomains()
 	if err != nil {
 		return nil, err
 	}
 	for _, d := range domains {
-		// add keeps only addresses on this host, so a domain reporting elsewhere
-		// (or nowhere) opens nothing here.
-		add(d.DMARCRua)
+		if hosted := HostedReportAddress(s.hostname, d.Name); strings.EqualFold(strings.TrimSpace(d.DMARCRua), hosted) {
+			add(hosted)
+		}
 	}
 	sort.Strings(out)
 	return out, nil

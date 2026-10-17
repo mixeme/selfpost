@@ -737,11 +737,14 @@ the argument.
   into the store (`countInboundWrites`, both writers),
   `InsertInboundSpamMessage`; TestInboundRecipientRepeatedIsOneRow,
   TestInboundJournalIsCutWhicheverWriterWrites.
-- [ ] **W1.** Refuse a custom report address on the hostname; exact hosted
+- [x] **W1.** Refuse a custom report address on the hostname; exact hosted
   address only in `AllowedRecipients`; a tag required for every recipient on
   the hostname in `checkReportDomain`; the existing test inverted; the
   accepted-risk text corrected. Check the live registry for a custom address
-  on the hostname first (none expected). — **Opus**, 1.5 h.
+  on the hostname first (none expected). — **Opus**, 1.5 h. *Done
+  2026-10-17:* the live registry holds two hosted addresses and no custom
+  one on the hostname; TestCustomReportAddressOnTheHostnameIsRefused, the
+  untagged cases in TestIngestMessageRejectsTagMismatch.
 - [ ] **A5/W2.** Delete a domain's reports in `domain.Service.Delete` (the
   cheap form); security.md § Roles says reports go with the domain. —
   **Sonnet**, 0.5 h. (The `domain_id` form is better and 2 h; take it if

@@ -44,6 +44,14 @@ func (h *Handlers) HandleDomainDMARC(w http.ResponseWriter, r *http.Request) {
 			refuse(http.StatusBadRequest, "Enter the report address or choose another option.")
 			return
 		}
+		// An address on the server's own name is a mailbox of this server:
+		// the one way to one is the hosted choice, which is tagged with this
+		// domain. A typed one opened an untagged mailbox - or another
+		// domain's - to the whole internet (security audit 2026-10-17, W1).
+		if dmarc.IsHostedOnHostname(email, h.cfg.Hostname) {
+			refuse(http.StatusBadRequest, "That address is on this server's own name. To have SelfPost receive the reports, choose SelfPost hosted.")
+			return
+		}
 		rua = email
 	case ruaHosted:
 		if h.dmarc == nil || !h.dmarc.Enabled() {

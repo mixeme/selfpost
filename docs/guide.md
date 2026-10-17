@@ -1343,7 +1343,8 @@ settings) and nowhere else:
   server whose reports are parsed and shown under *DMARC reports*. Offered only
   while `DMARC_REPORTS_ENABLE=true`.
 - **A specific address** — any mailbox, typed for this domain; it receives the
-  raw XML. Beside the field, *Use my e-mail* fills it with the e-mail of your
+  raw XML. Not one on `SELFPOST_HOSTNAME`: to have this server receive the
+  reports, choose *SelfPost hosted*. Beside the field, *Use my e-mail* fills it with the e-mail of your
   profile (Account); it only fills the field, and saving is the form's own
   button. The button is absent when your profile has no e-mail.
 
@@ -1351,8 +1352,8 @@ Changing the choice changes the DMARC record to publish; the domain page shows
 the new value. There is no panel-wide or per-user default. Only addresses on
 `SELFPOST_HOSTNAME` that a domain has chosen are accepted on port 25 - the
 hosted address `dmarc-reports+<domain>@<hostname>` of a domain set to
-*SelfPost hosted*, or a typed address that happens to be on this host. There
-is no mailbox for the server as a whole.
+*SelfPost hosted* - and a report is kept only when it is for the domain the
+address is tagged with. There is no mailbox for the server as a whole.
 
 **DNS.** Publish the usual `_dmarc` TXT on each sending domain with
 `rua=mailto:…` pointing at the address the domain shows. Receivers deliver to the

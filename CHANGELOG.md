@@ -23,6 +23,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   each, and the journal milter's rows did not count toward the 10 000-row
   cut between the six-hourly prunes. Repeats are one row, a message's rows
   are written in one transaction, and both writers count toward the cut.
+- **A domain's custom DMARC report address may not be on the server's own
+  name** (audit W1): it opened a mailbox the whole internet could file
+  reports into, under any domain, or another domain's hosted one. Only the
+  hosted address of a domain that chose it is a mailbox now, and a report
+  must arrive at the address tagged with its domain.
 - **A stranger's recipient no longer writes an Inbound › Log row** (audit
   M2): Postfix quotes a refused recipient in its reply with the quotes
   removed, so `RCPT TO:<"; from=<x> to=<y> …"@domain>` spelled a second

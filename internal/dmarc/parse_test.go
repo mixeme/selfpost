@@ -101,7 +101,7 @@ func TestIngestMessageStoresReport(t *testing.T) {
 	// append raw gzip for simple single-part test
 	msg.Write(gz.Bytes())
 
-	if err := IngestMessage(st, msg, "dmarc-reports@mail.example.com", time.Now().UTC()); err != nil {
+	if err := IngestMessage(st, msg, "dmarc-reports+example.com@mail.example.com", time.Now().UTC()); err != nil {
 		t.Fatalf("IngestMessage: %v", err)
 	}
 	list, err := st.ListDMARCReports(store.DMARCReportScope{AllDomains: true}, 10)
@@ -131,7 +131,7 @@ func TestIngestMessageRejectsUnknownDomain(t *testing.T) {
 	}
 	defer st.Close()
 
-	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports@mail.example.com", time.Now().UTC())
+	err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), "dmarc-reports+example.com@mail.example.com", time.Now().UTC())
 	if !errors.Is(err, ErrRejected) {
 		t.Fatalf("report for an unconfigured domain: err = %v, want ErrRejected", err)
 	}
@@ -163,6 +163,14 @@ func TestIngestMessageRejectsTagMismatch(t *testing.T) {
 		"dmarc-reports+other.example@mail.example.com", time.Now().UTC())
 	if !errors.Is(err, ErrRejected) {
 		t.Fatalf("report at an address tagged for another domain: err = %v, want ErrRejected", err)
+	}
+	// An address with no tag is no domain's mailbox, whatever the report
+	// claims (security audit 2026-10-17, W1).
+	for _, untagged := range []string{"ops@mail.example.com", "dmarc-reports@mail.example.com"} {
+		err = IngestMessage(st, bytes.NewBufferString(gzipMessage(t, sampleXML)), untagged, time.Now().UTC())
+		if !errors.Is(err, ErrRejected) {
+			t.Errorf("report at the untagged %s: err = %v, want ErrRejected", untagged, err)
+		}
 	}
 }
 

@@ -636,10 +636,16 @@ deferred item from the roadmap.
   the alignment statistics the panel shows. Inherent to how `rua` works:
   reporters are arbitrary third parties and the mailbox address is published in
   DNS. The ingest already constrains the meaningful part — a report cannot be
-  filed under a domain this instance does not host, and the claimed domain is
-  cross-checked against the `+tag` of the delivery address (effective since
-  2.0.0: before it the recipient never reached the command) — and the data is
-  advisory statistics only; nothing enforces off it. What a stranger can do is
+  filed under a domain this instance does not host, and the claimed domain
+  must be the `+tag` of the delivery address (checked since 2.0.0: before it
+  the recipient never reached the command; required since `2.14.4`) — and
+  the data is advisory statistics only; nothing enforces off it. The only
+  mailboxes are the hosted addresses, each open while its own domain has
+  chosen it: a typed report address on the server's own name is refused, and
+  one stored before is no mailbox (until `2.14.4` a domain user could type
+  `ops@<hostname>` and so open an untagged mailbox to the internet whose
+  reports were filed under any domain, or another domain's hosted address -
+  security audit 2026-10-17, W1). What a stranger can do is
   limited to a domain that chose a SelfPost-hosted address, through that
   address: file reports under it, replace one whose reporter and id they know,
   and fill that domain's 500 — not another domain's. A message that is not a

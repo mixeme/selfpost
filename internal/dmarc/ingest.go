@@ -113,13 +113,19 @@ func IngestMessage(st *store.Store, r io.Reader, recipient string, receivedAt ti
 }
 
 // checkReportDomain refuses a report whose policy domain is not one of this
-// relay's sending domains, or that contradicts the +tag of the address it was
-// delivered to.
+// relay's sending domains, or is not the +tag of the address it was delivered
+// to. Every mailbox here is a hosted one, tagged with its domain
+// (AllowedRecipients), so an address without a tag is no mailbox of a domain
+// and its report belongs to none (security audit 2026-10-17, W1).
 func checkReportDomain(st *store.Store, domain, recipient string) error {
 	if domain == "" {
 		return rejected(fmt.Errorf("no policy domain"))
 	}
-	if tagged := TaggedDomain(recipient); tagged != "" && tagged != domain {
+	tagged := TaggedDomain(recipient)
+	if tagged == "" {
+		return rejected(fmt.Errorf("the address it was sent to (%s) is tagged with no domain", recipient))
+	}
+	if tagged != domain {
 		return rejected(fmt.Errorf("domain %q does not match the address it was sent to (%s)", domain, recipient))
 	}
 	ok, err := st.DomainExists(domain)
