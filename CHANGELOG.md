@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.2] - 2026-10-17
+
+The last small items of the day. No migration; schema 13.
+
 ### Added
 
 - **Health dials the inbound journal's socket** with the inbound relay on:
