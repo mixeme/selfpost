@@ -162,7 +162,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleOverviewFragment(rec, reqAs("/overview/fragment", globalPrincipal))
 		page := rec.Body.String()
-		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a> (4 of 5 answering)`} {
+		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a>: 4 of 5 answering`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("action %q: Overview is missing %q", tt.action, want)
 			}

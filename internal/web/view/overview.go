@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Overview is the data of the Overview page. Cards are the checks of Health
@@ -89,10 +90,12 @@ func (o *Overview) HeadOOB() Head {
 	return h
 }
 
-// overviewHead is the stamp and the sentence under it. The stamp takes the
-// worst card, counts the cards that are not fine, and the lead names them with
-// their detail so the operator sees what to open without scanning the grid. A
-// card that could not be read is a warning, never a pass (cardLevel).
+// overviewHead is the stamp and the sentence under it (mockup overview.html,
+// the owner's "1" of 2026-10-17). The stamp takes the worst card and counts
+// the cards that are not fine; the title says whether mail flows and how many
+// things need attention, and the lead names them with their values so the
+// operator sees what to open without scanning the grid. A card that could not
+// be read is a warning, never a pass (cardLevel).
 func overviewHead(host string, cards []HealthCard, updated time.Time) Head {
 	level, bad := LevelOK, []HealthCard{}
 	for _, c := range cards {
@@ -105,12 +108,14 @@ func overviewHead(host string, cards []HealthCard, updated time.Time) Head {
 		}
 	}
 
-	title, word, count := "Everything is running normally.", "OK", len(cards)
+	title, word, count := "Mail is flowing. Nothing needs attention.", "OK", len(cards)
 	switch level {
 	case LevelWarn:
-		title, word, count = "Running, with warnings.", "WARN", len(bad)
+		title, word, count = "Mail is flowing. "+needAttention(len(bad)), "WARN", len(bad)
 	case LevelFail:
-		title, word, count = "A component needs attention.", "FAIL", len(bad)
+		// A failed card is Postfix, a milter socket, a queue that cannot be
+		// read: what can stop mail.
+		title, word, count = "Mail may not be flowing. "+needAttention(len(bad)), "FAIL", len(bad)
 	}
 
 	h := Head{
@@ -121,16 +126,35 @@ func overviewHead(host string, cards []HealthCard, updated time.Time) Head {
 		Note:     []string{"Updated " + updated.Local().Format("15:04:05"), "refreshes on its own"},
 	}
 	if len(bad) > 0 {
-		lead := Text{{Text: "Needs attention: "}}
+		var lead Text
 		for i, c := range bad {
 			if i > 0 {
-				lead = append(lead, Inline{Text: ", "})
+				lead = append(lead, Inline{Text: "; "})
 			}
-			lead = append(lead, Link(c.Href, c.Name), Inline{Text: " (" + c.Value + ")"})
+			lead = append(lead, Link(c.Href, c.Name), Inline{Text: ": " + lowerFirst(c.Value)})
 		}
 		h.Lead = append(lead, Inline{Text: "."})
 	}
 	return h
+}
+
+// needAttention is the second sentence of the title for n things.
+func needAttention(n int) string {
+	if n == 1 {
+		return "One thing needs attention."
+	}
+	return strconv.Itoa(n) + " things need attention."
+}
+
+// lowerFirst writes a card's value inside a sentence: "Expires in 12 days"
+// becomes "expires in 12 days", but a word that starts with two capitals - an
+// abbreviation, "CPU 98 %" - stays as it is.
+func lowerFirst(s string) string {
+	r := []rune(s)
+	if len(r) > 1 && unicode.IsUpper(r[0]) && unicode.IsLower(r[1]) {
+		r[0] = unicode.ToLower(r[0])
+	}
+	return string(r)
 }
 
 // FormatCount writes a whole number with its thousands separated by a no-break

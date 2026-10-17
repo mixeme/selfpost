@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Overview's head says it as the mockup does** (overview-head): "Mail is
+  flowing. One thing needs attention." - or "Nothing needs attention", or
+  "Mail may not be flowing" when a check fails - and under it each check
+  that is not fine with its value ("TLS certificate: expires in 12 days.").
+
 ## [2.14.0] - 2026-10-17
 
 Password reset by e-mail, to a confirmed address. Migration 0013; schema 13.

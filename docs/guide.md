@@ -455,7 +455,9 @@ assumptions stay here in `docs/guide.md`.
 ### Overview and Health
 
 **Overview** (`/overview`, global role) shows the stamp — the worst of its
-checks — and one card per check: machine (processor and memory), supervised
+checks — with a sentence beside it ("Mail is flowing. One thing needs
+attention.", "Mail may not be flowing." when a check fails) and, under it,
+each check that is not fine with its value; then one card per check: machine (processor and memory), supervised
 processes (Postfix, the panel - whose roles include the DKIM signer - and
 their helpers), TLS certificate, queue, milter sockets and reverse DNS. A
 check the panel could not run shows as a warning, never as fine. Below the cards are the outbound domain list and, with the inbound relay
