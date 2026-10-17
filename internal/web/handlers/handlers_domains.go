@@ -206,6 +206,9 @@ func (h *Handlers) HandleReload(w http.ResponseWriter, r *http.Request) {
 	if h.dmarc != nil && h.dmarc.Enabled() {
 		steps = append(steps, step{"the DMARC report maps", h.dmarc.Resync})
 	}
+	// A rebuild that changed nothing asked no reload (security audit
+	// 2026-10-17, W6): this button re-reads whatever is on disk.
+	steps = append(steps, step{"Postfix's reload", h.apps.ReloadPostfix})
 	for _, s := range steps {
 		if err := s.run(); err != nil {
 			logf("panel: manual reload (%s): %v", s.name, err)

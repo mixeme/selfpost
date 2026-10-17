@@ -32,6 +32,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   a monitor next to it; the internet gets `404`.
 - **Every container has a process ceiling** (audit I3): `pids_limit` 1024
   for SelfPost, 256 for the proxies and rspamd, 64 for certbot.
+- **A save that changes no map no longer reloads Postfix, and DNS
+  re-checks are limited** (audit W6/M9): every application, upstream,
+  recipient or report-address save reloaded Postfix, and *Re-check DNS*
+  bypassed the cache without limit. Now only a changed file is written and
+  reloaded (Health's *Reload configuration* always re-reads), and a user
+  re-checks twenty times in 15 minutes.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to

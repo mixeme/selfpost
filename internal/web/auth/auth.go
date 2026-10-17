@@ -54,6 +54,8 @@ type Module struct {
 	// ignored (links.go, sendReset).
 	resetDayLimiter    *rateLimiter
 	resetNoticeLimiter *rateLimiter
+	// recheckLimiter counts the DNS re-checks a user forces (AllowDNSRecheck).
+	recheckLimiter *rateLimiter
 
 	proxyWatch proxyWatch
 	refusals   *refusalLog
@@ -98,6 +100,7 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		// silence for the rest of the day (security audit 2026-10-17, A3).
 		resetDayLimiter:    newRateLimiter(resetsPerDay, 24*time.Hour),
 		resetNoticeLimiter: newRateLimiter(1, 24*time.Hour),
+		recheckLimiter:     newRateLimiter(20, 15*time.Minute),
 		trustedProxies:     cfg.TrustedProxyCIDRs,
 	}
 	m.setupLimiter.startSweeper()
@@ -112,6 +115,7 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 	m.mailLimiter.startSweeper()
 	m.resetDayLimiter.startSweeper()
 	m.resetNoticeLimiter.startSweeper()
+	m.recheckLimiter.startSweeper()
 	// Made now rather than at the first unknown name, which would otherwise
 	// pay for two bcrypt runs (review of audit stage 4).
 	go noSuchUserHash()
@@ -129,6 +133,14 @@ func (m *Module) Bootstrap() error {
 // Account form is within the user's rate limit (security.md).
 func (m *Module) AllowPasswordChange(userID int64) bool {
 	return m.passwordLimiter.Allow("user:" + strconv.FormatInt(userID, 10))
+}
+
+// AllowDNSRecheck is whether a user may make the DNS checks again, past the
+// five-minute cache: each re-check is up to fourteen resolver queries, and a
+// domain user could press it without end (security audit 2026-10-17, M9).
+// Twenty in fifteen minutes per user.
+func (m *Module) AllowDNSRecheck(userID int64) bool {
+	return m.recheckLimiter.Allow("user:" + strconv.FormatInt(userID, 10))
 }
 
 // PasswordCheckPassed gives back the attempt AllowPasswordChange took for a

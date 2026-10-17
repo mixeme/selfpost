@@ -17,6 +17,15 @@ import (
 // *postfix.Postfix satisfies it; tests substitute a fake.
 type SenderMaps interface {
 	RebuildSenderLoginMaps(bindings []postfix.Binding) error
+	// Reload has Postfix re-read its configuration whatever changed.
+	Reload() error
+}
+
+// ReloadPostfix has Postfix re-read its configuration. A rebuild that
+// changes no file asks no reload; Health's Reload configuration ends with
+// this one, so that it re-reads whatever is on disk.
+func (s *Service) ReloadPostfix() error {
+	return s.pf.Reload()
 }
 
 // Service coordinates application state across SQLite, sasldb2 and the Postfix

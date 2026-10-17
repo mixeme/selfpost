@@ -29,13 +29,8 @@ func (p *Postfix) RebuildDMARCMaps(cfg DMARCMapsConfig) error {
 		return err
 	}
 	rc, tr, rd := p.dmarcMapPaths()
-	if err := writeFileAtomic(rc, recip, 0o640); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(tr, transport, 0o640); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(rd, relay, 0o640); err != nil {
+	changed, err := writeChanged(mapFile{rc, recip}, mapFile{tr, transport}, mapFile{rd, relay})
+	if err != nil || !changed {
 		return err
 	}
 	return p.reload()

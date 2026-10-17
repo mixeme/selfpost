@@ -132,3 +132,33 @@ func TestRebuildRejectsUnsafeWithoutWriting(t *testing.T) {
 		t.Errorf("reload called %d times, want 1 (no reload on failure)", *reloads)
 	}
 }
+
+// A rebuild that changes no file writes nothing and asks no reload; a change
+// in any one file reloads once (security audit 2026-10-17, W6).
+func TestARebuildThatChangesNothingDoesNotReload(t *testing.T) {
+	p, reloads := newTestPostfix(t)
+	b := []Binding{{"@example.com", "app1"}}
+	for i := 0; i < 3; i++ {
+		if err := p.RebuildSenderLoginMaps(b); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if *reloads != 1 {
+		t.Errorf("three identical sender-map rebuilds reloaded %d times, want 1", *reloads)
+	}
+	routes := []InboundRoute{{Domain: "in.example.com", Host: "mx.example.net", Port: 25, TLSMode: "may", RecipientMode: "any"}}
+	for i := 0; i < 2; i++ {
+		if err := p.RebuildInboundMaps(routes); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if *reloads != 2 {
+		t.Errorf("two identical inbound rebuilds after it: %d reloads in all, want 2", *reloads)
+	}
+	if err := p.RebuildSenderLoginMaps(append(b, Binding{"@other.example", "app2"})); err != nil {
+		t.Fatal(err)
+	}
+	if *reloads != 3 {
+		t.Errorf("a changed map: %d reloads in all, want 3", *reloads)
+	}
+}

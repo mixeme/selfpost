@@ -804,9 +804,14 @@ the argument.
   SelfPost (Postfix's default_process_limit of 100 per service, three smtpd
   services), 256 for the proxies and rspamd, 64 for certbot; e2e reads
   `pids.max` back (checkPidsLimit).
-- [ ] **W6/M9.** Coalesce Postfix reloads (reload only when the rendered map
+- [x] **W6/M9.** Coalesce Postfix reloads (reload only when the rendered map
   changed; a 2 s debounce for bursts); a per-user limiter on `dns-recheck`.
-  — **Opus**, 1.5 h.
+  — **Opus**, 1.5 h. *Done 2026-10-17:* a rebuild that changes no file
+  writes nothing and asks no reload (`writeChanged`), Health's button
+  re-reads in any case; no debounce - with unchanged saves gone, a burst is
+  real changes, each of which Postfix must see; twenty re-checks in 15
+  minutes per user, then the cached result. TestARebuildThatChangesNothingDoesNotReload,
+  TestDNSRechecksArePerUser.
 - [ ] **W4/W5/W8.** Key size 1024-4096 on import; ≤ 500 applications per
   export; an import named as the hostname refused with a sentence. —
   **Sonnet**, 1.5 h.

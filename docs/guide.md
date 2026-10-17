@@ -516,7 +516,8 @@ readings, numbered in the order of what stops mail first:
 - **Hostname and reverse DNS** — compares `SELFPOST_HOSTNAME` against the PTR
   record the internet publishes for this server's IP (forward-confirmed
   reverse DNS), see [Server-level DNS](#server-level-dns-ptrrdns); use
-  *Re-check DNS* after changing DNS. *Greeting* is the `220` line Postfix
+  *Re-check DNS* after changing DNS (twenty re-checks in 15 minutes per user;
+past that the page shows the last result). *Greeting* is the `220` line Postfix
   opens every connection with; it must name the hostname, and another name
   there is a warning.
 - **Notification mail** — whether the DNS records the panel's own mail is
@@ -538,7 +539,8 @@ readings, numbered in the order of what stops mail first:
   selector table (`/data/dkim/selectors`), the Postfix sender map, the
   inbound relay maps and the filter lists (with `INBOUND_RELAY_ENABLE=true`),
   the DMARC report maps (with `DMARC_REPORTS_ENABLE=true`) - removes the keys
-  of deleted domains, and has Postfix re-read them; the signer needs no
+  of deleted domains, and has Postfix re-read them (a save elsewhere that
+  changes no file asks no reload; this button always does); the signer needs no
   reload, it reads the table for every message. This is
   what the first start after a restore does (see [Restore](#restore)). Use it
   if the daemons drifted from what the panel shows after manual edits under

@@ -69,7 +69,8 @@ func (p *Postfix) RebuildSenderLoginMaps(bindings []Binding) error {
 	if err != nil {
 		return err
 	}
-	if err := writeFileAtomic(p.senderLoginMapsPath, content, 0o640); err != nil {
+	changed, err := writeChanged(mapFile{p.senderLoginMapsPath, content})
+	if err != nil || !changed {
 		return err
 	}
 	return p.reload()

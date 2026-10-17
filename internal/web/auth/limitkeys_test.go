@@ -114,3 +114,21 @@ func TestProxyWatchAndRefusalsAreLogged(t *testing.T) {
 		t.Errorf("refusals logged %d times (want 5), or the name unescaped:\n%s", n, got)
 	}
 }
+
+// A user forces the DNS checks twenty times in fifteen minutes, then sees
+// the cached result (security audit 2026-10-17, M9); another user is not
+// affected.
+func TestDNSRechecksArePerUser(t *testing.T) {
+	m := testModule(t, false)
+	for i := 0; i < 20; i++ {
+		if !m.AllowDNSRecheck(1) {
+			t.Fatalf("re-check %d refused", i+1)
+		}
+	}
+	if m.AllowDNSRecheck(1) {
+		t.Error("the 21st re-check was allowed")
+	}
+	if !m.AllowDNSRecheck(2) {
+		t.Error("another user's first re-check was refused")
+	}
+}

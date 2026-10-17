@@ -20,6 +20,8 @@ var offlineDNS = dnscheck.New([]string{"127.0.0.1:9"})
 
 type nopSenderMaps struct{}
 
+func (nopSenderMaps) Reload() error { return nil }
+
 func (nopSenderMaps) RebuildSenderLoginMaps([]postfix.Binding) error { return nil }
 
 // appStand is a panel with one sending domain and a working application

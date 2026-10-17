@@ -275,6 +275,10 @@ func (h *Handlers) HandleInboundDNSRecheck(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	if !h.allowRecheck(r) {
+		http.Redirect(w, r, fmt.Sprintf("/inbound/domains/%d", d.ID), http.StatusSeeOther)
+		return
+	}
 	if h.dns != nil && h.cfg.Hostname != "" {
 		h.dns.InboundMX(d.Name, h.cfg.Hostname, true)
 	}

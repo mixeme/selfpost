@@ -273,8 +273,24 @@ func (h *Handlers) HandleDomainDNSRecheck(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	if !h.allowRecheck(r) {
+		http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d", d.ID), http.StatusSeeOther)
+		return
+	}
 	h.domainDNS(d, record, d.DMARCRua, true)
 	http.Redirect(w, r, fmt.Sprintf("/outbound/domains/%d?rechecked=1", d.ID), http.StatusSeeOther)
+}
+
+// allowRecheck is whether the signed-in user may force the DNS checks now
+// (auth.AllowDNSRecheck). Past the limit the page shows the cached result,
+// without saying it re-checked; the log says why.
+func (h *Handlers) allowRecheck(r *http.Request) bool {
+	p, ok := h.principal(r)
+	if !ok || h.auth == nil || h.auth.AllowDNSRecheck(p.ID) {
+		return true
+	}
+	logf("panel: user %d: DNS re-checks asked for too often; the cached result is shown", p.ID)
+	return false
 }
 
 // limitChoice names which of the form's three limit choices an application has:

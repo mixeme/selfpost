@@ -20,6 +20,8 @@ type fakeMaps struct {
 	failNext bool
 }
 
+func (f *fakeMaps) Reload() error { return nil }
+
 func (f *fakeMaps) RebuildSenderLoginMaps(b []postfix.Binding) error {
 	f.calls++
 	if f.failNext {
@@ -513,6 +515,8 @@ func TestSaveSettingsIsAllOrNothing(t *testing.T) {
 type overlapMaps struct {
 	inside, most atomic.Int32
 }
+
+func (o *overlapMaps) Reload() error { return nil }
 
 func (o *overlapMaps) RebuildSenderLoginMaps([]postfix.Binding) error {
 	n := o.inside.Add(1)

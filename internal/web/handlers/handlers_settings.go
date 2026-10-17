@@ -203,6 +203,10 @@ func (h *Handlers) HandleSettingsDNSRecheck(w http.ResponseWriter, r *http.Reque
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
+	if !h.allowRecheck(r) {
+		http.Redirect(w, r, "/server/settings", http.StatusSeeOther)
+		return
+	}
 	h.dns.Server(h.cfg.Hostname, true)
 	h.serverMail(true)
 	http.Redirect(w, r, "/server/settings?rechecked=1", http.StatusSeeOther)

@@ -40,16 +40,8 @@ func (p *Postfix) RebuildInboundMaps(routes []InboundRoute) error {
 		return err
 	}
 	rd, tr, rc, tl := p.inboundMapPaths()
-	if err := writeFileAtomic(rd, relay, 0o640); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(tr, transport, 0o640); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(rc, recipients, 0o640); err != nil {
-		return err
-	}
-	if err := writeFileAtomic(tl, tlsPolicy, 0o640); err != nil {
+	changed, err := writeChanged(mapFile{rd, relay}, mapFile{tr, transport}, mapFile{rc, recipients}, mapFile{tl, tlsPolicy})
+	if err != nil || !changed {
 		return err
 	}
 	return p.reload()

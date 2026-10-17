@@ -26,6 +26,8 @@ const savedElsewhere = "Check the logs and try again."
 
 type failingSenderMaps struct{}
 
+func (failingSenderMaps) Reload() error { return nil }
+
 func (failingSenderMaps) RebuildSenderLoginMaps([]postfix.Binding) error {
 	return errors.New("write /srv/" + leak + "/sender_login_maps: permission denied")
 }
