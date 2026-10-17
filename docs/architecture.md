@@ -63,7 +63,7 @@ The panel runs `postfix-reload` through supervisord's XML-RPC interface and
 waits for its exit status (`internal/supervisor`, `RunOnce`); the program
 rests EXITED after a run.
 
-**Liveness:** `GET /healthz` (unauthenticated) returns 200 when panel - whose
+**Liveness:** `GET /healthz` (unauthenticated; answered only to a request with no `X-Forwarded-For` from loopback or a private address, else 404) returns 200 when panel - whose
 roles include the DKIM signer - and postfix are RUNNING
 (`internal/health`, `Liveness`); Docker `HEALTHCHECK` uses the same probe (its
 90-second start period covers postfix's STARTING).

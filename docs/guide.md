@@ -819,15 +819,18 @@ again whole and loses the keys of domains added under 2.8.x.
 ### Container health
 
 The image declares a Docker `HEALTHCHECK` that probes `GET /healthz` on port
-8080 (unauthenticated). It returns `200 ok` when the panel - whose roles
+8080 (unauthenticated, and answered only to a request that did not come
+through a reverse proxy - no `X-Forwarded-For` - from loopback or a private
+address; anyone else gets `404`). It returns `200 ok` when the panel - whose roles
 include the DKIM signer - and Postfix are both `RUNNING` under supervisord;
 otherwise `503 unhealthy`. This
 catches a dead mail path that would still leave the HTTP server up, but it
 does **not** verify TLS certificates, DNS records, or end-to-end delivery —
 use the authenticated [Overview and Health](#overview-and-health) pages for
-that. External monitoring
-can use the same endpoint through the reverse proxy if you expose it, or poll
-`docker inspect` health state on the host.
+that. External monitoring runs on the host - `curl -fsS
+http://127.0.0.1:8080/healthz` - or polls `docker inspect` health state;
+through the reverse proxy the endpoint is not found, so its answer tells a
+stranger nothing.
 
 ### Server-level DNS (PTR/rDNS)
 

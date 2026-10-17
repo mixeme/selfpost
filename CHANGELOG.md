@@ -26,6 +26,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   username could keep a live reset link arriving in that mailbox five times
   an hour. After five in a day the owner is told once that further requests
   are ignored for 24 hours.
+- **`/healthz` is not answered through the reverse proxy** (audit I6):
+  only a request with no `X-Forwarded-For` from loopback or a private
+  address gets the liveness answer - the container's own check, the host,
+  a monitor next to it; the internet gets `404`.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to

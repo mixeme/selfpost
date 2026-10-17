@@ -356,7 +356,17 @@ func redirectHome(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/overview", http.StatusSeeOther)
 }
 
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
+// handleHealth answers the liveness probe - but only to a client that did not
+// come through a reverse proxy: one with no X-Forwarded-For, from loopback or
+// a private address (the container's own HEALTHCHECK, the host, a monitor on
+// the Docker network). Every supported proxy appends X-Forwarded-For, and the
+// panel's port is published on loopback only, so the internet gets a 404:
+// "unhealthy: postfix" was a free tell (security audit 2026-10-17, I6).
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	if !localProbe(r) {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if err := health.Liveness(); err != nil {
 		http.Error(w, "unhealthy\n", http.StatusServiceUnavailable)
@@ -364,6 +374,20 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok\n"))
+}
+
+// localProbe is whether a request comes straight from loopback or a private
+// address, not through a proxy.
+func localProbe(r *http.Request) bool {
+	if r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("Forwarded") != "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
 }
 
 func handleLicense(w http.ResponseWriter, r *http.Request) {
