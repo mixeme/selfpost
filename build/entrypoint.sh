@@ -91,6 +91,7 @@ drop_links /data/dkim /data/dkim.new /data/opendkim /data/sasl /data/postfix /da
 	/data/sasl/sasldb2 /data/postfix/queue \
 	/data/postfix/sender_login_maps /data/postfix/relay_domains \
 	/data/postfix/transport /data/postfix/relay_recipients /data/postfix/tls_policy \
+	/data/postfix/dmarc_recipients /data/postfix/dmarc_transport /data/postfix/dmarc_relay_domains \
 	/data/log/mail.log
 # Restored backups or previously-created state may contain panel-owned files
 # under /data; make sure they stay writable without disturbing anything that a

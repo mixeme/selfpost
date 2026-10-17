@@ -693,9 +693,10 @@ the argument.
   tests pass with the field. — **Opus**, 2 h. *Done 2026-10-17:* also on a
   change of e-mail (where reset links go); a save of the name and the
   reach alone is not asked; TestUserFormAsksForTheAccountPassword.
-- [ ] **I2.** The three DMARC maps in `drop_links`; `[ -L ]` beside `[ -e ]`
+- [x] **I2.** The three DMARC maps in `drop_links`; `[ -L ]` beside `[ -e ]`
   in postfix-config.sh:538,545; an e2e case plants a link and expects the
-  log line. — **Opus**, 0.5 h.
+  log line. — **Opus**, 0.5 h. *Done 2026-10-17:* TestStartsOnA28Data
+  plants a dangling `dmarc_transport` with DMARC reports on.
 - [ ] **M2.** Greedy reply group anchored on Postfix's own tail; the live
   line above as a test; security.md § Mail path reworded ("the last `;
   from=<`, which is Postfix's because a HELO name can hold none of

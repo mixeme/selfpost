@@ -95,6 +95,14 @@ func TestStartsOnA28Data(t *testing.T) {
 		t.Fatalf("generate throwaway TLS cert: %v", err)
 	}
 
+	// A dangling link where root creates an empty DMARC map: the panel owns
+	// /data/postfix and could plant one. The entrypoint removes it and
+	// creates nothing at its target (audit 2026-10-17, I2).
+	const planted = "/etc/selfpost-planted-by-the-panel"
+	if err := os.Symlink(planted, filepath.Join(dataDir, "postfix", "dmarc_transport")); err != nil {
+		t.Fatal(err)
+	}
+
 	name := "selfpost-e2e-upgrade"
 	_ = exec.Command("docker", "rm", "-f", name).Run()
 	defer func() {
@@ -103,7 +111,7 @@ func TestStartsOnA28Data(t *testing.T) {
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	}()
 	if out, err := exec.Command("docker", "run", "-d", "--name", name,
-		"-e", "SELFPOST_HOSTNAME="+host, "-e", "MILTER_WAIT_TIMEOUT=10",
+		"-e", "SELFPOST_HOSTNAME="+host, "-e", "MILTER_WAIT_TIMEOUT=10", "-e", "DMARC_REPORTS_ENABLE=true",
 		"-v", dataDir+":/data", "-v", certDir+":/etc/postfix/tls:ro",
 		"selfpost:e2e").CombinedOutput(); err != nil {
 		t.Fatalf("docker run: %v\n%s", err, out)
@@ -147,6 +155,12 @@ func TestStartsOnA28Data(t *testing.T) {
 	// its postrotate asks no reload of a Postfix not running yet (the test
 	// server's rollout of 2026-10-16 logged "fatal: the Postfix mail system
 	// is not running"; build/logrotate-mail.conf).
+	if !strings.Contains(logs(), "entrypoint: removing the symbolic link /data/postfix/dmarc_transport") {
+		t.Errorf("the entrypoint did not remove the planted link:\n%s", logs())
+	}
+	if got := exec1(`test -e ` + planted + ` && echo created || echo absent; test -f /data/postfix/dmarc_transport && ! test -L /data/postfix/dmarc_transport && echo file`); got != "absent\nfile" {
+		t.Errorf("planted link: %q, want the target absent and the map a regular file", got)
+	}
 	if got := exec1(`test -f /data/log/mail.log.1 && echo rotated`); got != "rotated" {
 		t.Errorf("the rotation due at the start did not run: %q", got)
 	}

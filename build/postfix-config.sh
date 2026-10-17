@@ -534,8 +534,12 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	TRANSPORT_SETTING=""
 	RECIPIENT_RESTRICTIONS="reject"
 	if [ "${INBOUND_RELAY_ENABLE}" = "true" ]; then
+		# [ -e ] is false for a dangling link and the redirect would follow
+		# it: the entrypoint's drop_links removes links at these paths, and
+		# this refuses to create through one all the same (audit 2026-10-17,
+		# I2).
 		for f in "$RELAY_DOMAINS_MAP" "$TRANSPORT_MAP" "$RELAY_RECIPIENTS_MAP" "$TLS_POLICY_MAP"; do
-			[ -e "$f" ] || : > "$f"
+			[ -e "$f" ] || [ -L "$f" ] || : > "$f"
 		done
 		RELAY_DOMAINS_SETTING="texthash:${RELAY_DOMAINS_MAP}"
 		TRANSPORT_SETTING="texthash:${TRANSPORT_MAP}"
@@ -543,7 +547,7 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	fi
 	if [ "${DMARC_REPORTS_ENABLE}" = "true" ]; then
 		for f in "$DMARC_RECIPIENTS_MAP" "$DMARC_TRANSPORT_MAP" "$DMARC_RELAY_DOMAINS_MAP"; do
-			[ -e "$f" ] || : > "$f"
+			[ -e "$f" ] || [ -L "$f" ] || : > "$f"
 		done
 		ln -sf /usr/local/bin/panel /usr/local/bin/dmarc-ingest
 		# flags=, user= and argv= are arguments of pipe(8), not -o parameters:

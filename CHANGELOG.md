@@ -13,6 +13,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   check. Adding a user, setting a password, changing an e-mail or a role on
   the user form, and deleting a user now ask for your own account password,
   as a backup does, under the same limit on wrong guesses.
+- **The entrypoint follows no link at the DMARC maps** (audit I2): the
+  three `dmarc_*` maps root creates at the start were missing from the list
+  of paths where a symbolic link is removed first.
 
 ## [2.14.3] - 2026-10-17
 
