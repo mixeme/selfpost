@@ -80,11 +80,17 @@
           <div class="sp-box-body">
             <form class="sp-form" method="post" action="#">
               <div class="field"><label class="label" for="username">Username</label><div class="control has-icons-left"><input class="input" id="username" name="username" value="admin" autocomplete="username" spellcheck="false" required><span class="icon is-left"><i class="ti ti-user"></i></span></div></div>
-              <div class="field"><label class="label" for="email">E-mail</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="mix@example.org" autocomplete="email"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
-                <p class="help">Your own address. A domain's report address can be filled with it from Domain settings.</p></div>
+              <div class="field"><label class="label" for="email">E-mail <span class="tag is-warning is-light">not confirmed</span></label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="mix@example.org" autocomplete="email"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
+                <p class="help">Your own address. Saving a new one sends it a link to confirm it; once confirmed it is where a link to reset your password can go. A domain's report address can be filled with it from Domain settings.</p></div>
+              <div class="field"><label class="label" for="pcur">Current password</label><div class="control"><input class="input" id="pcur" name="current_password" type="password" autocomplete="current-password"></div>
+                <p class="help">Needed only to change the e-mail.</p></div>
               <div class="field"><label class="checkbox"><input type="checkbox" name="notify" checked> Send me notifications</label>
                 <p class="help">To this address, when something needs you: a DNS record of a domain stops matching, a rate limit refuses mail, the TLS certificate is about to expire, a message has waited in the queue for three days. <a href="help.html#notifications">What is sent and when</a></p></div>
               <button type="submit" class="button is-primary">Save profile</button>
+            </form>
+            <form class="sp-form mt-4" method="post" action="#">
+              <p class="help mb-3">A link was sent to <span class="sp-mono">mix@example.org</span> at 14:02; it works once, for 24 hours.</p>
+              <button type="submit" class="button">Send the link again</button>
             </form>
           </div>
         </div>

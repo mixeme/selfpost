@@ -3,7 +3,6 @@
       <div class="sp-grow">
         <p class="sp-kicker"><a href="users.html">Users</a> /</p>
         <h1 class="title is-3">acme-ops</h1>
-        <p class="sp-lead">The same form, empty, creates a new user.</p>
       </div>
       <a class="button is-danger is-light" href="user-delete.html"><i class="ti ti-trash"></i>Delete user</a>
     </div>
@@ -15,8 +14,8 @@
             <div class="sp-box-head"><span class="sp-no">01</span><h2>Account</h2><a class="sp-help" href="help.html#users" title="Roles and domain assignments"><i class="ti ti-help-circle"></i></a></div>
             <div class="sp-box-body">
               <div class="field"><label class="label" for="username">Username</label><div class="control"><input class="input" id="username" name="username" value="acme-ops" autocomplete="username" spellcheck="false" required></div></div>
-              <div class="field"><label class="label" for="email">E-mail</label><div class="control"><input class="input" id="email" name="email" type="email" value="ops@acme.io" autocomplete="off"></div>
-                <p class="help">The user's own address. They can change it under Account.</p></div>
+              <div class="field"><label class="label" for="email">E-mail <span class="tag is-success is-light">confirmed</span></label><div class="control"><input class="input" id="email" name="email" type="email" value="ops@acme.io" autocomplete="off"></div>
+                <p class="help">The user's own address. They can change it under Account. A new one is sent a link to confirm it; until it is confirmed no reset link goes to it.</p></div>
               <div class="field"><label class="label" for="password">Password</label><div class="control"><input class="input" id="password" name="password" type="password" autocomplete="new-password"></div>
                 <p class="help">Leave empty to keep the current one.</p></div>
               <div class="field"><label class="label" for="role">Role</label>
