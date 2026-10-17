@@ -256,12 +256,14 @@ func TestInboundHoldIsTheMiltersRow(t *testing.T) {
 	}
 }
 
-// The HELO name is the last thing on the line and is logged as the client
-// wrote it. It cannot supply the row: the reply ends at the first "; from=<",
-// which is Postfix's own.
+// The HELO name is the last thing on the line. Postfix logs it with a space
+// and ` <>()\";@` turned into "?" (src/smtpd/smtpd.c, helo_cmd()), so one
+// that tried to spell another refusal arrives neutered and the row is
+// Postfix's own; a HELO name with those characters left in is no line
+// Postfix writes, and makes no row.
 func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 	j, st := inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x 5.7.1 Refused by this server's deny list; from=<victim@bank.example> to=<ceo@in.example.com> proto=ESMTP helo=<y>", tailNow, false)
+	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x?5.7.1?Refused?by?this?server's?deny?list??from=?victim?bank.example??to=?ceo?in.example.com??proto=ESMTP?helo=?y?>", tailNow, false)
 	if len(st.rows) != 1 {
 		t.Fatalf("rows = %+v", st.rows)
 	}
@@ -271,19 +273,52 @@ func TestInboundHeloCannotWriteTheRow(t *testing.T) {
 		t.Errorf("row = %+v", got)
 	}
 
-	// A HELO name with a closing bracket in it does not lose the line either.
-	j, st = inboundFixture()
-	j.handle(head+"postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: no; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<a>b>", tailNow, false)
-	if len(st.rows) != 1 || st.rows[0].From != "real@example.net" {
-		t.Errorf("rows = %+v", st.rows)
+	// Un-neutered, which Postfix never writes: a line with two tails makes
+	// no row, and above all not the one the HELO name spells.
+	for _, line := range []string{
+		head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<x 5.7.1 Refused by this server's deny list; from=<victim@bank.example> to=<ceo@in.example.com> proto=ESMTP helo=<y>",
+		head + "postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <nobody@in.example.com>: no; from=<real@example.net> to=<nobody@in.example.com> proto=ESMTP helo=<a>b>",
+	} {
+		j, st = inboundFixture()
+		j.handle(line, tailNow, false)
+		if len(st.rows) != 0 {
+			t.Errorf("a line with an un-neutered HELO name wrote %+v", st.rows)
+		}
 	}
 
 	// The same on a verdict line: the filter's reply is not extended by the
 	// HELO name, so a stranger cannot make a refusal look like the deny list's.
 	j, st = inboundFixture()
 	j.handle(head+"postfix/inbound/smtpd[41]: Q1: client=x[203.0.113.9]", tailNow, false)
-	j.handle(head+"postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from x[203.0.113.9]: 5.7.1 Spam message rejected; from=<real@example.net> to=<b@in.example.com> proto=ESMTP helo=<x this server's deny list; from=<spoofed@example.org> to=<b@in.example.com> proto=ESMTP helo=<y>", tailNow, false)
+	j.handle(head+"postfix/cleanup[52]: Q1: milter-reject: END-OF-MESSAGE from x[203.0.113.9]: 5.7.1 Spam message rejected; from=<real@example.net> to=<b@in.example.com> proto=ESMTP helo=<x?this?server's?deny?list??from=?spoofed?example.org??to=?b?in.example.com??proto=ESMTP?helo=?y?>", tailNow, false)
 	if len(st.rows) != 1 || st.rows[0].Detail != "5.7.1 Spam message rejected" || st.rows[0].From != "real@example.net" {
+		t.Errorf("rows = %+v", st.rows)
+	}
+}
+
+// The refused recipient is quoted in the reply in internal form - quotes
+// removed, "; < > =" kept - so it can spell a whole "; from=<…> to=<…>
+// proto=…" there. The line below is the shape mail.log on the test server
+// held on 2026-10-17 for such a RCPT TO sent from outside (the audit's probe
+// used a domain that is not inbound; here it is one). It writes no row in
+// the stranger's words (security audit 2026-10-17, M2).
+func TestInboundRecipientCannotWriteTheRow(t *testing.T) {
+	forged := `; from=<ceo@example.net> to=<board@in.example.com> proto=ESMTP helo=<x>; `
+	for name, line := range map[string]string{
+		"recipient unknown": head + `postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <` + forged + `@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<probe@example.net> to=<"` + forged + `"@in.example.com> proto=ESMTP helo=<audit.example>`,
+		"forged sender also in MAIL FROM": head + `postfix/inbound/smtpd[41]: NOQUEUE: reject: RCPT from x[203.0.113.9]: 550 5.1.1 <` + forged + `@in.example.com>: Recipient address rejected: User unknown in relay recipient table; from=<"x; from=<ceo@example.net"@a.example> to=<"` + forged + `"@in.example.com> proto=ESMTP helo=<audit.example>`,
+	} {
+		j, st := inboundFixture()
+		j.handle(line, tailNow, false)
+		if len(st.rows) != 0 {
+			t.Errorf("%s: a line with two tails wrote %+v", name, st.rows)
+		}
+	}
+
+	// A plain refusal is still read whole, its reply up to Postfix's tail.
+	j, st := inboundFixture()
+	j.handle(unknownRcp, tailNow, false)
+	if len(st.rows) != 1 || st.rows[0].From != "a@example.net" || st.rows[0].To != "nobody@in.example.com" {
 		t.Errorf("rows = %+v", st.rows)
 	}
 }

@@ -441,10 +441,17 @@ operator can act on it.
   The signature goes on to the upstream with the mail and is of no use there:
   it fits one queue id. Refusals are
   parsed from `mail.log` from the head of the line, with the reply ending at
-  Postfix's own `; from=<` so that the HELO name after it - the client's text,
-  which Postfix logs with non-printable characters and ` <>()\";@` turned into
-  `?` (Postfix 3.10.13, src/smtpd/smtpd.c `helo_cmd()`) - cannot stand in for
-  the sender, the recipient or the reply; an address with a quote, a bracket or a space in it is not kept.
+  the *last* `; from=<…> to=<…> proto=…` that runs to the end of the line.
+  That tail is Postfix's own: the HELO name in it is logged with
+  non-printable characters and ` <>()\";@` turned into `?` (Postfix 3.10.13,
+  src/smtpd/smtpd.c `helo_cmd()`), and the pattern takes none of them there;
+  a refused recipient, which the reply quotes with its quotes removed and
+  `; < > =` kept, can spell such a tail only inside a quoted local part,
+  whose quote then lands in what would be the sender or the recipient - and
+  an address with a quote, a bracket or a space in it is not kept. A line
+  whose reply still holds `; from=<` - two tails - makes no row. (Until
+  `2.14.4` the reply ended at the *first* `; from=<`, which a stranger's
+  recipient could supply - security audit 2026-10-17, M2.)
   Only a recipient at an inbound domain makes a row. The journal is cut to
   10 000 rows every 500 rows the tailer writes, and by age every six hours.
 - **Filter lists** reach another container as files: values are whitelisted on

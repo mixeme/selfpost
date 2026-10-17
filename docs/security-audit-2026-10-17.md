@@ -697,10 +697,13 @@ the argument.
   in postfix-config.sh:538,545; an e2e case plants a link and expects the
   log line. — **Opus**, 0.5 h. *Done 2026-10-17:* TestStartsOnA28Data
   plants a dangling `dmarc_transport` with DMARC reports on.
-- [ ] **M2.** Greedy reply group anchored on Postfix's own tail; the live
+- [x] **M2.** Greedy reply group anchored on Postfix's own tail; the live
   line above as a test; security.md § Mail path reworded ("the last `;
   from=<`, which is Postfix's because a HELO name can hold none of
-  `<>;\"`"). — **Opus**, 1 h.
+  `<>;\"`"). — **Opus**, 1 h. *Done 2026-10-17:* the HELO name in the
+  tail may hold none of the neutered characters and each SASL field is one
+  word (a `.*` SASL tail would have let a quoted sender spell the whole
+  tail); TestInboundRecipientCannotWriteTheRow.
 - [ ] **M5.** Keep at most two `From:`/`Sender:` values; security.md:810
   reworded. — **Opus**, 0.5 h.
 - [ ] **A4.** Duplicate-cookie line through `loggedPath`. — **Sonnet**, 0.25 h.

@@ -101,15 +101,24 @@ type Inbound struct {
 // addresses), and a pattern that could start anywhere would let him write
 // journal rows.
 //
-// For the same reason the reply is the shortest text before "; from=<", and
-// the HELO name - the last thing on the line but the SASL fields above, which
-// Postfix logs as the client wrote it, spaces and brackets included - is
-// whatever is left. Taking the longest reply instead would let a HELO name
-// that itself spells
-// "; from=<…> to=<…> proto=…" supply the sender, the recipient and the reply
-// of the row (security review, 2026-10-12).
+// The reply is the client's text too: a refusal quotes the refused
+// recipient, and Postfix quotes it in internal form - quotes removed, "; < >
+// =" kept (extract_addr(), tok822_internalize(); smtpd_check_reject() applies
+// only printable()) - so a stranger's RCPT TO:<"; from=<x> to=<y> ..."@d>
+// spells a whole "; from=<…> to=<…> proto=…" inside the reply. The shortest
+// reply ended there, and the row's sender, recipient and domain were the
+// stranger's (security audit 2026-10-17, M2, proven on the test server).
+// What the client cannot spell is the end of the line: the HELO name is
+// logged with a space and ` <>()\";@` turned into "?" (src/smtpd/smtpd.c,
+// helo_cmd(), NEUTER_CHARACTERS), and an address that holds "; from=<" or a
+// ">" needs a quoted local part, whose quote then stands inside what the
+// pattern would take for the sender or the recipient - which the filter
+// below refuses. So the reply is the longest text before a "; from=<…>
+// to=<…> proto=…" that runs to the end of the line, the HELO name holds none
+// of the neutered characters, and each SASL field (never written on port 25)
+// is one word. A line it does not fit leaves no row.
 var (
-	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*?); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<.*>)?(?: sasl_(?:method|username|sender)=.*)?$`)
+	inboundRejectRe = regexp.MustCompile(`^\S+ postfix/(inbound/smtpd|cleanup)\[\d+\]: ([0-9A-Za-z]+): (reject|milter-reject|milter-discard): \S+ from [^\[\s]*\[([0-9A-Fa-f:.]+)\]: (.*); from=<([^>]*)> to=<([^>]*)> proto=\S+(?: helo=<[^ <>()\\";@]*>)?(?: sasl_method=\S*)?(?: sasl_username=\S*)?(?: sasl_sender=\S*)?$`)
 	inboundClientRe = regexp.MustCompile(`^\S+ postfix/inbound/smtpd\[\d+\]: ([0-9A-Za-z]+): client=`)
 	// A queue id stops being port 25's when the message is queued (qmgr takes
 	// it: the filter let it through), when cleanup removes the queue file of
@@ -209,6 +218,13 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 	// shows it: the sender is left with an unclosed quote. An address with a
 	// quote, a bracket or a space in it is not one the journal keeps.
 	if strings.ContainsAny(from, "\"<> ") || strings.ContainsAny(to, "\"<> ") {
+		return
+	}
+	// A reply that still holds "; from=<" is a line with two tails, one of
+	// them written by the client - a refused recipient quoted in the reply
+	// (audit 2026-10-17, M2) or a HELO name Postfix failed to neuter. Which
+	// is Postfix's is then a guess the journal does not make.
+	if strings.Contains(reason, "; from=<") {
 		return
 	}
 	if program == "cleanup" {
