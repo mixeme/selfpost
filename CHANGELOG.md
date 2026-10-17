@@ -18,6 +18,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   removed, so `RCPT TO:<"; from=<x> to=<y> …"@domain>` spelled a second
   sender and recipient there, and the parser took the first. It now takes
   Postfix's own tail at the end of the line.
+- **The sender check keeps two `From:` and two `Sender:` lines** (audit M5),
+  not every one an application sends: the judgement needs no more, and a
+  hundred long lines were megabytes held per connection.
 - **The entrypoint follows no link at the DMARC maps** (audit I2): the
   three `dmarc_*` maps root creates at the start were missing from the list
   of paths where a symbolic link is removed first.

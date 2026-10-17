@@ -132,6 +132,7 @@ func TestSenderCheck(t *testing.T) {
 		{"a subdomain of its own", "shop", [][2]string{from("a@sub.shop.example.org")}, false, "not an address this application sends as"},
 		{"no From: line", "shop", [][2]string{{"Subject", "hello"}}, false, "no From: line"},
 		{"two From: lines", "shop", [][2]string{from("a@shop.example.org"), from("director@example.org")}, false, "more than one From: line"},
+		{"a hundred From: lines", "shop", manyFroms(100), false, "more than one From: line"},
 		{"two addresses in one line", "shop", [][2]string{from("a@shop.example.org, director@example.org")}, false, "one address"},
 		{"not an address", "shop", [][2]string{from("the shop")}, false, "as a mail program reads it"},
 		{"an address before a list comma, then another", "shop", [][2]string{from("director@example.org, <a@shop.example.org>")}, false, "one address"},
@@ -458,5 +459,26 @@ func TestSenderLineHeldToTheSameRule(t *testing.T) {
 				t.Fatalf("log rows: %+v, want one of reason %q", rows, reason)
 			}
 		})
+	}
+}
+
+// manyFroms is n From: lines; the sender check keeps two of them (audit
+// 2026-10-17, M5).
+func manyFroms(n int) [][2]string {
+	out := make([][2]string, n)
+	for i := range out {
+		out[i] = [2]string{"From", "a@shop.example.org"}
+	}
+	return out
+}
+
+func TestSenderKeepsTwoFromAndSenderLines(t *testing.T) {
+	s := &senderSession{}
+	for i := 0; i < 100; i++ {
+		s.Header("From", "a@shop.example.org", nil)
+		s.Header("Sender", "b@shop.example.org", nil)
+	}
+	if len(s.froms) != 2 || len(s.senders) != 2 {
+		t.Errorf("kept %d From: and %d Sender: values, want 2 and 2", len(s.froms), len(s.senders))
 	}
 }

@@ -309,11 +309,18 @@ func (s *senderSession) RcptTo(rcpt string, m *milter.Modifier) (milter.Response
 
 func (s *senderSession) Header(name, value string, m *milter.Modifier) (milter.Response, error) {
 	// The name is trimmed: the obsolete syntax allows blanks before the colon.
+	// Two of each are kept: the judgement needs only none, one or more, and
+	// Postfix bounds a header's length but not their number (audit
+	// 2026-10-17, M5: a hundred 60 000-byte From: lines were 6 MB held).
 	switch textproto.CanonicalMIMEHeaderKey(strings.TrimSpace(name)) {
 	case "From":
-		s.froms = append(s.froms, value)
+		if len(s.froms) < 2 {
+			s.froms = append(s.froms, value)
+		}
 	case "Sender":
-		s.senders = append(s.senders, value)
+		if len(s.senders) < 2 {
+			s.senders = append(s.senders, value)
+		}
 	case "Subject":
 		if s.subject == "" {
 			s.subject = mailhdr.DecodeSubject(value)

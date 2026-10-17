@@ -704,8 +704,8 @@ the argument.
   tail may hold none of the neutered characters and each SASL field is one
   word (a `.*` SASL tail would have let a quoted sender spell the whole
   tail); TestInboundRecipientCannotWriteTheRow.
-- [ ] **M5.** Keep at most two `From:`/`Sender:` values; security.md:810
-  reworded. — **Opus**, 0.5 h.
+- [x] **M5.** Keep at most two `From:`/`Sender:` values; security.md:810
+  reworded. — **Opus**, 0.5 h. *Done 2026-10-17:* TestSenderKeepsTwoFromAndSenderLines.
 - [ ] **A4.** Duplicate-cookie line through `loggedPath`. — **Sonnet**, 0.25 h.
 - [ ] **S6.** `smtpd_etrn_restrictions = reject`, `smtpd_discard_ehlo_keywords
   = etrn` in postfix-config.sh; architecture.md § Postfix one line. Done when

@@ -824,7 +824,10 @@ deferred item from the roadmap.
   `headerLimit`; `2.8.0`): it keeps no more than that and drops its list
   once the block it signs is built. No mail program writes such a section,
   and the refusal is permanent, so a sender is told rather than retried.
-  The other milters keep a few headers each (From, Sender, Subject).
+  The other milters keep a few headers each: the sender check two `From:`
+  and two `Sender:` values at most - it needs only none, one or more - and
+  the first Subject (until `2.14.4` it kept every `From:`/`Sender:` line,
+  which Postfix bounds in length but not in number; audit 2026-10-17, M5).
   Until `2.8.0` the milter library itself added every header of a message
   to a map of its own in each milter - up to the port's message size limit,
   from strangers on port 25 - which none of the milters read; the panel
