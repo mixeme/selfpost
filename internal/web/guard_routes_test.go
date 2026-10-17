@@ -47,7 +47,7 @@ var routes = struct{ always, inbound, dmarc []string }{
 		"GET /server/users/{uid}/delete", "POST /server/users/{uid}/delete",
 		"GET /server/settings", "POST /server/settings", "POST /server/settings/dns-recheck",
 		"GET /server/components",
-		"GET /account", "POST /account/profile", "POST /account/password",
+		"GET /account", "POST /account/profile", "POST /account/password", "POST /account/email/confirm",
 		"GET /help",
 	},
 	inbound: []string{
@@ -163,7 +163,8 @@ func TestRoutesFollowNavigation(t *testing.T) {
 	}
 
 	// What stays as it was.
-	for _, p := range []string{"/healthz", "/license", "/static/panel.css", "/setup/token", "/login", "/logout"} {
+	for _, p := range []string{"/healthz", "/license", "/static/panel.css", "/setup/token", "/login", "/logout",
+		"/login/reset", "/login/reset/token", "/confirm/token"} {
 		if got := answers(public, http.MethodGet, p); got == "" || got == "/" {
 			t.Errorf("GET %s is no longer a public route", p)
 		}
