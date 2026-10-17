@@ -12,12 +12,18 @@
     {{template "body_open"}}
     <form class="sp-form" method="post" action="/account/profile">
       <div class="field"><label class="label" for="username">Username</label><div class="control has-icons-left"><input class="input" id="username" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required><span class="icon is-left"><i class="ti ti-user"></i></span></div></div>
-      <div class="field"><label class="label" for="email">E-mail</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="email" autocapitalize="none" spellcheck="false"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
-        <p class="help">Your own address. A domain's report address can be filled with it from Domain settings.</p></div>
+      <div class="field"><label class="label" for="email">E-mail{{with .EmailTag}} {{template "tag" .}}{{end}}</label><div class="control has-icons-left"><input class="input" id="email" name="email" type="email" value="{{.Email}}" autocomplete="email" autocapitalize="none" spellcheck="false"><span class="icon is-left"><i class="ti ti-mail"></i></span></div>
+        <p class="help">Your own address. Saving a new one sends it a link to confirm it; once confirmed it is where a link to reset your password can go. A domain's report address can be filled with it from Domain settings.</p></div>
+      <div class="field"><label class="label" for="profile_password">Current password</label><div class="control"><input class="input" id="profile_password" name="current_password" type="password" autocomplete="current-password"></div>
+        <p class="help">Needed only to change the e-mail.</p></div>
       <div class="field"><label class="checkbox"><input type="checkbox" name="notify"{{if .Notify}} checked{{end}}> Send me notifications</label>
         <p class="help">To this address, when something needs you: a DNS record of a domain stops matching, a rate limit refuses mail, the TLS certificate is about to expire, a message has waited in the queue for three days. <a href="/help#notifications">What is sent and when</a></p></div>
       <button type="submit" class="button is-primary">Save profile</button>
     </form>
+    {{with .Resend}}<form class="sp-form mt-4" method="post" action="/account/email/confirm">
+      <p class="help mb-3">{{if .Sent}}A link was sent to <span class="sp-mono">{{.Email}}</span> at {{.Sent}}; it works once, for 24 hours.{{else}}No link is waiting: send one to confirm <span class="sp-mono">{{.Email}}</span>.{{end}}</p>
+      <button type="submit" class="button">Send the link again</button>
+    </form>{{end}}
     {{template "body_close"}}
     {{template "box_close"}}
   </div>

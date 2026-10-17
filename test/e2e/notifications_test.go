@@ -40,6 +40,8 @@ func (c *panelClient) setAccountEmail(username, email string) error {
 		"username": {username},
 		"email":    {email},
 		"notify":   {"on"},
+		// A new e-mail asks for the password (password-reset).
+		"current_password": {adminPassword},
 	})
 	if err != nil {
 		return err

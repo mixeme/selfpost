@@ -4,6 +4,7 @@
 package web
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/mixeme/selfpost/internal/health"
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/legal"
+	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/auth"
@@ -141,6 +143,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		SessionIdleDays:   cfg.SessionIdleDays,
 		TrustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}, v, setupTokenPath)
+	a.SetMailer(notify.NewMailer(cfg.Hostname))
 	h := handlers.New(st, domains, apps, inboundSvc, lists, dmarcSvc, handlers.Config{
 		Hostname:                   cfg.Hostname,
 		SubmissionEnabled:          cfg.SubmissionEnabled,
@@ -179,6 +182,13 @@ func (s *Server) Start() error {
 	return s.auth.Bootstrap()
 }
 
+// Drain waits, until ctx ends, for what the panel still does after its
+// answers - the links of password-reset being mailed - so the database is not
+// closed under them.
+func (s *Server) Drain(ctx context.Context) {
+	s.auth.Wait(ctx)
+}
+
 // Handler returns the panel's HTTP handler (router).
 func (s *Server) Handler() http.Handler {
 	mux, authed := s.muxes()
@@ -200,6 +210,10 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	mux.Handle("/static/", view.StaticHandler())
 	mux.HandleFunc("/setup/", s.auth.HandleSetup)
 	mux.HandleFunc("/login", s.auth.HandleLogin)
+	// The links of password-reset, opened from a mail, signed in or not.
+	mux.HandleFunc("/login/reset", s.auth.HandleReset)
+	mux.HandleFunc("/login/reset/", s.auth.HandleResetLink)
+	mux.HandleFunc("/confirm/", s.auth.HandleConfirm)
 	mux.HandleFunc("/logout", s.auth.HandleLogout)
 
 	authed = http.NewServeMux()
@@ -213,6 +227,7 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 	authed.HandleFunc("GET /account", h.HandleAccount)
 	authed.HandleFunc("POST /account/profile", h.HandleAccountProfile)
 	authed.HandleFunc("POST /account/password", h.HandleAccountPassword)
+	authed.HandleFunc("POST /account/email/confirm", h.HandleAccountConfirmLink)
 
 	// Overview. Its handler checks the role itself: the page is global-only
 	// but does not live under /server/.

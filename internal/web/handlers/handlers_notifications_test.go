@@ -26,14 +26,14 @@ const notifyHost = "mail.example.org"
 // stored, Save profile writes it, and an unchecked box is a form without the
 // field, which means off. Saving it changes nothing else of the profile.
 func TestAccountNotifyCheckbox(t *testing.T) {
-	h, _ := settingsServer(t)
+	h, password := settingsServer(t)
 	notify := func() bool {
 		u, _ := h.store.GetUser(globalPrincipal.ID)
 		return u.Notify
 	}
 	save := func(extra url.Values) {
 		t.Helper()
-		form := url.Values{"username": {"admin"}, "email": {"mix@example.org"}}
+		form := url.Values{"username": {"admin"}, "email": {"mix@example.org"}, "current_password": {password}}
 		for k, v := range extra {
 			form[k] = v
 		}

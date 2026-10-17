@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
@@ -33,6 +34,16 @@ type Module struct {
 	loginLimiter    *rateLimiter
 	setupLimiter    *rateLimiter
 	passwordLimiter *rateLimiter
+	// resetLimiter counts the requests for a reset link per client address,
+	// linkLimiter the requests a link's page gets per client address, and
+	// mailLimiter the links mailed to one user's address (links.go).
+	resetLimiter *rateLimiter
+	linkLimiter  *rateLimiter
+	mailLimiter  *rateLimiter
+	mailer       Mailer
+	// mailing counts the links being mailed after their answer, so a stop
+	// waits for them (Wait) before the database closes.
+	mailing sync.WaitGroup
 
 	trustedProxies []*net.IPNet
 }
@@ -56,11 +67,20 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		// out of signing in (audit 2026-10-12, L15), and the one guessing
 		// is whoever holds that user's session, wherever from.
 		passwordLimiter: newRateLimiter(10, 15*time.Minute),
-		trustedProxies:  cfg.TrustedProxyCIDRs,
+		resetLimiter:    newRateLimiter(5, 15*time.Minute),
+		linkLimiter:     newRateLimiter(30, 15*time.Minute),
+		// Five links an hour to one address, of either kind: three resets
+		// asked for and a couple of confirmations is ordinary use, a mailbox
+		// full of them is not.
+		mailLimiter:    newRateLimiter(5, time.Hour),
+		trustedProxies: cfg.TrustedProxyCIDRs,
 	}
 	m.setupLimiter.startSweeper()
 	m.loginLimiter.startSweeper()
 	m.passwordLimiter.startSweeper()
+	m.resetLimiter.startSweeper()
+	m.linkLimiter.startSweeper()
+	m.mailLimiter.startSweeper()
 	// Made now rather than at the first unknown name, which would otherwise
 	// pay for two bcrypt runs (review of audit stage 4).
 	go noSuchUserHash()

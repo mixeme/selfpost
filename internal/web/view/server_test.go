@@ -152,7 +152,7 @@ func TestUserFormShowsWhatIsStoredUnderTheHandlersFieldNames(t *testing.T) {
 	pageHas(t, "User", out,
 		`<h1 class="title is-3">acme-ops</h1>`, `href="/server/users">Users</a>`, `href="/server/users/3/delete"`,
 		`<form class="sp-form" method="post" action="/server/users/3">`,
-		`name="username" value="acme-ops"`, `<label class="label" for="email">E-mail</label>`,
+		`name="username" value="acme-ops"`, `<label class="label" for="email">E-mail <span class="tag is-success is-light">confirmed</span></label>`,
 		`<input class="input" id="email" name="email" type="email" value="ops@acme.io" autocomplete="off">`,
 		`name="password" type="password" autocomplete="new-password">`,
 		`Leave empty to keep the current one.`,
@@ -316,8 +316,9 @@ func TestEveryHelpLinkLandsOnATopic(t *testing.T) {
 // change it under Account, and it can receive DMARC reports if they choose.
 func TestUserFormEmailHelpSaysOnlyWhatIsTrue(t *testing.T) {
 	out := renderSignedIn(t, "user", userFixture())
-	pageHas(t, "User", out, `The user's own address. They can change it under Account.`)
-	pageLacks(t, "User", out, `notification`, `reset`)
+	pageHas(t, "User", out, `The user's own address. They can change it under Account. A new one is sent a link to confirm it; until it is confirmed no reset link goes to it.`,
+		`E-mail <span class="tag is-success is-light">confirmed</span>`)
+	pageLacks(t, "User", out, `notification`)
 }
 
 // A domain's report address belongs to the domain, not to a user: deleting a

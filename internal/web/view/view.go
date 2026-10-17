@@ -35,6 +35,9 @@ type Engine struct {
 var pageFiles = map[string][]string{
 	"setup":               {"templates/setup.html"},
 	"login":               {"templates/login.html"},
+	"login-reset":         {"templates/login_reset.html"},
+	"login-reset-set":     {"templates/login_reset_set.html"},
+	"confirm-email":       {"templates/confirm_email.html"},
 	"overview":            {"templates/overview.html", "templates/overview_cards.html"},
 	"health":              {"templates/health.html", "templates/health_body.html"},
 	"account":             {"templates/account.html"},

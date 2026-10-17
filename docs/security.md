@@ -138,7 +138,8 @@ The panel is exposed to the internet — the items below are **not optional**.
   after it was found, so the cookie of a deleted user is dead and cannot become
   the session of whoever is created under the same name later; renaming a user
   leaves their sessions alone.
-- **What ends a user's sessions:** deleting the user (all); a password change on
+- **What ends a user's sessions:** deleting the user (all); a password set
+  from a reset link (all, `2.14.0`); a password change on
   Account (that user's *other* sessions — never another user's); a password set
   for them by a global user on the user form (all of theirs, except the current
   one when they set their own); signing out (the current one only); signing
@@ -148,6 +149,36 @@ The panel is exposed to the internet — the items below are **not optional**.
   held.
 - Polling by the monitoring screens (`HX-Request` `GET`s) does not renew a
   session.
+- **Password reset by e-mail (`2.14.0`).** A link goes only to an address
+  its account has confirmed, by a link sent to that address; notifications
+  go to an unconfirmed one (owner, 2026-10-17) - they carry no secret. A link
+  is 256 random bits (`crypto/rand`); `user_links` keeps its SHA-256 only,
+  so the database or a backup opens nothing. A confirmation link lives 24
+  hours, a reset link 30 minutes; each is taken once, in the transaction
+  that deletes it (`DELETE … RETURNING`), and a newer link of the same kind
+  replaces the older. A reset link holds only while the account's address is
+  still the confirmed one it was sent to; a confirmation link only while the
+  address is the one it confirms. The link's host is `SELFPOST_HOSTNAME`,
+  never the request's `Host`, which an attacker would choose to receive the
+  token. The request form answers the same for every name and sends the mail
+  after answering, so neither the words nor the time tell whether a name
+  exists or is confirmed; requests are limited to five in 15 minutes per
+  client address, mails to five an hour per account, and a link's page to 30
+  requests in 15 minutes per client address. A link's page changes nothing
+  on `GET` (a mail scanner opens links): the button does. Setting a password
+  from a link ends every session of the account and every other reset link.
+  Changing the account e-mail asks for the current password, as the password
+  does: the address is where a reset link goes. From the security review
+  (2026-10-17): confirming an address also takes being signed in as its
+  account, and the confirmation mail does not name the account - a mistyped
+  address is a stranger's, who could otherwise confirm it and reset the
+  password; a reset request does not replace the links already sent, and
+  none is sent within ten minutes of the last, so a stranger repeating a
+  username neither kills the link in the mailbox nor spends the account's
+  links; the link is taken and the password set in one transaction that
+  checks the address again; a restore deletes every link; a rejected
+  request's log line hides a link's token; a stop waits for the links still
+  being mailed.
 
 ### Roles
 

@@ -821,7 +821,9 @@ building them only takes method values, so the route guard test can run it on
 a bare `Server` and ask which pattern answers a path:
 
 - **public** — `/healthz` (liveness), `/license` (the embedded `LICENSE`),
-  `/static/`, `/setup/`, `/login`, `/logout`;
+  `/static/`, `/setup/`, `/login`, `/logout`, and the links of
+  password-reset, opened from a mail signed in or not: `/login/reset`,
+  `/login/reset/<token>`, `/confirm/<token>` (`internal/web/auth/links.go`);
 - **authenticated** — everything else, behind `RequireAuth`: a request without
   a live session is redirected to `/login`.
 
@@ -845,7 +847,7 @@ only reads (the delete confirmation at `GET …/delete` renders a form).
 | Inbound › Domains | `GET, POST /inbound/domains` · `/inbound/domains/{id}` · `POST …/dns-recheck`, `…/upstream`, `…/recipients` · `GET, POST …/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
 | Inbound › Log, Filter lists | `GET /inbound/log` · `GET, POST /inbound/filter-lists` · `POST /inbound/filter-lists/{id}/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
 | Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload`, `/server/health/test-message` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `POST /server/settings/dns-recheck` · `GET /server/components` |
-| Account | `GET /account` · `POST /account/profile`, `/account/password` |
+| Account | `GET /account` · `POST /account/profile`, `/account/password`, `/account/email/confirm` |
 | User menu | `GET /help` · `POST /logout` (public mux) |
 
 An application is addressed under its domain, and an application id that does

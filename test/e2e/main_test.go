@@ -401,6 +401,10 @@ func TestE2E(t *testing.T) {
 	run("inbound_bare_newline_is_one_message", func(t *testing.T) {
 		testInboundBareNewline(t, sc)
 	})
+	// After every step that uses adminPassword: the reset sets another.
+	run("password_reset_by_e_mail", func(t *testing.T) {
+		testPasswordReset(t, sc)
+	})
 	// Last: it recreates the container in another zone.
 	run("time_zone_is_the_containers", func(t *testing.T) {
 		testTimeZone(t, sc)

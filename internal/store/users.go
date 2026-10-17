@@ -42,6 +42,9 @@ type User struct {
 	// Email is the user's own address — what the panel writes to, and what the
 	// button beside a domain's typed report address fills it with.
 	Email string
+	// EmailConfirmed is when Email was confirmed by its link, zero while it
+	// is not: only a confirmed address is sent a reset link (migration 0013).
+	EmailConfirmed time.Time
 	// AllDomains / AllInboundDomains widen a domain user's list to every
 	// domain of that direction, including those added later; the id lists
 	// are then ignored.
@@ -55,19 +58,20 @@ type User struct {
 	InboundDomainIDs []int64
 }
 
-const userColumns = "id, username, password_hash, role, email, all_domains, all_inbound_domains, notify, created_at"
+const userColumns = "id, username, password_hash, role, email, all_domains, all_inbound_domains, notify, created_at, email_confirmed_at"
 
 func scanUser(r scanRow) (User, error) {
 	var (
-		u         User
-		createdAt string
+		u                    User
+		createdAt, confirmed string
 	)
 	err := r.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Email,
-		&u.AllDomains, &u.AllInboundDomains, &u.Notify, &createdAt)
+		&u.AllDomains, &u.AllInboundDomains, &u.Notify, &createdAt, &confirmed)
 	if err != nil {
 		return User{}, err
 	}
 	u.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	u.EmailConfirmed, _ = time.Parse(time.RFC3339, confirmed)
 	return u, nil
 }
 
@@ -316,8 +320,8 @@ func (s *Store) SaveUser(c UserChange) error {
 	// An empty hash keeps the stored one: the form read it when it was
 	// opened, and the user may have changed it on Account since.
 	res, err := tx.Exec(
-		"UPDATE users SET username = ?, password_hash = COALESCE(NULLIF(?, ''), password_hash), email = ?, role = ? WHERE id = ?",
-		c.Username, c.PasswordHash, c.Email, c.Role, c.ID,
+		"UPDATE users SET username = ?, password_hash = COALESCE(NULLIF(?, ''), password_hash), email = ?, role = ?, "+keepConfirmed+" WHERE id = ?",
+		c.Username, c.PasswordHash, c.Email, c.Role, c.Email, c.ID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -366,11 +370,19 @@ func requireAGlobal(tx *sql.Tx) error {
 	return nil
 }
 
-// UpdateUser replaces a user's username, password hash and account e-mail.
+// keepConfirmed keeps the confirmation of an address that stays the same and
+// clears it for another; its placeholder takes the new address. SQLite
+// 3.53.4, https://sqlite.org/lang_update.html: every expression on the right
+// of SET sees the row as it was before the UPDATE, so email here is the old
+// address.
+const keepConfirmed = "email_confirmed_at = CASE WHEN email = ? THEN email_confirmed_at ELSE '' END"
+
+// UpdateUser replaces a user's username, password hash and account e-mail; a
+// new e-mail is unconfirmed.
 func (s *Store) UpdateUser(id int64, username, passwordHash, email string) error {
 	res, err := s.db.Exec(
-		"UPDATE users SET username = ?, password_hash = ?, email = ? WHERE id = ?",
-		username, passwordHash, email, id,
+		"UPDATE users SET username = ?, password_hash = ?, email = ?, "+keepConfirmed+" WHERE id = ?",
+		username, passwordHash, email, email, id,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {

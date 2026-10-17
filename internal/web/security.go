@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // contentSecurityPolicy is the panel's CSP. Everything the pages load —
@@ -96,7 +97,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 			// saving anything".
 			logf("panel: rejected %s %s: cross-origin request (Sec-Fetch-Site=%q Origin=%q Host=%q); "+
 				"if this was a legitimate request, check that the reverse proxy passes the original Host header through",
-				r.Method, r.URL.Path, r.Header.Get("Sec-Fetch-Site"), r.Header.Get("Origin"), r.Host)
+				r.Method, loggedPath(r.URL.Path), r.Header.Get("Sec-Fetch-Site"), r.Header.Get("Origin"), r.Host)
 			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
 			return
 		}
@@ -167,4 +168,16 @@ func originAllowed(r *http.Request) bool {
 		return false
 	}
 	return u.Host == r.Host
+}
+
+// loggedPath is a request's path as the log may hold it: the token of a
+// password-reset link is a secret, and the log is read by more than the
+// person the link went to (security review, 2026-10-17).
+func loggedPath(p string) string {
+	for _, prefix := range []string{"/login/reset/", "/confirm/"} {
+		if strings.HasPrefix(p, prefix) && len(p) > len(prefix) {
+			return prefix + "…"
+		}
+	}
+	return p
 }

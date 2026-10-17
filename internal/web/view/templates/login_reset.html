@@ -1,0 +1,17 @@
+{{/* Asking for a reset link (mockup login-reset.html): the form column of the
+     signed-out screen. The answer to the form is the sign-in page, the same
+     for any name (mockup login-reset-sent.html). */}}
+{{define "content"}}
+<form class="sp-form" method="post" action="/login/reset">
+  {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}
+  <h1 class="title is-3">Reset password</h1>
+  <p class="sp-muted mb-4">A link to set a new password goes to the e-mail of the account, once that address is confirmed under Account. It works once, for 30 minutes.</p>
+  {{if .Error}}{{template "flash" .Notice}}{{end}}
+  <div class="field">
+    <label class="label" for="username">Username</label>
+    <div class="control has-icons-left"><input class="input" id="username" name="username" autocomplete="username" autofocus required><span class="icon is-left"><i class="ti ti-user"></i></span></div>
+  </div>
+  <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Send the link</button></div>
+  <p class="mt-4"><a href="/login">Back to sign in</a></p>
+</form>
+{{end}}

@@ -290,14 +290,18 @@ func TestAccountHasTwoFormsEachItsOwnPost(t *testing.T) {
 		`<h1 class="title is-3">Account</h1>`, `Signed in as admin · global`,
 		`action="/account/profile"`, `name="username"`, `name="email"`, `value="mix@example.org"`,
 		`action="/account/password"`, `name="current_password"`, `name="new_password"`, `name="new_password_confirm"`,
-		`Your own address. A domain's report address can be filled with it from Domain settings.`,
+		`Your own address. Saving a new one sends it a link to confirm it; once confirmed it is where a link to reset your password can go. A domain's report address can be filled with it from Domain settings.`,
+		`E-mail <span class="tag is-warning is-light">not confirmed</span>`,
+		`<input class="input" id="profile_password" name="current_password" type="password" autocomplete="current-password">`,
+		`action="/account/email/confirm"`, `A link was sent to <span class="sp-mono">mix@example.org</span> at 14:02; it works once, for 24 hours.`,
 	)
 	// Account is Profile and Password; where a domain's reports go is the
 	// domain's own setting.
 	pageLacks(t, "Account", out, `send_log_retention_days`, `/account/dmarc`, `dmarc_default`, `<h2>DMARC reports</h2>`,
 		`Report authorization`, `default report address`, `id="dmarc"`)
-	// No form asks for another's fields: two forms, two submit buttons.
-	if got := strings.Count(out, `<form class="sp-form" method="post"`); got != 2 {
+	// No form asks for another's fields: the profile, the password and,
+	// while the address is not confirmed, its link again.
+	if got := strings.Count(out, `<form class="sp-form`); got != 3 {
 		t.Errorf("Account has %d forms, want 2", got)
 	}
 	// Two equal columns, one box each.

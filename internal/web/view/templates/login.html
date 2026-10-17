@@ -14,7 +14,7 @@
 <form class="sp-form" method="post" action="/login">
   {{if .Host}}<p>{{template "kicker" .Host}}</p>{{end}}
   <h1 class="title is-3">Sign in</h1>
-  {{if .Error}}{{template "flash" .Notice}}{{end}}
+  {{if .Error}}{{template "flash" .Notice}}{{else if .Info}}{{template "flash" .InfoNotice}}{{end}}
   <div class="field">
     <label class="label" for="username">Username</label>
     <div class="control has-icons-left"><input class="input" id="username" name="username" autocomplete="username" autofocus required><span class="icon is-left"><i class="ti ti-user"></i></span></div>
@@ -24,6 +24,7 @@
     <div class="control has-icons-left"><input class="input" id="password" name="password" type="password" autocomplete="current-password" required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
   </div>
   <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Sign in</button></div>
+  <p class="mt-4"><a href="/login/reset">Forgot your password?</a></p>
 </form>
 {{end}}
 {{end}}

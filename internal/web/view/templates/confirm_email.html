@@ -1,0 +1,28 @@
+{{/* The page a confirmation link opens (mockup confirm-email.html): the
+     address and a button, since a mail scanner opens links and a GET must
+     change nothing. After the button, the same column says it is done; a link
+     that does not work says so and has no button. */}}
+{{define "content"}}
+{{if .Done}}
+<div class="sp-form">
+  {{with .Kicker}}<p>{{template "kicker" .}}</p>{{end}}
+  <h1 class="title is-3">E-mail confirmed</h1>
+  <p class="sp-muted mb-4"><span class="sp-mono">{{.Email}}</span> is the confirmed address of this account.</p>
+  <p><a href="/account">Account</a></p>
+</div>
+{{else if .Error}}
+<div class="sp-form">
+  {{with .Kicker}}<p>{{template "kicker" .}}</p>{{end}}
+  <h1 class="title is-3">Confirm e-mail</h1>
+  {{template "flash" .Notice}}
+  {{if .SignIn}}<p><a href="/login">Sign in</a></p>{{else}}<p><a href="/account">Account</a></p>{{end}}
+</div>
+{{else}}
+<form class="sp-form" method="post" action="/confirm/{{.Token}}">
+  {{with .Kicker}}<p>{{template "kicker" .}}</p>{{end}}
+  <h1 class="title is-3">Confirm e-mail</h1>
+  <p class="sp-muted mb-4"><span class="sp-mono">{{.Email}}</span> becomes the confirmed address of this account: where a link to reset its password can be sent.</p>
+  <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Confirm</button></div>
+</form>
+{{end}}
+{{end}}

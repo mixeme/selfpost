@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Password reset by e-mail** (password-reset): *Forgot your password?* on
+  the sign-in page sends a one-time link, for 30 minutes, to the account's
+  e-mail - once that address has been confirmed by a link sent to it. A new
+  address is sent its confirmation link when it is saved (Account, or the
+  user form); Account shows whether it is confirmed and can send the link
+  again. Notifications go to the address confirmed or not. Setting a new
+  password from a link signs every session of the account out. Migration
+  0013; schema 13.
+
+### Changed
+
+- **Changing your e-mail on Account asks for your password**, as changing
+  the password does: the address is where a reset link goes.
+
 ## [2.13.1] - 2026-10-17
 
 The documents and the panel's words checked against the code. No migration;

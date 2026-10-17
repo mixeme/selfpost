@@ -231,9 +231,12 @@ type UserForm struct {
 	Submit     string
 	CancelHref string
 
-	Account     Box
-	Username    string
-	Email       string
+	Account  Box
+	Username string
+	Email    string
+	// EmailTag says whether the stored address is confirmed (nil without
+	// one).
+	EmailTag    *Tag
 	NewUser     bool
 	PasswordMin int
 	Roles       []Option
@@ -419,4 +422,17 @@ func names(list []string) Text {
 		out = append(out, Strong(n))
 	}
 	return out
+}
+
+// WithEmailState tags the user's stored address confirmed or not; nothing
+// for a user without one.
+func (p *UserForm) WithEmailState(email string, confirmed bool) *UserForm {
+	switch {
+	case email == "":
+	case confirmed:
+		p.EmailTag = &Tag{Status: "ok", Label: "confirmed"}
+	default:
+		p.EmailTag = &Tag{Status: "warn", Label: "not confirmed"}
+	}
+	return p
 }

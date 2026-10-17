@@ -1,0 +1,19 @@
+{{/* The page a reset link opens (mockup login-reset-set.html): the new
+     password, posted back to the link's own path. */}}
+{{define "content"}}
+<form class="sp-form" method="post" action="/login/reset/{{.Token}}">
+  {{with .Kicker}}<p>{{template "kicker" .}}</p>{{end}}
+  <h1 class="title is-3">New password</h1>
+  <p class="sp-muted mb-4">Setting it signs every session of this account out; sign in with it afterwards.</p>
+  {{if .Error}}{{template "flash" .Notice}}{{end}}
+  <div class="field">
+    <label class="label" for="new_password">New password</label>
+    <div class="control has-icons-left"><input class="input" id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="12" autofocus required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
+  </div>
+  <div class="field">
+    <label class="label" for="new_password_confirm">Repeat</label>
+    <div class="control has-icons-left"><input class="input" id="new_password_confirm" name="new_password_confirm" type="password" autocomplete="new-password" minlength="12" required><span class="icon is-left"><i class="ti ti-lock"></i></span></div>
+  </div>
+  <div class="field mt-5"><button type="submit" class="button is-primary is-fullwidth">Set password</button></div>
+</form>
+{{end}}

@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/web/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,10 +36,11 @@ func TestAccountPageShowsTwoForms(t *testing.T) {
 	}
 }
 
-// The profile form saves the name and the e-mail without asking for the
-// password and without changing the password or any domain's report address.
+// The profile form saves the name and the e-mail - a new e-mail with the
+// current password - without changing the password or any domain's report
+// address.
 func TestAccountProfile(t *testing.T) {
-	h, _ := settingsServer(t)
+	h, password := settingsServer(t)
 	before, _ := h.store.GetUser(globalPrincipal.ID)
 	d, _ := h.store.AddDomain("example.com", "mail")
 	if err := h.store.SetDomainDMARCAddress(d.ID, "reports@hub.example"); err != nil {
@@ -43,7 +48,7 @@ func TestAccountProfile(t *testing.T) {
 	}
 
 	rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,
-		url.Values{"username": {"operator"}, "email": {"mix@example.org"}})
+		url.Values{"username": {"operator"}, "email": {"mix@example.org"}, "current_password": {password}})
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/account?done=profile" {
 		t.Fatalf("POST /account/profile = %d to %q:\n%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
@@ -70,9 +75,88 @@ func TestAccountProfile(t *testing.T) {
 	if _, err := h.store.CreateUser("taken", "h", store.RoleGlobal, store.Reach{}); err != nil {
 		t.Fatal(err)
 	}
-	rec = postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, url.Values{"username": {"taken"}, "email": {"other@example.org"}})
+	rec = postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, url.Values{"username": {"taken"}, "email": {"other@example.org"}, "current_password": {password}})
 	if u, _ = h.store.GetUser(globalPrincipal.ID); rec.Code != http.StatusConflict || u.Username != "operator" || u.Email != "mix@example.org" {
 		t.Errorf("a taken username = %d, profile now %q / %q", rec.Code, u.Username, u.Email)
+	}
+}
+
+// linkMailer keeps the links the panel would have mailed.
+type linkMailer struct{ sent []string }
+
+func (r *linkMailer) Send(to, subject, body string) error {
+	r.sent = append(r.sent, to+" | "+subject+" | "+body)
+	return nil
+}
+
+// sentBy is what ml has been given once h's links sent after their answers
+// have gone.
+func sentBy(h *Handlers, ml *linkMailer) []string {
+	h.auth.Wait(context.Background())
+	return ml.sent
+}
+
+// withMail gives h an auth module that mails, as mail.example.org, to a
+// linkMailer.
+func withMail(t *testing.T, h *Handlers) *linkMailer {
+	t.Helper()
+	h.auth = auth.New(h.store, auth.Config{Hostname: "mail.example.org"}, h.view, filepath.Join(t.TempDir(), "setup-token"))
+	ml := &linkMailer{}
+	h.auth.SetMailer(ml)
+	return ml
+}
+
+// The e-mail is where a reset link goes once confirmed, so changing it asks
+// for the password; the new address is sent its link and shows as not
+// confirmed, with Send the link again; a confirmed address shows as such and
+// keeps its mark when only the name changes.
+func TestAccountEmailIsConfirmedByItsLink(t *testing.T) {
+	h, password := settingsServer(t)
+	ml := withMail(t, h)
+	change := url.Values{"username": {"admin"}, "email": {"mix@example.org"}}
+	for name, pw := range map[string]string{"no password": "", "wrong password": "nope"} {
+		form := url.Values{"username": change["username"], "email": change["email"], "current_password": {pw}}
+		if rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, form); rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s: %d", name, rec.Code)
+		}
+	}
+	if u, _ := h.store.GetUser(globalPrincipal.ID); u.Email != "" || len(sentBy(h, ml)) != 0 {
+		t.Fatalf("a refused change saved %q, sent %d", u.Email, len(sentBy(h, ml)))
+	}
+	change.Set("current_password", password)
+	rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, change)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/account?done=profile-link" {
+		t.Fatalf("change: %d %q\n%s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	}
+	if len(sentBy(h, ml)) != 1 || !strings.HasPrefix(sentBy(h, ml)[0], "mix@example.org | [SelfPost] Confirm your e-mail | ") ||
+		!strings.Contains(sentBy(h, ml)[0], "https://mail.example.org/confirm/") {
+		t.Fatalf("sent = %q", sentBy(h, ml))
+	}
+	out := getBody(t, h.HandleAccount, "/account")
+	for _, want := range []string{`<span class="tag is-warning is-light">not confirmed</span>`, `action="/account/email/confirm"`, `A link was sent to`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("account page missing %q", want)
+		}
+	}
+	// Send the link again: a second link.
+	if rec := postFormAs(h.HandleAccountConfirmLink, globalPrincipal, "/account/email/confirm", nil, nil); rec.Code != http.StatusSeeOther || len(sentBy(h, ml)) != 2 {
+		t.Fatalf("send again: %d, sent %d", rec.Code, len(sentBy(h, ml)))
+	}
+	// Confirmed: the tag says so, the form is gone, and a new name keeps it
+	// without the password.
+	if ok, _ := h.store.ConfirmEmail(globalPrincipal.ID, "mix@example.org", time.Now()); !ok {
+		t.Fatal("confirm")
+	}
+	out = getBody(t, h.HandleAccount, "/account")
+	if !strings.Contains(out, `<span class="tag is-success is-light">confirmed</span>`) || strings.Contains(out, `action="/account/email/confirm"`) {
+		t.Errorf("a confirmed address:\n%s", out)
+	}
+	if rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,
+		url.Values{"username": {"operator"}, "email": {"mix@example.org"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("a new name: %d", rec.Code)
+	}
+	if u, _ := h.store.GetUser(globalPrincipal.ID); u.EmailConfirmed.IsZero() || len(sentBy(h, ml)) != 2 {
+		t.Errorf("a new name: confirmed %v, sent %d", u.EmailConfirmed, len(sentBy(h, ml)))
 	}
 }
 
@@ -110,7 +194,12 @@ func TestAccountIsOpenToADomainAdministrator(t *testing.T) {
 	h, _ := settingsServer(t)
 	d, _ := h.store.AddDomain("example.com", "mail")
 	p := domainAdmin(t, h.store, "ops", d.ID)
-	rec := postFormAs(h.HandleAccountProfile, p, "/account/profile", nil, url.Values{"username": {"ops"}, "email": {"ops@example.org"}})
+	// A new e-mail asks for the password: the administrator's is set here.
+	hash, _ := bcrypt.GenerateFromPassword([]byte("ops-password-1234"), bcrypt.MinCost)
+	if err := h.store.SetUserPassword(p.ID, string(hash)); err != nil {
+		t.Fatal(err)
+	}
+	rec := postFormAs(h.HandleAccountProfile, p, "/account/profile", nil, url.Values{"username": {"ops"}, "email": {"ops@example.org"}, "current_password": {"ops-password-1234"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST /account/profile as a domain administrator = %d:\n%s", rec.Code, rec.Body.String())
 	}

@@ -27,8 +27,39 @@ type Account struct {
 	// Notify is whether the panel writes to this user: the checkbox under the
 	// e-mail.
 	Notify bool
+	// EmailTag says whether the stored address is confirmed (nil without
+	// one); Resend is the form that sends its link again, nil once it is
+	// confirmed (password-reset).
+	EmailTag *Tag
+	Resend   *ResendLink
 
 	Password Box
+}
+
+// ResendLink is Account's "Send the link again": the address and when its
+// live link went ("" for none).
+type ResendLink struct {
+	Email string
+	Sent  string
+}
+
+// WithEmailState sets the stored address's tag and, while it is not
+// confirmed, the resend form: sentAt is when its live link went, zero for
+// none.
+func (a *Account) WithEmailState(email string, confirmed bool, sentAt time.Time) *Account {
+	if email == "" {
+		return a
+	}
+	if confirmed {
+		a.EmailTag = &Tag{Status: "ok", Label: "confirmed"}
+		return a
+	}
+	a.EmailTag = &Tag{Status: "warn", Label: "not confirmed"}
+	a.Resend = &ResendLink{Email: email}
+	if !sentAt.IsZero() {
+		a.Resend.Sent = sentAt.Local().Format("15:04")
+	}
+	return a
 }
 
 // NewAccount builds the page for a user. role is "global" or "domain" and

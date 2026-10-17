@@ -88,7 +88,7 @@ func (m *Module) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		m.renderLogin(w, http.StatusOK, "")
+		m.view.Render(w, http.StatusOK, "login", view.NewLogin(m.cfg.Hostname, "").WithInfo(loginInfo(r)))
 	case http.MethodPost:
 		m.submitLogin(w, r)
 	default:

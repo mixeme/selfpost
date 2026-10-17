@@ -42,7 +42,7 @@ func TestBaselineSchema(t *testing.T) {
 	st := openTestStore(t)
 	want := map[string]string{
 		"settings":              "key value",
-		"users":                 "id username password_hash role email all_domains all_inbound_domains created_at notify",
+		"users":                 "id username password_hash role email all_domains all_inbound_domains created_at notify email_confirmed_at",
 		"sessions":              "token_hash user_id created_at expires_at",
 		"domains":               "id name dkim_selector dmarc_rua created_at",
 		"user_domains":          "user_id domain_id",
@@ -64,6 +64,7 @@ func TestBaselineSchema(t *testing.T) {
 		"notify_addressees":     "key address told_at",
 		"sender_check_days":     "day down_seconds deferred messages estimated",
 		"delivery_log_days":     "day reconcile_closed reconcile_missed reconcile_contradicted tailer_blind_seconds queued_over_lifetime",
+		"user_links":            "token_hash user_id purpose email created_at expires_at",
 	}
 	rows, err := st.db.Query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
 	if err != nil {
@@ -111,7 +112,7 @@ func TestBaselineSchema(t *testing.T) {
 		"idx_inbound_spam_log_created_at", "idx_inbound_spam_log_domain_created_at", "idx_inbound_spam_log_domain_id_created_at", "idx_inbound_spam_log_queue_id",
 		"idx_send_log_app_login", "idx_send_log_app_login_created_at", "idx_send_log_created_at", "idx_send_log_domain", "idx_send_log_domain_id", "idx_send_log_domain_id_created_at",
 		"idx_send_log_lines_queue_id", "idx_send_log_open", "idx_send_log_queue_id", "idx_send_log_refusal_line", "idx_send_log_rejected",
-		"idx_sessions_expires_at",
+		"idx_sessions_expires_at", "idx_user_links_user",
 	}
 	sort.Strings(wantIdx)
 	if strings.Join(indexes, " ") != strings.Join(wantIdx, " ") {
@@ -119,8 +120,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 12 {
-		t.Errorf("user_version = %d, %v; want 12", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 13 {
+		t.Errorf("user_version = %d, %v; want 13", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -196,8 +197,8 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 12 {
-		t.Errorf("user_version = %d, %v; want 12", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 13 {
+		t.Errorf("user_version = %d, %v; want 13", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)

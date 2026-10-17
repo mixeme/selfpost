@@ -558,13 +558,35 @@ readings, numbered in the order of what stops mail first:
 ### Account
 
 **Account** (`/account`, every role) is the signed-in user's own: **Profile**
-(username and e-mail) and **Password**. Saving the profile does not ask for the
-password; changing the password asks for the current one and is rate-limited
-like a sign-in. The e-mail is the user's own address: it is where the panel
+(username and e-mail) and **Password**. Changing the username or the
+notifications switch does not ask for the password; changing the e-mail does,
+and so does changing the password, both on the limit of a sign-in's guesses
+(ten in 15 minutes per user). The e-mail is the user's own address: it is where the panel
 sends [notifications](#notifications) while *Send me notifications* is ticked
 beside it, and what a domain's *Use my e-mail* button fills in (see
 [Domain-level DNS](#domain-level-dns-spf-dkim-dmarc)). Application SASL logins
 are separate and are not changed here.
+
+**A confirmed e-mail and a forgotten password.** A new address - saved under
+Account, or typed for a user by the global role on the user form - is sent a
+link that confirms it (`https://<SELFPOST_HOSTNAME>/confirm/…`), which works
+once, for 24 hours, opened in a browser signed in as that account; its page
+has a button, and only the button confirms. The mail does not name the
+account, so a mistyped address cannot be confirmed by whoever reads it.
+Account tags the address *confirmed* or *not confirmed* and, while it is not,
+offers *Send the link again* (at most five links an hour to one address).
+Notifications go to the address either way. Only a confirmed address can be
+sent a reset link: *Forgot your password?* on the sign-in page asks for the
+username and always answers the same - whether the name exists, and whether
+its address is confirmed, is not said; another link is not sent within ten
+minutes of the last - and the link
+(`https://<SELFPOST_HOSTNAME>/login/reset/…`) works once, for 30 minutes, and
+only while the account's address is still the one it was sent to. Setting the
+new password signs every session of the account out. The links name the
+server by `SELFPOST_HOSTNAME`, so the panel must be served at that name. An
+account without a confirmed address recovers as before: the global role sets
+a new password on the user form, and the only global user from the container
+(see [Users](#users)).
 
 ### Settings
 

@@ -37,7 +37,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
-| password-reset | Password reset by e-mail | agreed (2026-10-13) | — | — |
+| password-reset | Password reset by e-mail | done 2026-10-17, unreleased | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | shipped `2.13.0` | — | — |
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | shipped `2.9.0` | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | shipped `2.9.0` | — | — |
@@ -458,6 +458,22 @@ goes and today Account saves it without the password.
 to come need it - they are not the owner and should not have to ask him for
 a new password). Mockup-first; changing the account e-mail asks for the
 current password in the same cut.
+
+**Notifications to an unconfirmed address (owner, 2026-10-17):** "Без
+подтверждения слать" - they go to it confirmed or not; only a reset link
+needs it confirmed. Every address saved before the release is unconfirmed,
+and cutting them off would have stopped every warning at once.
+
+**Done (2026-10-17):** design 2f5f5b2, route guard b7bbb2c, panel guard
+0774da2. Migration 0013 (`users.email_confirmed_at`, `user_links`). Links
+are 256 bits, kept as SHA-256, confirmation 24 h and reset 30 min, taken
+once (`DELETE … RETURNING`), built on `SELFPOST_HOSTNAME` (never `Host`);
+the request answers the same for every name and mails after answering;
+limits per client address and per account; a link's GET page has a button
+(mail scanners open links). A reset ends every session. Changing the
+e-mail on Account asks for the password. The global role's user form sends
+a typed address its link. e2e `password_reset_by_e_mail` runs it through
+the sink.
 
 ---
 

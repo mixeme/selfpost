@@ -153,7 +153,13 @@ func (h *Handlers) renderUserForm(w http.ResponseWriter, r *http.Request, status
 			in.InDomains = append(in.InDomains, view.DomainChoice{ID: d.ID, Name: d.Name, Checked: inb[d.ID]})
 		}
 	}
-	h.view.Render(w, status, "user", view.NewUserForm(h.shellMeta(r), in))
+	page := view.NewUserForm(h.shellMeta(r), in)
+	if userID != 0 {
+		if u, err := h.store.GetUser(userID); err == nil {
+			page.WithEmailState(u.Email, !u.EmailConfirmed.IsZero())
+		}
+	}
+	h.view.Render(w, status, "user", page)
 }
 
 // lastGlobalLocked is whether the form's user is the only global one, whose role
@@ -206,7 +212,8 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	// The user, the e-mail and the reach in one transaction: a failure leaves
 	// no user rather than half of one (audit 2026-10-12, M9).
-	if _, err := h.store.AddUser(store.UserChange{Username: username, PasswordHash: string(hash), Email: email, Role: role, Reach: reach}); err != nil {
+	id, err := h.store.AddUser(store.UserChange{Username: username, PasswordHash: string(hash), Email: email, Role: role, Reach: reach})
+	if err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			h.renderUserForm(w, r, http.StatusConflict, 0, userFormView{FormErr: "That username is already in use.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 			return
@@ -218,6 +225,11 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		logf("panel: create user: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Could not create user. Please check the logs."})
 		return
+	}
+	// An address typed for a user is unconfirmed until that user opens its
+	// link (roadmap password-reset).
+	if email != "" {
+		h.sendConfirmation(id)
 	}
 	http.Redirect(w, r, "/server/users?done=created", http.StatusSeeOther)
 }
@@ -316,6 +328,10 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 	}
 	if password != "" {
 		h.endSessionsAfterPasswordSet(r, p, u)
+		h.endResetLinks(u.ID)
+	}
+	if email != "" && email != u.Email {
+		h.sendConfirmation(u.ID)
 	}
 	http.Redirect(w, r, "/server/users?done=updated", http.StatusSeeOther)
 }
@@ -331,6 +347,14 @@ func (h *Handlers) endSessionsAfterPasswordSet(r *http.Request, by auth.Principa
 		}
 	}
 	h.auth.DestroyUserSessions(u.ID)
+}
+
+// endResetLinks removes the reset links of a user whose password was just set
+// on the user form: a password set another way leaves none behind it.
+func (h *Handlers) endResetLinks(userID int64) {
+	if err := h.store.DeleteUserLinks(userID, store.LinkReset); err != nil {
+		logf("panel: user form: %v", err)
+	}
 }
 
 // HandleUserDeleteConfirm shows the cascade warning before a panel user is

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/store"
 	"github.com/mixeme/selfpost/internal/web/validate"
@@ -60,6 +61,11 @@ func (h *Handlers) HandleAccount(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) renderAccount(w http.ResponseWriter, r *http.Request, status int, u store.User, f accountForm) {
 	page := view.NewAccount(h.shellMeta(r), string(u.Role))
 	page.Username, page.Email, page.Notify = f.Username, f.Email, f.Notify
+	var sent time.Time
+	if l, err := h.store.LatestUserLink(u.ID, store.LinkConfirm, time.Now()); err == nil && l.Email == u.Email {
+		sent = l.CreatedAt
+	}
+	page.WithEmailState(u.Email, !u.EmailConfirmed.IsZero(), sent)
 	page.WithResult(accountFlash(r), f.Err)
 	h.view.Render(w, status, "account", page)
 }
@@ -68,6 +74,10 @@ func accountFlash(r *http.Request) string {
 	switch r.URL.Query().Get("done") {
 	case "profile":
 		return "Profile saved."
+	case "profile-link":
+		return "Profile saved. A link to confirm the new address is on its way."
+	case "link":
+		return "A new link is on its way."
 	case "password":
 		return "Password changed. Any other signed-in sessions were signed out."
 	}
@@ -108,6 +118,25 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}
+	// The e-mail is where a reset link goes once it is confirmed, so
+	// changing it asks for the password, as changing the password does
+	// (roadmap password-reset; 2.0 security review), on the same limit.
+	emailChanged := f.Email != u.Email
+	if emailChanged {
+		if !h.auth.AllowPasswordChange(u.ID) {
+			fail(http.StatusTooManyRequests, "Too many attempts. Please wait and try again.")
+			return
+		}
+		current := r.PostFormValue("current_password")
+		if current == "" {
+			fail(http.StatusUnauthorized, "Your current password is needed to change the e-mail.")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)); err != nil {
+			fail(http.StatusUnauthorized, "Current password is incorrect.")
+			return
+		}
+	}
 	if err := h.store.UpdateUser(u.ID, f.Username, u.PasswordHash, f.Email); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			fail(http.StatusConflict, "That username is already in use.")
@@ -125,7 +154,52 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	logf("panel: user %d profile updated (username: %t, e-mail: %t, notifications: %t)", u.ID, f.Username != u.Username, f.Email != u.Email, f.Notify)
+	if emailChanged && f.Email != "" && h.sendConfirmation(u.ID) {
+		http.Redirect(w, r, "/account?done=profile-link", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/account?done=profile", http.StatusSeeOther)
+}
+
+// HandleAccountConfirmLink sends the account's unconfirmed address its link
+// again (Account, "Send the link again").
+func (h *Handlers) HandleAccountConfirmLink(w http.ResponseWriter, r *http.Request) {
+	u, ok := h.accountUser(w, r)
+	if !ok {
+		return
+	}
+	if u.Email == "" || !u.EmailConfirmed.IsZero() {
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+	f := formOf(u)
+	if !h.auth.AllowConfirmationLink(u.ID) {
+		f.Err = "Too many links asked for. Please wait and try again."
+		h.renderAccount(w, r, http.StatusTooManyRequests, u, f)
+		return
+	}
+	h.auth.SendConfirmationLater(u)
+	http.Redirect(w, r, "/account?done=link", http.StatusSeeOther)
+}
+
+// sendConfirmation mails the user's unconfirmed address its link after the
+// answer, within the limit of links to one address; whether one was sent off.
+// A link that cannot go is logged: the address is saved all the same, and
+// Account offers to send it again.
+func (h *Handlers) sendConfirmation(userID int64) bool {
+	if h.auth == nil || !h.auth.CanMail() {
+		return false
+	}
+	u, err := h.store.GetUser(userID)
+	if err != nil || u.Email == "" || !u.EmailConfirmed.IsZero() {
+		return false
+	}
+	if !h.auth.AllowConfirmationLink(u.ID) {
+		logf("panel: user %d: confirmation links asked for too often; none was sent", u.ID)
+		return false
+	}
+	h.auth.SendConfirmationLater(u)
+	return true
 }
 
 // HandleAccountPassword changes the password. It asks for the current one and
@@ -177,6 +251,10 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 	}
 	if token, ok := h.auth.SessionToken(r); ok {
 		h.auth.DestroyOtherSessions(u.ID, token)
+	}
+	// A password set another way leaves no reset link behind it.
+	if err := h.store.DeleteUserLinks(u.ID, store.LinkReset); err != nil {
+		logf("panel: account: %v", err)
 	}
 	logf("panel: user %d changed their password", u.ID)
 	http.Redirect(w, r, "/account?done=password", http.StatusSeeOther)

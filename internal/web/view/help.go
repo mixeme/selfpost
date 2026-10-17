@@ -305,6 +305,7 @@ var serverTopics = []HelpTopic{
 
 var accountTopics = []HelpTopic{
 	{ID: HelpAccount, Title: "Your account", Body: []Text{
-		Plain("Account is your own, whatever your role: your username and e-mail, whether the panel sends you notifications, and your password. Changing the password signs out every other session of this account and keeps the one you are using; applications have their own logins and are not affected."),
+		Rich("Account is your own, whatever your role: your username and e-mail, whether the panel sends you notifications, and your password. Changing the password signs out every other session of this account and keeps the one you are using; applications have their own logins and are not affected. A new e-mail is sent a link that confirms it, which works once, for 24 hours; changing the e-mail asks for your password. Notifications go to the address whether it is confirmed or not, but only a confirmed one can get a link to reset a forgotten password: ",
+			Em("Forgot your password?"), " on the sign-in page sends it, for 30 minutes and once, and setting the new password signs every session of the account out. Without a confirmed e-mail the global administrator sets a new password under Users, and the only global administrator recovers from the container."),
 	}},
 }

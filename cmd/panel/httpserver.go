@@ -169,7 +169,9 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	srv := newHTTPServer(cfg.httpAddr, srvApp.Handler())
 
 	// Shut the server down cleanly when the process is asked to stop.
+	shutDown := make(chan struct{})
 	go func() {
+		defer close(shutDown)
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -180,5 +182,13 @@ func serveHTTP(ctx context.Context, cfg config, st *store.Store) error {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	// ListenAndServe returns at the stop, before its requests have
+	// (net/http, Server.Shutdown); Shutdown returns once they have. The links
+	// they mail after their answers go on after that, and end before the
+	// database closes.
+	<-shutDown
+	drainCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	srvApp.Drain(drainCtx)
 	return nil
 }

@@ -40,7 +40,7 @@ func TestLayoutShowsTheVersionOnlyWhenSignedIn(t *testing.T) {
 		"Source",
 		"No warranty",
 	}
-	signedOut := map[string]bool{"login": true, "setup": true}
+	signedOut := map[string]bool{"login": true, "setup": true, "login-reset": true, "login-reset-set": true, "confirm-email": true}
 	for name, fixture := range pageFixtures {
 		rec := httptest.NewRecorder()
 		engine.Render(rec, http.StatusOK, name, fixture())

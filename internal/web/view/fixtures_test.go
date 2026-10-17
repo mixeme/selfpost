@@ -21,13 +21,20 @@ import (
 // This file belongs to the implementation, not to the guards: the step that
 // restyles a page adds its fixture here in the same commit.
 var pageFixtures = map[string]func() any{
-	"components": func() any { return KitPage() },
-	"login":      func() any { return NewLogin("mail.example.org", "") },
-	"setup":      func() any { return NewSetup("0123456789abcdef", "") },
-	"overview":   func() any { return overviewFixture() },
-	"health":     func() any { return healthFixture(false) },
-	"account":    func() any { return accountFixture() },
-	"settings":   func() any { return settingsFixture() },
+	"components":  func() any { return KitPage() },
+	"login":       func() any { return NewLogin("mail.example.org", "") },
+	"setup":       func() any { return NewSetup("0123456789abcdef", "") },
+	"login-reset": func() any { return NewReset("mail.example.org", "") },
+	"login-reset-set": func() any {
+		return NewResetSet("mail.example.org", "admin", "0123456789abcdef", "")
+	},
+	"confirm-email": func() any {
+		return NewConfirm("mail.example.org", "admin", "mix@example.org", "0123456789abcdef")
+	},
+	"overview": func() any { return overviewFixture() },
+	"health":   func() any { return healthFixture(false) },
+	"account":  func() any { return accountFixture() },
+	"settings": func() any { return settingsFixture() },
 
 	"out-domains":         func() any { return outDomainsFixture() },
 	"out-domain":          func() any { return outDomainFixture() },
@@ -141,6 +148,8 @@ func healthFixture(refresh bool) *Health {
 func accountFixture() *Account {
 	a := NewAccount(admin(), "global")
 	a.Username, a.Email, a.Notify = "admin", "mix@example.org", true
+	// The mockup's address: not confirmed, its link sent at 14:02.
+	a.WithEmailState("mix@example.org", false, time.Date(2026, 10, 17, 14, 2, 0, 0, time.UTC))
 	return a
 }
 
@@ -438,7 +447,7 @@ func userFixture() *UserForm {
 		AllOut:     true,
 		OutDomains: []DomainChoice{{ID: 1, Name: "example.org"}, {ID: 2, Name: "shop.example.org"}, {ID: 3, Name: "notify.acme.io"}},
 		InDomains:  []DomainChoice{{ID: 1, Name: "lists.example.org"}, {ID: 2, Name: "acme.io", Checked: true}},
-	})
+	}).WithEmailState("ops@acme.io", true)
 }
 
 // userDeleteFixture is the mockup's confirmation: acme-ops, who has all

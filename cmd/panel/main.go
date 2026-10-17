@@ -318,6 +318,13 @@ func openData(cfg config, resync func(*store.Store) error) (st *store.Store, res
 	}
 	if restored {
 		log.Printf("restore manifest accepted; regenerating mail-path maps from SQLite")
+		// A link taken after the backup was made would work again from it
+		// (security review, 2026-10-17); a link sent before a restore is
+		// asked for again.
+		if err := st.DeleteAllUserLinks(); err != nil {
+			_ = st.Close()
+			return nil, false, err
+		}
 		if err := resync(st); err != nil {
 			_ = st.Close()
 			return nil, false, err
