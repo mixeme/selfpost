@@ -5,7 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Upgrading
+
+- **Give the TLS private key to group 10997** (audit I1): `chgrp 10997
+  certs/privkey.pem` - or certbot's `archive/<name>/privkey*.pem` - and the
+  same in whatever renews it. Group 10998, which the guide named until now,
+  has Postfix in it; the backup keeps working with either, but only 10997
+  keeps the key from Postfix's daemons.
+
 ### Security
+
+- **The TLS private key no longer has to be readable by Postfix** (audit
+  I1): the guide gave it to group 10998 for the panel's backup, and
+  `postfix` is in that group, so every Postfix daemon - an smtpd talking to
+  the internet included - could read it. A new group, `backupkey` (10997),
+  holds the panel alone; the guide, Help and the backup's refusal name it.
 
 - **A stolen `global` session no longer takes a full backup** (security
   audit 2026-10-17, A2, high): the user form set the signed-in user's own

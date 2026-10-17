@@ -266,6 +266,12 @@ operator can act on it.
   `mail.log`, which `postfix` writes, through it the other way
   ([build/Dockerfile](../build/Dockerfile), `build/entrypoint.sh`). The DKIM
   keys are not in it (§ Mail path).
+- **Group `backupkey` (gid 10997) has one member, `panel`.** The operator
+  gives the host's TLS private key to it so that a full backup carries the
+  key; Postfix serves a root-only copy and has no way to the original. Until
+  `2.14.4` the guide gave the key to `selfpost`, so every Postfix daemon -
+  an smtpd talking to the internet included - could read it (security audit
+  2026-10-17, I1; measured on the test server with `docker exec -u postfix`).
 - **The container keeps `KILL`** (`deploy/docker-compose.yml`, `cap_add`;
   every other capability not listed there is dropped). Without it root
   cannot signal a process of another uid (kill(2), capabilities(7); measured

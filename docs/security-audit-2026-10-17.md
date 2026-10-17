@@ -755,7 +755,7 @@ the argument.
 
 ### Stage 2 — the key group (~2.5 h) → patch release, then the test server's `certs/`
 
-- [ ] **I1.** `groupadd --system --gid 10997 backupkey; usermod -aG backupkey
+- [x] **I1.** `groupadd --system --gid 10997 backupkey; usermod -aG backupkey
   panel` in the Dockerfile; the guide's two `chgrp 10998` become `10997`
   with a sentence on why; `handlers_backup.go:398-399` likewise; the e2e
   stage gives the key to 10997 and `restore_test` asserts the `postfix` uid

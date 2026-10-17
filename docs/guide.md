@@ -336,13 +336,13 @@ ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 ```
 
 The panel reads them as its own user (Health shows the certificate, a full
-backup carries both files), through the container's group 10998. certbot's
+backup carries both files), through the container's group 10997. certbot's
 documentation gives the way for a server that is not root, and certbot keeps
 the key's group and mode at every renewal:
 
 ```sh
 sudo chmod 0755 /etc/letsencrypt/live /etc/letsencrypt/archive
-sudo chgrp 10998 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
+sudo chgrp 10997 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 sudo chmod 0640 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 ```
 
@@ -363,7 +363,7 @@ docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
 The fragment mounts certbot's directory into both nginx and SelfPost, at
 `/etc/letsencrypt`; `./certs` holds two links to
 `/etc/letsencrypt/live/mail.example.com/` — a path that exists inside the
-container, not on the host — and the panel reads the key through group 10998,
+container, not on the host — and the panel reads the key through group 10997,
 as in the Apache case. Then start everything:
 
 ```sh
@@ -371,7 +371,7 @@ mkdir certs
 ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
 ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 sudo chmod 0755 nginx/certbot-etc/live nginx/certbot-etc/archive
-sudo chgrp 10998 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
+sudo chgrp 10997 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
 sudo chmod 0640 nginx/certbot-etc/archive/mail.example.com/privkey*.pem
 
 docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml up -d
@@ -887,11 +887,13 @@ instance keeps running, what goes into the archive, and what happens on restore.
 → *Full backup*. *Encrypt with a password* is ticked; untick it for a plain
 archive. Same archive as the CLI below. The panel runs as its own user, not as
 root, so **the private key in `certs/` has to be readable by it**: give the
-file to the container's `selfpost` group, which has the fixed id 10998 and holds
-both the panel and Postfix —
+file to the container's `backupkey` group, which has the fixed id 10997 and
+holds the panel alone - not Postfix, whose daemons face the internet (until
+`2.14.4` the guide said group 10998, `selfpost`, which Postfix is in; a key
+given to it then is to be given to 10997 now) —
 
 ```sh
-chgrp 10998 certs/privkey.pem && chmod 640 certs/privkey.pem
+chgrp 10997 certs/privkey.pem && chmod 640 certs/privkey.pem
 ```
 
 — and have whatever renews the certificate do the same; certbot does it by
@@ -968,7 +970,7 @@ methods avoid it by stopping first.
 | SQLite consistency | `VACUUM INTO` snapshot | Safe when stopped | Safe when stopped |
 | `data/log/` | Excluded | Included (optional exclude) | Included (optional exclude) |
 | Postfix queue | No | Yes | Yes |
-| `certs/` private key | Yes (the panel needs it readable by group 10998; links are followed) | Yes when `certs/` holds the files; links are stored as links unless `tar -h` | No — deploy files separate |
+| `certs/` private key | Yes (the panel needs it readable by group 10997; links are followed) | Yes when `certs/` holds the files; links are stored as links unless `tar -h` | No — deploy files separate |
 | `data/manifest.json` | Written (version stamp) | Absent | Absent |
 | Restore version check | Yes — must match image tag | No | No |
 | Post-restore *Resync* | Yes, on first boot | No | No |

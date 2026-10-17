@@ -94,7 +94,7 @@ HOSTNAME_VALUE="${SELFPOST_HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # other user; Postfix does not enforce it (smtpd loads the key as root in
 # pre_jail_init(), Postfix 3.10.13 src/smtpd/smtpd.c), but the mount cannot
 # give that mode - it is :ro and owned by the host's user, often readable by
-# group 10998 for the panel's backup. So the pair is copied into a directory of
+# group 10997 (the panel's alone) for the panel's backup. So the pair is copied into a directory of
 # Postfix's own, the key root:root 0600, before postconf and `postfix check`
 # (assumptions D-arch:154).
 TLS_CERT_SRC="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"

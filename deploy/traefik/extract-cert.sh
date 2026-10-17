@@ -59,7 +59,7 @@ grep -q -- '-----BEGIN CERTIFICATE-----' "$tmp_cert" || die "the certificate of 
 grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$tmp_key" || die "the key of $DOMAIN is not PEM"
 
 chmod 0640 "$tmp_cert" "$tmp_key"
-# The group the files had stays theirs: the guide gives the key to group 10998
+# The group the files had stays theirs: the guide gives the key to group 10997
 # so the panel can read it for a full backup, and a run from root's cron would
 # otherwise hand it to root's group (review of audit stage 5).
 for f in fullchain privkey; do

@@ -269,12 +269,12 @@ var serverTopics = []HelpTopic{
 	{ID: HelpBackup, Title: "Backup and moving a domain", Body: []Text{
 		Rich("Full backup downloads one archive of the whole instance: ", Code("data/"), " (the database, DKIM keys and application credentials), ",
 			Code("docker-compose.yml"), ", ", Code(".env"), " and ", Code("certs/"),
-			". Both it and a domain's export ask for your account password - the one you sign in with - at every download, so a session left open is not enough to take them; every attempt, right or wrong, counts against the limit of a password change, ten in 15 minutes."+
+			". Both it and a domain's export ask for your account password - the one you sign in with - at every download, so a session left open is not enough to take them; a wrong one counts against the limit of a password change, ten in 15 minutes."+
 				" The Postfix queue is not in it. The backup is taken while the server is running, and Postfix keeps moving messages through the queue, "+
 				"so a copy could hold a message twice or miss it; mail still waiting for delivery is therefore not carried over, and a restored server "+
 				"starts with an empty queue. To keep the queue, stop the container and archive the project directory instead. The private key in ", Code("certs/"),
-			" has to be readable by the panel: give it to group 10998 on the host (", Code("chgrp 10998"), ", ", Code("chmod 640"),
-			"). Until then the panel refuses to make a backup and names the file, rather than hand over an archive without the key. It holds secrets, so leave Encrypt with a password ticked: the file is sealed as ", Code(".spbk"),
+			" has to be readable by the panel: give it to group 10997 on the host (", Code("chgrp 10997"), ", ", Code("chmod 640"),
+			"), a group only the panel is in, so Postfix's daemons cannot read it. Until then the panel refuses to make a backup and names the file, rather than hand over an archive without the key. It holds secrets, so leave Encrypt with a password ticked: the file is sealed as ", Code(".spbk"),
 			", the password is not stored, and without it nothing can be recovered. To restore, unpack it into an empty project directory (decrypt a ",
 			Code(".spbk"), " first with ", Code("selfpost-backup -decrypt"),
 			") and start the same SelfPost version that made it; the panel refuses data from another version. The reverse-proxy configuration and ",

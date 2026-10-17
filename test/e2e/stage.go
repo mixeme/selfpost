@@ -116,13 +116,32 @@ func writeSelfSignedCert(certPath, keyPath string) error {
 		return err
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	// Readable by everyone, which a real key must never be. On a server the
-	// operator gives the key to the container's selfpost group (10998) so the
-	// panel can put it into a full backup; the runner of this suite is not
-	// always root and cannot hand a file to a group it is not in. The key is
+	// As the guide has the operator do: group 10997, the panel's alone, and
+	// 0640 - the panel can back it up and no Postfix daemon can read it
+	// (security audit 2026-10-17, I1). A runner that is not root cannot hand
+	// a file to a group it is not in; then the key is readable by everyone,
+	// which a real key must never be, and keyGroupStaged says so. The key is
 	// thrown away with the stage directory.
-	if err := os.WriteFile(keyPath, keyPEM, 0o644); err != nil {
+	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
 		return err
 	}
+	return stageKeyMode(keyPath)
+}
+
+// keyGroup is the container's group for the TLS key (build/Dockerfile).
+const keyGroup = 10997
+
+// keyGroupStaged is whether the stage's key went to keyGroup at 0640 (the
+// runner is root) rather than 0644.
+var keyGroupStaged bool
+
+// stageKeyMode gives a key the group and mode the guide gives a real one, or
+// 0644 when the runner may not.
+func stageKeyMode(keyPath string) error {
+	if err := os.Chown(keyPath, -1, keyGroup); err == nil {
+		keyGroupStaged = true
+		return os.Chmod(keyPath, 0o640)
+	}
+	keyGroupStaged = false
 	return os.Chmod(keyPath, 0o644)
 }

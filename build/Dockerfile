@@ -109,9 +109,10 @@ RUN groupadd --system --gid 10999 panel  && useradd --system --uid 10999 --gid p
 # (set up in entrypoint.sh) - lets Postfix read the sasldb2/sender map and
 # connect to the panel's milters. The DKIM keys are the panel's alone. (The
 # supervisor control socket has a group of its own, `supervisor`, below.)
-# The id is fixed, because the host sees it: an operator gives the TLS
-# private key on the host to this group by number, so that the panel can put
-# it into a full backup (guide § Taking a full backup). It lies outside the
+# The id is fixed, because the host saw it: until 2.14.4 an operator gave the
+# TLS private key on the host to this group by number - now to backupkey,
+# below, which Postfix is not in - and a key given then still names it. It
+# lies outside the
 # range the distribution hands out to system groups, 100-999 (adduser 3.152,
 # /etc/adduser.conf: "Default: FIRST_SYSTEM_GID=100, LAST_SYSTEM_GID=999";
 # passwd 1:4.17.4-2, /etc/login.defs: SYS_GID_MIN 101, SYS_GID_MAX 999 - both
@@ -126,6 +127,16 @@ RUN groupadd --system --gid 10999 panel  && useradd --system --uid 10999 --gid p
 RUN groupadd --system --gid 10998 selfpost \
  && usermod -aG selfpost panel \
  && usermod -aG selfpost postfix
+
+# The host's TLS private key is given to this group, not to selfpost, so that
+# the panel can put it into a full backup (guide § Taking a full backup) and
+# no Postfix daemon can read it: postfix is in selfpost, and a memory-safety
+# bug in an smtpd reached from the internet would otherwise yield the key of
+# the mail and of the panel (security audit 2026-10-17, I1). Postfix itself
+# serves a root-only copy (postfix-config.sh). The panel is the one member.
+# Fixed for the same reason as selfpost's, next to it.
+RUN groupadd --system --gid 10997 backupkey \
+ && usermod -aG backupkey panel
 
 # The panel reads the mail queue with `postqueue -p` (and the status page's
 # queue card). postqueue is setgid postdrop, which normally gives it the group

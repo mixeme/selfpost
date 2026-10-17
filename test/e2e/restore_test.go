@@ -24,7 +24,7 @@ import (
 // record that was published before the backup.
 func testFullBackupRestore(t *testing.T, sc *scenario) {
 	// A private key the panel may not read - the state a server is in until
-	// its operator gives the key to group 10998. The panel does not make an
+	// its operator gives the key to group 10997. The panel does not make an
 	// archive without it: it refuses, names the file and says what to do.
 	keyPath := filepath.Join(h.stageDir, "certs", "privkey.pem")
 	if err := os.Chmod(keyPath, 0o600); err != nil {
@@ -46,11 +46,22 @@ func testFullBackupRestore(t *testing.T, sc *scenario) {
 	if err != nil {
 		t.Fatalf("full backup with an unreadable key: %v", err)
 	}
-	if resp.StatusCode != 500 || !strings.Contains(body, "not allowed to read certs/privkey.pem") || !strings.Contains(body, "chgrp 10998") {
+	if resp.StatusCode != 500 || !strings.Contains(body, "not allowed to read certs/privkey.pem") || !strings.Contains(body, "chgrp 10997") {
 		t.Fatalf("full backup with an unreadable key: status %d, want a refusal that names the file and the way out:\n%.800s", resp.StatusCode, body)
 	}
-	if err := os.Chmod(keyPath, 0o644); err != nil {
+	if err := stageKeyMode(keyPath); err != nil {
 		t.Fatal(err)
+	}
+	// Given to group 10997 the key is the panel's to read and no Postfix
+	// daemon's: postfix is in selfpost, not in backupkey (security audit
+	// 2026-10-17, I1). Only where the runner could give it that group.
+	if keyGroupStaged {
+		if out, err := h.compose("exec", "-T", "-u", "postfix", "selfpost", "head", "-c", "1", "/etc/postfix/tls/privkey.pem"); err == nil {
+			t.Errorf("the postfix uid reads the TLS key given to group %d:\n%s", keyGroup, out)
+		}
+		if out, err := h.compose("exec", "-T", "-u", "panel", "selfpost", "head", "-c", "1", "/etc/postfix/tls/privkey.pem"); err != nil {
+			t.Errorf("the panel cannot read the TLS key given to group %d: %v\n%s", keyGroup, err, out)
+		}
 	}
 
 	// A map under data/postfix by a name the entrypoint does not list - the
