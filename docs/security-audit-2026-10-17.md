@@ -847,8 +847,8 @@ the argument.
 
 ### Stage 6 — the rest, and what to accept (~3 h)
 
-- [ ] **M7.** guide: upstream `encrypt` checks no certificate. — **Sonnet**,
-  0.25 h. (Offering `secure` is hours and a `domain`-user-facing choice;
+- [x] **M7.** guide: upstream `encrypt` checks no certificate. — **Sonnet**,
+  0.25 h. *Done 2026-10-17:* guide and Help. (Offering `secure` is hours and a `domain`-user-facing choice;
   propose it on the roadmap, not here.)
 - [ ] **A6, A7, A10, W7, M6, M8** and the README note — half an hour each,
   or the wording change named under each. — **Sonnet**, 2 h.

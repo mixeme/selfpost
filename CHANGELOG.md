@@ -98,6 +98,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   three `dmarc_*` maps root creates at the start were missing from the list
   of paths where a symbolic link is removed first.
 
+### Documentation
+
+- **The upstream's "Required" TLS checks no certificate**, and the guide and
+  Help now say so (audit M7): it guards against a listener, not against one
+  who answers in the upstream's place.
+
+
 ## [2.14.3] - 2026-10-17
 
 A tag beside a label. No migration; schema 13.
