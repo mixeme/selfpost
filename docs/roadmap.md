@@ -37,7 +37,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | review-2026-08-followups | Remaining findings of the 2026-08-19 code review | closed 2026-10-14 (rows placed in [audit-2026-10-12](audit-2026-10-12.md)) | — | — |
 | panel-notifications | E-mail notifications about important events | shipped `2.3.0` | 10/10 | [plans/panel-notifications.md](plans/panel-notifications.md) |
 | delivery-log-storage | Keep a message's `mail.log` lines with its send-log row | shipped `2.2.0` | 8/8 | [plans/delivery-log-storage.md](plans/delivery-log-storage.md) |
-| password-reset | Password reset by e-mail | done 2026-10-17, unreleased | — | — |
+| password-reset | Password reset by e-mail | shipped `2.14.0` | — | — |
 | local-time | The panel shows time, and counts its days, in a time zone other than UTC | shipped `2.13.0` | — | — |
 | notification-mail-recheck | The Notification mail records on Server › Settings can be checked again from where they are shown | shipped `2.9.0` | — | — |
 | settings-save-row | Server › Settings: the Save button no longer stands alone under a long right column | shipped `2.9.0` | — | — |

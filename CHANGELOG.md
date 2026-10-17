@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-17
+
+Password reset by e-mail, to a confirmed address. Migration 0013; schema 13.
+
 ### Added
 
 - **Password reset by e-mail** (password-reset): *Forgot your password?* on
