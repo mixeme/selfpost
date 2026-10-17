@@ -787,8 +787,9 @@ the argument.
   key. — **Sonnet**, 0.5 h. *Done 2026-10-17* (`refusalLog`).
 - [x] **A9.** IPv6 keyed by /64. — **Sonnet**, 0.5 h. *Done 2026-10-17:*
   TestIPv6IsLimitedPerSlash64.
-- [ ] **A3.** After five unsolicited reset links in a day, one mail saying
+- [x] **A3.** After five unsolicited reset links in a day, one mail saying
   further requests are ignored for 24 h, then silence. — **Opus**, 1.5 h.
+  *Done 2026-10-17:* TestResetLinksPauseForADayAfterFive.
 - [ ] **I6.** `/healthz` answered only to loopback and trusted-proxy peers;
   the guide's "Container health" says the proxy may expose it on purpose
   with the fragment line. — **Sonnet**, 0.5 h.

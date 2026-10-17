@@ -49,6 +49,11 @@ type Module struct {
 	linkLimiter      *rateLimiter
 	linkAddrLimiter  *rateLimiter
 	mailLimiter      *rateLimiter
+	// resetDayLimiter counts the reset links mailed to one account in a
+	// day, resetNoticeLimiter the one notice that further requests are
+	// ignored (links.go, sendReset).
+	resetDayLimiter    *rateLimiter
+	resetNoticeLimiter *rateLimiter
 
 	proxyWatch proxyWatch
 	refusals   *refusalLog
@@ -88,8 +93,12 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		// Five links an hour to one address, of either kind: three resets
 		// asked for and a couple of confirmations is ordinary use, a mailbox
 		// full of them is not.
-		mailLimiter:    newRateLimiter(5, time.Hour),
-		trustedProxies: cfg.TrustedProxyCIDRs,
+		mailLimiter: newRateLimiter(5, time.Hour),
+		// Five reset links a day to one account, then one notice and
+		// silence for the rest of the day (security audit 2026-10-17, A3).
+		resetDayLimiter:    newRateLimiter(resetsPerDay, 24*time.Hour),
+		resetNoticeLimiter: newRateLimiter(1, 24*time.Hour),
+		trustedProxies:     cfg.TrustedProxyCIDRs,
 	}
 	m.setupLimiter.startSweeper()
 	m.loginLimiter.startSweeper()
@@ -101,6 +110,8 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 	m.resetLimiter.startSweeper()
 	m.linkLimiter.startSweeper()
 	m.mailLimiter.startSweeper()
+	m.resetDayLimiter.startSweeper()
+	m.resetNoticeLimiter.startSweeper()
 	// Made now rather than at the first unknown name, which would otherwise
 	// pay for two bcrypt runs (review of audit stage 4).
 	go noSuchUserHash()

@@ -605,7 +605,8 @@ Notifications go to the address either way. Only a confirmed address can be
 sent a reset link: *Forgot your password?* on the sign-in page asks for the
 username and always answers the same - whether the name exists, and whether
 its address is confirmed, is not said; another link is not sent within ten
-minutes of the last - and the link
+minutes of the last, and after five in a day the owner is mailed once that
+further requests are ignored for 24 hours - and the link
 (`https://<SELFPOST_HOSTNAME>/login/reset/…`) works once, for 30 minutes, and
 only while the account's address is still the one it was sent to. Setting the
 new password signs every session of the account out. The links name the

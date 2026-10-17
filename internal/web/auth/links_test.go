@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/mixeme/selfpost/internal/store"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -296,6 +297,36 @@ func TestLinkPathsWithoutAToken(t *testing.T) {
 		}
 		if rec := get(h, p); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: %d", p, rec.Code)
+		}
+	}
+}
+
+// Five reset links a day to one account, then one notice that further
+// requests are ignored for a day, then nothing (security audit 2026-10-17,
+// A3). The ten-minute spacing is stepped over by removing the last link.
+func TestResetLinksPauseForADayAfterFive(t *testing.T) {
+	m, ml := linkModule(t, true)
+	u, _ := m.store.GetUserByUsername("admin")
+	for i := 0; i < resetsPerDay+3; i++ {
+		if err := m.store.DeleteUserLinks(u.ID, store.LinkReset); err != nil {
+			t.Fatal(err)
+		}
+		m.sendReset("admin")
+		got, sent := ml.next(t)
+		switch {
+		case i < resetsPerDay:
+			if !sent || !resetLinkRe.MatchString(got.body) {
+				t.Fatalf("link %d: sent %v, %+v", i+1, sent, got)
+			}
+		case i == resetsPerDay:
+			if !sent || got.subject != "[SelfPost] Reset links paused for a day" || resetLinkRe.MatchString(got.body) ||
+				!strings.Contains(got.body, "ignored for 24 hours") {
+				t.Fatalf("the notice: sent %v, %+v", sent, got)
+			}
+		default:
+			if sent {
+				t.Fatalf("request %d after the notice sent %+v", i+1, got)
+			}
 		}
 	}
 }

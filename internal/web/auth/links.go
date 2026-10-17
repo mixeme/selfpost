@@ -29,6 +29,12 @@ const (
 	// spend the account's links an hour in a minute (security review,
 	// 2026-10-17).
 	resetSpacing = 10 * time.Minute
+	// resetsPerDay is how many reset links one account is mailed in a day.
+	// Anyone who knows a username can ask for them; past this the owner is
+	// told once that further requests are ignored for a day, and then nothing
+	// more is sent - rather than a live link in the mailbox five times an
+	// hour for ever (security audit 2026-10-17, A3).
+	resetsPerDay = 5
 )
 
 // later runs f after the answer, counted for Wait.
@@ -182,7 +188,22 @@ func (m *Module) sendReset(username string) {
 		logf("panel: user %d: a reset link went less than %s ago; none was sent", u.ID, resetSpacing)
 		return
 	}
-	if !m.mailLimiter.Allow("reset:" + strconv.FormatInt(u.ID, 10)) {
+	key := "reset:" + strconv.FormatInt(u.ID, 10)
+	if !m.resetDayLimiter.Allow(key) {
+		if !m.resetNoticeLimiter.Allow(key) {
+			logf("panel: user %d: reset links asked for again after today's %d; nothing was sent", u.ID, resetsPerDay)
+			return
+		}
+		logf("panel: user %d: reset links asked for more than %d times today; the owner is told further requests are ignored for 24 hours", u.ID, resetsPerDay)
+		body := "Reset links for the SelfPost account " + u.Username + " at " + m.cfg.Hostname + " have been asked for more than " +
+			strconv.Itoa(resetsPerDay) + " times today. Further requests are ignored for 24 hours, and no more mail of this kind will come before then.\n\n" +
+			"If it was not you, nothing needs doing: the password stays as it is. A global administrator can set a new password on Server > Users at any time.\n"
+		if err := m.mailer.Send(u.Email, "[SelfPost] Reset links paused for a day", body); err != nil {
+			logf("panel: user %d: notice not sent: %v", u.ID, err)
+		}
+		return
+	}
+	if !m.mailLimiter.Allow(key) {
 		logf("panel: user %d: reset links asked for too often; none was sent", u.ID)
 		return
 	}

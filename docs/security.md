@@ -176,7 +176,10 @@ The panel is exposed to the internet — the items below are **not optional**.
   after answering, so neither the words nor the time tell whether a name
   exists or is confirmed; requests are limited to five in 15 minutes per
   client address and username (fifty per address alone), mails to five an
-  hour per account, and a link's page to 30 requests in 15 minutes per link
+  hour per account and five reset links a day - after which the owner is
+  told once that further requests are ignored for 24 hours, and nothing
+  more is sent (`2.14.4`; audit A3: anyone who knew a username kept a live
+  link in that mailbox five times an hour) - and a link's page to 30 requests in 15 minutes per link
   (300 per address alone), so one stranger behind a shared proxy cannot stop
   the others asking for or opening a link (`2.14.4`; audit A1). A link's page changes nothing
   on `GET` (a mail scanner opens links): the button does. Setting a password

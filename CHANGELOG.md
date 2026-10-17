@@ -22,6 +22,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and name, and an IPv6 client is one per /64. With every request coming
   from one private address with `X-Forwarded-For` and `TRUSTED_PROXY_CIDR`
   empty, the log says what to set. Refused sign-ins are logged.
+- **Reset links pause for a day after five** (audit A3): anyone who knew a
+  username could keep a live reset link arriving in that mailbox five times
+  an hour. After five in a day the owner is told once that further requests
+  are ignored for 24 hours.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to
