@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.3] - 2026-10-17
+
+A tag beside a label. No migration; schema 13.
+
 ### Fixed
 
 - **A tag beside a label no longer squeezes the field under it**: the
