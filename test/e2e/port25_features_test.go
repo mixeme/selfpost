@@ -262,6 +262,12 @@ func testInboundRelay(t *testing.T, sc *scenario) {
 			to, token, time.Now().UTC().Format(time.RFC1123Z))
 	}
 
+	// A stranger cannot flush the queue toward the domain's upstream: ETRN is
+	// refused and not offered (security audit 2026-10-17, S6).
+	if code, ehlo, err := etrnPort25(inboundDomain); err != nil || code != 554 || strings.Contains(strings.ToUpper(ehlo), "ETRN") {
+		t.Errorf("ETRN %s on port 25 = %d (%v), EHLO offers:\n%s", inboundDomain, code, err, ehlo)
+	}
+
 	token := uniqueToken("inbound")
 	if res := deliverPort25("someone@stranger.e2e.test", inboundRecipient, message(inboundRecipient, token)); !res.ok() {
 		t.Fatalf("port 25 did not accept mail for %s: %v", inboundRecipient, res.firstErr())

@@ -103,7 +103,10 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   `smtpd_milters` is always overridden on this service, because main.cf's
   submission chain would otherwise let a signing outage defer relayed mail and
   would file inbound mail into the outbound send log under the sender's
-  domain. With the inbound relay on the chain is the optional antispam milter,
+  domain. `ETRN` is refused on every listener and not offered in the EHLO
+  reply (`smtpd_etrn_restrictions=reject`, `smtpd_discard_ehlo_keywords=etrn`):
+  Postfix's default lets any client flush the queue toward an inbound
+  domain's upstream. With the inbound relay on the chain is the optional antispam milter,
   then the panel's **inbound journal milter** (unix socket
   `INBOUND_JOURNAL_MILTER_SOCKET`, default
   `/run/selfpost/inbound-journal.sock`, `default_action=accept`); with DMARC

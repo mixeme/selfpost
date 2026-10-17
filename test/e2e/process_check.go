@@ -149,12 +149,13 @@ func checkDKIMTree(s *stack) error {
 // checkPostfixHardening reads back what postfix-config.sh sets against
 // downgrade and enumeration (audit 2026-10-12, L31).
 func checkPostfixHardening(s *stack) error {
-	out, err := s.execIn("selfpost", "postconf", "-h", "smtpd_tls_protocols", "smtpd_tls_mandatory_protocols", "disable_vrfy_command", "smtpd_banner")
+	out, err := s.execIn("selfpost", "postconf", "-h", "smtpd_tls_protocols", "smtpd_tls_mandatory_protocols", "disable_vrfy_command", "smtpd_banner",
+		"smtpd_etrn_restrictions", "smtpd_discard_ehlo_keywords")
 	if err != nil {
 		return fmt.Errorf("postconf: %v\n%s", err, out)
 	}
 	got := strings.Split(strings.TrimSpace(out), "\n")
-	want := []string{">=TLSv1.2", ">=TLSv1.2", "yes", "$myhostname ESMTP"}
+	want := []string{">=TLSv1.2", ">=TLSv1.2", "yes", "$myhostname ESMTP", "reject", "etrn"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		return fmt.Errorf("postconf -h of the hardened settings = %q, want %q", got, want)
 	}

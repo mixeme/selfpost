@@ -323,11 +323,18 @@ postconf -e \
 # and the banner names no distribution (Debian's adds "(Debian)": postfix
 # 3.10.13-0+deb13u1, debian/main.cf.in:15 "(@DEB_VENDOR@)", filled in by
 # debian/rules:118; the upstream default is "$myhostname ESMTP $mail_name").
+# ETRN is refused to everyone and not offered: Postfix's default lets any
+# client flush the queue toward an inbound domain's upstream
+# (fast_flush_domains = $relay_domains), and nothing here needs it (security
+# audit 2026-10-17, S6; Postfix 3.10.13, src/smtpd/smtpd.c, etrn_cmd() asks
+# smtpd_check_etrn(), whose "reject" answers reject_code, 554).
 postconf -e \
 	"smtpd_tls_protocols=>=TLSv1.2" \
 	"smtpd_tls_mandatory_protocols=>=TLSv1.2" \
 	"smtp_tls_mandatory_protocols=>=TLSv1.2" \
 	"disable_vrfy_command=yes" \
+	"smtpd_etrn_restrictions=reject" \
+	"smtpd_discard_ehlo_keywords=etrn" \
 	'smtpd_banner=$myhostname ESMTP'
 
 # SASL: Cyrus with the local sasldb2 the panel maintains. The realm is left

@@ -709,9 +709,11 @@ the argument.
 - [x] **A4.** Duplicate-cookie line through `loggedPath`. — **Sonnet**, 0.25 h.
   *Done 2026-10-17:* `loggedPath` moved to `auth.LoggedPath`, used by both
   lines; TestDuplicateCookieLineHidesALinksToken.
-- [ ] **S6.** `smtpd_etrn_restrictions = reject`, `smtpd_discard_ehlo_keywords
+- [x] **S6.** `smtpd_etrn_restrictions = reject`, `smtpd_discard_ehlo_keywords
   = etrn` in postfix-config.sh; architecture.md § Postfix one line. Done when
-  an e2e `ETRN` on 25 gets `554`. — **Opus**, 0.5 h.
+  an e2e `ETRN` on 25 gets `554`. — **Opus**, 0.5 h. *Done 2026-10-17:*
+  testInboundRelay sends ETRN for the inbound domain; checkPostfixHardening
+  reads both settings back.
 - [ ] **X1.** SECURITY.md's table: `latest 2.x` supported, `1.x` not. —
   **Sonnet**, 0.25 h.
 

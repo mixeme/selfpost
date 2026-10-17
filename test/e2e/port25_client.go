@@ -82,6 +82,37 @@ func waitForPort25Ready(timeout time.Duration) error {
 	})
 }
 
+// etrnPort25 sends EHLO and then ETRN domain on port 25 and returns ETRN's
+// reply code and what EHLO offered.
+func etrnPort25(domain string) (int, string, error) {
+	conn, err := net.DialTimeout("tcp", port25Addr, 10*time.Second)
+	if err != nil {
+		return 0, "", fmt.Errorf("dial %s: %w", port25Addr, err)
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	tp := textproto.NewConn(conn)
+	if _, _, err := tp.ReadResponse(220); err != nil {
+		return 0, "", err
+	}
+	if err := tp.PrintfLine("EHLO mx.stranger.e2e.test"); err != nil {
+		return 0, "", err
+	}
+	_, ehlo, err := tp.ReadResponse(250)
+	if err != nil {
+		return 0, ehlo, err
+	}
+	if err := tp.PrintfLine("ETRN %s", domain); err != nil {
+		return 0, ehlo, err
+	}
+	code, _, err := tp.ReadResponse(0)
+	_ = tp.PrintfLine("QUIT")
+	if code != 0 {
+		err = nil // any code is the answer asked for
+	}
+	return code, ehlo, err
+}
+
 // deliverPort25Raw is deliverPort25 with the DATA bytes written as they
 // stand. net/smtp's data writer would turn a bare LF into CRLF and stuff a
 // lone "." (net/textproto, DotWriter), which is the very input this is for.

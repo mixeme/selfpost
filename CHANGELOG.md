@@ -23,6 +23,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   hundred long lines were megabytes held per connection.
 - **A link's token stays out of the duplicate-cookie log line** (audit A4),
   as it already did out of the origin check's.
+- **ETRN is refused and no longer offered** (audit S6): Postfix's default
+  let anyone on port 25 flush the queue toward an inbound domain's upstream.
 - **The entrypoint follows no link at the DMARC maps** (audit I2): the
   three `dmarc_*` maps root creates at the start were missing from the list
   of paths where a symbolic link is removed first.
