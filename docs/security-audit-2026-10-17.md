@@ -685,12 +685,14 @@ the argument.
 
 ### Stage 0 — the high and the cheap guards (~5 h) → patch release
 
-- [ ] **A2.** `reauth` on user create, on a user update that carries
+- [x] **A2.** `reauth` on user create, on a user update that carries
   `password` or changes `role`, and on user delete; the user form gets the
   `account_password` field the Backup page has; security.md § Backup and
   domain export says the user form is covered. Done when a test with a
   session and no password gets 401 on all three and the existing user-form
-  tests pass with the field. — **Opus**, 2 h.
+  tests pass with the field. — **Opus**, 2 h. *Done 2026-10-17:* also on a
+  change of e-mail (where reset links go); a save of the name and the
+  reach alone is not asked; TestUserFormAsksForTheAccountPassword.
 - [ ] **I2.** The three DMARC maps in `drop_links`; `[ -L ]` beside `[ -e ]`
   in postfix-config.sh:538,545; an e2e case plants a link and expects the
   log line. — **Opus**, 0.5 h.

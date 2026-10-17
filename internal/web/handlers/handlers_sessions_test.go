@@ -102,7 +102,7 @@ func TestAccountPasswordSignsOutOnlyTheUsersOtherSessions(t *testing.T) {
 // An administrator who sets another user's password on the user form takes
 // away every login that user had under the old one.
 func TestUserFormPasswordSignsOutThatUsersSessions(t *testing.T) {
-	h, _ := settingsServer(t)
+	h, password := settingsServer(t)
 	admin := globalPrincipal
 	bob := addUser(t, h, "bob", "bobs-long-password-1")
 	adminCurrent := signedIn(t, h, "admin", "admin-current")
@@ -110,7 +110,7 @@ func TestUserFormPasswordSignsOutThatUsersSessions(t *testing.T) {
 	bob2 := signedIn(t, h, "bob", "bob-2")
 
 	rec := postWithSession(h.HandleUserEdit, admin, adminCurrent, "/server/users/"+idStr(bob.ID), map[string]string{"uid": idStr(bob.ID)},
-		url.Values{"username": {"bob"}, "role": {"global"}, "password": {"a-brand-new-long-password"}})
+		url.Values{"username": {"bob"}, "role": {"global"}, "password": {"a-brand-new-long-password"}, "account_password": {password}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST user form = %d:\n%s", rec.Code, rec.Body.String())
 	}
@@ -125,12 +125,12 @@ func TestUserFormPasswordSignsOutThatUsersSessions(t *testing.T) {
 
 // Saving the form without a new password does not sign anyone out.
 func TestUserFormWithoutAPasswordKeepsTheSessions(t *testing.T) {
-	h, _ := settingsServer(t)
+	h, password := settingsServer(t)
 	bob := addUser(t, h, "bob", "bobs-long-password-1")
 	bob1 := signedIn(t, h, "bob", "bob-1")
 
 	rec := postWithSession(h.HandleUserEdit, globalPrincipal, "no-session", "/server/users/"+idStr(bob.ID), map[string]string{"uid": idStr(bob.ID)},
-		url.Values{"username": {"bob"}, "role": {"global"}, "email": {"bob@example.org"}})
+		url.Values{"username": {"bob"}, "role": {"global"}, "email": {"bob@example.org"}, "account_password": {password}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST user form = %d:\n%s", rec.Code, rec.Body.String())
 	}
@@ -142,12 +142,12 @@ func TestUserFormWithoutAPasswordKeepsTheSessions(t *testing.T) {
 // An administrator who sets their own password through the user form is signed
 // out everywhere except in the browser they are using.
 func TestUserFormOwnPasswordKeepsTheCurrentSession(t *testing.T) {
-	h, _ := settingsServer(t)
+	h, password := settingsServer(t)
 	current := signedIn(t, h, "admin", "admin-current")
 	other := signedIn(t, h, "admin", "admin-other")
 
 	rec := postWithSession(h.HandleUserEdit, globalPrincipal, current, "/server/users/1", map[string]string{"uid": "1"},
-		url.Values{"username": {"admin"}, "role": {"global"}, "password": {"a-brand-new-long-password"}})
+		url.Values{"username": {"admin"}, "role": {"global"}, "password": {"a-brand-new-long-password"}, "account_password": {password}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST user form = %d:\n%s", rec.Code, rec.Body.String())
 	}

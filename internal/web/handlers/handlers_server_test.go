@@ -286,6 +286,7 @@ func TestUserDeletePageNamesTheAssignmentsAndRefusalsStayOnTheForm(t *testing.T)
 	out1, _ := st.AddDomain("out.example.com", "mail")
 	in1, _ := st.AddInboundDomain("in.example.com")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 	u := userWith(t, st, "shop", store.RoleDomain, store.Reach{DomainIDs: []int64{out1.ID}, InboundDomainIDs: []int64{in1.ID}})
 
 	path := "/server/users/" + idStr(u.ID) + "/delete"
@@ -294,6 +295,7 @@ func TestUserDeletePageNamesTheAssignmentsAndRefusalsStayOnTheForm(t *testing.T)
 		`<h1 class="title is-3">Delete shop</h1>`, `<div class="box sp-danger-zone">`,
 		`remove the assignments to <strong>out.example.com</strong> (outbound) and to <strong>in.example.com</strong> (inbound).`,
 		`<form method="post" action="` + path + `">`, `href="/server/users/` + idStr(u.ID) + `">Keep it`,
+		`name="account_password" type="password" autocomplete="current-password" required`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the delete page is missing %q", want)
@@ -309,7 +311,7 @@ func TestUserDeletePageNamesTheAssignmentsAndRefusalsStayOnTheForm(t *testing.T)
 	if _, err := st.GetUser(root.ID); err != nil {
 		t.Errorf("the refused delete removed the user: %v", err)
 	}
-	if rec := send(h.HandleUserDelete, &root, "POST", path, map[string]string{"uid": idStr(u.ID)}, url.Values{}); rec.Code != http.StatusSeeOther {
+	if rec := send(h.HandleUserDelete, &root, "POST", path, map[string]string{"uid": idStr(u.ID)}, url.Values{"account_password": {testAccountPassword}}); rec.Code != http.StatusSeeOther {
 		t.Errorf("deleting another user = %d", rec.Code)
 	}
 	if _, err := st.GetUser(u.ID); err == nil {

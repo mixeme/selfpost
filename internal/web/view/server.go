@@ -341,7 +341,8 @@ func NewUserForm(m Meta, in UserFormInput) *UserForm {
 // what goes with them, the one button that does it, and the way out.
 type UserDelete struct {
 	Meta
-	Head Head
+	Head  Head
+	Flash *Flash
 
 	Danger       Box
 	Intro        Text
@@ -362,6 +363,8 @@ type UserDeleteInput struct {
 	AllInbound  bool
 	Outbound    []string
 	Inbound     []string
+	// Error is a refusal of the confirmation (a wrong account password).
+	Error string
 }
 
 // NewUserDelete builds the page.
@@ -383,6 +386,9 @@ func NewUserDelete(m Meta, in UserDeleteInput) *UserDelete {
 		Action:   href + "/delete",
 		Confirm:  "Delete " + in.Username,
 		KeepHref: href,
+	}
+	if in.Error != "" {
+		p.Flash = &Flash{Error: true, Text: Plain(in.Error)}
 	}
 	if in.Global {
 		p.Consequences = append(p.Consequences, Plain("remove their global access to the server and to every domain."))

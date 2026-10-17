@@ -284,7 +284,7 @@ var serverTopics = []HelpTopic{
 	{ID: HelpUsers, Title: "Users and roles", Body: []Text{
 		Rich("The two roles are a reach, not a rank: every user is an administrator and signs in with a username and password. Global reaches the whole server — Overview, Server, the queue and every domain — and is the only role that adds or deletes domains and users. Domain reaches only the domains assigned to it, outbound and inbound separately (the same name on both lists is two assignments); ",
 			Em("All"), " includes domains added later, and a domain user needs at least one domain or ", Em("All"),
-			" on either list. The only global user cannot be demoted or deleted, and you cannot delete the account you are signed in with. A new password set here signs that user out everywhere; set for yourself, it keeps the session you set it from."),
+			" on either list. The only global user cannot be demoted or deleted, and you cannot delete the account you are signed in with. A new password set here signs that user out everywhere; set for yourself, it keeps the session you set it from. Adding a user, changing a user's password, e-mail or role, and deleting a user ask for your own account password, as a backup does, with the same limit on wrong guesses."),
 	}},
 	{ID: HelpSettings, Title: "Settings", Body: []Text{
 		Rich("Settings holds what is true of the whole instance. The time zone is the container's, ", Code("TZ"), " in ", Code(".env"),

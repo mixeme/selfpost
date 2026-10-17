@@ -16,10 +16,11 @@ func TestUserFormSetsTheAccountEmail(t *testing.T) {
 	h, st := inboundHandlers(t)
 	out1, _ := st.AddDomain("one.example.com", "mail")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 
 	rec := send(h.HandleUserNew, &root, "POST", "/server/users/new", nil, url.Values{
 		"username": {"ops"}, "email": {"  ops@acme.io "}, "password": {"a-long-enough-password-1"}, "role": {"domain"},
-		"domain_ids": {idStr(out1.ID)},
+		"domain_ids": {idStr(out1.ID)}, "account_password": {testAccountPassword},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create with an e-mail = %d:\n%s", rec.Code, rec.Body.String())
@@ -32,7 +33,7 @@ func TestUserFormSetsTheAccountEmail(t *testing.T) {
 	path, pv := "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)}
 	post := func(extra url.Values) store.User {
 		t.Helper()
-		form := url.Values{"username": {"ops"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}}
+		form := url.Values{"username": {"ops"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}, "account_password": {testAccountPassword}}
 		for k, v := range extra {
 			form[k] = v
 		}
@@ -54,7 +55,7 @@ func TestUserFormSetsTheAccountEmail(t *testing.T) {
 
 	// Creating without one is fine.
 	rec = send(h.HandleUserNew, &root, "POST", "/server/users/new", nil, url.Values{
-		"username": {"plain"}, "password": {"a-long-enough-password-1"}, "role": {"global"}})
+		"username": {"plain"}, "password": {"a-long-enough-password-1"}, "role": {"global"}, "account_password": {testAccountPassword}})
 	if plain, _ := st.GetUserByUsername("plain"); rec.Code != http.StatusSeeOther || plain.Email != "" {
 		t.Errorf("create without an e-mail = %d, %q", rec.Code, plain.Email)
 	}

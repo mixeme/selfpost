@@ -18,10 +18,11 @@ func TestUserFormSendsANewAddressItsLink(t *testing.T) {
 	ml := withMail(t, h)
 	out1, _ := st.AddDomain("one.example.com", "mail")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 
 	rec := send(h.HandleUserNew, &root, "POST", "/server/users/new", nil, url.Values{
 		"username": {"ops"}, "email": {"ops@acme.io"}, "password": {"a-long-enough-password-1"}, "role": {"domain"},
-		"domain_ids": {idStr(out1.ID)},
+		"domain_ids": {idStr(out1.ID)}, "account_password": {testAccountPassword},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d:\n%s", rec.Code, rec.Body.String())
@@ -42,7 +43,7 @@ func TestUserFormSendsANewAddressItsLink(t *testing.T) {
 	}
 	// The same address saved again keeps its mark and sends nothing; a new
 	// one loses it and is sent its link.
-	form := url.Values{"username": {"ops"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}, "email": {"ops@acme.io"}}
+	form := url.Values{"username": {"ops"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}, "email": {"ops@acme.io"}, "account_password": {testAccountPassword}}
 	if rec := send(h.HandleUserEdit, &root, "POST", path, pv, form); rec.Code != http.StatusSeeOther || len(sentBy(h, ml)) != 1 {
 		t.Fatalf("the same address: %d, sent %d", rec.Code, len(sentBy(h, ml)))
 	}

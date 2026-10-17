@@ -203,6 +203,12 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderUserForm(w, r, http.StatusBadRequest, 0, userFormView{FormErr: "Assign at least one outbound or inbound domain to a domain administrator.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 		return
 	}
+	// A new user is an account whose password the creator knows: a session
+	// alone must not be enough to make one (audit 2026-10-17, A2).
+	if status, msg := h.reauth(r, "create user"); status != 0 {
+		h.renderUserForm(w, r, status, 0, userFormView{FormErr: msg, FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
+		return
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
@@ -293,12 +299,25 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 
-	hash := "" // empty keeps the stored hash (SaveUser)
 	if password != "" {
 		if err := validate.AdminPassword(password); err != nil {
 			h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: err.Error(), FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
 			return
 		}
+	}
+	// A password, an e-mail (where reset links go) or a role set here is a way
+	// to an account, the signed-in one's own included: it asks for the
+	// signed-in user's password, as a backup does (audit 2026-10-17, A2).
+	// Name and reach alone do not.
+	if needsReauth(u, password, email, role) {
+		if status, msg := h.reauth(r, "user "+strconv.FormatInt(u.ID, 10)); status != 0 {
+			h.renderUserForm(w, r, status, u.ID, userFormView{FormErr: msg, FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})
+			return
+		}
+	}
+
+	hash := "" // empty keeps the stored hash (SaveUser)
+	if password != "" {
 		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 		if err != nil {
 			logf("panel: update user hash: %v", err)
@@ -334,6 +353,12 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 		h.sendConfirmation(u.ID)
 	}
 	http.Redirect(w, r, "/server/users?done=updated", http.StatusSeeOther)
+}
+
+// needsReauth is whether a user-form save changes what reaches the account:
+// its password, its e-mail (reset links go there) or its role.
+func needsReauth(u store.User, password, email string, role store.Role) bool {
+	return password != "" || email != u.Email || role != u.Role
 }
 
 // endSessionsAfterPasswordSet signs out the logins a user had under the old
@@ -378,6 +403,13 @@ func (h *Handlers) HandleUserDeleteConfirm(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.renderUserDelete(w, r, http.StatusOK, u, "")
+}
+
+// renderUserDelete draws the confirmation, with a refusal above it when
+// errMsg is set.
+func (h *Handlers) renderUserDelete(w http.ResponseWriter, r *http.Request, status int, u store.User, errMsg string) {
+	var err error
 	in := view.UserDeleteInput{
 		ID: u.ID, Username: u.Username, Global: u.Role == store.RoleGlobal,
 		AllOutbound: u.AllDomains, AllInbound: u.AllInboundDomains,
@@ -389,7 +421,8 @@ func (h *Handlers) HandleUserDeleteConfirm(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	h.view.Render(w, http.StatusOK, "user-delete", view.NewUserDelete(h.shellMeta(r), in))
+	in.Error = errMsg
+	h.view.Render(w, status, "user-delete", view.NewUserDelete(h.shellMeta(r), in))
 }
 
 // assignedNames names the domains a domain user is assigned one by one, outbound
@@ -454,6 +487,12 @@ func (h *Handlers) submitUserDelete(w http.ResponseWriter, r *http.Request, u st
 	}
 	if u.ID == p.ID {
 		h.renderUserForm(w, r, http.StatusBadRequest, u.ID, userFormView{FormErr: "You cannot delete your own account while signed in.", FormUsername: u.Username, FormEmail: u.Email, FormRole: string(u.Role)})
+		return
+	}
+	// Removing an administrator asks for the signed-in user's password: a
+	// session alone must not lock the others out (audit 2026-10-17, A2).
+	if status, msg := h.reauth(r, "delete user "+strconv.FormatInt(u.ID, 10)); status != 0 {
+		h.renderUserDelete(w, r, status, u, msg)
 		return
 	}
 	if err := h.store.DeleteUser(u.ID); err != nil {

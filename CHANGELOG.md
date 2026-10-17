@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Security
+
+- **A stolen `global` session no longer takes a full backup** (security
+  audit 2026-10-17, A2, high): the user form set the signed-in user's own
+  password without the current one, which then passed the backup's password
+  check. Adding a user, setting a password, changing an e-mail or a role on
+  the user form, and deleting a user now ask for your own account password,
+  as a backup does, under the same limit on wrong guesses.
+
 ## [2.14.3] - 2026-10-17
 
 A tag beside a label. No migration; schema 13.

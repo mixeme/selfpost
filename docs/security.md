@@ -471,6 +471,16 @@ operator can act on it.
   file's own protection, not this one: whoever downloads it chooses that
   password. The import and the `selfpost-backup` CLI, which runs inside the
   container, are not asked.
+- **Nor is it enough to make an account that would pass that check**
+  (security audit 2026-10-17, A2). Until `2.14.4` a `global` session could
+  set its own password on the user form - no current password asked, the
+  session kept - and then pass the check above with the password it chose,
+  or add a second global user with a password it knew. The user form now
+  asks for the same account password, under the same limiter, when it adds a
+  user and when a save sets a password, changes the e-mail (where reset
+  links go) or changes the role - the signed-in user's own account included -
+  and deleting a user asks for it too. A save of the name and the domain
+  assignments alone is not asked: neither reaches an account's secret.
 - Both files are secrets: a full backup carries DKIM keys, `sasldb2`, the
   panel users' password hashes, `docker-compose.yml`, `.env`, and the TLS
   private key from `certs/` when present; a domain export carries the DKIM key

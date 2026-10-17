@@ -286,7 +286,7 @@ func TestDeletingAUserLeavesDomainAddressesAndNamesNobody(t *testing.T) {
 		lacks(t, name+" for the co-administrator", body, `boss-private@example.org`, `admin&#39;s`, `s default`, `Another user`)
 	}
 
-	rec := send(s.h.HandleUserDelete, &globalPrincipal, "POST", "/server/users/"+idStr(ops.ID)+"/delete", map[string]string{"uid": idStr(ops.ID)}, url.Values{})
+	rec := send(s.h.HandleUserDelete, &globalPrincipal, "POST", "/server/users/"+idStr(ops.ID)+"/delete", map[string]string{"uid": idStr(ops.ID)}, url.Values{"account_password": {"correct-password-here!"}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("deleting a user = %d:\n%s", rec.Code, rec.Body.String())
 	}

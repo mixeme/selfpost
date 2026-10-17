@@ -719,6 +719,12 @@ The panel refuses to remove or demote the **last** global user, so it can never
 end up with none. A user cannot delete the account they are signed in with.
 The user form also sets the user's e-mail, which the users list shows.
 
+Adding a user, setting a user's password, changing their e-mail or role -
+your own account's included - and deleting a user ask for **your account
+password**, the one you sign in with, as a backup does and under the same
+limit on wrong guesses: a session left open is not enough to hand out an
+account. Saving only the name or the domain assignments is not asked.
+
 ### Sessions
 
 A login survives a container restart: sessions live in SQLite, not in

@@ -20,9 +20,10 @@ func TestUserFormSavesTheWholeChange(t *testing.T) {
 	h, st := inboundHandlers(t)
 	out1, _ := st.AddDomain("out.example.com", "mail")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 	u := userWith(t, st, "shop", store.RoleDomain, store.Reach{DomainIDs: []int64{out1.ID}})
 	rec := send(h.HandleUserEdit, &root, "POST", "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)},
-		url.Values{"username": {"shop2"}, "email": {"shop@example.com"}, "role": {"global"}})
+		url.Values{"username": {"shop2"}, "email": {"shop@example.com"}, "role": {"global"}, "account_password": {testAccountPassword}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST = %d:\n%s", rec.Code, rec.Body.String())
 	}
@@ -36,7 +37,7 @@ func TestUserFormSavesTheWholeChange(t *testing.T) {
 
 	// And back to a domain user, with an assignment.
 	rec = send(h.HandleUserEdit, &root, "POST", "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)},
-		url.Values{"username": {"shop2"}, "email": {"shop@example.com"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}})
+		url.Values{"username": {"shop2"}, "email": {"shop@example.com"}, "role": {"domain"}, "domain_ids": {idStr(out1.ID)}, "account_password": {testAccountPassword}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST = %d:\n%s", rec.Code, rec.Body.String())
 	}
@@ -85,9 +86,10 @@ func TestUserFormCreatesWithEmailAndReach(t *testing.T) {
 	h, st := inboundHandlers(t)
 	out1, _ := st.AddDomain("out.example.com", "mail")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 	rec := send(h.HandleUserNew, &root, "POST", "/server/users/new", nil,
 		url.Values{"username": {"fresh"}, "password": {"a-long-enough-password"}, "email": {"fresh@example.com"},
-			"role": {"domain"}, "domain_ids": {idStr(out1.ID)}})
+			"role": {"domain"}, "domain_ids": {idStr(out1.ID)}, "account_password": {testAccountPassword}})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create = %d:\n%s", rec.Code, rec.Body.String())
 	}

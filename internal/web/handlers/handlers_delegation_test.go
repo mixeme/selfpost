@@ -353,11 +353,12 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 	out, _ := st.AddDomain("out.example.com", "mail")
 	in, _ := st.AddInboundDomain("in.example.com")
 	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
 	const password = "a-long-enough-password-1"
 
 	create := func(username string, extra url.Values) (*httptest.ResponseRecorder, store.User) {
 		t.Helper()
-		form := url.Values{"username": {username}, "password": {password}, "role": {"domain"}}
+		form := url.Values{"username": {username}, "password": {password}, "role": {"domain"}, "account_password": {testAccountPassword}}
 		for k, v := range extra {
 			form[k] = v
 		}
@@ -385,6 +386,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 	update := func(u store.User, form url.Values) store.User {
 		t.Helper()
 		form.Set("username", u.Username)
+		form.Set("account_password", testAccountPassword)
 		rec := send(h.HandleUserEdit, &root, "POST", "/server/users/"+idStr(u.ID), map[string]string{"uid": idStr(u.ID)}, form)
 		if rec.Code != http.StatusSeeOther {
 			t.Fatalf("update %s = %d:\n%s", u.Username, rec.Code, rec.Body.String())

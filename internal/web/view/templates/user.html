@@ -4,7 +4,8 @@
      the lists while the role is Global (data-global-role on the select,
      data-domain-pick on the boxes); without scripts they stay in view and the
      server ignores them for the global role. A blank password keeps the current
-     one. */}}
+     one. Your account password is asked for a new user and for a change of
+     password, e-mail or role (audit 2026-10-17, A2); the server decides. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 {{if .Flash}}{{template "flash" .Flash}}{{end}}
@@ -25,6 +26,8 @@
     <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
   </select></div></div>
   <p class="help">Everyone here is an administrator; the role is the reach. <em>Global</em> also sees Server and is the only one who adds or deletes domains. The only global user cannot be changed to <em>domain</em> or deleted.</p></div>
+<div class="field"><label class="label" for="acpw">Your account password</label><div class="control"><input class="input" id="acpw" name="account_password" type="password" autocomplete="current-password"{{if .NewUser}} required{{end}}></div>
+  <p class="help">Yours, the one you sign in with, not this user's. Asked when you add a user, or change a password, an e-mail or a role here: a session left open must not be enough to hand out an account.</p></div>
 {{template "body_close"}}
 {{template "box_close"}}
     </div>
