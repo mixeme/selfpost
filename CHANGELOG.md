@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.14.5] - 2026-10-18
+
+A line less in the mail log. No migration; schema 13.
+
 ### Fixed
 
 - **ETRN is discarded from the EHLO reply silently**: since `2.14.4` Postfix
