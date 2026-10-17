@@ -435,18 +435,20 @@ func TestOutDomainDeleteNamesWhatGoesWithIt(t *testing.T) {
 		`<h1 class="title is-3">Delete example.org</h1>`, `<div class="box sp-danger-zone">`, `<h2>This cannot be undone</h2>`,
 		`Deleting <strong>example.org</strong> will:`, `permanently delete its DKIM signing key;`,
 		`delete <strong>both applications</strong> (<span class="sp-mono">prod-server</span>, <span class="sp-mono">alerts</span>) with their credentials and sender bindings;`,
+		`delete the <strong>12 DMARC reports</strong> received for it;`,
 		`stop signing mail as the domain.`, `Inbound domains are not touched.`,
 		`<form method="post" action="/outbound/domains/1/delete">`, `class="button is-danger"`, `Delete example.org</button>`,
 		`href="/outbound/domains/1">Keep it</a>`,
 		`<h2>Moving it instead?</h2>`, `<a href="/outbound/domains/1/settings">Export the domain</a>`,
 	)
 
-	// No applications: nothing to say about them.
-	out = renderSignedIn(t, "out-domain-delete", NewOutDomainDelete(admin(), 1, "example.org", nil))
-	pageLacks(t, "Delete", out, `applications`, `credentials`)
+	// No applications and no reports: nothing to say about them.
+	out = renderSignedIn(t, "out-domain-delete", NewOutDomainDelete(admin(), 1, "example.org", nil, 0))
+	pageLacks(t, "Delete", out, `applications`, `credentials`, `received for it`)
 	pageHas(t, "Delete", out, `permanently delete its DKIM signing key;`, `stop signing mail as the domain.`)
-	out = renderSignedIn(t, "out-domain-delete", NewOutDomainDelete(admin(), 1, "example.org", []string{"only"}))
-	pageHas(t, "Delete", out, `<strong>its application</strong> (<span class="sp-mono">only</span>)`)
+	out = renderSignedIn(t, "out-domain-delete", NewOutDomainDelete(admin(), 1, "example.org", []string{"only"}, 1))
+	pageHas(t, "Delete", out, `<strong>its application</strong> (<span class="sp-mono">only</span>)`,
+		`delete the <strong>DMARC report</strong> received for it;`)
 }
 
 // ---- Helpers

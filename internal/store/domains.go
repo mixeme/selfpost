@@ -132,8 +132,22 @@ func (s *Store) GetDomain(id int64) (Domain, error) {
 // foreign_keys ON, which Open's DSN sets on every one
 // (https://sqlite.org/foreignkeys.html § 2, § 4.3); the rows the cascade
 // removes are not in RowsAffected (https://sqlite.org/c3ref/changes.html).
+//
+// The domain's DMARC reports go with it, in the same transaction (their
+// records by the table's cascade): reports belong to a domain by name, and a
+// domain deleted and added again - by anyone, for anyone - must not hand its
+// old reports to whoever it is assigned to then (security audit 2026-10-17,
+// A5/W2). The logs keep their rows, by id, for the global role.
 func (s *Store) DeleteDomain(id int64) error {
-	res, err := s.db.Exec("DELETE FROM domains WHERE id = ?", id)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete domain: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // a no-op after Commit
+	if _, err := tx.Exec(`DELETE FROM dmarc_reports WHERE domain = (SELECT name FROM domains WHERE id = ?)`, id); err != nil {
+		return fmt.Errorf("delete domain: its DMARC reports: %w", err)
+	}
+	res, err := tx.Exec("DELETE FROM domains WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete domain: %w", err)
 	}
@@ -143,6 +157,9 @@ func (s *Store) DeleteDomain(id int64) error {
 	}
 	if n == 0 {
 		return ErrDomainNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete domain: commit: %w", err)
 	}
 	return nil
 }

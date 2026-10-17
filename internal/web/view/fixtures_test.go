@@ -260,7 +260,7 @@ func outAppCreatedFixture() *OutAppCreated {
 // outDomainDeleteFixture is the mockup's confirmation: the domain has the two
 // applications that go with it.
 func outDomainDeleteFixture() *OutDomainDelete {
-	return NewOutDomainDelete(admin(), 1, "example.org", []string{"prod-server", "alerts"})
+	return NewOutDomainDelete(admin(), 1, "example.org", []string{"prod-server", "alerts"}, 12)
 }
 
 // outLogFixture is the mockup's Outbound log: six messages of three domains on

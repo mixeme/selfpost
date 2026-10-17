@@ -28,6 +28,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   reports into, under any domain, or another domain's hosted one. Only the
   hosted address of a domain that chose it is a mailbox now, and a report
   must arrive at the address tagged with its domain.
+- **A domain's DMARC reports are deleted with it** (audit A5/W2): reports
+  belong to a domain by name, and a domain deleted and added again showed
+  its old reports to whoever it was assigned to then.
 - **A stranger's recipient no longer writes an Inbound › Log row** (audit
   M2): Postfix quotes a refused recipient in its reply with the quotes
   removed, so `RCPT TO:<"; from=<x> to=<y> …"@domain>` spelled a second

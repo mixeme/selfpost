@@ -136,7 +136,13 @@ func (h *Handlers) HandleDeleteConfirm(w http.ResponseWriter, r *http.Request) {
 	for i, a := range apps {
 		logins[i] = a.Login
 	}
-	h.view.Render(w, http.StatusOK, "out-domain-delete", view.NewOutDomainDelete(h.shellMeta(r), d.ID, d.Name, logins))
+	reports, err := h.store.CountDMARCReports(d.Name)
+	if err != nil {
+		logf("panel: delete domain %d: %v", d.ID, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	h.view.Render(w, http.StatusOK, "out-domain-delete", view.NewOutDomainDelete(h.shellMeta(r), d.ID, d.Name, logins, reports))
 }
 
 // HandleDeleteDomain performs the deletion and returns to the domain list.

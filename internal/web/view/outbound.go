@@ -768,8 +768,9 @@ type OutDomainDelete struct {
 }
 
 // NewOutDomainDelete builds the page. logins are the applications the domain
-// has: they are named, because they go with it.
-func NewOutDomainDelete(m Meta, id int64, name string, logins []string) *OutDomainDelete {
+// has: they are named, because they go with it; reports is how many DMARC
+// reports go with it (security audit 2026-10-17, A5/W2), not said when none.
+func NewOutDomainDelete(m Meta, id int64, name string, logins []string, reports int) *OutDomainDelete {
 	m.Title, m.Section, m.Page = "Delete "+name, "outbound", "domains"
 	href := DomainHref(id)
 	p := &OutDomainDelete{
@@ -796,6 +797,12 @@ func NewOutDomainDelete(m Meta, id int64, name string, logins []string) *OutDoma
 		}
 		item = append(item, Inline{Text: ") with their credentials and sender bindings;"})
 		p.Consequences = append(p.Consequences, item)
+	}
+	switch {
+	case reports == 1:
+		p.Consequences = append(p.Consequences, Rich("delete the ", Strong("DMARC report"), " received for it;"))
+	case reports > 1:
+		p.Consequences = append(p.Consequences, Rich("delete the ", Strong(strconv.Itoa(reports)+" DMARC reports"), " received for it;"))
 	}
 	p.Consequences = append(p.Consequences, Rich("stop signing mail as the domain."))
 	return p

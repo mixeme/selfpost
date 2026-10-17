@@ -745,9 +745,10 @@ the argument.
   2026-10-17:* the live registry holds two hosted addresses and no custom
   one on the hostname; TestCustomReportAddressOnTheHostnameIsRefused, the
   untagged cases in TestIngestMessageRejectsTagMismatch.
-- [ ] **A5/W2.** Delete a domain's reports in `domain.Service.Delete` (the
+- [x] **A5/W2.** Delete a domain's reports in `domain.Service.Delete` (the
   cheap form); security.md § Roles says reports go with the domain. —
-  **Sonnet**, 0.5 h. (The `domain_id` form is better and 2 h; take it if
+  **Sonnet**, 0.5 h. *Done 2026-10-17:* in `store.DeleteDomain`, one
+  transaction with the domain; TestDeletingADomainDeletesItsReports. (The `domain_id` form is better and 2 h; take it if
   stage 1 is split across two sittings.)
 - [ ] **W3.** A mutex around `Resync`'s read + write + reload. — **Sonnet**,
   0.5 h.

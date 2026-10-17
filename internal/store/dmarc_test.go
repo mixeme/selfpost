@@ -106,3 +106,42 @@ func TestListDMARCReportsEmptyListIsNoRows(t *testing.T) {
 		t.Errorf("all domains with a list = %d report(s), %v; want both (AllDomains wins)", len(list), err)
 	}
 }
+
+// A domain's DMARC reports go when the domain does, records included, and
+// another domain's stay: a domain added again under the old name starts with
+// none (security audit 2026-10-17, A5/W2).
+func TestDeletingADomainDeletesItsReports(t *testing.T) {
+	st := openTestStore(t)
+	gone, _ := st.AddDomain("gone.example", "sel")
+	if _, err := st.AddDomain("kept.example", "sel"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, d := range []string{"gone.example", "kept.example"} {
+		if _, err := st.InsertDMARCReport(DMARCReport{
+			Domain: d, Reporter: "google.com", ReportID: "r-" + d, PeriodBegin: now.Add(-24 * time.Hour), PeriodEnd: now, ReceivedAt: now,
+			Records: []DMARCReportRecord{{SourceIP: "203.0.113.1", Count: 1, SPFResult: "pass", DKIMResult: "pass"}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.DeleteDomain(gone.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddDomain("gone.example", "sel"); err != nil {
+		t.Fatal(err)
+	}
+	if list, err := st.ListDMARCReports(DMARCReportScope{Domains: []string{"gone.example"}}, 10); err != nil || len(list) != 0 {
+		t.Errorf("the domain added again has %d old reports (%v)", len(list), err)
+	}
+	if list, err := st.ListDMARCReports(DMARCReportScope{Domains: []string{"kept.example"}}, 10); err != nil || len(list) != 1 {
+		t.Errorf("the other domain has %d reports (%v), want 1", len(list), err)
+	}
+	var records int
+	if err := st.db.QueryRow("SELECT COUNT(*) FROM dmarc_report_records").Scan(&records); err != nil || records != 1 {
+		t.Errorf("%d report records left (%v), want the kept domain's one", records, err)
+	}
+	if err := st.DeleteDomain(gone.ID); err != ErrDomainNotFound {
+		t.Errorf("deleting it again = %v, want ErrDomainNotFound", err)
+	}
+}

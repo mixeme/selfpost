@@ -161,6 +161,16 @@ func (s *Store) PruneDMARCReports(domain string) error {
 	return nil
 }
 
+// CountDMARCReports is how many reports a domain has: what deleting it
+// deletes with it (DeleteDomain).
+func (s *Store) CountDMARCReports(domain string) (int, error) {
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM dmarc_reports WHERE domain = ?`, domain).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count dmarc reports of %s: %w", domain, err)
+	}
+	return n, nil
+}
+
 // IncrDMARCParseFailures bumps the failure counter in settings.
 func (s *Store) IncrDMARCParseFailures() error {
 	raw, err := s.GetSetting(DMARCParseFailuresKey)

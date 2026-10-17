@@ -193,7 +193,7 @@ assigned outbound domains and inbound domains **separately**, each list with
 | Overview, Server (Health, System log, Backup, Users, Settings, kit page) | yes | no — 404 |
 | Outbound queue | yes | no — 404 (a queue is not filtered by domain) |
 | Outbound: domain page, applications, Domain settings (report address, rate limit, export), log | every domain | assigned outbound domains |
-| Outbound › DMARC reports | every report, with the server's ingest statistics | reports of assigned domains, without the ingest box |
+| Outbound › DMARC reports | every report, with the server's ingest statistics | reports of assigned domains, without the ingest box (a domain's reports are deleted with it, so a domain added again under the same name starts with none) |
 | Inbound: domain page, upstream, recipients | every inbound domain | assigned inbound domains |
 | Inbound › Log | every row, including those of a domain deleted since | rows of assigned inbound domains (by id: not those of an earlier domain of the same name), without the links into the filter lists |
 | Inbound › Filter lists; the inbound log's retention | yes | no — 404 |
