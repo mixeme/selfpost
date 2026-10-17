@@ -111,6 +111,9 @@ func TestE2E(t *testing.T) {
 		if err := checkPostfixHardening(h); err != nil {
 			t.Fatal(err)
 		}
+		if err := checkPidsLimit(h); err != nil {
+			t.Fatal(err)
+		}
 		if err := checkInboundRelayOff(h); err != nil {
 			t.Fatal(err)
 		}

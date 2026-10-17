@@ -99,10 +99,12 @@ services:
       # when the variable is true.
       - "25:25"
       - "127.0.0.1:8080:8080"
-    # Hardening. SelfPost's entrypoint still needs to run as
-    # root very briefly to fix /data ownership and normalise permissions
-    # under the shared `selfpost` group (see build/entrypoint.sh) before
-    # supervisord drops the panel to an unprivileged user — so this cannot be
+    # Hardening. SelfPost's entrypoint runs as root to fix /data ownership
+    # and normalise permissions under the shared `selfpost` group (see
+    # build/entrypoint.sh) before supervisord drops the panel to an
+    # unprivileged user; supervisord, Postfix's master, cert-reload and
+    # logrotate stay root for the container's life, which is inherent to
+    # them (security audit 2026-10-17, I3) — so this cannot be
     # `user: panel` or a fully read-only rootfs without breaking that startup
     # self-healing. What IS applied: no privilege escalation past what the
     # image already grants, and every Linux capability dropped except the
@@ -151,3 +153,9 @@ services:
       - SETGID
       - DAC_OVERRIDE
       - KILL
+    # A ceiling on processes and threads, so that a runaway or compromised
+    # program cannot use up the host's (security audit 2026-10-17, I3).
+    # Postfix starts up to 100 processes per service by default
+    # (default_process_limit), and a busy server runs three smtpd services,
+    # cleanup and smtp at once; 1024 leaves them room.
+    pids_limit: 1024

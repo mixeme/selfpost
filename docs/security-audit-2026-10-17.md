@@ -799,8 +799,11 @@ the argument.
 
 ### Stage 4 — resources and imports (~5 h)
 
-- [ ] **I3.** `pids_limit: 512` in every compose fragment; the comment
-  corrected; one e2e run. — **Sonnet**, 0.5 h.
+- [x] **I3.** `pids_limit: 512` in every compose fragment; the comment
+  corrected; one e2e run. — **Sonnet**, 0.5 h. *Done 2026-10-17:* 1024 for
+  SelfPost (Postfix's default_process_limit of 100 per service, three smtpd
+  services), 256 for the proxies and rspamd, 64 for certbot; e2e reads
+  `pids.max` back (checkPidsLimit).
 - [ ] **W6/M9.** Coalesce Postfix reloads (reload only when the rendered map
   changed; a 2 s debounce for bursts); a per-user limiter on `dns-recheck`.
   — **Opus**, 1.5 h.

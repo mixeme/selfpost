@@ -146,6 +146,19 @@ func checkDKIMTree(s *stack) error {
 	return nil
 }
 
+// checkPidsLimit reads the container's process ceiling back from the kernel:
+// the shipped compose sets pids_limit (security audit 2026-10-17, I3).
+func checkPidsLimit(s *stack) error {
+	out, err := s.execIn("selfpost", "cat", "/sys/fs/cgroup/pids.max")
+	if err != nil {
+		return fmt.Errorf("read pids.max: %v\n%s", err, out)
+	}
+	if got := strings.TrimSpace(out); got != "1024" {
+		return fmt.Errorf("the container's pids.max is %q, want the compose file's 1024", got)
+	}
+	return nil
+}
+
 // checkPostfixHardening reads back what postfix-config.sh sets against
 // downgrade and enumeration (audit 2026-10-12, L31).
 func checkPostfixHardening(s *stack) error {

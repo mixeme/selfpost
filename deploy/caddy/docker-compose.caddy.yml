@@ -48,6 +48,8 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    # A ceiling on processes and threads (security audit 2026-10-17, I3).
+    pids_limit: 256
     depends_on:
       - selfpost
     ports:
