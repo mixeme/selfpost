@@ -280,6 +280,26 @@ re-read what changed, update the citations, then this table:
 | `logrotate` | `3.22.0-1` |
 <!-- /cited-package-versions -->
 
+A security update of one of these, or of OpenSSL or Berkeley DB, reaches
+operators only with the next release: published tags are never rebuilt.
+`.github/workflows/base-packages.yml` compares every Monday what
+`debian:trixie-slim` would install with the versions the last release was
+built with, below, and fails when one has moved - the sign to cut a patch
+release. Cutting a release updates this table from the image
+(`dpkg-query -W` of these names; security audit 2026-10-17, I5):
+
+<!-- base-package-versions -->
+| Package | Built with |
+|---|---|
+| `postfix` | `3.10.13-0+deb13u1` |
+| `libsasl2-2` | `2.1.28+dfsg1-9` |
+| `libsasl2-modules-db` | `2.1.28+dfsg1-9` |
+| `sasl2-bin` | `2.1.28+dfsg1-9` |
+| `openssl` | `3.5.7-1~deb13u3` |
+| `libssl3t64` | `3.5.7-1~deb13u3` |
+| `libdb5.3t64` | `5.3.28+dfsg2-9` |
+<!-- /base-package-versions -->
+
 A document instead of source: its URL and section. Where neither answers the
 question, the comment says so and what was measured instead - "measured on
 the e2e stand, 2026-10-14: ..." - and a measurement is never written as if

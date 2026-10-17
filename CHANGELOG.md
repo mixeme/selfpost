@@ -41,6 +41,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **A domain import is bounded** (audit W4, W5, W8): a DKIM key over 4096
   bits, more than 500 applications, and a domain named as the server
   itself - whose key signs the panel's own mail - are refused.
+- **The build is pinned and checked** (audit I4, I5): GitHub Actions by
+  commit, certbot and Caddy by release; govulncheck on the source in CI and
+  on the image's binaries before a release is pushed; a weekly check says
+  when a Debian package the mail path runs on has moved, so that a patch
+  release follows.
 - **The TLS private key no longer has to be readable by Postfix** (audit
   I1): the guide gave it to group 10998 for the panel's backup, and
   `postfix` is in that group, so every Postfix daemon - an smtpd talking to

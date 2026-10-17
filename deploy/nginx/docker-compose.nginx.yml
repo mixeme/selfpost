@@ -60,7 +60,9 @@ services:
       - ./nginx/certbot-www:/var/www/certbot:ro
 
   certbot:
-    image: certbot/certbot:latest
+    # Pinned like every image here: "latest" moves under a running server
+    # (security audit 2026-10-17, I4). Bump it deliberately.
+    image: certbot/certbot:v5.8.0
     pids_limit: 64
     volumes:
       - ./nginx/certbot-etc:/etc/letsencrypt

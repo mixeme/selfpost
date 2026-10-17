@@ -768,6 +768,13 @@ published, then `docker compose up -d`. The backup version check requires the ru
 to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag).
 
+**Base-package fixes come with releases.** The image is Debian trixie, and a
+security update of Postfix, Cyrus SASL, OpenSSL or Berkeley DB reaches you with
+the next SelfPost release built after it: a published image tag is never
+rebuilt. The project checks every week whether one of those has moved and cuts
+a patch release when it has; a release whose notes say "base packages" is one
+of those.
+
 **To 2.8.0** there is nothing to do. From 2.8.0 the panel signs outgoing
 mail itself, in a milter of its own, and OpenDKIM is no longer in the image;
 the keys, the selectors and the DNS records stay as they are. The keys move

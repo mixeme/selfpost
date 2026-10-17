@@ -1,0 +1,20 @@
+name: base packages
+
+# Every Monday: has a Debian package the mail path runs on moved since the
+# last release was built? A red run is the nudge to cut a patch release
+# (security audit 2026-10-17, I5; .github/scripts/base-packages.sh).
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Compare with trixie
+        run: sh .github/scripts/base-packages.sh

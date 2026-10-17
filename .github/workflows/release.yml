@@ -66,14 +66,14 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: v${{ needs.prepare.outputs.version }}
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build image (native, loaded locally for the e2e gate)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: build/Dockerfile
@@ -83,7 +83,7 @@ jobs:
             VERSION=${{ needs.prepare.outputs.version }}
           tags: selfpost:e2e
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.26"
           cache-dependency-path: test/e2e/go.sum
@@ -110,8 +110,22 @@ jobs:
             fi
           done
 
+      # The binaries about to be pushed, as built in the image - with the Go
+      # of golang:1.26-trixie, which may lag the runner's: a standard-library
+      # advisory fixed in a later patch fails the release until the base tag
+      # moves, which is the point (security audit 2026-10-17, I4).
+      - name: Vulnerabilities in the image's binaries
+        run: |
+          set -euo pipefail
+          id=$(docker create selfpost:e2e)
+          trap 'docker rm -f "$id" >/dev/null' EXIT
+          for bin in panel selfpost-backup; do
+            docker cp "$id:/usr/local/bin/$bin" "/tmp/$bin"
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -mode=binary "/tmp/$bin"
+          done
+
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -152,14 +166,14 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: v${{ needs.prepare.outputs.version }}
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

@@ -16,7 +16,8 @@
 # the CA URL's host and path, "acme-v02.api.letsencrypt.org-directory" for Let's
 # Encrypt). caddy/modules/caddytls/automation.go, DefaultIssuers(): ZeroSSL is a
 # second issuer only when an email is configured, and the Caddyfile below sets
-# none. Read at the projects' master of 2026-10-14: `caddy:2` is a moving tag.
+# none. Read at the projects' master of 2026-10-14, when the image was the
+# moving `caddy:2`; it is pinned below now, and a bump re-reads these.
 #
 # Merge with the base file — run this from the deploy/ directory (Compose
 # resolves every relative path in both files against the directory of the
@@ -46,7 +47,9 @@ services:
       - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>:/etc/postfix/tls:ro
 
   caddy:
-    image: caddy:2
+    # Pinned to a release: "2" moves under a running server (security audit
+    # 2026-10-17, I4). Bump it deliberately.
+    image: caddy:2.11.7
     restart: unless-stopped
     # A ceiling on processes and threads (security audit 2026-10-17, I3).
     pids_limit: 256

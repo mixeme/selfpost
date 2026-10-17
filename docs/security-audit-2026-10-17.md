@@ -824,17 +824,25 @@ the argument.
 
 ### Stage 5 — supply chain and currency (~2.5 h)
 
-- [ ] **I4.** Actions pinned by SHA with the version in a comment;
+- [x] **I4.** Actions pinned by SHA with the version in a comment;
   `govulncheck ./...` in `test.yml` and in `release.yml` before the push (a
   stdlib advisory fixed in the current patch of the pinned minor fails the
   build until the base tag moves — that is the point); `certbot` and
   `caddy` pinned in the fragments. Leave `provenance`/`sbom` off until the
   GHCR cleanup loop is taught to keep attestation manifests (a follow-up,
-  1 h). — **Sonnet**, 1 h.
-- [ ] **I5.** guide § Upgrading and SECURITY.md: base-package fixes arrive
+  1 h). — **Sonnet**, 1 h. *Done 2026-10-17:* actions pinned to the
+  latest release of the major each used (checkout v4.4.0, setup-go v5.6.0,
+  setup-buildx v3.12.0, build-push v6.19.2, login v3.7.0); govulncheck
+  v1.9.0 on the source in test.yml and on the image's two binaries
+  (`-mode=binary`, the base image's Go) in release.yml before the push;
+  certbot v5.8.0, caddy 2.11.7. provenance/SBOM stay off, as planned.
+- [x] **I5.** guide § Upgrading and SECURITY.md: base-package fixes arrive
   with the next patch release; the owner's rule on published tags. A weekly
   workflow that rebuilds the package list in `debian:trixie-slim` and fails
-  when postfix/libsasl2/openssl/libdb moved, as the nudge. — **Sonnet**,
+  when postfix/libsasl2/openssl/libdb moved, as the nudge. — **Sonnet**, *Done 2026-10-17:* the guide, SECURITY.md;
+  `base-packages.yml` + `.github/scripts/base-packages.sh` against a table
+  in development.md (seven packages, from the 2.14.3 image), tried on the
+  test server both ways.
   1.5 h.
 
 ### Stage 6 — the rest, and what to accept (~3 h)

@@ -13,6 +13,12 @@ reporting if you are behind — the image tag is `ghcr.io/mixeme/selfpost:X.Y.Z`
 | 1.x | no — upgrade to 2.x (guide § Upgrading) |
 | 0.x | no (pre-release) |
 
+A security update of a Debian package the image runs - Postfix, Cyrus SASL,
+OpenSSL, Berkeley DB - arrives with the next patch release built after it:
+published image tags are never rebuilt. A weekly check
+(`.github/workflows/base-packages.yml`) says when one has moved, and a patch
+release follows.
+
 ## Reporting a vulnerability
 
 **Do not open a public issue.** Use GitHub's private vulnerability reporting:
