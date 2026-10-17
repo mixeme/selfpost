@@ -61,7 +61,12 @@ var outlineExempt = map[string]string{
 
 // Pages that are redesigned but have no outline: the kit page is the
 // vocabulary itself, and the signed-out screens have no shell to outline.
-var noOutline = map[string]bool{"components": true, "login": true, "setup": true}
+var noOutline = map[string]bool{"components": true, "login": true, "setup": true,
+	"login-reset": true, "login-reset-set": true, "confirm-email": true}
+
+// signedOut are the screens drawn without a user: the split sp-signin screen.
+var signedOut = map[string]bool{"login": true, "setup": true,
+	"login-reset": true, "login-reset-set": true, "confirm-email": true}
 
 // The classes a page template may write itself: text and table-cell utilities
 // and the form grid. Every other sp- class is a component's and is written in
@@ -405,7 +410,7 @@ func TestPanelPageStructure(t *testing.T) {
 				}
 			}
 			pages := root.find("sp-page")
-			if name == "login" || name == "setup" {
+			if signedOut[name] {
 				if len(pages) != 0 || len(root.find("sp-signin")) != 1 || len(root.find("navbar")) != 0 {
 					t.Error("a signed-out page is the split sp-signin screen, without the navbar and the page container")
 				}
