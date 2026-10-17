@@ -407,6 +407,12 @@ docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
 
 Verify Caddy's on-disk cert path for your version before relying on the
 default mount — see the comment at the top of the Caddy compose fragment.
+With Caddy the certificate lives in Caddy's own data, not in `certs/`, and
+Caddy writes its keys readable by itself alone: the panel's full backup then
+refuses with "certs/ holds no certificate". Back up `./caddy/caddy-data`
+with the project directory instead, or keep a copy of the pair in `certs/`,
+the key given to group 10997 (`chgrp 10997`, `chmod 640`), refreshed after
+each renewal.
 
 **Traefik (containerised).** Edit the `Host(...)` label and ACME email in
 [deploy/traefik/docker-compose.traefik.yml](../deploy/traefik/docker-compose.traefik.yml),

@@ -29,8 +29,8 @@ const (
 
 // Application is a SASL account bound to a single domain (product.md §
 // Multi-domain model). The password is never stored here — only in sasldb2,
-// hashed — so it can be shown exactly once at creation/regeneration
-// (security.md). Addresses is populated only in 'list' mode.
+// which Cyrus keeps in the clear (PLAIN and LOGIN need it; security.md) — so
+// it can be shown exactly once at creation/regeneration. Addresses is populated only in 'list' mode.
 type Application struct {
 	ID             int64
 	DomainID       int64

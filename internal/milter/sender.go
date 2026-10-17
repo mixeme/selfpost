@@ -202,11 +202,12 @@ func splitTableLine(line string) (key, value string, ok bool) {
 // tries for a local domain is never a key here: every key the panel writes
 // has an "@" (internal/postfix renderSenderLoginMaps).
 //
-// Case is folded in ASCII only. Postfix folds as Unicode (src/util/casefold.c
-// with ICU, which Debian builds with), but every key and login the panel
-// writes is ASCII; a Unicode fold would only let a look-alike pass - the
-// Kelvin sign for "k" - for an address that is not the domain's (review of
-// stage 2c).
+// Case is folded in ASCII only, as Postfix folds the keys of the texthash
+// map the panel writes (src/util/dict_thash.c:113 and dict_ht.c:58-64,
+// lowercase(): ASCII; security audit 2026-10-17 corrected this comment, which
+// said Unicode). Every key and login the panel writes is ASCII; a Unicode fold
+// would only let a look-alike pass - the Kelvin sign for "k" - for an address
+// that is not the domain's (review of stage 2c).
 func (b *Bindings) Allowed(login, addr string) (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

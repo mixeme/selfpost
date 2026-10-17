@@ -171,8 +171,10 @@ The panel is exposed to the internet — the items below are **not optional**.
   is 256 random bits (`crypto/rand`); `user_links` keeps its SHA-256 only,
   so the database or a backup opens nothing. A confirmation link lives 24
   hours, a reset link 30 minutes; each is taken once, in the transaction
-  that deletes it (`DELETE … RETURNING`), and a newer link of the same kind
-  replaces the older. A reset link holds only while the account's address is
+  that deletes it (`DELETE … RETURNING`); a newer confirmation link replaces
+  the older one, while a reset link is not replaced - the one in the mailbox
+  works until it is used or expires, and another is not sent within ten
+  minutes of it. A reset link holds only while the account's address is
   still the confirmed one it was sent to; a confirmation link only while the
   address is the one it confirms. The link's host is `SELFPOST_HOSTNAME`,
   never the request's `Host`, which an attacker would choose to receive the
@@ -278,8 +280,8 @@ operator can act on it.
 
 ### Output and process
 
-- Rendering goes through `html/template` with auto-escaping (queue, log,
-  journal, themes).
+- Rendering goes through `html/template` with auto-escaping (queue, logs,
+  journal, every page).
 - The panel process is **not root** (`user=panel` in supervisord); path access
   is granted through the `selfpost` group with minimal permissions. The
   supervisord control socket, which can stop or restart any program, is the
@@ -299,8 +301,10 @@ operator can act on it.
   `2.14.4` the guide gave the key to `selfpost`, so every Postfix daemon -
   an smtpd talking to the internet included - could read it (security audit
   2026-10-17, I1; measured on the test server with `docker exec -u postfix`).
-- **The container keeps `KILL`** (`deploy/docker-compose.yml`, `cap_add`;
-  every other capability not listed there is dropped). Without it root
+- **The container keeps eight capabilities**, `KILL` among them
+  (`deploy/docker-compose.yml`, `cap_add`: NET_BIND_SERVICE, CHOWN, FOWNER,
+  FSETID, SETUID, SETGID, DAC_OVERRIDE, KILL, each with its reason there;
+  every other is dropped). Without it root
   cannot signal a process of another uid (kill(2), capabilities(7); measured
   on the test server, 2026-10-16), and two root processes must: supervisord
   stops and restarts the panel, and Postfix's master ends its children,

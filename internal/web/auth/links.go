@@ -168,7 +168,8 @@ func (m *Module) HandleReset(w http.ResponseWriter, r *http.Request) {
 }
 
 // sendReset mails the account named username a reset link if its address is
-// confirmed, at most three an hour.
+// confirmed: not within resetSpacing of the last, five a day (then one
+// notice) and five an hour.
 func (m *Module) sendReset(username string) {
 	if username == "" || m.mailer == nil || m.cfg.Hostname == "" {
 		return

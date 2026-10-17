@@ -15,7 +15,7 @@ import (
 )
 
 // socketPath is supervisord's control socket: build/supervisord.conf,
-// [unix_http_server] file=, group selfpost, which the panel is in.
+// [unix_http_server] file=, group supervisor, whose one member is the panel.
 const socketPath = "/run/supervisor.sock"
 
 // runOnceFor bounds RunOnce: a reload that is still running after it is

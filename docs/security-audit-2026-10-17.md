@@ -855,8 +855,11 @@ the argument.
   M6, M8 in code (a session from a longer window is cut at the next check;
   three headers signed; a long header line logged); A6, A7, W7 by wording
   in security.md - each is what the code should do; the README note.
-- [ ] **Doc drift sweep** — every line under "Doc and comment drift" above.
-  — **Sonnet**, 1 h.
+- [x] **Doc drift sweep** — every line under "Doc and comment drift" above.
+  — **Sonnet**, 1 h. *Done 2026-10-17:*
+  every line, each with the finding that fixed it or in this sweep; left as
+  history: migration `0013`'s comment (a migration is not edited after it
+  shipped); the live compose is re-copied at the next rollout.
 - **Accept, with the argument:** *the setuid/setgid binaries of the base
   image* — inert under `no-new-privileges`, which the shipped compose sets
   and the e2e exercises; removing Debian's set is a maintenance cost at every

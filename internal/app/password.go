@@ -13,7 +13,8 @@ const passwordBytes = 24
 
 // generatePassword returns a strong, URL-safe random password for an
 // application's SASL account. The panel generates it, shows it once and never
-// stores the plaintext (security.md); sasldb2 keeps only the hashed form.
+// stores it in its own database; sasldb2 keeps it, in the clear, as Cyrus
+// does for PLAIN and LOGIN (security.md).
 //
 // base64url output keeps the password to a safe ASCII alphabet with no shell or
 // SMTP-special characters, so it survives being typed into client configuration

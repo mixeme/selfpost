@@ -243,7 +243,9 @@ then OpenDKIM did, in a program of its own
   (`internal/domain`, `Keys`; `DKIM_DIR`, default `/data/dkim`). A key is
   made when a domain is added and an existing one is reused, never
   overwritten: that would invalidate the record already published
-  (`EnsureKey`). A domain export carries the key and an import writes it. A
+  (`EnsureKey`). A domain export carries the key and an import writes it,
+  over whatever key the name had (`ImportKey`: the import is the domain
+  with exactly that key). A
   deleted domain's key directory is removed once the selector table no
   longer names it; one a deletion had to leave, Reload configuration removes
   (`Service.Resync`).
@@ -1031,7 +1033,8 @@ A validation refusal is shown as the text the validator wrote (on the form,
 next to the field, or in a notice above the first box). Anything else — a
 database error, `saslpasswd2`, a Postfix reload — is logged
 and the page gets a fixed sentence saying so; the error text never reaches the
-browser. A template error renders a bare `500` rather than a half-written page
+browser - save on the global-only Backup page, where an import's refusal
+names what is wrong with the file (security.md § Output and process). A template error renders a bare `500` rather than a half-written page
 (`Engine.Render` buffers).
 
 ### Sessions
