@@ -503,7 +503,10 @@ operator can act on it.
   user and when a save sets a password, changes the e-mail (where reset
   links go) or changes the role - the signed-in user's own account included -
   and deleting a user asks for it too. A save of the name and the domain
-  assignments alone is not asked: neither reaches an account's secret.
+  assignments alone is not asked: neither reaches an account's secret. Only
+  wrong passwords count against the limiter; a right one gives its attempt
+  back, so an administrator adding users is not locked out of the next
+  backup.
 - Both files are secrets: a full backup carries DKIM keys, `sasldb2`, the
   panel users' password hashes, `docker-compose.yml`, `.env`, and the TLS
   private key from `certs/` when present; a domain export carries the DKIM key

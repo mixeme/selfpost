@@ -100,6 +100,14 @@ func (m *Module) AllowPasswordChange(userID int64) bool {
 	return m.passwordLimiter.Allow("user:" + strconv.FormatInt(userID, 10))
 }
 
+// PasswordCheckPassed gives back the attempt AllowPasswordChange took for a
+// check that found the right password: only wrong guesses count, so an
+// administrator who adds ten users in a quarter of an hour is not locked out
+// of the next backup (review of audit 2026-10-17 stage 0).
+func (m *Module) PasswordCheckPassed(userID int64) {
+	m.passwordLimiter.Refund("user:" + strconv.FormatInt(userID, 10))
+}
+
 // SessionToken returns the session token the request carries, if exactly one
 // cookie of that name is present.
 func (m *Module) SessionToken(r *http.Request) (string, bool) {

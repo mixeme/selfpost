@@ -353,6 +353,7 @@ func (h *Handlers) reauth(r *http.Request, what string) (int, string) {
 		logf("panel: %s: user %d gave a wrong account password", what, p.ID)
 		return http.StatusUnauthorized, "Your account password is incorrect."
 	}
+	h.auth.PasswordCheckPassed(p.ID)
 	return 0, ""
 }
 

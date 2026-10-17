@@ -150,11 +150,11 @@ rm -f /data/sasl/sasldb2.new
 # Postfix state under /data (architecture.md § Persistence). The panel writes
 # sender_login_maps; Postfix owns the on-disk queue tree under queue/.
 mkdir -p /data/postfix/queue
-[ -e /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
+[ -e /data/postfix/sender_login_maps ] || [ -L /data/postfix/sender_login_maps ] || : > /data/postfix/sender_login_maps
 # Inbound relay maps (written by the panel when INBOUND_RELAY_ENABLE=true).
 # Empty files keep postfix check happy if the flag is on before any domain exists.
 for f in relay_domains transport relay_recipients tls_policy; do
-	[ -e "/data/postfix/$f" ] || : > "/data/postfix/$f"
+	[ -e "/data/postfix/$f" ] || [ -L "/data/postfix/$f" ] || : > "/data/postfix/$f"
 done
 # Every map here is the panel's to write and Postfix's to read - the sender
 # map, the inbound and the DMARC maps alike - so each file beside queue/ is
@@ -196,7 +196,7 @@ chmod 0755 /data/antispam
 # because parent directory has insecure permissions" when the directory's
 # group is not root and has write permission.
 mkdir -p /data/log
-[ -e /data/log/mail.log ] || : > /data/log/mail.log
+[ -e /data/log/mail.log ] || [ -L /data/log/mail.log ] || : > /data/log/mail.log
 chown -R postfix:selfpost /data/log
 chmod 2750 /data/log
 find /data/log -type f -exec chmod 0640 {} +

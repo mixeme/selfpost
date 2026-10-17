@@ -12,7 +12,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   password without the current one, which then passed the backup's password
   check. Adding a user, setting a password, changing an e-mail or a role on
   the user form, and deleting a user now ask for your own account password,
-  as a backup does, under the same limit on wrong guesses.
+  as a backup does, under the same limit on wrong guesses - which now
+  counts wrong passwords only.
 - **A domain's rate limit is taken only by its own applications** (audit
   M1): the level-2 domain limit was read from `MAIL FROM`, which reaches the
   milter before Postfix holds it to the login, so a client that never

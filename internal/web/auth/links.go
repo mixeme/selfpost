@@ -407,7 +407,7 @@ func loginInfo(r *http.Request) string {
 // Every log line that names a request's path goes through it: the origin
 // check's refusal and the duplicate-cookie line (audit 2026-10-17, A4).
 func LoggedPath(p string) string {
-	for _, prefix := range []string{"/login/reset/", "/confirm/"} {
+	for _, prefix := range []string{"/login/reset/", "/confirm/", "/setup/"} {
 		if strings.HasPrefix(p, prefix) && len(p) > len(prefix) {
 			return prefix + "…"
 		}

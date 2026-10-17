@@ -8,6 +8,7 @@ func TestLoggedPathHidesTokens(t *testing.T) {
 	for in, want := range map[string]string{
 		"/login/reset/abcDEF123": "/login/reset/…",
 		"/confirm/abcDEF123":     "/confirm/…",
+		"/setup/abcDEF123":       "/setup/…",
 		"/login/reset":           "/login/reset",
 		"/confirm/":              "/confirm/",
 		"/account/profile":       "/account/profile",

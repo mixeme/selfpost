@@ -134,3 +134,18 @@ func TestUserFormAsksForTheAccountPassword(t *testing.T) {
 		t.Fatalf("delete with the right password = %d:\n%s", rec.Code, rec.Body.String())
 	}
 }
+
+// Only wrong guesses count against the account-password limit: a dozen
+// right ones in a row - an administrator adding users - leave the next
+// backup open (review of audit 2026-10-17 stage 0).
+func TestRightAccountPasswordsDoNotUseUpTheLimit(t *testing.T) {
+	h, st := inboundHandlers(t)
+	root := userWith(t, st, "root", store.RoleGlobal, store.Reach{})
+	withAccountPassword(t, h, st, root)
+	for i := 0; i < 12; i++ {
+		form := url.Values{"username": {"new-user-" + idStr(int64(i))}, "password": {"a-long-enough-password-1"}, "role": {"global"}, "account_password": {testAccountPassword}}
+		if rec := send(h.HandleUserNew, &root, "POST", "/server/users/new", nil, form); rec.Code != http.StatusSeeOther {
+			t.Fatalf("user %d = %d:\n%.600s", i, rec.Code, rec.Body.String())
+		}
+	}
+}
