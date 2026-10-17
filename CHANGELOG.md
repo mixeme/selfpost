@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Health dials the inbound journal's socket** with the inbound relay on:
+  the milter that writes Inbound › Log was the one the panel did not check.
+  The send log's socket is named as the mockup names it, `journal-milter`.
+
+### Changed
+
+- **A DMARC report says which day it is**: its day stays the reporter's, in
+  UTC (owner, 2026-10-17: accepted as it is), and the report's page now says
+  so under its window; Settings and Help name it as the one exception to
+  the panel's zone. A daily report from midnight to midnight is one day, not
+  two.
+
+### Documentation
+
+- The guide's gaps from the docs audit: `/license` and `/server/components`,
+  DMARC pages' paths, `selfpost-backup -o`, `-i` and `-version`, the
+  Inbound log's retention field, `PANEL_COOKIE_SECURE`.
+
 ## [2.14.1] - 2026-10-17
 
 Overview's head in the mockup's words. No migration; schema 13.

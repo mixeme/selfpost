@@ -222,12 +222,21 @@ func (h *Handlers) relayIPs() map[string]bool {
 	return ips
 }
 
+// formatDMARCWindow is the day, or days, a report covers, as its reporter
+// counts them: in UTC (RFC 7489 § 7.2, date-range in UTC seconds), which the
+// panel keeps whatever its own zone (owner, 2026-10-17). A window that ends
+// at midnight ends the day before: a daily report from 00:00 to 00:00 is one
+// day, not two.
 func formatDMARCWindow(begin, end time.Time) string {
 	if begin.IsZero() {
 		return ""
 	}
-	if begin.Year() == end.Year() && begin.YearDay() == end.YearDay() {
-		return begin.UTC().Format("2 Jan")
+	begin, last := begin.UTC(), end.UTC()
+	if last.After(begin) && last.Equal(last.Truncate(24*time.Hour)) {
+		last = last.Add(-time.Second)
 	}
-	return begin.UTC().Format("2 Jan") + " – " + end.UTC().Format("2 Jan")
+	if begin.Year() == last.Year() && begin.YearDay() == last.YearDay() {
+		return begin.Format("2 Jan")
+	}
+	return begin.Format("2 Jan") + " – " + last.Format("2 Jan")
 }

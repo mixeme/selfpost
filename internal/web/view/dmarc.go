@@ -328,8 +328,8 @@ type ReportInput struct {
 	DomainID    int64
 	Contact     string
 	Pass, Fail  int
-	Window      string // the window in the title: "20 Sep"
-	Period      string // the window with its times: "20 Sep 00:00 – 21 Sep 00:00"
+	Window      string // the reporter's day, in the title: "20 Sep"
+	Period      string // the window with its times, this zone's: "20 Sep 03:00 – 21 Sep 03:00"
 	Received    string // "2026-09-21 04:40"
 	PolicyP     string
 	PolicySP    string
@@ -339,6 +339,16 @@ type ReportInput struct {
 	Recipient   string
 	// Hub is whether the viewer reaches the hub: the trail leads back to it only then.
 	Hub bool
+}
+
+// windowNote says, under a report's window, which day the report is of: the
+// reporter's, in UTC, which the title and the lists name (owner, 2026-10-17:
+// "Показ времени отчёта по UTC принимаем ... Пояснения добавь").
+func windowNote(day string) Text {
+	if day == "" {
+		return nil
+	}
+	return Plain("The reporter's day, " + day + ": reports count their days in UTC, and the title and the lists name that day. The times are this panel's zone.")
 }
 
 // NewDMARCReport builds the page of one report.
@@ -359,7 +369,7 @@ func NewDMARCReport(m Meta, in ReportInput) *DMARCReport {
 	report := []Fact{
 		{Label: "Reporter", Value: Plain(in.Reporter)},
 		{Label: "Report id", Value: Plain(in.ReportID), Mono: true, Small: true},
-		{Label: "Window", Value: Plain(in.Period)},
+		{Label: "Window", Value: Plain(in.Period), Note: windowNote(in.Window)},
 		{Label: "Received", Value: Plain(in.Received)},
 	}
 	if in.Contact != "" {

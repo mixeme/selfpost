@@ -81,6 +81,9 @@ type Config struct {
 	SignSocket      string
 	SignLocalSocket string
 	JournalSocket   string
+	// InboundJournalSocket is the inbound journal milter's, dialled with
+	// the inbound relay on; it fails open like the journal's.
+	InboundJournalSocket string
 	// SenderSocket is the sender check's socket, attached strictly.
 	SenderSocket string
 	// SessionIdleDays is the sliding inactivity window after which a login
@@ -160,6 +163,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		SignSocket:                 cfg.SignSocket,
 		SignLocalSocket:            cfg.SignLocalSocket,
 		JournalSocket:              cfg.JournalSocket,
+		InboundJournalSocket:       cfg.InboundJournalSocket,
 		SenderSocket:               cfg.SenderSocket,
 		RateLimitMessagesPerIP:     cfg.RateLimitMessagesPerIP,
 		RateLimitWindowSeconds:     cfg.RateLimitWindowSeconds,

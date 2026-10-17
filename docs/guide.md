@@ -253,6 +253,11 @@ expected to set; defaults match the code exactly.
 | `TZ` | Time zone of the container, an IANA name such as `Europe/Moscow`: every time the panel shows, every day it counts (today on Health, the days of the statistics, the days of the log filters) and the stamps Postfix writes in `mail.log`, so the two agree. Stored times stay UTC, so changing it is only a restart. *Server › Settings* shows the zone in use, and says so when the image does not know the name (the times are then UTC). | UTC | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for sign-in and setup rate-limiting (account-change attempts are counted per user, whatever the address). **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
+`PANEL_COOKIE_SECURE` is not in the table: the session cookie is `Secure`
+unless it is `false`, which only a trial over plain HTTP wants, and the
+compose file does not pass it - the local trial in the README sets it on
+`docker run` (`-e PANEL_COOKIE_SECURE=false`).
+
 TLS certificate paths (`TLS_CERT_FILE`, `TLS_KEY_FILE`) are fixed in
 [deploy/docker-compose.yml](../deploy/docker-compose.yml) to match the `./certs`
 bind mount — configure the mount, not these variables.
@@ -434,6 +439,11 @@ menu: a group with nothing in it is absent. *Inbound* appears only with
 queue, answer 404 to a user with the *domain* role — the same answer a missing
 page gets.
 
+Two pages are outside the menu: `/license`, the AGPL-3.0 text the footer links
+to, open to anyone; and `/server/components` (global role), the panel's
+component kit - every building block of its pages on one page, a reference
+for whoever works on the panel.
+
 Pages that used to be one are now several. The old Status page is **Overview**
 (one verdict per check) and **Server › Health** (the tables behind them). The
 old Settings page is **Account** (your own name, e-mail and password) and
@@ -467,8 +477,9 @@ readings, numbered in the order of what stops mail first:
 
 - **Processes** and **Milter sockets**: the DKIM signer's two - `dkim-signer · applications` for what
   applications send on 465/587, `dkim-signer · notifications` for the
-  panel's own mail - the sender check, the send log (the journal-milter)
-  and, with one configured, the spam filter. Postfix attaches the signer
+  panel's own mail - the sender check, the send log (the journal-milter),
+  with the inbound relay on the Inbound log's (the inbound-journal-milter,
+  fail-open like the send log's), and, with one configured, the spam filter. Postfix attaches the signer
   strictly, so either of its rows down means the mail that goes through it
   waits.
 - **Sender check** — what the strict check of the `From:` line has cost
@@ -613,7 +624,10 @@ the `mail.log` lines on Server › System log and on a message's page read the
 same clock as the rest of the page. The database keeps its times in UTC, so
 changing the zone is a restart and nothing more; the days counted before it
 stay days of the old zone, a shift of a few hours in the statistics. A name
-the image does not know leaves everything in UTC, and the box says so.
+the image does not know leaves everything in UTC, and the box says so. One
+thing keeps UTC on purpose: the day a DMARC report covers is its reporter's,
+who counts days in UTC, so the lists and a report's title name that day; the
+report's page gives its window's times in this zone and says which day it is.
 
 ### Notifications
 
@@ -1142,7 +1156,10 @@ The CLI also *writes* encrypted backups for scripted/cron use. The password
 must be at least 12 characters, as on the panel's forms (decrypting takes
 any), and it comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>`
 (first line), never from a command-line argument, which would be visible in
-the process list.
+the process list. Its other flags: `-o <file>` writes the output to a file
+instead of standard output, `-i <file>` reads the encrypted archive from a
+file instead of standard input (with `-decrypt`), and `-version` prints the
+version.
 `-e` with the name only takes the value from your shell's environment, so it is
 not written on the command line:
 
@@ -1344,7 +1361,11 @@ sees the *Ingest* box — whether ingest works, the last report received, report
 kept this week and parse failures. Open a domain's roll-up from the list or
 from *DMARC reports* in the domain page's menu. A user with the *domain* role
 sees the reports of the domains assigned to them, without the *Ingest* box.
-Summaries are pruned (500 kept for each domain, 90 days max).
+Summaries are pruned (500 kept for each domain, 90 days max). A report's
+page is `/outbound/dmarc/reports/<id>` and a domain's roll-up
+`/outbound/dmarc/domains/<id>`. A report's day - in the lists and its title -
+is the reporter's, counted in UTC as reports count their days; its page shows
+the window's times in the panel's zone, with a line naming that day.
 
 A message that is not a report the relay keeps — unreadable as an aggregate
 report, about a domain not sent from here, or delivered to another domain's
@@ -1631,7 +1652,7 @@ the row is deleted by retention, and not while another row carries the same
 queue id (Postfix reuses ids); a
 message accepted before `2.2.0` shows them only while they are still in the
 current file, and the page says so when there are none. Retention is set under **Server › Settings** (global
-role); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial default until it
+role; with the inbound relay on, the Inbound log's has a field of its own there); `SEND_LOG_RETENTION_DAYS` in `.env` is only the initial default until it
 is changed there.
 
 ### Exporting and importing a single domain

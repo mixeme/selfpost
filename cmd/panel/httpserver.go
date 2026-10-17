@@ -118,6 +118,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		SignSocket:                 cfg.signSocket,
 		SignLocalSocket:            cfg.signLocalSocket,
 		JournalSocket:              cfg.journalSocket,
+		InboundJournalSocket:       cfg.inboundJournalSocket,
 		SenderSocket:               cfg.senderSocket,
 		SessionIdleDays:            cfg.sessionIdleDays,
 		DNSResolvers:               cfg.dnsResolvers,

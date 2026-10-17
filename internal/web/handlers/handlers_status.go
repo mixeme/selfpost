@@ -572,7 +572,12 @@ func (h *Handlers) healthChecks() healthReadings {
 		signerSocket(h.cfg.SignSocket, "applications"),
 		signerSocket(h.cfg.SignLocalSocket, "notifications"),
 		health.CheckSocket("sender-check", h.cfg.SenderSocket, true),
-		health.CheckSocket("send-log", h.cfg.JournalSocket, false),
+		health.CheckSocket("journal-milter", h.cfg.JournalSocket, false),
+	}
+	// The inbound journal writes Inbound › Log, fail-open as the outbound
+	// one: dialled while there is an inbound relay to journal.
+	if h.cfg.InboundEnabled {
+		sockets = append(sockets, health.CheckSocket("inbound-journal-milter", h.cfg.InboundJournalSocket, false))
 	}
 	if on, milter, action := h.inboundFilter(); on {
 		sockets = append(sockets, filterSocket(milter, action))

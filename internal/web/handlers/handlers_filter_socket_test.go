@@ -27,7 +27,8 @@ func socketsServer(t *testing.T) *Handlers {
 	h.cfg.SignLocalSocket = filepath.Join(dir, "sign-local.sock")
 	h.cfg.JournalSocket = filepath.Join(dir, "journal.sock")
 	h.cfg.SenderSocket = filepath.Join(dir, "sender.sock")
-	for _, path := range []string{h.cfg.SignSocket, h.cfg.SignLocalSocket, h.cfg.SenderSocket, h.cfg.JournalSocket} {
+	h.cfg.InboundJournalSocket = filepath.Join(dir, "inbound-journal.sock")
+	for _, path := range []string{h.cfg.SignSocket, h.cfg.SignLocalSocket, h.cfg.SenderSocket, h.cfg.JournalSocket, h.cfg.InboundJournalSocket} {
 		l, err := net.Listen("unix", path)
 		if err != nil {
 			t.Skipf("unix sockets unavailable here: %v", err)
@@ -57,8 +58,9 @@ func TestFilterOffAddsNoSocket(t *testing.T) {
 	h := socketsServer(t)
 	h.cfg.InboundEnabled = true
 	h.cfg.InboundAntispamMilter = "" // no filter attached
-	if got := socketsOf(t, h); len(got) != 4 {
-		t.Fatalf("%d sockets with the filter off, want 4: %+v", len(got), got)
+	// The relay's own journal is dialled; no filter is.
+	if got := socketsOf(t, h); len(got) != 5 || got[4].Name != "inbound-journal-milter" {
+		t.Fatalf("%d sockets with the filter off, want 5 (the inbound journal last): %+v", len(got), got)
 	}
 
 	// A milter address with the inbound relay off is not a filter either.
@@ -69,7 +71,7 @@ func TestFilterOffAddsNoSocket(t *testing.T) {
 		t.Fatalf("%d sockets with the inbound relay off, want 4: %+v", len(got), got)
 	}
 	card := socketCard(t, h)
-	if card.Value != "4 of 4 answering" || card.Sub != "dkim-signer, sender-check, send-log" || card.Level != "" {
+	if card.Value != "4 of 4 answering" || card.Sub != "dkim-signer, sender-check, journal-milter" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 }
@@ -85,7 +87,7 @@ func TestFilterOnAnsweringIsTheLastSocket(t *testing.T) {
 	h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = "inet:"+l.Addr().String(), "tempfail"
 
 	got := socketsOf(t, h)
-	if len(got) != 5 || got[4].Name != "Spam filter" || got[4].Note != "inbound" || got[4].Path != "inet:"+l.Addr().String() {
+	if len(got) != 6 || got[5].Name != "Spam filter" || got[5].Note != "inbound" || got[5].Path != "inet:"+l.Addr().String() {
 		t.Fatalf("sockets = %+v", got)
 	}
 	for _, s := range got {
@@ -94,7 +96,7 @@ func TestFilterOnAnsweringIsTheLastSocket(t *testing.T) {
 		}
 	}
 	card := socketCard(t, h)
-	if card.Value != "5 of 5 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
+	if card.Value != "6 of 6 answering" || card.Sub != "incl. the spam filter" || card.Level != "" {
 		t.Errorf("card = %+v", card)
 	}
 
@@ -134,10 +136,10 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 	} {
 		h.cfg.InboundAntispamMilter, h.cfg.InboundAntispamAction = dead, tt.action
 		got := socketsOf(t, h)
-		if len(got) != 5 {
-			t.Fatalf("action %q: %d sockets, want 5", tt.action, len(got))
+		if len(got) != 6 {
+			t.Fatalf("action %q: %d sockets, want 6", tt.action, len(got))
 		}
-		f := got[4]
+		f := got[5]
 		refused := "Connection to " + l.Addr().String() + " refused. " + tt.detail
 		if f.Present || f.Status != tt.status || f.Detail != refused {
 			t.Errorf("action %q: filter = %+v, want status %q, detail %q", tt.action, f, tt.status, refused)
@@ -148,7 +150,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 			t.Errorf("action %q: SocketStatus = %q, want %q", tt.action, c.SocketStatus, tt.status)
 		}
 		card := socketCard(t, h)
-		if card.Value != "4 of 5 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
+		if card.Value != "5 of 6 answering" || card.Level != tt.level || !strings.HasSuffix(card.Sub, "Spam filter") {
 			t.Errorf("action %q: card = %+v", tt.action, card)
 		}
 
@@ -162,7 +164,7 @@ func TestFilterDownIsAMissingSocket(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.HandleOverviewFragment(rec, reqAs("/overview/fragment", globalPrincipal))
 		page := rec.Body.String()
-		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a>: 4 of 5 answering`} {
+		for _, want := range []string{`>` + tt.stamp + `<`, `Milter sockets</a>: 5 of 6 answering`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("action %q: Overview is missing %q", tt.action, want)
 			}

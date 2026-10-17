@@ -98,7 +98,7 @@ func TestDMARCReportShowsTheReportItsPolicyAndRecords(t *testing.T) {
 		`<h1 class="title is-4">Outlook.com · 20 Sep</h1>`,
 		`<a href="/outbound/dmarc">DMARC reports</a> / <a href="/outbound/dmarc/domains/2">shop.example.org</a> /`,
 		"<span>shop.example.org</span><span class=\"tag is-success is-light\">1 903 pass</span><span class=\"tag is-warning is-light\">7 fail</span>",
-		`<h2>Report</h2>`, `<dd class="sp-mono sp-small">5f1c9a0e7b2d4e61a3</dd>`, `<dd>20 Sep 00:00 – 21 Sep 00:00</dd>`, `<dd>2026-09-21 04:40</dd>`,
+		`<h2>Report</h2>`, `<dd class="sp-mono sp-small">5f1c9a0e7b2d4e61a3</dd>`, `<dd>20 Sep 00:00 – 21 Sep 00:00</dd><dd class="sp-muted">The reporter&#39;s day, 20 Sep: reports count their days in UTC, and the title and the lists name that day. The times are this panel&#39;s zone.</dd>`, `<dd>2026-09-21 04:40</dd>`,
 		`<h2>Published policy</h2>`, `<dd class="sp-mono">none / none / 100</dd>`, `<dd class="sp-mono">r / r</dd>`, `<dd class="sp-mono sp-small">dmarc@mail.example.org</dd>`,
 		`<h2>Records</h2>`, `Parsed from the aggregate XML`,
 		`203.0.113.25 <span class="tag is-light">this relay</span>`, "<td>1 903</td>",
