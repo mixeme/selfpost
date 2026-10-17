@@ -5,6 +5,7 @@ package dmarc
 import (
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -22,6 +23,10 @@ type Service struct {
 	maps     Maps
 	hostname string
 	enabled  bool
+
+	// resyncMu makes a rebuild's read and write one step, as app.Service's
+	// (security audit 2026-10-17, W3; the review of stage 1).
+	resyncMu sync.Mutex
 }
 
 // NewService builds the DMARC ingest service.
@@ -34,6 +39,8 @@ func (s *Service) Enabled() bool { return s.enabled }
 
 // Resync rebuilds the Postfix allow-list and transport maps from SQLite.
 func (s *Service) Resync() error {
+	s.resyncMu.Lock()
+	defer s.resyncMu.Unlock()
 	if !s.enabled {
 		return s.maps.RebuildDMARCMaps(postfix.DMARCMapsConfig{})
 	}

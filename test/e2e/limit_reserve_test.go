@@ -18,11 +18,15 @@ const limitDomain = "limit.e2e.test"
 // testDomainLimitNotReservedByAStranger is the "done when" of the security
 // audit's M1 (2026-10-17): the level-2 domain limit is the login's domain's.
 // MAIL FROM reaches the journal milter before Postfix holds it to a login, so
-// a client with no login naming a domain there used to take that domain's
-// slots. Here a domain has a limit of one message an hour; a stranger opens
-// the submission port, names the domain in MAIL FROM three times without
-// signing in, and the domain's own application still sends its one message -
-// and is refused the second, so the limit is in force.
+// a client with no login naming a domain there used to take one of that
+// domain's slots and hold it for as long as its transaction stayed open.
+// Here a domain has a limit of one message an hour; a stranger opens the
+// submission port, names the domain in MAIL FROM without signing in and
+// keeps the transaction open, and meanwhile the domain's own application
+// sends its one message - and is refused the second, so the limit is in
+// force. (A RSET between the stranger's MAIL FROMs would end the
+// transaction, which releases the slot under the old code as well: the
+// review of stage 1 found the first version of this step passing on it.)
 func testDomainLimitNotReservedByAStranger(t *testing.T, sc *scenario) {
 	domainID, err := sc.panel.addDomain(limitDomain)
 	if err != nil {
@@ -45,9 +49,11 @@ func testDomainLimitNotReservedByAStranger(t *testing.T, sc *scenario) {
 		t.Fatalf("save the domain limit: status %d, landed on %s:\n%.800s", resp.StatusCode, resp.Request.URL.Path, body)
 	}
 
-	if err := strangerMailFrom("x@"+limitDomain, 3); err != nil {
+	stranger, err := strangerHoldsMailFrom("x@" + limitDomain)
+	if err != nil {
 		t.Fatalf("the stranger's MAIL FROM: %v", err)
 	}
+	defer stranger()
 
 	send := func(token string) sendResult {
 		return attemptSend(sendAttempt{
@@ -63,35 +69,31 @@ func testDomainLimitNotReservedByAStranger(t *testing.T, sc *scenario) {
 	}
 }
 
-// strangerMailFrom opens the implicit-TLS submission port, says EHLO and
-// sends MAIL FROM:<from> n times with RSET between, never signing in. Each
-// MAIL FROM is answered 250: the journal milter continues, and Postfix
-// refuses such a client only at RCPT (smtpd_delay_reject).
-func strangerMailFrom(from string, n int) error {
+// strangerHoldsMailFrom opens the implicit-TLS submission port, says EHLO
+// and MAIL FROM:<from> without signing in, and leaves the transaction open
+// until the returned func is called. The MAIL FROM is answered 250: the
+// journal milter continues, and Postfix refuses such a client only at RCPT
+// (smtpd_delay_reject).
+func strangerHoldsMailFrom(from string) (func(), error) {
 	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", smtpsAddr, &tls.Config{
 		InsecureSkipVerify: true,
 		ServerName:         selfpostHostname,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	c, err := smtp.NewClient(conn, selfpostHostname)
 	if err != nil {
 		_ = conn.Close()
-		return err
+		return nil, err
 	}
-	defer c.Close()
 	if err := c.Hello("stranger.e2e.test"); err != nil {
-		return err
+		_ = c.Close()
+		return nil, err
 	}
-	for i := 0; i < n; i++ {
-		if err := c.Mail(from); err != nil {
-			return fmt.Errorf("MAIL FROM %d: %w", i+1, err)
-		}
-		if err := c.Reset(); err != nil {
-			return err
-		}
+	if err := c.Mail(from); err != nil {
+		_ = c.Close()
+		return nil, fmt.Errorf("MAIL FROM: %w", err)
 	}
-	_ = c.Quit()
-	return nil
+	return func() { _ = c.Quit(); _ = c.Close() }, nil
 }

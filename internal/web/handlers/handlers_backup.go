@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mixeme/selfpost/internal/backup"
+	"github.com/mixeme/selfpost/internal/dmarc"
 	"github.com/mixeme/selfpost/internal/domain"
 	"github.com/mixeme/selfpost/internal/secretfile"
 	"github.com/mixeme/selfpost/internal/store"
@@ -449,6 +450,13 @@ func (h *Handlers) checkDomainImport(exp *domain.DomainExport) string {
 	if exp.DMARCRua != "" {
 		if err := validate.Email(exp.DMARCRua); err != nil {
 			return invalid("report address", err)
+		}
+		// As on Domain settings: an address on this server's own name is
+		// only ever the domain's own hosted one (security audit 2026-10-17,
+		// W1; the review of stage 1 found the import path open).
+		if dmarc.IsHostedOnHostname(exp.DMARCRua, h.cfg.Hostname) &&
+			!strings.EqualFold(strings.TrimSpace(exp.DMARCRua), dmarc.HostedReportAddress(h.cfg.Hostname, exp.Domain)) {
+			return "The export's report address is on this server's own name and is not the domain's own hosted address. Edit the file's dmarc_rua, or set it to empty and choose the address on Domain settings after the import."
 		}
 	}
 	limit := func(rl *domain.RateLimitExport) error {

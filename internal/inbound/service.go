@@ -7,6 +7,7 @@ package inbound
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
@@ -21,6 +22,10 @@ type Maps interface {
 type Service struct {
 	store *store.Store
 	maps  Maps
+
+	// resyncMu makes a rebuild's read and write one step, as app.Service's
+	// (security audit 2026-10-17, W3; the review of stage 1).
+	resyncMu sync.Mutex
 }
 
 // NewService builds the inbound service over the shared store and Postfix maps.
@@ -161,6 +166,8 @@ func (s *Service) Delete(id int64) error {
 
 // Resync rebuilds the inbound Postfix maps from SQLite.
 func (s *Service) Resync() error {
+	s.resyncMu.Lock()
+	defer s.resyncMu.Unlock()
 	list, err := s.store.ListInboundDomains()
 	if err != nil {
 		return err

@@ -91,7 +91,7 @@ func (s *Store) countInboundWrites(n int) error {
 	s.inboundWrites.Store(0)
 	// The zero time removes nothing by age: this is the cap alone.
 	if _, err := s.PruneInboundSpam(time.Time{}, inboundCapRows); err != nil {
-		return fmt.Errorf("cut inbound_spam_log to %d rows: %w", inboundCapRows, err)
+		return fmt.Errorf("the rows were written; cutting inbound_spam_log to %d rows: %w", inboundCapRows, err)
 	}
 	return nil
 }

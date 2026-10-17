@@ -38,6 +38,12 @@ func TestDomainImportIsCheckedLikeTheForms(t *testing.T) {
 	if msg := h.checkDomainImport(&exp); msg != "" {
 		t.Fatalf("a good export refused: %s", msg)
 	}
+	// The domain's own hosted address is its own.
+	own := good()
+	own.DMARCRua = "dmarc-reports+example.com@mail.example.org"
+	if msg := h.checkDomainImport(&own); msg != "" {
+		t.Fatalf("the domain's own hosted address refused: %s", msg)
+	}
 	if got := strings.Join(exp.Applications[0].AuthAllowedIPs, " "); got != "192.0.2.1 2001:db8::1" {
 		t.Errorf("client addresses stored as %q, want as the form stores them", got)
 	}
@@ -64,6 +70,11 @@ func TestDomainImportIsCheckedLikeTheForms(t *testing.T) {
 			"Invalid DKIM selector in export file: selector must be at most 63 characters"},
 		{"report address", func(e *domain.DomainExport) { e.DMARCRua = "not an address" },
 			"Invalid report address in export file: "},
+		// As on Domain settings (security audit 2026-10-17, W1).
+		{"report address on the hostname", func(e *domain.DomainExport) { e.DMARCRua = "ops@MAIL.example.org" },
+			"The export's report address is on this server's own name"},
+		{"another domain's hosted address", func(e *domain.DomainExport) { e.DMARCRua = "dmarc-reports+victim.example@mail.example.org" },
+			"The export's report address is on this server's own name"},
 		{"no window", func(e *domain.DomainExport) { e.RateLimit.WindowSeconds = 0 },
 			"Invalid rate limit for the domain in export file: enter a time window greater than zero seconds"},
 		{"no messages", func(e *domain.DomainExport) { e.RateLimit.MaxMessages = 0 },

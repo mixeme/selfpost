@@ -144,7 +144,7 @@ func (s *Store) DeleteDomain(id int64) error {
 		return fmt.Errorf("delete domain: begin: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck // a no-op after Commit
-	if _, err := tx.Exec(`DELETE FROM dmarc_reports WHERE domain = (SELECT name FROM domains WHERE id = ?)`, id); err != nil {
+	if _, err := tx.Exec(`DELETE FROM dmarc_reports WHERE domain = (SELECT name FROM domains WHERE id = ?) COLLATE NOCASE`, id); err != nil {
 		return fmt.Errorf("delete domain: its DMARC reports: %w", err)
 	}
 	res, err := tx.Exec("DELETE FROM domains WHERE id = ?", id)
