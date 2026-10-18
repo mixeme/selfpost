@@ -93,6 +93,22 @@ print("" if r is None else "|".join(r))`, token)
 		t.Fatalf("the Inbound log does not show the deferral:\n%.4000s", body)
 	}
 
+	// The message waits on Inbound › Queue with the upstream's reason, and not
+	// on Outbound › Queue: one Postfix queue, split by the recipient's domain.
+	_, body, err = sc.panel.get("/inbound/queue")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, `<td class="sp-mono">`+queueID+`</td>`) ||
+		!strings.Contains(body, `<td class="sp-muted">connect to 10.77.0.11[10.77.0.11]:2526: Connection refused</td>`) {
+		t.Fatalf("Inbound › Queue does not list the deferred message %s:\n%.4000s", queueID, body)
+	}
+	if _, body, err = sc.panel.get("/outbound/queue"); err != nil {
+		t.Fatal(err)
+	} else if strings.Contains(body, queueID) {
+		t.Fatalf("Outbound › Queue lists the inbound message %s", queueID)
+	}
+
 	for _, args := range [][]string{{"postsuper", "-e", queueID}, {"postqueue", "-i", queueID}} {
 		if out, err := h.execIn("selfpost", args...); err != nil {
 			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, out)

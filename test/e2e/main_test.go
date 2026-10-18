@@ -214,10 +214,10 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("GET /outbound/queue = %d", resp.StatusCode)
 		}
 		if strings.Contains(body, "Could not read the mail queue") {
-			t.Fatal("the panel could not run postqueue -p (queue directory permissions)")
+			t.Fatal("the panel could not run postqueue -j (queue directory permissions)")
 		}
-		if !strings.Contains(body, "Mail queue is empty") {
-			t.Fatalf("the queue page does not show postqueue's listing of an empty queue:\n%s", body)
+		if !strings.Contains(body, "Nothing is waiting. Every message has reached its receiving server.") {
+			t.Fatalf("the queue page does not say the queue is empty:\n%s", body)
 		}
 	})
 

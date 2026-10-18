@@ -136,6 +136,17 @@ print("" if r is None else r[0]+" "+r[1])`, token)
 		t.Fatal(err)
 	}
 
+	// Outbound › Queue lists the waiting recipient, with Postfix's reason and
+	// the link to its row in the Outbound log (postqueue -j, as the panel).
+	_, body, err := sc.panel.get("/outbound/queue")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, `<td class="sp-mono">`+queueID+`</td>`) || !regexp.MustCompile(`<td class="sp-muted">[^<]*deferred transport</td>`).MatchString(body) ||
+		!regexp.MustCompile(`<td class="sp-actions"><a href="/outbound/log/\d+">Details</a></td>`).MatchString(body) {
+		t.Fatalf("Outbound › Queue does not list the deferred message %s with its reason and row:\n%.4000s", queueID, body)
+	}
+
 	exec("postsuper", "-e", queueID)
 	exec("postqueue", "-i", queueID)
 	if err := waitFor("the expired message's row to be bounced", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
