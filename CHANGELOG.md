@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-18
+
+The two proposals the security audit left as product choices. Migration
+0014; schema 14.
+
 ### Added
 
 - **Verified TLS to an inbound domain's upstream** (upstream-tls-verify; the
