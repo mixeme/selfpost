@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-10-18
+
+The queues as the 2.0 mockups drew them: Outbound › Queue a table, Inbound ›
+Queue built. No migration; schema 14.
+
 ### Added
 
 - **Inbound › Queue** (`/inbound/queue`, global role, with the inbound relay
