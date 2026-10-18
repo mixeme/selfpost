@@ -49,7 +49,6 @@ var deferredScreens = map[string]string{
 	"in-queue":              "queue as a table / inbound queue, undecided",
 	"in-quarantine":         "inbound-quarantine, candidate",
 	"in-quarantine-message": "inbound-quarantine, candidate",
-	"preflight":             "preflight, candidate",
 }
 
 // Pages whose 2.0 content is deliberately not the mockup's (decided
