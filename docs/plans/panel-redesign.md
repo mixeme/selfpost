@@ -97,7 +97,7 @@ only.
 | Add / delete a domain, either direction | yes | no |
 | Queues, either direction | yes | no — the global role only (owner, 2026-10-18: "Пока только Global. Пересмотр по необходимости."; roadmap § Dropped) |
 | Inbound › Quarantine | all domains | assigned inbound domains |
-| Inbound › Filter lists, Server › Preflight | yes | no — the lists are instance-wide |
+| Inbound › Filter lists | yes | no — the lists are instance-wide |
 | Account, Help | yes | yes |
 
 - New table `user_inbound_domains (user_id, inbound_domain_id)`, mirroring
@@ -164,7 +164,6 @@ list, an action under the thing it changes.
 |---|---|---|
 | overview | `GET /overview` | `/status` |
 | health | `GET /server/health` · `POST …/recheck` · `POST …/reload` | tables of `/status` · `/status/recheck` · `/reload` |
-| preflight | `GET /server/preflight` · `POST …/preflight/run` · `POST …/preflight/test-email` | — (preflight; its plan says `/preflight`) |
 | out-domains | `GET, POST /outbound/domains` | `/domains` |
 | out-domain | `GET /outbound/domains/{id}` · `POST …/dns-recheck` | `/domains/{id}` |
 | out-domain-settings | `GET /outbound/domains/{id}/settings` · `POST …/settings/reports` · `…/settings/ratelimit` · `…/settings/ratelimit/recalc` · `…/settings/export` | cards of `/domains/{id}` · `…/dmarc` · `…/ratelimit` · `…/ratelimit/recalc` · `…/export` |

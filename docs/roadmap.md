@@ -134,10 +134,6 @@ without that it is not offered again.
   line "last connection from outside on each port", read from `mail.log`, and
   a command in the help to run from one's own machine. **Returns if:** the
   owner accepts an outside probe, or asks for one of the two substitutes.
-- **preflight as a page of its own** (dropped 2026-10-13): its installation
-  checks went to Server › Health (health-setup-checks, `2.11.0`) and its test
-  e-mail to a form of its own (test-email, `2.12.0`). Its plan,
-  `plans/preflight.md`, was removed and stays in git history.
 - **A domain administrator's rows in the queues** (decided 2026-10-18:
   "Пока только Global. Пересмотр по необходимости."). Since `2.16.0` both
   queues are tables split by the recipient's domain, so the rows of a
