@@ -621,3 +621,57 @@ func (s *Store) DeleteSendLogBefore(cutoff time.Time) (int64, error) {
 	n, _ := res.RowsAffected()
 	return n, nil
 }
+
+// SendLogRef is one send-log row as Outbound › Queue needs it: the row's id,
+// for the link to its page, and the recipient, to tell the rows of one
+// message apart.
+type SendLogRef struct {
+	ID int64
+	To string
+}
+
+// sendLogRefsChunk keeps one query's parameters well under SQLite's limit
+// (SQLITE_MAX_VARIABLE_NUMBER, 32766 since 3.32.0, https://sqlite.org/limits.html).
+const sendLogRefsChunk = 500
+
+// sendLogRefsQuery reads the rows of n queue ids, through idx_send_log_queue_id
+// (TestSendLogQueriesUseTheirIndexes).
+func sendLogRefsQuery(n int) string {
+	marks := strings.TrimSuffix(strings.Repeat("?,", n), ",")
+	return `SELECT id, queue_id, COALESCE(to_addr, '') FROM send_log WHERE queue_id IN (` + marks + `) ORDER BY id`
+}
+
+// SendLogRefsByQueueID returns the send-log rows of each of the queue ids, in
+// row order: what Outbound › Queue links a waiting recipient to. An id with no
+// row - the panel's own mail, a bounce, a row past the retention - is absent.
+func (s *Store) SendLogRefsByQueueID(queueIDs []string) (map[string][]SendLogRef, error) {
+	out := make(map[string][]SendLogRef)
+	for start := 0; start < len(queueIDs); start += sendLogRefsChunk {
+		chunk := queueIDs[start:min(start+sendLogRefsChunk, len(queueIDs))]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		rows, err := s.db.Query(sendLogRefsQuery(len(chunk)), args...)
+		if err != nil {
+			return nil, fmt.Errorf("send-log rows by queue id: %w", err)
+		}
+		for rows.Next() {
+			var (
+				ref     SendLogRef
+				queueID string
+			)
+			if err := rows.Scan(&ref.ID, &queueID, &ref.To); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("send-log rows by queue id: %w", err)
+			}
+			out[queueID] = append(out[queueID], ref)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("send-log rows by queue id: %w", err)
+		}
+	}
+	return out, nil
+}

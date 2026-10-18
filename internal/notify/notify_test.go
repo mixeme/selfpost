@@ -460,12 +460,12 @@ func TestQueueLeavesOutTheNotifiersOwnMail(t *testing.T) {
 	b := newBench(t)
 	old := b.now.Add(-4 * 24 * time.Hour)
 	b.q = []postfix.QueuedMessage{
-		{ID: "NOTE0001", Sender: "postmaster@mail.example.org", Recipients: []string{"gone@example.net"}, Arrival: old},
-		{ID: "BOUNCE01", Sender: "", Recipients: []string{"Postmaster@Mail.Example.Org"}, Arrival: old},
+		{ID: "NOTE0001", Sender: "postmaster@mail.example.org", Recipients: []postfix.QueuedRecipient{{Address: "gone@example.net"}}, Arrival: old},
+		{ID: "BOUNCE01", Sender: "", Recipients: []postfix.QueuedRecipient{{Address: "Postmaster@Mail.Example.Org"}}, Arrival: old},
 	}
 	want(t, "only its own mail is old", b.hour())
 
-	b.q = append(b.q, postfix.QueuedMessage{ID: "APP00001", Sender: "", Recipients: []string{"app@example.com"}, Arrival: old})
+	b.q = append(b.q, postfix.QueuedMessage{ID: "APP00001", Sender: "", Recipients: []postfix.QueuedRecipient{{Address: "app@example.com"}}, Arrival: old})
 	if got := b.hour(); len(got) != 1 {
 		t.Errorf("an application's bounce is old too: %v, want one message", got)
 	}

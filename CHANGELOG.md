@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Inbound › Queue** (`/inbound/queue`, global role, with the inbound relay
+  on): mail accepted on port 25 that its upstream has not yet taken, a row
+  per recipient with the upstream's last reply - the screen `in-queue`, drawn
+  for 2.0 and not built until now. Help has its topic.
+
+### Changed
+
+- **Outbound › Queue is the table the mockup draws** instead of
+  `postqueue -p`'s text: a row per recipient, oldest first - queue id, when
+  it arrived, sender, recipient, and the last reply of the receiving server
+  or why no connection was made - with *Details* to the message in the
+  Outbound log when it has a row there. The box head counts the messages and
+  their size; past 200 recipients the oldest 200 are listed and a line says
+  how many wait. Read from `postqueue -j` (Postfix 3.10.13,
+  `src/postqueue/showq_json.c`: `message_size`, and a recipient's
+  `delay_reason` when it has one). A recipient of an inbound domain is on
+  Inbound › Queue instead.
+- **Overview's queue card** is *Queues*, "Both empty", "outbound and inbound"
+  while the inbound relay is on, as the mockup has it: Postfix keeps one queue
+  for both.
+- `TestUnbuiltScreensAreOnTheRoadmap`: a screen the guards let pass unbuilt
+  must be named in `docs/roadmap.md`. The two queues had been deferred on
+  2026-10-09 with no roadmap row and were forgotten; development.md says so.
+
 ## [2.15.0] - 2026-10-18
 
 The two proposals the security audit left as product choices. Migration

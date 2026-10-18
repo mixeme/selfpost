@@ -47,6 +47,7 @@ var pageFixtures = map[string]func() any{
 	"in-domain":        func() any { return inDomainFixture() },
 	"in-domain-delete": func() any { return inDomainDeleteFixture() },
 	"in-log":           func() any { return inLogFixture() },
+	"in-queue":         func() any { return inQueueFixture() },
 	"in-filter-lists":  func() any { return inFilterListsFixture() },
 
 	"out-log":      func() any { return outLogFixture() },
@@ -395,16 +396,20 @@ func inDomainFixture() *InDomain {
 	return p
 }
 
-// outQueueFixture is the queue as Postfix prints it for the mockup's one waiting
-// message, greylisted by the receiving server, and the retry policy it shows.
-func outQueueFixture() *OutQueue {
-	listing := "-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------\n" +
-		"4XcB7k2Jm9z1     3174 Sun Sep 21 13:58:07  alerts@example.org\n" +
-		"(host mx1.example.org[192.0.2.10] said: 451 4.7.1 Greylisted, try again in 5 minutes (in reply to RCPT TO command))\n" +
-		"                                         noc@example.org\n" +
-		"\n" +
-		"-- 3 Kbytes in 1 Request.\n"
-	return NewOutQueue(admin(), listing, "").WithRetryPolicy("5 minutes", "about 1 hour 7 minutes", "5 days", false)
+// outQueueFixture is the mockup's Outbound queue: one message waiting, its one
+// recipient greylisted by the receiving server, and the retry policy it shows.
+func outQueueFixture() *Queue {
+	entries := []QueueEntry{{
+		ID: "4XcB7k2Jm9z1", Queue: "deferred", Arrival: time.Date(2026, 9, 21, 13, 58, 7, 0, time.Local), Size: 3174,
+		Sender: "alerts@example.org", Recipient: "noc@example.org",
+		Reason: "451 4.7.1 Greylisted, try again in 5 minutes", Href: "/outbound/log/41",
+	}}
+	return NewOutQueue(admin(), entries, "").WithRetryPolicy("5 minutes", "about 1 hour 7 minutes", "5 days", false)
+}
+
+// inQueueFixture is the mockup's Inbound queue: nothing waiting.
+func inQueueFixture() *Queue {
+	return NewInQueue(admin(), nil, "").WithRetryPolicy("5 minutes", "about 1 hour 7 minutes", "5 days", false)
 }
 
 // systemLogFixture is the mockup's System log: nine lines of mail.log, as the

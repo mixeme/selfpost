@@ -30,7 +30,6 @@ directory).
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Stage H of the 2026-10-17 security audit: the test server's host (S1, S2, S5) and its DNS (S3) | stages 0-6 shipped `2.14.4`, the product side of S3 `2.15.0`; stage H the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) § Stage H |
 | go-milter-upstream | An issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
-| queue-table | Outbound › Queue as the table the mockup draws, from `postqueue -j`; an Inbound › Queue (`in-queue`) | candidate, undecided since 2026-10-09 | — | — |
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -90,25 +89,6 @@ one SMTP session over the one milter connection smtpd opened (Postfix
 cleanup; src/smtpd/smtpd.c:3475, milter_send()).
 When upstream releases a version that does not keep the map (or offers the
 option), `third_party/go-milter` goes and `go.mod`'s `replace` with it.
-
----
-
-## queue-table
-
-**Problem:** the 2.0 mockups draw Outbound › Queue as a table and an
-Inbound › Queue (`in-queue`); the redesign kept both out as decisions of
-their own (owner, 2026-10-09). Outbound › Queue shows `postqueue -p`'s own
-listing in a log pane, and the mockup's `in-queue` is drawn but not built
-(`deferredScreens`, `outlineExempt` in the guard tests).
-
-**Goal:** the outbound queue as a table from `postqueue -j` - a row per
-message with its sender, recipients, age and last reason - and, if the owner
-wants it, the same for mail port 25 holds for an upstream.
-
-**Recommendation:** the outbound table first, read-only - about 4 h with its
-tests, since the notifier already reads `postqueue -j` for each message's
-arrival time; the inbound queue and any action on a row (retry, delete) only
-if the owner asks for them, each drawn mockup-first.
 
 ---
 

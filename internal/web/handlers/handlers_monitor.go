@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mixeme/selfpost/internal/logtail"
@@ -461,9 +462,8 @@ func (h *Handlers) HandleMailQueue(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	policy := h.cfg.RetryPolicy
-	h.view.Render(w, http.StatusOK, "out-queue", h.outQueuePage(r).
-		WithRetryPolicy(policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime(), policy.FromDefaults))
+	out, _, errText := h.queueEntries()
+	h.view.Render(w, http.StatusOK, "out-queue", h.withRetryPolicy(view.NewOutQueue(h.shellMeta(r), out, errText)))
 }
 
 // HandleMailQueueBody serves the HTMX polling fragment for the queue view.
@@ -471,14 +471,116 @@ func (h *Handlers) HandleMailQueueBody(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.requireGlobal(w, r); !ok {
 		return
 	}
-	h.view.RenderFragment(w, http.StatusOK, "out_queue_body", h.outQueuePage(r))
+	out, _, errText := h.queueEntries()
+	h.view.RenderFragment(w, http.StatusOK, "queue_body", view.NewOutQueue(h.shellMeta(r), out, errText))
 }
 
-// outQueuePage reads the queue and gives it to the view; the page and its
-// fragment draw the same box from it.
-func (h *Handlers) outQueuePage(r *http.Request) *view.OutQueue {
-	out, errText := readQueue()
-	return view.NewOutQueue(h.shellMeta(r), out, errText)
+// HandleInboundQueue renders the Inbound queue page: the recipients of inbound
+// domains still waiting for their upstream. Like the Outbound queue it is the
+// global role's (requireInboundGlobal), and 404 while the relay is off.
+func (h *Handlers) HandleInboundQueue(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireInboundGlobal(w, r); !ok {
+		return
+	}
+	_, in, errText := h.queueEntries()
+	h.view.Render(w, http.StatusOK, "in-queue", h.withRetryPolicy(view.NewInQueue(h.shellMeta(r), in, errText)))
+}
+
+// HandleInboundQueueBody serves the HTMX polling fragment of the Inbound queue.
+func (h *Handlers) HandleInboundQueueBody(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.requireInboundGlobal(w, r); !ok {
+		return
+	}
+	_, in, errText := h.queueEntries()
+	h.view.RenderFragment(w, http.StatusOK, "queue_body", view.NewInQueue(h.shellMeta(r), in, errText))
+}
+
+func (h *Handlers) withRetryPolicy(p *view.Queue) *view.Queue {
+	policy := h.cfg.RetryPolicy
+	return p.WithRetryPolicy(policy.FirstRetry(), policy.BackoffCap(), policy.QueueLifetime(), policy.FromDefaults)
+}
+
+// queueListing reads what Postfix holds. It is a var so tests can answer
+// without a running Postfix.
+var queueListing = postfix.QueueListing
+
+// queueEntries reads the queue once and splits it by the recipient's domain:
+// a recipient of an inbound domain waits for its upstream (Inbound › Queue),
+// every other one for a receiving server (Outbound › Queue) - the panel's own
+// mail and bounces included. A recipient of the Outbound queue is linked to
+// its send-log row when it has one. errText is what the page says when the
+// queue cannot be read; the reason goes to the log, not to the page.
+func (h *Handlers) queueEntries() (out, in []view.QueueEntry, errText string) {
+	const unreadable = "Could not read the mail queue."
+	msgs, err := queueListing()
+	if err != nil {
+		logf("panel: postqueue -j: %v", err)
+		return nil, nil, unreadable
+	}
+	inbound := map[string]bool{}
+	if h.cfg.InboundEnabled {
+		domains, err := h.store.ListInboundDomains()
+		if err != nil {
+			// Without the list, a recipient cannot be told to be inbound;
+			// putting it under Outbound would show it on the wrong page.
+			logf("panel: queue: inbound domains: %v", err)
+			return nil, nil, unreadable
+		}
+		for _, d := range domains {
+			inbound[strings.ToLower(d.Name)] = true
+		}
+	}
+	ids := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		ids = append(ids, m.ID)
+	}
+	refs, err := h.store.SendLogRefsByQueueID(ids)
+	if err != nil {
+		logf("panel: queue: send-log rows: %v", err) // the rows still show, without Details
+	}
+	for _, m := range msgs {
+		for _, rcpt := range m.Recipients {
+			e := view.QueueEntry{
+				ID: m.ID, Queue: m.Queue, Arrival: m.Arrival, Size: m.Size,
+				Sender: m.Sender, Recipient: rcpt.Address, Reason: rcpt.DelayReason,
+			}
+			if inbound[recipientDomain(rcpt.Address)] {
+				in = append(in, e)
+				continue
+			}
+			e.Href = sendLogHref(refs[m.ID], rcpt.Address)
+			out = append(out, e)
+		}
+	}
+	return out, in, ""
+}
+
+// recipientDomain is the domain of an address, lower-cased: what Postfix
+// matches relay_domains against.
+func recipientDomain(addr string) string {
+	at := strings.LastIndexByte(addr, '@')
+	if at < 0 {
+		return ""
+	}
+	return strings.ToLower(addr[at+1:])
+}
+
+// sendLogHref is the page of the send-log row of a waiting recipient: the row
+// of that recipient, or, when the queue names it otherwise than the row does
+// (a canonical map rewrote it; the row holds the RCPT TO as sent), the
+// message's first row. "" when the message has no row.
+func sendLogHref(refs []store.SendLogRef, rcpt string) string {
+	if len(refs) == 0 {
+		return ""
+	}
+	ref := refs[0]
+	for _, r := range refs {
+		if strings.EqualFold(r.To, rcpt) {
+			ref = r
+			break
+		}
+	}
+	return "/outbound/log/" + strconv.FormatInt(ref.ID, 10)
 }
 
 // readQueue runs postqueue -p, returning a friendly message instead of the

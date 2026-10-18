@@ -469,18 +469,18 @@ func renderShell(t *testing.T, e *Engine, m Meta) string {
 }
 
 // The menu has the entries that are built and none of the ones that are not (plan
-// § Routes): no Inbound Queue or Quarantine, no Preflight.
-func TestMenuHoldsTheTwoDotZeroEntries(t *testing.T) {
+// § Routes): no Quarantine, no Preflight. Inbound › Queue joined it in 2.16.0.
+func TestMenuHoldsTheBuiltEntries(t *testing.T) {
 	out := renderShell(t, kitEngine(t), Meta{Title: "t", User: "admin", IsGlobal: true})
 	for _, href := range []string{
 		"/overview", "/outbound/domains", "/outbound/log", "/outbound/queue", "/outbound/dmarc",
-		"/inbound/domains", "/inbound/log", "/inbound/filter-lists", "/server/health", "/server/log", "/server/backup", "/server/users", "/server/settings",
+		"/inbound/domains", "/inbound/log", "/inbound/queue", "/inbound/filter-lists", "/server/health", "/server/log", "/server/backup", "/server/users", "/server/settings",
 		"/account", "/help", "/license",
 	} {
 		mustContain(t, out, `href="`+href+`"`)
 	}
 	for _, gone := range []string{
-		"/inbound/queue", "/inbound/quarantine", "/server/preflight",
+		"/inbound/quarantine", "/server/preflight",
 		`href="/status"`, `href="/domains"`, `href="/users"`, `href="/settings"`,
 	} {
 		mustNotContain(t, out, gone)

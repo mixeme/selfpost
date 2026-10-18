@@ -447,7 +447,15 @@ func healthCards(c healthReadings) []view.HealthCard {
 		certValue = fmt.Sprintf("Expires in %d days", cert.DaysLeft)
 	}
 
-	queueValue := queueCardValue(c.QueueSummary)
+	// One Postfix queue, split into two pages when the inbound relay is on
+	// (mockup overview: "Queues · Both empty · outbound and inbound").
+	queueName, queueValue, queueSub := "Queue", queueCardValue(c.QueueSummary), "outbound"
+	if c.Inbound {
+		queueName, queueSub = "Queues", "outbound and inbound"
+		if queueValue == "Empty" {
+			queueValue = "Both empty"
+		}
+	}
 	if e := c.QueueError; e != "" {
 		queueValue = "Could not be read"
 	}
@@ -492,7 +500,7 @@ func healthCards(c healthReadings) []view.HealthCard {
 		card("Machine", "ti-cpu", "/server/health", machine.Status, cpu, ram),
 		card("Processes", "ti-server-cog", "/server/health", c.ProcessStatus, procValue, procSub),
 		card("TLS certificate", "ti-certificate", "/server/health", cert.Status, certValue, cert.Subject),
-		card("Queue", "ti-stack-2", "/outbound/queue", c.QueueStatus, queueValue, "outbound"),
+		card(queueName, "ti-stack-2", "/outbound/queue", c.QueueStatus, queueValue, queueSub),
 		card("Milter sockets", "ti-plug-connected", "/server/health", c.SocketStatus,
 			fmt.Sprintf("%d of %d answering", answering, len(sockets)), socketSub),
 		card("Reverse DNS", "ti-arrows-exchange", "/server/health", ptr.Status, ptrValue, c.Hostname),
@@ -539,12 +547,15 @@ type healthReadings struct {
 	QueueSummary  string
 	QueueError    string
 	QueueStatus   health.Status
-	Machine       health.Machine
-	Cert          health.Certificate
-	Sockets       []health.Socket
-	SocketStatus  health.Status
-	Hostname      string
-	PTR           dnscheck.Result
+	// Inbound is the relay on port 25: Postfix's one queue then holds mail of
+	// both directions, and the Queues card says so.
+	Inbound      bool
+	Machine      health.Machine
+	Cert         health.Certificate
+	Sockets      []health.Socket
+	SocketStatus health.Status
+	Hostname     string
+	PTR          dnscheck.Result
 	// Banner is Postfix's smtpd_banner, expanded: the greeting after "220".
 	Banner string
 }
@@ -597,6 +608,7 @@ func (h *Handlers) healthChecks() healthReadings {
 		QueueSummary:  queueSummary(queueText),
 		QueueError:    queueErr,
 		QueueStatus:   queueStatus,
+		Inbound:       h.cfg.InboundEnabled,
 		Machine:       machine,
 		Cert:          cert,
 		Sockets:       sockets,

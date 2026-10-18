@@ -510,6 +510,7 @@ func fixtureRetryPolicy() postfix.RetryPolicy {
 // The retry policy sits on the page itself, outside the HTMX poll, and prints
 // whatever policy was cached on Config — never a live postconf.
 func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
+	stubQueue(t, nil, nil)
 	h := &Handlers{view: mustView(t), cfg: Config{Version: "test", RetryPolicy: fixtureRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueue, "/outbound/queue")
@@ -533,6 +534,7 @@ func TestMailQueueShowsRetryPolicyCard(t *testing.T) {
 }
 
 func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
+	stubQueue(t, nil, nil)
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: fixtureRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueueBody, "/outbound/queue/fragment")
@@ -545,6 +547,7 @@ func TestMailQueueBodyOmitsRetryPolicyCard(t *testing.T) {
 }
 
 func TestMailQueueNotesCompiledInFallback(t *testing.T) {
+	stubQueue(t, nil, nil)
 	h := &Handlers{view: mustView(t), cfg: Config{RetryPolicy: postfix.DefaultRetryPolicy()}}
 
 	out := getBody(t, h.HandleMailQueue, "/outbound/queue")

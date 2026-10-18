@@ -61,6 +61,8 @@ func TestSendLogQueriesUseTheirIndexes(t *testing.T) {
 			[]string{"SEARCH send_log USING INDEX idx_send_log_domain_id_created_at (domain_id=? AND created_at>?)"}, true},
 		{"busiest hour of an application", peakPerHourQuery(appByLogin), []any{"app1", StatusRejected, since},
 			[]string{"SEARCH send_log USING INDEX idx_send_log_app_login_created_at (app_login=? AND created_at>?)"}, true},
+		{"the rows of queued messages", sendLogRefsQuery(2), []any{"4XcB7k2Jm9z1", "5F00AA12"},
+			[]string{"SEARCH send_log USING INDEX idx_send_log_queue_id (queue_id=?)"}, true},
 		{"open rows", listOpenQuery, []any{since},
 			[]string{"SEARCH send_log USING INDEX idx_send_log_open (created_at<?)"}, true},
 		{"open rows counted", countOpenQuery, []any{since},

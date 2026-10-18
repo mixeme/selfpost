@@ -95,7 +95,7 @@ only.
 | Outbound: domain, applications, settings, log, DMARC | all domains | assigned outbound domains |
 | Inbound: domain (upstream, recipients), log | all domains | assigned inbound domains |
 | Add / delete a domain, either direction | yes | no |
-| Queues, either direction | yes | no, until the queue is a filterable table |
+| Queues, either direction | yes | no — the queue is the instance's; a domain's rows for its administrator would be a decision of its own |
 | Inbound › Quarantine | all domains | assigned inbound domains |
 | Inbound › Filter lists, Server › Preflight | yes | no — the lists are instance-wide |
 | Account, Help | yes | yes |
@@ -215,8 +215,10 @@ Rules that come with the rename:
 **Needs its own roadmap decision before it is built** (the mockups show the
 target; none of this is smuggled in with the restyle):
 
-- Queue as a table — parse `postqueue -j` instead of printing `postqueue -p`.
-- Inbound queue — the same queue filtered by recipient domain.
+- Queue as a table — parse `postqueue -j` instead of printing `postqueue -p`
+  (built in `2.16.0`).
+- Inbound queue — the same queue filtered by recipient domain (built in
+  `2.16.0`).
 - Inbound log — rides on `inbound-antispam-panel` (`2.1.0`).
 - Server › Health — a route for the tables removed from Overview, and the
   home of *Reload configuration* (today a card on `/status`).
@@ -236,7 +238,6 @@ Drawn and not built (`deferredScreens` in the guard tests):
 
 | Screen | Item | State |
 |---|---|---|
-| `in-queue` | [queue-table](../roadmap.md#queue-table): the queue as a table from `postqueue -j`, and an Inbound › Queue | undecided; Outbound › Queue shows postqueue's listing in a log pane (`outlineExempt`) |
 | `in-quarantine`, `in-quarantine-message` | inbound-quarantine, an idea off the roadmap ([its notes](inbound-quarantine.md)) | its open questions stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
 
 The sibling strip under the navbar holds five or six entries per group without

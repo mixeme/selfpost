@@ -863,7 +863,7 @@ only reads (the delete confirmation at `GET …/delete` renders a form).
 | Outbound › Log, Queue | `GET /outbound/log` · `/outbound/log/fragment` · `/outbound/log/{id}` · `GET /outbound/queue` · `/outbound/queue/fragment` |
 | Outbound › DMARC reports | `GET /outbound/dmarc` · `…/dmarc/domains/{id}` · `…/dmarc/reports/{id}` — registered only with `DMARC_REPORTS_ENABLE=true` |
 | Inbound › Domains | `GET, POST /inbound/domains` · `/inbound/domains/{id}` · `POST …/dns-recheck`, `…/upstream`, `…/recipients` · `GET, POST …/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
-| Inbound › Log, Filter lists | `GET /inbound/log` · `GET, POST /inbound/filter-lists` · `POST /inbound/filter-lists/{id}/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
+| Inbound › Log, Queue, Filter lists | `GET /inbound/log` · `GET /inbound/queue` · `/inbound/queue/fragment` · `GET, POST /inbound/filter-lists` · `POST /inbound/filter-lists/{id}/delete` — registered only with `INBOUND_RELAY_ENABLE=true` |
 | Server | `GET /server/health` (+ `/fragment`) · `POST /server/health/recheck`, `/server/health/reload`, `/server/health/test-message` · `GET /server/log` (+ `/fragment`) · `GET, POST /server/backup` · `POST /server/backup/import` · `/server/users`, `…/new`, `…/{uid}`, `…/{uid}/delete` · `GET, POST /server/settings` · `POST /server/settings/dns-recheck` · `GET /server/components` |
 | Account | `GET /account` · `POST /account/profile`, `/account/password`, `/account/email/confirm` |
 | User menu | `GET /help` · `POST /logout` (public mux) |

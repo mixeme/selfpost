@@ -447,7 +447,7 @@ changes.
 |---|---|---|
 | Overview | Overview | `/overview` |
 | Outbound | Domains · Log · Queue · DMARC reports | `/outbound/domains`, `/outbound/log`, `/outbound/queue`, `/outbound/dmarc` |
-| Inbound | Domains · Log · Filter lists (global role) | `/inbound/domains`, `/inbound/log`, `/inbound/filter-lists` |
+| Inbound | Domains · Log · Queue and Filter lists (global role) | `/inbound/domains`, `/inbound/log`, `/inbound/queue`, `/inbound/filter-lists` |
 | Server | Health · System log · Backup · Users · Settings | `/server/health`, `/server/log`, `/server/backup`, `/server/users`, `/server/settings` |
 | User menu (your name) | Account · Help · Sign out | `/account`, `/help`, `POST /logout` |
 
@@ -564,14 +564,25 @@ past that the page shows the last result). *Greeting* is the `220` line Postfix
 ### Queue and System log
 
 - **Outbound › Queue** (`/outbound/queue`, global role) — live view of
-  messages Postfix is still trying to deliver, deferring or holding, as
-  `postqueue -p` lists them. It only shows: nothing there deletes or forces a message. A box
+  messages Postfix is still trying to deliver, deferring or holding, a row
+  per recipient, oldest first: queue id, when it arrived, sender, recipient,
+  and the last reply of the receiving server or why no connection was made
+  (from `postqueue -j`). *Details* opens the message in the Outbound log when
+  it has a row there; the panel's own mail and bounces have none. The box
+  head counts the messages and their size; past 200 recipients the oldest 200
+  are listed and a line says how many there are - `postqueue -p` in the
+  container lists them all. It only shows: nothing there deletes or forces a message. A box
   states this instance's retry policy — first retry delay, later backoff cap,
   how long a message stays in the queue — from `postconf -h`, read once when
   the panel starts. A `postconf -e` override inside the container is visible
   after the next panel (or container) restart. There is no maximum attempt
   count: Postfix retries until the message is delivered or the queue lifetime
   runs out.
+- **Inbound › Queue** (`/inbound/queue`, global role, with the inbound relay
+  on) — the same Postfix queue, the recipients of inbound domains: mail
+  accepted on port 25 that its upstream has not yet taken, with the
+  upstream's last reply. A recipient belongs here when its domain is an
+  inbound domain, and to Outbound › Queue otherwise.
 - **Server › System log** (`/server/log`) — tail of `/data/log/mail.log`
   (Postfix and related daemon lines). The log rotates daily (14 files kept)
   with a `postfix reload` after each rotation; a background loop checks every

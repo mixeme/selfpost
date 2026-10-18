@@ -56,6 +56,13 @@ func TestHealthCards(t *testing.T) {
 		}
 	}
 
+	// With the inbound relay on, the one queue is both directions'.
+	in := checksFixture()
+	in.Inbound = true
+	if q := healthCards(in)[3]; q.Name != "Queues" || q.Value != "Both empty" || q.Sub != "outbound and inbound" {
+		t.Errorf("queue card with the relay on = %+v", q)
+	}
+
 	// A check that could not run must not look fine.
 	c := checksFixture()
 	c.ProcessError = true

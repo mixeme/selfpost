@@ -28,10 +28,15 @@ not json at all
 		!got[0].Arrival.Equal(time.Unix(1791000000, 0)) {
 		t.Errorf("first message = %+v", got[0])
 	}
-	if len(got[0].Recipients) != 1 || got[0].Recipients[0] != "a@example.net" {
+	if len(got[0].Recipients) != 1 || got[0].Recipients[0] != (QueuedRecipient{"a@example.net", "connect to mx.example.net[203.0.113.9]:25: Connection timed out"}) {
 		t.Errorf("first message's recipients = %v", got[0].Recipients)
 	}
-	if got[1].ID != "5F00AA12" || got[1].Queue != "active" {
+	if got[0].Size != 446 {
+		t.Errorf("first message's size = %d, want 446", got[0].Size)
+	}
+	// A recipient not tried yet has no delay_reason (showq_json.c writes it
+	// only when there is one).
+	if got[1].ID != "5F00AA12" || got[1].Queue != "active" || got[1].Recipients[0] != (QueuedRecipient{Address: "b@example.net"}) {
 		t.Errorf("second message = %+v", got[1])
 	}
 	if empty, err := parseQueueJSON(nil); err != nil || len(empty) != 0 {
@@ -50,9 +55,12 @@ not json at all
 func TestQueueMessagesReportsAFailedListing(t *testing.T) {
 	old := readQueueJSON
 	t.Cleanup(func() { readQueueJSON = old })
-	readQueueJSON = func() ([]byte, error) { return nil, errors.New("postqueue: Permission denied") }
+	readQueueJSON = func(time.Duration) ([]byte, error) { return nil, errors.New("postqueue: Permission denied") }
 
 	if msgs, err := QueueMessages(); err == nil {
 		t.Fatalf("no error for a failed listing (got %v)", msgs)
+	}
+	if msgs, err := QueueListing(); err == nil {
+		t.Fatalf("no error for a failed listing on a page (got %v)", msgs)
 	}
 }

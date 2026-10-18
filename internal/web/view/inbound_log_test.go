@@ -278,13 +278,14 @@ func TestFilterListsEscapesTheEntries(t *testing.T) {
 	pageLacks(t, "Filter lists", out, `<img src=x>`, `<script>alert`)
 }
 
-// The menu leads to both pages, the lists for the global role only.
-func TestInboundMenuHasLogAndFilterLists(t *testing.T) {
+// The menu leads to the pages, the queue and the lists for the global role only.
+func TestInboundMenuHasLogQueueAndFilterLists(t *testing.T) {
 	out := renderSignedIn(t, "in-log", inLogFixture())
 	pageHas(t, "Inbound log", out,
 		`<a class="navbar-item is-active" href="/inbound/log"><i class="ti ti-list-details"></i>Log</a>`,
+		`<a class="navbar-item" href="/inbound/queue"><i class="ti ti-stack-2"></i>Queue</a>`,
 		`<a class="navbar-item" href="/inbound/filter-lists"><i class="ti ti-filter"></i>Filter lists</a>`,
-		`<a href="/inbound/log" aria-current="page"><i class="ti ti-list-details"></i>Log</a><a href="/inbound/filter-lists"><i class="ti ti-filter"></i>Filter lists</a>`)
+		`<a href="/inbound/log" aria-current="page"><i class="ti ti-list-details"></i>Log</a><a href="/inbound/queue"><i class="ti ti-stack-2"></i>Queue</a><a href="/inbound/filter-lists"><i class="ti ti-filter"></i>Filter lists</a>`)
 	out = renderSignedIn(t, "in-filter-lists", inFilterListsFixture())
 	pageHas(t, "Filter lists", out,
 		`<a class="navbar-item is-active" href="/inbound/filter-lists">`, `<a href="/inbound/filter-lists" aria-current="page">`)
@@ -292,7 +293,7 @@ func TestInboundMenuHasLogAndFilterLists(t *testing.T) {
 	domain := NewInLog(Meta{User: "ops", HasInbound: true}, 90, nil, InLogFilter{}).WithRows(nil, 1, 1)
 	out = renderSignedIn(t, "in-log", domain)
 	pageHas(t, "Inbound log", out, `<a class="navbar-item is-active" href="/inbound/log">`, `<a href="/inbound/log" aria-current="page">`)
-	pageLacks(t, "Inbound log", out, `/inbound/filter-lists`)
+	pageLacks(t, "Inbound log", out, `/inbound/filter-lists`, `/inbound/queue`)
 }
 
 // What a sheet says, from the two shapes a row's detail has: the filter's

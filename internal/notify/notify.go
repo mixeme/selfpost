@@ -541,7 +541,7 @@ func (n *Notifier) ownMail(m postfix.QueuedMessage) bool {
 		return true
 	}
 	for _, rcpt := range m.Recipients {
-		if strings.EqualFold(rcpt, own) {
+		if strings.EqualFold(rcpt.Address, own) {
 			return true
 		}
 	}

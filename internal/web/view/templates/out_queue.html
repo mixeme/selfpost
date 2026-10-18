@@ -1,10 +1,10 @@
-{{/* Outbound queue (mockup out-queue.html): what Postfix is still holding, in one
-     box that polls (out_queue_body.html), and under it the retry policy read once
-     at panel start. The queue is postqueue's own listing until it is a table. */}}
+{{/* Outbound queue (mockup out-queue.html): what Postfix is still holding for a
+     receiving server, in one box that polls (queue_body.html), and under it the
+     retry policy read once at panel start. */}}
 {{define "content"}}
 {{template "page_head" .Head}}
 
-{{template "out_queue_body" .}}
+{{template "queue_body" .}}
 
 {{template "box_open" .Retries}}
 {{template "body_open"}}

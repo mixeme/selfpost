@@ -57,8 +57,9 @@ const (
 	HelpRecipients = "recipients"
 	HelpFilter     = "filter"
 	// HelpInboundLog and HelpFilterLists: the plain "log" is the Outbound log's.
-	HelpInboundLog  = "inbound-log"
-	HelpFilterLists = "filter-lists"
+	HelpInboundLog   = "inbound-log"
+	HelpInboundQueue = "inbound-queue"
+	HelpFilterLists  = "filter-lists"
 	// Server
 	HelpBackup   = "backup"
 	HelpUsers    = "users"
@@ -139,13 +140,15 @@ func NewHelp(m Meta, inbound bool) *Help {
 			{Label: "Valid recipients", Icon: "ti-address-book", Href: "#" + HelpRecipients},
 			{Label: "Spam filter", Icon: "ti-shield-check", Href: "#" + HelpFilter},
 			{Label: "Inbound log", Icon: "ti-list-details", Href: "#" + HelpInboundLog},
+			{Label: "Inbound queue", Icon: "ti-stack-2", Href: "#" + HelpInboundQueue},
 			{Label: "Filter lists", Icon: "ti-filter", Href: "#" + HelpFilterLists},
 		}
 		// The filter lists are the whole server's and their page is 404 to
 		// a domain administrator (requireInboundGlobal), so their topic is
-		// not shown to one either.
+		// not shown to one either; nor is the queue's, the global role's too.
 		if !m.IsGlobal {
 			topics, menu = withoutTopic(topics, menu, HelpFilterLists)
+			topics, menu = withoutTopic(topics, menu, HelpInboundQueue)
 		}
 		add("Inbound", topics, menu)
 	}
@@ -216,7 +219,7 @@ var outboundTopics = []HelpTopic{
 			Code("mail.log"), ", found by queue id - and for a message refused before it had one, Postfix's one line about the refusal. The lines are kept with the row: they stay on the page after that file has rotated, for as long as the row does. A message accepted before version 2.2.0 shows them only while they are still in the current file. Rows are deleted after the retention set in Server › Settings, 90 days by default, and their lines with them. A domain administrator sees only the rows of their own domains."),
 	}},
 	{ID: HelpQueue, Title: "Queue and retries", Body: []Text{
-		Rich("The page lists, as ", Code("postqueue -p"), " prints it, the messages Postfix has accepted and not yet delivered: mail being sent right now and mail deferred for a later attempt. Only the global role can open it, and it only shows; nothing here deletes or forces a message. A deferred message is tried again after the first retry delay, then at gaps that double up to a cap, until the receiving server takes it or the queue lifetime runs out and it bounces; there is no attempt counter, and the box on the page shows this server's values. A queue that keeps growing means a receiver is refusing or not answering: open the message from the Outbound log to read the reason Postfix logged."),
+		Plain("The page lists the messages Postfix has accepted and not yet delivered, one row per recipient: mail being sent right now and mail deferred for a later attempt, with the last reply of the receiving server, or why no connection was made. Mail for an inbound domain waits under Inbound › Queue instead. Only the global role can open it, and it only shows; nothing here deletes or forces a message, and Details opens the message in the Outbound log. A deferred message is tried again after the first retry delay, then at gaps that double up to a cap, until the receiving server takes it or the queue lifetime runs out and it bounces; there is no attempt counter, and the box on the page shows this server's values. A queue that keeps growing means a receiver is refusing or not answering; the last reply says which."),
 	}},
 	{ID: HelpDMARC, Title: "DMARC reports", Body: []Text{
 		Rich("An aggregate report is the summary a receiving provider sends, usually daily, to the ", Code("rua="),
@@ -255,6 +258,9 @@ var inboundTopics = []HelpTopic{
 			Br(), Br(),
 			"Accepted mail is recorded as it passes; refused mail is read from ", Code("mail.log"),
 			", so its row has no subject, and a message refused after its text was sent is one row however many recipients it had. A refusal to relay for a domain that is not an inbound one is every scanner on the internet and is not recorded. Rows are kept for the number of days set in Settings, and never more than 10 000."),
+	}},
+	{ID: HelpInboundQueue, Title: "Inbound queue", Body: []Text{
+		Plain("Mail accepted on port 25 and not yet taken by its upstream, one row per recipient, with the upstream's last reply or why it could not be reached. It is the same Postfix queue as Outbound › Queue, split by the recipient's domain, and retried the same way; an upstream that refuses or does not answer is what makes it grow. Only the global role can open it, and it only shows."),
 	}},
 	{ID: HelpFilterLists, Title: "Filter lists", Body: []Text{
 		Rich("Two lists for the whole server that correct the spam filter by hand. An entry is a sender address, a sender domain — that domain, not its subdomains — or a client address or network in CIDR form. A sender on the Deny list is refused outright. A sender on the Allow list is given a weight no spam score outweighs, so the filter lets it through. The sender's address is whatever the sending server says it is - anyone can claim to be a sender you allow - so allow a client address or network where you can, and a sender address only for mail you would rather receive forged than lose. When entries of both lists match one message, ",

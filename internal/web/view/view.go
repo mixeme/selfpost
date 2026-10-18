@@ -58,13 +58,14 @@ var pageFiles = map[string][]string{
 	"in-domain":           {"templates/in_domain.html"},
 	"in-domain-delete":    {"templates/in_domain_delete.html"},
 	"in-log":              {"templates/in_log.html"},
+	"in-queue":            {"templates/in_queue.html", "templates/queue_body.html"},
 	"in-filter-lists":     {"templates/in_filter_lists.html"},
 	"out-log":             {"templates/out_log.html", "templates/out_log_rows.html"},
 	"out-message":         {"templates/out_message.html"},
 	"dmarc":               {"templates/dmarc.html"},
 	"dmarc-domain":        {"templates/dmarc_domain.html"},
 	"dmarc-report":        {"templates/dmarc_report.html"},
-	"out-queue":           {"templates/out_queue.html", "templates/out_queue_body.html"},
+	"out-queue":           {"templates/out_queue.html", "templates/queue_body.html"},
 	"components":          {"templates/kit.html"},
 }
 
@@ -72,7 +73,7 @@ var pageFiles = map[string][]string{
 // template file, for standalone rendering by the HTMX polling endpoints.
 var fragmentFiles = map[string]string{
 	"out_log_rows":    "templates/out_log_rows.html",
-	"out_queue_body":  "templates/out_queue_body.html",
+	"queue_body":      "templates/queue_body.html",
 	"system_log_body": "templates/system_log_body.html",
 	"health_body":     "templates/health_body.html",
 	"overview_poll":   "templates/overview_cards.html",

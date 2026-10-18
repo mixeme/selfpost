@@ -285,9 +285,12 @@ func (s *Server) muxes() (public, authed *http.ServeMux) {
 		authed.HandleFunc("GET /inbound/domains/{id}/delete", h.HandleInboundDeleteConfirm)
 		authed.HandleFunc("POST /inbound/domains/{id}/delete", h.HandleInboundDelete)
 		// The log is for everyone who reaches an inbound domain (scoped to
-		// theirs); the lists are the instance's, so the handlers keep the
-		// global role's check (requireInboundGlobal) and answer 404 to the rest.
+		// theirs); the queue and the lists are the instance's, so the handlers
+		// keep the global role's check (requireInboundGlobal) and answer 404
+		// to the rest.
 		authed.HandleFunc("GET /inbound/log", h.HandleInboundLog)
+		authed.HandleFunc("GET /inbound/queue", h.HandleInboundQueue)
+		authed.HandleFunc("GET /inbound/queue/fragment", h.HandleInboundQueueBody)
 		authed.HandleFunc("GET /inbound/filter-lists", h.HandleFilterLists)
 		authed.HandleFunc("POST /inbound/filter-lists", h.HandleFilterListAdd)
 		authed.HandleFunc("POST /inbound/filter-lists/{id}/delete", h.HandleFilterListDelete)

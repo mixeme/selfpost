@@ -560,3 +560,29 @@ func TestCloseUnmatchedTestMessages(t *testing.T) {
 		t.Errorf("the row with a queue id = %+v", r)
 	}
 }
+
+// Outbound › Queue links a waiting recipient to its row: the rows of each queue
+// id asked for, in row order, and nothing for an id with none.
+func TestSendLogRefsByQueueID(t *testing.T) {
+	s := openTestStore(t)
+	for _, e := range []SendLogEntry{
+		{QueueID: "Q1", Domain: "example.com", From: "a@example.com", To: "x@example.net"},
+		{QueueID: "Q1", Domain: "example.com", From: "a@example.com", To: "y@example.net"},
+		{QueueID: "Q2", Domain: "example.com", From: "a@example.com", To: "z@example.net"},
+	} {
+		if err := s.InsertQueued(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refs, err := s.SendLogRefsByQueueID([]string{"Q1", "NONE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 || len(refs["Q1"]) != 2 || refs["Q1"][0].To != "x@example.net" || refs["Q1"][1].To != "y@example.net" ||
+		refs["Q1"][0].ID >= refs["Q1"][1].ID {
+		t.Errorf("refs = %+v", refs)
+	}
+	if refs, err := s.SendLogRefsByQueueID(nil); err != nil || len(refs) != 0 {
+		t.Errorf("no ids: %v, %v", refs, err)
+	}
+}

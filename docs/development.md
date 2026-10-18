@@ -451,6 +451,15 @@ that changes the mockups, a guard or the script touches nothing else under
 [plans/panel-redesign.md](plans/panel-redesign.md) § The contract and
 § Enforcement have the full rules.
 
+**A drawn screen that is not built has a row.** A screen the mockups draw and
+the panel does not build, or builds otherwise (the guards' `deferredScreens`
+and `outlineExempt`), is named in [roadmap.md](roadmap.md) - a row of the index,
+or an idea under *Ideas* - in the same commit that exempts it.
+`TestUnbuiltScreensAreOnTheRoadmap` fails otherwise. The queue as a table and
+the Inbound queue were drawn for 2.0, deferred on 2026-10-09 with no row of
+their own, and then forgotten for nine releases, the guards green because they
+had been told to be (owner, 2026-10-18: "Фиаско"); built in `2.16.0`.
+
 ### End-to-end (container suite)
 
 Separate Go module `test/e2e/`; **not** included in the main module's

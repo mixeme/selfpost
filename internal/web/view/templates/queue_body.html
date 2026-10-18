@@ -1,0 +1,13 @@
+{{/* The polled part of either queue, in the page and in its fragment (GET
+     /outbound/queue/fragment, /inbound/queue/fragment) alike: the box itself
+     polls (.Queue.Poll), so the response replaces it whole. A row per recipient,
+     oldest first; with nothing to list it says why instead. */}}
+{{define "queue_body"}}{{template "box_open" .Queue}}
+{{if .Rows}}<div class="table-container"><table class="table is-fullwidth is-hoverable">
+  <thead><tr><th>Queue id</th><th>Arrived</th><th>From</th><th>To</th><th>Last reply</th>{{if .Details}}<th></th>{{end}}</tr></thead>
+  <tbody>{{range .Rows}}
+    <tr><td class="sp-mono">{{.ID}}</td><td class="sp-mono sp-muted sp-nowrap sp-small">{{.Arrived}}</td><td>{{wbr_at .From}}</td><td>{{wbr_at .To}}</td><td class="sp-muted">{{.Reply}}</td>{{if $.Details}}<td class="sp-actions">{{if .Href}}<a href="{{.Href}}">Details</a>{{end}}</td>{{end}}</tr>{{end}}
+  </tbody>
+</table></div>
+{{with .Foot}}{{template "box_foot" .}}{{end}}{{else}}{{template "empty_state" .Empty}}{{end}}
+{{template "box_close"}}{{end}}

@@ -11,7 +11,7 @@ import (
 )
 
 // QueuedMessage is one message Postfix is holding, as `postqueue -j` reports
-// it: where it is, and since when.
+// it: where it is, since when, and what became of each recipient's last try.
 //
 // Postfix 3.10.13, src/postqueue/showq_json.c, format_json(): one object and a
 // newline per message - "queue_name", "queue_id", "arrival_time" (seconds,
@@ -22,21 +22,31 @@ type QueuedMessage struct {
 	ID         string
 	Queue      string // "deferred", "active", "hold", "incoming", "maildrop"
 	Sender     string
-	Recipients []string
+	Recipients []QueuedRecipient
 	Arrival    time.Time
+	Size       int64 // bytes, "message_size"
 }
 
-// queueJSONTimeout is longer than the listing for a page gets: the notifier
-// asks once an hour and can wait, and a queue large enough to be slow to list
-// is the one that must not go unreported.
+// QueuedRecipient is one recipient of a queued message. DelayReason is why its
+// last delivery attempt did not finish - the remote server's reply, or why no
+// connection was made - and empty when there was none yet (showq_json.c writes
+// "delay_reason" only for a recipient that has one).
+type QueuedRecipient struct {
+	Address     string
+	DelayReason string
+}
+
+// queueJSONTimeout is longer than the listing for a page gets (postqueueTimeout):
+// the notifier asks once an hour and can wait, and a queue large enough to be
+// slow to list is the one that must not go unreported.
 const queueJSONTimeout = 30 * time.Second
 
-// readQueueJSON runs `postqueue -j`. It is a var so tests can answer without a
-// running Postfix, the way readRetryConf is.
+// readQueueJSON runs `postqueue -j` with a deadline. It is a var so tests can
+// answer without a running Postfix, the way readRetryConf is.
 var readQueueJSON = postqueueJSON
 
-func postqueueJSON() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), queueJSONTimeout)
+func postqueueJSON(timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	// A fixed flag and no user input, never through a shell (security.md).
 	cmd := exec.CommandContext(ctx, "postqueue", "-j")
@@ -46,7 +56,7 @@ func postqueueJSON() ([]byte, error) {
 	cmd.Stderr = errOut
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return nil, fmt.Errorf("postqueue -j timed out after %s", queueJSONTimeout)
+		return nil, fmt.Errorf("postqueue -j timed out after %s", timeout)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("postqueue -j: %w: %s", err, strings.TrimSpace(errOut.buf.String()))
@@ -63,7 +73,18 @@ func postqueueJSON() ([]byte, error) {
 // for the notification about mail that has waited too long. An error means the
 // queue could not be listed and says nothing about any message.
 func QueueMessages() ([]QueuedMessage, error) {
-	out, err := readQueueJSON()
+	out, err := readQueueJSON(queueJSONTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return parseQueueJSON(out)
+}
+
+// QueueListing is QueueMessages for a page: the Outbound and Inbound queues
+// (architecture.md § Panel HTTP surface). A page waits as long as the
+// `postqueue -p` listing did, not the notifier's half minute.
+func QueueListing() ([]QueuedMessage, error) {
+	out, err := readQueueJSON(postqueueTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -86,9 +107,11 @@ func parseQueueJSON(out []byte) ([]QueuedMessage, error) {
 			QueueName   string `json:"queue_name"`
 			QueueID     string `json:"queue_id"`
 			ArrivalTime int64  `json:"arrival_time"`
+			MessageSize int64  `json:"message_size"`
 			Sender      string `json:"sender"`
 			Recipients  []struct {
-				Address string `json:"address"`
+				Address     string `json:"address"`
+				DelayReason string `json:"delay_reason"`
 			} `json:"recipients"`
 		}
 		if err := json.Unmarshal([]byte(line), &e); err != nil || e.QueueID == "" || e.ArrivalTime <= 0 {
@@ -99,9 +122,10 @@ func parseQueueJSON(out []byte) ([]QueuedMessage, error) {
 			Queue:   e.QueueName,
 			Sender:  e.Sender,
 			Arrival: time.Unix(e.ArrivalTime, 0).UTC(),
+			Size:    e.MessageSize,
 		}
 		for _, r := range e.Recipients {
-			m.Recipients = append(m.Recipients, r.Address)
+			m.Recipients = append(m.Recipients, QueuedRecipient{Address: r.Address, DelayReason: r.DelayReason})
 		}
 		msgs = append(msgs, m)
 	}
