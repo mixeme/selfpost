@@ -46,17 +46,14 @@ const mockupDir = "../../../docs/assets/panel-redesign/panel"
 // with its own plan (panel-redesign.md § Room for roadmap items). They are the
 // only keys of outlines.json the finished panel may lack.
 var deferredScreens = map[string]string{
-	"in-queue":              "queue as a table / inbound queue, undecided",
 	"in-quarantine":         "inbound-quarantine, candidate",
 	"in-quarantine-message": "inbound-quarantine, candidate",
 }
 
-// Pages whose 2.0 content is deliberately not the mockup's (decided
-// 2026-10-09: both queues ship the old content inside the new shell until the
-// queue is a table). They obey every rule except the outline comparison.
-var outlineExempt = map[string]string{
-	"out-queue": "old postqueue output in the new shell until queue-as-a-table is decided",
-}
+// Pages whose content is deliberately not the mockup's. They obey every rule
+// except the outline comparison. Empty since the queues became tables (owner,
+// 2026-10-18); until then both shipped postqueue's listing in the new shell.
+var outlineExempt = map[string]string{}
 
 // Pages that are redesigned but have no outline: the kit page is the
 // vocabulary itself, and the signed-out screens have no shell to outline.

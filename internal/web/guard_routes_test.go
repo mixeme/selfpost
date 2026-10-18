@@ -58,6 +58,7 @@ var routes = struct{ always, inbound, dmarc []string }{
 		"POST /inbound/domains/{id}/recipients",
 		"GET /inbound/domains/{id}/delete", "POST /inbound/domains/{id}/delete",
 		"GET /inbound/log",
+		"GET /inbound/queue", "GET /inbound/queue/fragment",
 		"GET /inbound/filter-lists", "POST /inbound/filter-lists",
 		"POST /inbound/filter-lists/{id}/delete",
 	},
