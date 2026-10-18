@@ -108,6 +108,9 @@ func (s *Service) SetTransportAs(id int64, host, portRaw, tlsMode string, mayCha
 	if err := checkTLSMode(tlsMode); err != nil {
 		return 0, err
 	}
+	if err := checkSecureHost(host, tlsMode); err != nil {
+		return 0, err
+	}
 	domains, err := s.store.ListInboundDomains()
 	if err != nil {
 		return 0, err

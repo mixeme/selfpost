@@ -136,3 +136,18 @@ func TestRenderInboundMapsOneTLSLinePerNextHop(t *testing.T) {
 		t.Errorf("tls_policy = %q, want the next hop once", tlsPolicy)
 	}
 }
+
+// Verified TLS is Postfix's secure level, written as the others are; the
+// certificate is matched against the next hop's name by the main.cf default
+// (smtp_tls_secure_cert_match = nexthop, dot-nexthop).
+func TestRenderInboundMapsSecure(t *testing.T) {
+	_, _, _, tlsPolicy, err := renderInboundMaps([]InboundRoute{
+		{Domain: "in.example.com", Host: "mx.example.net", Port: 25, TLSMode: "secure", RecipientMode: "any"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(tlsPolicy) != "[mx.example.net]:25 secure\n" {
+		t.Errorf("tls_policy = %q", tlsPolicy)
+	}
+}

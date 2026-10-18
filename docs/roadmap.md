@@ -29,7 +29,7 @@ in `git log` and [CHANGELOG.md](../CHANGELOG.md).
 | ID | Topic | Status | Progress | Plan |
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Follow-ups of the 2026-10-17 security audit: A2 (high), seven mediums, the lows | stages 0-6 shipped `2.14.4` (2026-10-17); stage H (the host, S1-S3, S5) the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) |
-| upstream-tls-verify | Inbound: offer "Verified" TLS to the upstream (Postfix `secure`, the upstream's name checked), beside Required, which checks no certificate (audit M7) | proposed | — | — |
+| upstream-tls-verify | Inbound: offer "Verified" TLS to the upstream (Postfix `secure`, the upstream's name checked), beside Required, which checks no certificate (audit M7) | built 2026-10-18 (owner: "Оба предложения делаем") | — | — |
 | server-dmarc-hint | Server › Settings lists a DMARC record for the server's own name beside its DKIM and SPF (audit S3, product side) | built 2026-10-18 (owner: "Оба предложения делаем") | — | — |
 | inbound-upstream-result | Inbound › Log shows what the upstream answered: sent, deferred, bounced, with its last reply | shipped `2.10.0` | 7/7 | [plans/inbound-upstream-result.md](plans/inbound-upstream-result.md) |
 | health-setup-checks | Server › Health also checks the certificate's name, Postfix's greeting and the trusted proxy (was preflight) | shipped `2.11.0` | — | — |

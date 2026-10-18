@@ -24,6 +24,7 @@ func InboundDomainHref(id int64) string { return inboundDomains + "/" + strconv.
 const (
 	recipientModeAny = "any"
 	tlsModeEncrypt   = "encrypt"
+	tlsModeSecure    = "secure"
 	tlsModeNone      = "none"
 )
 
@@ -120,6 +121,8 @@ func tlsTag(mode string) Tag {
 	switch mode {
 	case tlsModeEncrypt:
 		return Tag{Status: "ok", Label: "required"}
+	case tlsModeSecure:
+		return Tag{Status: "ok", Label: "verified"}
 	case tlsModeNone:
 		return Tag{Status: "off", Label: "off"}
 	}
@@ -303,7 +306,7 @@ func NewInDomain(m Meta, in InDomainInput) *InDomain {
 		Host:           in.Host,
 		Port:           strconv.Itoa(in.Port),
 		TLSOptions: []Option{{Value: "may", Label: "Opportunistic"}, {Value: tlsModeEncrypt, Label: "Required"},
-			{Value: tlsModeNone, Label: "Off"}},
+			{Value: tlsModeSecure, Label: "Verified"}, {Value: tlsModeNone, Label: "Off"}},
 		TLSSelected: in.TLSMode,
 
 		Recipients:       Box{No: "03", Title: "Valid recipients", ID: "recipients", Help: topicLink(HelpRecipients, "Listed addresses or any address")},
@@ -335,6 +338,8 @@ func inDomainLead(in InDomainInput) Text {
 	switch in.TLSMode {
 	case tlsModeEncrypt:
 		tls = "over required TLS"
+	case tlsModeSecure:
+		tls = "over verified TLS"
 	case tlsModeNone:
 		tls = "without TLS"
 	}

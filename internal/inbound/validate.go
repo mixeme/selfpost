@@ -103,11 +103,24 @@ func parsePort(raw string) (int, error) {
 
 func checkTLSMode(mode string) error {
 	switch mode {
-	case "may", "encrypt", "none":
+	case "may", "encrypt", "secure", "none":
 		return nil
 	default:
 		return invalid("invalid TLS mode")
 	}
+}
+
+// checkSecureHost refuses Verified TLS for an upstream given by address:
+// Postfix's secure level matches the certificate against the next hop's name
+// (smtp_tls_secure_cert_match = nexthop, dot-nexthop; Postfix 3.10.13,
+// postconf(5): "the transport next-hop configured for the domain stripped of
+// ... enclosing square brackets and trailing port"), and a certificate names
+// hosts, not addresses.
+func checkSecureHost(host, mode string) error {
+	if mode == "secure" && net.ParseIP(host) != nil {
+		return invalid("Verified TLS checks the upstream's certificate against its name: give the upstream by name, not by address")
+	}
+	return nil
 }
 
 func checkRecipientMode(mode string) error {

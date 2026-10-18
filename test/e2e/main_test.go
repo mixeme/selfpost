@@ -407,6 +407,9 @@ func TestE2E(t *testing.T) {
 	run("inbound_bare_newline_is_one_message", func(t *testing.T) {
 		testInboundBareNewline(t, sc)
 	})
+	run("inbound_upstream_verified_tls", func(t *testing.T) {
+		testVerifiedUpstreamTLS(t, sc)
+	})
 	// After every step that uses adminPassword: the reset sets another.
 	run("password_reset_by_e_mail", func(t *testing.T) {
 		testPasswordReset(t, sc)

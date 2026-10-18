@@ -14,10 +14,13 @@ const (
 )
 
 // TLS modes for the hand-off to the upstream. Values are Postfix
-// smtp_tls_policy_maps levels: may (opportunistic), encrypt (required), none.
+// smtp_tls_policy_maps levels: may (opportunistic), encrypt (required),
+// secure (verified: the certificate checked against the upstream's name;
+// migration 0014), none.
 const (
 	TLSModeMay     = "may"
 	TLSModeEncrypt = "encrypt"
+	TLSModeSecure  = "secure"
 	TLSModeNone    = "none"
 )
 

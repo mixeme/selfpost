@@ -2,6 +2,7 @@ package inbound
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -64,5 +65,30 @@ func TestOneTLSModePerUpstream(t *testing.T) {
 	}
 	if d, _ := st.GetInboundDomain(c.ID); d.Port != 2525 || mode(a.ID) != "may" {
 		t.Errorf("the refused save changed something: c on %d, a %s", d.Port, mode(a.ID))
+	}
+}
+
+// Verified TLS (secure) is saved for an upstream given by name and refused for
+// one given by address: Postfix checks the certificate against the next hop's
+// name (upstream-tls-verify).
+func TestVerifiedTLSNeedsTheUpstreamsName(t *testing.T) {
+	st, err := store.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	s := NewService(st, nullMaps{})
+	d, _ := s.Add("in.example")
+	for _, host := range []string{"10.0.0.8", "[2001:db8::25]"} {
+		var v *ValidationError
+		if err := s.SetTransport(d.ID, host, "25", store.TLSModeSecure); !errors.As(err, &v) || !strings.Contains(err.Error(), "give the upstream by name") {
+			t.Errorf("Verified TLS to %s: %v, want refused", host, err)
+		}
+	}
+	if err := s.SetTransport(d.ID, "MX.Example.NET", "25", store.TLSModeSecure); err != nil {
+		t.Fatalf("Verified TLS to a name: %v", err)
+	}
+	if got, _ := st.GetInboundDomain(d.ID); got.TLSMode != store.TLSModeSecure || got.Host != "mx.example.net" {
+		t.Errorf("saved %s %s", got.Host, got.TLSMode)
 	}
 }

@@ -29,7 +29,8 @@
   <div class="field"><label class="label" for="tls">TLS to upstream</label>
     <div class="control"><div class="select is-fullwidth"><select id="tls" name="tls_mode">{{$sel := .TLSSelected}}{{range .TLSOptions}}
       <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
-    </select></div></div></div>
+    </select></div></div>
+    <p class="help">Required encrypts the hop without checking who answers. Verified also checks the upstream's certificate: issued by a trusted authority for the host above, which is then given by name.</p></div>
   <button type="submit" class="button is-primary">Save upstream</button>
 </form>
 {{template "body_close"}}

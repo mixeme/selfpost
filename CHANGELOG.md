@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 
+- **Verified TLS to an inbound domain's upstream** (upstream-tls-verify; the
+  security audit's M7): a fourth choice beside Opportunistic, Required and
+  Off - Postfix's `secure` level, which also checks that the upstream's
+  certificate was issued by a trusted authority for its name. The upstream
+  is then given by name. Postfix's SMTP client now trusts Debian's
+  `ca-certificates`; mail to the recipients' MX is unchanged. Migration
+  0014 widens the stored TLS mode; schema 14.
 - **A DMARC record for the server's own name** (server-dmarc-hint; the
   security audit's S3): Server › Settings › Notification mail gives
   `v=DMARC1; p=reject` at `_dmarc.<hostname>` beside the DKIM and SPF

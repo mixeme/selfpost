@@ -120,8 +120,8 @@ func TestBaselineSchema(t *testing.T) {
 	}
 
 	var version, appID int64
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 13 {
-		t.Errorf("user_version = %d, %v; want 13", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 14 {
+		t.Errorf("user_version = %d, %v; want 14", version, err)
 	}
 	if err := st.db.QueryRow("PRAGMA application_id").Scan(&appID); err != nil || appID != applicationID {
 		t.Errorf("application_id = %#x, %v; want %#x", appID, err, applicationID)
@@ -197,8 +197,8 @@ func TestOpenMigratesA20Database(t *testing.T) {
 	}
 	defer st.Close()
 	var version int
-	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 13 {
-		t.Errorf("user_version = %d, %v; want 13", version, err)
+	if err := st.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 14 {
+		t.Errorf("user_version = %d, %v; want 14", version, err)
 	}
 	if ok, err := st.UserExists(); err != nil || !ok {
 		t.Errorf("the user of the 2.0 database: exists = %v, %v", ok, err)
@@ -440,5 +440,24 @@ func TestTwoOpensMigrateOnce(t *testing.T) {
 	entries, _ := fs.ReadDir(migrationsFS, "migrations")
 	if version != len(entries) {
 		t.Fatalf("user_version %d, want %d", version, len(entries))
+	}
+}
+
+// Migration 0014 widens the upstream's TLS mode to secure and keeps every
+// upstream as it was (upstream-tls-verify).
+func TestUpstreamTLSModeSecure(t *testing.T) {
+	st := openTestStore(t)
+	d, err := st.AddInboundDomain("in.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateInboundTransport(d.ID, "mx.example.net", 25, TLSModeSecure); err != nil {
+		t.Fatalf("secure refused: %v", err)
+	}
+	if err := st.UpdateInboundTransport(d.ID, "mx.example.net", 25, "verify"); err == nil {
+		t.Error("a mode the panel does not know was stored")
+	}
+	if got, err := st.GetInboundDomain(d.ID); err != nil || got.TLSMode != TLSModeSecure {
+		t.Errorf("mode %q, %v", got.TLSMode, err)
 	}
 }

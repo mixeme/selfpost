@@ -115,7 +115,7 @@ func assertInboundRouteSafe(r InboundRoute) error {
 		return fmt.Errorf("postfix: invalid inbound port %d", r.Port)
 	}
 	switch r.TLSMode {
-	case "may", "encrypt", "none":
+	case "may", "encrypt", "secure", "none":
 	default:
 		return fmt.Errorf("postfix: invalid tls mode %q", r.TLSMode)
 	}

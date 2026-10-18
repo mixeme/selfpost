@@ -1237,10 +1237,21 @@ for such a sender.
 
 **Panel** (`/inbound/domains`): the global role adds and deletes domains. On a
 domain's page, set the upstream host/port and TLS to that hop (opportunistic /
-required / off), and choose recipients. *Required* is Postfix's `encrypt`
+required / verified / off), and choose recipients. *Required* is Postfix's `encrypt`
 level: the hop is encrypted, but the upstream's certificate is not checked,
 so it guards against someone who listens on the way, not against one who
-answers in the upstream's place. An upstream has one TLS mode: Postfix
+answers in the upstream's place. *Verified* is Postfix's `secure` level: the
+certificate must be issued by an authority Debian's `ca-certificates`
+trusts, for the upstream's host name - so the upstream is given by name,
+not by address (the panel refuses an address with it), and mail waits in
+the queue while the check fails, a self-signed certificate or one for
+another name included. To try an upstream before choosing it:
+
+```sh
+docker exec <container> posttls-finger -c -l secure -F /etc/ssl/certs/ca-certificates.crt "[mx.example.com]:25"
+```
+
+"Verified TLS connection established" means it will pass. An upstream has one TLS mode: Postfix
 keeps the TLS policy per next hop, not per domain, so the mode saved for one
 domain is the mode of every domain forwarded to the same host and port, and
 they are changed with it; a *domain* user who does not manage all of them is

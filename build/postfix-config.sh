@@ -297,9 +297,19 @@ postconf -e \
 	"local_transport=error:local mail delivery is disabled"
 
 # Outbound delivery: straight to the recipient MX, opportunistic TLS.
+# The client trusts the authorities Debian's ca-certificates ships, for an
+# inbound domain's upstream with Verified TLS (the "secure" level in the TLS
+# policy map, upstream-tls-verify): Postfix trusts none by default - the
+# *_tls_CAfile defaults are empty and tls_append_default_CA is "no" (Postfix
+# 3.10.13, src/global/mail_params.h, DEF_SMTP_TLS_CA_FILE,
+# DEF_TLS_APPEND_DEF_CA). The levels may and encrypt check nothing and only
+# log the verdict; mail to the recipients' MX is unchanged. The file is the
+# bundle update-ca-certificates writes (ca-certificates, installed in the
+# image), read by smtp(8) unchrooted (chroot is off below).
 postconf -e \
 	"smtp_tls_security_level=may" \
-	"smtp_tls_note_starttls_offer=yes"
+	"smtp_tls_note_starttls_offer=yes" \
+	"smtp_tls_CAfile=/etc/ssl/certs/ca-certificates.crt"
 
 # TLS server material shared by every inbound service. auth_only guarantees
 # credentials are never accepted before TLS is up on any port. Postfix 3.10.13,
