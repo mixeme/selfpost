@@ -238,7 +238,6 @@ Drawn and not built (`deferredScreens` in the guard tests):
 |---|---|---|
 | `in-queue` | [queue-table](../roadmap.md#queue-table): the queue as a table from `postqueue -j`, and an Inbound › Queue | undecided; Outbound › Queue shows postqueue's listing in a log pane (`outlineExempt`) |
 | `in-quarantine`, `in-quarantine-message` | inbound-quarantine, an idea off the roadmap ([its notes](inbound-quarantine.md)) | its open questions stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
-| `preflight` | preflight as a page of its own, dropped 2026-10-13 ([roadmap](../roadmap.md#dropped-with-the-condition-for-return)); its checks went to Server › Health, the test e-mail to its own form | a leftover of a dropped item |
 
 The sibling strip under the navbar holds five or six entries per group without
 wrapping; Inbound would reach five (Domains · Log · Queue · Quarantine ·

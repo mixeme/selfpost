@@ -31,7 +31,6 @@ NAV = [
     ]),
     ("server", "Server", "health.html", "ti-server-2", [
         ("health", "Health", "health.html", "ti-heartbeat"),
-        ("preflight", "Preflight", "preflight.html", "ti-checklist"),
         ("system-log", "System log", "system-log.html", "ti-file-text"),
         ("backup", "Backup", "backup.html", "ti-archive"),
         ("users", "Users", "users.html", "ti-users"),

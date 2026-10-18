@@ -380,11 +380,6 @@
    ]
   }
  ],
- "preflight": [
-  "head+postmark+actions",
-  "box[Checks]:table",
-  "box[Send a test e-mail]:body"
- ],
  "settings": [
   "head+actions",
   {
