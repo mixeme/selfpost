@@ -13,7 +13,7 @@ import (
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
 
-// The panel pages of notifications (plans/panel-notifications.md): the user's
+// The panel pages of notifications (docs/architecture.md § Notifications): the user's
 // checkbox on Account, the instance's switch and the DNS records of the server's
 // own name on Server › Settings, and the state of those records on Server ›
 // Health. What is sent and when is internal/notify's and tested there.

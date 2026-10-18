@@ -57,7 +57,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # test say whether it does.
 # No DKIM package is installed: the panel signs itself (internal/milter,
 # sign.go) and makes the keys in Go (internal/domain/dkim.go); OpenDKIM left
-# the image in 2.8.0 (docs/plans/panel-dkim-signing.md).
+# the image in 2.8.0 (docs/architecture.md § DKIM signing).
 # systemd-standalone-sysusers is named so that cron-daemon-common, which
 # logrotate brings (logrotate 3.22.0-1, debian/control: "Depends: cron |
 # anacron | cron-daemon | systemd-sysv"), creates its group with it rather

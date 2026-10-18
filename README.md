@@ -44,7 +44,7 @@ send log and DNS checks in the panel, encrypted backups.
 | [Architecture](docs/architecture.md) | As-built technical design |
 | [Security design](docs/security.md) | Mandatory requirements, accepted risks, the CSRF ADR |
 | [Development](docs/development.md) | Building, testing, docs rules, model routing, commits |
-| [Roadmap](docs/roadmap.md) | Open work (1.x+) — direction, not commitments |
+| [Roadmap](docs/roadmap.md) | Open work — direction, not commitments |
 | [CHANGELOG](CHANGELOG.md) | Release history |
 
 Found a vulnerability? Do not open an issue — [SECURITY.md](SECURITY.md) has

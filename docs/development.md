@@ -1,7 +1,7 @@
 # SelfPost — development
 
 **What this file is.** How to build, test, document, and ship changes. Open
-work after 1.0 (1.x+) lives in [roadmap.md](roadmap.md) and linked
+work lives in [roadmap.md](roadmap.md) and linked
 [plans/](plans/). Product boundaries: [product.md](product.md). As-built layout:
 [architecture.md](architecture.md).
 
@@ -90,7 +90,7 @@ checklist changes; update the numerator when steps are checked off.
 
 ### Roadmap track: commit and version
 
-For the current 1.x+ roadmap queue ([roadmap.md](roadmap.md) index), stricter
+For the roadmap queue ([roadmap.md](roadmap.md) index), stricter
 than the default «meaningful step» rule in [§ Commits and release build](#commits-and-release-build):
 
 **After each checklist step**
@@ -106,58 +106,10 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
    [deploy/docker-compose.yml](../deploy/docker-compose.yml).
 2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
    [§ Release image](#release-image)).
-
-**Planned version cuts** (from pin `2.15.0`; adjust if semver changes mid-track):
-
-| Stage | ID | Cut |
-|---|---|---|
-| 1 | queue-retries | `1.3.1` (PATCH) |
-| 2 | inbound-relay | `1.4.0` |
-| 3 | send-log-retention | `1.5.0` |
-| 4 | domain-stats-auto-ratelimit | `1.6.0` |
-| 5 | dmarc-reports | `1.7.0` |
-| 6 | panel-docs | `1.8.0` |
-| 7 | application auth IPs | `1.9.0` |
-| 8 | port-25 Postfix startup fix | `1.9.1` (PATCH) |
-| 9 | 2026-08-19 code review pass | `1.9.2` (PATCH) |
-| 10 | panel-redesign prep (docs only, owner-requested cut) | `1.9.3` (PATCH) |
-| 11 | panel-redesign plan: component kit, stages, reorder (docs only, owner-requested cut) | `1.9.4` (PATCH) |
-| 12 | GHCR release fix: keep per-arch images, sweep orphaned versions (CI only) | `1.9.5` (PATCH) |
-| 13 | panel-redesign | `2.0.0` (MAJOR, no compatibility) |
-| 14 | DMARC ingest drops and bounds, full backup from the panel, no queue in a backup | `2.0.1` (PATCH) |
-| 15 | inbound-antispam-panel | `2.1.0` (was `1.10.0`, reordered 2026-10-09) |
-| 16 | delivery-log-storage | `2.2.0` |
-| 17 | panel-notifications | `2.3.0` |
-| 18 | from-header-binding | `2.4.0` |
-| 19 | code audit 2026-10-12 and its plan (docs only, owner-requested cut) | `2.4.1` (PATCH) |
-| 20 | audit-2026-10-12 stage 0: release hygiene | `2.4.2` (PATCH) |
-| 21 | audit-2026-10-12 stages 1 and 2 | `2.5.0` |
-| 22 | audit-2026-10-12 stage 2b: the log tailer | `2.5.1` |
-| 23 | audit-2026-10-12 stage 2c: the sender check reads From: as OpenDKIM does | `2.5.2` |
-| 24 | audit-2026-10-12 stage 3: persistence and restore | `2.5.3` |
-| 25 | audit-2026-10-12 stage 4: panel behaviour | `2.5.4` |
-| 26 | audit-2026-10-12 stage 5: image and Postfix hardening | `2.6.0` |
-| 27 | port25-bare-newline | `2.6.1` (PATCH) |
-| 28 | base-trixie | `2.7.0` |
-| 29 | panel-dkim-signing | `2.8.0` |
-| 30 | dns-record-collapse, settings-save-row, notification-mail-recheck; `/data/opendkim` removed | `2.9.0` |
-| 31 | log panes wrap on a phone | `2.9.1` (PATCH) |
-| 32 | inbound-upstream-result | `2.10.0` |
-| 33 | long, non-repeating queue ids | `2.10.1` (PATCH) |
-| 34 | phone-desktop-mode | `2.10.2` (PATCH) |
-| 35 | backup-reauth | `2.10.3` (PATCH) |
-| 36 | origin-strict | `2.10.4` (PATCH) |
-| 37 | health-setup-checks | `2.11.0` |
-| 38 | test-email | `2.12.0` |
-| 39 | local-time | `2.13.0` |
-| 40 | docs-audit | `2.13.1` |
-| 41 | password-reset | `2.14.0` |
-| 42 | overview-head | `2.14.1` |
-| 43 | dmarc-day, health-sockets | `2.14.2` |
-| 44 | label-tag | `2.14.3` |
-| 45 | security-audit-2026-10-17, stages 0-6 | `2.14.4` |
-| 46 | etrn-silent | `2.14.5` |
-| 47 | server-dmarc-hint, upstream-tls-verify | `2.15.0` |
+3. The item leaves [roadmap.md](roadmap.md) and its plan file is deleted; what
+   it did is in the CHANGELOG, the rest in git history. A report whose
+   finding ids the code cites (the audits, the assumptions register) stays,
+   marked closed.
 
 Docs-only prep (checklists in plans, no product code) uses the same per-step
 commit rule but **no** version cut until the next product stage ships.
@@ -308,7 +260,8 @@ question, the comment says so and what was measured instead - "measured on
 the e2e stand, 2026-10-14: ..." - and a measurement is never written as if
 it were read. A test fixture copied from a real log says where and when it
 was seen; one composed by hand says that it was composed. The heuristics
-review of 2026-10-14 (audit-2026-10-12, stage 2c) brought the code that
+review of 2026-10-14 ([audit-2026-10-12](audit-2026-10-12.md), stage 2c; the
+[assumptions register](assumptions-2026-10-14.md)) brought the code that
 existed then up to this rule.
 
 ---
@@ -623,7 +576,8 @@ There is no `docs/archive/` directory.
 | Development process (this file) | [development.md](development.md) |
 | Security requirements and accepted risks | [security.md](security.md) |
 | SQLite schema and migrations | [schema-migrations.md](schema-migrations.md) |
-| Roadmap (1.x+) | [roadmap.md](roadmap.md) |
+| Roadmap | [roadmap.md](roadmap.md) |
+| Closed audits, cited by finding id from the code | [audit-2026-10-12.md](audit-2026-10-12.md), [assumptions-2026-10-14.md](assumptions-2026-10-14.md), [security-audit-2026-10-17.md](security-audit-2026-10-17.md) |
 | Active design plans | [plans/](plans/) |
 | Release history | [CHANGELOG.md](../CHANGELOG.md) |
 
@@ -640,8 +594,8 @@ There is no `docs/archive/` directory.
 | [deploy/.env.example](../deploy/.env.example) | Public env template; full reference in [guide.md](guide.md) |
 | [CHANGELOG.md](../CHANGELOG.md) | Keep a Changelog |
 
-Out of scope for v1.x: `CONTRIBUTING.md`, man pages, a separate docs site
-(candidates in [roadmap.md](roadmap.md)).
+Out of scope: `CONTRIBUTING.md` (dropped, with its condition, in
+[roadmap.md](roadmap.md)), man pages, a separate docs site.
 
 ### Maintaining documentation
 

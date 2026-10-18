@@ -365,8 +365,8 @@ operator can act on it.
   MIME boundary and the signature still verified), then once more each of the shown ones present
   (Subject, Date, To, Cc, Reply-To, Sender) and `From` last, so one of those
   added after signing breaks the signature. Until `2.8.0` OpenDKIM signed - a
-  2018 beta with three 2026 CVEs open and nobody upstream to fix them
-  ([own-mta-builds](own-mta-builds-2026-10-15.md) § 1) - and chose the key
+  2018 beta with three 2026 CVEs open and nobody upstream to fix them - and
+  chose the key
   by the `From:` header; it left the image, and with it the syslog relay and
   `/dev/log`, the port of its `From:` parser, its tables and their reload by
   a signal across uids. Architecture § DKIM signing.
@@ -445,8 +445,7 @@ operator can act on it.
   and later; `src/global/mail_params.h`, `DEF_SMTPD_FORBID_BARE_LF`), so
   they end DATA the same way; the port-25 setting stays explicit. Before
   `2.7.0` a smuggled transaction on a submission port was still the
-  authenticated session's, under its sender bindings and milters
-  ([own-mta-builds](own-mta-builds-2026-10-15.md) § 5).
+  authenticated session's, under its sender bindings and milters.
 - **The panel's milters judge every message of a connection.** Postfix
   introduces a client to a milter once per connection, and the milter library
   replaces the milter's session after any reply that is not "continue". Until
@@ -651,7 +650,7 @@ deferred item from the roadmap.
   templates must contain no inline scripts and no inline styles. Decided by
   the owner on 2026-10-13: no tokens; the roadmap item that asked for them is
   dropped and the origin check is made strict instead
-  ([origin-strict](roadmap.md#origin-strict)). This bullet and the ADR below
+  (origin-strict, `2.10.4`). This bullet and the ADR below
   are the single record of the decision, and the ADR's **Revisit if** says
   when tokens are built after all.
 - **Destructive-action confirmation (`data-confirm`) is JavaScript-only.**
@@ -872,7 +871,8 @@ deferred item from the roadmap.
   seconds or the whole instance; Server › Health counts the
   downtime and the mail deferred for it. Trigger to revisit: those numbers
   not staying at nothing - then the check moves into a process of its own
-  ([plans/from-header-binding.md](plans/from-header-binding.md)).
+  (a subcommand of the panel binary and a `[program:]` of supervisord; the
+  downtime figure then needs a new meaning).
 - **A malformed packet on a milter socket of the panel ends the panel.** The
   milter library indexes into an empty packet and nobody recovers the panic,
   so the process exits and supervisord starts it again. The sockets are
@@ -956,21 +956,13 @@ deferred item from the roadmap.
   uses with another mode is refused and told that mode - not the domain -
   so the form tells whether some domain forwards to a given host and port.
   Accepted with the rest of this item.
-- **Account's profile (username, e-mail) is saved without the password.**
-  Saving the profile does not ask for the current password, as changing the
-  password does. Since 2.3.0 the e-mail is where notifications go, so a stolen
-  session can turn them to another address: the thief then learns what they
-  say - which domain's DNS is wrong, which application is refused, when the
-  certificate expires, sender addresses of old queued mail - and the user
-  stops hearing it. Nothing in a notification gives access. A `domain` user
-  can likewise point signed mail of this server at a third party's address,
-  a dozen messages a day per assigned domain at most. The profile form also
-  says when a username is taken, so a signed-in user can tell which
-  usernames exist; signing in does not (`2.5.4`). It
-  becomes a requirement to ask for the current password when changing
-  `users.email` as soon as [password-reset](roadmap.md#password-reset) mails a
-  link to it — from then on whoever can change the address could take the
-  account over.
+- **Account's username is saved without the password.** Changing the
+  e-mail on Account asks for the current password since `2.14.0`, on the
+  password change's limit: it is where a reset link goes, so whoever could
+  change it could take the account over. The username and the notification
+  switch are saved without it. The profile form says when a username is
+  taken, so a signed-in user can tell which usernames exist; signing in does
+  not (`2.5.4`).
 
 ## ADR: CSRF via origin checking, without tokens
 
@@ -1023,7 +1015,7 @@ external-site case this ADR covers.
 
 **Decision of 2026-10-13 (owner).** Asked to choose between this ADR, tokens,
 and a strict origin check, the owner chose the ADR with the strict check
-([origin-strict](roadmap.md#origin-strict)) and no tokens. Session-bound tokens
+(origin-strict, `2.10.4`) and no tokens. Session-bound tokens
 are the answer to return to - a hidden field in every state-changing form and
 htmx path, checked against the session, on top of the origin check - when
 either condition above comes true, and also when: a browser the panel must

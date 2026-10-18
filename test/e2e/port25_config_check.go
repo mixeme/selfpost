@@ -54,7 +54,7 @@ var port25Cases = []port25Case{
 			// The SMTP-smuggling defence. Postfix 3.10.13 has it by default
 			// (src/global/mail_params.h, DEF_SMTPD_FORBID_BARE_LF "normalize");
 			// set explicitly since 2.6.1, when the image ran Postfix 3.7.11,
-			// whose default was "no" (own-mta-builds, § 5), and kept so the
+			// whose default was "no" (docs/security.md § Mail path), and kept so the
 			// listener does not depend on the default. testInboundBareNewline
 			// drives it.
 			{param: "smtpd_forbid_bare_newline", contains: "normalize", wantExact: true},

@@ -17,8 +17,8 @@ When you add or review a migration, update this file in the same change.
 
 | Field | Value |
 |---|---|
-| Chain head | `user_version = 13` |
-| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql`, `0010_send_log_indexes.sql`, `0011_notify_addressees.sql`, `0012_inbound_upstream.sql` |
+| Chain head | `user_version = 14` |
+| Files | `0001_init.sql` (the 2.0 baseline), `0002_inbound_spam_log.sql`, `0003_send_log_lines.sql`, `0004_notifications.sql`, `0005_send_log_rejected_index.sql`, `0006_sender_check.sql`, `0007_delivery_log_days.sql`, `0008_tenant_boundary.sql`, `0009_refusal_line.sql`, `0010_send_log_indexes.sql`, `0011_notify_addressees.sql`, `0012_inbound_upstream.sql`, `0013_email_links.sql`, `0014_upstream_tls_secure.sql` |
 | File mark | `PRAGMA application_id = 0x53503230` ("SP20") |
 | Database file | `/data/selfpost.db` (bind mount) |
 | Compatibility | 2.x MINOR releases must boot a `2.0.0` data directory. **Nothing is carried over from 1.x.** |
@@ -91,6 +91,7 @@ audit (`2.5.0`), `0009_refusal_line.sql` (`2.5.1`) and
 | 11 | `0011_notify_addressees.sql` | 2.5.4 | DDL | `notify_addressees (key, address, told_at)`: who a subject's notification is owed to and who was handed it, so a copy that failed or was held back by the hourly ceiling goes out at a later check and a subject's end goes to those told (audit 2026-10-12, stage 4); deleted with its `notify_state` row |
 | 12 | `0012_inbound_upstream.sql` | 2.10.0 | DDL | `inbound_spam_log` gains `queue_id`, `upstream_status` (`''`, `queued`, `held`, `sent`, `deferred`, `bounced`; CHECK), `upstream_relay`, `upstream_reply` and `upstream_at`, and the partial index `idx_inbound_spam_log_queue_id` on rows that have a queue id: what the upstream answered about mail accepted on port 25, put on the row by the log tailer (inbound-upstream-result). Rows from before have none |
 | 13 | `0013_email_links.sql` | 2.14.0 | DDL | `users.email_confirmed_at` (`''` for every address saved before it: all unconfirmed) and `user_links`, the one-time links that confirm an address and reset a password, with `idx_user_links_user` (password-reset; owner, 2026-10-13 and 2026-10-17) |
+| 14 | `0014_upstream_tls_secure.sql` | 2.15.0 | DDL + data | `inbound_transports.tls_mode` may be `secure` (Verified: Postfix's level that checks the upstream's certificate against its name; upstream-tls-verify, security audit 2026-10-17, M7). SQLite cannot alter a CHECK, so the table is made anew with the wider one and its rows copied |
 
 **Kind:** *DDL* — schema only; *data* — `INSERT`/`UPDATE` that must stay correct
 for operators upgrading from older 2.x images.
@@ -113,7 +114,7 @@ for operators upgrading from older 2.x images.
 | `send_log` | Delivery journal. `reason` says why a row was refused (`limit`, `client`, `from`, and `sender` since 2.8.0) or that the sweep closed it (`reconcile`, `reconcile-contradicted`), `header_from` what the From: or Sender: line of a message refused for it said (v6), `refusal_line`, `client_ip` and `recovered` (v9), and `domain_id` (v8: the row belongs to a domain by id, `ON DELETE SET NULL`) |
 | `logtail_state` | Log-tailer read position |
 | `inbound_domains` | Inbound relay domains |
-| `inbound_transports` | Upstream host / port / TLS per inbound domain |
+| `inbound_transports` | Upstream host / port / TLS per inbound domain; `tls_mode` is `may`, `encrypt`, `secure` (v14) or `none` |
 | `inbound_recipients` | Allow-list when `recipient_mode = list` |
 | `user_inbound_domains` | Inbound domains assigned to a `domain` user — granted separately from the outbound ones |
 | `dmarc_reports` | Parsed aggregate report summaries |

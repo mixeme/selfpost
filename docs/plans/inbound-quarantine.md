@@ -1,8 +1,8 @@
 # Plan: inbound-quarantine
 
 **Status:** an idea to think about, not on the roadmap (owner, 2026-10-12) — design TBD; needs explicit agreement before any code  
-**Version:** TBD (`1.x` MINOR if opt-in and backward-compatible; may warrant `2.x`
-if it changes inbound storage or backup contract).
+**Version:** TBD (a 2.x MINOR if opt-in; a major only if it breaks the
+inbound storage or backup contract).
 
 ---
 
@@ -17,8 +17,8 @@ so we can compare approaches before committing.
 
 ## Why it is separate from inbound-antispam-panel
 
-[inbound-antispam-panel.md](inbound-antispam-panel.md) covers **metadata**
-(journal + lists). Quarantine implies **storing message bodies** (or a durable
+inbound-antispam-panel (shipped `2.1.0`; [architecture.md](../architecture.md)
+§ Mail path) covers **metadata** (journal + lists). Quarantine implies **storing message bodies** (or a durable
 reference to them) under `/data`, retention, release workflow, and a wider
 attack/backup surface — closer to "mini-mailbox" than pure relay.
 
@@ -68,9 +68,7 @@ to the upstream, 14 days, headers only in the panel); it does not settle them.
 
 - Inbound relay, shipped in `[1.4.0]` — as built in
   [architecture.md](../architecture.md) § Mail path.
-- Sensible to decide **after** or **alongside**
-  [inbound-antispam-panel.md](inbound-antispam-panel.md) (journal/lists), but
-  not blocked on it for design discussion.
+- Builds on inbound-antispam-panel (journal and lists, shipped `2.1.0`).
 
 ## Done when (placeholder)
 

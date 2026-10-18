@@ -1,5 +1,11 @@
 # Security audit — 2026-10-17
 
+> **Stages 0-6 shipped in `2.14.4` (2026-10-17)**, the product side of S3
+> and the fix of M7 in `2.15.0` (2026-10-18). Stage H, the owner's host and
+> DNS, is open and tracked in [roadmap.md](roadmap.md#security-audit-2026-10-17).
+> The file stays because the code cites its finding ids (`A2`, `M7`...); its
+> `file:line` references are of the tree at `44bf09d`.
+
 **What this is.** A full security audit of SelfPost at `44bf09d` (release
 `2.14.3`): the code tree, the image and its process model, the deployment
 fragments, CI/CD and the supply chain, the dependencies, and the live

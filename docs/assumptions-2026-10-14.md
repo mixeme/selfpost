@@ -1,5 +1,12 @@
 # What SelfPost assumes of other programs - the register of 2026-10-14
 
+> **Closed 2026-10-14** (stage 2c of [audit-2026-10-12](audit-2026-10-12.md),
+> shipped `2.5.2`): every entry answered, the citations written into the
+> code, what the sources contradicted fixed. The file stays because the code
+> names its entries (`assumptions C-V5`, `A-43`); its `file:line` references
+> are of the tree at `0f984ff`, not of today's, and OpenDKIM, named
+> throughout, left the image in `2.8.0`.
+
 The heuristics review of audit-2026-10-12, stage 2c. The owner's rule
 (development.md § "Code that relies on another component's behaviour"):
 what Postfix, OpenDKIM, Cyrus SASL, rspamd, supervisord, logrotate, Docker,

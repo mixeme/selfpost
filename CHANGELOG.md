@@ -377,7 +377,7 @@ Nothing for an operator to do.
 ### Added
 
 - **Inbound › Log shows what the upstream answered** (inbound-upstream-result,
-  [the plan](docs/plans/inbound-upstream-result.md)): an *Upstream* column
+  the plan, since removed): an *Upstream* column
   beside the decision - *queued*, *held*, *sent*, *deferred* (a greylisting, an
   upstream that cannot be reached), *bounced* (refused, or expired in the
   queue) - opening the last reply, the host that gave it and when. Read from
@@ -456,7 +456,7 @@ schema 11.
 ### Added
 
 - **The panel signs outgoing mail with DKIM itself** (panel-dkim-signing,
-  [the plan](docs/plans/panel-dkim-signing.md)): a milter of the panel's on
+  the plan, since removed): a milter of the panel's on
   two sockets, one for applications' mail - signed with the key of the
   domain the login belongs to - and one for the panel's own, signed with the
   server's name. `relaxed/simple`, RFC 6376 § 5.4.1's headers and `From`
@@ -643,7 +643,7 @@ No migration; schema 11.
   The listener now sets `normalize` - the setting Postfix recommends and 3.9
   made the default: DATA ends only at the standard `<CR><LF>.<CR><LF>`, a
   bare newline elsewhere is read as a line end. Found while reading for
-  [own-mta-builds](docs/own-mta-builds-2026-10-15.md) (§ 5); `test/e2e`
+  own-mta-builds (§ 5, since removed); `test/e2e`
   sends the sequence and finds one message at the upstream with all of it
   inside. Only installations with `INBOUND_RELAY_ENABLE=true` or
   `DMARC_REPORTS_ENABLE=true` have the listener.
@@ -1359,7 +1359,7 @@ Documentation only; no product code changes.
   held to - any address of the application's domain, or the addresses of its
   list, with or without a `+extension` - and refuses anything else with
   `550 5.7.1`, a domain this server does not sign for included
-  ([plans/from-header-binding.md](docs/plans/from-header-binding.md)).
+  (plans/from-header-binding.md, since removed).
 - **The check is strict.** It is the first milter of the chain, on a socket
   of its own (`SENDER_CHECK_SOCKET`), attached with
   `default_action=tempfail`: while the panel does not answer, Postfix defers
@@ -1413,7 +1413,7 @@ Documentation only; no product code changes.
   a user's own switch, `users.notify`, on for everyone; `notify_state`, what
   the panel has already written to its users about. The instance switch is a
   settings key, on unless turned off
-  ([plans/panel-notifications.md](docs/plans/panel-notifications.md)).
+  (plans/panel-notifications.md, since removed).
 - **The panel writes to its users when something needs them.** Four things,
   each said once: a sending domain's DKIM, SPF or DMARC record stops matching
   (after two hourly checks in a row, and once more when it matches again); a
@@ -1463,7 +1463,7 @@ Documentation only; no product code changes.
   The table that will hold what Postfix wrote about a message for as long as
   its send-log row lives, with the store methods to write a line, to write it
   once, to read the lines of a row and to prune
-  ([plans/delivery-log-storage.md](docs/plans/delivery-log-storage.md)).
+  (plans/delivery-log-storage.md, since removed).
 - **The log tailer keeps what Postfix writes about queued messages.** A
   `mail.log` line headed by a queue id is stored with the line's own time, one
   transaction per pass over the log; after an unclean stop a line read twice
@@ -2063,7 +2063,7 @@ screens. Nothing in `internal/web` changes; the design stays `candidate`
   scrolling at 1280px and up. Documented on the components page and in the
   plan (§ Type and tables).
 - Panel redesign, header comparison sheet
-  ([docs/assets/panel-redesign/header/](docs/assets/panel-redesign/header/index.html)):
+  (`docs/assets/panel-redesign/header/`, since removed):
   at nav size the stamp dissolves into the brick bar and the perforated edge
   was drawn inverted (round bumps instead of round holes). Three replacements
   beside the current header — **A** wordmark with the stamp's real hole-to-tooth
@@ -2137,7 +2137,7 @@ screens. Nothing in `internal/web` changes; the design stays `candidate`
   grammar (`measure` / `fill` plus Web Awesome layout CSS), no JS component
   library, new mockups rather than `docs/assets/panel-ui/`. Status: candidate.
 - Roadmap item and plan for `/preflight` installation check page
-  ([docs/plans/preflight.md](docs/plans/preflight.md)) — instance-level
+  (`docs/plans/preflight.md`, since removed) — instance-level
   infrastructure verification (rDNS, TLS, ports, HELO banner, proxy headers,
   DKIM socket, test email). Status: candidate.
 
@@ -2311,7 +2311,7 @@ antispam and quarantine. Upgrading from 1.9.0 is a tag bump; no migration.
 
 ### Added
 
-- [docs/plans/inbound-antispam-panel.md](docs/plans/inbound-antispam-panel.md) —
+- `docs/plans/inbound-antispam-panel.md` (since removed) —
   agreed plan for inbound antispam journal (inbound-journal milter + mail.log
   rejects) and instance-wide allow/deny lists synced to rspamd maps; target
   `1.10.0`; Composer → Opus → Fable workflow.
@@ -2511,7 +2511,7 @@ tag bump; no schema migration.
   self-contained backups and persistent queue.
 
 - docs: HTML mockups for a full panel UI refresh
-  ([docs/assets/panel-ui/](docs/assets/panel-ui/index.html)) — current screens,
+  (`docs/assets/panel-ui/`, since removed) — current screens,
   agreed and candidate roadmap surfaces (queue-retries, inbound-relay,
   dmarc-reports, panel-docs), a hybrid width (ops pages use the window, forms
   keep a reading measure), and a 390px emergency layout. The stamp and brick

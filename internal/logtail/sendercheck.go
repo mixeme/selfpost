@@ -8,7 +8,7 @@ import (
 )
 
 // The sender check is attached to Postfix strictly: while the panel does not
-// answer on its socket, mail is deferred (docs/plans/from-header-binding.md).
+// answer on its socket, mail is deferred (docs/architecture.md § Sender check).
 // How many submissions that happened to is read here, from what Postfix
 // writes about it, and shown on Server > Health. It is the figure that also
 // sees a panel which is running and not answering.

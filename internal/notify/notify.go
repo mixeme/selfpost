@@ -5,7 +5,7 @@
 //
 // Each subject has a row of state in the database, so a thing is said once and
 // a restart says nothing again. The rules of when a message goes out are the
-// owner's (docs/plans/panel-notifications.md § When a message is sent) and
+// owner's (docs/architecture.md § Notifications) and
 // live in this file; what the messages say is in text.go, how they leave in
 // mailer.go.
 package notify

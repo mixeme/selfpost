@@ -88,8 +88,9 @@ func verifyDKIM(raw []byte, domain string) error {
 	return nil
 }
 
-// checkPanelSignature is the oracle of docs/plans/panel-dkim-signing.md: the
-// message carries one DKIM signature, the panel's, for domain - signed as
+// checkPanelSignature is the oracle of the panel's DKIM signer
+// (docs/architecture.md § DKIM signing): the message carries one DKIM
+// signature, the panel's, for domain - signed as
 // OpenDKIM signed until 2.8.0 (relaxed/simple, rsa-sha256, From over-signed)
 // - and dkimpy (python3-dkim in the sink image), an implementation that is
 // not go-msgauth, the panel's library, verifies it. Stage 1 compared it with

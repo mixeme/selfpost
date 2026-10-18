@@ -1,15 +1,16 @@
 # Plan: panel-redesign
 
-**Status:** shipped in `2.0.0` (2026-10-11)  
-**Date:** 2026-09-21 (replaces the 2026-09-08 givens)  
-**Version:** `2.0.0` MAJOR — a breaking release by the owner's decision (§ No compatibility).
+**Status:** the design contract of the panel; built and shipped in `2.0.0`
+(2026-10-11), a breaking release by the owner's decision (§ No compatibility).
+Its implementation checklist (27/27) is in the git history.  
+**Date:** 2026-09-21 (replaces the 2026-09-08 givens)
 
 ---
 
 ## What this file is
 
-The design contract for the control panel and the plan to implement it. The
-design itself is drawn and accepted:
+The design contract for the control panel. The design itself is drawn and
+accepted:
 
 | Artefact | Role |
 |---|---|
@@ -72,9 +73,9 @@ and the migration chain is deleted to zero.** The redesign is `2.0.0`.
 - **Schema.** `internal/store/migrations/` is emptied and replaced by one
   baseline, `0001_init.sql`, equal to the 2.0 schema (including the new
   assignment table below). No historical `admin` table, no create-then-drop.
-  This is [schema-squash](../roadmap.md#schema-squash) with its trigger now
-  decided and without the upgrade gate that item planned: 2.0 starts from an
-  empty data directory.
+  This was the roadmap item schema-squash, with its trigger decided and
+  without the upgrade gate that item planned: 2.0 starts from an empty data
+  directory.
 - **Docs.** `schema-migrations.md` shrinks to the 2.0 baseline; the 1.x chain
   stays in git history.
 
@@ -145,8 +146,7 @@ shown another user's login name, and three explicit choices are simpler.
 - The 2.0 baseline has `users.email`: the user's own address, edited on
   **Account**, set by the global administrator on the user form and shown in
   the users list. It is what the panel writes to — event notifications
-  ([panel-notifications](../roadmap.md#panel-notifications)) and a reset link
-  ([password-reset](../roadmap.md#password-reset)) — and what the fill button
+  (`2.3.0`) and a reset link (`2.14.0`) — and what the fill button
   offers. **Account** is Profile and Password; Server › Settings keeps nothing
   of DMARC.
 - Baseline: `domains.dmarc_rua` alone (`''` = no reports). The hosted choice is
@@ -226,37 +226,23 @@ shell, and its menu entry is hidden if the page does not exist.
 
 ## Room for roadmap items
 
-The mockups draw today's features, the four rows above, and the screens of
-the open roadmap items — none of them needed a new component or layout. A
-mockup of a feature is its target look, not a decision to build it: each item
-keeps its own status and plan. From here on a feature's screens are drawn
+The mockups drew the 2.0 pages and the screens of the roadmap items of the
+time; none of them needed a new component or layout. A mockup of a feature is
+its target look, not a decision to build it. A feature's screens are drawn
 mockup-first in this system (`panel/src/`, `build.py`, `check.py --write`) as
-the first step of that feature's plan — not invented during implementation.
+the first step of that feature's work, not invented during implementation.
 
-| Roadmap item | Where it lands | Built from | Drawn |
-|---|---|---|---|
-| inbound-antispam-panel (agreed, `2.1.0`) | journal = **Inbound › Log** (add client IP and engine to the mockup's columns; `quarantine` joins the decisions); lists = new **Inbound › Filter lists**, global-only because the lists are instance-wide | list layout: add form + two tables, `status_tag`, filter form in `box_head`; the log links *Allow / Deny sender* to the lists | `in-log`, `in-filter-lists` |
-| inbound-quarantine (an idea, off the roadmap since 2026-10-12) | new **Inbound › Quarantine**, list + detail with *Release* / *Discard* | list layout; detail like `out-message` with `facts`, `log_pane` for headers only, Release beside a `sp-danger-zone` Discard | `in-quarantine`, `in-quarantine-message` — the open questions of its plan (where mail lives, what release means, retention, RBAC) stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
-| preflight (candidate) | new **Server › Preflight**, next to Health: Health is what runs now, Preflight is the deeper on-demand installation check with a test e-mail form | `postmark` verdict, a table of checks with `status_tag` and a *What to do* column, one form box for the test e-mail | `preflight` |
-| panel-notifications (candidate) | one checkbox per user on **Account** (no choice per event, owner 2026-10-12); one switch under **Server › Settings** | a checkbox in a box, `help` | **no** — drawn once, taken out of `account` and `settings` on 2026-10-10 (owner): 2.0 ships no box for a feature that is not built; redrawn as the first step of its plan |
-| password-reset (candidate) | a link on sign-in, two signed-out screens (request, set new password) | the signed-out layout | **no** |
-| delivery-log-storage (candidate) | the *Delivery log* box of **Outbound › Log › message**, filled from a table instead of a grep of today's `mail.log` | `log_pane`, unchanged | `out-message` |
-| csrf-tokens | no screen; every form gains a hidden field — forms are rendered through one helper so the token cannot be forgotten | — | n/a |
-| template-data-typing | no screen; the component partials are the natural first users of typed data | — | n/a |
-| structured-logging, contributing, review follow-ups | none | — | n/a |
+Drawn and not built (`deferredScreens` in the guard tests):
+
+| Screen | Item | State |
+|---|---|---|
+| `in-queue` | [queue-table](../roadmap.md#queue-table): the queue as a table from `postqueue -j`, and an Inbound › Queue | undecided; Outbound › Queue shows postqueue's listing in a log pane (`outlineExempt`) |
+| `in-quarantine`, `in-quarantine-message` | inbound-quarantine, an idea off the roadmap ([its notes](inbound-quarantine.md)) | its open questions stay open; the mockup assumes SelfPost-held mail, release to upstream, 14 days, delegated like the rest of Inbound |
+| `preflight` | preflight as a page of its own, dropped 2026-10-13 ([roadmap](../roadmap.md#dropped-with-the-condition-for-return)); its checks went to Server › Health, the test e-mail to its own form | a leftover of a dropped item |
 
 The sibling strip under the navbar holds five or six entries per group without
 wrapping; Inbound would reach five (Domains · Log · Queue · Quarantine ·
 Filter lists), Server six. Past that a group is split rather than squeezed.
-
-Ordering with 2.0 (owner, 2026-10-09: feature order is not fixed, take
-whatever suits development): **the redesign ships first as `2.0.0`**, and
-inbound-antispam-panel follows as `2.1.0`, built from the component kit on
-the 2.0 baseline. The other way round would have styled two screens twice and
-written a 1.x migration only to dissolve it into the baseline. The antispam
-back end (journal milter, log tailer, list CRUD, rspamd map sync) touches
-nothing under `internal/web/view` and may be built alongside stages 0–1 below
-if time allows; its two screens wait for the kit.
 
 ## Three layers
 
@@ -485,60 +471,3 @@ reviewed.
 - Dark scheme and the narrow-screen shell: Bulma ships both; they are drawn
   and agreed as a `design:` change before anyone implements them.
 - Weakening CSP; a JS bundler; a front-end framework.
-
-## Implementation checklist
-Roadmap status: **agreed** (owner, 2026-10-09). Stages are ordered for
-development, not by feature priority (owner, 2026-10-09). Stage 1 touches no
-file under `internal/web/view` and may run alongside stage 0; stage 2 starts
-only when both are done. Every stage-2 step ends with the evidence of
-§ Evidence for "done".
-
-**Decided**
-
-- [x] Owner decision recorded here: keep today's paths or rename with redirects — **owner** (2026-09-21: rename, § Routes)
-- [x] Owner decision: no compatibility, migrations to zero, `2.0.0` — **owner** (2026-09-21, § No compatibility)
-- [x] Owner decision: inbound is delegated per user, separately from outbound — **owner** (2026-09-21, § Who sees what)
-- [x] Owner decision: the redesign ships before inbound-antispam-panel; feature order follows development convenience — **owner** (2026-10-09, § Room for roadmap items)
-- [x] Decision inside 2.0: **Server › Health** is built with the restyle (the tables that leave Overview need a home, § Routes); **queue as a table** and the **inbound queue** stay roadmap decisions — both queue pages ship old content in the new shell, the Inbound › Queue entry hidden — (2026-10-09)
-
-**Stage 0 — foundation and component kit** (§ Component kit)
-
-- [x] Vendor Bulma 1.0.4 and the icon subset (MIT) under `/static`, NOTICE and development.md rows, pinned checksum — **Haiku**
-- [x] Guard tests from § Enforcement and `TestRoutesFollowNavigation`, red against today's panel where expected, with the `legacyPages` ratchet listing every page; `design-first` CI step including the ratchet and the history-blob check (§ Against resurrected pages) — **Opus**
-- [x] `panel.css` from `panel/theme.css` + `shared/brand.css`; `components.html` partials with typed inputs in `components.go`; `status_tag`, `copy_field`, `wbr_at` — **Sonnet**
-- [x] `layout.html`: navbar, perforated edge, sibling strip, user menu, footer, visibility flags; the signed-out shell — **Sonnet**
-- [x] `GET /server/components` behind the global role rendering every partial from fixtures; kit acceptance (§ Component kit) with evidence — **Sonnet**, reviewed by **Opus**
-
-**Stage 1 — data and routes** (no template work; parallel with stage 0)
-
-- [x] Schema from zero: single `0001_init.sql` baseline with `users.email`, `user_inbound_domains`, the two `all_*` flags; store tests; `schema-migrations.md` rewritten — **Opus**
-- [x] Inbound delegation: `requireInboundDomain`, lists and log filtered in the query, two-list user form data, per-route 404 tests for both roles including another tenant's id — **Opus**
-- [x] Routes renamed per § Routes: new paths, one fragment name, old paths removed, subtree `requireGlobal()` for `/server/`; links in the old templates retargeted so the panel works on every commit — **Opus**
-- [x] The application form as one POST; `out-app-created` as the response with `Cache-Control: no-store` — **Opus**
-- [x] Server › Health route and handler (tables and *Reload configuration* from `/status`); Overview handler reduced to verdicts — **Opus**
-
-**Stage 2 — pages, in groups** (each step: partial calls only, page off the ratchet list, evidence pairs)
-
-- [x] Signed-out pages: login, setup — **Sonnet**
-- [x] Overview, Health, and the Account / Settings split — **Sonnet**
-- [x] Outbound: domains, domain, domain settings, application form, shown-once password, delete — **Sonnet**
-- [x] Outbound: log, message, DMARC hub / domain / report — **Sonnet**
-- [x] Inbound: domains, domain with the *Spam filter* box, delete — **Sonnet**
-- [x] Server: system log, backup, users, user form, delete; Help as `help_topic` partials, the drawer removed — **Sonnet**
-- [x] Queues: old content inside the new shell (outbound), Inbound › Queue hidden — **Sonnet**
-- [x] Remove the old `panel.css`, the drawer code in `panel.js` and every class nothing references; `legacyPages` empty, vocabulary test green with no allow-list — **Sonnet**
-
-**Stage 3 — reviews, docs, 2.0.0**
-
-- [x] Technical review of the whole against the mockups, evidence pairs complete — **Opus**
-- [x] Security review of the route rename, subtree authorization and inbound delegation — **Fable**
-- [x] guide.md screenshots and wording for the new navigation; architecture.md § Panel HTTP surface and § Persistence; security.md roles; *Removed* in the CHANGELOG with one line that 2.0 starts from an empty data directory; strike the three UI rows of review-2026-08-followups that the redesign retires — **Sonnet**
-- [x] `go vet`, `go test ./...`, e2e suite; version cut `2.0.0` — **Haiku**
-
-**After 2.0** — features land in the kit, each from its own plan, mockup first
-(§ Room for roadmap items): inbound-antispam-panel `2.1.0`; then, in whatever
-order suits development, preflight, delivery-log-storage, panel-notifications,
-password-reset (two screens to draw first), queue as a table with the inbound
-queue, csrf-tokens
-(one hidden field in the form partial once security.md is settled).
-inbound-quarantine is an idea outside the roadmap.

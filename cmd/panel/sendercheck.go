@@ -24,7 +24,7 @@ const aliveEvery = 2 * time.Second
 // try again later"), so while this role is not serving, mail is deferred:
 // what that costs is counted here and
 // by the log tailer, and shown on Server > Health
-// (docs/plans/from-header-binding.md § Statistics).
+// (docs/architecture.md § Sender check).
 func serveSenderCheck(ctx context.Context, cfg config, st *store.Store) error {
 	ln, err := listenMilter(cfg.senderSocket)
 	if err != nil {

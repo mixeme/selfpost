@@ -426,7 +426,7 @@ postconf -e \
 # deferred (docs/security.md).
 #
 # The panel's DKIM signer follows, strict too: unreachable, it defers rather
-# than send unsigned (docs/plans/panel-dkim-signing.md). It signs with the
+# than send unsigned (docs/architecture.md § DKIM signing). It signs with the
 # key of the login's domain. The journal-milter is monitoring only and is
 # fail-open (default_action=accept): its failure must never block the relay.
 # Per-milter settings use Postfix 3.0+ brace syntax.
@@ -756,7 +756,7 @@ if [ "${INBOUND_RELAY_ENABLE}" = "true" ] || [ "${DMARC_REPORTS_ENABLE}" = "true
 	# only here (above), so no client is spared. The submission ports take
 	# the default, normalize as well since this Postfix: an application whose
 	# SMTP library ends DATA with a bare <LF>.<LF> is no longer read to its
-	# end there (own-mta-builds, § 5: their smuggled transaction would still
+	# end there (docs/security.md § Mail path: their smuggled transaction would still
 	# be the authenticated session's, so they were left to the default).
 	postconf -P \
 		"smtp/inet/smtpd_forbid_bare_newline=normalize" \

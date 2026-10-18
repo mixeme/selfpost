@@ -340,9 +340,9 @@ type Usage struct {
 // counts for every entry of the deciding list that fits it: the journal does
 // not say which of two fitting entries the filter met first.
 //
-// A counter kept with each entry would not depend on the journal; the plan
-// (docs/plans/inbound-antispam-panel.md, Filter list usage) says when that is
-// worth a migration.
+// A counter kept with each entry would not depend on the journal;
+// docs/architecture.md (the antispam filter lists) says when that is worth a
+// migration.
 func (l *Lists) Usage() (map[int64]Usage, error) {
 	entries, err := l.store.ListSpamListEntries()
 	if err != nil {

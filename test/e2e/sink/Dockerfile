@@ -4,7 +4,7 @@
 # the panel's signer added) straight off disk. smtp-sink ships in the postfix
 # package itself. python3-dkim (dkimpy 1.1.8-2 in trixie, /usr/bin/dkimverify)
 # is the independent DKIM verifier the suite holds the panel's signer to
-# (docs/plans/panel-dkim-signing.md); it looks the keys up through the
+# (docs/architecture.md § DKIM signing); it looks the keys up through the
 # stand's CoreDNS (compose.override.yml, sink's dns).
 FROM debian:trixie-slim
 

@@ -1,6 +1,6 @@
 package milter
 
-// The DKIM signer (docs/plans/panel-dkim-signing.md): the panel's own milter
+// The DKIM signer (docs/architecture.md § DKIM signing): the panel's own milter
 // that signs what applications send on 465/587 with the key of the domain
 // their login belongs to, and what the panel itself sends with the key of
 // the server's name. Each of the two is a socket of its own, so the socket a

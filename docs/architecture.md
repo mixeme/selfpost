@@ -177,9 +177,15 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   off the journal on each view of Filter lists - the rows a list decided (the
   deny rule's reply, the allow rule's symbol, which the journal milter keeps
   ahead of its six-symbol cap) matched against the entries as rspamd matches
-  them. When that stops being good enough is written in
-  [plans/inbound-antispam-panel.md](plans/inbound-antispam-panel.md) § Filter
-  list usage.
+  them. So a count reaches back as far as the journal does, a row counts for
+  every fitting entry of the deciding list, and a count is of messages,
+  roughly. A counter kept with each entry (hits and last hit on
+  `inbound_spam_list`, a migration) is worth it when any one of these holds
+  (owner, 2026-10-12): the journal is cut by its 10 000-row cap rather than by
+  age (the tailer's prune keeps removing rows while the oldest row of
+  Inbound › Log is younger than the retention); the retention is set short,
+  towards its 7 days; counts are wanted that outlive the journal; or the page
+  is slow - past a few hundred entries, measure it.
   **Inbound relay** (`INBOUND_RELAY_ENABLE=true`): accepts only
   `relay_domains` + `relay_recipient_maps` (`reject_unauth_destination`,
   `reject_unlisted_recipient`). Maps under `/data/postfix/` (`relay_domains`,
@@ -235,8 +241,7 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
 The panel signs outgoing mail itself, in a role of its own, `dkim-signer`
 ([cmd/panel/signer.go](../cmd/panel/signer.go),
 [internal/milter/sign.go](../internal/milter/sign.go)), since `2.8.0`; until
-then OpenDKIM did, in a program of its own
-([plans/panel-dkim-signing.md](plans/panel-dkim-signing.md)).
+then OpenDKIM did, in a program of its own (CHANGELOG `[2.8.0]`).
 
 - **Keys** — `/data/dkim/keys/<name>/<selector>.private`, PKCS#1 PEM, one
   for each sending domain and one for the server's own name
@@ -353,7 +358,7 @@ milter, § Postfix above, port 25):
    (`300s` / `4000s` / `5d` / `0`) with a muted note on the box.
 2. **sender check** — unix socket `SENDER_CHECK_SOCKET`, first in the chain
    and **strict** (`default_action=tempfail`): § Sender check below.
-3. **DKIM signer** (`2.8.0`, [plans/panel-dkim-signing.md](plans/panel-dkim-signing.md))
+3. **DKIM signer** (`2.8.0`, § DKIM signing)
    — unix sockets `DKIM_SIGN_SOCKET` (applications' mail on 465/587, signed
    with the key of the domain the SASL login belongs to) and
    `DKIM_SIGN_LOCAL_SOCKET` (the panel's own mail, `non_smtpd_milters`,
@@ -397,8 +402,8 @@ generates pass no milter.
 ### Sender check
 
 [internal/milter/sender.go](../internal/milter/sender.go) holds a message's
-`From:` header against the application that sends it
-([plans/from-header-binding.md](plans/from-header-binding.md)). Postfix holds
+`From:` header against the application that sends it (since `2.4.0`;
+`Sender:` too since `2.8.0`). Postfix holds
 the envelope sender against the SASL login, and the signer signs with the key
 of the login's domain (§ DKIM signing): the signature's `d=` is that domain,
 and a receiver holds it to the domain of `From:` (DMARC, RFC 7489 § 3.1.1).
@@ -504,10 +509,15 @@ the hole it closed was the same.
 [internal/notify](../internal/notify/notify.go) reports four things to the
 users of the panel: a sending domain's DNS record that stopped matching, a
 level-2 rate limit that refused mail, the TLS certificate about to expire, a
-message more than three days in the queue. The rules of when a message goes
-out are the owner's and are written in
-[plans/panel-notifications.md](plans/panel-notifications.md) § When a message
-is sent; the operator's view is guide § Notifications.
+message more than three days in the queue. The operator's view is guide
+§ Notifications. When a message goes out is the owner's rule (2026-10-12):
+
+| Subject | Sent | "Cleared" message |
+|---|---|---|
+| DNS mismatch | when it has held for an hour (two checks, below); a resolver that did not answer is not a mismatch | the same way back |
+| Certificate | 14 days before expiry, and 3 days before if it is still the same certificate | none |
+| Level-2 limit refused mail | at the first refusal for a sending domain, then at most once a day for it | none |
+| Queue older than three days | when such a message appears | one, when none is left |
 
 - **Readings.** Once an hour, starting three minutes after the process does:
   every sending domain's records through a DNS checker of the notifier's own,
@@ -1179,7 +1189,7 @@ full backups also archive the operator's `./certs` PEM files when present.
 ### Database
 
 The schema is an embedded baseline, `internal/store/migrations/0001_init.sql`,
-and the migrations after it (`0002` to `0012` today; the next is `0013`),
+and the migrations after it (`0002` to `0014` today; the next is `0015`),
 applied by `store.Open` in file order; `PRAGMA user_version` counts the files
 applied and
 `PRAGMA application_id` is `0x53503230` ("SP20"). There is no 1.x migration
@@ -1198,7 +1208,11 @@ The tables that carry the panel's model:
   the user's own address, edited on Account and set by the global role on the
   user form; `all_domains` / `all_inbound_domains` widen a *domain* user to
   every domain of that direction, including ones added later (with a flag set
-  the assignment rows are ignored).
+  the assignment rows are ignored); `email_confirmed_at` is when `email` was
+  confirmed, `''` while it is not (v13).
+- **`user_links`** — the one-time links that confirm an address and reset a
+  password (v13): the token's SHA-256, `purpose`, the address it went to, its
+  expiry; one live link per user and purpose.
 - **`user_domains`** and **`user_inbound_domains`** — the outbound and inbound
   domains assigned to a *domain* user. Separate tables: the same name on both
   is two assignments, and a sending domain gives no inbound access or the other

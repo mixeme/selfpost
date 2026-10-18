@@ -22,7 +22,7 @@ import (
 
 // The sender check: a message's From: line is held against the application
 // that sends it, under the rule Postfix holds the envelope sender to
-// (docs/plans/from-header-binding.md). The signer signs with the key of the
+// (docs/architecture.md § Sender check). The signer signs with the key of the
 // domain the login belongs to (sign.go), and a receiver holds that signature
 // to the domain of this line (DMARC, RFC 7489 § 3.1.1), so without the check
 // an application could send under the server's signature as another domain

@@ -111,7 +111,7 @@ find /data -mindepth 1 -maxdepth 1 ! -name log ! -name postfix ! -name sasl ! -n
 # serves (cmd/panel/signer.go). Until 2.8.0 the keys were under
 # /data/opendkim, shared with OpenDKIM; 2.8.x copied them to /data/dkim at its
 # first start and kept the old tree for a rollback to 2.7.x until the next
-# release, this one (docs/plans/panel-dkim-signing.md, Q2). It is removed
+# release, this one (CHANGELOG [2.9.0]). It is removed
 # once /data/dkim holds a key. A /data that never ran 2.8.x - keys under the
 # old tree only - stops the start instead: the panel would make the server's
 # own name a new key, and its published record would no longer match; 2.8.x
