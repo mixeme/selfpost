@@ -34,16 +34,16 @@
     <div class="column is-6">
 {{template "box_open" .Outbound}}
 {{template "body_open"}}
-<div class="field"><label class="checkbox"><input type="checkbox" name="all_domains" value="1"{{if .AllOut}} checked{{end}}> <strong>All outbound domains</strong>, including ones added later</label></div>{{range .OutDomains}}
-<div class="field"><label class="checkbox"><input type="checkbox" name="domain_ids" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="all_domains" value="1" data-all-out{{if .AllOut}} checked{{end}}> <strong>All outbound domains</strong>, including ones added later</label></div>{{range .OutDomains}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="domain_ids" value="{{.ID}}" data-single-out{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
 <p class="help">With <em>All</em> ticked the single domains are ignored.</p>
 {{template "body_close"}}
 {{template "box_close"}}
 {{if .ShowInbound}}
 {{template "box_open" .Inbound}}
 {{template "body_open"}}
-<div class="field"><label class="checkbox"><input type="checkbox" name="all_inbound_domains" value="1"{{if .AllIn}} checked{{end}}> <strong>All inbound domains</strong>, including ones added later</label></div>{{range .InDomains}}
-<div class="field"><label class="checkbox"><input type="checkbox" name="inbound_domain_ids" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="all_inbound_domains" value="1" data-all-in{{if .AllIn}} checked{{end}}> <strong>All inbound domains</strong>, including ones added later</label></div>{{range .InDomains}}
+<div class="field"><label class="checkbox"><input type="checkbox" name="inbound_domain_ids" value="{{.ID}}" data-single-in{{if .Checked}} checked{{end}}> {{.Name}}</label></div>{{end}}
 <p class="help">Granted separately from outbound: the same name on both lists is two assignments. The <em>domain</em> role needs at least one domain, or <em>All</em>, on either list.</p>
 {{template "body_close"}}
 {{template "box_close"}}

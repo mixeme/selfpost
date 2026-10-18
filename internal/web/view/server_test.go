@@ -59,6 +59,7 @@ func TestBackupHasBothFormsAndTheEncryptionHooks(t *testing.T) {
 		`name="password"`, `name="password_confirm"`, `minlength="12"`, `placeholder="at least 12 characters"`,
 		`name="file"`, `accept=".json,.spde,application/json"`, `required data-import-file`,
 		`data-import-password-fields`, `name="import_password"`, `<div class="box" id="import">`,
+		`The export itself is made on the <a href="/outbound/domains">domain's settings</a>.`,
 	)
 	pageLacks(t, "Backup", out, `notification`)
 }
@@ -157,8 +158,8 @@ func TestUserFormShowsWhatIsStoredUnderTheHandlersFieldNames(t *testing.T) {
 		`name="password" type="password" autocomplete="new-password">`,
 		`Leave empty to keep the current one.`,
 		`<select id="role" name="role" data-global-role="global">`, `<option value="domain" selected>`, `<option value="global">`,
-		`name="all_domains" value="1" checked`, `name="domain_ids" value="1">`, `name="domain_ids" value="3">`,
-		`name="all_inbound_domains" value="1">`, `name="inbound_domain_ids" value="1">`, `name="inbound_domain_ids" value="2" checked`,
+		`name="all_domains" value="1" data-all-out checked`, `name="domain_ids" value="1" data-single-out>`, `name="domain_ids" value="3" data-single-out>`,
+		`name="all_inbound_domains" value="1" data-all-in>`, `name="inbound_domain_ids" value="1" data-single-in>`, `name="inbound_domain_ids" value="2" data-single-in checked`,
 		`>Save user</button>`, `href="/server/users">Cancel</a>`,
 	)
 	pageLacks(t, "User", out, `name="password" type="password" autocomplete="new-password" required`, `disabled`,
@@ -194,7 +195,11 @@ func TestUserFormOfTheOnlyGlobalUser(t *testing.T) {
 // domains is marked, so panel.js can hide the lists while the role is Global.
 func TestUserFormMarksTheListsTheGlobalRoleHides(t *testing.T) {
 	out := renderSignedIn(t, "user", userFixture())
-	pageHas(t, "User", out, `<select id="role" name="role" data-global-role="global">`)
+	pageHas(t, "User", out, `<select id="role" name="role" data-global-role="global">`,
+		// panel.js disables a list's single domains while its All is ticked
+		// (testdata/alldomains_test.js).
+		`name="all_domains" value="1" data-all-out`, `name="domain_ids" value="`, `data-single-out`,
+		`name="all_inbound_domains" value="1" data-all-in`, `data-single-in`)
 	if n := strings.Count(out, `<div class="box" data-domain-pick>`); n != 2 {
 		t.Errorf("%d boxes are marked data-domain-pick, want the outbound and the inbound list", n)
 	}

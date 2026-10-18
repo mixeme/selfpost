@@ -190,6 +190,24 @@
       target: "[data-domain-pick]",
       visible: function (el) { return el.value !== el.dataset.globalRole; }
     },
+    // The user form: with "All outbound domains" (or inbound) ticked the
+    // single domains of that list are ignored, and are shown disabled as the
+    // mockup user.html draws them. A disabled box is not submitted (HTML
+    // Living Standard, form-control-infrastructure.html#constructing-entry-list),
+    // which changes nothing: the server ignores them with All. Without this
+    // script they stay clickable, and the help line says they are ignored.
+    {
+      match: "input[data-all-out]",
+      target: "input[data-single-out]",
+      visible: function (el) { return !el.checked; },
+      disable: true
+    },
+    {
+      match: "input[data-all-in]",
+      target: "input[data-single-in]",
+      visible: function (el) { return !el.checked; },
+      disable: true
+    },
     {
       match: "input[data-encrypt-toggle]",
       target: "[data-encrypt-fields]",
@@ -222,6 +240,10 @@
       // A block can be several elements (the user form's two lists of domains).
       var show = rule.visible(control);
       form.querySelectorAll(rule.target).forEach(function (target) {
+        if (rule.disable) {
+          target.disabled = !show;
+          return;
+        }
         // hidden alone does not hide an element whose own stylesheet gives it a
         // display (Bulma's .box), so Bulma's is-hidden helper goes with it.
         // HTML Living Standard, rendering.html#hidden-elements: [hidden] is

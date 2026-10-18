@@ -431,7 +431,7 @@ func TestUserFormAssignsBothDirections(t *testing.T) {
 	body := send(h.HandleUserEdit, &root, "GET", "/server/users/"+idStr(other.ID), map[string]string{"uid": idStr(other.ID)}, nil).Body.String()
 	for _, want := range []string{
 		`name="all_domains"`, `name="all_inbound_domains"`, "out.example.com",
-		`name="inbound_domain_ids" value="` + idStr(in.ID) + `" checked`,
+		`name="inbound_domain_ids" value="` + idStr(in.ID) + `" data-single-in checked`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the user form is missing %q", want)

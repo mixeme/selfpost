@@ -31,6 +31,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   must be named in `docs/roadmap.md`. The two queues had been deferred on
   2026-10-09 with no roadmap row and were forgotten; development.md says so.
 
+### Fixed
+
+Two gaps a comparison of every mockup with the panel found (the rest
+matches):
+
+- **Server › Users, the user form:** with *All outbound domains* (or *All
+  inbound domains*) ticked, that list's single domains are disabled, as the
+  mockup draws them - the server ignored them already, which the help line
+  says. panel.js does it; without scripts they stay clickable.
+- **Server › Backup, Import a domain:** "the domain's settings" links to
+  Outbound › Domains, where each domain's settings are, as the mockup's link
+  does.
+
 ## [2.15.0] - 2026-10-18
 
 The two proposals the security audit left as product choices. Migration
