@@ -128,6 +128,18 @@
               <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=spf1 a -all"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
             <p class="help">Notifications are sent without it, and a receiver may file them as spam.</p>
           </div>
+
+          <div class="sp-record">
+            <div class="sp-record-head"><h3>DMARC</h3><span class="tag is-warning is-light">missing</span><small>For the server's own name, not for your domains</small></div>
+            <div class="sp-row">
+              <div class="field"><label class="label">Host / name</label>
+                <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="_dmarc.mail.example.org"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+              <div class="field"><label class="label">Type</label><div class="control"><input class="input" readonly value="TXT"></div></div>
+            </div>
+            <div class="field"><label class="label">Value to publish</label>
+              <div class="field has-addons"><div class="control is-expanded"><input class="input" readonly value="v=DMARC1; p=reject"></div><div class="control"><button type="button" class="button"><i class="ti ti-copy"></i>Copy</button></div></div></div>
+            <p class="help">Without it a receiver does not refuse mail forged in the server's name - a false password-reset message included. Only the panel sends as this name, signed, so reject is safe.</p>
+          </div>
         </div>
 
         <div class="box" id="rate-limits">
