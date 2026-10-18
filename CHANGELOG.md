@@ -10,8 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **Machine requirements by what is switched on** (guide § Installation,
   README § Requirements), measured on the test installation instead of the
   old unmeasured "1 vCPU, 512 MB-1 GB, 8-10 GB": 512 MB of host memory for
-  outbound mail with or without port 25, 1 GB with the spam filter; one
-  vCPU. Building the image needs 1.5 GB of memory - a build held to 1 GB was
+  outbound mail with or without port 25; with the spam filter 768 MB when
+  port-25 messages are kept small and 1 GB for several 25 MiB messages at
+  once (rspamd measured at 118 MB at rest, 232 MB on one 25 MiB message,
+  424 MB on three); the proxy containers' own; one vCPU. Building the image needs 1.5 GB of memory - a build held to 1 GB was
   killed in the Go compiler - and about 3 GB of free disk. The send log
   grows about 2-3 KB a message for its retention.
 

@@ -67,8 +67,12 @@ missing PTR record for you. Details: [Operator guide](docs/guide.md).
 
   | Switched on | Host memory, at least | Images on disk |
   |---|---|---|
-  | Outbound only (465/587), or with port 25 (inbound relay, DMARC reports) | 512 MB | 315 MB |
-  | With the spam filter (rspamd sidecar) | 1 GB | 626 MB |
+  | Outbound only (465/587), with or without port 25 (inbound relay, DMARC reports) | 512 MB | 315 MB |
+  | With the spam filter (rspamd sidecar), port-25 messages kept small | 768 MB | 626 MB |
+  | With the spam filter and 25 MiB messages, several at once | 1 GB | 626 MB |
+
+  rspamd takes about 100 MB more for each large message it scans; a reverse
+  proxy in a container adds its own few megabytes.
 
   One vCPU is enough. **Building the image needs 1.5 GB of memory and about
   3 GB of free disk** (the Go compiler: a 1 GB build was killed) - on a

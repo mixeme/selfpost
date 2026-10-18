@@ -59,30 +59,51 @@ changed (see the CHANGELOG, *Removed*).
 
 ### Machine requirements
 
-What SelfPost needs of the host depends on what is switched on. The figures
-were measured on the test installation on 2026-10-19 - SelfPost 2.16.0 with
-the inbound relay and the spam filter on, a host of 2 vCPU and 4 GB - and,
-for the build, in a container held to a given memory and one CPU. What is
-worked out from them rather than measured says so.
+What SelfPost needs of the host depends on what is switched on. The options
+that change it are independent of each other: port 587 costs nothing until a
+client uses it; port 25 is one listener whether the inbound relay, DMARC
+reports or both open it; the spam filter is a second container, which
+needs port 25 (an rspamd elsewhere, given by `INBOUND_ANTISPAM_MILTER`,
+costs this host nothing); and the reverse proxy is either a program on the
+host or one of the containers under `deploy/`. The figures were measured on
+the test installation on 2026-10-19 - SelfPost 2.16.0, a host of 2 vCPU and
+4 GB - at rest, under load made for the purpose (SMTP sessions to port 25
+held open; messages given to rspamd to scan, nothing delivered), and, for
+the build, in a container held to a given memory and one CPU.
 
-**Running**
+**Running.** What each part uses, measured:
 
-| Switched on | What it uses (measured) | Host memory, at least | Images on disk |
-|---|---|---|---|
-| Outbound only: 465, and 587 if enabled | 55 MB at rest, 80 MB the most seen: the panel about 30 MB, supervisord 30 MB, Postfix's daemons 6-12 MB each, most of that shared libraries | 512 MB | 315 MB, the SelfPost image |
-| Port 25: the inbound relay and/or DMARC reports | the same at rest; each SMTP connection being served is one more Postfix `smtpd`, of the size of its resident siblings (6 MB, mostly shared) | 512 MB | the same |
-| The spam filter: the rspamd sidecar, `deploy/antispam/` | 120 MB more, rspamd's five processes | 1 GB | 311 MB more, the rspamd image |
+| Part | At rest | Under load |
+|---|---|---|
+| SelfPost: the panel, Postfix, supervisord | 55-60 MB (the panel and supervisord about 30 MB each, Postfix's daemons 6-12 MB each, mostly shared libraries) | 123 MB with 20 SMTP sessions open at once - about 3 MB a session |
+| The spam filter: rspamd, five processes | 118 MB | 153 MB scanning ten 100 KB messages at once; 232 MB scanning one 25 MiB message; 424 MB scanning three of them at once |
+| A reverse-proxy container from `deploy/` | Caddy 10 MB, nginx 3 MB, Traefik 21 MB | not measured |
 
-The host's own system and Docker come on top of what SelfPost uses, and
-are what the third column leaves room for. Docker's daemon grows with the
-images and the build cache it keeps: on the test server, after a week of
-builds for three projects, `dockerd` held 600 MB - prune what you do not
-need (below).
+rspamd sees only mail on port 25, and a message there may be as large as
+`INBOUND_MESSAGE_SIZE_LIMIT` (25 MiB by default): each such message rspamd
+is scanning adds about 100 MB while it does. That, not SelfPost, is what
+sets the memory a host with the spam filter needs.
+
+The host's own system and Docker come on top. They were not measured on a
+fresh host, and the table below allows them 300 MB; on the test server
+`systemd-journald` and `containerd` took about 120 MB, and Docker's daemon
+had grown to 600 MB after a week of image builds for three projects - prune
+the build cache (below) and it stays smaller.
+
+| Switched on | Host memory, at least | Images on disk |
+|---|---|---|
+| Outbound only (465, and 587 if enabled), with or without port 25 | **512 MB**: SelfPost's 123 MB under load and the allowance | 315 MB |
+| With the spam filter, messages on port 25 kept small (`INBOUND_MESSAGE_SIZE_LIMIT` of a few MiB) or rarely large | **768 MB**: 123 + 153 MB under load and the allowance, with room for one large message (+100 MB) | 626 MB |
+| With the spam filter and the default 25 MiB, several large messages at once | **1 GB**: 123 + 424 MB and the allowance | 626 MB |
+| A reverse proxy as a container | the proxy's own (3-21 MB at rest) on top | Caddy 92 MB, nginx 280 MB, Traefik 231 MB |
+
+512 MB is not enough with the spam filter: at rest SelfPost, rspamd and the
+allowance come to about 480 MB, and one large message is another 100 MB.
+Without swap the kernel then kills a process - the panel, Postfix or rspamd.
 
 One vCPU is enough to run it: at rest SelfPost and rspamd use under 0.1 % of
-a CPU. The
-image is built and run on `amd64` and `arm64`; rspamd's image is published
-for both.
+a CPU. The image is built and run on `amd64` and `arm64`; rspamd's image is
+published for both.
 
 **Building the image.** As long as no 2.x image is published (see [Fixed
 image tag](#fixed-image-tag)), every installation builds its own, and the
