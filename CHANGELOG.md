@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **A DMARC record for the server's own name** (server-dmarc-hint; the
+  security audit's S3): Server › Settings › Notification mail gives
+  `v=DMARC1; p=reject` at `_dmarc.<hostname>` beside the DKIM and SPF
+  records, checks it, and Health's card shows it. Without one a receiver
+  does not refuse mail forged in the server's name, a false password-reset
+  message among it; `p=none` is shown as weak.
+
 ## [2.14.5] - 2026-10-18
 
 A line less in the mail log. No migration; schema 13.

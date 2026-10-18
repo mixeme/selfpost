@@ -105,6 +105,32 @@ func (c *Checker) checkDMARC(ctx context.Context, q Query) Result {
 	return Result{Status: health.StatusOK, Detail: detail, Records: records}
 }
 
+// checkServerDMARC checks the DMARC record of the server's own name. It is a
+// sending domain's check held to more: a record missing is an error, as a
+// missing DKIM or SPF record of this name is, and p=none, which refuses
+// nothing, a warning - either leaves forged mail in the server's name
+// deliverable, and that name sends nothing a stricter policy could hurt
+// (ServerMailDMARC). quarantine is as good as reject here.
+func (c *Checker) checkServerDMARC(ctx context.Context, name string) Result {
+	r := c.checkDMARC(ctx, Query{Name: name})
+	recordName := DMARCRecordName(name)
+	switch {
+	case r.Status == health.StatusWarn && len(r.Records) == 0:
+		// Missing, as a missing DKIM or SPF record of this name is: the page
+		// draws it as a warning all the same (notifications still go).
+		r.Status = health.StatusError
+		r.Detail = fmt.Sprintf("No DMARC record at %s. Publish the TXT record %q - without it a receiver does not refuse mail forged in this server's name.", recordName, ServerMailDMARC)
+	case r.Status == health.StatusOK:
+		if policy, _ := tagValue(r.Records[0], "p"); strings.EqualFold(policy, "none") {
+			r.Status = health.StatusWarn
+			r.Detail = fmt.Sprintf("Published with p=none, which refuses nothing: mail forged in this server's name is still delivered. Publish %q - only the panel sends as this name, signed.", ServerMailDMARC)
+		} else {
+			r.Detail = fmt.Sprintf("Published with policy p=%s.", policy)
+		}
+	}
+	return r
+}
+
 // checkReportAuth verifies the hub domain publishes _report._dmarc for external
 // aggregate-report destinations. Missing authorisation does not affect outbound
 // delivery, only whether reports reach the rua= mailbox.

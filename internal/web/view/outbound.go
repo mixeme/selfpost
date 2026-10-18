@@ -213,6 +213,21 @@ func ServerMailSPF(host, value string, c DNSCheck) Record {
 	return r
 }
 
+// ServerMailDMARC is the DMARC record of the server's own name
+// (server-dmarc-hint). While it is not in place the note under the value says
+// what it is for and why its strict policy is safe.
+func ServerMailDMARC(host, value string, c DNSCheck) Record {
+	r := Record{Name: "DMARC", Note: Plain("For the server's own name, not for your domains"),
+		Host: host, Type: "TXT", Value: value}
+	var standing Text
+	if c.Status != "ok" {
+		standing = Plain("Without it a receiver does not refuse mail forged in the server's name - a false password-reset message included. Only the panel sends as this name, signed, so reject is safe.")
+	}
+	applyCheck(&r, c, standing, nil)
+	r.Status = mailTag(c)
+	return r
+}
+
 // DMARCRecordInput is what a DMARC record needs besides its check: where the
 // reports go in words (Source: the address, or "no reports") and the page that changes it,
 // the page of the reports themselves ("" when the panel has none), and whether

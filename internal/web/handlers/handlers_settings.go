@@ -170,11 +170,17 @@ func (h *Handlers) serverMail(force bool) serverMailState {
 	spfOf := func(c view.DNSCheck) (view.Record, view.MailRow) {
 		return view.ServerMailSPF(host, dnscheck.ServerMailSPF, c), view.NewMailRow("SPF", host, c)
 	}
+	dmarcHost := dnscheck.DMARCRecordName(host)
+	dmarcOf := func(c view.DNSCheck) (view.Record, view.MailRow) {
+		return view.ServerMailDMARC(dmarcHost, dnscheck.ServerMailDMARC, c), view.NewMailRow("DMARC", dmarcHost, c)
+	}
 	mail, err := h.domains.ServerMail()
 	if err != nil {
 		logf("panel: server mail: %v", err)
-		rec, row := spfOf(view.DNSCheck{Status: string(health.StatusUnknown)})
-		return serverMailState{records: []view.Record{rec}, rows: []view.MailRow{row}, status: string(health.StatusUnknown)}
+		unknown := view.DNSCheck{Status: string(health.StatusUnknown)}
+		rec, row := spfOf(unknown)
+		drec, drow := dmarcOf(unknown)
+		return serverMailState{records: []view.Record{rec, drec}, rows: []view.MailRow{row, drow}, status: string(health.StatusUnknown)}
 	}
 	srv := h.dns.Server(host, false)
 	check := h.dns.ServerMail(dnscheck.Query{
@@ -183,13 +189,14 @@ func (h *Handlers) serverMail(force bool) serverMailState {
 	}, force)
 	dkim := dnsCheck(check.DKIM)
 	spfRec, spfRow := spfOf(dnsCheck(check.SPF))
+	dmarcRec, dmarcRow := dmarcOf(dnsCheck(check.DMARC))
 	status := check.Overall
 	if status == health.StatusError {
 		status = health.StatusWarn
 	}
 	return serverMailState{
-		records: []view.Record{view.ServerMailDKIM(mail.Selector, mail.Record.Name, mail.Record.Value, dkim), spfRec},
-		rows:    []view.MailRow{view.NewMailRow("DKIM", mail.Record.Name, dkim), spfRow},
+		records: []view.Record{view.ServerMailDKIM(mail.Selector, mail.Record.Name, mail.Record.Value, dkim), spfRec, dmarcRec},
+		rows:    []view.MailRow{view.NewMailRow("DKIM", mail.Record.Name, dkim), spfRow, dmarcRow},
 		status:  string(status),
 		checked: check.CheckedAt,
 	}

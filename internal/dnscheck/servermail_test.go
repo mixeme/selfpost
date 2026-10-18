@@ -27,14 +27,15 @@ func TestServerMailPublished(t *testing.T) {
 		txt: map[string][]string{
 			"sp._domainkey.mail.example.org": {serverDKIM},
 			"mail.example.org":               {ServerMailSPF},
+			"_dmarc.mail.example.org":        {ServerMailDMARC},
 		},
 		addr: map[string][]net.IPAddr{"mail.example.org": ipAddrs("203.0.113.25")},
 	}
 	c := newTestChecker(f)
 
 	m := c.ServerMail(serverMailQuery(), false)
-	if m.DKIM.Status != health.StatusOK || m.SPF.Status != health.StatusOK || m.Overall != health.StatusOK {
-		t.Fatalf("DKIM %s (%s), SPF %s (%s), overall %s", m.DKIM.Status, m.DKIM.Detail, m.SPF.Status, m.SPF.Detail, m.Overall)
+	if m.DKIM.Status != health.StatusOK || m.SPF.Status != health.StatusOK || m.DMARC.Status != health.StatusOK || m.Overall != health.StatusOK {
+		t.Fatalf("DKIM %s (%s), SPF %s (%s), DMARC %s (%s), overall %s", m.DKIM.Status, m.DKIM.Detail, m.SPF.Status, m.SPF.Detail, m.DMARC.Status, m.DMARC.Detail, m.Overall)
 	}
 
 	// Cached like a domain, and re-read when forced.
@@ -100,5 +101,30 @@ func TestSPFLookupThatDidNotAnswerIsNotAMismatch(t *testing.T) {
 	f.fail = nil
 	if got := c.ServerMail(q, true).SPF; got.Status != health.StatusError {
 		t.Errorf("the name does not exist: SPF is %s (%s), want an error", got.Status, got.Detail)
+	}
+}
+
+// The server's own name's DMARC record (server-dmarc-hint): missing is an
+// error and p=none a warning, each naming the record to publish; quarantine or
+// reject is ok.
+func TestServerMailDMARC(t *testing.T) {
+	for _, c := range []struct {
+		name, record string
+		want         health.Status
+		says         string
+	}{
+		{"missing", "", health.StatusError, `Publish the TXT record "v=DMARC1; p=reject"`},
+		{"p=none", "v=DMARC1; p=none; rua=mailto:x@example.org", health.StatusWarn, "refuses nothing"},
+		{"p=quarantine", "v=DMARC1; p=quarantine", health.StatusOK, "p=quarantine"},
+		{"p=reject", ServerMailDMARC, health.StatusOK, "p=reject"},
+	} {
+		f := &fakeResolver{txt: map[string][]string{}}
+		if c.record != "" {
+			f.txt["_dmarc.mail.example.org"] = []string{c.record}
+		}
+		m := newTestChecker(f).ServerMail(serverMailQuery(), false)
+		if m.DMARC.Status != c.want || !strings.Contains(m.DMARC.Detail, c.says) {
+			t.Errorf("%s: %s (%s), want %s saying %q", c.name, m.DMARC.Status, m.DMARC.Detail, c.want, c.says)
+		}
 	}
 }

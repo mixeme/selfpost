@@ -139,6 +139,7 @@ func healthFixture(refresh bool) *Health {
 	h.WithNotificationMail("postmaster@mail.example.org", []MailRow{
 		NewMailRow("DKIM", mailFixtureDKIMHost, DNSCheck{Status: "ok"}),
 		NewMailRow("SPF", "mail.example.org", DNSCheck{Status: "error"}),
+		NewMailRow("DMARC", "_dmarc.mail.example.org", DNSCheck{Status: "warn"}),
 	}, "warn")
 	return h
 }
@@ -171,6 +172,7 @@ func settingsFixture() *Settings {
 		WithMail([]Record{
 			ServerMailDKIM("sp2026", mailFixtureDKIMHost, key, DNSCheck{Status: "ok"}),
 			ServerMailSPF("mail.example.org", "v=spf1 a -all", DNSCheck{Status: "error", Detail: "No SPF record is published for mail.example.org."}),
+			ServerMailDMARC("_dmarc.mail.example.org", "v=DMARC1; p=reject", DNSCheck{Status: "warn", Detail: "No DMARC record at _dmarc.mail.example.org."}),
 		}, "3 min ago").
 		WithTimeZone("Europe/Moscow", msk, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC))
 }

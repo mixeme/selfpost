@@ -679,18 +679,24 @@ the Outbound log and count against no rate limit. They name the page of the
 panel to open and carry no link: the panel does not know the address its
 reverse proxy serves it under.
 
-**Two DNS records make them arrive.** The server's own name is not one of your
+**Three DNS records make them arrive.** The server's own name is not one of your
 sending domains, so it needs records of its own, shown with the values to
 publish under **Server › Settings › Notification mail**:
 
 - a **DKIM** key for the hostname, which the panel generates and signs
   notifications with (`<selector>._domainkey.<hostname>`, TXT);
-- an **SPF** record for the hostname: `v=spf1 a -all` (TXT).
+- an **SPF** record for the hostname: `v=spf1 a -all` (TXT);
+- a **DMARC** record for the hostname: `v=DMARC1; p=reject` at
+  `_dmarc.<hostname>` (TXT). It has receivers refuse mail forged in the
+  server's name - a false "reset your password" message among it. Only the
+  panel sends as this name, signed with its key, from the address its SPF
+  names, so reject costs nothing; `p=quarantine` is accepted too, `p=none`
+  is shown as weak, since it refuses nothing.
 
 **Server › Health** shows whether each is in place in the *Notification mail*
 card. Without them notifications are still sent, and a receiver may file them
 as spam or, if the parent domain publishes a strict DMARC policy, refuse them.
-Mail of your sending domains depends on neither. If the hostname is itself one
+Mail of your sending domains depends on none of them. If the hostname is itself one
 of your sending domains, the DKIM record is that domain's and is already
 published - and whoever administers that domain can then send mail that
 looks like the panel's; a hostname that is nobody's sending domain is the

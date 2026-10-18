@@ -188,6 +188,7 @@ type Mail struct {
 	Name      string
 	DKIM      Result
 	SPF       Result
+	DMARC     Result
 	Overall   health.Status
 	CheckedAt time.Time
 }
@@ -196,9 +197,17 @@ type Mail struct {
 // address record is the one sender.
 const ServerMailSPF = "v=spf1 a -all"
 
-// ServerMail checks the DKIM and SPF records of the server's own name. q is as
-// for a domain, with Name the hostname. Cached like a domain; force skips the
-// cache.
+// ServerMailDMARC is the DMARC record to publish for the server's own name
+// (server-dmarc-hint; security audit 2026-10-17, S3). Only the panel sends as
+// that name - from postmaster@ it, signed with the name's own key, from the
+// address its SPF names - so every genuine message aligns and reject costs
+// nothing; without a record a receiver does not refuse mail forged in the
+// server's name, a false password-reset message among it.
+const ServerMailDMARC = "v=DMARC1; p=reject"
+
+// ServerMail checks the DKIM, SPF and DMARC records of the server's own name.
+// q is as for a domain, with Name the hostname. Cached like a domain; force
+// skips the cache.
 func (c *Checker) ServerMail(q Query, force bool) Mail {
 	key := "\x00mail\x00" + q.Name
 	if !force {
@@ -214,16 +223,17 @@ func (c *Checker) ServerMail(q Query, force bool) Mail {
 	defer cancel()
 	m := Mail{Name: q.Name, CheckedAt: time.Now()}
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() { defer wg.Done(); m.DKIM = c.checkDKIM(ctx, q) }()
 	go func() { defer wg.Done(); m.SPF = c.checkSPF(ctx, q) }()
+	go func() { defer wg.Done(); m.DMARC = c.checkServerDMARC(ctx, q.Name) }()
 	wg.Wait()
 	// checkSPF words a missing record for a sending domain; for the server's
 	// own name the record to publish is a different one.
 	if m.SPF.Status == health.StatusError && len(m.SPF.Records) == 0 {
 		m.SPF.Detail = fmt.Sprintf("No SPF record is published for %s. Publish the TXT record %q - without it a receiver has nothing authorising this server to send as its own name.", q.Name, ServerMailSPF)
 	}
-	m.Overall = health.Worst(m.DKIM.Status, m.SPF.Status)
+	m.Overall = health.Worst(m.DKIM.Status, m.SPF.Status, m.DMARC.Status)
 
 	c.mu.Lock()
 	c.mail[key] = cached[Mail]{value: m, expires: m.CheckedAt.Add(c.domainTTL)}

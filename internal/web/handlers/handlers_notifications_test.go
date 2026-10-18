@@ -162,10 +162,11 @@ func serverMailStand(t *testing.T) (*Handlers, *fakeZone, domain.ServerMail) {
 	return h, zone, mail
 }
 
-// publishMail puts both records of the server's own name into the zone.
+// publishMail puts the three records of the server's own name into the zone.
 func publishMail(zone *fakeZone, mail domain.ServerMail) {
 	zone.publishTXT(mail.Record.Name, mail.Record.Value)
 	zone.publishTXT(notifyHost, dnscheck.ServerMailSPF)
+	zone.publishTXT(dnscheck.DMARCRecordName(notifyHost), dnscheck.ServerMailDMARC)
 }
 
 // With both records in DNS, Settings gives each with the value to publish and
@@ -182,14 +183,16 @@ func TestSettingsMailRecordsPublished(t *testing.T) {
 		`<h3>SPF</h3><span class="tag is-success is-light">published</span>`,
 		`For the server&#39;s own name, not for your domains`,
 		`value="v=spf1 a -all"`,
+		`<h3>DMARC</h3><span class="tag is-success is-light">published</span>`,
+		`value="_dmarc.mail.example.org"`, `value="v=DMARC1; p=reject"`,
 		`<span class="sp-mono">postmaster@mail.example.org</span>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("settings page is missing %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "may file them as spam") {
-		t.Error("the warning about a missing SPF record is shown while it is published")
+	if strings.Contains(out, "may file them as spam") || strings.Contains(out, "does not refuse mail forged") {
+		t.Error("the note about a missing SPF or DMARC record is shown while it is published")
 	}
 }
 
@@ -203,7 +206,9 @@ func TestSettingsMailRecordsMissing(t *testing.T) {
 	for _, want := range []string{
 		`<h3>DKIM</h3><span class="tag is-warning is-light">missing</span>`,
 		`<h3>SPF</h3><span class="tag is-warning is-light">missing</span>`,
-		`value="sp2026._domainkey.mail.example.org"`, `value="v=spf1 a -all"`,
+		`<h3>DMARC</h3><span class="tag is-warning is-light">missing</span>`,
+		`value="sp2026._domainkey.mail.example.org"`, `value="v=spf1 a -all"`, `value="v=DMARC1; p=reject"`,
+		`Without it a receiver does not refuse mail forged in the server&#39;s name`,
 		`Notifications are sent without it, and a receiver may file them as spam.`,
 		`No TXT record is published at sp2026._domainkey.mail.example.org.`,
 	} {
@@ -259,6 +264,7 @@ func TestHealthNotificationMailCard(t *testing.T) {
 		`id="notification-mail"`, `<h2>Notification mail</h2><div class="sp-end"><span class="tag is-warning is-light">warn</span></div>`,
 		`DKIM<br><span class="sp-muted sp-mono sp-small">sp2026._domainkey.mail.example.org</span></td><td><span class="tag is-success is-light">published</span>`,
 		`SPF<br><span class="sp-muted sp-mono sp-small">mail.example.org</span></td><td><span class="tag is-warning is-light">missing</span>`,
+		`DMARC<br><span class="sp-muted sp-mono sp-small">_dmarc.mail.example.org</span></td><td><span class="tag is-warning is-light">missing</span>`,
 		`Sent from <span class="sp-mono">postmaster@mail.example.org</span>`,
 		`href="/server/settings#notification-mail"`,
 	} {
@@ -296,8 +302,8 @@ func TestHealthNotificationMailCardIsGreenAndPolled(t *testing.T) {
 // the records of the server's own name again as well as for its address.
 func TestHealthRecheckAsksForNotificationMailAgain(t *testing.T) {
 	h, zone, mail := serverMailStand(t)
-	if out := getBody(t, h.HandleHealth, "/server/health"); strings.Count(out, `is-warning is-light">missing`) != 2 {
-		t.Fatalf("before publishing, both records should be missing:\n%s", out)
+	if out := getBody(t, h.HandleHealth, "/server/health"); strings.Count(out, `is-warning is-light">missing`) != 3 {
+		t.Fatalf("before publishing, the three records should be missing:\n%s", out)
 	}
 
 	publishMail(zone, mail)
@@ -309,8 +315,8 @@ func TestHealthRecheckAsksForNotificationMailAgain(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST /server/health/recheck = %d, want 303", rec.Code)
 	}
-	if out := getBody(t, h.HandleHealth, "/server/health"); strings.Count(out, `is-success is-light">published`) != 2 {
-		t.Errorf("after Re-check DNS both records should be published:\n%s", out)
+	if out := getBody(t, h.HandleHealth, "/server/health"); strings.Count(out, `is-success is-light">published`) != 3 {
+		t.Errorf("after Re-check DNS the three records should be published:\n%s", out)
 	}
 }
 
@@ -318,8 +324,8 @@ func TestHealthRecheckAsksForNotificationMailAgain(t *testing.T) {
 // Settings, where a record that has just been published comes back folded.
 func TestSettingsRecheckAsksForNotificationMailAgain(t *testing.T) {
 	h, zone, mail := serverMailStand(t)
-	if out := getBody(t, h.HandleServerSettings, "/server/settings"); strings.Count(out, `is-warning is-light">missing`) != 2 {
-		t.Fatalf("before publishing, both records should be missing:\n%s", out)
+	if out := getBody(t, h.HandleServerSettings, "/server/settings"); strings.Count(out, `is-warning is-light">missing`) != 3 {
+		t.Fatalf("before publishing, the three records should be missing:\n%s", out)
 	}
 
 	publishMail(zone, mail)
@@ -332,8 +338,8 @@ func TestSettingsRecheckAsksForNotificationMailAgain(t *testing.T) {
 		t.Fatalf("POST /server/settings/dns-recheck = %d to %q, want 303 to /server/settings?rechecked=1", rec.Code, rec.Header().Get("Location"))
 	}
 	out := getBody(t, h.HandleServerSettings, "/server/settings?rechecked=1")
-	if n := strings.Count(out, `<details class="sp-record">`); n != 2 {
-		t.Errorf("after Re-check DNS both records should be published and folded, %d are:\n%s", n, out)
+	if n := strings.Count(out, `<details class="sp-record">`); n != 3 {
+		t.Errorf("after Re-check DNS the three records should be published and folded, %d are:\n%s", n, out)
 	}
 	if !strings.Contains(out, "DNS re-checked.") || !strings.Contains(out, "· checked just now") {
 		t.Errorf("Settings does not say the records were just re-checked:\n%s", out)
