@@ -19,6 +19,7 @@ changed (see the CHANGELOG, *Removed*).
 ## Table of contents
 
 - [Installation](#installation)
+  - [Machine requirements](#machine-requirements)
   - [Ports](#ports)
   - [Local trial](#local-trial)
   - [Initial setup](#initial-setup)
@@ -55,6 +56,77 @@ changed (see the CHANGELOG, *Removed*).
   - [Exporting and importing a single domain](#exporting-and-importing-a-single-domain)
 
 ## Installation
+
+### Machine requirements
+
+What SelfPost needs of the host depends on what is switched on. The figures
+were measured on the test installation on 2026-10-19 - SelfPost 2.16.0 with
+the inbound relay and the spam filter on, a host of 2 vCPU and 4 GB - and,
+for the build, in a container held to a given memory and one CPU. What is
+worked out from them rather than measured says so.
+
+**Running**
+
+| Switched on | What it uses (measured) | Host memory, at least | Images on disk |
+|---|---|---|---|
+| Outbound only: 465, and 587 if enabled | 55 MB at rest, 80 MB the most seen: the panel about 30 MB, supervisord 30 MB, Postfix's daemons 6-12 MB each, most of that shared libraries | 512 MB | 315 MB, the SelfPost image |
+| Port 25: the inbound relay and/or DMARC reports | the same at rest; each SMTP connection being served is one more Postfix `smtpd`, of the size of its resident siblings (6 MB, mostly shared) | 512 MB | the same |
+| The spam filter: the rspamd sidecar, `deploy/antispam/` | 120 MB more, rspamd's five processes | 1 GB | 311 MB more, the rspamd image |
+
+The host's own system and Docker come on top of what SelfPost uses, and
+are what the third column leaves room for. Docker's daemon grows with the
+images and the build cache it keeps: on the test server, after a week of
+builds for three projects, `dockerd` held 600 MB - prune what you do not
+need (below).
+
+One vCPU is enough to run it: at rest SelfPost and rspamd use under 0.1 % of
+a CPU. The
+image is built and run on `amd64` and `arm64`; rspamd's image is published
+for both.
+
+**Building the image.** As long as no 2.x image is published (see [Fixed
+image tag](#fixed-image-tag)), every installation builds its own, and the
+build needs more than running does:
+
+- **Memory: 1.5 GB.** The Go compiler is the largest part: the build was
+  killed for want of memory at 1 GB and at 512 MB (on `modernc.org/sqlite`
+  and `modernc.org/libc`) and passed at 1.5 GB - from cold, on one CPU, in
+  4.5 minutes (2.5 on two). On a smaller machine, build the image on
+  another one and bring it over:
+  `docker save ghcr.io/mixeme/selfpost:<tag> | ssh <host> docker load`.
+  Swap would give the compiler room too, but was not tried.
+- **Disk: about 3 GB free while it builds** - the Go image (1.3 GB), the
+  downloaded modules (0.6 GB), the compile step (0.4 GB) and the image
+  (315 MB). Each rebuild leaves another 0.4 GB compile step in Docker's build
+  cache (the test server had gathered 16 GB of them in a week);
+  `docker builder prune` gives it back.
+
+**Data, under `./data`.** What grows, and what bounds it:
+
+- **The send log** - the main driver: a row per recipient, with the
+  `mail.log` lines Postfix wrote about it, about 2-3 KB a message, kept for
+  the send-log retention (90 days by default, Server › Settings). Worked
+  out from that: 1 000 messages a day keep about 250 MB, 10 000 about
+  2.5 GB.
+- **`mail.log`** - today's file and 14 rotated, compressed ones. About
+  750 bytes of log a message before compression, and the noise of scanners
+  on port 25 when it is open (400 KB a day on the test server). Worked out
+  from that: under 20 MB in all at 10 000 messages a day.
+- **The mail queue** (`/data/postfix/queue`) - empty while mail flows. While
+  a receiving server, or an inbound domain's upstream, does not take mail,
+  it holds that mail up to the queue lifetime (5 days by default, [Queue and
+  System log](#queue-and-system-log)): leave room for an outage's worth -
+  on port 25 a message may be up to `INBOUND_MESSAGE_SIZE_LIMIT` (25 MiB).
+  Postfix itself refuses mail with `452 4.3.1 Insufficient system storage`
+  once the free space is under 1.5 times a listener's message size limit
+  (Postfix 3.10.13, `src/smtpd/smtpd_check.c`, `smtpd_check_queue()`).
+- **The inbound log** keeps at most 10 000 rows; DMARC reports, the DKIM
+  keys and the rest of the database are small.
+
+A full backup holds the database, the DKIM keys, the SASL credentials, the
+deployment files and `certs/`, so it is about the size of the send log; `mail.log` and
+the queue are left out of it ([Full backup and
+restore](#full-backup-and-restore)).
 
 ### Ports
 

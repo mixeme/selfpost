@@ -62,9 +62,19 @@ missing PTR record for you. Details: [Operator guide](docs/guide.md).
 
 - Docker + Compose v2 on the host
 - A reverse proxy in front of the panel (SelfPost never terminates HTTPS itself)
-- Rough sizing: **1 vCPU**, **512 MB–1 GB RAM**, **8–10 GB disk** (send log and
-  rotated `mail.log` are the main growth drivers; both sit in the `./data`
-  volume, and both are capped — 90 days and 14 files by default)
+- Machine, by what is switched on (measured; details and disk growth in the
+  guide's [Machine requirements](docs/guide.md#machine-requirements)):
+
+  | Switched on | Host memory, at least | Images on disk |
+  |---|---|---|
+  | Outbound only (465/587), or with port 25 (inbound relay, DMARC reports) | 512 MB | 315 MB |
+  | With the spam filter (rspamd sidecar) | 1 GB | 626 MB |
+
+  One vCPU is enough. **Building the image needs 1.5 GB of memory and about
+  3 GB of free disk** (the Go compiler: a 1 GB build was killed) - on a
+  smaller machine, build elsewhere and `docker load` the image. The send log
+  is what grows: about 2-3 KB a message for the retention (90 days by
+  default) - 10 000 messages a day keep about 2.5 GB.
 
 ### Network and IP
 

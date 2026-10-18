@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Documentation
+
+- **Machine requirements by what is switched on** (guide § Installation,
+  README § Requirements), measured on the test installation instead of the
+  old unmeasured "1 vCPU, 512 MB-1 GB, 8-10 GB": 512 MB of host memory for
+  outbound mail with or without port 25, 1 GB with the spam filter; one
+  vCPU. Building the image needs 1.5 GB of memory - a build held to 1 GB was
+  killed in the Go compiler - and about 3 GB of free disk. The send log
+  grows about 2-3 KB a message for its retention.
+
 ## [2.16.0] - 2026-10-18
 
 The queues as the 2.0 mockups drew them: Outbound › Queue a table, Inbound ›
