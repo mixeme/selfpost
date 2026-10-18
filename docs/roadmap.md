@@ -138,6 +138,16 @@ without that it is not offered again.
   checks went to Server › Health (health-setup-checks, `2.11.0`) and its test
   e-mail to a form of its own (test-email, `2.12.0`). Its plan,
   `plans/preflight.md`, was removed and stays in git history.
+- **A domain administrator's rows in the queues** (decided 2026-10-18:
+  "Пока только Global. Пересмотр по необходимости."). Since `2.16.0` both
+  queues are tables split by the recipient's domain, so the rows of a
+  domain could be shown to the administrator it is assigned to, as the logs
+  are; Outbound › Queue and Inbound › Queue stay the global role's.
+  **Returns if:** the owner asks for it. The work then: the rows filtered by
+  the user's reach in the handler (outbound by the send-log row's domain or
+  the sender's, inbound by the recipient's), the menu entry and the help
+  topic shown to a `domain` user, and the per-route 404 tests turned into
+  reach tests.
 - **csrf-tokens** (decided 2026-10-13) - session-bound tokens on every form.
   Replaced by origin-strict (`2.10.4`); the conditions for building
   tokens after all are in [security.md](security.md), ADR § *CSRF via origin
