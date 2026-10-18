@@ -4,7 +4,7 @@
       <div class="sp-grow">
         <p class="sp-kicker"><a href="in-domains.html">Inbound domains</a> /</p>
         <h1 class="title is-3">lists.example.org</h1>
-        <p class="sp-lead">Accepted on port 25, handed to <span class="sp-mono">mx.internal:25</span> over required TLS · 4 recipients</p>
+        <p class="sp-lead">Accepted on port 25, handed to <span class="sp-mono">mx.internal:25</span> over verified TLS · 4 recipients</p>
       </div>
       <div class="buttons">
         <form method="post" action="#"><button type="submit" class="button"><i class="ti ti-refresh"></i>Re-check DNS</button></form>
@@ -58,7 +58,8 @@
                     <div class="field"><label class="label" for="port">Port</label><div class="control"><input class="input sp-mono" id="port" name="port" inputmode="numeric" value="25" required></div></div>
                   </div>
                   <div class="field"><label class="label" for="tls">TLS to upstream</label>
-                    <div class="control"><div class="select is-fullwidth"><select id="tls" name="tls_mode"><option>Opportunistic</option><option selected>Required</option><option>Off</option></select></div></div></div>
+                    <div class="control"><div class="select is-fullwidth"><select id="tls" name="tls_mode"><option>Opportunistic</option><option>Required</option><option selected>Verified</option><option>Off</option></select></div></div>
+                    <p class="help">Required encrypts the hop without checking who answers. Verified also checks the upstream's certificate: issued by a trusted authority for the host above, which is then given by name.</p></div>
                   <button type="submit" class="button is-primary">Save upstream</button>
                 </form>
               </div>
