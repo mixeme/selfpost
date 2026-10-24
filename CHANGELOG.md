@@ -44,6 +44,11 @@ Docker 29, by the guide, with real Let's Encrypt certificates (2026-10-25).
 
 ### Documentation
 
+- **Machine requirements checked on a fresh host booted with 512 MB, 768 MB
+  and 1 GB** (kernel `mem=`): the system and idle Docker took 146, 253 and
+  291 MB, within the 300 MB the table allows, until now unmeasured; each row
+  holds under its loads, and at 512 MB with the spam filter three 25 MiB
+  messages at once had the kernel kill rspamd, as the guide says.
 - **Installing by the guide, as measured on a fresh host:** step 1 fetches
   the chosen proxy's directory too, and the proxy commands run from the
   project directory (they said `deploy/`); the duplicate `mkdir certs` is

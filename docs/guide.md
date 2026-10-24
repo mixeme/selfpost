@@ -84,11 +84,14 @@ rspamd sees only mail on port 25, and a message there may be as large as
 is scanning adds about 100 MB while it does. That, not SelfPost, is what
 sets the memory a host with the spam filter needs.
 
-The host's own system and Docker come on top. They were not measured on a
-fresh host, and the table below allows them 300 MB; on the test server
-`systemd-journald` and `containerd` took about 120 MB, and Docker's daemon
-had grown to 600 MB after a week of image builds for three projects - prune
-the build cache (below) and it stays smaller.
+The host's own system and Docker come on top, and the table below allows
+them 300 MB. Measured on a fresh Debian 13 host with Docker 29.9.2, booted
+with 512 MB, 768 MB and 1 GB (kernel `mem=`, 2026-10-25): with Docker
+running and nothing started they took 146, 253 and 291 MB - `dockerd` about
+95 MB and `containerd` 55 MB of it, the kernel's own share growing with the
+memory. On the test server, Docker's daemon had grown to 600 MB after a week
+of image builds for three projects - prune the build cache (below) and it
+stays smaller.
 
 | Switched on | Host memory, at least | Images on disk |
 |---|---|---|
@@ -100,6 +103,20 @@ the build cache (below) and it stays smaller.
 512 MB is not enough with the spam filter: at rest SelfPost, rspamd and the
 allowance come to about 480 MB, and one large message is another 100 MB.
 Without swap the kernel then kills a process - the panel, Postfix or rspamd.
+
+Each row was checked on that fresh host booted with that much memory, under
+the same loads, the host's free memory (`MemAvailable`) at its lowest:
+
+| Booted with | Outbound only, 20 TLS sessions on 465 | Spam filter, ten 100 KB messages | one 25 MiB message | three 25 MiB at once |
+|---|---|---|---|---|
+| 512 MB | 195 MB free | 89 MB | 19 MB | the kernel killed rspamd |
+| 768 MB | 307 MB | 194 MB | 135 MB | 7 MB |
+| 1 GB | 514 MB | 385 MB | 343 MB | 200 MB |
+
+The messages were given to rspamd with `rspamc` inside its container, as for
+the table above, with no Docker client running on the host meanwhile; the
+SMTP sessions' client ran on the host and took 20 MB of it, which a real
+client on another machine does not.
 
 One vCPU is enough to run it: at rest SelfPost and rspamd use under 0.1 % of
 a CPU. The image is built and run on `amd64` and `arm64`; rspamd's image is
