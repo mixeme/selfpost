@@ -5,8 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-10-25
+
 Every proxy of `deploy/` set up from scratch on a fresh Debian 13 host with
 Docker 29, by the guide, with real Let's Encrypt certificates (2026-10-25).
+No migration; schema 14.
 
 ### Fixed
 
