@@ -13,6 +13,10 @@ func TestOverviewHeadSentences(t *testing.T) {
 	cert := HealthCard{Name: "TLS certificate", Value: "Expires in 12 days", Href: "/server/health", Level: LevelWarn}
 	cpu := HealthCard{Name: "Machine", Value: "CPU 98 %", Href: "/server/health", Level: LevelWarn}
 	postfix := HealthCard{Name: "Processes", Value: "4 of 5 running", Href: "/server/health", Level: LevelFail}
+	// A value that is a sentence of its own, as the certificate card's is
+	// when it cannot be read (seen on a fresh host behind Caddy, 2026-10-25).
+	unread := HealthCard{Name: "TLS certificate", Value: "Could not read the certificate at /etc/postfix/tls/x.crt.", Href: "/server/health", Level: LevelFail}
+	ptr := HealthCard{Name: "Reverse DNS", Value: "Needs attention", Href: "/server/health", Level: LevelFail}
 	for _, c := range []struct {
 		name        string
 		cards       []HealthCard
@@ -22,6 +26,7 @@ func TestOverviewHeadSentences(t *testing.T) {
 		{"one warning", []HealthCard{ok, cert}, "Mail is flowing. One thing needs attention.", "TLS certificate: expires in 12 days."},
 		{"two warnings", []HealthCard{cert, cpu}, "Mail is flowing. 2 things need attention.", "TLS certificate: expires in 12 days; Machine: CPU 98 %."},
 		{"a failure", []HealthCard{postfix, cert}, "Mail may not be flowing. 2 things need attention.", "Processes: 4 of 5 running; TLS certificate: expires in 12 days."},
+		{"a value with its own stop", []HealthCard{unread, ptr}, "Mail may not be flowing. 2 things need attention.", "TLS certificate: could not read the certificate at /etc/postfix/tls/x.crt; Reverse DNS: needs attention."},
 	} {
 		h := overviewHead("mail.example.org", c.cards, time.Now())
 		if h.Title != c.title {

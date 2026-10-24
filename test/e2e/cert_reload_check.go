@@ -94,3 +94,88 @@ func checkCertRenewalPickedUp(s *stack) error {
 	}
 	return nil
 }
+
+// checkCertArrivingAfterStart starts the container with no certificate in the
+// mount, as a proxy that obtains its own (Caddy, Traefik) leaves it, then puts
+// the pair there and waits for cert-reload to make Postfix's copy and serve
+// it. Until 2.16.1 nothing made the copy: Postfix read the mounted files, the
+// panel - which reads what Postfix serves - could not read a key the proxy
+// keeps root's alone, and Health called the certificate unreadable until a
+// restart (measured on a fresh host, 2026-10-25). The stand's interval of 2 s
+// is also how often cert-reload looks while there is no copy.
+func checkCertArrivingAfterStart(s *stack) error {
+	certs := filepath.Join(s.stageDir, "certs")
+	pair := []string{"fullchain.pem", "privkey.pem"}
+	for _, f := range pair {
+		if err := os.Rename(filepath.Join(certs, f), filepath.Join(s.stageDir, f+".away")); err != nil {
+			return fmt.Errorf("take the certificate out of the mount: %w", err)
+		}
+	}
+	putBack := func() error {
+		for _, f := range pair {
+			if err := os.Rename(filepath.Join(s.stageDir, f+".away"), filepath.Join(certs, f)); err != nil {
+				return fmt.Errorf("put the certificate back: %w", err)
+			}
+		}
+		return nil
+	}
+	// Recreated, not restarted: a restarted container keeps the copy's
+	// folder from its earlier start, and one behind Caddy has none - the
+	// case where cert-reload made it 0700, out of the panel's reach (2.16.1,
+	// before its release).
+	if err := s.recreateSelfpost(); err != nil {
+		_ = putBack()
+		return fmt.Errorf("recreate selfpost: %w", err)
+	}
+	if err := waitFor("Postfix running without a certificate", 60*time.Second, 500*time.Millisecond, func() (bool, error) {
+		out, _ := s.execIn("selfpost", "supervisorctl", "-c", "/etc/supervisor/supervisord.conf", "status")
+		if st := parseSupervisorStatus(out)["postfix"]; st != "RUNNING" {
+			return false, fmt.Errorf("postfix is %q", st)
+		}
+		return true, nil
+	}); err != nil {
+		_ = putBack()
+		return fmt.Errorf("%w\n%s", err, s.logs("selfpost"))
+	}
+	out, err := s.execIn("selfpost", "postconf", "-h", "smtpd_tls_cert_file")
+	if err != nil || strings.TrimSpace(out) != "/etc/postfix/tls/fullchain.pem" {
+		_ = putBack()
+		return fmt.Errorf("with no certificate at start Postfix reads %q (%v), want the mounted path itself", out, err)
+	}
+	if _, err := servedSerial(); err == nil {
+		_ = putBack()
+		return fmt.Errorf("port 465 presented a certificate with none mounted")
+	}
+
+	if err := putBack(); err != nil {
+		return err
+	}
+	want, err := fileSerial(filepath.Join(certs, "fullchain.pem"))
+	if err != nil {
+		return err
+	}
+	if err := waitFor("port 465 to present the certificate that appeared", 30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		got, err := servedSerial()
+		if err != nil {
+			return false, err
+		}
+		return got.Cmp(want) == 0, fmt.Errorf("serial %s served, want %s", got, want)
+	}); err != nil {
+		return fmt.Errorf("%w\n%s", err, s.logs("selfpost"))
+	}
+	// The panel reads the copy for Health as its own user, through the
+	// folder, which is 0755 as postfix-config.sh makes it at the start.
+	out, err = s.execIn("selfpost", "sh", "-c",
+		"postconf -h smtpd_tls_cert_file smtpd_tls_key_file && stat -c '%a %U' /etc/postfix/tls-internal /etc/postfix/tls-internal/privkey.pem && "+
+			"setpriv --reuid=panel --regid=panel --init-groups head -c 27 /etc/postfix/tls-internal/fullchain.pem")
+	if err != nil {
+		return fmt.Errorf("the certificate Postfix reads: %v\n%s", err, out)
+	}
+	if out != "/etc/postfix/tls-internal/fullchain.pem\n/etc/postfix/tls-internal/privkey.pem\n755 root\n600 root\n-----BEGIN CERTIFICATE-----" {
+		return fmt.Errorf("the certificate Postfix reads: %q, want the copy in a 755 folder, the key 600 root, the certificate readable by the panel", out)
+	}
+	if !strings.Contains(s.logs("selfpost"), "certificate appeared after start") {
+		return fmt.Errorf("cert-reload did not say it took the certificate:\n%s", s.logs("selfpost"))
+	}
+	return waitForSMTPSReady(30 * time.Second)
+}

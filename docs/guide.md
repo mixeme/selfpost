@@ -221,7 +221,8 @@ On first start the one-time setup URL is printed in the container log
 (`docker compose logs -f`) and written to `/data/setup-token` inside the
 container — `./data/setup-token` on the host, mode `0600` — then deleted when
 setup completes. The link is `https://<SELFPOST_HOSTNAME>/setup/<token>` (path
-token, not a query string), valid for ten minutes. Open it to choose the
+token, not a query string), valid for ten minutes; after that, opening a
+setup link makes a new one, printed and written the same way. Open it to choose the
 administrator username and password — until then the panel has no login, and
 its sign-in page says there is no administrator yet and points at the setup
 link. If this host ships container logs to a central aggregator, prefer reading the
@@ -255,6 +256,20 @@ curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/docker-com
 curl -O https://raw.githubusercontent.com/mixeme/selfpost/main/deploy/.env.example
 cp .env.example .env
 ```
+
+With nginx, Caddy or Traefik as the proxy, fetch its directory as well, into
+`selfpost/` beside the compose file - the commands under [Reverse
+proxy](#reverse-proxy-mandatory) are run from there. For nginx:
+
+```sh
+R=https://raw.githubusercontent.com/mixeme/selfpost/main/deploy
+mkdir -p nginx && curl -o nginx/docker-compose.nginx.yml $R/nginx/docker-compose.nginx.yml \
+  -o nginx/nginx.conf.example $R/nginx/nginx.conf.example
+```
+
+Caddy's are `caddy/Caddyfile` and `caddy/docker-compose.caddy.yml`,
+Traefik's `traefik/docker-compose.traefik.yml` and `traefik/extract-cert.sh`
+(then `chmod +x traefik/extract-cert.sh`).
 
 Edit `.env` — at minimum set `SELFPOST_HOSTNAME` to your mail hostname (bare
 FQDN, e.g. `mail.example.com`). It must match the PTR record you request from
@@ -436,10 +451,21 @@ linking `certs` to it, gives the container links into a directory it does not
 have: Postfix then starts without a certificate.
 
 ```sh
-mkdir certs
 ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
 ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 ```
+
+`postfix check` then warns at every start, in the container's log, that the
+two are "group or other writable": it looks at the links themselves, whose
+mode is always 0777, not at the files they lead to (Postfix 3.10.13,
+`conf/postfix-script:375`, `find` without `-L`). The warning is harmless;
+Postfix reads the files.
+
+`certbot --apache` also adds a redirect of its own to the vhost's port-80
+part, after the fragment's, and with it the challenge path is redirected to
+HTTPS too. Renewal still works: certbot answers the challenge through
+configuration of its own (measured 2026-10-25, Apache 2.4.69 and certbot
+4.0.0 on Debian 13: `certbot renew --dry-run` passed).
 
 The panel reads them as its own user (Health shows the certificate, a full
 backup carries both files), through the container's group 10997. certbot's
@@ -454,11 +480,12 @@ sudo chmod 0640 /etc/letsencrypt/archive/mail.example.com/privkey*.pem
 
 **nginx (containerised).** Edit
 [deploy/nginx/nginx.conf.example](../deploy/nginx/nginx.conf.example) and
-replace `mail.example.com` first. Then, from the `deploy/` directory, issue
+replace `mail.example.com` first. Then, from the project directory, issue
 the first certificate - before nginx can serve HTTPS, so certbot answers the
 challenge itself (`--standalone`), and port 80 must be free while it runs.
 The `certbot` service's own entrypoint is its renewal loop, which ignores
-any arguments, hence `--entrypoint certbot`:
+any arguments, hence `--entrypoint certbot`; `--register-unsafely-without-email`
+instead of `--email` registers without an address:
 
 ```sh
 docker compose -f docker-compose.yml -f nginx/docker-compose.nginx.yml \
@@ -473,7 +500,6 @@ container, not on the host — and the panel reads the key through group 10997,
 as in the Apache case. Then start everything:
 
 ```sh
-mkdir certs
 ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
 ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 sudo chmod 0755 nginx/certbot-etc/live nginx/certbot-etc/archive
@@ -487,7 +513,11 @@ Renewals cannot use the standalone method: nginx holds port 80 by then. The
 fragment's renewal loop runs `certbot renew --webroot -w /var/www/certbot`,
 the directory nginx serves the challenges from; certbot renews with the
 options it is given and keeps them for the certificate once a renewal with
-them succeeds (certbot's documentation, "Renewing certificates").
+them succeeds (certbot's documentation, "Renewing certificates"). nginx
+reads the certificate only when it starts or reloads, so the fragment has it
+reload itself twice a day, and the `certbot` service restarts with Docker
+like the others. Until `2.16.1` neither held: nginx went on serving the old
+certificate after a renewal, and after a reboot the renewal loop stayed down.
 
 **Caddy (containerised, automatic ACME).** Edit
 [deploy/caddy/Caddyfile](../deploy/caddy/Caddyfile) and the `<hostname>` placeholders
@@ -500,6 +530,12 @@ docker compose -f docker-compose.yml -f caddy/docker-compose.caddy.yml up -d
 
 Verify Caddy's on-disk cert path for your version before relying on the
 default mount — see the comment at the top of the Caddy compose fragment.
+Caddy obtains the certificate after SelfPost has started, and SelfPost takes
+it within a minute (see the end of this section). The fragment mounts the
+issuer's folder, not the hostname's: Caddy deletes the hostname's folder
+while it is empty and makes a new one, and until `2.16.1` the fragment
+mounted the deleted one - SelfPost had no certificate until its container
+was recreated.
 With Caddy the certificate lives in Caddy's own data, not in `certs/`, and
 Caddy writes its keys readable by itself alone: the panel's full backup then
 refuses with "certs/ holds no certificate". Back up `./caddy/caddy-data`
@@ -507,21 +543,39 @@ with the project directory instead, or keep a copy of the pair in `certs/`,
 the key given to group 10997 (`chgrp 10997`, `chmod 640`), refreshed after
 each renewal.
 
-**Traefik (containerised).** Edit the `Host(...)` label and ACME email in
+**Traefik (containerised).** Edit the `Host(...)` label and the ACME email
+(or delete that line to register without one) in
 [deploy/traefik/docker-compose.traefik.yml](../deploy/traefik/docker-compose.traefik.yml),
-start the stack, then extract PEM files for Postfix whenever Traefik issues or
-renews a certificate:
+start the stack, then extract PEM files for Postfix into `certs/` once
+Traefik has the certificate - `acme.json` holds it a few seconds after the
+panel's container is healthy - and give the key to the panel's group, as
+under Apache, for the full backup:
 
 ```sh
 docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
-./traefik/extract-cert.sh ./traefik/letsencrypt/acme.json mail.example.com ./traefik/extracted-certs
+./traefik/extract-cert.sh ./traefik/letsencrypt/acme.json mail.example.com ./certs
+sudo chgrp 10997 certs/privkey.pem
 ```
 
-Schedule `extract-cert.sh` (cron or a timer) alongside Traefik's renewals.
+`extract-cert.sh` needs `jq` on the host, and keeps the group of the files it
+replaces. Run it again after each of Traefik's renewals, from cron, e.g.
+twice a day:
+
+```sh
+0 */12 * * * cd /path/to/selfpost && ./traefik/extract-cert.sh ./traefik/letsencrypt/acme.json mail.example.com ./certs
+```
+
+Until `2.16.1` the fragment pinned Traefik `v3.1`, which cannot talk to
+Docker 29 (its client asks for API 1.24, the daemon takes 1.40 and up) and so
+obtained no certificate; and the pair went to `traefik/extracted-certs`,
+which a full backup does not carry.
 
 Whatever the proxy, SelfPost notices a renewed certificate in the mount within
 a day (`TLS_RELOAD_INTERVAL_SECONDS`) and starts serving it on 465 and 587
-without a restart.
+without a restart. A certificate that was not there when SelfPost started -
+Caddy and Traefik obtain theirs after it - is taken within a minute; until
+then 465 and 587 offer no TLS, and Server › Health says the certificate
+cannot be read.
 
 ## Instance administration
 
@@ -1197,7 +1251,10 @@ The last entry of every panel and CLI archive, `data/contents.json`, records
 each file under `data/` with its size and SHA-256, and the first start
 compares `/data` with it; a file that differs is named in the message.
 `docker-compose.yml`, `.env` and `certs/` are not compared — they are yours to
-edit before that start. A journal file beside the database
+edit before that start. The archive records no owners, so `certs/` comes back
+as plain files owned by root, links to certbot's files included: give the key
+to group 10997 again (`chgrp 10997 certs/privkey.pem`), or put the links back,
+or the panel's own full backup refuses and names the file. A journal file beside the database
 (`selfpost.db-wal`, `-shm`, `-journal`) is refused too: no archive holds one,
 so it is left from what the directory held before, and SQLite would take it
 up. To unpack again, unpack into an **empty** directory.
@@ -1211,7 +1268,24 @@ had the database open, so its files are no longer the archive's.
 directory, unpack the backup there, edit `.env` (and `docker-compose.yml` if
 needed) for the new hostname or proxy, then `docker compose up -d`. The archive
 carries `certs/` from the old host — re-issue certificates when the hostname
-changes; a new IP needs only DNS (the A record and the PTR). Set up the reverse-proxy vhost separately (not in the backup).
+changes. Set up the reverse-proxy vhost separately (not in the backup). What
+else changes with the host (measured 2026-10-25, moving the test server's
+backup to a second host under a new name):
+
+- **A new IP** needs the A record and the PTR, and the SPF record of every
+  outbound domain: the record the panel shows names the server's address
+  (`ip4:`), so each domain's SPF fails until it names the new one
+  (*Outbound › Domains*).
+- **A new hostname** gives notification mail a new DKIM key: the first start
+  makes one for the new name and removes the old name's. Publish the records
+  *Server › Settings* shows; the domains' own keys come over unchanged.
+- **`TRUSTED_PROXY_CIDR`** from the old `.env` names the old host's Docker
+  gateway, and the new project's network may have another (a directory of
+  another name gets a network of its own). Run the `docker network inspect`
+  of [Full deployment](#full-deployment) again; until then Server › Health
+  says every visitor shares one sign-in limit and names the address.
+- **The spam filter**, if it was on, needs its `antispam/` directory copied
+  again (below).
 
 The inbound log and the filter lists are in the database and so in the
 backup, and so are the list files under `data/antispam/`; the panel writes

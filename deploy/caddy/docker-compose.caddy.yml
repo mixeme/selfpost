@@ -10,7 +10,9 @@
 # This has been stable across recent Caddy releases but is an internal
 # storage detail, not a documented public API — VERIFY the exact path against
 # the Caddy version you deploy (`docker compose exec caddy find /data/caddy/certificates -name '*.crt'`)
-# before wiring it into the volume mount below.
+# before wiring it into the volume mount below. Measured with caddy:2.11.7 on
+# a fresh host, 2026-10-25: exactly this path, the certificate 9 s after
+# Caddy's first start.
 # Read in the source (caddyserver/certmagic, storage.go, KeyBuilder.SiteCert():
 # certificates/<issuer key>/<domain>/<domain>.crt; acmeissuer.go, issuerKey():
 # the CA URL's host and path, "acme-v02.api.letsencrypt.org-directory" for Let's
@@ -19,9 +21,10 @@
 # none. Read at the projects' master of 2026-10-14, when the image was the
 # moving `caddy:2`; it is pinned below now, and a bump re-reads these.
 #
-# Merge with the base file — run this from the deploy/ directory (Compose
-# resolves every relative path in both files against the directory of the
-# FIRST -f file, i.e. deploy/, which is why paths below are ./caddy/... -
+# Merge with the base file — run this from the project directory, the one
+# holding docker-compose.yml, with this file in its caddy/ (Compose resolves
+# every relative path in both files against the directory of the FIRST -f
+# file, which is why paths below are ./caddy/... -
 # docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
 # evaluated relative to the base file"):
 #
@@ -35,16 +38,23 @@ services:
       - "25:25"
     environment:
       # Caddy names certificate files after the hostname, not
-      # fullchain.pem/privkey.pem like certbot — override the base file's
-      # paths to match.
-      TLS_CERT_FILE: /etc/postfix/tls/<hostname>.crt
-      TLS_KEY_FILE: /etc/postfix/tls/<hostname>.key
+      # fullchain.pem/privkey.pem like certbot, in a folder of the same name -
+      # override the base file's paths to match.
+      TLS_CERT_FILE: /etc/postfix/tls/<hostname>/<hostname>.crt
+      TLS_KEY_FILE: /etc/postfix/tls/<hostname>/<hostname>.key
     volumes: !override
       - ./data:/data
       - .:/selfpost-deploy:ro
-      # Replace <hostname> with your actual mail/panel hostname, matching
-      # the Caddyfile below and SELFPOST_HOSTNAME.
-      - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<hostname>:/etc/postfix/tls:ro
+      # The issuer's folder, not the hostname's below it: on its first start
+      # Caddy deletes the hostname's folder while it is empty and makes a new
+      # one when the certificate comes (certmagic v0.25.6, the version Caddy
+      # 2.11.7 builds with, maintain.go, deleteExpiredCerts(): "deleting site
+      # folder because key is empty"; it never deletes the issuer's). Docker
+      # creates a missing mount source as an empty folder, so a mount of the
+      # hostname's folder kept pointing at the deleted one, and Postfix had
+      # no certificate until the container was recreated (measured on a fresh
+      # host, 2026-10-25: two folders, two inodes).
+      - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/etc/postfix/tls:ro
 
   caddy:
     # Pinned to a release: "2" moves under a running server (security audit

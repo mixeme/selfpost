@@ -39,7 +39,7 @@ func runNotifier(ctx context.Context, cfg config, st *store.Store) error {
 			}, true), nil
 		},
 		Certificate: func() health.Certificate {
-			return health.CheckServedCertificate(cfg.tlsServedCertFile, cfg.tlsCertFile, cfg.tlsReloadInterval, time.Now())
+			return health.CheckServedCertificate(cfg.tlsServedCert.Path(), cfg.tlsCertFile, cfg.tlsReloadInterval, time.Now())
 		},
 		Queue: postfix.QueueMessages,
 	}, notify.NewMailer(cfg.hostname), cfg.hostname)

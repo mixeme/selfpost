@@ -6,9 +6,10 @@
 # This is a FRAGMENT, not a full replacement for ../docker-compose.yml: it
 # adds an nginx + certbot pair and removes the panel's host port publish (nginx
 # takes over 80/443 and proxies to the panel over the compose network
-# instead). Merge it with the base file — run this from the deploy/ directory
-# (Compose resolves every relative path in both files against the directory of
-# the FIRST -f file, i.e. deploy/, which is why paths below are ./nginx/... -
+# instead). Merge it with the base file — run this from the project directory,
+# the one holding docker-compose.yml, with this file in its nginx/ (Compose
+# resolves every relative path in both files against the directory of the
+# FIRST -f file, which is why paths below are ./nginx/... -
 # docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
 # evaluated relative to the base file"):
 #
@@ -51,6 +52,13 @@ services:
     pids_limit: 256
     depends_on:
       - selfpost
+    # nginx reads its certificate when it starts and when it reloads, and the
+    # certbot service below cannot signal it, so it reloads itself twice a
+    # day, as often as certbot looks. Without this a renewed certificate
+    # waited for nginx's next restart: measured on a fresh host, 2026-10-25,
+    # nginx served the old serial after certbot had renewed. The reload is
+    # graceful (nginx.org/en/docs/control.html, "Changing Configuration").
+    command: ["/bin/sh", "-c", "while :; do sleep 12h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"]
     ports:
       - "80:80"
       - "443:443"
@@ -63,6 +71,11 @@ services:
     # Pinned like every image here: "latest" moves under a running server
     # (security audit 2026-10-17, I4). Bump it deliberately.
     image: certbot/certbot:v5.8.0
+    # Without a restart policy the renewal loop stayed down after a reboot or
+    # a restart of Docker, and the certificate ran out 90 days later
+    # (measured on a fresh host, 2026-10-25: nginx and SelfPost came back,
+    # certbot stayed "Exited").
+    restart: unless-stopped
     pids_limit: 64
     volumes:
       - ./nginx/certbot-etc:/etc/letsencrypt

@@ -8,11 +8,17 @@
 # Requires bash and jq. Usage: ./extract-cert.sh <acme.json path> <domain> <output dir>
 #
 # The layout is not documented (doc.traefik.io/traefik/v3.1/https/acme/ says
-# only "JSON file"); read in Traefik v3.1.0: pkg/provider/acme/local_store.go
+# only "JSON file"); read in Traefik v3.1.0 and again at v3.7.14, the version
+# docker-compose.traefik.yml pins: pkg/provider/acme/local_store.go
 # keeps map[resolver name]*StoredData, store.go StoredData{Account,
-# Certificates}, provider.go Certificate{domain, certificate, key} with the PEM
-# as []byte - base64 in JSON (Go encoding/json). "le" is the resolver
-# docker-compose.traefik.yml names.
+# Certificates}, provider.go CertAndStore{Certificate, Store} with
+# Certificate{domain, certificate, key} embedded, the PEM as []byte - base64
+# in JSON (Go encoding/json). "le" is the resolver docker-compose.traefik.yml
+# names. Measured with v3.7.14 on a fresh host, 2026-10-25: a Let's Encrypt
+# certificate extracted and served on 465.
+#
+# The output directory is the project's certs/, which the base compose file
+# mounts and a full backup carries.
 #
 # Nothing is replaced unless both new files are PEM: a domain acme.json does
 # not hold, an empty field or a broken file stops the script with an error and
@@ -25,7 +31,7 @@ set -euo pipefail
 
 ACME_JSON="${1:?path to acme.json}"
 DOMAIN="${2:?domain name, e.g. mail.example.com}"
-OUT_DIR="${3:?output directory, e.g. ./extracted-certs}"
+OUT_DIR="${3:?output directory, e.g. ./certs}"
 
 mkdir -p "$OUT_DIR"
 umask 077
@@ -58,7 +64,12 @@ printf '%s' "$key_b64" | base64 -d >"$tmp_key" || die "the key of $DOMAIN is not
 grep -q -- '-----BEGIN CERTIFICATE-----' "$tmp_cert" || die "the certificate of $DOMAIN is not PEM"
 grep -q -- '-----BEGIN .*PRIVATE KEY-----' "$tmp_key" || die "the key of $DOMAIN is not PEM"
 
-chmod 0640 "$tmp_cert" "$tmp_key"
+# The certificate is public, readable by all as certbot leaves it; the key the
+# owner's and its group's. Until 2.16.1 both were 0640, and with the files
+# root's a full backup from the panel refused: "The panel is not allowed to
+# read certs/fullchain.pem" (measured on a fresh host, 2026-10-25).
+chmod 0644 "$tmp_cert"
+chmod 0640 "$tmp_key"
 # The group the files had stays theirs: the guide gives the key to group 10997
 # so the panel can read it for a full backup, and a run from root's cron would
 # otherwise hand it to root's group (review of audit stage 5).

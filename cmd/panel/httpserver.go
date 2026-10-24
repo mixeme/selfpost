@@ -111,7 +111,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		Version:                    buildinfo.Version,
 		TrustedProxyCIDRs:          cfg.trustedProxies,
 		TLSCertFile:                cfg.tlsCertFile,
-		TLSServedCertFile:          cfg.tlsServedCertFile,
+		TLSServedCertFile:          cfg.tlsServedCert.Path,
 		SMTPBanner:                 cfg.smtpBanner,
 		TimeZone:                   cfg.timeZone,
 		TLSReloadInterval:          cfg.tlsReloadInterval,

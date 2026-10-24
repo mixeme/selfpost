@@ -61,12 +61,12 @@ type Config struct {
 	// Empty (the default) keeps rate-limiting keyed on RemoteAddr only.
 	TrustedProxyCIDRs []*net.IPNet
 	// TLSCertFile is the mounted certificate (guide § Environment variables);
-	// TLSServedCertFile is Postfix's copy of it, the one served on 465/587,
-	// and TLSReloadInterval how often that copy is refreshed. Health reads
-	// the served one and names the mounted one while they differ
-	// (health.CheckServedCertificate).
+	// TLSServedCertFile gives Postfix's copy of it, the one served on
+	// 465/587 (health.ServedCert), and TLSReloadInterval how often that copy
+	// is refreshed. Health reads the served one and names the mounted one
+	// while they differ (health.CheckServedCertificate).
 	TLSCertFile       string
-	TLSServedCertFile string
+	TLSServedCertFile func() string
 	TLSReloadInterval time.Duration
 	// SMTPBanner is Postfix's smtpd_banner as postconf expands it, "" when
 	// it could not be read (health.SMTPBanner).

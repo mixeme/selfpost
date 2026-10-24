@@ -216,6 +216,28 @@ func TestUptime(t *testing.T) {
 // The certificate shown is the one Postfix serves; a different mounted file is
 // a renewal waiting, a warning once it waited past cert-reload's interval
 // (assumptions A-65).
+// ServedCert asks postconf again while Postfix serves the mounted file - a
+// certificate missing at the start, which cert-reload later copies - or
+// while postconf could not be asked, and keeps the copy once it is named.
+func TestServedCertFollowsTheCopy(t *testing.T) {
+	const mounted, copied = "/etc/postfix/tls/fullchain.pem", "/etc/postfix/tls-internal/fullchain.pem"
+	answers := []string{"", mounted, mounted, copied, mounted}
+	asked := 0
+	s := &ServedCert{mounted: mounted, read: func() string {
+		a := answers[asked]
+		asked++
+		return a
+	}}
+	for i, want := range []string{"", mounted, mounted, copied, copied, copied} {
+		if got := s.Path(); got != want {
+			t.Fatalf("check %d: %q, want %q", i+1, got, want)
+		}
+	}
+	if asked != 4 {
+		t.Fatalf("postconf asked %d times, want 4: not again once the copy is named", asked)
+	}
+}
+
 func TestCheckServedCertificate(t *testing.T) {
 	dir := t.TempDir()
 	served := filepath.Join(dir, "served.pem")

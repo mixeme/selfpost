@@ -92,10 +92,10 @@ type config struct {
 	// serves. The default mirrors build/postfix-config.sh, so the status
 	// page checks exactly what Postfix was configured with.
 	tlsCertFile string
-	// tlsServedCertFile is the certificate Postfix serves (its copy of
-	// tlsCertFile), read from postconf at the start; tlsReloadInterval is
-	// how often build/postfix-cert-reload.sh looks for a renewal.
-	tlsServedCertFile string
+	// tlsServedCert follows the certificate Postfix serves (its copy of
+	// tlsCertFile) in postconf; tlsReloadInterval is how often
+	// build/postfix-cert-reload.sh looks for a renewal.
+	tlsServedCert     *health.ServedCert
 	tlsReloadInterval time.Duration
 	// smtpBanner is Postfix's smtpd_banner, expanded, read from postconf at
 	// the start: Health shows the greeting it makes.
@@ -345,8 +345,9 @@ func openData(cfg config, resync func(*store.Store) error) (st *store.Store, res
 func run() error {
 	cfg := loadConfig()
 	// postfix-config.sh has written main.cf before supervisord started the
-	// panel (build/entrypoint.sh), and nothing rewrites it after.
-	cfg.tlsServedCertFile = health.ServedCertPath()
+	// panel (build/entrypoint.sh); after, only cert-reload changes it, and
+	// only the certificate's path (health.ServedCert).
+	cfg.tlsServedCert = health.NewServedCert(cfg.tlsCertFile)
 	cfg.smtpBanner = health.SMTPBanner()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

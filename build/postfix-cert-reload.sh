@@ -10,7 +10,9 @@
 # copy; when they differ it copies both beside their targets, checks that the
 # copies - not the mounted files, which a renewer may be rewriting - are a
 # certificate and the key that belongs to it, renames both over the targets
-# and reloads Postfix. When nothing changed it does nothing.
+# and reloads Postfix. When nothing changed it does nothing. When the files
+# were not there at start, so that no copy was made, it looks every minute
+# and makes the copy once they are (adopt).
 # (Postfix 3.10.13: smtpd loads the certificate in pre_jail_init(), once per
 # process, src/smtpd/smtpd.c:6442; "postfix reload" is SIGHUP to master,
 # conf/postfix-script:277, after which the old smtpd processes exit on the closed
@@ -30,6 +32,17 @@ DIR=/etc/postfix/tls-internal
 CERT="$DIR/fullchain.pem"
 KEY="$DIR/privkey.pem"
 PENDING=0 # a copy was renewed and Postfix has not been reloaded since
+
+# How often to look while there is no copy: the certificate was not there at
+# start. A proxy that obtains its certificate itself (Caddy, Traefik) has it
+# only after SelfPost has started, and until then 465 and 587 have no TLS -
+# measured on a fresh host, 2026-10-25: Caddy had it 9 s after its start.
+# A minute, or the interval when that is shorter.
+LOOK=60
+case "$INTERVAL" in
+'' | *[!0-9]*) ;;
+*) [ "$INTERVAL" -lt "$LOOK" ] && LOOK=$INTERVAL ;;
+esac
 
 reload() {
 	if postfix reload; then
@@ -53,14 +66,65 @@ same_pair() {
 	[ -n "$cert_pub" ] && [ "$cert_pub" = "$key_pub" ]
 }
 
+# copied says whether Postfix serves a copy, as it does when the certificate
+# was there at start (postfix-config.sh) or appeared later (adopt below).
+copied() {
+	[ "$(postconf -h smtpd_tls_cert_file 2>/dev/null)" = "$CERT" ]
+}
+
+# copy_pair copies the mounted pair beside Postfix's copy, checks that the
+# copies - not the mounted files, which a renewer may be rewriting - are a
+# certificate and the key that belongs to it, and renames both over the
+# copy, the key root's alone. $1 names the pair in the messages.
+copy_pair() {
+	# 0755 as postfix-config.sh makes it at the start, not this script's
+	# umask's 0700: the panel reads the certificate through it for Health.
+	# A container that started without a certificate has no such folder yet
+	# (measured behind Caddy on a fresh host, 2026-10-25: Health "could not
+	# read" the copy).
+	mkdir -p "$DIR" && chmod 0755 "$DIR"
+	rm -f "$CERT.new" "$KEY.new"
+	if ! cp "$SRC_CERT" "$CERT.new" || ! cp "$SRC_KEY" "$KEY.new"; then
+		rm -f "$CERT.new" "$KEY.new"
+		echo "cert-reload: copying the $1 failed, will try again after $2s" >&2
+		return 1
+	fi
+	if ! same_pair "$CERT.new" "$KEY.new"; then
+		rm -f "$CERT.new" "$KEY.new"
+		echo "cert-reload: the $1 and its key do not belong together; will look again after $2s" >&2
+		return 1
+	fi
+	chown root:root "$CERT.new" "$KEY.new"
+	chmod 0644 "$CERT.new"
+	chmod 0600 "$KEY.new"
+	mv -f "$KEY.new" "$KEY" && mv -f "$CERT.new" "$CERT"
+}
+
+# adopt makes the copy the start would have made, once the certificate that
+# was missing then is there whole, and points Postfix at it. Until 2.16.1
+# Postfix went on reading the mounted files: each new smtpd took the
+# certificate once it was there, but the panel, which reads what Postfix
+# serves, could not read a key the proxy keeps root's alone, and Health
+# called the certificate unreadable until a restart.
+adopt() {
+	if [ ! -r "$SRC_CERT" ] || [ ! -r "$SRC_KEY" ]; then
+		return
+	fi
+	copy_pair "certificate that appeared after start" "$LOOK" || return
+	if ! postconf -e "smtpd_tls_cert_file=$CERT" "smtpd_tls_key_file=$KEY"; then
+		echo "cert-reload: pointing Postfix at the copy failed, will try again after ${LOOK}s" >&2
+		return
+	fi
+	PENDING=1
+	reload "certificate appeared after start"
+}
+
 refresh() {
 	if [ "$PENDING" = 1 ]; then
 		reload "renewed certificate, earlier reload had failed"
 	fi
-	if [ "$(postconf -h smtpd_tls_cert_file 2>/dev/null)" != "$CERT" ]; then
-		# Postfix reads the mounted files themselves (they were missing at
-		# start, so no copy was made): a reload is what picks up a change.
-		reload "periodic TLS refresh"
+	if ! copied; then
+		adopt
 		return
 	fi
 	if [ ! -r "$SRC_CERT" ] || [ ! -r "$SRC_KEY" ]; then
@@ -70,26 +134,16 @@ refresh() {
 	if cmp -s "$SRC_CERT" "$CERT" && cmp -s "$SRC_KEY" "$KEY"; then
 		return
 	fi
-	rm -f "$CERT.new" "$KEY.new"
-	if ! cp "$SRC_CERT" "$CERT.new" || ! cp "$SRC_KEY" "$KEY.new"; then
-		rm -f "$CERT.new" "$KEY.new"
-		echo "cert-reload: copying the renewed certificate failed, will try again after ${INTERVAL}s" >&2
-		return
-	fi
-	if ! same_pair "$CERT.new" "$KEY.new"; then
-		rm -f "$CERT.new" "$KEY.new"
-		echo "cert-reload: the mounted certificate and key differ from Postfix's copy but do not belong together; will look again after ${INTERVAL}s" >&2
-		return
-	fi
-	chown root:root "$CERT.new" "$KEY.new"
-	chmod 0644 "$CERT.new"
-	chmod 0600 "$KEY.new"
-	mv -f "$KEY.new" "$KEY" && mv -f "$CERT.new" "$CERT"
+	copy_pair "renewed certificate" "$INTERVAL" || return
 	PENDING=1
 	reload "renewed certificate"
 }
 
 while true; do
-	sleep "${INTERVAL}"
+	if copied; then
+		sleep "${INTERVAL}"
+	else
+		sleep "${LOOK}"
+	fi
 	refresh
 done

@@ -29,7 +29,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 | `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc + notifier; with the inbound relay on also the inbound journal milter |
 | `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (the sender check's, the DKIM signer's two, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
-| `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it |
+| `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it; every minute while none has been there since the start |
 | `logrotate` | root | 400 | Periodic `mail.log` rotation |
 
 Until `2.8.0` two more programs ran before the panel: `opendkim`, the DKIM
@@ -234,7 +234,11 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   not check its mode), which the mount cannot give; Postfix reads the copy.
   `cert-reload` compares the mount with the copy daily; when they differ and
   the certificate and key belong together it renews the copy (each file
-  renamed into place) and reloads Postfix.
+  renamed into place) and reloads Postfix. A pair that was not in the mount
+  at start (Caddy and Traefik obtain theirs after SelfPost starts) leaves
+  Postfix reading the mount itself, with no copy; `cert-reload` then looks
+  every minute and, once the pair is there and belongs together, makes the
+  copy, points Postfix at it and reloads (since `2.16.1`).
 
 ### DKIM signing
 
@@ -1345,7 +1349,8 @@ unsupported rather than as a missing doc:
   `MILTER_WAIT_TIMEOUT` (`30` seconds).
 - **Background maintenance:** `TLS_RELOAD_INTERVAL_SECONDS` (`86400` — how
   often a renewed certificate is looked for; Postfix is reloaded only when one
-  is found),
+  is found. While no certificate has been there since the start it is looked
+  for every minute, or this often when that is shorter),
   `LOGROTATE_INTERVAL_SECONDS` (`21600` — check `mail.log` rotation every six
   hours; logrotate keeps 14 rotated files on a daily schedule, and each
   rotation triggers `postfix reload`).

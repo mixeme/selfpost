@@ -131,7 +131,9 @@ func overviewHead(host string, cards []HealthCard, updated time.Time) Head {
 			if i > 0 {
 				lead = append(lead, Inline{Text: "; "})
 			}
-			lead = append(lead, Link(c.Href, c.Name), Inline{Text: ": " + lowerFirst(c.Value)})
+			// A value can be a sentence of its own ("Could not read the
+			// certificate at ...."); the lead puts its own stop after it.
+			lead = append(lead, Link(c.Href, c.Name), Inline{Text: ": " + strings.TrimSuffix(lowerFirst(c.Value), ".")})
 		}
 		h.Lead = append(lead, Inline{Text: "."})
 	}

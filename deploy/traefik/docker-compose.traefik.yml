@@ -1,16 +1,23 @@
 
 # Alternative reverse-proxy: Traefik. Traefik does NOT write plain PEM files —
 # everything (cert + key) lives bundled inside acme.json. SelfPost needs
-# separate PEM files for Postfix, so an extraction step is required; see
-# extract-cert.sh in this directory and the cron/systemd-timer note below.
+# separate PEM files for Postfix, so an extraction step is required: see
+# extract-cert.sh in this directory, which writes them into the project's
+# certs/ - the base file's mount, and what a full backup carries - and the
+# cron note in docs/guide.md, "Reverse proxy".
 #
-# Merge with the base file — run this from the deploy/ directory (Compose
+# Merge with the base file — run this from the project directory, the one
+# holding docker-compose.yml, with this file in its traefik/ (Compose
 # resolves every relative path in both files against the directory of the
-# FIRST -f file, i.e. deploy/, which is why paths below are ./traefik/... -
+# FIRST -f file, which is why paths below are ./traefik/... -
 # docs.docker.com/compose/how-tos/multiple-compose-files/merge/: "Paths are
 # evaluated relative to the base file"):
 #
 #   docker compose -f docker-compose.yml -f traefik/docker-compose.traefik.yml up -d
+#
+# Traefik routes to the panel only once its container is healthy - the
+# image's health check passes within 30 s of the start; until then Traefik
+# answers 404 (measured with v3.7.14, 2026-10-25).
 
 services:
   selfpost:
@@ -18,16 +25,11 @@ services:
       - "465:465"
       - "587:587"
       - "25:25"
-    volumes: !override
-      - ./data:/data
-      - .:/selfpost-deploy:ro
-      # Populated by extract-cert.sh from traefik's acme.json — see below.
-      - ./traefik/extracted-certs:/etc/postfix/tls:ro
     labels:
       # Traefik only proxies the panel; it never sees the mail ports.
       # These live on the selfpost service (not traefik's) because the
       # docker provider reads routing labels off the container being routed
-      # to, not off traefik itself. (doc.traefik.io/traefik/v3.1/providers/
+      # to, not off traefik itself. (doc.traefik.io/traefik/v3.7/providers/
       # docker/, "Routing Configuration": "Traefik uses container labels";
       # with exposedByDefault=false only containers labelled
       # traefik.enable=true.)
@@ -38,7 +40,15 @@ services:
       - traefik.http.services.selfpost.loadbalancer.server.port=8080
 
   traefik:
-    image: traefik:v3.1
+    # Pinned to a release, bumped deliberately. v3.1 could not work with
+    # Docker 29: its client asked for API 1.24 and the daemon took nothing
+    # under 1.40, so Traefik saw no containers and obtained no certificate
+    # (measured on a fresh host, 2026-10-25, Docker 29.9.2). v3.7.14 builds
+    # its client with github.com/moby/moby/client v0.6.0 and no fixed version
+    # (pkg/provider/docker/shared.go, createClient()), and keeps acme.json as
+    # extract-cert.sh reads it (pkg/provider/acme/local_store.go,
+    # provider.go, CertAndStore) - read at the v3.7.14 tag.
+    image: traefik:v3.7.14
     restart: unless-stopped
     # A ceiling on processes and threads (security audit 2026-10-17, I3).
     pids_limit: 256
@@ -50,6 +60,8 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      # An address you read for Let's Encrypt's notices; delete the line to
+      # register without one.
       - --certificatesresolvers.le.acme.email=you@example.com
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web

@@ -28,7 +28,7 @@ type Config struct {
 	DeployRoot        string
 	Version           string
 	TLSCertFile       string
-	TLSServedCertFile string
+	TLSServedCertFile func() string
 	TLSReloadInterval time.Duration
 	SMTPBanner        string
 	TimeZone          string

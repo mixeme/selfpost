@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -107,14 +108,45 @@ type Renewal struct {
 // as postconf prints it (Postfix 3.10.13, postconf(1): -h, the value without
 // its name): build/postfix-config.sh's copy when the mounted files were there
 // at the start, the mounted file itself otherwise. "" when postconf fails.
-// It is read once, at the panel's start, as the retry policy is: main.cf is
-// written before supervisord starts the panel and not after.
 func ServedCertPath() string {
 	out, err := exec.Command("postconf", "-h", "smtpd_tls_cert_file").Output()
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// ServedCert follows ServedCertPath. main.cf is written before supervisord
+// starts the panel, and since 2.16.1 one thing changes it after:
+// build/postfix-cert-reload.sh points Postfix at a copy once a certificate
+// that was missing at the start is there (adopt). So while Postfix reads the
+// mounted file itself - or postconf could not be asked - it is asked again
+// at each check; once it names another file, the copy, that stays, as
+// nothing points Postfix back at the mount. Until 2.16.1 it was read once,
+// and Health went on showing the mounted file as the one served after the
+// copy was made (e2e certificate_arriving_after_start_picked_up).
+type ServedCert struct {
+	mounted string
+	read    func() string
+
+	mu   sync.Mutex
+	path string
+}
+
+// NewServedCert follows the certificate Postfix serves for the mounted
+// certificate file mounted (TLS_CERT_FILE).
+func NewServedCert(mounted string) *ServedCert {
+	return &ServedCert{mounted: mounted, read: ServedCertPath}
+}
+
+// Path is the certificate file Postfix serves, "" when it is not known.
+func (s *ServedCert) Path() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.path == "" || s.path == s.mounted {
+		s.path = s.read()
+	}
+	return s.path
 }
 
 // CheckServedCertificate checks the certificate Postfix serves (served) and,

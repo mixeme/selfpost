@@ -5,7 +5,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+Every proxy of `deploy/` set up from scratch on a fresh Debian 13 host with
+Docker 29, by the guide, with real Let's Encrypt certificates (2026-10-25).
+
+### Fixed
+
+- **A certificate that appears after SelfPost started is taken within a
+  minute.** Caddy and Traefik obtain theirs after the container is up, so
+  Postfix started with no copy and read the mount itself; nothing made the
+  copy later, and Server › Health said the certificate could not be read
+  until a restart, as the panel cannot read a key the proxy keeps root's
+  alone. `cert-reload` now looks every minute while there is no copy, makes
+  it once the pair is there and belongs together, points Postfix at it and
+  reloads; the panel follows `smtpd_tls_cert_file` until it names the copy
+  (it read it once, at its start). e2e
+  `certificate_arriving_after_start_picked_up`.
+- **nginx fragment:** nginx went on serving the old certificate after
+  certbot renewed it - nothing reloaded it - so the panel's HTTPS would have
+  expired 30 days after the first renewal; it now reloads itself twice a
+  day. The `certbot` service had no restart policy and stayed down after a
+  reboot or a restart of Docker, ending renewals; it restarts with the rest.
+- **Caddy fragment:** the mount pointed at the hostname's certificate
+  folder, which Caddy deletes while it is empty and makes anew (certmagic,
+  `deleteExpiredCerts`), so the container kept the deleted folder and had no
+  certificate until it was recreated. It mounts the issuer's folder now, and
+  `TLS_CERT_FILE` names `<host>/<host>.crt` in it.
+- **Traefik fragment:** `traefik:v3.1` cannot talk to Docker 29 (its client
+  asks for API 1.24, the daemon takes 1.40 and up), so it saw no containers
+  and obtained no certificate; pinned to `v3.7.14`, whose source was read
+  for the client and for the `acme.json` layout `extract-cert.sh` reads. The
+  pair is extracted into the project's `certs/`, which the base file mounts
+  and a full backup carries - from `traefik/extracted-certs` the panel's
+  backup refused with "certs/ holds no certificate". `extract-cert.sh`
+  writes the certificate 0644 (it wrote both files 0640, and the panel could
+  not read a root-owned certificate for the backup); the key stays 0640.
+- Overview's lead no longer doubles a stop after a card value that is a
+  sentence of its own ("…x.crt.;").
+
 ### Documentation
+
+- **Installing by the guide, as measured on a fresh host:** step 1 fetches
+  the chosen proxy's directory too, and the proxy commands run from the
+  project directory (they said `deploy/`); the duplicate `mkdir certs` is
+  gone; certbot's own redirect under Apache and Postfix's harmless "group or
+  other writable" warning for links in `certs/` are explained; Traefik's
+  extraction gets a cron line, the email may be left out; an expired setup
+  link is replaced by the next visit.
+- **Moving to another host:** a new IP needs every domain's SPF changed (the
+  record names the server's address), a new hostname a new DKIM key for
+  notification mail, `TRUSTED_PROXY_CIDR` the new Docker gateway; a restored
+  `certs/` is root's, so the key goes back to group 10997.
 
 - **Machine requirements by what is switched on** (guide § Installation,
   README § Requirements), measured on the test installation instead of the

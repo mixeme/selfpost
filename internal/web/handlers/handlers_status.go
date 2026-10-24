@@ -578,7 +578,11 @@ func (h *Handlers) healthChecks() healthReadings {
 		queueStatus = health.StatusWarn
 	}
 
-	cert := health.CheckServedCertificate(h.cfg.TLSServedCertFile, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now()).ForHost(h.cfg.Hostname)
+	served := ""
+	if h.cfg.TLSServedCertFile != nil {
+		served = h.cfg.TLSServedCertFile()
+	}
+	cert := health.CheckServedCertificate(served, h.cfg.TLSCertFile, h.cfg.TLSReloadInterval, time.Now()).ForHost(h.cfg.Hostname)
 	sockets := []health.Socket{
 		signerSocket(h.cfg.SignSocket, "applications"),
 		signerSocket(h.cfg.SignLocalSocket, "notifications"),
