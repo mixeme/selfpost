@@ -18,6 +18,9 @@ After `/clear` or a fresh chat:
 3. Skim [product.md](product.md) if scope is in doubt.
 4. Continue from the next unchecked step in the **active** plan file (not the
    roadmap index).
+5. In the maintainer's checkout, `dev/handoff.md` and `dev/workflow.md` (not
+   in git) say where the last session stopped, the state of the test
+   machines and how changes reach them.
 
 History of closed phases is in `git log` and [CHANGELOG.md](../CHANGELOG.md),
 not duplicated here.
