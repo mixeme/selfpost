@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Documentation
+
+- **Upgrading › To 2.16.2:** the three lines of `docker-compose.yml` that
+  change besides the tag, and that a rollback needs only the tag - measured
+  on a copy of the test server upgraded from 2.16.0 (tag only: works, the
+  warning stays; three lines: no warning; back to 2.16.0 on them: works).
+  Upgrading now says a release that changes the compose file says so, and to
+  make the change in one's own file rather than replace it.
+- **The proxies under load** in Machine requirements, until now "not
+  measured": with 50 clients opening a new TLS connection per request, nginx
+  13 MB, Caddy 32 MB, Traefik 46 MB.
+
 ## [2.16.2] - 2026-10-25
 
 No migration; schema 14. The compose file changed (the certificate's mount

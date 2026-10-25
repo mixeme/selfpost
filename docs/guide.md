@@ -69,7 +69,11 @@ host or one of the containers under `deploy/`. The figures were measured on
 the test installation on 2026-10-19 - SelfPost 2.16.0, a host of 2 vCPU and
 4 GB - at rest, under load made for the purpose (SMTP sessions to port 25
 held open; messages given to rspamd to scan, nothing delivered), and, for
-the build, in a container held to a given memory and one CPU.
+the build, in a container held to a given memory and one CPU. The proxies
+under load were measured on a second, fresh host on 2026-10-25 (nginx 1.27,
+Caddy 2.11.7, Traefik v3.7.14): 50 clients for 20 seconds asking for the
+sign-in page and its stylesheet, counted as `docker stats` counts a
+container's memory.
 
 **Running.** What each part uses, measured:
 
@@ -77,7 +81,7 @@ the build, in a container held to a given memory and one CPU.
 |---|---|---|
 | SelfPost: the panel, Postfix, supervisord | 55-60 MB (the panel and supervisord about 30 MB each, Postfix's daemons 6-12 MB each, mostly shared libraries) | 123 MB with 20 SMTP sessions open at once - about 3 MB a session |
 | The spam filter: rspamd, five processes | 118 MB | 153 MB scanning ten 100 KB messages at once; 232 MB scanning one 25 MiB message; 424 MB scanning three of them at once |
-| A reverse-proxy container from `deploy/` | Caddy 10 MB, nginx 3 MB, Traefik 21 MB | not measured |
+| A reverse-proxy container from `deploy/` | Caddy 10 MB, nginx 3 MB, Traefik 21 MB | nginx 13 MB, Caddy 32 MB, Traefik 46 MB with 50 clients opening a new TLS connection for each request to the panel; 12, 29 and 42 MB over kept-alive connections |
 
 rspamd sees only mail on port 25, and a message there may be as large as
 `INBOUND_MESSAGE_SIZE_LIMIT` (25 MiB by default): each such message rspamd
@@ -98,7 +102,7 @@ stays smaller.
 | Outbound only (465, and 587 if enabled), with or without port 25 | **512 MB**: SelfPost's 123 MB under load and the allowance | 315 MB |
 | With the spam filter, messages on port 25 kept small (`INBOUND_MESSAGE_SIZE_LIMIT` of a few MiB) or rarely large | **768 MB**: 123 + 153 MB under load and the allowance, with room for one large message (+100 MB) | 626 MB |
 | With the spam filter and the default 25 MiB, several large messages at once | **1 GB**: 123 + 424 MB and the allowance | 626 MB |
-| A reverse proxy as a container | the proxy's own (3-21 MB at rest) on top | Caddy 92 MB, nginx 280 MB, Traefik 231 MB |
+| A reverse proxy as a container | the proxy's own (3-21 MB at rest, up to 46 MB under load) on top | Caddy 92 MB, nginx 280 MB, Traefik 231 MB |
 
 512 MB is not enough with the spam filter: at rest SelfPost, rspamd and the
 allowance come to about 480 MB, and one large message is another 100 MB.
@@ -947,7 +951,10 @@ Bump the pinned image tag in `docker-compose.yml` to the target release, build
 that tag as under [Fixed image tag](#fixed-image-tag) while no 2.x image is
 published, then `docker compose up -d`. The backup version check requires the running image
 to match the version that created a full backup — see [Fixed image
-tag](#fixed-image-tag).
+tag](#fixed-image-tag). A release that changes `deploy/docker-compose.yml`
+beyond the tag says so in its CHANGELOG section and below; make the same
+change in yours, which holds your own edits (the `/etc/letsencrypt` line,
+say), rather than replacing it.
 
 **Base-package fixes come with releases.** The image is Debian trixie, and a
 security update of Postfix, Cyrus SASL, OpenSSL or Berkeley DB reaches you with
@@ -980,6 +987,30 @@ whose keys are under `data/opendkim` only stops at the start and says so,
 rather than give the server's own name a new key. Rolling back from 2.9.x
 to 2.8.x needs nothing; to 2.7.x, the old tree is gone - only a full backup
 of 2.7.x brings it back.
+
+**To 2.16.2** change three lines of `docker-compose.yml` besides the tag:
+the certificate is mounted at `/etc/selfpost/tls`, outside Postfix's
+`/etc/postfix`, so that `postfix check` stops calling the links in `certs/`
+"group or other writable" at every start.
+
+```diff
+-      TLS_CERT_FILE: /etc/postfix/tls/fullchain.pem
+-      TLS_KEY_FILE: /etc/postfix/tls/privkey.pem
++      TLS_CERT_FILE: /etc/selfpost/tls/fullchain.pem
++      TLS_KEY_FILE: /etc/selfpost/tls/privkey.pem
+...
+-      - ./certs:/etc/postfix/tls:ro
++      - ./certs:/etc/selfpost/tls:ro
+```
+
+With Caddy, its fragment's two `TLS_*_FILE` lines and its mount change the
+same way; the nginx fragment's mount too. A compose file left as it was
+works with 2.16.2, the warning included; and as the older images take the
+paths from `TLS_CERT_FILE` and `TLS_KEY_FILE` too, a rollback needs only the
+tag. Measured 2026-10-25 on a copy of the test server, from 2.16.0: with
+only the tag changed, the same keys and the certificate served, the two
+warnings still there; with the three lines, no warning; back on 2.16.0 with
+the new lines, the same.
 
 **Rolling back to 2.7.x** from 2.8.x (only): the 2.7.x image signs with OpenDKIM
 from `data/opendkim`, which holds the keys as they were at the upgrade. A
