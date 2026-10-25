@@ -100,15 +100,15 @@ than the default «meaningful step» rule in [§ Commits and release build](#com
 
 1. Check off the step in the plan file; bump `Progress` in the roadmap index.
 2. Append [CHANGELOG.md](../CHANGELOG.md) under `[Unreleased]` for that step.
-3. Commit on `main` (push / tag / Release only on explicit request).
+3. Commit on `main` (a tag only with a version cut, below).
 
 **After each roadmap stage** (all checklist steps done; «Done when» satisfied)
 
 1. Version cut in one commit: rename `[Unreleased]` to `[X.Y.Z] - date`, open a
    fresh `[Unreleased]`, bump the image pin in
    [deploy/docker-compose.yml](../deploy/docker-compose.yml).
-2. Git tag `vX.Y.Z` and publish the GitHub Release only on explicit request (see
-   [§ Release image](#release-image)).
+2. Git tag `vX.Y.Z` on that commit - every version cut gets one, and the tag
+   publishes the image (see [§ Release image](#release-image)).
 3. The item leaves [roadmap.md](roadmap.md) and its plan file is deleted; what
    it did is in the CHANGELOG, the rest in git history. A report whose
    finding ids the code cites (the audits, the assumptions register) stays,
@@ -320,15 +320,16 @@ the step (e.g. `Claude Sonnet 4.6`).
 
 Every such step also updates [CHANGELOG.md](../CHANGELOG.md) under
 `[Unreleased]` (Keep a Changelog). On an explicit version cut, rename
-`[Unreleased]` to `[X.Y.Z] - date` and open a fresh empty `[Unreleased]`. Image
-tag / push only on explicit request (see `release.yml`).
+`[Unreleased]` to `[X.Y.Z] - date` and open a fresh empty `[Unreleased]`, then
+tag it `vX.Y.Z` (see `release.yml`).
 
 ### Release image
 
 The release image is published **only** for a SemVer version `X.Y.Z`: a
-**published** GitHub Release whose tag is `vX.Y.Z`, or a `workflow_dispatch`
-that supplies that version. Pushing a git tag alone does not publish. Ordinary
-commits, and a dispatch from `main` without a version input, do not publish.
+pushed git tag `vX.Y.Z`, or a `workflow_dispatch` that supplies that version
+(the tag must exist). Every version cut is tagged, so every version has its
+image (owner, 2026-10-25; before that a tag only on his word, which is why
+`2.0.1` to `2.16.2` have none). Ordinary commits do not publish.
 The version is the single source that drives the image tag and `-ldflags` in
 the binaries so they cannot drift apart. The e2e gate rebuilds the image it
 then pushes, so `release.yml` hands it the version as `SELFPOST_E2E_VERSION`;
@@ -337,7 +338,7 @@ both compare `panel -version` and `selfpost-backup -version` with it. (Until
 `2.4.2` the rebuild stamped every published image `e2e`; those images stay as
 they are.)
 
-**Steps (on explicit request):**
+**Steps (every version cut):**
 
 1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pinned
    tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
