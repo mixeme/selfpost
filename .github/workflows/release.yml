@@ -86,6 +86,8 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.26"
+          # The newest patch, not the runner image's cached one (test.yml).
+          check-latest: true
           cache-dependency-path: test/e2e/go.sum
 
       - name: e2e (gates publishing — see docs/development.md)

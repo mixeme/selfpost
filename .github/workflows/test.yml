@@ -25,9 +25,14 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash .github/scripts/design-first.sh "$BASE" "$HEAD"
 
+      # check-latest: the runner image caches a Go patch release that can be
+      # behind the newest, and the vulnerability check below is about this
+      # Go's standard library (GO-2026-6809, fixed in 1.26.10, went red here
+      # on a cached 1.26.9 the day it came out).
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.26"
+          check-latest: true
           cache: true
           cache-dependency-path: |
             go.sum

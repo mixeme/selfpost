@@ -32,6 +32,10 @@ ghcr.io, and one dead branch in the code. Nothing to do besides the tag.
   is `3.22.0-1+b2`, Debian's binary-only rebuild with no source changes
   (2025-04-07); the check compared binary versions and failed the arm64
   build of `v2.16.2` on a difference nothing cited is in.
+- **CI takes the newest Go 1.26 patch**, not the one the runner image
+  caches: GO-2026-6809 (`crypto/x509`, fixed in 1.26.10) turned the `test`
+  workflow red on a cached 1.26.9. The image's binaries are built by
+  `golang:1.26-trixie`, already 1.26.10, and checked again before a push.
 
 ### Documentation
 
