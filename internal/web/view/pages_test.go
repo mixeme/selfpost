@@ -272,6 +272,21 @@ func TestHealthStatesTheFixtureDoesNotDraw(t *testing.T) {
 	}
 }
 
+// The Hostname card's note is drawn only when there is one: muted, or red
+// for a problem receivers refuse mail for.
+func TestHealthHostnameNote(t *testing.T) {
+	h := healthFixture(false)
+	if out := renderSignedIn(t, "health", h); strings.Count(out, `<p class="mt-4 `) != 1 {
+		t.Error("an ok Hostname card has a note (the certificate's is the page's only one)")
+	}
+	h.HostDetail = "Could not check the reverse DNS of 203.0.113.25: the DNS lookup failed (timed out). Try Re-check in a moment."
+	pageHas(t, "Health", renderSignedIn(t, "health", h),
+		`<p class="mt-4 sp-muted">Could not check the reverse DNS of 203.0.113.25`)
+	h.HostDetail, h.HostProblem = "No address of mail.example.org has a reverse (PTR) record pointing back at it.", true
+	pageHas(t, "Health", renderSignedIn(t, "health", h),
+		`<p class="mt-4 has-text-danger">No address of mail.example.org has a reverse (PTR) record`)
+}
+
 func TestNewHealthFlash(t *testing.T) {
 	if h := NewHealth(admin(), ""); h.Flash != nil {
 		t.Error("a flash without a message")

@@ -30,7 +30,6 @@ directory).
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Stage H of the 2026-10-17 security audit: the test server's host (S1, S2, S5) and its DNS (S3) | stages 0-6 shipped `2.14.4`, the product side of S3 `2.15.0`; stage H the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) § Stage H |
 | go-milter-upstream | An issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
-| ptr-detail | Health's Hostname and reverse DNS card shows why it is not ok | candidate | — | § ptr-detail below |
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -90,29 +89,6 @@ one SMTP session over the one milter connection smtpd opened (Postfix
 cleanup; src/smtpd/smtpd.c:3475, milter_send()).
 When upstream releases a version that does not keep the map (or offers the
 option), `third_party/go-milter` goes and `go.mod`'s `replace` with it.
-
----
-
-## ptr-detail
-
-**Problem (found 2026-10-25, on a host with no PTR):** `internal/dnscheck`
-writes a sentence for each outcome of the reverse-DNS check
-(`checkServer`, `srv.PTR.Detail`): no PTR and what to ask the provider, only
-N of M addresses matching, the lookup not answered. Since the 2.x pages no
-page shows it: card 05 of Server › Health gives the hostname, a `Lookup`
-line per address and the greeting, and its Help topic the general rule. For
-a PTR that is missing or names another host the `Lookup` line says enough;
-for a lookup that was not answered (status unknown) nothing on the page says
-what happened or that it is not the PTR's fault.
-
-**Goal:** the card shows the check's sentence under its facts whenever its
-status is not ok, as the certificate card does (`CertDetail`).
-
-**Size:** about 45 minutes with a view test and the Health page test; no
-migration.
-
-**Done when:** a Health page with an unanswered reverse lookup, and one
-with a partial match, each show the sentence; an ok one shows none.
 
 ---
 

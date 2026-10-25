@@ -335,6 +335,9 @@ func healthPage(m view.Meta, c healthReadings, flash string) *view.Health {
 		}
 		page.HostFacts = append(page.HostFacts, view.Fact{Label: "Lookup", Value: lookup, Mono: true})
 	}
+	if ptr.Status != health.StatusOK {
+		page.HostDetail, page.HostProblem = ptr.Detail, ptr.Status == health.StatusError
+	}
 	// The greeting must name the hostname: a receiver compares it with the
 	// name it looked up, and a container id or localhost there reads as a
 	// misconfigured host. A banner that could not be read says nothing.

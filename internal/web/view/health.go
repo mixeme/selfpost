@@ -44,6 +44,11 @@ type Health struct {
 	SocketRows []SocketRow
 	Hostname   Box
 	HostFacts  []Fact
+	// HostDetail is the DNS check's sentence when it is not ok, in red
+	// (HostProblem) when mail from the host is refused for it: no address,
+	// no PTR, none that matches (owner, 2026-10-26).
+	HostDetail  string
+	HostProblem bool
 
 	// NotifyMail is the card of the DNS records notifications are signed and
 	// authorised with (their values are under Server › Settings); NotifyNote

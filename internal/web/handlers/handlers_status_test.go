@@ -136,6 +136,32 @@ func TestProcessRowOfAnIdleOneShotSaysOnDemand(t *testing.T) {
 	}
 }
 
+// Health's Hostname card says under its facts what the reverse-DNS check
+// found when it is not ok - in red only when it is an error, which receivers
+// refuse mail for (owner, 2026-10-26); an ok card says nothing more.
+func TestHealthHostnameDetail(t *testing.T) {
+	for _, tc := range []struct {
+		status  health.Status
+		detail  string
+		problem bool
+	}{
+		{health.StatusOK, "", false},
+		{health.StatusUnknown, "Could not check the reverse DNS of 203.0.113.25: the DNS lookup failed (timed out). Try Re-check in a moment.", false},
+		{health.StatusWarn, "Only 1 of 2 addresses of mail.example.org have a matching PTR record.", false},
+		{health.StatusError, "No address of mail.example.org has a reverse (PTR) record pointing back at it.", true},
+	} {
+		c := checksFixture()
+		c.PTR = dnscheck.Result{Status: tc.status, Detail: "the check's sentence"}
+		if tc.detail != "" {
+			c.PTR.Detail = tc.detail
+		}
+		page := healthPage(view.Meta{}, c, "")
+		if page.HostDetail != tc.detail || page.HostProblem != tc.problem {
+			t.Errorf("%s: detail %q, problem %v; want %q, %v", tc.status, page.HostDetail, page.HostProblem, tc.detail, tc.problem)
+		}
+	}
+}
+
 // Health's Hostname card shows Postfix's greeting on a row of its own, and
 // warns when it names another host; the certificate's names carry whether
 // they are the hostname's.

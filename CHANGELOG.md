@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Health's Hostname and reverse DNS card says what the check found** when
+  it is not ok, under its facts, as the certificate card does: that the
+  lookup was not answered and to re-check (unknown), that only some
+  addresses have a matching PTR (warn), that none has one or the name has
+  no address (error). The sentence was written by the check all along and
+  shown on no page since 2.0.0. Red for an error - receivers refuse or
+  spam-score mail from a host without a matching PTR - muted otherwise
+  (owner, 2026-10-26).
+
 ### Documentation
 
 - **2.16.3 is on ghcr.io** for `amd64` and `arm64`, the first 2.x image

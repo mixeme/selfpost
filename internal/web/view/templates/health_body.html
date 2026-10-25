@@ -41,6 +41,7 @@
   {{template "box_open" .Hostname}}
   {{template "body_open"}}
   {{template "facts" .HostFacts}}
+  {{if .HostDetail}}<p class="mt-4 {{if .HostProblem}}has-text-danger{{else}}sp-muted{{end}}">{{.HostDetail}}</p>{{end}}
   {{template "body_close"}}
   {{template "box_close"}}
   {{template "box_open" .Machine}}
