@@ -7,9 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [2.16.3] - 2026-10-25
 
-No migration; schema 14. The image is 2.16.2's, built again with its new
-version: what changed is the release workflow, so that this one is the
-first 2.x image published on ghcr.io. Nothing to do besides the tag.
+No migration; schema 14. The image does what 2.16.2's does: what changed is
+the release workflow, so that this one is the first 2.x image published on
+ghcr.io, and one dead branch in the code. Nothing to do besides the tag.
+
+### Code
+
+- **A dead branch in the Inbound log's catch-up is gone.** After recording
+  a refusal read from `mail.log`, "the row was there already" returned
+  where the function ended anyway; staticcheck called it a value never used
+  (SA4006), and the `test` workflow had been red on it since 2026-10-17.
+  Nothing the journal records changes.
 
 ### Release workflow
 

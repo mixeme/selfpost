@@ -266,15 +266,13 @@ func (j *inboundJournal) handle(line string, now time.Time, catchingUp bool) {
 		e.Decision = store.SpamDecisionTempfail
 	}
 	if catchingUp {
-		if wrote, err := j.st.InsertInboundSpamOnce(e); err != nil {
-			log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
-			return
-		} else if !wrote {
-			return // read before the last stop
-		}
-	} else if err := j.st.InsertInboundSpam(e); err != nil {
+		// A row read before the last stop is there already and not written.
+		_, err = j.st.InsertInboundSpamOnce(e)
+	} else {
+		err = j.st.InsertInboundSpam(e)
+	}
+	if err != nil {
 		log.Printf("log-tailer: inbound journal: record %s -> %s: %v", from, to, err)
-		return
 	}
 	// Between the six-hourly prunes the store cuts the journal to its cap
 	// every so many rows, the journal milter's and these together
