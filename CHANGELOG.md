@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.3] - 2026-10-25
+
+No migration; schema 14. The image is 2.16.2's, built again with its new
+version: what changed is the release workflow, so that this one is the
+first 2.x image published on ghcr.io. Nothing to do besides the tag.
+
 ### Release workflow
 
 - **A pushed tag `vX.Y.Z` publishes the image**; a GitHub Release is no
