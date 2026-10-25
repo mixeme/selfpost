@@ -357,8 +357,11 @@ tagging — Actions reads that repo, not Gitea.
 
 **Gitea → GitHub tag mirror.** Tags are pushed to Gitea and reach GitHub
 through the push mirror; the mirrored tag push is what starts the build
-(`v2.16.2`, 2026-10-25). Not always: `v2.16.3` had not reached GitHub half
-an hour later, though `main` had. Check `gh api
+(`v2.16.2`, 2026-10-25). Not always: the Gitea host's TLS connection to
+github.com breaks now and then (`TLS connect error ... unexpected eof while
+reading`, the mirror's last error on 2026-10-26), and a sync that failed is
+not retried until the next push or the mirror's interval - `v2.16.3` and
+`v2.16.4` stayed on Gitea alone. Check `gh api
 repos/mixeme/selfpost/git/ref/tags/vX.Y.Z`; if it is absent, create the same
 tag on GitHub (`gh api repos/mixeme/selfpost/git/refs -f
 ref=refs/tags/vX.Y.Z -f sha=<full sha>`) - that starts the run, and the
