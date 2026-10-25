@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.4] - 2026-10-26
+
+No migration; schema 14. Nothing to do besides the tag.
+
 ### Changed
 
 - **Health's Hostname and reverse DNS card says what the check found** when
