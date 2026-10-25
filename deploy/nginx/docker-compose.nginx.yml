@@ -42,7 +42,7 @@ services:
       # container: certbot's directory below is mounted there whole, because
       # its live/ files are relative links into archive/ (mounting live/ alone
       # left them pointing at nothing). docs/guide.md, "Reverse proxy", nginx.
-      - ./certs:/etc/postfix/tls:ro
+      - ./certs:/etc/selfpost/tls:ro
       - ./nginx/certbot-etc:/etc/letsencrypt:ro
 
   nginx:

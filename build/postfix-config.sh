@@ -97,8 +97,8 @@ HOSTNAME_VALUE="${SELFPOST_HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # group 10997 (the panel's alone) for the panel's backup. So the pair is copied into a directory of
 # Postfix's own, the key root:root 0600, before postconf and `postfix check`
 # (assumptions D-arch:154).
-TLS_CERT_SRC="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
-TLS_KEY_SRC="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
+TLS_CERT_SRC="${TLS_CERT_FILE:-/etc/selfpost/tls/fullchain.pem}"
+TLS_KEY_SRC="${TLS_KEY_FILE:-/etc/selfpost/tls/privkey.pem}"
 TLS_INTERNAL_DIR=/etc/postfix/tls-internal
 TLS_CERT="$TLS_CERT_SRC"
 TLS_KEY="$TLS_KEY_SRC"

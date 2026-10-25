@@ -68,6 +68,13 @@ func testCertbotLayout(t *testing.T, sc *scenario) {
 	if got.Cmp(want) != 0 {
 		t.Fatalf("port 465 serves serial %s, want %s, the certificate certs/ links to", got, want)
 	}
+	// The links are mounted outside /etc/postfix, where "postfix check" does
+	// not walk: under /etc/postfix/tls, until 2.16.2, it called each link
+	// "group or other writable" at every start (seen on a fresh host,
+	// 2026-10-25).
+	if logs := h.logs("selfpost"); strings.Contains(logs, "group or other writable") {
+		t.Fatalf("postfix check warns about certs/ links:\n%s", logs)
+	}
 
 	_, body, err := sc.panel.get("/server/health")
 	if err != nil {

@@ -220,7 +220,7 @@ func TestUptime(t *testing.T) {
 // certificate missing at the start, which cert-reload later copies - or
 // while postconf could not be asked, and keeps the copy once it is named.
 func TestServedCertFollowsTheCopy(t *testing.T) {
-	const mounted, copied = "/etc/postfix/tls/fullchain.pem", "/etc/postfix/tls-internal/fullchain.pem"
+	const mounted, copied = "/etc/selfpost/tls/fullchain.pem", "/etc/postfix/tls-internal/fullchain.pem"
 	answers := []string{"", mounted, mounted, copied, mounted}
 	asked := 0
 	s := &ServedCert{mounted: mounted, read: func() string {

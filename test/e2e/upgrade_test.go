@@ -112,7 +112,7 @@ func TestStartsOnA28Data(t *testing.T) {
 	}()
 	if out, err := exec.Command("docker", "run", "-d", "--name", name,
 		"-e", "SELFPOST_HOSTNAME="+host, "-e", "MILTER_WAIT_TIMEOUT=10", "-e", "DMARC_REPORTS_ENABLE=true",
-		"-v", dataDir+":/data", "-v", certDir+":/etc/postfix/tls:ro",
+		"-v", dataDir+":/data", "-v", certDir+":/etc/selfpost/tls:ro",
 		"selfpost:e2e").CombinedOutput(); err != nil {
 		t.Fatalf("docker run: %v\n%s", err, out)
 	}

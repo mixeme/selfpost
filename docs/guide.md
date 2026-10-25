@@ -204,7 +204,7 @@ The [README quick start](../README.md#quick-start) runs a single container
 with `PANEL_COOKIE_SECURE=false` and port 8080 published on localhost. No
 reverse proxy, no `./certs` bind mount — Postfix still starts, but Overview
 and Health will report missing TLS material until you mount PEM files at
-`/etc/postfix/tls/fullchain.pem` and `privkey.pem`.
+`/etc/selfpost/tls/fullchain.pem` and `privkey.pem`.
 
 The one-time setup link is always printed as
 `https://<SELFPOST_HOSTNAME>/setup/<token>` (and written the same way to
@@ -228,7 +228,7 @@ openssl req -x509 -newkey rsa:2048 \
   -days 1 -nodes -subj '/CN=mail.local.test'
 ```
 
-Add `-v /tmp/selfpost-certs:/etc/postfix/tls:ro` to the `docker run` command
+Add `-v /tmp/selfpost-certs:/etc/selfpost/tls:ro` to the `docker run` command
 (and keep `SELFPOST_HOSTNAME=mail.local.test` so it matches the certificate CN).
 Clients must skip TLS verification — the cert is not from a public CA.
 
@@ -471,12 +471,6 @@ have: Postfix then starts without a certificate.
 ln -s /etc/letsencrypt/live/mail.example.com/fullchain.pem certs/fullchain.pem
 ln -s /etc/letsencrypt/live/mail.example.com/privkey.pem certs/privkey.pem
 ```
-
-`postfix check` then warns at every start, in the container's log, that the
-two are "group or other writable": it looks at the links themselves, whose
-mode is always 0777, not at the files they lead to (Postfix 3.10.13,
-`conf/postfix-script:375`, `find` without `-L`). The warning is harmless;
-Postfix reads the files.
 
 `certbot --apache` also adds a redirect of its own to the vhost's port-80
 part, after the fragment's, and with it the challenge path is redirected to

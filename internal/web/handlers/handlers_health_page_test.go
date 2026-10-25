@@ -23,7 +23,7 @@ func healthReading() healthReadings {
 		{Name: "postfix", State: "FATAL", Detail: "exited too quickly", Status: health.StatusError},
 	}
 	c.Cert = health.Certificate{
-		Path: "/etc/postfix/tls/fullchain.pem", Subject: "mail.example.com",
+		Path: "/etc/selfpost/tls/fullchain.pem", Subject: "mail.example.com",
 		NotAfter: time.Date(2026, 11, 8, 9, 14, 0, 0, time.UTC), DaysLeft: 30,
 		Status: health.StatusOK, Detail: "Valid for another 30 day(s).",
 	}

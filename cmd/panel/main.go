@@ -177,7 +177,7 @@ func loadConfig() config {
 		rateLimitMessagesPerIP: envInt("RATE_LIMIT_MESSAGES_PER_IP", 100),
 		rateLimitWindowSeconds: envInt("RATE_LIMIT_WINDOW_SECONDS", 3600),
 
-		tlsCertFile:       envDefault("TLS_CERT_FILE", "/etc/postfix/tls/fullchain.pem"),
+		tlsCertFile:       envDefault("TLS_CERT_FILE", "/etc/selfpost/tls/fullchain.pem"),
 		tlsReloadInterval: time.Duration(envInt("TLS_RELOAD_INTERVAL_SECONDS", 86400)) * time.Second,
 
 		// Per-domain DKIM state (architecture.md § DKIM signing): the keys and

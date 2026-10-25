@@ -40,8 +40,8 @@ services:
       # Caddy names certificate files after the hostname, not
       # fullchain.pem/privkey.pem like certbot, in a folder of the same name -
       # override the base file's paths to match.
-      TLS_CERT_FILE: /etc/postfix/tls/<hostname>/<hostname>.crt
-      TLS_KEY_FILE: /etc/postfix/tls/<hostname>/<hostname>.key
+      TLS_CERT_FILE: /etc/selfpost/tls/<hostname>/<hostname>.crt
+      TLS_KEY_FILE: /etc/selfpost/tls/<hostname>/<hostname>.key
     volumes: !override
       - ./data:/data
       - .:/selfpost-deploy:ro
@@ -54,7 +54,7 @@ services:
       # hostname's folder kept pointing at the deleted one, and Postfix had
       # no certificate until the container was recreated (measured on a fresh
       # host, 2026-10-25: two folders, two inodes).
-      - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/etc/postfix/tls:ro
+      - ./caddy/caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/etc/selfpost/tls:ro
 
   caddy:
     # Pinned to a release: "2" moves under a running server (security audit

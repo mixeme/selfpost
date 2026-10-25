@@ -84,8 +84,8 @@ func checkCertRenewalPickedUp(s *stack) error {
 	// The path that was broken is the one taken: Postfix reads the copy, and
 	// the copy is the renewed file, the key private to root.
 	out, err := s.execIn("selfpost", "sh", "-c",
-		"postconf -h smtpd_tls_cert_file && cmp /etc/postfix/tls/fullchain.pem /etc/postfix/tls-internal/fullchain.pem && "+
-			"cmp /etc/postfix/tls/privkey.pem /etc/postfix/tls-internal/privkey.pem && stat -c '%a %U' /etc/postfix/tls-internal/privkey.pem")
+		"postconf -h smtpd_tls_cert_file && cmp /etc/selfpost/tls/fullchain.pem /etc/postfix/tls-internal/fullchain.pem && "+
+			"cmp /etc/selfpost/tls/privkey.pem /etc/postfix/tls-internal/privkey.pem && stat -c '%a %U' /etc/postfix/tls-internal/privkey.pem")
 	if err != nil {
 		return fmt.Errorf("the certificate Postfix reads: %v\n%s", err, out)
 	}
@@ -138,7 +138,7 @@ func checkCertArrivingAfterStart(s *stack) error {
 		return fmt.Errorf("%w\n%s", err, s.logs("selfpost"))
 	}
 	out, err := s.execIn("selfpost", "postconf", "-h", "smtpd_tls_cert_file")
-	if err != nil || strings.TrimSpace(out) != "/etc/postfix/tls/fullchain.pem" {
+	if err != nil || strings.TrimSpace(out) != "/etc/selfpost/tls/fullchain.pem" {
 		_ = putBack()
 		return fmt.Errorf("with no certificate at start Postfix reads %q (%v), want the mounted path itself", out, err)
 	}

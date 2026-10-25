@@ -106,7 +106,7 @@ func runEntrypointBackground(t *testing.T, hostnameEnv string) (output string, s
 	up := exec.Command("docker", "run", "-d", "--name", name,
 		"-e", "SELFPOST_HOSTNAME="+hostnameEnv,
 		"-v", dataDir+":/data",
-		"-v", certDir+":/etc/postfix/tls:ro",
+		"-v", certDir+":/etc/selfpost/tls:ro",
 		"selfpost:e2e")
 	if out, err := up.CombinedOutput(); err != nil {
 		return string(out), false

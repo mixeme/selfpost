@@ -305,7 +305,7 @@ func addDeployFiles(a *archive, deployRoot string, onWarn func(string)) error {
 		return err
 	}
 	// certs/ is what Postfix serves its certificate from (the compose file
-	// mounts it at /etc/postfix/tls). There and empty - or holding only what
+	// mounts it at /etc/selfpost/tls). There and empty - or holding only what
 	// the archive cannot carry - it would give an archive that restores a
 	// server without its certificate, so there is none (audit 2026-10-12,
 	// L2).

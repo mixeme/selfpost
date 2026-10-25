@@ -29,8 +29,8 @@ services:
       SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"
       # Path Postfix reads inside the container — matches the certs bind mount
       # below. Point these at your reverse-proxy's PEM output.
-      TLS_CERT_FILE: /etc/postfix/tls/fullchain.pem
-      TLS_KEY_FILE: /etc/postfix/tls/privkey.pem
+      TLS_CERT_FILE: /etc/selfpost/tls/fullchain.pem
+      TLS_KEY_FILE: /etc/selfpost/tls/privkey.pem
       # Set to true to also publish RFC 6409 submission (587/STARTTLS) alongside
       # the primary 465/smtps listener.
       SUBMISSION_ENABLE: "${SUBMISSION_ENABLE:-false}"
@@ -76,8 +76,13 @@ services:
       - .:/selfpost-deploy:ro
       # Read-only: SelfPost only ever reads certificates, never manages them.
       # ./certs holds fullchain.pem and privkey.pem: the files themselves, or
-      # links to where your reverse proxy's certbot keeps them.
-      - ./certs:/etc/postfix/tls:ro
+      # links to where your reverse proxy's certbot keeps them. Mounted outside
+      # /etc/postfix: Postfix serves a copy (build/postfix-config.sh), and
+      # "postfix check" walks /etc/postfix and calls every link there "group
+      # or other writable" - a link's own mode is 0777 (Postfix 3.10.13,
+      # conf/postfix-script:375, find without -L). Until 2.16.2 it was
+      # /etc/postfix/tls, and certbot's links warned at every start.
+      - ./certs:/etc/selfpost/tls:ro
       # With certbot on the host (docs/guide.md, "Reverse proxy (mandatory)", Apache):
       # certs/ holds links into /etc/letsencrypt/live/, and certbot's live/
       # files are themselves relative links into archive/ - so the whole

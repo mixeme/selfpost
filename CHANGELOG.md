@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **The certificate is mounted at `/etc/selfpost/tls`, outside Postfix's
+  `/etc/postfix`.** With `certs/` as links to certbot's files, as the guide
+  sets it up, `postfix check` called each link "group or other writable" at
+  every start: it walks `/etc/postfix` and sees a link's own mode, 0777
+  (Postfix 3.10.13, `conf/postfix-script:375`). Postfix serves a copy of the
+  pair, so the mount has no reason to be there. The compose files and their
+  `TLS_CERT_FILE`/`TLS_KEY_FILE` name the new path; a compose file that still
+  mounts `/etc/postfix/tls` and names it in `TLS_CERT_FILE` works as before,
+  warning included. e2e `certbot_layout_followed` checks the log has no such
+  warning.
+
 ## [2.16.1] - 2026-10-25
 
 Every proxy of `deploy/` set up from scratch on a fresh Debian 13 host with

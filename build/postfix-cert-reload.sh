@@ -26,8 +26,8 @@ set -u
 umask 077 # the key's copy is never readable by others, not even for an instant
 
 INTERVAL="${TLS_RELOAD_INTERVAL_SECONDS:-86400}"
-SRC_CERT="${TLS_CERT_FILE:-/etc/postfix/tls/fullchain.pem}"
-SRC_KEY="${TLS_KEY_FILE:-/etc/postfix/tls/privkey.pem}"
+SRC_CERT="${TLS_CERT_FILE:-/etc/selfpost/tls/fullchain.pem}"
+SRC_KEY="${TLS_KEY_FILE:-/etc/selfpost/tls/privkey.pem}"
 DIR=/etc/postfix/tls-internal
 CERT="$DIR/fullchain.pem"
 KEY="$DIR/privkey.pem"

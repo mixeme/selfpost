@@ -228,7 +228,9 @@ smtp/inet` removes Debian's stock smtpd). Outbound delivery still uses the
   The queue id in the header leads to the message's row in the panel's log
   and to smtpd's `client=` line in mail.log.
 - **Chroot disabled** for all services (DNS/TLS inside container).
-- **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`, copied
+- **TLS certs** — read-only mount at `TLS_CERT_FILE` / `TLS_KEY_FILE`
+  (`/etc/selfpost/tls/`, outside `/etc/postfix`, whose links `postfix check`
+  calls "group or other writable"; `/etc/postfix/tls` until `2.16.2`), copied
   at start into `/etc/postfix/tls-internal`, owned by root, the key `0600`
   (the certificate `0644`) as Postfix's TLS_README advises (Postfix itself reads the key as root and does
   not check its mode), which the mount cannot give; Postfix reads the copy.
