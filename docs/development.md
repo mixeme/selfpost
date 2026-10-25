@@ -224,8 +224,10 @@ module cache at the version `go.mod` pins.
 The image takes `debian:trixie-slim` and installs without pinning (pinned
 Debian versions leave the mirrors), so a rebuild after a point or security
 release runs packages the citations were not read against. The versions
-read are these; the e2e stand compares them with `dpkg-query` in the image
-it built (`checkCitedPackageVersions`), and a difference fails the run -
+read are these - source versions, which a binary-only rebuild (`+bN`, on
+one architecture) does not change; the e2e stand compares them with
+`dpkg-query` in the image it built (`checkCitedPackageVersions`), and a
+difference fails the run -
 re-read what changed, update the citations, then this table:
 
 <!-- cited-package-versions -->

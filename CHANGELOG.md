@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Release workflow
+
+- **A pushed tag `vX.Y.Z` publishes the image**; a GitHub Release is no
+  longer needed. Other tags start nothing.
+- **The e2e gate runs as root**, as on the test machine it is written and
+  run on. On the runner's own user, the first 2.x release run (`v2.16.2`)
+  failed three tests that plant files in, or remove, a `/data` the image's
+  accounts own - `permission denied`, nothing in the image. No image was
+  published from that tag.
+- **The cited-package check compares source versions.** On arm64, logrotate
+  is `3.22.0-1+b2`, Debian's binary-only rebuild with no source changes
+  (2025-04-07); the check compared binary versions and failed the arm64
+  build of `v2.16.2` on a difference nothing cited is in.
+
 ### Documentation
 
 - **Upgrading › To 2.16.2:** the three lines of `docker-compose.yml` that

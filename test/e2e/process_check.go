@@ -91,7 +91,11 @@ func checkInboundRelayOff(s *stack) error {
 // the versions their sources were read at (docs/development.md, the table
 // between the cited-package-versions markers). The image installs unpinned
 // from a moving trixie, so a point release changes them on a rebuild
-// without anyone reading what changed (assumptions C-D1).
+// without anyone reading what changed (assumptions C-D1). The citations are
+// of the source, so the source version is compared: a binary-only rebuild
+// changes the binary version on one architecture and nothing that was read
+// (logrotate is 3.22.0-1+b2 on arm64 only - "Binary-only non-maintainer
+// upload for arm64; no source changes", 2025-04-07).
 func checkCitedPackageVersions(s *stack) error {
 	doc, err := os.ReadFile(filepath.Join(s.repoRoot, "docs", "development.md"))
 	if err != nil {
@@ -113,7 +117,7 @@ func checkCitedPackageVersions(s *stack) error {
 	if len(names) == 0 {
 		return fmt.Errorf("the cited-package-versions table lists no package")
 	}
-	out, err := s.execIn("selfpost", append([]string{"dpkg-query", "-W", "-f", "${Package} ${Version}\n"}, names...)...)
+	out, err := s.execIn("selfpost", append([]string{"dpkg-query", "-W", "-f", "${Package} ${source:Version}\n"}, names...)...)
 	if err != nil {
 		return fmt.Errorf("dpkg-query: %v\n%s", err, out)
 	}

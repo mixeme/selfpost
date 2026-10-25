@@ -93,9 +93,17 @@ jobs:
         # that rebuild is the image pushed below. Without the version here it
         # was stamped "e2e" (audit 2026-10-12, H1); the suite now checks the
         # stamp against this variable.
+        # As root, as on the test machine the e2e is written and run on: the
+        # stands leave the /data they mount owned by the image's accounts, and
+        # the tests plant files in it and remove it afterwards. Root has its
+        # own Go caches (HOME=/root), so the runner's stay writable for the
+        # steps below.
         env:
           SELFPOST_E2E_VERSION: ${{ needs.prepare.outputs.version }}
-        run: cd test/e2e && go test -v -timeout 20m ./...
+        run: |
+          cd test/e2e
+          sudo --preserve-env=SELFPOST_E2E_VERSION env "PATH=$PATH" HOME=/root \
+            go test -v -timeout 20m ./...
 
       - name: Check the version stamp of the image about to be pushed
         env:
