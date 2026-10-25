@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.2] - 2026-10-25
+
+No migration; schema 14. The compose file changed (the certificate's mount
+and `TLS_CERT_FILE`/`TLS_KEY_FILE`): take the new one along with the image.
+
 ### Changed
 
 - **The certificate is mounted at `/etc/selfpost/tls`, outside Postfix's
