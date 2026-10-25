@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Documentation
+
+- **2.16.3 is on ghcr.io** for `amd64` and `arm64`, the first 2.x image
+  there (pulled anonymously and checked: `panel -version` says `2.16.3`).
+  README, the compose file and the guide no longer tell to build the image
+  first; Upgrading is a tag, `docker compose pull` and `up -d`. Building it
+  yourself stays in the guide, with what the build needs.
+- **The release steps** in development.md: a pushed tag publishes, no GitHub
+  Release; a failed run's tag is left and the fix is the next version; how
+  the Gitea mirror carries tags, and why tags are never moved.
+
 ## [2.16.3] - 2026-10-25
 
 No migration; schema 14. The image does what 2.16.2's does: what changed is

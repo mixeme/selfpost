@@ -126,9 +126,8 @@ One vCPU is enough to run it: at rest SelfPost and rspamd use under 0.1 % of
 a CPU. The image is built and run on `amd64` and `arm64`; rspamd's image is
 published for both.
 
-**Building the image.** As long as no 2.x image is published (see [Fixed
-image tag](#fixed-image-tag)), every installation builds its own, and the
-build needs more than running does:
+**Building the image** yourself, instead of pulling the published one (see
+[Fixed image tag](#fixed-image-tag)), needs more than running does:
 
 - **Memory: 1.5 GB.** The Go compiler is the largest part: the build was
   killed for want of memory at 1 GB and at 512 MB (on `modernc.org/sqlite`
@@ -347,9 +346,10 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `2.16.3`. **No 2.x image is
-published on ghcr.io yet** (the newest there is `1.3.0`); until one is, build
-it from the checkout under the pinned name, and Compose uses the local image
+deliberately never `:latest`. The current pin is `2.16.3`, published on
+ghcr.io for `amd64` and `arm64` - the first 2.x image there; `2.0.0` to
+`2.16.2` were never published. To build it yourself instead, build the
+checkout of that tag under the pinned name, and Compose uses the local image
 instead of pulling:
 
 ```sh
@@ -947,9 +947,8 @@ left open will not keep a session alive forever.
 
 ### Upgrading
 
-Bump the pinned image tag in `docker-compose.yml` to the target release, build
-that tag as under [Fixed image tag](#fixed-image-tag) while no 2.x image is
-published, then `docker compose up -d`. The backup version check requires the running image
+Bump the pinned image tag in `docker-compose.yml` to the target release, then
+`docker compose pull` and `docker compose up -d`. The backup version check requires the running image
 to match the version that created a full backup — see [Fixed image
 tag](#fixed-image-tag). A release that changes `deploy/docker-compose.yml`
 beyond the tag says so in its CHANGELOG section and below; make the same

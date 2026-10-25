@@ -120,16 +120,6 @@ One container, panel at `http://127.0.0.1:8080` — no reverse proxy, no TLS
 files, no compose files. Good for clicking through the UI on your machine;
 outbound mail will not reach the real internet without DNS, PTR, and port 25.
 
-> **The 2.x line is not published on ghcr.io yet** (the newest image there is
-> `1.3.0`). Until it is, build the image from this checkout under the name the
-> commands below and `deploy/docker-compose.yml` use; Docker then takes the
-> local image and pulls nothing:
->
-> ```sh
-> docker build -f build/Dockerfile --build-arg VERSION=2.16.3 \
->   -t ghcr.io/mixeme/selfpost:2.16.3 .
-> ```
-
 ```sh
 docker run --rm -d --name selfpost-try \
   -p 127.0.0.1:8080:8080 \

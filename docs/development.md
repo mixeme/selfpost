@@ -341,48 +341,34 @@ they are.)
 
 1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pinned
    tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
-   local-trial image references) in the **same** release commit. While no
-   image of the current line is published, README, guide § Fixed image tag
-   and the compose file's header say so and show the local build under the
-   pinned name; bump the version there too. The first publication of the
-   line removes those notes.
-2. Create and push git tag `vX.Y.Z` on that commit.
-3. Publish the GitHub Release for `vX.Y.Z` (not a draft).
-4. Workflow [release.yml](../.github/workflows/release.yml) builds, e2e-gates,
-   and publishes `ghcr.io/mixeme/selfpost:X.Y.Z` (checks out tag `vX.Y.Z`).
-
-**GitHub Release vs GHCR.** The public [Releases](https://github.com/mixeme/selfpost/releases)
-page lists only **published** releases. A draft is visible to maintainers only —
-it looks like “no releases” to everyone else. CI does not create or publish the
-GitHub Release; you do that in the UI. Deleting a release’s git tag on GitHub
-(or re-pushing tags while cleaning the registry) converts a published release
-back into a **draft** — that matches “I published three times and it keeps
-disappearing”. After publish, leave the tag on GitHub; clean up only unwanted
-GHCR package versions, not the git tag.
+   local-trial image references, and the local build in guide § Fixed image
+   tag) in the **same** release commit.
+2. Create and push git tag `vX.Y.Z` on that commit (lightweight, like the
+   earlier ones). No GitHub Release is needed.
+3. Workflow [release.yml](../.github/workflows/release.yml) runs on the tag
+   push: it builds, e2e-gates, and publishes `ghcr.io/mixeme/selfpost:X.Y.Z`
+   (checks out tag `vX.Y.Z`). Only a `vX.Y.Z` tag starts it; a failed run
+   publishes nothing, and its tag is left as it is - the fix goes into the
+   next version (`v2.16.2` is one such tag; `2.16.3` is its image).
 
 Push workflow and source changes to **github.com/mixeme/selfpost** before
-publishing — Actions reads that repo, not Gitea.
+tagging — Actions reads that repo, not Gitea.
 
-**Gitea → GitHub tag mirror.** If every tag push from Gitea is mirrored to
-GitHub, two things follow:
+**Gitea → GitHub tag mirror.** Tags are pushed to Gitea and reach GitHub
+through the push mirror; the mirrored tag push is what starts the build
+(measured on `v2.16.2`, 2026-10-25). Two things follow:
 
-1. **GitHub Release tags must not be deleted on GitHub.** Many mirror setups
-   prune remote tags that are absent on Gitea (or re-push with `--force` /
-   `--prune`). Deleting `v1.0.0` / `v1.3.0` on GitHub converts a published
-   Release back to draft. Mirror **branches and new tags forward**; do not
-   delete release tags on the GitHub side. GHCR cleanup is package versions in
-   the UI — not `git push github --delete` and not tag prune on the mirror.
-
-2. **Tag push runs the workflow file at that tag's commit**, not `main`. `v1.0.0`
-   still points at a commit whose `release.yml` has `on: push: tags` and no
-   per-arch GHCR cleanup — every mirror (re)push of that tag can republish
-   `1.0.0-amd64` / `1.0.0-arm64`. Tags from `v1.3.0` onward only run
-   `release.yml` on **Publish release** (`release: published`), so mirroring
-   those tags alone does not start the image build.
-
-   Safe mirror: push tags to GitHub without deleting existing ones; keep release
-   tags on Gitea; publish the GitHub Release on github.com after the mirror has
-   the tag.
+1. **A tag push runs the workflow file at that tag's commit**, not `main`'s.
+   A change to `release.yml` takes effect only for tags on commits that have
+   it; re-running an old tag runs its old workflow (or, by
+   `workflow_dispatch`, `main`'s workflow on the old tag's code and tests).
+2. **Tags are never deleted or moved**, on either side. GitHub fires a push
+   for a tag only when the ref changes, so an unchanged tag the mirror
+   pushes again starts nothing; a tag deleted and pushed again starts its
+   workflow again - for `v1.0.0`, whose workflow also runs on `push: tags`,
+   that would republish `1.0.0-amd64` / `1.0.0-arm64`. The GitHub Releases
+   of `1.0.0` and `1.3.0` stay; deleting their tags would turn them back
+   into drafts. GHCR cleanup is package versions, not tags.
 
 Ordinary commits **do not** publish an image. The compose pin and the git tag
 must match (`1.0.0` / `v1.0.0` for the first published release). Intermediate
