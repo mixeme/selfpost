@@ -63,7 +63,7 @@ jobs:
       - name: Vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-      # The e2e module runs only in release.yml, after a release is published;
+      # The e2e module runs only in release.yml, on a pushed vX.Y.Z tag;
       # a type error there would first show up then. Compile it here without
       # running it: `go test -run` would still run TestMain, which brings up
       # the whole stand.

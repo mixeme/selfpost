@@ -1,9 +1,9 @@
 name: release
 
 # Publishes an immutable, version-tagged image on ghcr.io.
-# Ordinary commits and bare git tag pushes do not publish anything. A published
-# GitHub Release runs this workflow directly (same pattern as gosentry / imap-scrub).
-# You can also run it manually via workflow_dispatch with an explicit SemVer X.Y.Z.
+# Pushing a tag vX.Y.Z runs it; ordinary commits publish nothing, and no GitHub
+# Release is needed. You can also run it manually via workflow_dispatch with an
+# explicit SemVer X.Y.Z (the tag vX.Y.Z must exist: that is what is checked out).
 #
 # Native per-architecture builds (see docs/development.md), not qemu: running
 # the full Postfix and panel stack under emulation for the e2e gate below is
@@ -15,8 +15,8 @@ name: release
 # tag: they are the images the multi-arch manifest points at, and GHCR cannot
 # drop a tag without deleting the image behind it.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
     inputs:
       version:
@@ -38,18 +38,18 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "release" ]; then
-            raw="${RELEASE_TAG:-}"
+          if [ "$EVENT_NAME" = "push" ]; then
+            raw="${TAG:-}"
           else
             raw="${INPUT_VERSION:-}"
           fi
           raw="${raw#v}"
           if ! [[ "$raw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::release version is not SemVer X.Y.Z (event=${EVENT_NAME}; tag=${RELEASE_TAG:-} input=${INPUT_VERSION:-}). Refusing to publish ghcr.io/${{ github.repository }}:${raw:-?}"
+            echo "::error::release version is not SemVer X.Y.Z (event=${EVENT_NAME}; tag=${TAG:-} input=${INPUT_VERSION:-}). Refusing to publish ghcr.io/${{ github.repository }}:${raw:-?}"
             exit 1
           fi
           echo "version=${raw}" >> "$GITHUB_OUTPUT"
