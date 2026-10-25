@@ -356,7 +356,12 @@ tagging — Actions reads that repo, not Gitea.
 
 **Gitea → GitHub tag mirror.** Tags are pushed to Gitea and reach GitHub
 through the push mirror; the mirrored tag push is what starts the build
-(measured on `v2.16.2`, 2026-10-25). Two things follow:
+(`v2.16.2`, 2026-10-25). Not always: `v2.16.3` had not reached GitHub half
+an hour later, though `main` had. Check `gh api
+repos/mixeme/selfpost/git/ref/tags/vX.Y.Z`; if it is absent, create the same
+tag on GitHub (`gh api repos/mixeme/selfpost/git/refs -f
+ref=refs/tags/vX.Y.Z -f sha=<full sha>`) - that starts the run, and the
+mirror's later push of the same ref changes nothing. Two things follow:
 
 1. **A tag push runs the workflow file at that tag's commit**, not `main`'s.
    A change to `release.yml` takes effect only for tags on commits that have
