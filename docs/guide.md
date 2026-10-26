@@ -1328,10 +1328,11 @@ changes. Set up the reverse-proxy vhost separately (not in the backup). What
 else changes with the host (measured 2026-10-25, moving the test server's
 backup to a second host under a new name):
 
-- **A new IP** needs the A record and the PTR, and the SPF record of every
-  outbound domain: the record the panel shows names the server's address
-  (`ip4:`), so each domain's SPF fails until it names the new one
-  (*Outbound › Domains*).
+- **A new IP** needs the A record and the PTR. A domain whose SPF names the
+  server (`a:<SELFPOST_HOSTNAME>`, what the panel suggests since 2.16.6)
+  follows the A record; one that names the old address (`ip4:`, what the
+  panel suggested before) fails SPF until it is changed - the domain's page
+  says which (*Outbound › Domains*).
 - **A new hostname** gives notification mail a new DKIM key: the first start
   makes one for the new name and removes the old name's. Publish the records
   *Server › Settings* shows; the domains' own keys come over unchanged.
@@ -1815,7 +1816,12 @@ forwarding domain is a different object — it needs an MX, not these TXT
 records; see [Inbound relay](#inbound-relay).
 
 - **SPF** — a TXT record on the domain authorizing this server to send on its
-  behalf (e.g. `v=spf1 a mx ip4:<server IP> -all`, adjusted to your setup).
+  behalf. The panel suggests `v=spf1 a:<SELFPOST_HOSTNAME> -all`: the server's
+  name rather than its address, so that a move to another address changes
+  the name's A record and no domain's SPF. A domain that already publishes
+  SPF for other senders adds `a:<SELFPOST_HOSTNAME>` to its one record. A
+  record that names the address (`ip4:`) still passes; the check then says a
+  move would need it changed.
 - **DKIM** — a TXT record with the exact value the panel shows on that
   domain's page (*DNS records* box), one selector per domain.
 - **DMARC** — a `_dmarc` TXT record. The panel suggests `p=none` (monitoring

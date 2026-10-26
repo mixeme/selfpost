@@ -8,25 +8,11 @@ import (
 	"github.com/mixeme/selfpost/internal/health"
 )
 
+// The record names the server's host, never its addresses: a move to another
+// address then leaves every domain's SPF as it is.
 func TestSPFExample(t *testing.T) {
-	cases := []struct {
-		name     string
-		hostname string
-		ips      []string
-		want     string
-	}{
-		{"ipv4", "mail.example.com", []string{"203.0.113.10"}, "v=spf1 ip4:203.0.113.10 -all"},
-		{"both families", "mail.example.com", []string{"203.0.113.10", "2001:db8::1"},
-			"v=spf1 ip4:203.0.113.10 ip6:2001:db8::1 -all"},
-		{"no addresses", "mail.example.com", nil, "v=spf1 a:mail.example.com -all"},
-		{"unparsable addresses", "mail.example.com", []string{"not-an-ip"}, "v=spf1 a:mail.example.com -all"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := SPFExample(c.hostname, c.ips); got != c.want {
-				t.Errorf("SPFExample = %q, want %q", got, c.want)
-			}
-		})
+	if got, want := SPFExample("mail.example.com"), "v=spf1 a:mail.example.com -all"; got != want {
+		t.Errorf("SPFExample = %q, want %q", got, want)
 	}
 }
 
@@ -64,7 +50,7 @@ func TestMissingRecordChecksSuggestTheShownExample(t *testing.T) {
 	if spf.Status != health.StatusError {
 		t.Fatalf("SPF status = %q, want error (%s)", spf.Status, spf.Detail)
 	}
-	if want := SPFExample("mail.example.com", []string{"203.0.113.10"}); !strings.Contains(spf.Detail, want) {
+	if want := SPFExample("mail.example.com"); !strings.Contains(spf.Detail, want) {
 		t.Errorf("SPF advice %q does not suggest %q", spf.Detail, want)
 	}
 

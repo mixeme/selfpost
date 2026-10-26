@@ -69,7 +69,7 @@ func (h *Handlers) outDomainRows(domains []store.Domain, retention int, canDelet
 				logf("panel: domains: domain %d: dkim record: %v", d.ID, err)
 				return
 			}
-			dns, _ := h.domainDNS(d, record, d.DMARCRua, false)
+			dns := h.domainDNS(d, record, d.DMARCRua, false)
 			rows[i].DNS = dnsTags(dns.DKIM.Status, dns.SPF.Status, dns.DMARC.Status)
 		}()
 	}

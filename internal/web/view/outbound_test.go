@@ -97,7 +97,7 @@ func TestOutDomainRecordsSayWhatDNSHolds(t *testing.T) {
 	pageHas(t, "Domain", out,
 		`<h3>DKIM</h3>`, `<span class="tag is-success is-light">published</span>`, `selector <code>sp2026</code>`,
 		`sp2026._domainkey.example.org`, `<textarea class="textarea" rows="3" readonly>`,
-		`<h3>SPF</h3>`, `<span class="tag is-danger is-light">mismatch</span>`, `v=spf1 ip4:203.0.113.25 ~all`,
+		`<h3>SPF</h3>`, `<span class="tag is-danger is-light">mismatch</span>`, `v=spf1 a:mail.example.org ~all`,
 		`In DNS now`, `v=spf1 include:_spf.google.com ~all`, `Shallow check: <code>include:</code> is not followed.`,
 		`<h3>DMARC</h3>`, `Report address: <a href="/outbound/domains/1/settings">example.org@dmarc.mail.example.org</a>`,
 		`<code>p=none</code> does not affect delivery.`, `<a href="/outbound/dmarc/domains/1">reports</a>`,

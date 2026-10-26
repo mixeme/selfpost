@@ -243,6 +243,33 @@ func TestSPF(t *testing.T) {
 	}
 }
 
+// The record the panel suggests passes the check where the host resolves to
+// the server; one that names the address passes too, with the advice that a
+// move would need it changed; a record that misses the server is told to
+// add the host.
+func TestSPFSuggestsTheHost(t *testing.T) {
+	check := func(record string) Result {
+		f := &fakeResolver{
+			txt:  map[string][]string{"example.com": {record}},
+			addr: map[string][]net.IPAddr{"mail.example.com": ipAddrs("203.0.113.10")},
+		}
+		return newTestChecker(f).checkSPF(context.Background(), Query{
+			Name: "example.com", Hostname: "mail.example.com", ServerIPs: []string{"203.0.113.10"},
+		})
+	}
+	if got := check(SPFExample("mail.example.com")); got.Status != health.StatusOK || strings.Contains(got.Detail, "names the address") {
+		t.Errorf("the suggested record: %q (%s)", got.Status, got.Detail)
+	}
+	if got := check("v=spf1 ip4:203.0.113.10 -all"); got.Status != health.StatusOK ||
+		!strings.Contains(got.Detail, `a move to another one needs this record changed, where "a:mail.example.com"`) {
+		t.Errorf("a record naming the address: %q (%s)", got.Status, got.Detail)
+	}
+	if got := check("v=spf1 ip4:198.51.100.7 -all"); got.Status != health.StatusError ||
+		!strings.Contains(got.Detail, `Add "a:mail.example.com"`) {
+		t.Errorf("a record missing the server: %q (%s)", got.Status, got.Detail)
+	}
+}
+
 func TestSPFAMechanism(t *testing.T) {
 	f := &fakeResolver{
 		txt:  map[string][]string{"example.com": {"v=spf1 a -all"}},

@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A domain's SPF names the server, not its address.** The record the
+  domain page asks for is `v=spf1 a:<SELFPOST_HOSTNAME> -all` instead of
+  `ip4:<address>`, and a record that does not authorise the server is told
+  to add `a:<SELFPOST_HOSTNAME>`. Moving the server to another address then
+  changes the name's A record - needed anyway, for the PTR and the
+  greeting - and no domain's SPF (owner, 2026-10-26). A record that names the
+  address still passes; the check adds that a move would need it changed.
+  Receivers resolve the name once per check: one of SPF's ten lookups.
+
 ## [2.16.5] - 2026-10-26
 
 No migration; schema 14; the image does what 2.16.4's does. The compose

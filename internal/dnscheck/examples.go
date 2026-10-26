@@ -1,9 +1,6 @@
 package dnscheck
 
-import (
-	"net"
-	"strings"
-)
+import "strings"
 
 // SPF and DMARC are the two records SelfPost cannot generate for the operator:
 // unlike the DKIM record they are policy, not a key, and a domain may already
@@ -23,28 +20,14 @@ func ReportAuthRecordName(hubDomain string) string { return "_report._dmarc." + 
 // ReportAuthExample is the TXT value a hub domain publishes to accept reports.
 func ReportAuthExample() string { return "v=DMARC1;" }
 
-// SPFExample is the SPF record this server expects for a sending domain: the
-// addresses its mail actually leaves from, and "-all" to say that nothing else
-// is authorised. When the server's own addresses are not known (its hostname
-// does not resolve) it falls back to an "a:" mechanism naming the host, so the
-// panel always has something concrete to show.
-func SPFExample(hostname string, serverIPs []string) string {
-	var mechanisms []string
-	for _, s := range serverIPs {
-		ip := net.ParseIP(strings.TrimSpace(s))
-		switch {
-		case ip == nil:
-			continue
-		case ip.To4() != nil:
-			mechanisms = append(mechanisms, "ip4:"+ip.String())
-		default:
-			mechanisms = append(mechanisms, "ip6:"+ip.String())
-		}
-	}
-	if len(mechanisms) == 0 {
-		mechanisms = []string{"a:" + hostname}
-	}
-	return "v=spf1 " + strings.Join(mechanisms, " ") + " -all"
+// SPFExample is the SPF record this server expects for a sending domain: its
+// own name, which receivers resolve to the addresses its mail leaves from, and
+// "-all" to say that nothing else is authorised. The name rather than the
+// addresses, so that moving the server to another address changes the name's
+// A record only and no domain's SPF (owner, 2026-10-26); the name has to
+// resolve here anyway, for the PTR and the greeting.
+func SPFExample(hostname string) string {
+	return "v=spf1 a:" + hostname + " -all"
 }
 
 // EmailDomain returns the lower-case domain part of addr, or "" when invalid.

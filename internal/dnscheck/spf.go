@@ -48,7 +48,7 @@ func (c *Checker) checkSPF(ctx context.Context, q Query) Result {
 	case !found || len(records) == 0:
 		return Result{
 			Status: health.StatusError,
-			Detail: fmt.Sprintf("No SPF record is published for %s. Publish a TXT record such as %q — without it receivers have nothing authorising this server to send as the domain.", q.Name, SPFExample(q.Hostname, q.ServerIPs)),
+			Detail: fmt.Sprintf("No SPF record is published for %s. Publish a TXT record such as %q — without it receivers have nothing authorising this server to send as the domain.", q.Name, SPFExample(q.Hostname)),
 		}
 	case len(records) > 1:
 		return Result{
@@ -67,25 +67,37 @@ func (c *Checker) checkSPF(ctx context.Context, q Query) Result {
 			Records: records,
 		}
 	case matched != "":
+		detail := fmt.Sprintf("The SPF record authorises this server through its %q mechanism.", matched)
+		if byAddress(matched) {
+			detail += fmt.Sprintf(" It names the address: a move to another one needs this record changed, where \"a:%s\" would follow the server's own name.", q.Hostname)
+		}
 		return Result{
 			Status:  health.StatusOK,
-			Detail:  fmt.Sprintf("The SPF record authorises this server through its %q mechanism.", matched),
+			Detail:  detail,
 			Records: records,
 		}
 	case len(unfollowed) > 0:
 		return Result{
 			Status: health.StatusWarn,
-			Detail: fmt.Sprintf("No mechanism in the SPF record lists %s directly, but the record uses %s, which this check does not follow — the server may still be authorised through it. Verify with an external SPF validator, or add \"ip4:%s\" to be sure.",
-				ips[0], strings.Join(unfollowed, ", "), ips[0]),
+			Detail: fmt.Sprintf("No mechanism in the SPF record lists %s directly, but the record uses %s, which this check does not follow — the server may still be authorised through it. Verify with an external SPF validator, or add \"a:%s\" to be sure.",
+				ips[0], strings.Join(unfollowed, ", "), q.Hostname),
 			Records: records,
 		}
 	default:
 		return Result{
 			Status:  health.StatusError,
-			Detail:  fmt.Sprintf("The SPF record does not authorise %s, so mail sent from this server fails SPF. Add \"ip4:%s\" (or an \"a\" mechanism resolving here) to the record.", ips[0], ips[0]),
+			Detail:  fmt.Sprintf("The SPF record does not authorise %s, so mail sent from this server fails SPF. Add \"a:%s\", the server's own name, to the record.", ips[0], q.Hostname),
 			Records: records,
 		}
 	}
+}
+
+// byAddress reports whether the mechanism that authorised the server names
+// its address (ip4:/ip6:) rather than a name that resolves to it.
+func byAddress(mechanism string) bool {
+	_, mech := splitQualifier(mechanism)
+	lower := strings.ToLower(mech)
+	return strings.HasPrefix(lower, "ip4:") || strings.HasPrefix(lower, "ip6:")
 }
 
 // evaluateSPF walks the record's mechanisms, returning the first one that

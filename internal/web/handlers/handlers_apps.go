@@ -72,10 +72,10 @@ func (h *Handlers) renderDomain(w http.ResponseWriter, r *http.Request, status i
 	// What DNS actually publishes for the domain today, checked against the key
 	// this server signs with.
 	reportEmail := d.DMARCRua
-	dns, srv := h.domainDNS(d, record, reportEmail, false)
+	dns := h.domainDNS(d, record, reportEmail, false)
 	records := []view.Record{
 		view.DKIMRecord(d.DKIMSelector, record.Name, record.Value, dnsCheck(dns.DKIM)),
-		view.SPFRecord(d.Name, dnscheck.SPFExample(h.cfg.Hostname, srv.IPs), dnsCheck(dns.SPF)),
+		view.SPFRecord(d.Name, dnscheck.SPFExample(h.cfg.Hostname), dnsCheck(dns.SPF)),
 	}
 	reports := ""
 	if h.cfg.DMARCEnabled && reportEmail != "" {
@@ -245,10 +245,9 @@ func formatBound(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) 
 // domainDNS resolves what the world sees for a domain: its DKIM, SPF and DMARC
 // records. The server's own address comes from the (separately
 // cached) hostname check, so the SPF heuristic knows which IP it is looking for
-// and no extra environment variable is needed. That server result is returned
-// alongside, because the page's suggested SPF record is built from the same
-// addresses. force bypasses the cache, for the Re-check button.
-func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, reportEmail string, force bool) (dnscheck.Domain, dnscheck.Server) {
+// and no extra environment variable is needed. force bypasses the cache, for
+// the Re-check button.
+func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, reportEmail string, force bool) dnscheck.Domain {
 	srv := h.dns.Server(h.cfg.Hostname, false)
 	return h.dns.Domain(dnscheck.Query{
 		Name:             d.Name,
@@ -257,7 +256,7 @@ func (h *Handlers) domainDNS(d store.Domain, record domain.DKIMRecord, reportEma
 		Hostname:         srv.Hostname,
 		ServerIPs:        srv.IPs,
 		DMARCReportEmail: reportEmail,
-	}, force), srv
+	}, force)
 }
 
 // HandleDomainDNSRecheck re-runs the domain's DNS checks ignoring the cache and

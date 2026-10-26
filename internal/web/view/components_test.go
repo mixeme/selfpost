@@ -272,13 +272,13 @@ func TestDNSRecordShowsInDNSNowOnlyOnAMismatch(t *testing.T) {
 	mustNotContain(t, ok, "In DNS now", "is-danger")
 
 	bad := squash(partial(t, "dns_record", Record{
-		Name: "SPF", Status: Tag{Status: "mismatch"}, Host: "example.org", Type: "TXT", Value: "v=spf1 ip4:203.0.113.25 ~all",
-		InDNS: "v=spf1 include:_spf.google.com ~all", Problem: Rich("Add ", Code("ip4:203.0.113.25"), " before ~all."),
+		Name: "SPF", Status: Tag{Status: "mismatch"}, Host: "example.org", Type: "TXT", Value: "v=spf1 a:mail.example.org ~all",
+		InDNS: "v=spf1 include:_spf.google.com ~all", Problem: Rich("Add ", Code("a:mail.example.org"), " before ~all."),
 	}))
 	mustContain(t, bad, `<label class="label">In DNS now</label>`,
 		`<input class="input is-danger" readonly value="v=spf1 include:_spf.google.com ~all">`,
-		`<p class="help is-danger">Add <code>ip4:203.0.113.25</code> before ~all.</p>`,
-		`<input class="input" readonly value="v=spf1 ip4:203.0.113.25 ~all">`)
+		`<p class="help is-danger">Add <code>a:mail.example.org</code> before ~all.</p>`,
+		`<input class="input" readonly value="v=spf1 a:mail.example.org ~all">`)
 }
 
 // Only a record DNS holds as shown is folded; one that needs work stays open
