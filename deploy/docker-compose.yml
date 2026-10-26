@@ -172,3 +172,12 @@ services:
     # (default_process_limit), and a busy server runs three smtpd services,
     # cleanup and smtp at once; 1024 leaves them room.
     pids_limit: 1024
+    # Docker keeps a container's output (docker logs) in a json-file without
+    # a limit by default, for as long as the container lives; three files of
+    # 10 MB each bound it. Postfix's own log is /data/log/mail.log, rotated
+    # by the image, so this holds the programs' messages only.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

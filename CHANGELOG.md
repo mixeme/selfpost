@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Every container's `docker logs` is bounded**: three files of 10 MB
+  (`logging:` in each compose file - SelfPost, the antispam sidecar, and the
+  proxies' nginx, certbot, Caddy and Traefik). Docker's default json-file
+  log has no limit and grows for the container's life; rspamd's grew about
+  1 MB a day on the test server. Take the new compose files with the tag;
+  the limit applies when a container is recreated.
+
+### Documentation
+
+- **Logs outside `./data`** in Machine requirements: what bounds the
+  containers' logs, and one command that caps the host's systemd journal at
+  200 MB (on the test server it held 337 MB with no limit set).
+
 ## [2.16.6] - 2026-10-26
 
 No migration; schema 14. Nothing to do besides the tag; to have a later move

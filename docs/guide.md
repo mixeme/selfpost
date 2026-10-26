@@ -164,6 +164,21 @@ published for both.
 - **The inbound log** keeps at most 10 000 rows; DMARC reports, the DKIM
   keys and the rest of the database are small.
 
+**Logs outside `./data`.** Docker keeps every container's output (`docker
+logs`) in a file that has no limit by default and grows for as long as the
+container lives; the compose files bound each container's to three files of
+10 MB (`logging:`) - rspamd's grew about 1 MB a day on the test server. The
+host's own journal is the host's: systemd lets it take up to a tenth of the
+file system (at most 4 GB), and nothing SelfPost does bounds it. To cap it
+at 200 MB:
+
+```sh
+sudo mkdir -p /etc/systemd/journald.conf.d && printf '[Journal]\nSystemMaxUse=200M\n' | sudo tee /etc/systemd/journald.conf.d/size.conf >/dev/null && sudo systemctl restart systemd-journald
+```
+
+`journalctl --disk-usage` shows what it holds (337 MB on the test server
+after three and a half months up without a limit, 156 MB after the command).
+
 A full backup holds the database, the DKIM keys, the SASL credentials, the
 deployment files and `certs/`, so it is about the size of the send log; `mail.log` and
 the queue are left out of it ([Full backup and

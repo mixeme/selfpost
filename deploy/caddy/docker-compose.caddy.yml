@@ -63,6 +63,13 @@ services:
     restart: unless-stopped
     # A ceiling on processes and threads (security audit 2026-10-17, I3).
     pids_limit: 256
+    # docker logs bounded to three files of 10 MB, as SelfPost's
+    # (deploy/docker-compose.yml).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       - selfpost
     ports:
