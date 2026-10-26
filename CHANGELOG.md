@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.8] - 2026-10-26
+
+No migration; schema 14; the compose files changed only in the pin.
+
 ### Changed
 
 - **A record reported missing says it may just be new.** The SPF, DKIM and
