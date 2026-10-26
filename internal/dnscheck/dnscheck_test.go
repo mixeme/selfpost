@@ -178,6 +178,24 @@ func TestDKIMMissing(t *testing.T) {
 	}
 }
 
+// A record reported missing may be one published a moment ago that a resolver
+// still remembers as absent: every such detail says so, for a sending domain
+// and for the server's own name (2026-10-26, SPF read as missing on 1.1.1.1
+// minutes after it was published).
+func TestMissingRecordsMentionNegativeCaching(t *testing.T) {
+	f, q := dkimQuery(nil)
+	d := newTestChecker(f).Domain(q, false)
+	s := newTestChecker(&fakeResolver{}).ServerMail(serverMailQuery(), false)
+	for name, r := range map[string]Result{
+		"domain DKIM": d.DKIM, "domain SPF": d.SPF, "domain DMARC": d.DMARC,
+		"server DKIM": s.DKIM, "server SPF": s.SPF, "server DMARC": s.DMARC,
+	} {
+		if !strings.HasSuffix(r.Detail, justPublished) {
+			t.Errorf("%s (%s): no word on negative caching: %s", name, r.Status, r.Detail)
+		}
+	}
+}
+
 func TestDKIMWrongKey(t *testing.T) {
 	f, q := dkimQuery(map[string][]string{
 		"selfpost._domainkey.example.com": {"v=DKIM1; h=sha256; k=rsa; p=SOMEOTHERKEY"},

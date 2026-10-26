@@ -22,7 +22,7 @@ func (c *Checker) checkDKIM(ctx context.Context, q Query) Result {
 	if !found {
 		return Result{
 			Status: health.StatusError,
-			Detail: fmt.Sprintf("No TXT record is published at %s. Publish the record shown above — until then every message fails DKIM.", name),
+			Detail: fmt.Sprintf("No TXT record is published at %s. Publish the record shown above — until then every message fails DKIM.", name) + justPublished,
 		}
 	}
 
@@ -80,7 +80,7 @@ func (c *Checker) checkDMARC(ctx context.Context, q Query) Result {
 		if q.DMARCReportEmail == "" {
 			detail += " Aggregate reports (rua=) are optional on a send-only relay — omit rua= unless a mailbox that receives inbound mail is configured."
 		}
-		return Result{Status: health.StatusWarn, Detail: detail}
+		return Result{Status: health.StatusWarn, Detail: detail + justPublished}
 	}
 	if len(records) > 1 {
 		return Result{
@@ -119,7 +119,7 @@ func (c *Checker) checkServerDMARC(ctx context.Context, name string) Result {
 		// Missing, as a missing DKIM or SPF record of this name is: the page
 		// draws it as a warning all the same (notifications still go).
 		r.Status = health.StatusError
-		r.Detail = fmt.Sprintf("No DMARC record at %s. Publish the TXT record %q - without it a receiver does not refuse mail forged in this server's name.", recordName, ServerMailDMARC)
+		r.Detail = fmt.Sprintf("No DMARC record at %s. Publish the TXT record %q - without it a receiver does not refuse mail forged in this server's name.", recordName, ServerMailDMARC) + justPublished
 	case r.Status == health.StatusOK:
 		if policy, _ := tagValue(r.Records[0], "p"); strings.EqualFold(policy, "none") {
 			r.Status = health.StatusWarn

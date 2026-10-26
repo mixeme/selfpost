@@ -1859,6 +1859,12 @@ Each domain's page has a *DNS records* box comparing the published DKIM
 record against the key this server signs with, plus the domain's SPF,
 DMARC, and (when configured) DMARC report-authorisation records. Results are
 cached for a few minutes; use *Re-check DNS* right after publishing a record.
+A record you have just published can still read as missing: a public
+resolver asked before it existed - the panel itself asks when you add the
+domain - keeps that "no record" answer for the zone's negative-caching time
+(the smaller of the SOA record's TTL and its last field, the minimum; an hour
+for many zones). Re-check later before changing anything; receivers asking
+the same resolvers see the same delay.
 The SPF check is deliberately shallow — it looks for a mechanism that
 literally covers this server's address and does not follow `include:` or
 `redirect=`, so a record that authorizes the server through an include is

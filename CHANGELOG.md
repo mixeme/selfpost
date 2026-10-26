@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **A record reported missing says it may just be new.** The SPF, DKIM and
+  DMARC checks of a sending domain and of the server's own name add, when
+  the record is absent, that one published a moment ago may still read as
+  missing for up to the zone's negative-caching time, often an hour, and to
+  Re-check after that. Measured on a fresh server: an SPF record published
+  minutes after its domain was added read as missing on 1.1.1.1, which had
+  answered "no record" to the panel's own lookup at the add.
+
+### Documentation
+
+- **Domain-level DNS** explains the same delay: why a just-published record
+  can read as missing, how long, and that receivers see it too.
+
 ## [2.16.7] - 2026-10-26
 
 No migration; schema 14; the image does what 2.16.6's does. The compose files

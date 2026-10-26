@@ -231,7 +231,7 @@ func (c *Checker) ServerMail(q Query, force bool) Mail {
 	// checkSPF words a missing record for a sending domain; for the server's
 	// own name the record to publish is a different one.
 	if m.SPF.Status == health.StatusError && len(m.SPF.Records) == 0 {
-		m.SPF.Detail = fmt.Sprintf("No SPF record is published for %s. Publish the TXT record %q - without it a receiver has nothing authorising this server to send as its own name.", q.Name, ServerMailSPF)
+		m.SPF.Detail = fmt.Sprintf("No SPF record is published for %s. Publish the TXT record %q - without it a receiver has nothing authorising this server to send as its own name.", q.Name, ServerMailSPF) + justPublished
 	}
 	m.Overall = health.Worst(m.DKIM.Status, m.SPF.Status, m.DMARC.Status)
 
@@ -368,6 +368,14 @@ func (c *Checker) lookupTXT(ctx context.Context, name string) (records []string,
 	}
 	return txt, true, nil
 }
+
+// justPublished closes every "no such record" detail. A resolver asked before
+// the record existed keeps that answer for the zone's negative-caching time
+// (RFC 2308: the smaller of the SOA's TTL and minimum, an hour for many
+// zones), and Re-check asks the same resolvers. Measured 2026-10-26: an SPF
+// record published minutes after its domain was added still read as missing
+// on 1.1.1.1, whose first answer the panel had drawn at the add.
+const justPublished = ` Published it a moment ago? A resolver asked before it existed may answer "no record" for up to the zone's negative-caching time, often an hour - Re-check after that.`
 
 // lookupFailed is the shared shape for "the resolver did not answer": unknown,
 // not an accusation against the domain's configuration.
