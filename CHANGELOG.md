@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.5] - 2026-10-26
+
+No migration; schema 14; the image does what 2.16.4's does. The compose
+file changed: a `build:` section under the image. Take it along with the
+tag to have the build from a clone; without it nothing changes.
+
 ### Changed
 
 - **The compose file builds the image when it cannot get it.** Its
