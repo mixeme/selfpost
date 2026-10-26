@@ -340,10 +340,12 @@ they are.)
 
 **Steps (every version cut):**
 
-1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pinned
-   tag in [deploy/docker-compose.yml](../deploy/docker-compose.yml) (and any
-   local-trial image references, and the local build in guide § Fixed image
-   tag) in the **same** release commit.
+1. Close `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) and bump the pin
+   in the **same** release commit: in
+   [deploy/docker-compose.yml](../deploy/docker-compose.yml) the image tag and
+   the build's `VERSION`, one version (`deploy/compose_test.go`); the
+   local-trial image references; guide § Fixed image tag (the pin, the
+   checkout and the local build).
 2. Create and push git tag `vX.Y.Z` on that commit (lightweight, like the
    earlier ones). No GitHub Release is needed.
 3. Workflow [release.yml](../.github/workflows/release.yml) runs on the tag

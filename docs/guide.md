@@ -348,9 +348,23 @@ cat ./data/setup-token
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
 deliberately never `:latest`. The current pin is `2.16.4`. Every release
 from `2.16.3` on is published on ghcr.io for `amd64` and `arm64`; `2.0.0` to
-`2.16.2` were never published. To build it yourself instead, build the
-checkout of that tag under the pinned name, and Compose uses the local image
-instead of pulling:
+`2.16.2` were never published.
+
+The compose file can also build it. When the pinned image is neither on the
+host nor on ghcr.io - or ghcr.io is out of reach - `docker compose up`
+builds it from a clone of the repository instead of failing (its `build:`
+section; Compose tries the pull first, and an image already on the host is
+used as it is, built or pulled). The clone is the parent of the compose
+file's directory when the file is used from the clone's `deploy/`, or
+`SELFPOST_SOURCE` in `.env` when the deployment directory is elsewhere.
+Check the clone out at the pinned tag first - the build stamps the image
+with the version in the compose file, whatever code the clone holds:
+
+```sh
+git -C /opt/selfpost fetch --tags && git -C /opt/selfpost checkout v2.16.4
+```
+
+To build by hand instead, under the pinned name:
 
 ```sh
 docker build -f build/Dockerfile --build-arg VERSION=2.16.4 \
@@ -1275,8 +1289,9 @@ the panel exits with a message naming the tag to use, e.g.:
 backup: this backup was created by SelfPost 2.16.3 but this image is 2.16.4 — restore into the matching image (selfpost:2.16.3)
 ```
 
-Fix the tag in `docker-compose.yml` (build that tag as under [Fixed image
-tag](#fixed-image-tag) if it is not published), then `docker compose up -d`
+Fix the tag in `docker-compose.yml` (and `VERSION` under `build:`; an
+unpublished one is built as under [Fixed image tag](#fixed-image-tag)), then
+`docker compose up -d`
 again — the manifest is still there because the failed boot never got to
 delete it.
 

@@ -22,6 +22,16 @@
 services:
   selfpost:
     image: ghcr.io/mixeme/selfpost:2.16.4
+    # When the image is neither here nor on ghcr.io (or ghcr.io is out of
+    # reach), Compose builds it from a clone of the repository, checked out at
+    # this tag: the clone is this file's parent directory, or SELFPOST_SOURCE
+    # in .env. An image present here, or pulled, is used as it is.
+    # VERSION must equal the tag above (docs/guide.md, Fixed image tag).
+    build:
+      context: ${SELFPOST_SOURCE:-..}
+      dockerfile: build/Dockerfile
+      args:
+        VERSION: 2.16.4
     restart: unless-stopped
     environment:
       SELFPOST_HOSTNAME: "${SELFPOST_HOSTNAME:?set the mail/panel hostname, e.g. mail.example.com}"

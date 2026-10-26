@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **The compose file builds the image when it cannot get it.** Its
+  `build:` section (a clone of the repository: the parent of the compose
+  file's directory, or `SELFPOST_SOURCE` in `.env`) is used when the pinned
+  image is neither on the host nor on ghcr.io, or ghcr.io is out of reach -
+  a deployment no longer depends on GitHub to start a version (owner,
+  2026-10-26). Compose still tries the pull first and uses an image already
+  on the host as it is (Compose v5.3.1, `pullRequiredImages`; measured with
+  v5.6.1: an unpublished tag built from the clone, stamped with its version;
+  a missing clone with the image present changes nothing). A test keeps the
+  image tag and the build's `VERSION` one version. Guide, Fixed image tag:
+  check the clone out at the pinned tag first.
+
 ## [2.16.4] - 2026-10-26
 
 No migration; schema 14. Nothing to do besides the tag.
