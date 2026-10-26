@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.7] - 2026-10-26
+
+No migration; schema 14; the image does what 2.16.6's does. The compose files
+changed (`logging:` in every service): take them with the tag.
+
 ### Changed
 
 - **Every container's `docker logs` is bounded**: three files of 10 MB
