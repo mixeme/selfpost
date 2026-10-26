@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.6] - 2026-10-26
+
+No migration; schema 14. Nothing to do besides the tag; to have a later move
+leave the domains' SPF alone, change each domain's `ip4:` to
+`a:<SELFPOST_HOSTNAME>` once (the domain's page says so).
+
 ### Changed
 
 - **A domain's SPF names the server, not its address.** The record the

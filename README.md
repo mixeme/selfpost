@@ -126,7 +126,7 @@ docker run --rm -d --name selfpost-try \
   -e SELFPOST_HOSTNAME=mail.local.test \
   -e PANEL_COOKIE_SECURE=false \
   -v selfpost-try-data:/data \
-  ghcr.io/mixeme/selfpost:2.16.5
+  ghcr.io/mixeme/selfpost:2.16.6
 ```
 
 This trial runs with Docker's default capabilities and no
