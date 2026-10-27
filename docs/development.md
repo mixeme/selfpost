@@ -241,7 +241,9 @@ re-read what changed, update the citations, then this table:
 <!-- /cited-package-versions -->
 
 A security update of one of these, or of OpenSSL or Berkeley DB, reaches
-operators only with the next release: published tags are never rebuilt.
+operators with the next release: a published tag is not rebuilt for it. That
+is the default, not a ban (owner, 2026-10-27): the owner may still publish a
+version again or delete old ones from GHCR.
 `.github/workflows/base-packages.yml` compares every Monday what
 `debian:trixie-slim` would install with the versions the last release was
 built with, below, and fails when one has moved - the sign to cut a patch
@@ -566,6 +568,16 @@ the bytes that passed the gate. Each release leaves three tags in GHCR:
 cannot drop a tag without deleting the image, and deleting it breaks pulls of
 `X.Y.Z`. The last merge step removes only orphans: untagged versions left
 behind when a version is published again.
+
+Neither build adds a provenance attestation (`provenance: false` in
+`release.yml` and in `test/e2e/compose.override.yml`), so each per-arch tag is
+a single image and a release leaves no untagged versions. `2.16.3` to `2.16.8`
+were pushed with one from the e2e rebuild: their `X.Y.Z-amd64` was an index,
+and its two untagged versions (the amd64 image and the attestation) were what
+`X.Y.Z` pointed at. Those six versions were deleted from GHCR whole, tags
+included, after `2.16.9` was published (owner, 2026-10-27; his server was the
+only installation). Deleting an untagged version a tag points at breaks pulls
+of that tag.
 
 A failed e2e **blocks** image publication.
 

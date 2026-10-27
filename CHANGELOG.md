@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.9] - 2026-10-27
+
+No migration; schema 14; the image does what 2.16.8's does. The compose files
+changed only in the pin.
+
+### Release workflow
+
+- **No untagged versions in GHCR.** The e2e gate's rebuild, the image that
+  gets pushed, no longer adds a provenance attestation (`provenance: false`
+  in the e2e compose override, as in `release.yml`'s own build). With it,
+  `X.Y.Z-amd64` was an index, and the amd64 image and the attestation stayed
+  in GHCR as two untagged versions per release, which the version tag points
+  at. `X.Y.Z` also lists only `linux/amd64` and `linux/arm64` again, no
+  `unknown/unknown`.
+- **`2.16.3` to `2.16.8` leave ghcr.io** once this release is out, so that
+  none of those untagged versions remains; the owner's server was the only
+  installation. Their git tags stay, and the guide's Fixed image tag says how
+  to build one of them. The GitHub Release that announced 2.x moves from
+  `v2.16.5` to `v2.16.9`.
+
+### Documentation
+
+- **"Published tags are never rebuilt" is a default, not a ban.** The
+  security audit of 2026-10-17 recorded it as the owner's rule, which he did
+  not set. A base-package fix still arrives with the next release, not by
+  rebuilding a published tag; the owner may still publish a version again or
+  delete old ones from GHCR (development.md, SECURITY.md, guide § Upgrading).
+
 ## [2.16.8] - 2026-10-26
 
 No migration; schema 14; the compose files changed only in the pin.

@@ -32,6 +32,12 @@ services:
       # are evaluated relative to the base file"; assumptions C-K8).
       context: ../../..
       dockerfile: build/Dockerfile
+      # The image this build tags is the one release.yml pushes. With a
+      # provenance attestation (Compose's default) the amd64 runner pushed
+      # X.Y.Z-amd64 as an index over the image and the attestation, and both
+      # stayed in GHCR as untagged versions the version tag points at
+      # (2.16.3-2.16.8). release.yml's own build has provenance: false too.
+      provenance: false
       args:
         # release.yml sets SELFPOST_E2E_VERSION to the release's X.Y.Z, so the
         # image this build tags selfpost:e2e - the one release.yml then pushes -

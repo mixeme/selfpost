@@ -15,7 +15,7 @@ reporting if you are behind — the image tag is `ghcr.io/mixeme/selfpost:X.Y.Z`
 
 A security update of a Debian package the image runs - Postfix, Cyrus SASL,
 OpenSSL, Berkeley DB - arrives with the next patch release built after it:
-published image tags are never rebuilt. A weekly check
+a published image tag is not rebuilt for it. A weekly check
 (`.github/workflows/base-packages.yml`) says when one has moved, and a patch
 release follows.
 

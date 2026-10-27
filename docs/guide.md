@@ -361,9 +361,11 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `2.16.8`. Every release
-from `2.16.3` on is published on ghcr.io for `amd64` and `arm64`; `2.0.0` to
-`2.16.2` were never published.
+deliberately never `:latest`. The current pin is `2.16.9`. Every release
+from `2.16.9` on is published on ghcr.io for `amd64` and `arm64`. Of the 2.x
+releases before it, `2.0.0` to `2.16.2` were never published, and `2.16.3` to
+`2.16.8` were removed from ghcr.io once `2.16.9` was out; build one of those
+from its tag, as below.
 
 The compose file can also build it. When the pinned image is neither on the
 host nor on ghcr.io - or ghcr.io is out of reach - `docker compose up`
@@ -376,14 +378,14 @@ Check the clone out at the pinned tag first - the build stamps the image
 with the version in the compose file, whatever code the clone holds:
 
 ```sh
-git -C /opt/selfpost fetch --tags && git -C /opt/selfpost checkout v2.16.8
+git -C /opt/selfpost fetch --tags && git -C /opt/selfpost checkout v2.16.9
 ```
 
 To build by hand instead, under the pinned name:
 
 ```sh
-docker build -f build/Dockerfile --build-arg VERSION=2.16.8 \
-  -t ghcr.io/mixeme/selfpost:2.16.8 .
+docker build -f build/Dockerfile --build-arg VERSION=2.16.9 \
+  -t ghcr.io/mixeme/selfpost:2.16.9 .
 ```
 
 `VERSION` must equal the tag: it is the version the backup check compares
@@ -986,8 +988,8 @@ say), rather than replacing it.
 
 **Base-package fixes come with releases.** The image is Debian trixie, and a
 security update of Postfix, Cyrus SASL, OpenSSL or Berkeley DB reaches you with
-the next SelfPost release built after it: a published image tag is never
-rebuilt. The project checks every week whether one of those has moved and cuts
+the next SelfPost release built after it: a published image tag is not
+rebuilt for it. The project checks every week whether one of those has moved and cuts
 a patch release when it has; a release whose notes say "base packages" is one
 of those.
 
@@ -1301,7 +1303,7 @@ A version mismatch at step 5 refuses to start and leaves `/data` untouched —
 the panel exits with a message naming the tag to use, e.g.:
 
 ```
-backup: this backup was created by SelfPost 2.16.7 but this image is 2.16.8 — restore into the matching image (selfpost:2.16.7)
+backup: this backup was created by SelfPost 2.16.8 but this image is 2.16.9 — restore into the matching image (selfpost:2.16.8)
 ```
 
 Fix the tag in `docker-compose.yml` (and `VERSION` under `build:`; an
