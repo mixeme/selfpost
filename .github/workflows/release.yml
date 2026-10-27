@@ -172,6 +172,44 @@ jobs:
             backoff=$((backoff * 2))
           done
 
+      - name: Point the per-arch tag at the image, not an index over it
+        # On the amd64 runner the image the e2e rebuild leaves carries a
+        # provenance attestation, and docker push sends an index over the image
+        # and the attestation: both stay in GHCR as untagged versions the
+        # version tag points at (2.16.3-2.16.9; build.provenance: false in the
+        # compose override did not stop it on amd64 and failed arm64). Re-point
+        # the tag at the image the index names - the bytes that passed e2e;
+        # the merge job's cleanup then deletes the index and the attestation.
+        # --prefer-index=false copies a single manifest as it is instead of
+        # wrapping it in a new index (docs.docker.com/reference/cli/docker/
+        # buildx/imagetools/create/, "Description").
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-${ARCH}"
+          is_index() {
+            case "$1" in
+              application/vnd.oci.image.index.v1+json|application/vnd.docker.distribution.manifest.list.v2+json) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          raw=$(docker buildx imagetools inspect --raw "$image")
+          if ! is_index "$(jq -r '.mediaType // empty' <<<"$raw")"; then
+            echo "${image} is a single image"
+            exit 0
+          fi
+          digest=$(jq -r --arg arch "$ARCH" '
+            [.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest]
+            | if length == 1 then .[0] else error("want one linux/\($arch) image in the index, got \(length)") end' <<<"$raw")
+          docker buildx imagetools create --prefer-index=false -t "$image" "${image}@${digest}"
+          got=$(docker buildx imagetools inspect --raw "$image" | jq -r '.mediaType // empty')
+          if is_index "$got"; then
+            echo "::error::${image} is still an index (${got}) after re-pointing it at ${digest}"
+            exit 1
+          fi
+          echo "${image} -> ${digest}"
+
   merge:
     needs: [prepare, build]
     runs-on: ubuntu-latest

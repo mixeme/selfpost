@@ -555,6 +555,7 @@ prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
       → e2e (test/e2e; rebuilds selfpost:e2e with SELFPOST_E2E_VERSION=X.Y.Z)
       → check panel / selfpost-backup -version = X.Y.Z
       → push ghcr.io/...:X.Y.Z-amd64 | X.Y.Z-arm64
+      → point the per-arch tag at the image if the push made it an index
   → merge
       → docker buildx imagetools create → unified manifest X.Y.Z
       → GitHub Packages API → drop untagged versions no tagged manifest references
@@ -569,15 +570,18 @@ cannot drop a tag without deleting the image, and deleting it breaks pulls of
 `X.Y.Z`. The last merge step removes only orphans: untagged versions left
 behind when a version is published again.
 
-Neither build adds a provenance attestation (`provenance: false` in
-`release.yml` and in `test/e2e/compose.override.yml`), so each per-arch tag is
-a single image and a release leaves no untagged versions. `2.16.3` to `2.16.8`
-were pushed with one from the e2e rebuild: their `X.Y.Z-amd64` was an index,
-and its two untagged versions (the amd64 image and the attestation) were what
-`X.Y.Z` pointed at. Those six versions were deleted from GHCR whole, tags
-included, after `2.16.9` was published (owner, 2026-10-27; his server was the
-only installation). Deleting an untagged version a tag points at breaks pulls
-of that tag.
+On the amd64 runner the image the e2e rebuild leaves carries a provenance
+attestation, so `docker push` sends `X.Y.Z-amd64` as an index over the image
+and the attestation. Compose's `build.provenance: false` did not stop it there,
+and the arm64 runner's Compose rejects the key (`v2.16.9`, whose run failed on
+it). So a step after the push points each per-arch tag at the image itself
+(`imagetools create --prefer-index=false`) and fails if the tag is still an
+index; the cleanup then deletes the index and the attestation, and a release
+leaves no untagged versions. `2.16.3` to `2.16.9` went up with the index, and
+its two untagged versions were what `X.Y.Z` pointed at; those versions were
+deleted from GHCR whole, tags included, after `2.16.10` was published (owner,
+2026-10-27; his server was the only installation). Deleting an untagged
+version a tag points at breaks pulls of that tag.
 
 A failed e2e **blocks** image publication.
 

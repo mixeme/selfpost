@@ -5,25 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
-## [2.16.9] - 2026-10-27
+## [2.16.10] - 2026-10-27
 
 No migration; schema 14; the image does what 2.16.8's does. The compose files
 changed only in the pin.
 
 ### Release workflow
 
-- **No untagged versions in GHCR.** The e2e gate's rebuild, the image that
-  gets pushed, no longer adds a provenance attestation (`provenance: false`
-  in the e2e compose override, as in `release.yml`'s own build). With it,
-  `X.Y.Z-amd64` was an index, and the amd64 image and the attestation stayed
-  in GHCR as two untagged versions per release, which the version tag points
-  at. `X.Y.Z` also lists only `linux/amd64` and `linux/arm64` again, no
-  `unknown/unknown`.
-- **`2.16.3` to `2.16.8` leave ghcr.io** once this release is out, so that
+- **No untagged versions in GHCR.** On the amd64 runner the image the e2e
+  gate rebuilds, the one that gets pushed, carries a provenance attestation,
+  so `X.Y.Z-amd64` went up as an index, and the amd64 image and the
+  attestation stayed in GHCR as two untagged versions per release, which the
+  version tag points at. After the push, `release.yml` now points
+  `X.Y.Z-amd64` at the image itself - the bytes that passed e2e - and the
+  cleanup deletes the index and the attestation. `X.Y.Z` lists only
+  `linux/amd64` and `linux/arm64`, no `unknown/unknown`.
+- **`build.provenance: false` is gone from the e2e compose override.** It
+  was 2.16.9's fix: the arm64 runner's Compose rejects the key, and on amd64
+  the attestation came all the same.
+- **`2.16.3` to `2.16.9` leave ghcr.io** once this release is out, so that
   none of those untagged versions remains; the owner's server was the only
   installation. Their git tags stay, and the guide's Fixed image tag says how
   to build one of them. The GitHub Release that announced 2.x moves from
-  `v2.16.5` to `v2.16.9`.
+  `v2.16.5` to `v2.16.10`.
+
+## [2.16.9] - 2026-10-27
+
+Not published: the release run failed on arm64, so the tag has no image
+(`2.16.9-amd64` alone went up). Its changes are in 2.16.10.
+
+### Release workflow
+
+- **`provenance: false` in the e2e compose override**, meant to keep the
+  attestation out of the pushed image. The arm64 runner's Compose rejected
+  the key (`additional properties 'provenance' not allowed`); on amd64 the
+  image carried one all the same.
 
 ### Documentation
 
