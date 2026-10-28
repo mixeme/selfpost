@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **The record that lets another domain receive a domain's DMARC reports
+  has the name receivers look up**: `<sending domain>._report._dmarc.<report
+  address's domain>` (RFC 7489 §7.1). The domain page asked for
+  `_report._dmarc.<report address's domain>`, which no receiver queries, and
+  checked that name - so a domain reporting to an address on another domain,
+  every domain but the server's own name with *SelfPost hosted*, got no
+  reports while the page said the record was fine. Publish the new name; the
+  old one can go.
+
+### Documentation
+
+- **DMARC reports** and **Domain-level DNS** give the record's full name with
+  an example, and say that it is asked for whenever the two names differ,
+  though RFC 7489 needs it only across organisational domains.
+
 ## [2.16.10] - 2026-10-27
 
 No migration; schema 14; the image does what 2.16.8's does. The compose files

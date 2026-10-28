@@ -13,9 +13,15 @@ import "strings"
 // helper: it is published at the domain itself.)
 func DMARCRecordName(domainName string) string { return "_dmarc." + domainName }
 
-// ReportAuthRecordName is where a report-receiving domain authorises external
-// DMARC aggregate destinations (RFC 7489 §7.1).
-func ReportAuthRecordName(hubDomain string) string { return "_report._dmarc." + hubDomain }
+// ReportAuthRecordName is where hubDomain, the domain of a report address,
+// authorises aggregate reports about sendingDomain: a receiver looks up
+// "<sending domain>._report._dmarc.<hub>" (RFC 7489 §7.1) - the sending
+// domain first, so a hub says yes to each domain it takes reports for. Until
+// 2.16.11 the panel named "_report._dmarc.<hub>", which no receiver asks for
+// (2026-10-28, found adding dev.mixdep.ru with its reports on selfpost2).
+func ReportAuthRecordName(sendingDomain, hubDomain string) string {
+	return sendingDomain + "._report._dmarc." + hubDomain
+}
 
 // ReportAuthExample is the TXT value a hub domain publishes to accept reports.
 func ReportAuthExample() string { return "v=DMARC1;" }
@@ -60,5 +66,5 @@ func ExternalReportAuth(sendingDomain, reportEmail string) (name, value string, 
 	if hub == "" || strings.EqualFold(hub, sendingDomain) {
 		return "", "", false
 	}
-	return ReportAuthRecordName(hub), ReportAuthExample(), true
+	return ReportAuthRecordName(sendingDomain, hub), ReportAuthExample(), true
 }

@@ -410,14 +410,22 @@ func TestForgetDropsTheCachedDomain(t *testing.T) {
 }
 
 func TestReportAuth(t *testing.T) {
-	f := &fakeResolver{txt: map[string][]string{"_report._dmarc.hub.example": {"v=DMARC1;"}}}
-	got := newTestChecker(f).checkReportAuth(context.Background(), "hub.example")
+	f := &fakeResolver{txt: map[string][]string{"shop.example._report._dmarc.hub.example": {"v=DMARC1;"}}}
+	got := newTestChecker(f).checkReportAuth(context.Background(), "shop.example", "hub.example")
 	if got.Status != health.StatusOK {
 		t.Fatalf("status = %q (%s)", got.Status, got.Detail)
 	}
 
+	// The hub's own _report._dmarc, the name the panel gave until 2.16.11, is
+	// not what a receiver asks for (RFC 7489 §7.1): it authorises nothing.
+	f = &fakeResolver{txt: map[string][]string{"_report._dmarc.hub.example": {"v=DMARC1;"}}}
+	got = newTestChecker(f).checkReportAuth(context.Background(), "shop.example", "hub.example")
+	if got.Status != health.StatusWarn {
+		t.Fatalf("hub-only record = %q, want warn", got.Status)
+	}
+
 	f = &fakeResolver{}
-	got = newTestChecker(f).checkReportAuth(context.Background(), "hub.example")
+	got = newTestChecker(f).checkReportAuth(context.Background(), "shop.example", "hub.example")
 	if got.Status != health.StatusWarn {
 		t.Fatalf("missing = %q, want warn", got.Status)
 	}

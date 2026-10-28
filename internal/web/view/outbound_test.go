@@ -116,14 +116,14 @@ func TestOutDomainRecordsSayWhatDNSHolds(t *testing.T) {
 		SPFRecord("example.org", "v=spf1 -all", DNSCheck{Status: "warn", Detail: "The record ends in ~all.", Found: []string{"v=spf1 ~all"}}),
 		DMARCRecord(DMARCRecordInput{Host: "_dmarc.example.org", Value: "v=DMARC1; p=none", Check: DNSCheck{Status: "unknown", Detail: "DNS could not be reached."},
 			Source: "no reports", SettingsHref: "/outbound/domains/1/settings", SameDomain: true}),
-		ReportAuthRecord("_report._dmarc.hub.example", "v=DMARC1;", DNSCheck{Status: "error", Detail: "Not authorized."}),
+		ReportAuthRecord("shop.example._report._dmarc.hub.example", "v=DMARC1;", DNSCheck{Status: "error", Detail: "Not authorized."}),
 	}
 	out = renderSignedIn(t, "out-domain", outDomainFixture().WithRecords(records, "just now"))
 	pageHas(t, "Domain", out,
 		`<span class="tag is-danger is-light">missing</span>`, `No DKIM record was found.`,
 		`<span class="tag is-warning is-light">weak</span>`, `The record ends in ~all.`, `v=spf1 ~all`,
 		`<span class="tag is-light">not checked</span>`, `DNS could not be reached.`, `where SelfPost receives no mail`,
-		`<h3>Report authorization</h3>`, `_report._dmarc.hub.example`, `Needed because the address is on another domain than the senders`,
+		`<h3>Report authorization</h3>`, `shop.example._report._dmarc.hub.example`, `Needed because the address is on another domain than the senders`,
 		`4 OF 4 RECORDS`,
 	)
 	pageLacks(t, "Domain", out, `<a href="/outbound/dmarc/domains/1">reports</a>`) // no page of reports was given

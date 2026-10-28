@@ -343,7 +343,7 @@ func (c *Checker) checkDomain(ctx context.Context, q Query) Domain {
 		defer wg.Done()
 		hub := EmailDomain(q.DMARCReportEmail)
 		if hub != "" && !strings.EqualFold(hub, q.Name) {
-			d.DMARCReportAuth = c.checkReportAuth(ctx, hub)
+			d.DMARCReportAuth = c.checkReportAuth(ctx, q.Name, hub)
 		}
 	}()
 	wg.Wait()

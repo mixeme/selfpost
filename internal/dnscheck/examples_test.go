@@ -28,7 +28,7 @@ func TestDMARCExample(t *testing.T) {
 
 func TestExternalReportAuth(t *testing.T) {
 	name, value, ok := ExternalReportAuth("shop.com", "reports@hub.com")
-	if !ok || name != "_report._dmarc.hub.com" || value != "v=DMARC1;" {
+	if !ok || name != "shop.com._report._dmarc.hub.com" || value != "v=DMARC1;" {
 		t.Fatalf("external = (%q, %q, %v)", name, value, ok)
 	}
 	if _, _, ok := ExternalReportAuth("shop.com", "dmarc@shop.com"); ok {

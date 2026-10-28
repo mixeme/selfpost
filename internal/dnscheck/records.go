@@ -131,11 +131,11 @@ func (c *Checker) checkServerDMARC(ctx context.Context, name string) Result {
 	return r
 }
 
-// checkReportAuth verifies the hub domain publishes _report._dmarc for external
-// aggregate-report destinations. Missing authorisation does not affect outbound
-// delivery, only whether reports reach the rua= mailbox.
-func (c *Checker) checkReportAuth(ctx context.Context, hubDomain string) Result {
-	name := ReportAuthRecordName(hubDomain)
+// checkReportAuth verifies the hub domain authorises aggregate reports about
+// sendingDomain (ReportAuthRecordName). Missing authorisation does not affect
+// outbound delivery, only whether reports reach the rua= mailbox.
+func (c *Checker) checkReportAuth(ctx context.Context, sendingDomain, hubDomain string) Result {
+	name := ReportAuthRecordName(sendingDomain, hubDomain)
 	expected := ReportAuthExample()
 	txt, found, err := c.lookupTXT(ctx, name)
 	if err != nil {
@@ -166,15 +166,6 @@ func (c *Checker) checkReportAuth(ctx context.Context, hubDomain string) Result 
 		Detail:  fmt.Sprintf("Published at %s — aggregate reports addressed to %s are authorised.", name, hubDomain),
 		Records: records,
 	}
-}
-
-// ReportAuth checks whether hubDomain authorises external DMARC aggregate
-// reports. It is used on the settings page for the administrator profile.
-func (c *Checker) ReportAuth(ctx context.Context, hubDomain string) Result {
-	if hubDomain == "" {
-		return Result{}
-	}
-	return c.checkReportAuth(ctx, hubDomain)
 }
 
 // publicKeyTag extracts the p= (public key) tag of a DKIM record, with all

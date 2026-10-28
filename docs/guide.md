@@ -1675,9 +1675,13 @@ address is tagged with. There is no mailbox for the server as a whole.
 `rua=mailto:…` pointing at the address the domain shows. Receivers deliver to the
 address's domain: to its MX, or, without one, to its A record -
 `SELFPOST_HOSTNAME` has that already; a report address on another domain needs
-that domain's **MX** to point here. If a hub domain
-authorises external destinations, publish `_report._dmarc` there too; the panel
-checks it on the domain page.
+that domain's **MX** to point here. A sending domain whose report address is
+on another domain - every domain but `SELFPOST_HOSTNAME` itself with
+*SelfPost hosted* - needs that other domain to agree: publish
+`<sending domain>._report._dmarc.<report address's domain>` TXT
+`"v=DMARC1;"` in the report address's zone (RFC 7489 §7.1), for example
+`shop.example._report._dmarc.mail.example.org`. Receivers look up that name and
+send no report without it. The domain page shows the record and checks it.
 
 **Panel.** *Outbound › DMARC reports* lists recent reports. The global role also
 sees the *Ingest* box — whether ingest works, the last report received, reports
@@ -1848,8 +1852,12 @@ records; see [Inbound relay](#inbound-relay).
   address typed for the domain — a mailbox elsewhere that receives mail (*Use
   my e-mail* fills in your profile's) — or no reports, which leaves `rua=` out.
   The record the page shows follows that choice. If `rua=` points at another
-  domain, publish `_report._dmarc` on that hub domain too; the panel checks
-  it. Public mail hosts (Gmail, Outlook, …) cannot be used as external
+  domain, that domain has to authorise the reports with
+  `<this domain>._report._dmarc.<that domain>` TXT `"v=DMARC1;"` (see [DMARC
+  reports](#dmarc-reports)); the page shows the record and checks it. The
+  record is asked for whenever the two names differ, though RFC 7489 needs it
+  only across organisational domains (`a.example.com` reporting to
+  `mail.example.com` would do without it); publishing it there is harmless. Public mail hosts (Gmail, Outlook, …) cannot be used as external
   report destinations.
 
 Publish all three: receivers weigh SPF, DKIM and DMARC together, and large
