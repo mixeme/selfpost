@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.11] - 2026-10-28
+
+No migration; schema 14; the compose files changed only in the pin.
+
 ### Fixed
 
 - **The record that lets another domain receive a domain's DMARC reports
