@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.12] - 2026-10-28
+
+No migration; schema 14. The compose file changed (`SELFPOST_UPDATE_CHECK`
+in the environment): take it with the tag.
+
 ### Added
 
 - **Server › Health shows whether a newer version is published** - card 10

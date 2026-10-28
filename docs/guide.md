@@ -361,7 +361,7 @@ cat ./data/setup-token
 #### Fixed image tag
 
 `deploy/docker-compose.yml` pins an explicit version (`ghcr.io/mixeme/selfpost:X.Y.Z`),
-deliberately never `:latest`. The current pin is `2.16.11`. Every release
+deliberately never `:latest`. The current pin is `2.16.12`. Every release
 from `2.16.10` on is published on ghcr.io for `amd64` and `arm64`. Of the 2.x
 releases before it, `2.0.0` to `2.16.2` were never published, and `2.16.3` to
 `2.16.9` were removed from ghcr.io once `2.16.10` was out; build one of those
@@ -378,14 +378,14 @@ Check the clone out at the pinned tag first - the build stamps the image
 with the version in the compose file, whatever code the clone holds:
 
 ```sh
-git -C /opt/selfpost fetch --tags && git -C /opt/selfpost checkout v2.16.11
+git -C /opt/selfpost fetch --tags && git -C /opt/selfpost checkout v2.16.12
 ```
 
 To build by hand instead, under the pinned name:
 
 ```sh
-docker build -f build/Dockerfile --build-arg VERSION=2.16.11 \
-  -t ghcr.io/mixeme/selfpost:2.16.11 .
+docker build -f build/Dockerfile --build-arg VERSION=2.16.12 \
+  -t ghcr.io/mixeme/selfpost:2.16.12 .
 ```
 
 `VERSION` must equal the tag: it is the version the backup check compares
@@ -1315,7 +1315,7 @@ A version mismatch at step 5 refuses to start and leaves `/data` untouched —
 the panel exits with a message naming the tag to use, e.g.:
 
 ```
-backup: this backup was created by SelfPost 2.16.10 but this image is 2.16.11 — restore into the matching image (selfpost:2.16.10)
+backup: this backup was created by SelfPost 2.16.11 but this image is 2.16.12 — restore into the matching image (selfpost:2.16.11)
 ```
 
 Fix the tag in `docker-compose.yml` (and `VERSION` under `build:`; an
