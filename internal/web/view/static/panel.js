@@ -307,11 +307,13 @@
   });
 
   // --- Adaptive monitoring polling ---------------------------------------
-  // The four monitoring fragments carry data-poll and hx-trigger="load" for
-  // the first fetch only (htmx 2.0.4, src/htmx.js addTriggerHandler(): "load"
-  // fires once, when the element is first processed). panel.js schedules the rest: 5 s while the operator
-  // is active on the page, 30 s when the tab is visible but idle, and nothing
-  // while the tab is hidden. hx-trigger="every Ns [expr]" could express some
+  // The monitoring blocks carry data-poll and hx-get, and panel.js asks for
+  // every refresh: 5 s while the operator is active on the page, 30 s when
+  // the tab is visible but idle, and nothing while the tab is hidden. The page
+  // already holds a fresh reading, so the first refresh waits its turn too:
+  // until 2.16.13 each block asked again at once (hx-trigger="load"), and the
+  // same table was drawn twice within a second of every load - a jump on each
+  // filter and reload (owner, 2026-10-28). hx-trigger="every Ns [expr]" could express some
   // of that, but the filter is evaluated with `new Function`, which the
   // panel's CSP (default-src 'self', no 'unsafe-eval') would break: htmx
   // 2.0.4, src/htmx.js maybeGenerateConditional() compiles the filter with
@@ -394,19 +396,6 @@
     }, pollDelayMs(id));
   }
 
-  document.body.addEventListener("htmx:afterSwap", function (ev) {
-    var el = ev.detail.elt;
-    if (!el || !el.hasAttribute || !el.hasAttribute("data-poll")) {
-      return;
-    }
-    // Swapped-in markup still carries hx-trigger="load"; strip it so htmx does
-    // not issue a duplicate GET on top of the response we just received.
-    // htmx 2.0.4, src/htmx.js swap(): htmx:afterSwap fires on the new
-    // elements before doSettle() runs the settle tasks, and only those
-    // (makeAjaxLoadTask -> processNode) act on hx-trigger.
-    el.removeAttribute("hx-trigger");
-  });
-
   // The next refresh is scheduled when a request of the box ends, however
   // it ended. htmx 2.0.4, src/htmx.js issueAjaxRequest(): htmx:afterRequest
   // is fired on load, error, abort and timeout alike, and after a swap that
@@ -448,4 +437,9 @@
     }
     document.querySelectorAll("[data-poll]").forEach(schedulePoll);
   });
+
+  // The first refresh of each block on the page. panel.js is deferred, so the
+  // document is parsed by now (HTML Living Standard, scripting.html: a defer
+  // script runs after parsing, before DOMContentLoaded).
+  document.querySelectorAll("[data-poll]").forEach(schedulePoll);
 })();

@@ -17,7 +17,7 @@ func TestOutQueueShowsTheTableAndPollsItsBox(t *testing.T) {
 	pageHas(t, "Outbound queue", out,
 		`<h1 class="title is-3">Outbound queue</h1>`, `<h2>Waiting</h2>`,
 		`Messages accepted from applications and still waiting for the receiving server. Refreshes on its own.`,
-		`id="out-queue" data-poll aria-live="polite" hx-get="/outbound/queue/fragment" hx-trigger="load" hx-swap="outerHTML"`,
+		`id="out-queue" data-poll aria-live="polite" hx-get="/outbound/queue/fragment" hx-swap="outerHTML"`,
 		`1 message · 3.1 kB`, `href="/help#queue"`,
 		`<th>Queue id</th><th>Arrived</th><th>From</th><th>To</th><th>Last reply</th><th></th>`,
 		`<td class="sp-mono">4XcB7k2Jm9z1</td><td class="sp-mono sp-muted sp-nowrap sp-small">09-21 13:58:07</td>`,
@@ -110,7 +110,7 @@ func TestInQueue(t *testing.T) {
 	pageHas(t, "Inbound queue", out,
 		`<h1 class="title is-3">Inbound queue</h1>`,
 		`The same Postfix queue as <a href="/outbound/queue">outbound</a>, filtered by recipient domain.`,
-		`id="in-queue" data-poll aria-live="polite" hx-get="/inbound/queue/fragment" hx-trigger="load" hx-swap="outerHTML"`,
+		`id="in-queue" data-poll aria-live="polite" hx-get="/inbound/queue/fragment" hx-swap="outerHTML"`,
 		`Nothing is waiting. Every accepted message has reached its upstream.`, `href="/help#inbound-queue"`,
 		`back to the original sender`,
 	)

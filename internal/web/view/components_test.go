@@ -618,7 +618,7 @@ func TestPollAndOOBAttributesAreAbsentWhenEmpty(t *testing.T) {
 // fragment swaps into place — attributes on the element, nothing else changed.
 func TestPollAndOOBAttributes(t *testing.T) {
 	got := partial(t, "box_open", Box{No: "01", Title: "x", ID: "health", Poll: "/overview/fragment"})
-	mustContain(t, got, `<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`)
+	mustContain(t, got, `<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-swap="outerHTML">`)
 	got = partial(t, "page_head", Head{Title: "T", ID: "h", OOB: true})
 	mustContain(t, got, `<div class="sp-head" id="h" hx-swap-oob="true">`)
 }

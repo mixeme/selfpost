@@ -16,7 +16,7 @@
       <option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}
     </select></div></div>
     <p class="help">{{template "inline" .RuaHelp}}</p></div>
-  <div class="field" data-custom-address><label class="label" for="rua_email">Report address</label>
+  <div class="field{{if ne .RuaSelected "custom"}} is-hidden{{end}}"{{if ne .RuaSelected "custom"}} hidden{{end}} data-custom-address><label class="label" for="rua_email">Report address</label>
     <div class="field has-addons"><div class="control is-expanded"><input class="input" id="rua_email" name="dmarc_rua_email" type="email" value="{{.RuaCustom}}" placeholder="reports@your-mail-domain.com" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
       {{if .RuaMine}}<div class="control"><button type="button" class="button" data-fill="rua_email" data-fill-value="{{.RuaMine}}"><i class="ti ti-mail"></i>Use my e-mail</button></div>{{end}}</div></div>
   <button type="submit" class="button is-primary">Save report address</button>
@@ -29,7 +29,7 @@
 <p class="mb-3">One file with the DKIM key and every application's password hash — import it on another SelfPost and the published DNS needs no change. <strong>The file is a secret.</strong></p>
 <form class="sp-form" method="post" action="{{.ExportAction}}">
   <div class="field"><label class="checkbox"><input type="checkbox" name="encrypt" value="1"{{if .Encrypt}} checked{{end}} data-encrypt-toggle> Encrypt with a password (<code>.spde</code>)</label></div>
-  <div data-encrypt-fields>
+  <div{{if not .Encrypt}} class="is-hidden" hidden{{end}} data-encrypt-fields>
     <div class="sp-pair">
       <div class="field"><label class="label" for="encpw">Password</label><div class="control"><input class="input" id="encpw" name="password" type="password" autocomplete="new-password" minlength="{{.PasswordMin}}" placeholder="at least {{.PasswordMin}} characters"></div></div>
       <div class="field"><label class="label" for="encpw2">Repeat password</label><div class="control"><input class="input" id="encpw2" name="password_confirm" type="password" autocomplete="new-password"></div></div>
@@ -53,14 +53,14 @@
       <option value="manual"{{if not .Rate.Auto}} selected{{end}}>Manual</option>
       <option value="auto"{{if .Rate.Auto}} selected{{end}}>Auto (from statistics)</option>
     </select></div></div></div>
-  <div data-manual-fields>
+  <div{{if .Rate.Auto}} class="is-hidden" hidden{{end}} data-manual-fields>
     <div class="sp-pair">
       <div class="field"><label class="label" for="max">Messages (max {{.Rate.L1Messages}})</label><div class="control"><input class="input" id="max" name="max_messages" type="number" min="1" max="{{.Rate.L1Messages}}" value="{{.Rate.MaxMessages}}" placeholder="{{.Rate.L1Messages}}"></div></div>
       <div class="field"><label class="label" for="win">Window, s</label><div class="control"><input class="input" id="win" name="window_seconds" type="number" min="1" value="{{.Rate.Window}}"></div></div>
     </div>
     <p class="help mb-3">Leave the message limit empty to use level 1 only.</p>
   </div>
-  <div data-auto-fields>
+  <div{{if not .Rate.Auto}} class="is-hidden" hidden{{end}} data-auto-fields>
     <div class="field"><label class="label" for="mult">Multiplier ({{.Rate.MinMultiplier}}–{{.Rate.MaxMultiplier}}, default {{.Rate.DefaultMultiplier}})</label>
       <div class="control"><input class="input" id="mult" name="auto_multiplier" type="number" min="{{.Rate.MinMultiplier}}" max="{{.Rate.MaxMultiplier}}" step="0.1" value="{{.Rate.Multiplier}}"></div>
       <p class="help">{{template "inline" .Rate.AutoHelp}}</p></div>

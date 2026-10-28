@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **The page no longer jumps after it loads** (owner, 2026-10-28: "Когда
+  нажимаешь Filter страница как-то дёргается"; every page measured with the
+  browser's own layout-shift count):
+  - **Filter on the Outbound and Inbound logs replaces the list alone**: the
+    form is sent in place and its box is swapped out of the page that comes
+    back, with the address bar following; nothing else is drawn again.
+    Without the script it is the plain GET it was.
+  - **A polled block no longer asks for itself the moment the page loads**
+    (Overview, Health, both queues, the Outbound log, the System log): the
+    page already holds a fresh reading, and the same table was drawn twice
+    within a second of every load. The first refresh comes on the usual
+    timer; Health's CPU and network figures, measured between two
+    readings, appear five seconds after the page opens.
+  - **A block the page shows or hides by a choice arrives in that state**
+    instead of being closed by the script after the first paint: the
+    password fields of an export or a backup, the report address of a
+    domain, the manual and automatic limit fields, an application's or an
+    inbound domain's address list, the import's password, the domain lists
+    of a global user. Domain settings jumped the most (a layout shift of
+    0.027 on every load).
+  - **The fonts are kept for a year** (`Cache-Control: public,
+    max-age=31536000, immutable`) instead of being asked for again on every
+    page: one that came back after the page was drawn with the fallback
+    moved the text - by 0.29 of the System log's screen, 0.14 of Help's,
+    0.03 of Backup's. Every other asset still revalidates, so a release
+    reaches the browser on its next page. A font that changes gets a new
+    file name; a test holds each font to its bytes.
+
+  Measured in a browser on every page, loading each twice, before and after:
+  no layout shift is left on any of them, and no block is drawn twice.
+
 ## [2.16.12] - 2026-10-28
 
 No migration; schema 14. The compose file changed (`SELFPOST_UPDATE_CHECK`

@@ -16,7 +16,7 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 	pageHas(t, "Inbound log", out,
 		`<h1 class="title is-3">Inbound log</h1>`,
 		`refused mail is read from <code>mail.log</code>; the filter&#39;s verdict appears when the spam filter is on. Rows older than 90 days are deleted — change that in <a href="/server/settings">Settings</a>.`,
-		`<form class="sp-end" method="get" action="/inbound/log">`,
+		`<form class="sp-end" method="get" action="/inbound/log" hx-get="/inbound/log" hx-target="#messages" hx-select="#messages" hx-swap="outerHTML" hx-push-url="true">`,
 		`<select name="domain" aria-label="Domain"><option value="" selected>All domains</option><option value="lists.example.org">lists.example.org</option><option value="acme.io">acme.io</option></select>`,
 		`<select name="decision" aria-label="Decision"><option value="" selected>Any decision</option><option value="accept">accept</option><option value="reject">reject</option><option value="tempfail">tempfail</option><option value="quarantine">quarantine</option></select>`,
 		`<input class="input" type="date" name="from" value="2026-09-14" aria-label="From date">`,
@@ -49,7 +49,11 @@ func TestInLogShowsTheRowsAndTheirFilters(t *testing.T) {
 		`Page 1 of 38`, `<a href="/inbound/log?from=2026-09-14&amp;p=2&amp;to=2026-09-21">Older →</a>`,
 		`A decision opens its reason, an upstream result its last reply · Allow / Deny sender opens <a href="/inbound/filter-lists">Filter lists</a> with the entry filled in`,
 	)
-	pageLacks(t, "Inbound log", out, `← Newer`, `data-poll`, `hx-get`, `<th>Why</th>`)
+	// It does not poll: the one hx-get is the filter's, which swaps the box.
+	pageLacks(t, "Inbound log", out, `← Newer`, `data-poll`, `<th>Why</th>`)
+	if strings.Count(out, `hx-get`) != 1 {
+		t.Errorf("Inbound log has %d hx-get, want the filter's alone", strings.Count(out, `hx-get`))
+	}
 	// A message Postfix itself refused offers no way into the lists: one Deny
 	// for each of the four accepted messages, one Allow for each the filter
 	// refused or put off.

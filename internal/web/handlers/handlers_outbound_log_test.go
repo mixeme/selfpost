@@ -45,7 +45,7 @@ func TestOutLogFragmentIsTheRegionOfThePage(t *testing.T) {
 		t.Errorf("the fragment is not the page's polled region\npage:\n%s\nfragment:\n%s", page, fragment)
 	}
 	// The poll asks for the same filters again, and never replaces the filter form.
-	has(t, "region", page, `data-poll`, `aria-live="polite"`, `hx-trigger="load"`, `hx-swap="outerHTML"`,
+	has(t, "region", page, `data-poll`, `aria-live="polite"`, `hx-swap="outerHTML"`,
 		`hx-get="/outbound/log/fragment?domain=bs.example.ru"`)
 	lacks(t, "fragment", fragment, `<select`, `<form`)
 	if strings.Contains(page, "hx-swap-oob") {

@@ -16,7 +16,7 @@
 <p class="mb-3"><code>data/</code> (database, DKIM keys, credentials), <code>docker-compose.yml</code>, <code>.env</code> and <code>certs/</code> in one archive. The Postfix queue is left out: it cannot be copied reliably while the server is running. Restore into an empty project directory and start the <strong>same SelfPost version</strong>. The reverse-proxy vhost is not included.</p>
 <form class="sp-form" method="post" action="{{.FullAction}}">
   <div class="field"><label class="checkbox"><input type="checkbox" name="encrypt" value="1"{{if .Encrypt}} checked{{end}} data-encrypt-toggle> Encrypt with a password (<code>.spbk</code>)</label></div>
-  <div data-encrypt-fields>
+  <div{{if not .Encrypt}} class="is-hidden" hidden{{end}} data-encrypt-fields>
     <div class="sp-pair">
       <div class="field"><label class="label" for="encpw">Password</label><div class="control"><input class="input" id="encpw" name="password" type="password" autocomplete="new-password" minlength="{{.PasswordMin}}" placeholder="at least {{.PasswordMin}} characters"></div></div>
       <div class="field"><label class="label" for="encpw2">Repeat password</label><div class="control"><input class="input" id="encpw2" name="password_confirm" type="password" autocomplete="new-password"></div></div>
@@ -38,7 +38,7 @@
 <form class="sp-form" method="post" action="{{.ImportAction}}" enctype="multipart/form-data">
   <div class="field"><label class="label" for="importfile">Domain export file</label>
     <div class="file has-name is-fullwidth"><label class="file-label"><input class="file-input" id="importfile" name="file" type="file" accept=".json,.spde,application/json" required data-import-file><span class="file-cta"><i class="ti ti-upload"></i><span class="file-label ml-2">Choose a file…</span></span><span class="file-name">No file chosen</span></label></div></div>
-  <div class="field" data-import-password-fields><label class="label" for="importpw">Password</label>
+  <div class="field is-hidden" hidden data-import-password-fields><label class="label" for="importpw">Password</label>
     <div class="control"><input class="input" id="importpw" name="import_password" type="password" autocomplete="off"></div>
     <p class="help">Asked only for an encrypted <code>.spde</code> file.</p></div>
   <button type="submit" class="button is-primary"><i class="ti ti-file-import"></i>Import domain</button>

@@ -1,6 +1,8 @@
 package view
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -39,8 +41,12 @@ func TestStaticAssetsCarryETag(t *testing.T) {
 		if rec.Header().Get("ETag") == "" {
 			t.Errorf("%s: no ETag", name)
 		}
-		if got := rec.Header().Get("Cache-Control"); got != "no-cache" {
-			t.Errorf("%s: Cache-Control = %q, want %q", name, got, "no-cache")
+		want := "no-cache"
+		if strings.HasSuffix(name, ".woff2") {
+			want = fontCache
+		}
+		if got := rec.Header().Get("Cache-Control"); got != want {
+			t.Errorf("%s: Cache-Control = %q, want %q", name, got, want)
 		}
 	}
 }
@@ -127,5 +133,39 @@ func TestStaticDoesNotListOrServeWhatIsNotAnAsset(t *testing.T) {
 	}
 	if got, want := rec.Header().Get("ETag"), staticETags["/static/panel.css"]; got == "" || got != want {
 		t.Errorf("ETag of panel.css = %q, want %q", got, want)
+	}
+}
+
+// A font is kept for a year without being asked for again (fontCache), so one
+// changed under the same name would reach a browser a year late: a new font
+// gets a new name. This list is the fonts as they are; a font whose bytes no
+// longer match fails here, and the fix is a new file name, not a new hash.
+func TestFontsAreCachedAndNamedOnce(t *testing.T) {
+	want := map[string]string{
+		"ibm-plex-mono-400.woff2": "3c5a451f9ec27a35",
+		"ibm-plex-mono-600.woff2": "c4d3deb734a27e6d",
+		"ibm-plex-sans.woff2":     "e2291e842cf5af16",
+		"tabler-icons.woff2":      "4a0e1ab8991d1049",
+	}
+	got := map[string]string{}
+	_ = fs.WalkDir(assetsFS, "static", func(name string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(name, ".woff2") {
+			b, _ := fs.ReadFile(assetsFS, name)
+			sum := sha256.Sum256(b)
+			got[strings.TrimPrefix(name, "static/")] = hex.EncodeToString(sum[:8])
+		}
+		return nil
+	})
+	for name, sum := range got {
+		if want[name] == "" {
+			t.Errorf("%s is a font this test does not know: add it to the list", name)
+		} else if want[name] != sum {
+			t.Errorf("%s changed under its name (%s, was %s): a browser keeps the old one for a year - give the new font a new name", name, sum, want[name])
+		}
+	}
+	for name := range want {
+		if got[name] == "" {
+			t.Errorf("%s is gone: drop it from the list", name)
+		}
 	}
 }

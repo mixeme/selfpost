@@ -18,7 +18,7 @@
         <div class="control"><div class="select is-fullwidth"><select id="amode" name="mode" data-list-mode="list">{{$mode := .Mode}}{{range .Modes}}
           <option value="{{.Value}}"{{if eq .Value $mode}} selected{{end}}>{{.Label}}</option>{{end}}
         </select></div></div></div>
-      <div data-addresses>
+      <div{{if ne .Mode "list"}} class="is-hidden" hidden{{end}} data-addresses>
         <div class="field"><label class="label" for="addresses">Addresses</label>
           <div class="control"><textarea class="textarea" id="addresses" name="addresses" rows="3" placeholder="{{.Placeholder}}">{{.Addresses}}</textarea></div>
           <p class="help">One per line. Used only with a list.</p></div>
@@ -45,13 +45,13 @@
         <div class="control"><div class="select is-fullwidth"><select id="rmode" name="rl_mode" data-ratelimit-mode>{{$limit := .LimitMode}}{{range .LimitModes}}
           <option value="{{.Value}}"{{if eq .Value $limit}} selected{{end}}>{{.Label}}</option>{{end}}
         </select></div></div></div>
-      <div data-manual-fields>
+      <div{{if ne .LimitMode "manual"}} class="is-hidden" hidden{{end}} data-manual-fields>
         <div class="sp-pair">
           <div class="field"><label class="label" for="max">Messages (max {{.Rate.L1Messages}})</label><div class="control"><input class="input" id="max" name="max_messages" type="number" min="1" max="{{.Rate.L1Messages}}" value="{{.MaxMessages}}" placeholder="{{.Rate.L1Messages}}"></div></div>
           <div class="field"><label class="label" for="win">Window, s</label><div class="control"><input class="input" id="win" name="window_seconds" type="number" min="1" value="{{.Window}}"></div></div>
         </div>
       </div>
-      <div data-auto-fields>
+      <div{{if ne .LimitMode "auto"}} class="is-hidden" hidden{{end}} data-auto-fields>
         <div class="field"><label class="label" for="mult">Multiplier ({{.Rate.MinMultiplier}}–{{.Rate.MaxMultiplier}}, default {{.Rate.DefaultMultiplier}})</label>
           <div class="control"><input class="input" id="mult" name="auto_multiplier" type="number" min="{{.Rate.MinMultiplier}}" max="{{.Rate.MaxMultiplier}}" step="0.1" value="{{.Multiplier}}"></div>
           <p class="help">{{template "inline" .Rate.AutoHelp}}</p></div>

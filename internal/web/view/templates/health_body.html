@@ -12,7 +12,7 @@
 
 {{/* health_stack is the left stack: Processes, Sender check, Hostname and
      reverse DNS, Machine, Version. */}}
-{{define "health_stack"}}<div class="column is-6" id="health-stack" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
+{{define "health_stack"}}<div class="column is-6" id="health-stack" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-swap="outerHTML">
   {{template "box_open" .Processes}}
   {{if .ProcessError}}
   {{template "body_open"}}

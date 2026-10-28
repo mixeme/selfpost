@@ -44,7 +44,7 @@
     <div class="control"><div class="select is-fullwidth"><select id="rmode" name="recipient_mode" data-list-mode="list">{{$mode := .ModeSelected}}{{range .ModeOptions}}
       <option value="{{.Value}}"{{if eq .Value $mode}} selected{{end}}>{{.Label}}</option>{{end}}
     </select></div></div></div>
-  <div class="field" data-addresses><label class="label" for="addresses">Addresses</label>
+  <div class="field{{if ne .ModeSelected "list"}} is-hidden{{end}}"{{if ne .ModeSelected "list"}} hidden{{end}} data-addresses><label class="label" for="addresses">Addresses</label>
     <div class="control"><textarea class="textarea sp-mono" id="addresses" name="addresses" rows="4">{{.Addresses}}</textarea></div>
     <p class="help">{{template "inline" .RecipientsHelp}}</p></div>
   <button type="submit" class="button is-primary">Save recipients</button>

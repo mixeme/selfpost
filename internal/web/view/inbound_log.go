@@ -135,8 +135,8 @@ func NewInLog(m Meta, retentionDays int, domains []string, filter InLogFilter) *
 	p := &InLog{
 		Meta: m,
 		Head: Head{Kicker: "Inbound", Title: "Inbound log", Lead: lead},
-		Messages: Box{No: "01", Title: "Messages", Help: topicLink(HelpInboundLog, "What the decisions mean"), Filter: &Filter{
-			Action: inboundLog,
+		Messages: Box{No: "01", Title: "Messages", ID: "messages", Help: topicLink(HelpInboundLog, "What the decisions mean"), Filter: &Filter{
+			Action: inboundLog, Box: "messages",
 			Selects: []Select{
 				{Name: "domain", Label: "Domain", Options: domainOptions, Selected: filter.Domain},
 				{Name: "decision", Label: "Decision", Options: decisionOptions, Selected: filter.Decision},

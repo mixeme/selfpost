@@ -55,16 +55,32 @@ func buildStaticETags() map[string]string {
 // http.ServeContent answers the conditional request from the ETag we set here.
 // RFC 9111 § 5.2.2.4: no-cache lets a cache store the response but not reuse
 // it without validating it first.
+//
+// The fonts are the exception: kept for a year without asking (fontCache).
+// Asked again on every page, a font came back after the page was first drawn
+// with the fallback, and the text moved when it was swapped in - by 0.29 of
+// the System log's screen, 0.09 of Help's (layout shift, measured 2026-10-28).
+// A font is a vendored file that does not change under its name; a new one
+// gets a new name (TestFontsAreCachedAndNamedOnce).
 func StaticHandler() http.Handler {
 	files := http.FileServer(http.FS(assetsFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		etag, ok := staticETags[path.Clean(r.URL.Path)]
+		name := path.Clean(r.URL.Path)
+		etag, ok := staticETags[name]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("ETag", etag)
-		w.Header().Set("Cache-Control", "no-cache")
+		if path.Ext(name) == ".woff2" {
+			w.Header().Set("Cache-Control", fontCache)
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		files.ServeHTTP(w, r)
 	})
 }
+
+// fontCache is the Cache-Control of a font: a year, and immutable, so that a
+// reload does not ask either (RFC 8246).
+const fontCache = "public, max-age=31536000, immutable"

@@ -105,7 +105,11 @@ func TestInboundLogForTheGlobalRole(t *testing.T) {
 	if strings.Index(body, `Quarantined`) > strings.Index(body, `Hello B`) || strings.Index(body, `Hello B`) > strings.Index(body, `Hello A`) {
 		t.Error("the rows are not newest first")
 	}
-	lacks(t, "log", body, `data-poll`, `hx-get`)
+	// It does not poll: the one hx-get is the filter's, which swaps the box.
+	lacks(t, "log", body, `data-poll`)
+	if strings.Count(body, `hx-get`) != 1 {
+		t.Errorf("log has %d hx-get, want the filter's alone", strings.Count(body, `hx-get`))
+	}
 }
 
 // A domain administrator reads the rows of the inbound domains assigned to them,

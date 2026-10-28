@@ -14,7 +14,7 @@ func TestSystemLogShowsNewestFirstAndPollsItsBox(t *testing.T) {
 	out := renderSignedIn(t, "system-log", systemLogFixture())
 	pageHas(t, "System log", out,
 		`<h1 class="title is-3">System log</h1>`, `<h2>Recent lines</h2>`, `Last 200 lines · refreshes on its own`,
-		`id="system-log" data-poll aria-live="polite" hx-get="/server/log/fragment" hx-trigger="load" hx-swap="outerHTML"`,
+		`id="system-log" data-poll aria-live="polite" hx-get="/server/log/fragment" hx-swap="outerHTML"`,
 		`<span class="sp-d">Sep 21 14:01:52</span> postfix/smtp[2131]`,
 		`<span class="sp-w">postfix/smtp[2123]`, `<span class="sp-e">postfix/smtpd[2119]`,
 	)

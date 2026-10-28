@@ -74,6 +74,10 @@ function fireBody(type, detail) {
   (listeners.body[type] || []).forEach((fn) => fn({ type, detail, target: detail.elt }));
 }
 
+// The page as it loads: one polled box, already holding a fresh reading.
+const box = element("overview-stats", { "data-poll": "", "hx-get": "/overview/stats" });
+inPage = { [box.id]: box };
+
 vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
   document, window, htmx, setTimeout, clearTimeout, Date: FakeDate,
   Object, Math, console,
@@ -83,12 +87,11 @@ vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
 // A request that never ends is ended: htmx's default is no timeout.
 check(htmx.config.timeout === 30000, "htmx.config.timeout is " + htmx.config.timeout + ", want 30000");
 
-const box = element("overview-stats", { "data-poll": "", "hx-get": "/overview/stats", "hx-trigger": "load" });
-inPage = { [box.id]: box };
-
-// The first load ended well: the next refresh in 5 s, as the box's source.
-fireBody("htmx:afterRequest", { target: box, elt: box, successful: true });
-check(pendingDelays().join() === "5000", "after a refresh that worked: waits " + pendingDelays() + ", want 5000");
+// The first refresh waits its turn, 5 s: the page holds a fresh reading, and
+// asking at once drew the same table twice within a second of every load
+// (2026-10-28).
+check(requests.length === 0, "a refresh was asked for as the page loaded");
+check(pendingDelays().join() === "5000", "at load: waits " + pendingDelays() + ", want 5000");
 advance(5000);
 check(requests.length === 1, "no refresh was asked for after 5 s");
 check(requests[0] && requests[0].ctx.source === box, "the refresh does not name the box as its source");
@@ -114,10 +117,8 @@ check(pendingDelays().join() === "5000", "after failures and a success: waits " 
 // A swap replaced the box: the event that reaches the body comes from a
 // parent and names the old box as its target; the new one is scheduled.
 timers = [];
-const fresh = element("overview-stats", { "data-poll": "", "hx-get": "/overview/stats", "hx-trigger": "load" });
+const fresh = element("overview-stats", { "data-poll": "", "hx-get": "/overview/stats" });
 inPage = { [fresh.id]: fresh };
-fireBody("htmx:afterSwap", { elt: fresh });
-check(!fresh.hasAttribute("hx-trigger"), "the swapped-in box keeps hx-trigger");
 activity();
 fireBody("htmx:afterRequest", { target: box, elt: { id: "main" }, successful: true });
 check(pendingDelays().join() === "5000", "after a swap: waits " + pendingDelays() + ", want 5000");

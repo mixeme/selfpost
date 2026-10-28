@@ -84,7 +84,7 @@
      sp-credential (a secret shown once). A box foot, a table in its
      table-container, a run of records, a log or an empty state sit directly
      inside; anything else goes in body_open … body_close. */}}
-{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .OOB}} hx-swap-oob="true"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-trigger="load" hx-swap="outerHTML"{{end}}{{if .DomainPick}} data-domain-pick{{end}}{{with .Order}} data-order="{{.}}"{{end}}>
+{{define "box_open"}}<div class="box{{if eq .Variant "danger"}} sp-danger-zone{{else if eq .Variant "credential"}} sp-credential{{end}}{{if .Hidden}} is-hidden{{end}}"{{if .Hidden}} hidden{{end}}{{if .ID}} id="{{.ID}}"{{end}}{{if .OOB}} hx-swap-oob="true"{{end}}{{if .Poll}} data-poll aria-live="polite" hx-get="{{.Poll}}" hx-swap="outerHTML"{{end}}{{if .DomainPick}} data-domain-pick{{end}}{{with .Order}} data-order="{{.}}"{{end}}>
 {{template "box_head" .}}
 {{end}}
 {{define "box_close"}}</div>{{end}}
@@ -111,7 +111,7 @@
 
 {{/* filter_form is the filter of a list in the end slot of its box head
      (input: Filter): selects, date inputs and one button, sent with GET. */}}
-{{define "filter_form"}}<form class="sp-end" method="get" action="{{.Action}}">{{range .Selects}}
+{{define "filter_form"}}<form class="sp-end" method="get" action="{{.Action}}"{{if .Box}} hx-get="{{.Action}}" hx-target="#{{.Box}}" hx-select="#{{.Box}}" hx-swap="outerHTML" hx-push-url="true"{{end}}>{{range .Selects}}
 <div class="select"><select name="{{.Name}}" aria-label="{{.Label}}">{{$sel := .Selected}}{{range .Options}}<option value="{{.Value}}"{{if eq .Value $sel}} selected{{end}}>{{.Label}}</option>{{end}}</select></div>{{end}}{{range .Dates}}
 <input class="input" type="date" name="{{.Name}}" value="{{.Value}}" aria-label="{{.Label}}">{{end}}
 <button type="submit" class="button"><i class="ti ti-filter"></i>{{if .Button}}{{.Button}}{{else}}Filter{{end}}</button>

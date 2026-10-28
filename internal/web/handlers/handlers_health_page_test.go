@@ -235,7 +235,7 @@ func TestOverviewPageShowsVerdictsAndDomains(t *testing.T) {
 		`<h2>Outbound domains</h2>`, `<a href="/outbound/domains/1"><strong>example.org</strong></a>`,
 		"DKIM", "SPF", "DMARC", "1\u00a0msg", `<th>30 days</th>`,
 		`href="/server/health"`,
-		`id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML"`,
+		`id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-swap="outerHTML"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Overview is missing %q", want)
@@ -269,7 +269,7 @@ func TestOverviewFragmentIsTheBoxAndTheHead(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<div class="sp-head" id="overview-head" hx-swap-oob="true">`, `class="sp-postmark`, "Updated ",
-		`id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML"`,
+		`id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-swap="outerHTML"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the fragment is missing %q", want)

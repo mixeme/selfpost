@@ -302,6 +302,10 @@ type Box struct {
 	OOB bool
 	// DomainPick: see Box.
 	DomainPick bool
+	// Hidden draws the box hidden, as panel.js would hide it once the page
+	// runs (the show-when rules): a block the script hides after the first
+	// paint makes the page jump on every load (2026-10-28, measured).
+	Hidden bool
 	// InCards is a box of the cards layout, which orders its boxes on a
 	// phone by their numbers (Order).
 	InCards bool
@@ -331,9 +335,14 @@ type HelpLink struct {
 }
 
 // Filter is the input of filter_form, the filter of a list in a box head: it is
-// sent with GET to Action.
+// sent with GET to Action. With Box set to the id of the box it heads, htmx
+// sends it in place and swaps that box alone out of the page it gets back,
+// with the address bar following (hx-push-url): the page does not reload, so
+// nothing outside the list is drawn again (owner, 2026-10-28: "А нельзя по
+// фильтру перегружать только таблицу?"). Without the script it is a plain GET.
 type Filter struct {
 	Action  string
+	Box     string
 	Selects []Select
 	Dates   []DateInput
 	Button  string // "Filter" when empty

@@ -16,7 +16,7 @@ func TestOutLogShowsTheRowsAndTheirFilters(t *testing.T) {
 	pageHas(t, "Outbound log", out,
 		`<h1 class="title is-3">Outbound log</h1>`,
 		`Rows older than 30 days are deleted — change that in <a href="/server/settings">Settings</a>.`,
-		`<form class="sp-end" method="get" action="/outbound/log">`,
+		`<form class="sp-end" method="get" action="/outbound/log" hx-get="/outbound/log" hx-target="#messages" hx-select="#messages" hx-swap="outerHTML" hx-push-url="true">`,
 		`<select name="domain" aria-label="Domain"><option value="" selected>All domains</option><option value="example.org">example.org</option>`,
 		`<select name="app" aria-label="Application"><option value="" selected>All applications</option>`,
 		`<th>Time</th>`, `09-21 14:01:52`,

@@ -120,8 +120,8 @@ func NewOutLog(m Meta, retentionDays int, canSettings bool, domains, apps []stri
 	p := &OutLog{
 		Meta: m,
 		Head: Head{Kicker: "Outbound", Title: "Outbound log", Lead: lead},
-		Messages: Box{No: "01", Title: "Messages", Help: topicLink(HelpLog, "What the statuses mean"), Filter: &Filter{
-			Action: outboundLog,
+		Messages: Box{No: "01", Title: "Messages", ID: "messages", Help: topicLink(HelpLog, "What the statuses mean"), Filter: &Filter{
+			Action: outboundLog, Box: "messages",
 			Selects: []Select{
 				{Name: "domain", Label: "Domain", Options: options("All domains", domains), Selected: f.Domain},
 				{Name: "app", Label: "Application", Options: options("All applications", apps), Selected: f.App},

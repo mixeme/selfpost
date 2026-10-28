@@ -3,7 +3,7 @@
      polls (panel.js reads its id and data-poll; the response replaces it), and the
      foot under it, which the fragment marks to be swapped in by its id (.Foot.OOB)
      so the page count follows the rows. */}}
-{{define "out_log_rows"}}<div class="table-container" id="out-log-rows" data-poll aria-live="polite" hx-get="{{.PollURL}}" hx-trigger="load" hx-swap="outerHTML">
+{{define "out_log_rows"}}<div class="table-container" id="out-log-rows" data-poll aria-live="polite" hx-get="{{.PollURL}}" hx-swap="outerHTML">
 {{if .Rows}}<table class="table is-fullwidth is-hoverable">
   <thead><tr><th>Time</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th></th></tr></thead>
   <tbody>{{range .Rows}}

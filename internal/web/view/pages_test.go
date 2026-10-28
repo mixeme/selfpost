@@ -521,7 +521,7 @@ func unique(t *testing.T, where string, all []string) {
 func TestOverviewPageHasThePollAttributesAndNoOOBMark(t *testing.T) {
 	out := renderSignedIn(t, "overview", overviewFixture())
 	pageHas(t, "Overview", out,
-		`<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`,
+		`<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-swap="outerHTML">`,
 		`<div class="sp-head" id="overview-head">`)
 	pageLacks(t, "Overview", out, `hx-swap-oob`)
 	unique(t, "Overview", ids(out))
@@ -534,7 +534,7 @@ func TestOverviewFragmentIsTheBoxAndTheHeadOutOfBand(t *testing.T) {
 	frag := renderFragment(t, "overview_poll", overviewFixture())
 	pageHas(t, "fragment", frag,
 		`<div class="sp-head" id="overview-head" hx-swap-oob="true">`, `class="sp-postmark sp-warn"`, `Updated 14:02:31`,
-		`<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-trigger="load" hx-swap="outerHTML">`,
+		`<div class="box" id="health" data-poll aria-live="polite" hx-get="/overview/fragment" hx-swap="outerHTML">`,
 		`Expires in 12 days`)
 	pageLacks(t, "fragment", frag, `<html`, `<body`, `navbar`, `<table`, `Outbound domains`)
 	unique(t, "fragment", ids(frag))
