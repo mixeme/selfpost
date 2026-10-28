@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.13] - 2026-10-28
+
+No migration; schema 14; the compose files changed only in the pin.
+
 ### Fixed
 
 - **The page no longer jumps after it loads** (owner, 2026-10-28: "Когда
