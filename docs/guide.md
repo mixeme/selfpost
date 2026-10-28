@@ -423,6 +423,7 @@ expected to set; defaults match the code exactly.
 | `SEND_LOG_RETENTION_DAYS` | Initial default for how many days of send-log history are kept before the background sweep deletes rows, and with them the `mail.log` lines kept for each message (1–2 KB a message) — the main driver of `/data` growth over time and of the size of a full backup. After the first panel start, change retention under **Server › Settings** (global role); the env value is only used to seed SQLite when the setting has never been saved. | `90` | `.env` |
 | `PANEL_SESSION_IDLE_DAYS` | Sliding idle timeout for the panel login session, in days. There is no absolute cap: a user who keeps coming back stays signed in indefinitely. | `7` | `.env` |
 | `SELFPOST_DNS_RESOLVERS` | Comma-separated recursive resolvers the panel's PTR/SPF/DKIM/DMARC checks query directly (so they report what the internet sees, not what this host's stub resolver synthesises). Each is given 2 seconds to answer before the next is asked, and the one that answered last is asked first; a lookup none of them answered shows as not known, never as a wrong record. | `1.1.1.1:53`, `8.8.8.8:53`, `9.9.9.9:53` when unset | `.env` |
+| `SELFPOST_UPDATE_CHECK` | Whether the panel asks the image registry once a day for the newest published version, shown on **Server › Health** in the *Version* card. The check is two anonymous HTTPS requests to `ghcr.io` - a pull token for `mixeme/selfpost`, then its tag list - and sends nothing about the installation. `false` turns it off; nothing else is asked then. | `true` | `.env` |
 | `TZ` | Time zone of the container, an IANA name such as `Europe/Moscow`: every time the panel shows, every day it counts (today on Health, the days of the statistics, the days of the log filters) and the stamps Postfix writes in `mail.log`, so the two agree. Stored times stay UTC, so changing it is only a restart. *Server › Settings* shows the zone in use, and says so when the image does not know the name (the times are then UTC). | UTC | `.env` |
 | `TRUSTED_PROXY_CIDR` | Comma-separated CIDRs (bare IPs allowed) of reverse proxies allowed to supply `X-Forwarded-For` for sign-in and setup rate-limiting (account-change attempts are counted per user, whatever the address). **Leave unset unless you know the exact address of your reverse proxy.** A wrong value lets a client spoof its rate-limit key by sending a forged `X-Forwarded-For` header — the panel trusts the last hop only when the TCP peer matches one of these CIDRs. With Apache on the host (the default), the panel sees the proxy's connections come from the Docker network's gateway, e.g. `172.18.0.1` (`docker network inspect` shows it; measured 2026-10-15: the panel's `127.0.0.1:8080` is published through Docker's proxy, and a connection to such a port from the host arrives from the gateway). | *(empty — XFF ignored)* | `.env` |
 
@@ -681,7 +682,11 @@ checks — with a sentence beside it ("Mail is flowing. One thing needs
 attention.", "Mail may not be flowing." when a check fails) and, under it,
 each check that is not fine with its value; then one card per check: machine (processor and memory), supervised
 processes (Postfix, the panel - whose roles include the DKIM signer - and
-their helpers), TLS certificate, queue, milter sockets and reverse DNS. A
+their helpers), TLS certificate, queue, milter sockets and reverse DNS. The
+stamp and the sentence also count the checks of Health that have no card -
+Sender check, Notification mail and Version - so a warning there is never
+"Nothing needs attention" here; one of these that could not be read, or the
+version check turned off, counts as passed. A
 check the panel could not run shows as a warning, never as fine. Below the cards are the outbound domain list and, with the inbound relay
 on, the inbound one. Each card leads to its table on **Server › Health**
 (`/server/health`) — the queue card to the Outbound queue — and Health has the
@@ -728,6 +733,13 @@ past that the page shows the last result). *Greeting* is the `220` line Postfix
   one refresh after the page opens. A fully busy processor or a machine out of
   memory is a warning, because both delay or kill the mail path; throughput is
   only reported.
+- **Version** — the version running, the newest one published on
+  `ghcr.io/mixeme/selfpost` and when the registry was last asked (once a day,
+  see `SELFPOST_UPDATE_CHECK`). A newer one is a warning, *update*, with a
+  link to the CHANGELOG; to move to it, see [Upgrading](#upgrading). A
+  registry that did not answer is not known, not a fault of the server; the
+  last answer it gave is kept. A local build whose version is not `X.Y.Z` has
+  nothing to compare.
 - **Your address** (in the Configuration card) — the address the panel sees
   your browser at, and whether it took it from `X-Forwarded-For`. Behind a
   reverse proxy that the panel does not trust it is the proxy's own: every

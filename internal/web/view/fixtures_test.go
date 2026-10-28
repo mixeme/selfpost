@@ -68,8 +68,9 @@ var pageFixtures = map[string]func() any{
 // admin is the signed-in global administrator every fixture is rendered for.
 func admin() Meta { return Meta{User: "admin", IsGlobal: true} }
 
-// overviewFixture is the mockup's Overview: one certificate warning among six
-// checks, three outbound domains and two inbound.
+// overviewFixture is the mockup's Overview: a certificate warning on a card and
+// a newer version among the three checks without one - two of nine - three
+// outbound domains and two inbound.
 func overviewFixture() *Overview {
 	cards := []HealthCard{
 		{Name: "Machine", Value: "CPU 12%", Sub: "RAM 41%", Icon: "ti-cpu", Href: "/server/health"},
@@ -79,7 +80,12 @@ func overviewFixture() *Overview {
 		{Name: "Milter sockets", Value: "5 of 5 answering", Sub: "incl. the spam filter", Icon: "ti-plug-connected", Href: "/server/health"},
 		{Name: "Reverse DNS", Value: "Forward = reverse", Sub: "mail.example.org", Icon: "ti-arrows-exchange", Href: "/server/health"},
 	}
-	o := NewOverview(admin(), "mail.example.org", cards, time.Date(2026, 10, 9, 14, 2, 31, 0, time.UTC), 30, true)
+	o := NewOverview(admin(), "mail.example.org", cards, time.Date(2026, 10, 9, 14, 2, 31, 0, time.UTC), 30, true).
+		WithChecks([]HealthCard{
+			{Name: "Sender check", Href: "/server/health#sender-check"},
+			{Name: "Notification mail", Href: "/server/health#notification-mail"},
+			{Name: "Version", Href: "/server/health#version", Level: LevelWarn, Value: "2.16.12 is published"},
+		})
 	dns := func(dkim, spf, dmarc string) []Tag {
 		return []Tag{{Status: dkim, Label: "DKIM"}, {Status: spf, Label: "SPF"}, {Status: dmarc, Label: "DMARC"}}
 	}
@@ -142,6 +148,11 @@ func healthFixture(refresh bool) *Health {
 		NewMailRow("SPF", "mail.example.org", DNSCheck{Status: "error"}),
 		NewMailRow("DMARC", "_dmarc.mail.example.org", DNSCheck{Status: "warn"}),
 	}, "warn")
+	h.WithVersion(Tag{Status: "warn", Label: "update"}, []Fact{
+		{Label: "Running", Value: Plain("2.16.11"), Mono: true},
+		{Label: "Published", Value: Plain("2.16.12"), Mono: true},
+		{Label: "Checked", Value: Plain("2026-10-28 09:14"), Mono: true},
+	}, Rich("What changed is in the ", Link("https://github.com/mixeme/selfpost/blob/main/CHANGELOG.md", "CHANGELOG"), "."))
 	return h
 }
 

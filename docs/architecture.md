@@ -26,7 +26,7 @@ Managed programs ([build/supervisord.conf](../build/supervisord.conf)):
 
 | Program | User | Priority | Role |
 |---|---|---|---|
-| `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc + notifier; with the inbound relay on also the inbound journal milter |
+| `panel` | panel | 200 | HTTP UI + sender check + DKIM signer + journal-milter + log-tailer + rate-limit recalc + notifier + update check (unless `SELFPOST_UPDATE_CHECK=false`); with the inbound relay on also the inbound journal milter |
 | `postfix` | root (wrapper) | 300 | MTA — started only after the milter sockets exist (the sender check's, the DKIM signer's two, the journal milter's and, with the inbound relay on, the inbound journal milter's) |
 | `postfix-reload` | root | — | On-demand `postfix reload` (autostart off) |
 | `cert-reload` | root | 400 | Daily: re-copies a renewed TLS certificate for Postfix and reloads it; every minute while none has been there since the start |
@@ -393,6 +393,12 @@ milter, § Postfix above, port 25):
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
 7. **notifier** — writes to the panel's users when something needs them
    (§ Notifications below).
+8. **update check** — once a day (an hour after a failure) asks `ghcr.io` for
+   the tags of `mixeme/selfpost` with an anonymous pull token and keeps the
+   newest `X.Y.Z` in memory for Server › Health, card 10
+   ([internal/update](../internal/update/update.go)).
+   `SELFPOST_UPDATE_CHECK=false` leaves the role out. A failure goes to the
+   panel's log and to the card, which keeps the last answer.
 
 Milter chain in Postfix ([build/postfix-config.sh](../build/postfix-config.sh),
 `smtpd_milters`): the sender check (tempfail), the DKIM signer (tempfail),

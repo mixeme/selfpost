@@ -21,6 +21,7 @@ import (
 	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/update"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/handlers"
 	"github.com/mixeme/selfpost/internal/web/view"
@@ -95,6 +96,9 @@ type Config struct {
 	// checks must not go through the system resolver — see dnscheck's
 	// externalResolver — so this is how a closed network points them at its own.
 	DNSResolvers []string
+	// Updates is the version check of SELFPOST_UPDATE_CHECK; nil when it is
+	// off (update.Checker).
+	Updates *update.Checker
 	// RateLimitMessagesPerIP and RateLimitWindowSeconds are the level-1
 	// Postfix anvil backstop (env RATE_LIMIT_*), mirrored into the panel for
 	// display and to cap domain/app level-2 ceilings (guide § Rate limiting).
@@ -155,6 +159,7 @@ func New(st *store.Store, domains *domain.Service, apps *app.Service, inboundSvc
 		DBPath:                     cfg.DBPath,
 		DeployRoot:                 cfg.DeployRoot,
 		Version:                    cfg.Version,
+		Updates:                    cfg.Updates,
 		TLSCertFile:                cfg.TLSCertFile,
 		TLSServedCertFile:          cfg.TLSServedCertFile,
 		SMTPBanner:                 cfg.SMTPBanner,

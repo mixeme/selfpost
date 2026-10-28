@@ -56,13 +56,14 @@ func pageLacks(t *testing.T, page, out string, gones ...string) {
 
 // The stamp, the sentence and the cards say the same thing: the worst card
 // colours the stamp, the number counts the cards that are not fine, and the
-// lead names them with their detail and a way to the table behind each.
+// lead names them with their detail and a way to the table behind each. The
+// checks without a card count as well (WithChecks): nine in all.
 func TestOverviewHeadFollowsTheCards(t *testing.T) {
 	out := renderSignedIn(t, "overview", overviewFixture())
 	pageHas(t, "Overview", out,
-		`<h1 class="title is-3">Mail is flowing. One thing needs attention.</h1>`,
-		`class="sp-postmark sp-warn"`, `<b>WARN</b>`, `1 OF 6 CHECKS`,
-		`<a href="/server/health">TLS certificate</a>: expires in 12 days.`,
+		`<h1 class="title is-3">Mail is flowing. 2 things need attention.</h1>`,
+		`class="sp-postmark sp-warn"`, `<b>WARN</b>`, `2 OF 9 CHECKS`,
+		`<a href="/server/health">TLS certificate</a>: expires in 12 days; <a href="/server/health#version">Version</a>: 2.16.12 is published.`,
 		`Updated 14:02:31<br>refreshes on its own`, `<p class="sp-kicker">mail.example.org</p>`,
 		`class="sp-warn"`, // the certificate card
 		`href="/server/health"`, `>All details</a>`,
@@ -276,8 +277,8 @@ func TestHealthStatesTheFixtureDoesNotDraw(t *testing.T) {
 // for a problem receivers refuse mail for.
 func TestHealthHostnameNote(t *testing.T) {
 	h := healthFixture(false)
-	if out := renderSignedIn(t, "health", h); strings.Count(out, `<p class="mt-4 `) != 1 {
-		t.Error("an ok Hostname card has a note (the certificate's is the page's only one)")
+	if out := renderSignedIn(t, "health", h); strings.Count(out, `<p class="mt-4 `) != 2 {
+		t.Error("an ok Hostname card has a note (the certificate's and the version's are the page's only ones)")
 	}
 	h.HostDetail = "Could not check the reverse DNS of 203.0.113.25: the DNS lookup failed (timed out). Try Re-check in a moment."
 	pageHas(t, "Health", renderSignedIn(t, "health", h),

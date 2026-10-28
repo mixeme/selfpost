@@ -65,6 +65,14 @@ type Health struct {
 	ConfigFacts   []Fact
 	ConfigProblem Text
 
+	// Version is card 10: the running version, the newest one published on
+	// the image registry and when that was asked (update.Checker), and the
+	// line under them - the CHANGELOG when there is a newer one, else why the
+	// card says what it does.
+	Version      Box
+	VersionFacts []Fact
+	VersionNote  Text
+
 	// TestMessage is the card that sends the panel's test message
 	// (test-email): TestFrom is its sender, TestTo the address typed and
 	// TestErr why it was not sent, both kept when the form comes back.
@@ -192,7 +200,7 @@ func NewHealth(m Meta, flash string) *Health {
 		Head: Head{
 			Kicker:  "Server",
 			Title:   "Health",
-			Lead:    Plain("Everything behind the six cards on Overview. Refreshes automatically."),
+			Lead:    Plain("Everything behind the verdict on Overview. Refreshes automatically."),
 			Actions: []Action{{Label: "Re-check DNS", Icon: "ti-refresh", Post: "/server/health/recheck"}},
 		},
 		// Numbered by importance; the odd ones are the left stack.
@@ -211,6 +219,7 @@ func NewHealth(m Meta, flash string) *Health {
 		TestMessage: Box{No: "09", InCards: true, Title: "Test message", ID: "test-message",
 			End: Plain("Shows what the receiving server answers"), Help: topicLink(HelpTestMessage, "What the test proves")},
 		TestAction: TestMessageAction,
+		Version:    Box{No: "10", InCards: true, Title: "Version", ID: "version"},
 	}
 	if flash != "" {
 		h.Flash = &Flash{Text: Plain(flash)}
@@ -239,6 +248,14 @@ func (h *Health) WithSenderCheck(rows []SenderCheckRow, since, status string) *H
 	if since != "" {
 		h.SenderNote = append(h.SenderNote, Rich(" Counted since ", Mono(since), ".")...)
 	}
+	return h
+}
+
+// WithVersion fills card 10: its verdict tag, the facts and the line under
+// them.
+func (h *Health) WithVersion(verdict Tag, facts []Fact, note Text) *Health {
+	h.Version.End = Text{Inline{Tag: &verdict}}
+	h.VersionFacts, h.VersionNote = facts, note
 	return h
 }
 

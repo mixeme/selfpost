@@ -3,9 +3,11 @@ package handlers
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/update"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
 
@@ -200,5 +202,48 @@ func TestHealthGreetingAndCertificateName(t *testing.T) {
 	}
 	if tag := names(page); tag == nil || tag.Status != "fail" || tag.Label != "not for the hostname" {
 		t.Errorf("a certificate for another name: %+v", tag)
+	}
+}
+
+// Card 10 in each of its states: a newer version is "update" in yellow with
+// the CHANGELOG; the same is ok; a registry that never answered is unknown; a
+// failure after an answer keeps the version and says why; a local build has
+// nothing to compare; a check that is off says so.
+func TestVersionCard(t *testing.T) {
+	checked := time.Date(2026, 10, 28, 9, 14, 0, 0, time.Local)
+	for _, c := range []struct {
+		name    string
+		state   update.State
+		tag     view.Tag
+		newer   bool
+		facts   int
+		noteHas string
+	}{
+		{"newer", update.State{Running: "2.16.11", Published: "2.16.12", Checked: checked},
+			view.Tag{Status: "warn", Label: "update"}, true, 3, "CHANGELOG"},
+		{"current", update.State{Running: "2.16.11", Published: "2.16.11", Checked: checked},
+			view.Tag{Status: "ok"}, false, 3, ""},
+		{"never answered", update.State{Running: "2.16.11", Err: "token: dial tcp: i/o timeout"},
+			view.Tag{Status: "unknown"}, false, 1, "did not answer: token: dial tcp: i/o timeout"},
+		{"not asked yet", update.State{Running: "2.16.11"},
+			view.Tag{Status: "unknown"}, false, 1, "has not answered yet"},
+		{"failed after an answer", update.State{Running: "2.16.11", Published: "2.16.12", Checked: checked, Err: "tag list: ghcr.io answered 503"},
+			view.Tag{Status: "warn", Label: "update"}, true, 3, "CHANGELOG. The last check failed (tag list: ghcr.io answered 503)"},
+		{"local build", update.State{Running: "dev", Published: "2.16.12", Checked: checked},
+			view.Tag{Status: "unknown"}, false, 3, "A local build"},
+		{"off", update.State{Running: "2.16.11", Off: true},
+			view.Tag{Status: "off", Label: "off"}, false, 1, "SELFPOST_UPDATE_CHECK=false"},
+	} {
+		tag, facts, note, newer := versionCard(c.state)
+		if tag != c.tag || newer != c.newer || len(facts) != c.facts {
+			t.Errorf("%s: tag %+v newer %v facts %d", c.name, tag, newer, len(facts))
+		}
+		var text strings.Builder
+		for _, in := range note {
+			text.WriteString(in.Text)
+		}
+		if c.noteHas == "" && text.Len() > 0 || !strings.Contains(text.String(), c.noteHas) {
+			t.Errorf("%s: note %q, want it to hold %q", c.name, text.String(), c.noteHas)
+		}
 	}
 }

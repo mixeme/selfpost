@@ -13,9 +13,11 @@ import (
 
 	"github.com/mixeme/selfpost/internal/dnscheck"
 	"github.com/mixeme/selfpost/internal/health"
+	"github.com/mixeme/selfpost/internal/legal"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/update"
 	"github.com/mixeme/selfpost/internal/web/validate"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
@@ -45,7 +47,8 @@ func (h *Handlers) HandleOverview(w http.ResponseWriter, r *http.Request) {
 	_, _, days := store.StatsWindow(retention, time.Now())
 
 	inboundOn := h.cfg.InboundEnabled && h.inbound != nil
-	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, inboundOn)
+	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, inboundOn).
+		WithChecks(h.cardlessChecks())
 	page.OutboundRows = h.overviewDomains(domains, retention)
 	if inboundOn {
 		list, err := h.inbound.List()
@@ -71,7 +74,8 @@ func (h *Handlers) HandleOverviewFragment(w http.ResponseWriter, r *http.Request
 		return
 	}
 	_, _, days := store.StatsWindow(h.sendLogRetentionDays(), time.Now())
-	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, false)
+	page := view.NewOverview(h.shellMeta(r), h.cfg.Hostname, healthCards(h.healthChecks()), time.Now(), days, false).
+		WithChecks(h.cardlessChecks())
 	h.view.RenderFragment(w, http.StatusOK, "overview_poll", page)
 }
 
@@ -244,7 +248,83 @@ func (h *Handlers) healthView(r *http.Request, flash string) *view.Health {
 		}
 		status = string(health.StatusUnknown)
 	}
-	return page.WithSenderCheck(rows, since, status)
+	page.WithSenderCheck(rows, since, status)
+	tag, facts, note, _ := versionCard(h.cfg.Updates.State(h.cfg.Version))
+	return page.WithVersion(tag, facts, note)
+}
+
+// cardlessChecks are the checks of Health that Overview has no card for -
+// Sender check, Notification mail and Version - as Overview counts them in
+// its stamp and sentence (view.Overview.WithChecks; owner, 2026-10-28). A
+// check that could not be read, or is off, counts as passed here: on a card it
+// would be a warning, but these are not about whether mail flows now, and a
+// registry out of reach must not turn the stamp yellow.
+func (h *Handlers) cardlessChecks() []view.HealthCard {
+	level := func(s string) string {
+		if health.Status(s) == health.StatusUnknown || s == "off" {
+			return ""
+		}
+		return cardLevel(health.Status(s))
+	}
+	var checks []view.HealthCard
+	if stats, err := h.store.SenderCheckStats(time.Now()); err == nil {
+		_, _, status := senderCheckCard(stats, time.Now())
+		checks = append(checks, view.HealthCard{Name: "Sender check", Href: "/server/health#sender-check",
+			Level: level(status), Value: "mail was deferred in the last day"})
+	}
+	mail := h.serverMail(false)
+	checks = append(checks, view.HealthCard{Name: "Notification mail", Href: "/server/health#notification-mail",
+		Level: level(mail.status), Value: "a record is not in place"})
+	state := h.cfg.Updates.State(h.cfg.Version)
+	if !state.Off {
+		_, _, _, newer := versionCard(state)
+		c := view.HealthCard{Name: "Version", Href: "/server/health#version"}
+		if newer {
+			c.Level, c.Value = cardLevel(health.StatusWarn), state.Published+" is published"
+		}
+		checks = append(checks, c)
+	}
+	return checks
+}
+
+// changelogURL is where card 10 sends the reader for what a release changed.
+const changelogURL = legal.SourceURL + "/blob/main/CHANGELOG.md"
+
+// versionCard is card 10 from the version check: its verdict, the facts, the
+// line under them, and whether a newer version is published. A newer one is
+// "update" in yellow (owner, 2026-10-28); a registry that did not answer is
+// unknown, not a fault of the server; a check that is off says so.
+func versionCard(s update.State) (tag view.Tag, facts []view.Fact, note view.Text, newer bool) {
+	facts = []view.Fact{{Label: "Running", Value: view.Plain(s.Running), Mono: true}}
+	switch {
+	case s.Off:
+		return view.Tag{Status: "off", Label: "off"}, facts,
+			view.Rich("Not asked: ", view.Code("SELFPOST_UPDATE_CHECK=false"), "."), false
+	case s.Published == "" && s.Err != "":
+		return view.Tag{Status: string(health.StatusUnknown)}, facts,
+			view.Plain("The image registry did not answer: " + s.Err + "."), false
+	case s.Published == "":
+		return view.Tag{Status: string(health.StatusUnknown)}, facts,
+			view.Plain("The image registry has not answered yet."), false
+	}
+	facts = append(facts,
+		view.Fact{Label: "Published", Value: view.Plain(s.Published), Mono: true},
+		view.Fact{Label: "Checked", Value: view.Plain(s.Checked.Local().Format("2006-01-02 15:04")), Mono: true})
+	tag = view.Tag{Status: string(health.StatusOK)}
+	if s.Newer() {
+		tag, newer = view.Tag{Status: string(health.StatusWarn), Label: "update"}, true
+		note = view.Rich("What changed is in the ", view.Link(changelogURL, "CHANGELOG"), ".")
+	} else if _, ok := update.Parse(s.Running); !ok {
+		tag = view.Tag{Status: string(health.StatusUnknown)}
+		note = view.Plain("A local build: its version is not one to compare.")
+	}
+	if s.Err != "" {
+		if len(note) > 0 {
+			note = append(note, view.Inline{Text: " "})
+		}
+		note = append(note, view.Plain("The last check failed ("+s.Err+"); the published version is from the one before.")...)
+	}
+	return tag, facts, note, newer
 }
 
 // senderCheckCard is the Sender check card from its statistics. It warns when

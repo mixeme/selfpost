@@ -11,7 +11,7 @@
 {{template "health_mail" .}}{{end}}
 
 {{/* health_stack is the left stack: Processes, Sender check, Hostname and
-     reverse DNS, Machine. */}}
+     reverse DNS, Machine, Version. */}}
 {{define "health_stack"}}<div class="column is-6" id="health-stack" data-poll aria-live="polite" hx-get="/server/health/fragment" hx-trigger="load" hx-swap="outerHTML">
   {{template "box_open" .Processes}}
   {{if .ProcessError}}
@@ -51,6 +51,12 @@
       <tr><td>{{.Resource}}</td><td>{{if .Gauge}}<progress class="progress is-small {{.Gauge.Bar}} mb-1" value="{{.Gauge.Percent}}" max="100"></progress>{{.Gauge.Text}}{{else if .Usage}}<span class="sp-nowrap">{{.Usage}}</span>{{else}}<span class="sp-muted">—</span>{{end}}</td><td class="sp-muted">{{range .Detail}}<div>{{.}}</div>{{end}}</td></tr>{{end}}
     </tbody>
   </table></div>
+  {{template "box_close"}}
+  {{template "box_open" .Version}}
+  {{template "body_open"}}
+  {{template "facts" .VersionFacts}}
+  {{if .VersionNote}}<p class="mt-4 sp-muted">{{template "inline" .VersionNote}}</p>{{end}}
+  {{template "body_close"}}
   {{template "box_close"}}
 </div>{{end}}
 

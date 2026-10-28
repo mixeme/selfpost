@@ -122,6 +122,7 @@ func newPanel(cfg config, st *store.Store) (*web.Server, error) {
 		SenderSocket:               cfg.senderSocket,
 		SessionIdleDays:            cfg.sessionIdleDays,
 		DNSResolvers:               cfg.dnsResolvers,
+		Updates:                    cfg.updates,
 		RateLimitMessagesPerIP:     cfg.rateLimitMessagesPerIP,
 		RateLimitWindowSeconds:     cfg.rateLimitWindowSeconds,
 		RetryPolicy:                retryPolicy,

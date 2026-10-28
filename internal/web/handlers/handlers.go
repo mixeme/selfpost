@@ -14,6 +14,7 @@ import (
 	"github.com/mixeme/selfpost/internal/notify"
 	"github.com/mixeme/selfpost/internal/postfix"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/update"
 	"github.com/mixeme/selfpost/internal/web/auth"
 	"github.com/mixeme/selfpost/internal/web/view"
 )
@@ -27,6 +28,9 @@ type Config struct {
 	DBPath            string
 	DeployRoot        string
 	Version           string
+	// Updates is the version check (Server › Health, card 10); nil when
+	// SELFPOST_UPDATE_CHECK=false.
+	Updates           *update.Checker
 	TLSCertFile       string
 	TLSServedCertFile func() string
 	TLSReloadInterval time.Duration

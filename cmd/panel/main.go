@@ -28,6 +28,7 @@ import (
 	"github.com/mixeme/selfpost/internal/inbound"
 	"github.com/mixeme/selfpost/internal/logtail"
 	"github.com/mixeme/selfpost/internal/store"
+	"github.com/mixeme/selfpost/internal/update"
 )
 
 func main() {
@@ -75,16 +76,19 @@ type config struct {
 	mailLog                     string
 	retentionDays               int
 
-	dataDir                string
-	dbPath                 string
-	manifestPath           string
-	setupTokenPath         string
-	hostname               string
-	cookieSecure           bool
-	submissionEnabled      bool
-	trustedProxies         []*net.IPNet
-	sessionIdleDays        int
-	dnsResolvers           []string
+	dataDir           string
+	dbPath            string
+	manifestPath      string
+	setupTokenPath    string
+	hostname          string
+	cookieSecure      bool
+	submissionEnabled bool
+	trustedProxies    []*net.IPNet
+	sessionIdleDays   int
+	dnsResolvers      []string
+	// updates asks ghcr.io once a day for the newest published version
+	// (Server › Health, card 10); nil when SELFPOST_UPDATE_CHECK=false.
+	updates                *update.Checker
 	rateLimitMessagesPerIP int
 	rateLimitWindowSeconds int
 
@@ -172,6 +176,8 @@ func loadConfig() config {
 		// Recursive resolvers the deliverability checks query directly. Empty
 		// means dnscheck's public defaults; a closed network names its own here.
 		dnsResolvers: dnscheck.ParseResolvers(os.Getenv("SELFPOST_DNS_RESOLVERS")),
+		// The version check is on unless turned off (owner, 2026-10-28).
+		updates: newUpdateChecker(os.Getenv("SELFPOST_UPDATE_CHECK")),
 
 		// Level-1 anvil defaults match build/postfix-config.sh / guide.md.
 		rateLimitMessagesPerIP: envInt("RATE_LIMIT_MESSAGES_PER_IP", 100),
@@ -412,8 +418,8 @@ func run() error {
 	}
 
 	var wg sync.WaitGroup
-	// Room for every role to report a failure without blocking: eight at most.
-	errc := make(chan error, 8)
+	// Room for every role to report a failure without blocking: nine at most.
+	errc := make(chan error, 9)
 
 	roles := []struct {
 		name string
@@ -438,6 +444,13 @@ func run() error {
 			return nil
 		}},
 		{"notifier", func(ctx context.Context) error { return runNotifier(ctx, cfg, st) }},
+	}
+
+	if cfg.updates != nil {
+		roles = append(roles, struct {
+			name string
+			fn   func(context.Context) error
+		}{"update-check", cfg.updates.Run})
 	}
 
 	if cfg.inboundEnabled {
@@ -469,4 +482,14 @@ func run() error {
 		wg.Wait()
 		return err
 	}
+}
+
+// newUpdateChecker is the version check of SELFPOST_UPDATE_CHECK: on unless
+// the value is "false" (owner, 2026-10-28), so that an operator hears of a
+// release without having asked to.
+func newUpdateChecker(env string) *update.Checker {
+	if strings.EqualFold(strings.TrimSpace(env), "false") {
+		return nil
+	}
+	return update.New(buildinfo.Version)
 }

@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Added
+
+- **Server › Health shows whether a newer version is published** - card 10
+  *Version*: the version running, the newest `X.Y.Z` image on
+  `ghcr.io/mixeme/selfpost` and when that was asked, and, when it is newer,
+  *update* in yellow with a link to the CHANGELOG. The panel asks once a day:
+  two anonymous HTTPS requests to `ghcr.io`, a pull token and the tag list,
+  with nothing about the installation in them. `SELFPOST_UPDATE_CHECK=false`
+  turns it off; it is on by default. A registry that does not answer leaves
+  the card unknown and keeps its last answer.
+
+### Changed
+
+- **Overview's stamp and sentence count every check of Health**, the three
+  without a card on Overview as well - Sender check, Notification mail and
+  Version: "2 OF 9 CHECKS". Before, a warning on either of the first two
+  left Overview at "Nothing needs attention". The grid keeps its six cards.
+
 ## [2.16.11] - 2026-10-28
 
 No migration; schema 14; the compose files changed only in the pin.

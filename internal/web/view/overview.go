@@ -24,6 +24,8 @@ type Overview struct {
 	Meta
 	Head  Head
 	Cards []HealthCard
+	// updated is when the checks were read, kept for WithChecks.
+	updated time.Time
 
 	Health Box
 
@@ -64,10 +66,11 @@ type OverviewInbound struct {
 func NewOverview(m Meta, host string, cards []HealthCard, updated time.Time, days int, inboundOn bool) *Overview {
 	m.Title, m.Section, m.Page = "Overview", "overview", ""
 	o := &Overview{
-		Meta:  m,
-		Cards: cards,
-		Days:  days,
-		Head:  overviewHead(host, cards, updated),
+		Meta:    m,
+		Cards:   cards,
+		Days:    days,
+		updated: updated,
+		Head:    overviewHead(host, cards, updated),
 		Health: Box{No: "01", Title: "Server health", ID: "health", Poll: "/overview/fragment",
 			End:  Rich(Link("/server/health", "All details")),
 			Help: topicLink(HelpChecks, "What these checks mean")},
@@ -79,6 +82,16 @@ func NewOverview(m Meta, host string, cards []HealthCard, updated time.Time, day
 		InboundEmpty: EmptyState{Icon: "ti-world-download",
 			Text: Plain("No inbound domains yet. Mail is not accepted for any.")},
 	}
+	return o
+}
+
+// WithChecks counts the checks of Health that have no card - Sender check,
+// Notification mail, Version - in the stamp and the sentence, so that a
+// warning on Health is never "Nothing needs attention" here (owner,
+// 2026-10-28, variant A). The grid keeps its six cards.
+func (o *Overview) WithChecks(more []HealthCard) *Overview {
+	all := append(append([]HealthCard{}, o.Cards...), more...)
+	o.Head = overviewHead(o.Head.Kicker, all, o.updated)
 	return o
 }
 
