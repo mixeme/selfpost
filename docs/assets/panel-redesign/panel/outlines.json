@@ -82,7 +82,8 @@
       "box[Processes]:table",
       "box[Sender check]:table+body",
       "box[Hostname and reverse DNS]:body",
-      "box[Machine]:table"
+      "box[Machine]:table",
+      "box[Version]:body"
      ]
     },
     {
