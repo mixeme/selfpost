@@ -43,6 +43,12 @@ guarantees — the sender check, the signer, the rate limits, the tenant boundar
 the restore guards, the secret files — held up under this reading, and the
 faults found are in the panel's edges rather than in what carries mail.
 
+The second half of this file is a measurement of what the test suite costs and
+where the time goes (§ The test suite's cost): the panel's product code is
+fast, and ten minutes of suite on this machine is mostly bcrypt at the panel's
+real work factor, a full template parse and a database migration in every test,
+and four heavy packages contending for four cores.
+
 ---
 
 ## Findings
@@ -99,6 +105,12 @@ counts characters and has no maximum — harmless there, because scrypt has no
 such limit, but the two forms should not read differently for the same field.
 Whichever way it goes, [security.md](security.md) § Application SASL passwords
 and § Backup and domain export name the rule and have to follow it.
+
+The same limit has a second, invisible cost in the suite: `BcryptCost` is 12,
+which is 543 ms a hash and 631 ms a comparison on the machine this was measured
+on (§ The test suite's cost), and every test that signs in with a wrong name
+pays one. A validator that refuses an over-long password at the form would not
+change that; it is named here because both come from the same constant.
 
 **M2. The release procedure is written twice in `development.md`, and the two
 copies contradict each other and the workflow.** *Proven by reading; the
@@ -296,7 +308,8 @@ Run in the review worktree, Windows 10, Go 1.27.0, on 2026-11-05.
 - `go test ./...` — every package green but three, and in them five tests that
   assume a POSIX filesystem: the class
   [audit-2026-10-12](audit-2026-10-12.md) § Machine results named for this
-  platform, now four more of them.
+  platform, now four more of them. The run took **636 s**; what that time is
+  made of is § The test suite's cost below.
   - `internal/domain` `TestWriteLoadPrivateKeyRoundtrip` — `key perm = 666,
     want 0600`: Windows has no POSIX modes.
   - `internal/logtail` `TestFollowTailsAndRotates`,
@@ -306,15 +319,16 @@ Run in the review worktree, Windows 10, Go 1.27.0, on 2026-11-05.
     the test.
   - `internal/postfix` `TestQueueIDsRefusesATruncatedListing` — the fake
     `postqueue` writes 5 MiB by re-executing the test binary, and composing
-    that listing takes longer than the test's 5 s deadline on this machine; the
-    product path is not involved.
+    that listing takes longer than the test's 5 s deadline on this machine, all
+    the more so when the processors are busy. The product path is not involved.
 - `internal/web/handlers` — the package timed out once (`panic: test timed out
   after 10m0s`, `running tests: TestApplicationSaveRefusalKeepsTheLoginFixed
-  (16s)`) while the whole suite ran beside it, and passed on a run of its own
-  afterwards. Recorded as a flake under load, not as a finding: nothing in that
-  test waits on anything but a database and a rendered page, and the same run of
-  the package alone finished in 291 s. It is worth watching in CI, where the
-  runner is slower than this machine and the 10-minute ceiling is the same.
+  (16s)`) in the first full run, while the whole suite ran beside it, and
+  finished at 312 s in a second full run. Recorded as a consequence of load
+  rather than as a finding — the package's work is 172 s, and four packages
+  that each want a core are sharing four — but it is the reason to watch this
+  package's own time in CI, where the runner is slower than this machine and
+  the 10-minute ceiling is the same.
 
 The e2e suite was not run: it needs the Docker stand and its own 20 minutes, and
 this review changed nothing for it to gate.
@@ -372,6 +386,132 @@ pass read the code against the document and found the document true:
 - **The panel's component kit and guard tests**: the page data is typed, the
   kit is the only writer of its markup, `wbr_at` escapes before it inserts
   `<wbr>`, and no page carries an inline script or style.
+
+---
+
+## The test suite's cost, measured
+
+A second pass, 2026-11-06, on the same machine (Windows 10, 4 logical CPUs, Go
+1.27.0): where the ten minutes that `go test ./...` takes here are spent. Every
+number below is from this tree, measured with `go test -count=1 -json` per
+package and with throwaway tests since deleted; the product code was not touched.
+
+### What it costs
+
+| Package | Alone | Sum of the top-level tests | Tests | In `go test ./...` | Worst single test |
+|---|---|---|---|---|---|
+| `internal/web/auth` | 208.5 s | 208.3 s | 52 | **277.2 s** | `TestLoginBehindOneUntrustedProxyKeepsOthersIn` — 102.8 s |
+| `internal/web/handlers` | 172.6 s | 171.9 s | 201 | **311.9 s** | `TestRightAccountPasswordsDoNotUseUpTheLimit` — 6.8 s |
+| `internal/store` | 56.2 s | — | — | **218.2 s** | — |
+| `internal/web/view` | 62.6 s | 62.4 s | 207 | **193.6 s** | `TestShowWhenBlocksArriveInTheirState` — 3.7 s |
+
+The whole suite: **636 s** wall on this machine, 10.6 minutes.
+
+Two things in that table matter more than the totals. First, the tests within a
+package are sequential — the top-level sums match the wall time to within a
+second — so a package's cost is the work of its tests, and `go test ./...`
+overlaps only packages, one per CPU. Second, and this is the surprise: **a
+package costs two to four times more in the full run than alone** — `store`
+56 s → 218 s, `view` 63 s → 194 s, `handlers` 173 s → 312 s. Four packages that
+each saturate a core are fighting over four cores, and the ones that are
+memory- and syscall-heavy degrade worst. That is also the reason
+`internal/web/handlers` timed out at ten minutes in the first full run of this
+review and finished at 312 s in this one: it is the same work, against
+different neighbours.
+
+### Where it goes
+
+**1. bcrypt at the panel's work factor, in the code under test.** Measured
+directly: `bcrypt.GenerateFromPassword` at `BcryptCost` (12) is **543 ms**, and
+`CompareHashAndPassword` **631 ms**, against 1.4 ms and 1.9 ms at `MinCost`.
+The tests that pay it do so through the handler, not through a fixture:
+
+- `submitLogin` compares against `noSuchUserHash()`
+  ([auth/handlers.go:180](../internal/web/auth/handlers.go)) for **every
+  unknown username**, at `BcryptCost`, so that the answer takes as long as a
+  wrong password (audit 2026-10-12, M8 — a deliberate property of the product).
+  `TestLoginBehindOneUntrustedProxyKeepsOthersIn`
+  ([limitkeys_test.go:18-43](../internal/web/auth/limitkeys_test.go)) sends 115
+  failed sign-ins, most of them for names that do not exist: 115 × 0.55 s ≈ 63 s
+  of the test's 103. Six more tests in the package drive `postLogin` the same
+  way.
+- The setup, reset-link and Account tests generate real hashes at
+  `BcryptCost` through the handlers (`BcryptCost` is a constant, not a fixture
+  knob): `TestSetupRejectsCredentialsItWouldNotAcceptLater` 6.6 s,
+  `TestResetSendsALinkOnlyToAConfirmedAddress` 8.2 s,
+  `TestAccountPassword` 5.6 s, `TestAccountPasswordGuessesHaveTheirOwnLimit`
+  4.0 s.
+- `TestLoginTakesAsLongForAnUnknownName`
+  ([handlers_test.go:293](../internal/web/auth/handlers_test.go)) is 16.6 s and
+  **is** the measurement: eleven sign-ins at cost 12, by design. It should stay
+  the only test paying that price.
+
+**2. A fresh `view.New` and a fresh migrated database per test.** Measured:
+`view.New("test")` — which parses every page template with
+`html/template.ParseFS` — is **343 ms**, and `kitEngine` (which calls it) is
+invoked in 17 places in the view tests. `store.Open` on an empty path is **93 ms**
+(13 migrations applied, one transaction each), against **4 ms** on a file that
+already has the schema; the panel's test stubs open a database per test
+(`settingsServerAt`, and through it each of the `settingsServer` — 34 calls —
+and `newAppStand` — 26), and the auth package does the same (`testModule`, 20
+calls).
+
+**3. RSA key generation per test.** `rsa.GenerateKey(2048)` is **347 ms** on
+this CPU, and there are eight such calls in the suite: two in the handlers'
+test stands, two in `health_test.go`, one in `milter/sign_test.go`, one in
+`domain/transfer_test.go`, one in the e2e's `upgrade_test.go` and one in
+`health_served_test.go`. `internal/domain`'s 71 s in the first full run is
+largely key work of its own — `EnsureKey` in five places of `keys_test.go` and
+the 4096-bit key `transfer_test.go` builds.
+
+**4. Fixed sleeps.** The `logtail` tests wait on real time —
+`blindMin + 500ms` in one ([logtail_test.go:528](../internal/logtail/logtail_test.go)),
+50 ms polls in four others, `time.After(2*time.Second)` ceilings — and
+`schema_test.go:421` sleeps 500 ms. The package is 12 s locally, small, but it
+is the one place where the cost is by construction rather than by accident.
+
+### What could be done, in order of gain for risk
+
+1. **Let the tests pick the work factor.** `BcryptCost` is a `const`; making it
+   a package variable (or adding an unexported one the tests can lower) would
+   let the auth suite run at `MinCost` — roughly **100 s of that package's
+   208 s alone, and a third of its 277 s under load** — while the product keeps
+   12. The panel already treats the cost as a product decision recorded in
+   [security.md](security.md); a test that needs the real cost
+   (`TestLoginTakesAsLongForAnUnknownName`) sets it back explicitly. This is
+   the single change that removes most of the time, and it is small.
+2. **One `view.New` per package, shared.** `kitEngine` is `t.Helper()` plus a
+   full parse of every template; a package-level `sync.OnceValue` would cut the
+   17 parses to one. In `view` the parses are spread thin — the package's 62 s
+   is 207 tests at a fifth of a second each, many of which build a page — so
+   this is worth a few seconds there and rather more in `handlers`, where each
+   of the 34 stands parses the templates again through `mustView`.
+3. **One migrated template database, copied per test.** `store.Open`'s 93 ms is
+   89 ms of migrations; opening a copy of a schema-initialised file is 4 ms.
+   That is a fixture, and a fixture in this project's style needs to say why
+   it is safe (`Open` also sets `PRAGMA application_id` and the file's mode) —
+   worth doing for `store`, less clearly worth it for the panel's stands.
+4. **A handful of fixed RSA keys as test data** instead of generating them in
+   eight tests: ~2.8 s, and a 2048-bit test key in `testdata/` is not a secret
+   (none of them signs anything real).
+5. **The sleeps in `logtail`**: `blindMin` is a package constant; a test-only
+   override would turn a 3.5 s wait into milliseconds. Low absolute gain, so
+   last.
+
+One thing that is **not** on this list: making the whole suite run with
+`-p 1` or with more parallelism. The four heavy packages already overlap, and
+the table above is what overlapping costs them; the answer is less work per
+package, not a different schedule. Nor is the answer to shrink what the tests
+assert — the 115 sign-ins in `TestLoginBehindOneUntrustedProxyKeepsOthersIn`
+prove a rate-limit property the audit paid for, and the only thing wrong with
+them is the price of bcrypt, not the count.
+
+None of this changes what the tests assert. The reason to do it is arithmetic:
+of the 636 s the suite takes here, about 100 s is bcrypt at cost 12 and most of
+the rest is setup — templates parsed and databases migrated per test — that
+four processes then contend for. On a CI runner slower than this machine the
+same suite does not get shorter, and a suite that takes a quarter of an hour is
+one people stop running before they push.
 
 ---
 
