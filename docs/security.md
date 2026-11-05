@@ -79,7 +79,14 @@ the TLS key readable by Postfix through group 10998 (I1, now group 10997),
 a link the entrypoint could follow at the DMARC maps (I2), and every
 visitor sharing one sign-in limit behind an untrusted proxy (A1) - all fixed
 in `2.14.4`, with the lows the plan named; two reviews (Fable) of the fixes
-found nothing above low, and their lows were fixed too.
+found nothing above low, and their lows were fixed too. The 2026-11-05
+external review ([security-audit-2026-11-05.md](security-audit-2026-11-05.md);
+one reader, the tree only, no live system) found nothing above low: it held
+the session model, the origin check, the SQL layer, template escaping, the
+external commands, the validation, RBAC and re-auth, the image and CI against
+this document and agreed on each; its one note (E1) — the absent absolute
+session cap is stated in the guide but not under Accepted risks — is left to
+the owner to place or decline.
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
