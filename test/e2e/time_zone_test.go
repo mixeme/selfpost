@@ -51,7 +51,8 @@ func testTimeZone(t *testing.T, sc *scenario) {
 	}
 	// The minute it was sent, or the next one if the clock turned between.
 	minutes := []string{sent.Format("2006-01-02 15:04"), sent.Add(time.Minute).Format("2006-01-02 15:04")}
-	stamps := []string{sent.Format("Jan _2 15:04"), sent.Add(time.Minute).Format("Jan _2 15:04")}
+	// Postfix's msg_logger_print uses %d: the day is zero-padded.
+	stamps := []string{sent.Format("Jan 02 15:04"), sent.Add(time.Minute).Format("Jan 02 15:04")}
 	if err := waitFor("the test message's page to show it sent", 60*time.Second, time.Second, func() (bool, error) {
 		_, b, err := sc.panel.get(page)
 		body = b

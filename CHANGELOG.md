@@ -195,6 +195,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   tests that rename or remove an open log now skip on Windows with the reason in
   the result. They still run on Linux, while the rest of the Windows suite is
   green rather than reporting the platform as a product regression.
+- **The full gate runs on Windows, Linux and the Docker stand**: build, vet and
+  the main-module tests pass on both hosts, and the complete container suite
+  passes in 564.6 seconds. The gate caught two test-only defects: the fake
+  `supervisorctl` now waits on a timer so a standalone Linux helper process does
+  not deadlock, and the time-zone e2e expects Postfix's documented zero-padded
+  day (`Nov 06`, not `Nov  6`). No product assertion was weakened.
 
 ### Documentation
 

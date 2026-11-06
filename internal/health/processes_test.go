@@ -54,5 +54,7 @@ func TestSupervisorctlNeverWrites(t *testing.T) {
 	if os.Getenv("SP_SUPERVISORCTL_NEVER") == "" {
 		t.Skip("helper process, run by TestProcessesDoesNotWaitForAnUnansweredSupervisorctl")
 	}
-	<-make(chan struct{}) // never returns; killed by CommandContext
+	// A pending timer keeps the standalone helper's runtime from reporting a
+	// deadlock when this is the only test selected; CommandContext kills it.
+	time.Sleep(time.Hour)
 }
