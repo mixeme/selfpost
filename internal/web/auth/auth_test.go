@@ -65,7 +65,11 @@ func testModule(t *testing.T, cookieSecure bool) *Module {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { st.Close() })
-	return New(st, Config{CookieSecure: cookieSecure}, mustView(t), "")
+	m := New(st, Config{CookieSecure: cookieSecure}, mustView(t), "")
+	// Thirteen ticker goroutines per module otherwise outlive the test that
+	// built it (review 2026-11-05, FT10).
+	t.Cleanup(m.Stop)
+	return m
 }
 
 func TestSessionCookieNameFollowsCookieSecure(t *testing.T) {

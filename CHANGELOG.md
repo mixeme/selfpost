@@ -134,6 +134,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   twenty times slower still answers inside the timeout. The batching the
   inbound side uses is not worth touching the mail path for; the numbers are
   recorded in the plan and `InsertQueued` keeps its signature.
+- **The limiters' sweepers stop** (review 2026-11-05, FT10): thirteen ticker
+  goroutines ran for the process's life with no stop — the only goroutines in
+  the tree with no reason of their own to end, harmless in a supervised
+  single-purpose process but quietly accumulating in a test that builds many
+  modules. `Module.Stop` ends them (the panel's `Drain` calls it; the test
+  helper registers it), `Server.Drain` closes the module's life, and a test
+  holds that a stopped sweeper sweeps no more.
 
 ### Documentation
 

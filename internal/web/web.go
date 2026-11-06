@@ -193,9 +193,11 @@ func (s *Server) Start() error {
 
 // Drain waits, until ctx ends, for what the panel still does after its
 // answers - the links of password-reset being mailed - so the database is not
-// closed under them.
+// closed under them. The limiters' sweepers end here too: the panel runs one
+// auth module for its life, and this is its life's end.
 func (s *Server) Drain(ctx context.Context) {
 	s.auth.Wait(ctx)
+	s.auth.Stop()
 }
 
 // Handler returns the panel's HTTP handler (router).

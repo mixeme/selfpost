@@ -63,7 +63,13 @@ type Module struct {
 	// mailing counts the links being mailed after their answer, so a stop
 	// waits for them (Wait) before the database closes.
 	mailing sync.WaitGroup
-
+	// sweeperStop ends the limiters' ticker goroutines (Stop). The sweepers
+	// are the only goroutines in the tree with no reason of their own to end
+	// — the process's life is theirs — but the stop exists so a test that
+	// builds many modules does not quietly accumulate them (review
+	// 2026-11-05, FT10).
+	sweeperStop    chan struct{}
+	stopSweepers   sync.Once
 	trustedProxies []*net.IPNet
 }
 
@@ -103,24 +109,34 @@ func New(st *store.Store, cfg Config, v *view.Engine, setupTokenPath string) *Mo
 		recheckLimiter:     newRateLimiter(20, 15*time.Minute),
 		trustedProxies:     cfg.TrustedProxyCIDRs,
 	}
-	m.setupLimiter.startSweeper()
-	m.loginLimiter.startSweeper()
-	m.loginAddrLimiter.startSweeper()
-	m.resetAddrLimiter.startSweeper()
-	m.linkAddrLimiter.startSweeper()
-	m.refusals.limiter.startSweeper()
-	m.passwordLimiter.startSweeper()
-	m.resetLimiter.startSweeper()
-	m.linkLimiter.startSweeper()
-	m.mailLimiter.startSweeper()
-	m.resetDayLimiter.startSweeper()
-	m.resetNoticeLimiter.startSweeper()
-	m.recheckLimiter.startSweeper()
+	m.sweeperStop = make(chan struct{})
+	m.setupLimiter.startSweeper(m.sweeperStop)
+	m.loginLimiter.startSweeper(m.sweeperStop)
+	m.loginAddrLimiter.startSweeper(m.sweeperStop)
+	m.resetAddrLimiter.startSweeper(m.sweeperStop)
+	m.linkAddrLimiter.startSweeper(m.sweeperStop)
+	m.refusals.limiter.startSweeper(m.sweeperStop)
+	m.passwordLimiter.startSweeper(m.sweeperStop)
+	m.resetLimiter.startSweeper(m.sweeperStop)
+	m.linkLimiter.startSweeper(m.sweeperStop)
+	m.mailLimiter.startSweeper(m.sweeperStop)
+	m.resetDayLimiter.startSweeper(m.sweeperStop)
+	m.resetNoticeLimiter.startSweeper(m.sweeperStop)
+	m.recheckLimiter.startSweeper(m.sweeperStop)
 	// Made now rather than at the first unknown name, which would otherwise
 	// pay for two bcrypt runs (review of audit stage 4).
 	go noSuchUserHash()
 	m.setup = newSetupManager(st, cfg.Hostname, setupTokenPath)
 	return m
+}
+
+// Stop ends the limiters' sweeper goroutines. The panel runs one module for
+// the process's life and never calls this; it exists so a test that builds
+// many modules ends their tickers with the test instead of accumulating
+// goroutines for the rest of the binary's run (review 2026-11-05, FT10).
+// Safe to call more than once.
+func (m *Module) Stop() {
+	m.stopSweepers.Do(func() { close(m.sweeperStop) })
 }
 
 // Bootstrap runs once at startup. If setup is not complete it mints and

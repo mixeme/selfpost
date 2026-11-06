@@ -43,14 +43,19 @@ func newRateLimiter(max int, window time.Duration) *rateLimiter {
 	}
 }
 
-func (r *rateLimiter) startSweeper() {
+func (r *rateLimiter) startSweeper(stop <-chan struct{}) {
 	go func() {
 		ticker := time.NewTicker(r.window)
 		defer ticker.Stop()
-		for range ticker.C {
-			r.mu.Lock()
-			r.sweep(time.Now())
-			r.mu.Unlock()
+		for {
+			select {
+			case <-ticker.C:
+				r.mu.Lock()
+				r.sweep(time.Now())
+				r.mu.Unlock()
+			case <-stop:
+				return
+			}
 		}
 	}()
 }

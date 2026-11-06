@@ -174,3 +174,40 @@ func TestRateLimiterBoundsBlockedBuckets(t *testing.T) {
 		t.Fatalf("bucket count = %d, want at most the hard cap %d", len(r.buckets), hardCap)
 	}
 }
+
+// A stopped sweeper sweeps no more: the ticker goroutine ends with the channel
+// that started it, instead of running for the rest of the binary (review
+// 2026-11-05, FT10).
+func TestAStoppedSweeperSweepsNoMore(t *testing.T) {
+	r := newRateLimiter(2, 20*time.Millisecond)
+	stop := make(chan struct{})
+	r.startSweeper(stop)
+
+	r.Allow("203.0.113.7")
+	expire(r, "203.0.113.7")
+	// The sweeper's own tick sweeps the finished bucket: it is running.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		r.mu.Lock()
+		_, held := r.buckets["203.0.113.7"]
+		r.mu.Unlock()
+		if !held {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the sweeper never swept a finished bucket")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Stopped, a finished bucket stays: nothing ticks any more.
+	close(stop)
+	r.Allow("198.51.100.9")
+	expire(r, "198.51.100.9")
+	time.Sleep(120 * time.Millisecond)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, held := r.buckets["198.51.100.9"]; !held {
+		t.Fatal("a finished bucket disappeared with nothing sweeping - the sweeper did not stop")
+	}
+}
