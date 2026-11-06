@@ -62,6 +62,72 @@ func TestUpdateUserWithoutUser(t *testing.T) {
 	}
 }
 
+// The Account profile is one statement (review 2026-11-05, L4): username,
+// e-mail and the notifications switch together, the password hash untouched,
+// the address's confirmation kept for the address that stays and cleared for
+// a new one, a taken username refused whole.
+func TestUpdateUserProfile(t *testing.T) {
+	st := openTestStore(t)
+
+	if err := st.CreateGlobalUser("admin", "hash-one"); err != nil {
+		t.Fatalf("CreateGlobalUser: %v", err)
+	}
+	u, err := st.GetUserByUsername("admin")
+	if err != nil {
+		t.Fatalf("GetUserByUsername: %v", err)
+	}
+	if _, err := st.db.Exec("UPDATE users SET email_confirmed_at = ? WHERE id = ?",
+		"2026-11-06T09:00:00Z", u.ID); err != nil {
+		t.Fatalf("confirm address: %v", err)
+	}
+
+	if err := st.UpdateUserProfile(u.ID, "operator", "reports@hub.example", false); err != nil {
+		t.Fatalf("UpdateUserProfile: %v", err)
+	}
+	got, err := st.GetUser(u.ID)
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if got.Username != "operator" || got.Email != "reports@hub.example" || got.Notify {
+		t.Fatalf("profile after save: %+v", got)
+	}
+	if got.PasswordHash != "hash-one" {
+		t.Fatalf("the profile save rewrote the password hash: %q", got.PasswordHash)
+	}
+	if !got.EmailConfirmed.IsZero() {
+		t.Fatalf("a new address stayed confirmed: %v", got.EmailConfirmed)
+	}
+
+	// The same address, the switch back on: the confirmation stays.
+	if _, err := st.db.Exec("UPDATE users SET email_confirmed_at = ? WHERE id = ?",
+		"2026-11-06T09:30:00Z", u.ID); err != nil {
+		t.Fatalf("confirm address again: %v", err)
+	}
+	if err := st.UpdateUserProfile(u.ID, "operator", "reports@hub.example", true); err != nil {
+		t.Fatalf("UpdateUserProfile again: %v", err)
+	}
+	got, _ = st.GetUser(u.ID)
+	if got.EmailConfirmed.IsZero() || !got.Notify {
+		t.Fatalf("an unchanged address lost its confirmation, or the switch: %+v", got)
+	}
+
+	// A username that is taken is refused and nothing is saved.
+	if _, err := st.CreateUser("taken", "hash", RoleGlobal, Reach{}); err != nil {
+		t.Fatalf("create taken: %v", err)
+	}
+	if err := st.UpdateUserProfile(u.ID, "taken", "reports@hub.example", true); !errors.Is(err, ErrUserExists) {
+		t.Fatalf("a taken username = %v, want ErrUserExists", err)
+	}
+	got, _ = st.GetUser(u.ID)
+	if got.Username != "operator" {
+		t.Fatalf("a refused save changed the username: %q", got.Username)
+	}
+
+	if err := st.UpdateUserProfile(u.ID+1000, "ghost", "ghost@example.org", true); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("a user that does not exist = %v, want ErrUserNotFound", err)
+	}
+}
+
 func TestCreateDomainAdminUser(t *testing.T) {
 	st := openTestStore(t)
 	if err := st.CreateGlobalUser("admin", "hash"); err != nil {

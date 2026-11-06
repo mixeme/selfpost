@@ -143,7 +143,10 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		// (review 2026-11-05, L3).
 		h.auth.PasswordCheckPassed(u.ID)
 	}
-	if err := h.store.UpdateUser(u.ID, f.Username, u.PasswordHash, f.Email); err != nil {
+	// The whole profile in one statement: a save that failed halfway would
+	// leave the address changed while the page said nothing was — and the
+	// address is where a reset link goes (review 2026-11-05, L4).
+	if err := h.store.UpdateUserProfile(u.ID, f.Username, f.Email, f.Notify); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			fail(http.StatusConflict, "That username is already in use.")
 			return
@@ -151,13 +154,6 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 		logf("panel: account: update user %d: %v", u.ID, err)
 		fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
 		return
-	}
-	if f.Notify != u.Notify {
-		if err := h.store.SetUserNotify(u.ID, f.Notify); err != nil {
-			logf("panel: account: set notifications of user %d: %v", u.ID, err)
-			fail(http.StatusInternalServerError, "Could not save the profile. Please check the logs and try again.")
-			return
-		}
 	}
 	logf("panel: user %d profile updated (username: %t, e-mail: %t, notifications: %t)", u.ID, f.Username != u.Username, f.Email != u.Email, f.Notify)
 	if emailChanged && f.Email != "" && h.sendConfirmation(u.ID) {

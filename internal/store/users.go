@@ -400,6 +400,32 @@ func (s *Store) UpdateUser(id int64, username, passwordHash, email string) error
 	return nil
 }
 
+// UpdateUserProfile replaces the three fields of the profile the Account form
+// saves — username, e-mail and the notifications switch — in one statement
+// (review 2026-11-05, L4): a save that failed halfway would leave the address
+// changed while the page said nothing was, and the address is where a reset
+// link goes. The password hash is not the profile's and is not touched.
+func (s *Store) UpdateUserProfile(id int64, username, email string, notify bool) error {
+	res, err := s.db.Exec(
+		"UPDATE users SET username = ?, email = ?, notify = ?, "+keepConfirmed+" WHERE id = ?",
+		username, email, notify, email, id,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ErrUserExists
+		}
+		return fmt.Errorf("update user profile: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update user profile: %w", err)
+	}
+	if n == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
 // ClearUserReach removes everything a user is assigned — both lists and both
 // All flags. A user promoted to the global role keeps none of it, so a later
 // demotion does not quietly bring an old assignment back.

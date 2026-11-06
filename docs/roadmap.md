@@ -30,7 +30,7 @@ directory).
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Stage H of the 2026-10-17 security audit: the test server's host (S1, S2, S5) and its DNS (S3) | stages 0-6 shipped `2.14.4`, the product side of S3 `2.15.0`; stage H the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) § Stage H |
 | go-milter-upstream | An issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
-| audit-2026-11-05 | The three reviews of `2.16.13` — the full-tree audit, the second code review and the external security audit — consolidated into one triage: 4 mediums, 8 lows, 8 nits, the test suite's cost | agreed — triaged 2026-11-06, in progress | 6/29 | [plans/audit-2026-11-05.md](plans/audit-2026-11-05.md) |
+| audit-2026-11-05 | The three reviews of `2.16.13` — the full-tree audit, the second code review and the external security audit — consolidated into one triage: 4 mediums, 8 lows, 8 nits, the test suite's cost | agreed — triaged 2026-11-06, in progress | 7/29 | [plans/audit-2026-11-05.md](plans/audit-2026-11-05.md) |
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above

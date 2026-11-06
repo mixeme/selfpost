@@ -74,6 +74,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `reauth` does, `security.md` says the rule holds for the Account form, and a
   test charges the bucket with nine wrong passwords, makes one right change,
   and asserts the tenth wrong is answered as a wrong password, not a lockout.
+- **The Account profile is saved in one statement** (review 2026-11-05, L4):
+  the username and the e-mail went in one write and the notifications switch
+  in another, so a failure of the second reported "Could not save the
+  profile" over an address that had already changed — the one that matters
+  for reset links. `UpdateUserProfile` writes all three fields together (the
+  password hash untouched, the address's confirmation kept or cleared as
+  before), and the two-step path with its ambiguous error is gone; the store
+  method the second write used is removed with it.
 
 ### Documentation
 

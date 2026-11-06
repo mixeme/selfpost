@@ -47,14 +47,14 @@ func TestNotifyRecipients(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create %s: %v", name, err)
 		}
-		if err := s.UpdateUser(id, name, "hash", email); err != nil {
+		if err := s.UpdateUserProfile(id, name, email, true); err != nil {
 			t.Fatalf("update %s: %v", name, err)
 		}
 		if u, err := s.GetUser(id); err != nil || !u.Notify {
 			t.Fatalf("%s: a new user's switch is %v, %v; want on", name, u.Notify, err)
 		}
 		if !notify {
-			if err := s.SetUserNotify(id, false); err != nil {
+			if err := s.UpdateUserProfile(id, name, email, false); err != nil {
 				t.Fatalf("switch off %s: %v", name, err)
 			}
 		}
@@ -83,8 +83,8 @@ func TestNotifyRecipients(t *testing.T) {
 		}
 	}
 
-	if err := s.SetUserNotify(99999, true); err != ErrUserNotFound {
-		t.Errorf("switch of a user that does not exist: %v", err)
+	if err := s.UpdateUserProfile(99999, "nobody", "nobody@example.org", true); err != ErrUserNotFound {
+		t.Errorf("profile of a user that does not exist: %v", err)
 	}
 }
 

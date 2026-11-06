@@ -66,7 +66,7 @@ func TestAccountNotifyCheckbox(t *testing.T) {
 // again as it was submitted.
 func TestAccountNotifyIsNotSavedWithARefusedProfile(t *testing.T) {
 	h, _ := settingsServer(t)
-	if err := h.store.SetUserNotify(globalPrincipal.ID, false); err != nil {
+	if err := h.store.UpdateUserProfile(globalPrincipal.ID, "admin", "", false); err != nil {
 		t.Fatal(err)
 	}
 	rec := postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,

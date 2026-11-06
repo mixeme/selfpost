@@ -30,18 +30,6 @@ func (s *Store) SetNotificationsEnabled(on bool) error {
 	return s.SetSetting(settingNotifications, v)
 }
 
-// SetUserNotify sets a user's own switch (Account).
-func (s *Store) SetUserNotify(id int64, on bool) error {
-	res, err := s.db.Exec("UPDATE users SET notify = ? WHERE id = ?", on, id)
-	if err != nil {
-		return fmt.Errorf("set user notify: %w", err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrUserNotFound
-	}
-	return nil
-}
-
 // NotifyRecipients returns the addresses a notification goes to: every global
 // user, and for a subject that is a sending domain's (domainName not empty)
 // also the domain users it is assigned to - by name on their list, or by
