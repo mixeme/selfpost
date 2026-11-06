@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -11,6 +12,20 @@ import (
 // supervisorConf is the supervisord configuration the panel's other control
 // calls already address (see internal/postfix and internal/domain).
 const supervisorConf = "/etc/supervisor/supervisord.conf"
+
+// supervisorctlTimeout bounds `supervisorctl status`, which the /healthz
+// probe and the polled Health fragment both wait on. Docker's probe gives up
+// at 5 s (Dockerfile HEALTHCHECK --timeout=5s); past the bound the card
+// grades Unknown rather than leaving a handler goroutine and a process per
+// poll against pids_limit (review 2026-11-05, FT1). A var so a test can
+// shorten it, as logtail's knobs are vars.
+var supervisorctlTimeout = 5 * time.Second
+
+// supervisorctlP builds the `supervisorctl status` command. It is a var so
+// tests can put a fake in its place, the way postfix does for postqueueP.
+var supervisorctlP = func(ctx context.Context) *exec.Cmd {
+	return exec.CommandContext(ctx, "supervisorctl", "-c", supervisorConf, "status")
+}
 
 // oneShotPrograms are supervisord entries that are meant to sit idle: they are
 // started on demand and exit immediately, so STOPPED/EXITED is their healthy
@@ -42,10 +57,15 @@ type Process struct {
 // supervisor/supervisorctl.py, do_status(): exit status 3 (NOT_RUNNING) when
 // any program is in STOPPED_STATES, 4 when supervisord does not answer.
 func Processes() ([]Process, error) {
-	cmd := exec.Command("supervisorctl", "-c", supervisorConf, "status")
+	ctx, cancel := context.WithTimeout(context.Background(), supervisorctlTimeout)
+	defer cancel()
+	cmd := supervisorctlP(ctx)
 	out, err := cmd.CombinedOutput()
 	procs := parseProcesses(string(out))
 	if len(procs) == 0 {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("supervisorctl status timed out after %s", supervisorctlTimeout)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("supervisorctl status: %w: %s", err, strings.TrimSpace(string(out)))
 		}

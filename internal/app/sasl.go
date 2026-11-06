@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,9 +13,17 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mixeme/selfpost/internal/atomicfile"
 )
+
+// saslCmdTimeout bounds saslpasswd2 and db_dump, the two commands the
+// application forms wait on: a child that stops answering would block its
+// caller for ever, while every other external command in the tree has a
+// deadline (review 2026-11-05, FT1). The tree's own convention sets the
+// scale: postqueue gets 5 s, the notifier's sendmail 20 s.
+const saslCmdTimeout = 5 * time.Second
 
 // SASLDB manages the Cyrus SASL account database (sasldb2) the panel maintains
 // for application credentials (architecture.md § Mail path). The panel is the
@@ -293,9 +302,14 @@ func parseSASLSecret(dump []byte, login, realm string) (string, bool, error) {
 
 // runSaslpasswd2 executes the real saslpasswd2 with the given arguments and
 // stdin. Arguments are passed as a fixed argv (no shell), so no user input is
-// ever interpreted as a command (security.md).
+// ever interpreted as a command (security.md). Bounded: the application
+// forms wait on it, and a wedged child would hold its caller for ever —
+// in a tree that bounds every other external command, this one did not
+// (review 2026-11-05, FT1).
 func runSaslpasswd2(args []string, stdin []byte) error {
-	cmd := exec.Command("saslpasswd2", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), saslCmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "saslpasswd2", args...)
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
@@ -314,7 +328,9 @@ func runSaslpasswd2(args []string, stdin []byte) error {
 // error is not data and is left out of what is parsed (the same rule as
 // postconf's values in internal/postfix, retry.go; review of base-trixie).
 func dumpSASLDB(path string) ([]byte, error) {
-	cmd := exec.Command("db_dump", path)
+	ctx, cancel := context.WithTimeout(context.Background(), saslCmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "db_dump", path)
 	var errOut bytes.Buffer
 	cmd.Stderr = &errOut
 	out, err := cmd.Output()

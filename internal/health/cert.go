@@ -2,6 +2,7 @@ package health
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -11,6 +12,13 @@ import (
 	"sync"
 	"time"
 )
+
+// postconfTimeout bounds each `postconf` ask: ServedCertPath is asked again
+// at every Health check (the comment at ServedCert below says why), and an
+// unanswered postconf would hold the card's handler for ever — one goroutine
+// and one process per poll against pids_limit (review 2026-11-05, FT1). A var
+// so a test can shorten it, as logtail's knobs are vars.
+var postconfTimeout = 3 * time.Second
 
 // certWarnDays is how close to expiry the certificate has to be before the
 // status page complains. certbot renews a 90-day certificate at 30 days left
@@ -87,7 +95,9 @@ func (c Certificate) ForHost(host string) Certificate {
 // config.sh sets it to "$myhostname ESMTP". It is read once, at the start,
 // as ServedCertPath is; "" when postconf fails.
 func SMTPBanner() string {
-	out, err := exec.Command("postconf", "-x", "-h", "smtpd_banner").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), postconfTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "postconf", "-x", "-h", "smtpd_banner").Output()
 	if err != nil {
 		return ""
 	}
@@ -109,7 +119,9 @@ type Renewal struct {
 // its name): build/postfix-config.sh's copy when the mounted files were there
 // at the start, the mounted file itself otherwise. "" when postconf fails.
 func ServedCertPath() string {
-	out, err := exec.Command("postconf", "-h", "smtpd_tls_cert_file").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), postconfTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "postconf", "-h", "smtpd_tls_cert_file").Output()
 	if err != nil {
 		return ""
 	}

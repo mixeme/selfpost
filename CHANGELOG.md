@@ -20,6 +20,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   forms read alike — in the panel and in the `selfpost-backup` CLI;
   `security.md` (§ *First-run administrator setup*, § *Backup and domain
   export*) and the guide's CLI paragraph name the rule.
+- **The five external commands that had no deadline get one** (review
+  2026-11-05, FT1): `supervisorctl status` — asked by the `/healthz` probe
+  and the polled Health fragment — the two `postconf` asks of the certificate
+  checks, and `saslpasswd2` / `db_dump` in the application forms waited for
+  their child for ever, in a tree that bounds every other external command. A
+  child that stopped answering leaked a handler goroutine and a process per
+  poll against `pids_limit: 1024`, which is where Postfix stops being able to
+  fork. Each now runs under a few seconds' timeout (`supervisorctl` 5 s,
+  `postconf` 3 s, the SASL pair 5 s); a refused answer grades the Health card
+  `Unknown`, which the handler already renders, and a test with a fake
+  `supervisorctl` that never writes asserts the refusal within the bound.
 
 ### Documentation
 
