@@ -174,9 +174,9 @@ func (s *ServedCert) Path() string {
 // checked, as before.
 func CheckServedCertificate(served, mounted string, interval time.Duration, now time.Time) Certificate {
 	if served == "" {
-		return CheckCertificate(mounted)
+		return CheckCertificate(mounted, now)
 	}
-	c := CheckCertificate(served)
+	c := CheckCertificate(served, now)
 	if mounted == "" || mounted == served {
 		return c
 	}
@@ -228,9 +228,9 @@ func intervalText(d time.Duration) string {
 }
 
 // CheckCertificate parses the leaf certificate at path and reports how much
-// validity is left. A missing or unparsable file is an error status rather than
-// an error return: the status page reports it in place, like every other check.
-func CheckCertificate(path string) Certificate {
+// validity is left at now. A missing or unparsable file is an error status rather
+// than an error return: the status page reports it in place, like every other check.
+func CheckCertificate(path string, now time.Time) Certificate {
 	c := Certificate{Path: path}
 	if path == "" {
 		c.Status = StatusUnknown
@@ -257,9 +257,9 @@ func CheckCertificate(path string) Certificate {
 	}
 	c.leaf = leaf
 	c.NotAfter = leaf.NotAfter
-	c.DaysLeft = int(time.Until(leaf.NotAfter).Hours() / 24)
+	c.DaysLeft = int(leaf.NotAfter.Sub(now).Hours() / 24)
 	switch {
-	case !time.Now().Before(leaf.NotAfter):
+	case !now.Before(leaf.NotAfter):
 		c.Status = StatusError
 		c.Detail = "The certificate has expired. Senders will refuse the TLS connection."
 	case c.DaysLeft < certWarnDays:

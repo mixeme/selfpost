@@ -76,28 +76,32 @@ unix:///run/supervisor.sock refused connection
 
 func TestCheckCertificate(t *testing.T) {
 	dir := t.TempDir()
+	now := time.Now()
 
 	valid := filepath.Join(dir, "valid.pem")
 	writeCert(t, valid, "mail.example.com", 90*24*time.Hour)
-	if got := CheckCertificate(valid); got.Status != StatusOK {
+	if got := CheckCertificate(valid, now); got.Status != StatusOK {
 		t.Errorf("valid certificate: status %q (%s)", got.Status, got.Detail)
 	} else if got.Subject != "mail.example.com" {
 		t.Errorf("subject = %q", got.Subject)
 	}
+	if got := CheckCertificate(valid, now.Add(91*24*time.Hour)); got.Status != StatusError {
+		t.Errorf("the supplied moment decides expiry: status %q (%s)", got.Status, got.Detail)
+	}
 
 	soon := filepath.Join(dir, "soon.pem")
 	writeCert(t, soon, "mail.example.com", 3*24*time.Hour)
-	if got := CheckCertificate(soon); got.Status != StatusWarn {
+	if got := CheckCertificate(soon, now); got.Status != StatusWarn {
 		t.Errorf("nearly expired certificate: status %q (%s)", got.Status, got.Detail)
 	}
 
 	expired := filepath.Join(dir, "expired.pem")
 	writeCert(t, expired, "mail.example.com", -24*time.Hour)
-	if got := CheckCertificate(expired); got.Status != StatusError {
+	if got := CheckCertificate(expired, now); got.Status != StatusError {
 		t.Errorf("expired certificate: status %q (%s)", got.Status, got.Detail)
 	}
 
-	if got := CheckCertificate(filepath.Join(dir, "absent.pem")); got.Status != StatusError {
+	if got := CheckCertificate(filepath.Join(dir, "absent.pem"), now); got.Status != StatusError {
 		t.Errorf("missing certificate: status %q", got.Status)
 	}
 
@@ -105,11 +109,11 @@ func TestCheckCertificate(t *testing.T) {
 	if err := os.WriteFile(junk, []byte("not a certificate\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := CheckCertificate(junk); got.Status != StatusError {
+	if got := CheckCertificate(junk, now); got.Status != StatusError {
 		t.Errorf("unparsable certificate: status %q", got.Status)
 	}
 
-	if got := CheckCertificate(""); got.Status != StatusUnknown {
+	if got := CheckCertificate("", now); got.Status != StatusUnknown {
 		t.Errorf("unconfigured certificate: status %q", got.Status)
 	}
 }
@@ -315,12 +319,13 @@ func TestIntervalText(t *testing.T) {
 // its common name, as OpenSSL - and so a sending Postfix - still does.
 func TestCertificateForHost(t *testing.T) {
 	dir := t.TempDir()
+	now := time.Now()
 	cnOnly := filepath.Join(dir, "cn.pem")
 	writeCert(t, cnOnly, "mail.example.org", 90*24*time.Hour)
-	if c := CheckCertificate(cnOnly).ForHost("MAIL.example.org"); c.Status != StatusOK || c.MatchesHost == nil || !*c.MatchesHost {
+	if c := CheckCertificate(cnOnly, now).ForHost("MAIL.example.org"); c.Status != StatusOK || c.MatchesHost == nil || !*c.MatchesHost {
 		t.Errorf("a CN-only certificate for the hostname: %+v", c)
 	}
-	if c := CheckCertificate(cnOnly).ForHost("other.example.org"); c.Status != StatusError || *c.MatchesHost ||
+	if c := CheckCertificate(cnOnly, now).ForHost("other.example.org"); c.Status != StatusError || *c.MatchesHost ||
 		!strings.Contains(c.Detail, "None of the certificate's names is other.example.org") {
 		t.Errorf("a certificate for another name: %+v", c)
 	}
@@ -339,7 +344,7 @@ func TestCertificateForHost(t *testing.T) {
 	if err := os.WriteFile(san, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c := CheckCertificate(san)
+	c := CheckCertificate(san, now)
 	if strings.Join(c.Names, " ") != "*.example.net relay.example.org" {
 		t.Errorf("names = %q, want the DNS names", c.Names)
 	}

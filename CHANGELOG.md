@@ -152,6 +152,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   probe's GET. A local or private direct client now gets 405 for anything but
   GET and HEAD; a request through a proxy or from a public address still gets
   the unchanged 404, and HEAD carries no response body.
+- **A certificate's Health verdict describes one moment** (review 2026-11-05,
+  N3): `CheckCertificate` consulted the wall clock twice while
+  `CheckServedCertificate` already took a `now` for the renewal check, so one
+  box could mix slightly different readings near an expiry boundary. The
+  caller's moment now decides both the days left and the expiry verdict; a test
+  pins the same certificate as valid at one supplied moment and expired at
+  another.
 
 ### Documentation
 
