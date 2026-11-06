@@ -29,7 +29,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/mixeme/selfpost/internal/atomicfile"
 	"github.com/mixeme/selfpost/internal/backup"
@@ -75,11 +74,15 @@ func run(outPath, password string) error {
 	dataDir := envDefault("SELFPOST_DATA_DIR", "/data")
 	dbPath := envDefault("SELFPOST_DB_PATH", filepath.Join(dataDir, "selfpost.db"))
 
-	// The floor the panel holds the same files to: an encrypted backup is
+	// The bounds the panel holds the same files to: an encrypted backup is
 	// attacked offline, at leisure (security.md; audit 2026-10-12, M5). An
-	// empty password is no encryption, by design.
-	if password != "" && utf8.RuneCountInString(password) < validate.MinSecretFilePasswordLen {
-		return fmt.Errorf("the encryption password must be at least %d characters", validate.MinSecretFilePasswordLen)
+	// empty password is no encryption, by design. The ceiling is bcrypt's,
+	// which scrypt does not share — the two read alike (review 2026-11-05,
+	// M1).
+	if password != "" {
+		if err := validate.SecretFilePassword(password); err != nil {
+			return err
+		}
 	}
 
 	w, err := openOutput(outPath)

@@ -23,6 +23,14 @@ const (
 // weaker "any password is better than none".
 const MinSecretFilePasswordLen = MinAdminPasswordLen
 
+// MaxPasswordBytes is the ceiling for every password the panel hashes with
+// bcrypt: bcrypt takes at most 72 bytes and refuses a longer value outright
+// (golang.org/x/crypto/bcrypt, bcrypt.go: ErrPasswordTooLong when
+// len(password) > 72). Unlike the floor, which counts characters, the ceiling
+// counts bytes, because the limit is the hashing algorithm's, not a policy
+// choice (review 2026-11-05, M1).
+const MaxPasswordBytes = 72
+
 // Username enforces a strict server-side whitelist (security.md): letters,
 // digits, dot, dash, underscore. Client validation is never trusted.
 func Username(u string) error {
@@ -37,14 +45,39 @@ func Username(u string) error {
 	return nil
 }
 
-// AdminPassword enforces a minimum length. Composition rules beyond length tend
-// to reduce entropy in practice, so length is the sole gate.
+// AdminPassword enforces a minimum length and the hashing algorithm's ceiling.
+// Composition rules beyond length tend to reduce entropy in practice, so length
+// is the sole gate.
 func AdminPassword(p string) error {
 	// Characters, as the message says and as the backup password counts
-	// them (secretFilePassword, cmd/selfpost-backup): len would let six
+	// them (SecretFilePassword, cmd/selfpost-backup): len would let six
 	// Cyrillic letters, twelve bytes, pass for twelve.
 	if utf8.RuneCountInString(p) < MinAdminPasswordLen {
 		return fmt.Errorf("password must be at least %d characters", MinAdminPasswordLen)
+	}
+	// Bytes, not characters: bcrypt hashes at most 72 bytes and refuses
+	// the rest (ErrPasswordTooLong), and every writer of a panel password
+	// hands it to bcrypt (review 2026-11-05, M1). Refusing it here, with a
+	// sentence naming the limit, is what the five forms show; refusing it
+	// at the hash showed "Internal error".
+	if len(p) > MaxPasswordBytes {
+		return fmt.Errorf("password must be at most %d bytes (the hashing algorithm's limit)", MaxPasswordBytes)
+	}
+	return nil
+}
+
+// SecretFilePassword holds the password protecting an encrypted backup or
+// domain export to the same two bounds: the floor matches the administrator
+// password's (security.md § Backup and domain export) and the ceiling is
+// bcrypt's, although scrypt, which encrypts these files, has no such limit of
+// its own — one rule and one wording, so the two kinds of form read alike
+// (review 2026-11-05, M1).
+func SecretFilePassword(p string) error {
+	if utf8.RuneCountInString(p) < MinSecretFilePasswordLen {
+		return fmt.Errorf("password must be at least %d characters", MinSecretFilePasswordLen)
+	}
+	if len(p) > MaxPasswordBytes {
+		return fmt.Errorf("password must be at most %d bytes", MaxPasswordBytes)
 	}
 	return nil
 }

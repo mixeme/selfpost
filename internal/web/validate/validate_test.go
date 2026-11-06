@@ -1,6 +1,9 @@
 package validate
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeDomain(t *testing.T) {
 	cases := map[string]string{
@@ -74,5 +77,44 @@ func TestAdminPasswordCountsCharacters(t *testing.T) {
 	}
 	if err := AdminPassword("парольпароль"); err != nil {
 		t.Errorf("twelve Cyrillic letters: %v", err)
+	}
+}
+
+// The maximum counts bytes, not characters: bcrypt hashes at most 72 bytes and
+// refuses the rest outright (review 2026-11-05, M1), so the validator names
+// the limit before the hash fails as an internal error.
+func TestAdminPasswordCeilingCountsBytes(t *testing.T) {
+	if err := AdminPassword(strings.Repeat("x", MaxPasswordBytes)); err != nil {
+		t.Errorf("%d bytes: %v", MaxPasswordBytes, err)
+	}
+	for name, p := range map[string]string{
+		"seventy-three bytes": strings.Repeat("x", MaxPasswordBytes+1),
+		// Thirty-seven Cyrillic letters are seventy-four bytes: over the
+		// ceiling, over the floor — the case a non-Latin passphrase hits.
+		"thirty-seven cyrillic letters": strings.Repeat("п", 37),
+	} {
+		err := AdminPassword(p)
+		if err == nil {
+			t.Errorf("%s passed, want the ceiling", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "at most") || !strings.Contains(err.Error(), "bytes") {
+			t.Errorf("%s: error %q does not name the byte ceiling", name, err)
+		}
+	}
+}
+
+// The backup and export password holds to the same two bounds: the floor in
+// characters, the ceiling in bytes — scrypt has no ceiling of its own; the two
+// forms read alike (review 2026-11-05, M1).
+func TestSecretFilePasswordBounds(t *testing.T) {
+	if err := SecretFilePassword(strings.Repeat("x", MinSecretFilePasswordLen)); err != nil {
+		t.Errorf("the floor: %v", err)
+	}
+	if err := SecretFilePassword("пароль"); err == nil {
+		t.Error("six Cyrillic letters passed the floor counted in bytes")
+	}
+	if err := SecretFilePassword(strings.Repeat("x", MaxPasswordBytes+1)); err == nil {
+		t.Error("over the ceiling passed")
 	}
 }

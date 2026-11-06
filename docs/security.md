@@ -122,7 +122,11 @@ The panel is exposed to the internet — the items below are **not optional**.
   being DoS-ed).
 - Once the administrator exists the token is void forever, `/setup/*` → 404.
 - The administrator password is bcrypt in SQLite only; no plaintext and no
-  MD5.
+  MD5. Length is the sole composition rule, and it has a floor and a ceiling:
+  at least 12 characters, at most 72 **bytes** — bcrypt's own limit, which
+  hashes the password whole or refuses it. The floor counts characters and the
+  ceiling bytes, and every form that asks for one says which bound was missed,
+  in one sentence — not as an internal error (review 2026-11-05, M1).
 - `PANEL_USERNAME` / `PANEL_PASSWORD_HASH` in env are **not used**.
 
 ### Application SASL passwords
@@ -630,10 +634,13 @@ operator can act on it.
   `-password-file`, never as an argument (the process list is readable by any
   process in the container).
 - Minimum password length matches the administrator password (12
-  characters, counted as characters, not bytes, in both): the file
-  sits offline and can be attacked without a time limit. The panel's forms and,
-  since `2.5.3`, the CLI hold an encrypting password to it; decrypting takes
-  any.
+  characters, counted as characters, not bytes, in both), and so does the
+  ceiling — at most 72 bytes. That ceiling is bcrypt's, which scrypt, the
+  file's own algorithm, does not share; it is held to here as well so the
+  account form and the encryption form read alike (review 2026-11-05, M1).
+  The file sits offline and can be attacked without a time limit. The
+  panel's forms and, since `2.5.3`, the CLI hold an encrypting password to
+  both bounds; decrypting takes any.
 - The CLI's `-o FILE` is written beside its name and takes it only when
   whole, so a failure - a wrong password to `-decrypt` among them, which is
   checked on the first chunk before the output is touched - leaves the file

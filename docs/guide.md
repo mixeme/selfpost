@@ -1466,8 +1466,10 @@ leaves a `.NAME.tmp-*` file beside it, readable by its owner alone, to
 remove by hand.
 
 The CLI also *writes* encrypted backups for scripted/cron use. The password
-must be at least 12 characters, as on the panel's forms (decrypting takes
-any), and it comes from `SELFPOST_BACKUP_PASSWORD` or `-password-file <path>`
+is held to the same bounds as the panel's forms: at least 12 characters, at
+most 72 bytes (bcrypt's limit, held to by the panel's own password and by
+this one; decrypting takes any), and it comes from
+`SELFPOST_BACKUP_PASSWORD` or `-password-file <path>`
 (first line), never from a command-line argument, which would be visible in
 the process list. Its other flags: `-o <file>` writes the output to a file
 instead of standard output, `-i <file>` reads the encrypted archive from a

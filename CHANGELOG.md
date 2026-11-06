@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **A password the panel cannot hash is refused at the form, with a sentence
+  naming the limit** (review 2026-11-05, M1): `validate.AdminPassword` had a
+  floor of twelve characters and no ceiling, while bcrypt hashes at most 72
+  bytes, so a password manager's 40-character output — or any long sentence in
+  a non-Latin script: 37 Cyrillic letters are 74 bytes — was taken by every
+  form that asks for one and then failed at the hash, each of the five writers
+  answering "Internal error. Please try again." Every panel password now has
+  both bounds, the floor counted in characters and the ceiling in bytes, and
+  the forms carry the validator's own message. The backup and export password,
+  held to the same floor, gets the same ceiling — scrypt has none, but the two
+  forms read alike — in the panel and in the `selfpost-backup` CLI;
+  `security.md` (§ *First-run administrator setup*, § *Backup and domain
+  export*) and the guide's CLI paragraph name the rule.
+
 ### Documentation
 
 - **The three reviews of `2.16.13` are one plan** (triaged by the owner,

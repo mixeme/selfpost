@@ -366,8 +366,8 @@ func secretFilePassword(r *http.Request) (password, errMsg string) {
 		return "", ""
 	}
 	password = r.PostFormValue("password")
-	if len([]rune(password)) < validate.MinSecretFilePasswordLen {
-		return "", fmt.Sprintf("The encryption password must be at least %d characters.", validate.MinSecretFilePasswordLen)
+	if err := validate.SecretFilePassword(password); err != nil {
+		return "", err.Error()
 	}
 	if password != r.PostFormValue("password_confirm") {
 		return "", "The two passwords do not match."

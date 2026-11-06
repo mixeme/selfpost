@@ -56,6 +56,15 @@ func TestSecretFilePassword(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// The ceiling is bcrypt's, held to here as well so the two
+			// kinds of password form read alike (review 2026-11-05, M1).
+			name: "over the byte ceiling",
+			form: url.Values{"encrypt": {"1"},
+				"password":         {strings.Repeat("x", validate.MaxPasswordBytes+1)},
+				"password_confirm": {strings.Repeat("x", validate.MaxPasswordBytes+1)}},
+			wantErr: true,
+		},
+		{
 			name:    "ticked but empty",
 			form:    url.Values{"encrypt": {"1"}},
 			wantErr: true,

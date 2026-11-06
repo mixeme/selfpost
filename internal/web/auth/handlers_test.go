@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mixeme/selfpost/internal/web/validate"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -260,6 +261,42 @@ func TestSetupRejectsCredentialsItWouldNotAcceptLater(t *testing.T) {
 		if rec := getSetup(m, token); rec.Code != http.StatusOK {
 			t.Errorf("%s: the setup link was burned by a rejected form (%d)", name, rec.Code)
 		}
+	}
+}
+
+// A password longer than bcrypt's 72 bytes is refused at the form, with a
+// sentence that names the limit — not by the hash as an internal error after
+// the form had accepted it (review 2026-11-05, M1). The floor counts characters
+// and the ceiling bytes, so thirty-seven Cyrillic letters, seventy-four bytes,
+// are told the limit here too.
+func TestSetupRefusesAPasswordBcryptCannotHash(t *testing.T) {
+	for name, p := range map[string]string{
+		"seventy-three bytes":           strings.Repeat("x", validate.MaxPasswordBytes+1),
+		"thirty-seven cyrillic letters": strings.Repeat("п", 37),
+	} {
+		m := testModule(t, false)
+		token, _ := m.setup.activeToken()
+
+		rec := postSetup(m, token, setupForm("operator", p, p))
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", name, rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "at most") {
+			t.Errorf("%s: the form does not name the ceiling: %q", name, rec.Body.String())
+		}
+		if exists, err := m.store.UserExists(); err != nil || exists {
+			t.Errorf("%s: an administrator was created anyway (err=%v)", name, err)
+		}
+	}
+
+	// Seventy-two bytes are taken: the boundary itself is the operator's to
+	// use, and the account is created.
+	m := testModule(t, false)
+	token, _ := m.setup.activeToken()
+	p := strings.Repeat("x", validate.MaxPasswordBytes)
+	if rec := postSetup(m, token, setupForm("operator", p, p)); rec.Code != http.StatusSeeOther {
+		t.Errorf("seventy-two bytes: status = %d, want 303", rec.Code)
 	}
 }
 
