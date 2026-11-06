@@ -85,8 +85,8 @@ one reader, the tree only, no live system) found nothing above low: it held
 the session model, the origin check, the SQL layer, template escaping, the
 external commands, the validation, RBAC and re-auth, the image and CI against
 this document and agreed on each; its one note (E1) — the absent absolute
-session cap is stated in the guide but not under Accepted risks — is left to
-the owner to place or decline.
+session cap was stated in the guide but not under Accepted risks — is now
+placed there by the owner (2026-11-06).
 (2) **Accepted risks** —
 deliberate departures beyond the mandatory, recorded so the decision is not
 lost.
@@ -656,6 +656,11 @@ operator can act on it.
 An accepted risk is a decision with a condition for revisiting it, not a
 deferred item from the roadmap.
 
+- **Sessions have no absolute lifetime cap.** A session ends when its sliding
+  idle window (`PANEL_SESSION_IDLE_DAYS`) expires; a user who keeps coming back
+  stays signed in indefinitely, and an active stolen session can do the same.
+  Accepted for the single-operator panel by the owner on 2026-11-06. Revisit
+  when more than one person administers a server.
 - **Session-bound CSRF tokens are not implemented.** The origin check closes the
   neighbouring-subdomain case but depends on browser behaviour; a token does
   not. The price is a hidden field in roughly two dozen forms. The trigger to

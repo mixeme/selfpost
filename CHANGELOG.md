@@ -197,6 +197,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `maximal_queue_lifetime` or `maximal_backoff_time` followed by a Postfix
   reload does not update the queue and history boxes, stored-lines window or
   stuck-row count until the panel restarts.
+- **The session lifetime decision joins Accepted risks** (security review
+  2026-11-05, E1): there is deliberately no absolute cap beyond the sliding
+  idle window, so an active session — including a stolen one — can stay alive
+  indefinitely. The owner accepted that for a single-operator panel on
+  2026-11-06, with a second administrator as the trigger to revisit it; the
+  review history no longer leaves the placement open.
 
 ## [2.16.13] - 2026-10-28
 
