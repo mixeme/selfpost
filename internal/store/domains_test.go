@@ -2,14 +2,47 @@ package store
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
 
+var testStoreTemplate = sync.OnceValues(func() (string, error) {
+	dir, err := os.MkdirTemp("", "selfpost-store-test-")
+	if err != nil {
+		return "", err
+	}
+	st, err := Open(filepath.Join(dir, "template.db"))
+	if err == nil {
+		err = st.Close()
+	}
+	if err != nil {
+		_ = os.RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
+})
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
-	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	dir, err := testStoreTemplate()
+	if err != nil {
+		t.Fatalf("create store template: %v", err)
+	}
+	// The template is closed before its main file is copied, so no WAL or SHM
+	// state is needed. Open still checks the schema and application_id, sets the
+	// PRAGMAs and applies the private file modes to every test's copy.
+	contents, err := os.ReadFile(filepath.Join(dir, "template.db"))
+	if err != nil {
+		t.Fatalf("read store template: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "test.db")
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
+		t.Fatalf("copy store template: %v", err)
+	}
+	st, err := Open(path)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

@@ -173,6 +173,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   with `sync.OnceValues`. The handlers' inbound stands share a second engine
   with inbound enabled rather than mutating the default one, so enabling the
   feature in one test cannot leak its menu entries into another.
+- **Store tests migrate one template database, then copy it** (review
+  2026-11-05): the shared fixture closes the template before copying its main
+  file, so no WAL or shared-memory state is needed. Each test still opens its
+  own copy through `Open`, which checks the schema and application id, applies
+  the connection PRAGMAs and restores the private file modes; the template's
+  temporary directory is removed after the package finishes.
 
 ### Documentation
 

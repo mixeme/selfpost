@@ -12,7 +12,11 @@ import (
 // set it themselves (inZone).
 func TestMain(m *testing.M) {
 	time.Local = time.UTC
-	os.Exit(m.Run())
+	code := m.Run()
+	if dir, err := testStoreTemplate(); err == nil {
+		_ = os.RemoveAll(dir)
+	}
+	os.Exit(code)
 }
 
 // inZone runs the rest of the test in the zone name, as a container started
