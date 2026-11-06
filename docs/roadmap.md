@@ -133,6 +133,13 @@ The offered second line-by-line reads (milter internals, the view layer) were
 declined. The plan's checklist is the list to work from; the three reports
 stay as the record of what was read and what held up.
 
+**Implementation began the same day and is mid-way**: fourteen steps are
+committed (through FT10), L1 is closed by its measurement (669 ms
+end-of-data for 1000 recipients, ~0.67 ms a commit — the batch is not
+worth touching the mail path for), and the plan's *Where this stands*
+section carries everything a fresh session needs: the next step, the
+version cut (`2.16.14`) and the deployment that follow the gate.
+
 ---
 
 ## Dropped, with the condition for return
