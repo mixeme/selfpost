@@ -31,8 +31,7 @@ func inboundHandlers(t *testing.T) (*Handlers, *store.Store) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	v := mustView(t)
-	v.SetInboundEnabled(true)
+	v := mustInboundView(t)
 	h := &Handlers{
 		store:   st,
 		inbound: inbound.NewService(st, &recordingMaps{}),

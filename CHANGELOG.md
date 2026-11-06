@@ -168,6 +168,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   restores 12 and refreshes the cached dummy hash, so it still compares two
   equally expensive real hashes. The export-form test's expectation also catches
   up with M1's shared validator wording.
+- **Each web test package parses its templates once, not once per stand**
+  (review 2026-11-05): `kitEngine` and both `mustView` helpers cache the result
+  with `sync.OnceValues`. The handlers' inbound stands share a second engine
+  with inbound enabled rather than mutating the default one, so enabling the
+  feature in one test cannot leak its menu entries into another.
 
 ### Documentation
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -13,14 +14,21 @@ import (
 // itself (vocabulary, outlines, the stylesheet) is held by the guard tests,
 // which this file does not repeat.
 
+var sharedKitEngine = sync.OnceValues(func() (*Engine, error) {
+	e, err := New("9.9.9-test")
+	if err == nil {
+		e.SetInboundEnabled(true)
+		e.SetDMARCEnabled(true)
+	}
+	return e, err
+})
+
 func kitEngine(t *testing.T) *Engine {
 	t.Helper()
-	e, err := New("9.9.9-test")
+	e, err := sharedKitEngine()
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	e.SetInboundEnabled(true)
-	e.SetDMARCEnabled(true)
 	return e
 }
 

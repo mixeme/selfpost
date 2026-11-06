@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,9 +50,13 @@ func mustCreate(t *testing.T, s *sessionStore, username string) string {
 	return token
 }
 
+var sharedView = sync.OnceValues(func() (*view.Engine, error) {
+	return view.New("test")
+})
+
 func mustView(t *testing.T) *view.Engine {
 	t.Helper()
-	v, err := view.New("test")
+	v, err := sharedView()
 	if err != nil {
 		t.Fatalf("view: %v", err)
 	}
