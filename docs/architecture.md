@@ -388,7 +388,12 @@ milter, § Postfix above, port 25):
    (`UpdateStatus` is only called from [internal/logtail](../internal/logtail/logtail.go)).
    It also keeps the lines Postfix writes under a queue id, for the message's
    page (§ Log tailer, *Stored lines*), and counts the mail Postfix deferred
-   because the sender check did not answer.
+   because the sender check did not answer. Its reconcile loop reads the retry
+   policy once when it starts, separately from the HTTP role's start-up snapshot.
+   Thus a hand change to `maximal_queue_lifetime` or `maximal_backoff_time`
+   followed by a Postfix reload changes Postfix, but the queue and history boxes,
+   the stored-lines window and the stuck-row count keep their snapshots until the
+   panel restarts.
 6. **rate-limit recalc** — every six hours (and on demand from Domain settings and
    the application form), recomputes level-2 **Auto** rate limits from send-log statistics.
 7. **notifier** — writes to the panel's users when something needs them

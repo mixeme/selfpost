@@ -191,6 +191,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - **The panel's role count includes the update check** (review 2026-11-05,
   L5): the architecture's list has eight entries, nine with the inbound relay;
   its introduction still said seven and eight. The count now matches the list.
+- **The retry-policy snapshots' restart boundary is explicit** (review
+  2026-11-05, N4): both the HTTP role and the log-tailer's reconcile loop read
+  Postfix's queue lifetimes once. The architecture now says that a hand-edited
+  `maximal_queue_lifetime` or `maximal_backoff_time` followed by a Postfix
+  reload does not update the queue and history boxes, stored-lines window or
+  stuck-row count until the panel restarts.
 
 ## [2.16.13] - 2026-10-28
 
