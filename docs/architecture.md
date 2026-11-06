@@ -1224,7 +1224,9 @@ The tables that carry the panel's model:
   confirmed, `''` while it is not (v13).
 - **`user_links`** — the one-time links that confirm an address and reset a
   password (v13): the token's SHA-256, `purpose`, the address it went to, its
-  expiry; one live link per user and purpose.
+  expiry. A new confirmation link replaces the user's earlier one; reset links
+  accumulate until taken or expired so a stranger's request cannot kill the
+  user's link, bounded by five requests a day and their thirty-minute lifetime.
 - **`user_domains`** and **`user_inbound_domains`** — the outbound and inbound
   domains assigned to a *domain* user. Separate tables: the same name on both
   is two assignments, and a sending domain gives no inbound access or the other

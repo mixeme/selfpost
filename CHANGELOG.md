@@ -182,6 +182,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   context with their own timeout rather than inheriting the HTTP request's. A
   caller that goes away does not cancel work whose answer is cached for the
   next one; the comment now records that reliance where the contexts are made.
+- **The user-link table's real lifetime rules are documented** (review
+  2026-11-05, FT4): `architecture.md` said there was one live link per user and
+  purpose, while the store deliberately replaces confirmation links only and
+  lets reset links accumulate so a stranger's request cannot revoke the user's.
+  The schema now says so, with the five-a-day request limit, thirty-minute
+  expiry and removal when a reset link is taken.
 
 ## [2.16.13] - 2026-10-28
 
