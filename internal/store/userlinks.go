@@ -40,9 +40,23 @@ func (s *Store) CreateUserLink(tokenHash string, userID int64, purpose, email st
 	}
 	defer tx.Rollback()
 	// The first statement is a write (see UpdateStatus).
-	if _, err := tx.Exec(`DELETE FROM user_links WHERE (user_id = ? AND purpose = ? AND purpose = ?) OR expires_at <= ?`,
-		userID, purpose, LinkConfirm, now.UTC().Format(time.RFC3339)); err != nil {
-		return fmt.Errorf("create user link: %w", err)
+	//
+	// The replace-or-expire choice is an if in Go, not a doubled `purpose = ?`
+	// in the SQL (review 2026-11-05, FT7): the doubled column made the
+	// replacement clause true only when the link being created was itself a
+	// confirmation, which is what the doc comment above says - but the reason
+	// sat here in the comment, not at the condition, and the next reader spent
+	// a minute deciding whether it was a bug.
+	expired := now.UTC().Format(time.RFC3339)
+	if purpose == LinkConfirm {
+		if _, err := tx.Exec(`DELETE FROM user_links WHERE (user_id = ? AND purpose = ?) OR expires_at <= ?`,
+			userID, LinkConfirm, expired); err != nil {
+			return fmt.Errorf("create user link: %w", err)
+		}
+	} else {
+		if _, err := tx.Exec(`DELETE FROM user_links WHERE expires_at <= ?`, expired); err != nil {
+			return fmt.Errorf("create user link: %w", err)
+		}
 	}
 	if _, err := tx.Exec(`INSERT INTO user_links (token_hash, user_id, purpose, email, created_at, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?)`, tokenHash, userID, purpose, email,

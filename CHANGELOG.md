@@ -107,7 +107,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   — a deferred line counts for nothing, an expiry line for the message's every
   row, the recipient without regard to case — and `resultInLog` answers a
   single row through it.
-
+- **`CreateUserLink`'s delete says what it means once** (review 2026-11-05,
+  FT7): the SQL held `(user_id = ? AND purpose = ? AND purpose = ?)` with the
+  purpose and `LinkConfirm` bound to the two placeholders — correct, since the
+  doubled column is true only for a confirmation link, but readable as a typo,
+  and the reason for it lived in the comment above rather than at the line. The
+  choice is an `if` in Go now: a confirmation link replaces the user's earlier
+  one, a reset link does not, each in its own sentence of SQL.
 ### Documentation
 
 - **The three reviews of `2.16.13` are one plan** (triaged by the owner,
