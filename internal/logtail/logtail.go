@@ -979,7 +979,9 @@ type blindness struct {
 	long  bool      // the current stretch has passed blindMin
 }
 
-const blindMin = 3 * time.Second
+// blindMin is a var so the file-integration test can measure a short blind
+// stretch without waiting through the production threshold.
+var blindMin = 3 * time.Second
 
 func (b *blindness) see(now time.Time, blind bool) {
 	if blind && b.since.IsZero() {

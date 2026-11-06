@@ -185,6 +185,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and the e2e upgrade and mismatched-certificate cases. These keys sign no real
   mail; production DKIM keys and the throwaway e2e stand's TLS key are still
   generated afresh, and every test keeps its original assertions.
+- **The log-tailer's blind-stretch test waits milliseconds, not 3.5 seconds**
+  (review 2026-11-05): `blindMin` keeps its three-second production default but
+  is overridable like `pollInterval`; the integration test lowers it to 20 ms
+  and still requires the missing-file interval and the recorded blindness to
+  cross that threshold.
 
 ### Documentation
 

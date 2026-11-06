@@ -504,9 +504,11 @@ func TestFollowTailsAndRotates(t *testing.T) {
 // read, counted for Health; the file made again is read from its start. Like
 // TestFollowTailsAndRotates this runs on the server.
 func TestFollowCountsALogItCannotReadAndReadsItAgain(t *testing.T) {
-	old := pollInterval
-	pollInterval = 10 * time.Millisecond
-	t.Cleanup(func() { pollInterval = old })
+	oldPoll, oldBlindMin := pollInterval, blindMin
+	pollInterval, blindMin = 10*time.Millisecond, 20*time.Millisecond
+	t.Cleanup(func() {
+		pollInterval, blindMin = oldPoll, oldBlindMin
+	})
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mail.log")
@@ -525,7 +527,7 @@ func TestFollowCountsALogItCannotReadAndReadsItAgain(t *testing.T) {
 		t.Fatalf("remove: %v", err)
 	}
 	// blindness counts by the clock: the name must stay missing past blindMin.
-	time.Sleep(blindMin + 500*time.Millisecond)
+	time.Sleep(blindMin + 20*time.Millisecond)
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
 		t.Fatalf("recreate: %v", err)
 	}
