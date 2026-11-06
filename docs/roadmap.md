@@ -30,7 +30,6 @@ directory).
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Stage H of the 2026-10-17 security audit: the test server's host (S1, S2, S5) and its DNS (S3) | stages 0-6 shipped `2.14.4`, the product side of S3 `2.15.0`; stage H the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) § Stage H |
 | go-milter-upstream | An issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
-| audit-2026-11-05 | The three reviews of `2.16.13` — the full-tree audit, the second code review and the external security audit — consolidated into one triage: 4 mediums, 8 lows, 8 nits, the test suite's cost | implementation and gate complete; Fable security review pending | 29/29 | [plans/audit-2026-11-05.md](plans/audit-2026-11-05.md) |
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -90,55 +89,6 @@ one SMTP session over the one milter connection smtpd opened (Postfix
 cleanup; src/smtpd/smtpd.c:3475, milter_send()).
 When upstream releases a version that does not keep the map (or offers the
 option), `third_party/go-milter` goes and `go.mod`'s `replace` with it.
-
----
-
-## audit-2026-11-05
-
-The full-tree audit of `2.16.13`
-([audit-2026-11-05.md](audit-2026-11-05.md)) found nothing above medium, and
-nothing that loses mail, crosses a tenant boundary or weakens an
-authentication. The two mediums: **FT1**, five external commands in request and
-probe paths that have no deadline while every other one in the tree does
-(`supervisorctl status` and `postconf` in the polled Health fragment and in
-`/healthz`, `saslpasswd2` and `db_dump` in the application forms) — a child
-that stops answering leaks a goroutine and a process per poll against
-`pids_limit: 1024`; and **FT2**, the compose build fallback whose context is
-the deployment directory's parent, which in the layout the guide's own step 1
-creates is the operator's home directory. Four lows (a reconcile sweep that
-re-reads the log per closed row, a line of `architecture.md` about
-`user_links`, an N+1 on the polled Outbound log, a queue test that races a
-product constant) and four nits are in the same file, with the order this
-reader would do them in at its end.
-
-The same release has a second whole-tree review, committed to `main` while this
-one was running: [code-review-2026-11-05.md](code-review-2026-11-05.md)
-(`cbc7c00`) — two mediums of its own (**M1**, a password the panel asks for and
-then cannot hash; **M2**, the release procedure written twice in
-[development.md](development.md), the copies contradicting each other and
-`release.yml`), five lows and four nits. The two lists overlap at one finding
-(its L2 is FT5 here); § *The other review of the same date* in the audit file
-reconciles them. The external security audit of the same date
-([security-audit-2026-11-05.md](security-audit-2026-11-05.md)) added nothing
-above low: its one note (**E1**, the absent absolute session cap not recorded
-under Accepted risks) was the owner's to place or decline.
-
-**Triaged 2026-11-06** — all three folded into one plan,
-[plans/audit-2026-11-05.md](plans/audit-2026-11-05.md): the four mediums and
-the panel-edge lows first, the nits all taken (FT7, FT8, FT10 included), E1
-placed under Accepted risks, the test suite's five speedups in their measured
-order, and no refactoring — the audit's § *Refactoring and optimisation*
-declines it, and the `SetMaxOpenConns(1)` revisit trigger stands as written.
-The offered second line-by-line reads (milter internals, the view layer) were
-declined. The plan's checklist is the list to work from; the three reports
-stay as the record of what was read and what held up.
-
-**Implementation began the same day and is mid-way**: fourteen steps are
-committed (through FT10), L1 is closed by its measurement (669 ms
-end-of-data for 1000 recipients, ~0.67 ms a commit — the batch is not
-worth touching the mail path for), and the plan's *Where this stands*
-section carries everything a fresh session needs: the next step, the
-version cut (`2.16.14`) and the deployment that follow the gate.
 
 ---
 

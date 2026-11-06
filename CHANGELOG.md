@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.14] - 2026-11-06
+
+No migration; schema 14.
+
 ### Fixed
 
 - **A password the panel cannot hash is refused at the form, with a sentence
@@ -211,7 +215,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   [docs/code-review-2026-11-05.md](docs/code-review-2026-11-05.md),
   [docs/security-audit-2026-11-05.md](docs/security-audit-2026-11-05.md)) are
   consolidated into one triage and a 29-step checklist,
-  [docs/plans/audit-2026-11-05.md](docs/plans/audit-2026-11-05.md): the four
+  `docs/plans/audit-2026-11-05.md` (removed once shipped): the four
   mediums first (the password ceiling with its own message on every form that
   asks for one, the deadlines on the five external commands that have none,
   the compose build's context, the release procedure written once), then the
@@ -245,6 +249,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   indefinitely. The owner accepted that for a single-operator panel on
   2026-11-06, with a second administrator as the trigger to revisit it; the
   review history no longer leaves the placement open.
+- **The release was authorised before the independent Fable security review**
+  (owner, 2026-11-06): the owner explicitly deferred that review until later
+  and approved the release. The review remains planned; the completed Windows,
+  Linux and Docker gates above are not represented as a substitute for it.
 
 ## [2.16.13] - 2026-10-28
 
