@@ -4,6 +4,9 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/mixeme/selfpost/internal/web/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // TestMain runs the tests in UTC, whatever the zone of the machine they run
@@ -12,6 +15,7 @@ import (
 // set it themselves (inZone).
 func TestMain(m *testing.M) {
 	time.Local = time.UTC
+	auth.BcryptCost = bcrypt.MinCost
 	os.Exit(m.Run())
 }
 

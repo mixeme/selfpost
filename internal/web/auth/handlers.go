@@ -24,8 +24,8 @@ const (
 // account created here and the ones the settings and user pages write
 // (security.md). bcrypt records the cost inside the hash, so raising it only
 // affects passwords set from now on; existing hashes keep verifying at the
-// cost they were written with.
-const BcryptCost = 12
+// cost they were written with. Production leaves this at 12; tests lower it.
+var BcryptCost = 12
 
 func (m *Module) sessionCookie() string {
 	if m.cfg.CookieSecure {
@@ -176,13 +176,15 @@ func (m *Module) submitLogin(w http.ResponseWriter, r *http.Request) {
 
 // noSuchUserHash is a hash of the panel's work factor, compared against when
 // a sign-in names no user.
-var noSuchUserHash = sync.OnceValue(func() []byte {
+var noSuchUserHash = sync.OnceValue(makeNoSuchUserHash)
+
+func makeNoSuchUserHash() []byte {
 	h, err := bcrypt.GenerateFromPassword([]byte("selfpost: no such user"), BcryptCost)
 	if err != nil {
 		panic(err)
 	}
 	return h
-})
+}
 
 // setSessionCookie sets the session cookie. SameSite=Lax withholds it from a
 // cross-site request unless that is a top-level navigation with a safe method

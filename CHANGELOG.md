@@ -160,6 +160,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   pins the same certificate as valid at one supplied moment and expired at
   another.
 
+### Tests
+
+- **Password-hashing tests pay bcrypt's real cost only where it is measured**
+  (review 2026-11-05): the product keeps work factor 12, while the auth and
+  handler suites use `bcrypt.MinCost`. The unknown-user timing test explicitly
+  restores 12 and refreshes the cached dummy hash, so it still compares two
+  equally expensive real hashes. The export-form test's expectation also catches
+  up with M1's shared validator wording.
+
 ### Documentation
 
 - **The three reviews of `2.16.13` are one plan** (triaged by the owner,

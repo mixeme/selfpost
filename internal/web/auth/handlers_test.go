@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -328,6 +329,14 @@ func expireSetupToken(m *Module) {
 // medians of a few attempts each must be within a factor of two; before the
 // fix the unknown name answered some hundred times faster.
 func TestLoginTakesAsLongForAnUnknownName(t *testing.T) {
+	oldCost := BcryptCost
+	BcryptCost = 12
+	noSuchUserHash = sync.OnceValue(makeNoSuchUserHash)
+	t.Cleanup(func() {
+		BcryptCost = oldCost
+		noSuchUserHash = sync.OnceValue(makeNoSuchUserHash)
+	})
+
 	m := testModule(t, false)
 	hash, err := bcrypt.GenerateFromPassword([]byte(testPassword), BcryptCost)
 	if err != nil {

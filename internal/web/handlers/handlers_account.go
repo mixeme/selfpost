@@ -244,7 +244,7 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost())
 	if err != nil {
 		logf("panel: account: hashing password failed: %v", err)
 		fail(http.StatusInternalServerError, "Internal error. Please try again.")

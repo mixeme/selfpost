@@ -210,7 +210,7 @@ func (h *Handlers) submitUserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost())
 	if err != nil {
 		logf("panel: create user hash: %v", err)
 		h.renderUserForm(w, r, http.StatusInternalServerError, 0, userFormView{FormErr: "Internal error. Please try again."})
@@ -318,7 +318,7 @@ func (h *Handlers) submitUserUpdate(w http.ResponseWriter, r *http.Request, u st
 
 	hash := "" // empty keeps the stored hash (SaveUser)
 	if password != "" {
-		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+		newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost())
 		if err != nil {
 			logf("panel: update user hash: %v", err)
 			h.renderUserForm(w, r, http.StatusInternalServerError, u.ID, userFormView{FormErr: "Internal error. Please try again.", FormUsername: username, FormEmail: email, FormRole: string(role), Reach: reach})

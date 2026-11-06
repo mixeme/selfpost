@@ -2,6 +2,6 @@ package handlers
 
 import "github.com/mixeme/selfpost/internal/web/auth"
 
-// bcryptCost is the panel-wide password work factor; see auth.BcryptCost for
-// why it lives in one place.
-const bcryptCost = auth.BcryptCost
+// bcryptCost reads the panel-wide password work factor; see auth.BcryptCost
+// for why it lives in one place. A function keeps tests' lowered cost visible.
+func bcryptCost() int { return auth.BcryptCost }

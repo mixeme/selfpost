@@ -193,7 +193,7 @@ func TestDomainSettingsRefusalsStayOnTheSettingsPage(t *testing.T) {
 	if code != http.StatusBadRequest {
 		t.Fatalf("a short export password = %d", code)
 	}
-	has(t, "export refusal", body, `The encryption password must be at least 12 characters.`, `<h1 class="title is-3">Domain settings</h1>`)
+	has(t, "export refusal", body, `password must be at least 12 characters`, `<h1 class="title is-3">Domain settings</h1>`)
 	code, body = post(s.h.HandleExportDomain, "export", url.Values{"encrypt": {"1"}, "password": {"long-enough-password"}, "password_confirm": {"another-one-entirely"}, "account_password": {"correct-password-here!"}})
 	if code != http.StatusBadRequest {
 		t.Fatalf("export passwords that differ = %d", code)
