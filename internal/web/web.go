@@ -377,12 +377,19 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if err := health.Liveness(); err != nil {
 		http.Error(w, "unhealthy\n", http.StatusServiceUnavailable)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
+	}
 	_, _ = w.Write([]byte("ok\n"))
 }
 

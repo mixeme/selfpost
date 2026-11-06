@@ -10,6 +10,27 @@ import (
 // or a private address, and is not found for anyone else (security audit
 // 2026-10-17, I6). Liveness itself is not under test here: a probe that is
 // answered gets 200 or 503, never 404.
+func TestHealthzAnswersReadsOnly(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		r := httptest.NewRequest(method, "/healthz", nil)
+		r.RemoteAddr = "127.0.0.1:40000"
+		rec := httptest.NewRecorder()
+		handleHealth(rec, r)
+		if rec.Code == http.StatusNotFound || rec.Code == http.StatusMethodNotAllowed {
+			t.Errorf("%s: status = %d, want a liveness answer", method, rec.Code)
+		}
+	}
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions} {
+		r := httptest.NewRequest(method, "/healthz", nil)
+		r.RemoteAddr = "127.0.0.1:40000"
+		rec := httptest.NewRecorder()
+		handleHealth(rec, r)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s: status = %d, want 405", method, rec.Code)
+		}
+	}
+}
+
 func TestHealthzAnswersOnlyLocalProbes(t *testing.T) {
 	for _, c := range []struct {
 		name, remote, xff string

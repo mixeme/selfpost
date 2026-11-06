@@ -147,6 +147,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   a legitimate form when only the host's capitalisation differed. The host and
   port still compare together, so a different port remains a different origin;
   a test covers the case-only match.
+- **The liveness endpoint answers reads only** (review 2026-11-05, N2):
+  `/healthz` ran the same checks for POST, PUT and every other method as for a
+  probe's GET. A local or private direct client now gets 405 for anything but
+  GET and HEAD; a request through a proxy or from a public address still gets
+  the unchanged 404, and HEAD carries no response body.
 
 ### Documentation
 
