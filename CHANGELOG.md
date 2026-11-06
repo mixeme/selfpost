@@ -123,6 +123,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   a test holds the shape: a delete whose maps cannot be written fails, the
   entry is the one that was added, and its id still deletes once the maps
   can be written.
+- **The journal's per-recipient commit measured, and stays** (review
+  2026-11-05, L1): the second review's low asked whether one commit per
+  recipient inside the milter's end-of-message callback could cost a
+  thousand-recipient message its place in the queue (`milter_content_timeout`
+  is 30 s). Measured on the e2e stand: the window from the end of data to
+  Postfix's acceptance — the journal's per-recipient commits and the queueing
+  — is **669 ms for 1000 recipients, ~0.67 ms a commit**; the premise of tens
+  of milliseconds a commit was off by a factor of forty-five, and a disk
+  twenty times slower still answers inside the timeout. The batching the
+  inbound side uses is not worth touching the mail path for; the numbers are
+  recorded in the plan and `InsertQueued` keeps its signature.
 
 ### Documentation
 
