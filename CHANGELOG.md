@@ -177,6 +177,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   documents (the session-cap note placed under Accepted risks), and the test
   suite's five speedups in their measured order. No refactoring; the
   one-connection decision keeps its written revisit trigger.
+- **The DNS lookups' context choice is written at the call** (review
+  2026-11-05, FT9): the uncached checks intentionally start from a background
+  context with their own timeout rather than inheriting the HTTP request's. A
+  caller that goes away does not cancel work whose answer is cached for the
+  next one; the comment now records that reliance where the contexts are made.
 
 ## [2.16.13] - 2026-10-28
 

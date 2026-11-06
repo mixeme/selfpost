@@ -140,6 +140,9 @@ func (c *Checker) Server(hostname string, force bool) Server {
 		}
 	}
 
+	// Uncached lookups here and below deliberately do not inherit the HTTP
+	// request's context: each is bounded by c.timeout, and its answer fills the
+	// cache for the next caller even if this caller goes away.
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	srv := c.checkServer(ctx, hostname)
