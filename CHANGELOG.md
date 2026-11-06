@@ -82,6 +82,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   password hash untouched, the address's confirmation kept or cleared as
   before), and the two-step path with its ambiguous error is gone; the store
   method the second write used is removed with it.
+- **A queue larger than the cap is no longer reported as a timeout**
+  (review 2026-11-05, FT6): `postqueueTimeout` covered the process start and
+  the whole read, and when the deadline fired after the size cap had already
+  been reached, the truncation the reader knew about was thrown away — so a
+  merely big backlog was logged, and shown on the queues card, as `postqueue -p
+  timed out`, and the size-cap test raced the product's own constant (it lost
+  on a loaded machine, here and in CI's future). The timeout is a var now, as
+  logtail's knobs are; the deadline firing after the cap reports the cap
+  ("the listing is larger than N bytes, and its deadline fired while the rest
+  was being written"); and the fake `postqueue` of the tests composes its
+  listing once instead of formatting every entry as it writes it, so composing
+  can no longer be the slow part. Two new tests pin the halves: the cap named
+  when the deadline fires too, and the timeout named on a command that answers
+  nothing — both in milliseconds.
 
 ### Documentation
 

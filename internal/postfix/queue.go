@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-const postqueueTimeout = 5 * time.Second
+// postqueueTimeout bounds `postqueue -p`: the process start and the whole
+// read, on every ask the panel makes of the queue. A var, as logtail's
+// pollInterval and queueScanBytes are, so a test can shorten it instead of
+// racing it (review 2026-11-05, FT6).
+var postqueueTimeout = 5 * time.Second
 
 // maxQueueOutput bounds how much of `postqueue -p` the panel keeps. A deferred
 // queue with a very large backlog prints one paragraph per message, and the
@@ -64,6 +68,15 @@ func listQueue() (text string, truncated bool, err error) {
 	cmd.Stderr = out
 	err = cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
+		// The cap may have been reached before the deadline fired, and the
+		// reader knew it: say that instead of "timed out", because the two
+		// mean the same "no information" to the sweep (QueueIDs below) but
+		// not to the log line and the Health card, which would be calling a
+		// merely big queue a command that did not answer (review 2026-11-05,
+		// FT6).
+		if out.truncated {
+			return "", true, fmt.Errorf("postqueue -p: the listing is larger than %d bytes, and its %s deadline fired while the rest was being written", maxQueueOutput, postqueueTimeout)
+		}
 		return "", false, fmt.Errorf("postqueue -p timed out after %s", postqueueTimeout)
 	}
 	if err != nil {

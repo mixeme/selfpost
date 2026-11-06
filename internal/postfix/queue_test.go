@@ -8,12 +8,17 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestFakePostqueue is not a test: it is the fake `postqueue -p` the tests
 // below run in place of the real one, writing SP_FAKE_POSTQUEUE_BYTES bytes of
 // queue entries composed by hand after the layout of Postfix 3.10.13's
-// src/postqueue/showq_compat.c.
+// src/postqueue/showq_compat.c. The listing is composed once — one entry
+// repeated — and written in one pass, so a loaded test machine cannot make
+// composing it the slow part (review 2026-11-05, FT6). With
+// SP_FAKE_POSTQUEUE_LINGER_MS set it then sleeps that long, so a test can let
+// the deadline fire after the cap was reached, deterministically.
 func TestFakePostqueue(t *testing.T) {
 	if os.Getenv("SP_FAKE_POSTQUEUE") != "1" {
 		t.Skip("helper process")
@@ -22,12 +27,28 @@ func TestFakePostqueue(t *testing.T) {
 	fmt.Sscan(os.Getenv("SP_FAKE_POSTQUEUE_BYTES"), &size)
 	out := bufio.NewWriter(os.Stdout)
 	fmt.Fprintln(out, "-Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------")
-	for n, i := 0, 0; n < size; i++ {
+	// A batch of distinct ids, composed once and then repeated to the size
+	// asked: composing in the write loop was the slow part on a loaded
+	// machine, and the id is what the under-cap tests read out (review
+	// 2026-11-05, FT6).
+	var batch strings.Builder
+	for n, i := 0, 0; n < 4096; i++ {
 		entry := fmt.Sprintf("%010X      446 Fri Aug  8 10:13:31  app@example.com\n%41s rcpt@example.net\n\n", i, "")
-		out.WriteString(entry)
+		batch.WriteString(entry)
 		n += len(entry)
 	}
+	listing := strings.Repeat(batch.String(), size/4096+1)
+	if size > 0 {
+		if _, err := out.WriteString(listing[:size]); err != nil {
+			os.Exit(1)
+		}
+	}
 	out.Flush()
+	if linger := os.Getenv("SP_FAKE_POSTQUEUE_LINGER_MS"); linger != "" {
+		var ms int
+		fmt.Sscan(linger, &ms)
+		time.Sleep(time.Duration(ms) * time.Millisecond)
+	}
 	os.Exit(0)
 }
 
@@ -35,10 +56,19 @@ func TestFakePostqueue(t *testing.T) {
 // place of the real one for the rest of the test.
 func fakePostqueue(t *testing.T, size int) {
 	t.Helper()
+	fakePostqueueLingering(t, size, 0)
+}
+
+// fakePostqueueLingering is fakePostqueue whose process then sleeps lingerMs,
+// so a test can let the reader's deadline fire after the output was written.
+func fakePostqueueLingering(t *testing.T, size, lingerMs int) {
+	t.Helper()
 	old := postqueueP
 	postqueueP = func(ctx context.Context) *exec.Cmd {
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestFakePostqueue$")
-		cmd.Env = append(os.Environ(), "SP_FAKE_POSTQUEUE=1", fmt.Sprintf("SP_FAKE_POSTQUEUE_BYTES=%d", size))
+		cmd.Env = append(os.Environ(), "SP_FAKE_POSTQUEUE=1",
+			fmt.Sprintf("SP_FAKE_POSTQUEUE_BYTES=%d", size),
+			fmt.Sprintf("SP_FAKE_POSTQUEUE_LINGER_MS=%d", lingerMs))
 		return cmd
 	}
 	t.Cleanup(func() { postqueueP = old })
@@ -59,6 +89,46 @@ func TestQueueIDsRefusesATruncatedListing(t *testing.T) {
 	}
 	if !strings.HasSuffix(text, fmt.Sprintf("[listing truncated at %d bytes]\n", maxQueueOutput)) {
 		t.Fatalf("Queue on a 5 MiB listing does not end with the truncation note: ...%q", text[len(text)-80:])
+	}
+}
+
+// When postqueue passes the cap and then lingers past the deadline, the
+// refusal names the size, not the clock: a merely big queue stopped being
+// reported as a command that did not answer (review 2026-11-05, FT6). The
+// cap is reached well inside the shortened deadline and the linger carries
+// the process past it, so both facts are true at once, deterministically.
+func TestListQueueNamesTheCapWhenTheDeadlineFiresToo(t *testing.T) {
+	fakePostqueueLingering(t, 5<<20, 3000)
+	old := postqueueTimeout
+	postqueueTimeout = time.Second
+	t.Cleanup(func() { postqueueTimeout = old })
+
+	_, err := QueueIDs()
+	if err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Fatalf("QueueIDs on a capped listing that lingered past its deadline = %v; want the size cap named", err)
+	}
+	if _, err := Queue(); err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Fatalf("Queue on a capped listing that lingered past its deadline = %v; want the size cap named", err)
+	}
+}
+
+// A postqueue that answers nothing is bounded, and the refusal is the
+// timeout's, not the cap's — the other half of the deadline's honesty
+// (review 2026-11-05, FT6). The deadline is the test's, not the product's 5
+// s: the var the fix made of it is what lets this run in milliseconds.
+func TestListQueueTimesOutOnAnUnansweredPostqueue(t *testing.T) {
+	fakePostqueueLingering(t, 0, 2000)
+	old := postqueueTimeout
+	postqueueTimeout = 250 * time.Millisecond
+	t.Cleanup(func() { postqueueTimeout = old })
+
+	start := time.Now()
+	_, err := QueueIDs()
+	if err == nil || !strings.Contains(err.Error(), "timed out after 250ms") {
+		t.Fatalf("QueueIDs on a postqueue that never answered = %v; want the timeout named", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("the refusal took %v; want it bounded near the timeout", elapsed)
 	}
 }
 
