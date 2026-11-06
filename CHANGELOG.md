@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Documentation
+
+- **IP warmup now distinguishes authentication, server acceptance and inbox
+  placement.** The guide gives practical per-provider monitoring and ramp-up
+  advice and records the seven-day trial: all messages covered by DMARC reports
+  passed, while placement ranged from mostly inbox at Gmail to persistent spam
+  at Yandex, Outlook and iCloud; only Mail.ru's last test moved to the inbox.
+
 ## [2.16.14] - 2026-11-06
 
 No migration; schema 14.

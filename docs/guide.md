@@ -1905,12 +1905,48 @@ Server-level DNS (the PTR/rDNS record) is a separate, once-per-machine scope
 
 ### IP warmup
 
-A brand-new IP has no sending history, so receiving servers are cautious with
-it regardless of how correct your DKIM/SPF/DMARC are. Start with low volume to
-a domain, increase gradually over days/weeks rather than sending everything on
-day one, and check the IP against major blocklists (Spamhaus and similar)
-before and during warmup. This is inherent to how mail reputation works on the
-public internet, not something SelfPost's configuration can shortcut.
+A new IP address and a new sending domain have no established sending history.
+PTR, SPF, DKIM and DMARC authenticate the server and its mail; they do not
+promise inbox placement. A `sent` row in the [Outbound log](#outbound-log)
+means that the receiving server accepted a message, not that it reached the
+inbox. A passing result in a [DMARC aggregate report](#dmarc-reports) likewise
+says nothing about the spam folder.
+
+Warm up the actual sending identity you intend to keep, rather than rotating
+IP addresses or domains:
+
+1. Publish and verify PTR, SPF, DKIM and DMARC first, and check the IP against
+   major blocklists (Spamhaus and similar) before and during warmup.
+2. Start with low, regular volumes of mail that the recipients expect. Increase
+   gradually at each receiving provider over days or weeks; do not send a saved
+   backlog or a large campaign on day one. There is no universal daily schedule
+   that guarantees inbox placement.
+3. Watch the Outbound log and queue by receiving provider, read DMARC reports,
+   and inspect test mailboxes at the providers that matter to you. Neither the
+   log nor DMARC reports can replace checking where a message actually landed.
+4. Pause increases when deferrals or bounces rise, or when test mail keeps
+   landing in spam. Investigate the recipient list, message content, complaints
+   and blocklists before raising volume. Remove addresses that produce permanent
+   bounces instead of repeatedly sending to them.
+
+A seven-day SelfPost trial on a previously unused IP illustrates the limits of
+a short warmup. It sent one small plain-text message per test mailbox per day
+with valid PTR, SPF, DKIM and DMARC. The first message went only to Gmail and
+Yandex; the other mailboxes joined from message 2. The received DMARC reports
+covered 18 messages, all passing, yet folder placement was mixed:
+
+| Receiver | Observed placement |
+|---|---|
+| Gmail | Messages 1 and 3–7 in the inbox; message 2 in spam |
+| Yandex | All seven messages in spam |
+| Outlook | All five accepted messages in spam; one other message was refused with `S3150` |
+| Mail.ru | Messages 2–6 in spam; message 7 in the inbox |
+| iCloud | Messages 2–7 in spam |
+
+This is one small trial, not a provider benchmark or a promised timetable. In
+particular, one late inbox placement does not by itself establish a durable
+reputation. Warmup depends on the sender's continuing traffic and recipients'
+response; SelfPost cannot shortcut it with configuration.
 
 ### Rate limiting — level 2 (domain and application)
 
