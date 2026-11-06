@@ -536,20 +536,19 @@ Staticcheck 2026.1 → `go test ./...` (main module, no e2e; includes the panel 
 module compiled, not run (`go vet ./...`, Staticcheck and
 `go test -c -o /dev/null .` in `test/e2e`).
 
-### `release.yml` — published GitHub Release, or `workflow_dispatch` with SemVer
+### `release.yml` — a pushed `vX.Y.Z` tag, or a `workflow_dispatch` with SemVer
 
-Publishing a GitHub Release runs `release.yml` directly (`release: published`,
-same pattern as gosentry / imap-scrub). You can also run it manually via
-`workflow_dispatch` with an explicit `X.Y.Z` input. A bare git tag push does not
-run the workflow. The build always checks out `vX.Y.Z`, not `main` HEAD.
-
-`prepare` takes the version from `github.event.release.tag_name` on a release
-event, or from the `workflow_dispatch` `version` input. A dispatch whose input
-is missing or not `X.Y.Z` fails in `prepare`.
+What starts a publish is written once, in
+[§ Release image](#release-image): a pushed git tag `vX.Y.Z` — the tag must
+exist, it is what the workflow checks out — or a `workflow_dispatch` whose
+`X.Y.Z` input names one. Ordinary commits do not run it; no GitHub Release is
+needed. `prepare` takes the version from `github.ref_name` on a tag push or
+from the dispatch input, and a dispatch whose input is missing or not `X.Y.Z`
+fails in `prepare`.
 
 ```
-release: published
-prepare (version from release tag or workflow_dispatch input; checkout vX.Y.Z)
+push tag vX.Y.Z (or workflow_dispatch with X.Y.Z)
+prepare (version from github.ref_name or the dispatch input; checkout vX.Y.Z)
   → build [matrix: ubuntu-latest / ubuntu-24.04-arm]
       → docker build --load (VERSION from prepare)
       → e2e (test/e2e; rebuilds selfpost:e2e with SELFPOST_E2E_VERSION=X.Y.Z)

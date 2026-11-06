@@ -42,6 +42,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   in `.env` (`..` when the file is used from the clone's own `deploy/`); the
   guide's § *Fixed image tag* and `.env.example` say which and when, and a
   `deploy` test holds the default where it is.
+- **The release procedure is written once** (review 2026-11-05, M2):
+  `development.md` § *CI* still described the `2.16.2`-era trigger —
+  "Publishing a GitHub Release runs `release.yml` directly", "A bare git tag
+  push does not run the workflow", the version from
+  `github.event.release.tag_name` — the opposite of § *Release image* and of
+  the workflow, which runs on a pushed `vX.Y.Z` tag or a `workflow_dispatch`
+  input and reads `github.ref_name`. An operator reading the CI section would
+  publish a GitHub Release and wait for an image that never comes. § *CI* now
+  points at § *Release image* for what starts a publish, and the diagram names
+  the real trigger and version source.
 
 ### Documentation
 
