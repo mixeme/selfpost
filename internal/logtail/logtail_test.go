@@ -750,6 +750,38 @@ func TestReconcileCountsALineTheTailerMissed(t *testing.T) {
 	}
 }
 
+// The batch lookup answers the sweep's whole batch from one read of the two
+// files: a delivery line matches its row by queue id and recipient without
+// regard to case, an expiry line matches the message's every row (qmgr's
+// line names no recipient), a deferred line nothing, and a row whose lines
+// are gone nothing (review 2026-11-05, FT3).
+func TestResultsInLogAnswersABatchInOnePass(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mail.log")
+	log := "Oct 14 11:00:00 mail postfix/qmgr[10]: EXPIRYQ: from=<app@example.net>, status=expired, returned to sender\n" +
+		"Oct 14 11:00:01 mail postfix/smtp[26]: DELIVQ: to=<One@Example.net>, relay=mx[203.0.113.9]:25, dsn=2.0.0, status=sent (250 OK)\n" +
+		"Oct 14 11:00:02 mail postfix/smtp[26]: DEFERQ: to=<d@example.net>, relay=mx[203.0.113.9]:25, dsn=4.4.1, status=deferred (try later)\n"
+	if err := os.WriteFile(path, []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rows := []store.QueuedDelivery{
+		{ID: 1, QueueID: "EXPIRYQ", To: "first@example.net"},
+		{ID: 2, QueueID: "EXPIRYQ", To: "second@example.net"},
+		{ID: 3, QueueID: "DELIVQ", To: "one@example.net"},
+		{ID: 4, QueueID: "DELIVQ", To: "two@example.net"},
+		{ID: 5, QueueID: "DEFERQ", To: "d@example.net"},
+		{ID: 6, QueueID: "GONEQ", To: "lost@example.net"},
+	}
+	got := resultsInLog(path, rows)
+	want := []bool{true, true, true, false, false, false}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("row %d (%s/%s) = %v, want %v", i+1, rows[i].QueueID, rows[i].To, got[i], w)
+		}
+	}
+}
+
 // Each sweep records how many rows are queued past the queue lifetime, as a
 // level for the day.
 func TestCountStuckRecordsTheLevel(t *testing.T) {

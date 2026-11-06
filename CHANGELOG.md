@@ -96,6 +96,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   can no longer be the slow part. Two new tests pin the halves: the cap named
   when the deadline fires too, and the timeout named on a command that answers
   nothing — both in milliseconds.
+- **The reconcile sweep reads the log once per batch, not once per row**
+  (review 2026-11-05, FT3): it closed every open row Postfix no longer holds
+  after an outage-shaped backlog, and for each row it closed it re-read up to
+  8 MiB of `mail.log` and `mail.log.1` to ask whether a delivery line had been
+  missed — with the ~30k messages the 2026-10-12 audit measured, up to 240 GB
+  of (page-cached) scanning per sweep, every five minutes, ahead of the stuck
+  count on the same goroutine. `resultsInLog` now indexes the batch's rows by
+  queue id and recipient and answers all of them from one pass over each file
+  — a deferred line counts for nothing, an expiry line for the message's every
+  row, the recipient without regard to case — and `resultInLog` answers a
+  single row through it.
 
 ### Documentation
 

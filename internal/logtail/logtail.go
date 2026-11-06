@@ -387,17 +387,27 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 	}
 
 	var closed, missed int64
+	// The rows about to be closed, collected first: their result lines are
+	// looked for in one pass over the two log files for the whole batch
+	// (resultsInLog), not one read per row — the sweep's case is a backlog
+	// after an outage, and the per-row reads were minutes of scanning every
+	// five minutes (review 2026-11-05, FT3).
+	var closing []store.QueuedDelivery
 	for _, row := range rows {
 		if _, still := held[row.QueueID]; still {
 			continue
 		}
+		closing = append(closing, row)
+	}
+	results := resultsInLog(path, closing)
+	for i, row := range closing {
 		n, err := st.CloseUnreported(row.ID)
 		if err != nil {
 			log.Printf("log-tailer: reconcile: close %s/%s: %v", row.QueueID, row.To, err)
 			continue
 		}
 		closed += n
-		if n > 0 && resultInLog(path, row) {
+		if n > 0 && results[i] {
 			log.Printf("log-tailer: reconcile: %s/%s had a delivery line in the log the tailer did not read", row.QueueID, row.To)
 			missed++
 		}
@@ -413,6 +423,80 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 	}
 }
 
+// resultsInLog answers, for each row of rows in order, whether the current
+// log or the one rotated last holds a final result line for it — a delivery
+// line that says sent or bounced, or the message's expiry line. A deferred
+// line is not one: a deferred row has one by definition. One pass over each
+// file for the whole set of rows, not a read per row (review 2026-11-05, FT3):
+// the sweep closes its rows in a batch after an outage, and the per-row reads
+// cost up to queueScanBytes of each file per row — with the ~30k messages
+// audit-2026-10-12 H3 measured, minutes of scanning, every five minutes.
+// The batch the sweep holds is small enough to index in full: rows carry
+// QueueID and To, and a delivery line is matched on both (the recipient
+// without regard to case, as parseDelivery's callers do), an expiry line on
+// the queue id alone, since qmgr's line names no recipient.
+func resultsInLog(path string, rows []store.QueuedDelivery) []bool {
+	out := make([]bool, len(rows))
+	if path == "" {
+		return out
+	}
+	byExpiry := make(map[string][]int)
+	byDelivery := make(map[string][]int) // queue id + NUL + lower-cased recipient
+	for i, row := range rows {
+		if row.QueueID == "" {
+			continue
+		}
+		byExpiry[row.QueueID] = append(byExpiry[row.QueueID], i)
+		key := row.QueueID + "\x00" + strings.ToLower(row.To)
+		byDelivery[key] = append(byDelivery[key], i)
+	}
+	for _, p := range []string{path, path + ".1"} {
+		f, err := os.Open(p)
+		if err != nil {
+			continue
+		}
+		info, err := f.Stat()
+		if err != nil {
+			f.Close()
+			continue
+		}
+		// The same tail budget QueueLines reads: rows reach the sweep
+		// minutes after they were written, so the end of the two files is
+		// where a line for them would be.
+		start := info.Size() - queueScanBytes
+		if start < 0 {
+			start = 0
+		}
+		if _, err := f.Seek(start, io.SeekStart); err != nil {
+			f.Close()
+			continue
+		}
+		sc := bufio.NewScanner(f)
+		sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+		// Reading into the middle of the file lands mid-line; that fragment
+		// is dropped rather than matched against.
+		if start > 0 && sc.Scan() {
+			_ = sc.Text()
+		}
+		for sc.Scan() {
+			line := sc.Text()
+			if q, r, s, ok := parseDelivery(line); ok && s != store.StatusDeferred {
+				key := q + "\x00" + strings.ToLower(r)
+				for _, i := range byDelivery[key] {
+					out[i] = true
+				}
+			}
+			if q, ok := parseExpiry(line); ok {
+				for _, i := range byExpiry[q] {
+					out[i] = true
+				}
+			}
+		}
+		f.Close()
+	}
+	return out
+}
+
 // resultInLog says whether the current log or the one rotated last holds a
 // final result for row - a delivery line that says sent or bounced, or the
 // message's expiry line. A deferred line is not one: a deferred row has one
@@ -422,24 +506,7 @@ func reconcile(st StatusStore, cutoff time.Time, path string) {
 // name is "<log>.1", without the compression suffix under delaycompress
 // (build/logrotate-mail.conf).
 func resultInLog(path string, row store.QueuedDelivery) bool {
-	if path == "" {
-		return false
-	}
-	for _, p := range []string{path, path + ".1"} {
-		lines, err := QueueLines(p, row.QueueID, 256)
-		if err != nil {
-			continue
-		}
-		for _, line := range lines {
-			if q, r, s, ok := parseDelivery(line); ok && q == row.QueueID && strings.EqualFold(r, row.To) && s != store.StatusDeferred {
-				return true
-			}
-			if q, ok := parseExpiry(line); ok && q == row.QueueID {
-				return true
-			}
-		}
-	}
-	return false
+	return resultsInLog(path, []store.QueuedDelivery{row})[0]
 }
 
 // retentionLoop prunes expired send-log rows immediately and then periodically,
