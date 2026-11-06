@@ -411,7 +411,7 @@ func TestNobodyToTellIsNotSaid(t *testing.T) {
 	b := newBench(t)
 	users, _ := b.st.ListUsers()
 	for _, u := range users {
-		if err := b.st.SetUserNotify(u.ID, false); err != nil {
+		if err := b.st.UpdateUserProfile(u.ID, u.Username, u.Email, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -425,7 +425,7 @@ func TestNobodyToTellIsNotSaid(t *testing.T) {
 
 	for _, u := range users {
 		if u.Username == "root" {
-			if err := b.st.SetUserNotify(u.ID, true); err != nil {
+			if err := b.st.UpdateUserProfile(u.ID, u.Username, u.Email, true); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -438,7 +438,7 @@ func TestNobodyToTellIsNotSaid(t *testing.T) {
 	// Everything is put right while nobody listens again: no state is left to
 	// announce an ending later.
 	for _, u := range users {
-		if err := b.st.SetUserNotify(u.ID, false); err != nil {
+		if err := b.st.UpdateUserProfile(u.ID, u.Username, u.Email, false); err != nil {
 			t.Fatal(err)
 		}
 	}
