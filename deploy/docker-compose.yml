@@ -24,11 +24,16 @@ services:
     image: ghcr.io/mixeme/selfpost:2.16.13
     # When the image is neither here nor on ghcr.io (or ghcr.io is out of
     # reach), Compose builds it from a clone of the repository, checked out at
-    # this tag: the clone is this file's parent directory, or SELFPOST_SOURCE
-    # in .env. An image present here, or pulled, is used as it is.
-    # VERSION must equal the tag above (docs/guide.md, Fixed image tag).
+    # this tag: the clone is SELFPOST_SOURCE in .env. The default names
+    # ./source beside this file — a directory that does not exist by accident,
+    # so the build that cannot find it fails at once naming it, rather than
+    # sending the deployment directory's parent (a home directory, in the
+    # layout guide § Installation step 1 creates) to the Docker daemon as its
+    # context. Using the file from the clone's own deploy/? Set
+    # SELFPOST_SOURCE=.. there. An image present here, or pulled, is used as
+    # it is. VERSION must equal the tag above (docs/guide.md, Fixed image tag).
     build:
-      context: ${SELFPOST_SOURCE:-..}
+      context: ${SELFPOST_SOURCE:-./source}
       dockerfile: build/Dockerfile
       args:
         VERSION: 2.16.13

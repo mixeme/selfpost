@@ -31,6 +31,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `postconf` 3 s, the SASL pair 5 s); a refused answer grades the Health card
   `Unknown`, which the handler already renders, and a test with a fake
   `supervisorctl` that never writes asserts the refusal within the bound.
+- **The compose build's context defaults to a directory that cannot exist by
+  accident** (review 2026-11-05, FT2): it was the deployment directory's
+  parent, which in the layout the guide's own step 1 creates is the
+  operator's home directory — sent whole to the Docker daemon as the build's
+  context (`.dockerignore` does not apply, being read from the context root),
+  and the build failed on a missing `build/Dockerfile` only after that. The
+  default is now `./source` beside the compose file: a build that cannot find
+  it fails at once naming it. A clone still builds, through `SELFPOST_SOURCE`
+  in `.env` (`..` when the file is used from the clone's own `deploy/`); the
+  guide's § *Fixed image tag* and `.env.example` say which and when, and a
+  `deploy` test holds the default where it is.
 
 ### Documentation
 

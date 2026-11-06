@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"os"
 	"regexp"
 	"testing"
@@ -22,5 +23,22 @@ func TestComposeBuildVersionIsTheImageTag(t *testing.T) {
 	}
 	if string(image[1]) != string(version[1]) {
 		t.Errorf("image tag %s, build VERSION %s: they must be one version", image[1], version[1])
+	}
+}
+
+// The build context's default is a directory that cannot exist by accident
+// (review 2026-11-05, FT2). The guide's installation step 1 puts the compose
+// file in a directory of its own, so the parent is the operator's home
+// directory: as a build context it is sent whole to the Docker daemon - SSH
+// keys and mail included, and .dockerignore does not apply, being read from
+// the context root - and the build then fails on a missing build/Dockerfile.
+// ./source fails fast, naming itself.
+func TestComposeBuildContextDefaultIsNotTheParentDirectory(t *testing.T) {
+	b, err := os.ReadFile("docker-compose.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(b, []byte("context: ${SELFPOST_SOURCE:-./source}")) {
+		t.Error("the build context's default is not ./source; a parent directory as the context is sent whole to the daemon")
 	}
 }

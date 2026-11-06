@@ -371,9 +371,15 @@ The compose file can also build it. When the pinned image is neither on the
 host nor on ghcr.io - or ghcr.io is out of reach - `docker compose up`
 builds it from a clone of the repository instead of failing (its `build:`
 section; Compose tries the pull first, and an image already on the host is
-used as it is, built or pulled). The clone is the parent of the compose
-file's directory when the file is used from the clone's `deploy/`, or
-`SELFPOST_SOURCE` in `.env` when the deployment directory is elsewhere.
+used as it is, built or pulled). The clone is `SELFPOST_SOURCE` in `.env`.
+When the variable is not set the build's context defaults to `./source`
+beside the compose file: a directory that exists only if you put a clone
+there, so a build that cannot find it fails at once naming it - rather
+than sending the deployment directory's parent (in the layout step 1 of
+[Installation](#installation) creates, that parent is your home directory)
+to the Docker daemon as its context, and failing on a missing
+`build/Dockerfile` only after that. Using the compose file straight from a
+clone's `deploy/`? Set `SELFPOST_SOURCE=..` in `.env` there.
 Check the clone out at the pinned tag first - the build stamps the image
 with the version in the compose file, whatever code the clone holds:
 
