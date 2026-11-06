@@ -190,6 +190,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   is overridable like `pollInterval`; the integration test lowers it to 20 ms
   and still requires the missing-file interval and the recorded blindness to
   cross that threshold.
+- **Platform-bound tests say why Windows cannot run them** (review 2026-11-05):
+  the domain key round-trip's POSIX 0600-mode assertion and the three log-tailer
+  tests that rename or remove an open log now skip on Windows with the reason in
+  the result. They still run on Linux, while the rest of the Windows suite is
+  green rather than reporting the platform as a product regression.
 
 ### Documentation
 

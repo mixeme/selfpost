@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,9 @@ func testRSAKey(t *testing.T, name string) *rsa.PrivateKey {
 }
 
 func TestWriteLoadPrivateKeyRoundtrip(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce the POSIX 0600 file mode checked here")
+	}
 	key := testRSAKey(t, "rsa-2048.pem")
 	path := filepath.Join(t.TempDir(), "selfpost.private")
 	if err := writePrivateKeyPEM(path, key); err != nil {

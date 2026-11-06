@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -460,6 +461,9 @@ func (c *captureStore) reset() {
 // it (rename + fresh create, as logrotate does) and writes more, asserting the
 // tailer picks up lines from both the original and rotated file.
 func TestFollowTailsAndRotates(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows cannot rename a log file while the tailer has it open")
+	}
 	old := pollInterval
 	pollInterval = 10 * time.Millisecond
 	t.Cleanup(func() { pollInterval = old })
@@ -504,6 +508,9 @@ func TestFollowTailsAndRotates(t *testing.T) {
 // read, counted for Health; the file made again is read from its start. Like
 // TestFollowTailsAndRotates this runs on the server.
 func TestFollowCountsALogItCannotReadAndReadsItAgain(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows cannot remove a log file while the tailer has it open")
+	}
 	oldPoll, oldBlindMin := pollInterval, blindMin
 	pollInterval, blindMin = 10*time.Millisecond, 20*time.Millisecond
 	t.Cleanup(func() {
@@ -558,6 +565,9 @@ func TestFollowCountsALogItCannotReadAndReadsItAgain(t *testing.T) {
 // The rename of an open file is what logrotate does on Linux; like
 // TestFollowTailsAndRotates this runs on the server.
 func TestFollowReadsTheRotatedFileAfterTheSwitch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows cannot rename a log file while the tailer has it open")
+	}
 	old := pollInterval
 	pollInterval = 10 * time.Millisecond
 	t.Cleanup(func() { pollInterval = old })
