@@ -241,3 +241,49 @@ func TestApplicationAuthIPs(t *testing.T) {
 		t.Fatal("restriction off should allow any IP")
 	}
 }
+
+// The send-log screen's filter dropdown asks for the logins of a set of
+// domains on every poll of the page, so the answer is one statement's work
+// (review 2026-11-05, FT5 / L2). What the page depends on is the scope: only
+// the given domains' logins, ordered, an unknown id contributing nothing —
+// and an empty scope answering nothing, never everything, as the log's own
+// query does (sendLogWhere).
+func TestListApplicationLoginsByDomains(t *testing.T) {
+	st := openTestStore(t)
+	a := addTestDomain(t, st, "a.example")
+	b := addTestDomain(t, st, "b.example")
+	c := addTestDomain(t, st, "c.example")
+	for _, login := range []string{"zeta", "alpha", "mid"} {
+		if _, err := st.AddApplication(a.ID, login, AddressModeWildcard, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.AddApplication(b.ID, "beta", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddApplication(c.ID, "gamma", AddressModeWildcard, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := st.ListApplicationLoginsByDomains([]int64{a.ID, b.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 || got[0] != "alpha" || got[1] != "beta" || got[2] != "mid" || got[3] != "zeta" {
+		t.Fatalf("logins of a and b = %v, want [alpha beta mid zeta]", got)
+	}
+
+	if got, err := st.ListApplicationLoginsByDomains([]int64{c.ID}); err != nil || len(got) != 1 || got[0] != "gamma" {
+		t.Fatalf("logins of c = %v (%v), want [gamma]", got, err)
+	}
+
+	// A domain id that is not there contributes nothing, not an error.
+	if got, err := st.ListApplicationLoginsByDomains([]int64{a.ID, c.ID + 1000}); err != nil || len(got) != 3 {
+		t.Fatalf("with an unknown id = %v (%v), want a's three logins", got, err)
+	}
+
+	// No scope is no logins, not every login.
+	if got, err := st.ListApplicationLoginsByDomains(nil); err != nil || len(got) != 0 {
+		t.Fatalf("empty scope = %v (%v), want none", got, err)
+	}
+}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -355,21 +354,21 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		domainIDs = append(domainIDs, d.ID)
 	}
 
-	loginSet := make(map[string]bool)
-	for _, d := range assigned {
-		apps, err := h.store.ListApplicationsByDomain(d.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, a := range apps {
-			loginSet[a.Login] = true
-		}
+	// The dropdown needs the logins alone, and it is drawn on every poll of
+	// the page, on the one connection the journal-milter's per-message count
+	// also queues on: one statement, not one query per domain plus one per
+	// application, which is what ListApplicationsByDomain here cost
+	// (review 2026-11-05, FT5 / L2). A global administrator is offered every
+	// login; anyone else the logins of the domains assigned to them.
+	var logins []string
+	if p.IsGlobal() {
+		logins, err = h.store.ListApplicationLogins()
+	} else {
+		logins, err = h.store.ListApplicationLoginsByDomains(domainIDs)
 	}
-	logins := make([]string, 0, len(loginSet))
-	for login := range loginSet {
-		logins = append(logins, login)
+	if err != nil {
+		return nil, err
 	}
-	sort.Strings(logins)
 
 	filter := store.SendLogFilter{
 		Domain:   q.Get("domain"),
@@ -386,7 +385,13 @@ func (h *Handlers) outLogPage(r *http.Request) (*view.OutLog, error) {
 		if filter.Domain != "" && !allowedNames[filter.Domain] {
 			filter.Domain = ""
 		}
-		if filter.AppLogin != "" && !loginSet[filter.AppLogin] {
+		// The app filter is checked against the same logins the dropdown
+		// was built from - one query serves the dropdown and this check.
+		allowedLogins := make(map[string]bool, len(logins))
+		for _, l := range logins {
+			allowedLogins[l] = true
+		}
+		if filter.AppLogin != "" && !allowedLogins[filter.AppLogin] {
 			filter.AppLogin = ""
 		}
 	}

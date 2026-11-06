@@ -333,6 +333,23 @@ func TestSendLogIgnoresForgedFilters(t *testing.T) {
 	}
 }
 
+// The app filter's dropdown is one statement's work on every poll of the
+// page, and it offers exactly what the principal may see (review 2026-11-05,
+// FT5 / L2): a domain administrator is offered their own domains' logins
+// alone — the fragment redraws the region, so the dropdown is rebuilt by
+// every poll — and a global administrator every login there is.
+func TestOutLogAppFilterOffersOnlyTheAssignedLogins(t *testing.T) {
+	h, domains := serverWithTwoDomains(t)
+	p := domainAdmin(t, h.store, "app-filter", domains["first.example.ru"].ID)
+
+	out := getBodyAs(t, h.HandleDeliveries, "/outbound/log", p)
+	has(t, "domain admin", out, "first-app")
+	lacks(t, "domain admin", out, "second-app")
+
+	all := getBody(t, h.HandleDeliveries, "/outbound/log")
+	has(t, "global", all, "first-app", "second-app")
+}
+
 // The detail page has always checked membership; keep it checked, because the
 // list and the page are two ways to the same row.
 func TestDeliveryPageForeignDomainNotFound(t *testing.T) {

@@ -281,6 +281,42 @@ func (s *Store) ListApplicationLogins() ([]string, error) {
 	return out, rows.Err()
 }
 
+// ListApplicationLoginsByDomains returns the application logins of the given
+// domains, ordered, in one statement. The send-log screen's filter dropdown
+// asks for this on every poll of the page, on the single connection the
+// journal-milter's per-message count also queues on, so it is one statement —
+// not one query per domain plus one per application, which is what going
+// through ListApplicationsByDomain cost (review 2026-11-05, FT5 / L2). The
+// dropdown needs the logins alone; the address lists are the message page's.
+// An empty scope is not "no restriction": it answers nothing, as the log's
+// own query does (sendLogWhere).
+func (s *Store) ListApplicationLoginsByDomains(domainIDs []int64) ([]string, error) {
+	if len(domainIDs) == 0 {
+		return nil, nil
+	}
+	marks := make([]string, len(domainIDs))
+	args := make([]any, len(domainIDs))
+	for i, id := range domainIDs {
+		marks[i] = "?"
+		args[i] = id
+	}
+	rows, err := s.db.Query("SELECT login FROM applications WHERE domain_id IN ("+strings.Join(marks, ", ")+") ORDER BY login", args...)
+	if err != nil {
+		return nil, fmt.Errorf("list application logins by domain: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var login string
+		if err := rows.Scan(&login); err != nil {
+			return nil, err
+		}
+		out = append(out, login)
+	}
+	return out, rows.Err()
+}
+
 // ListLoginsByDomain returns the SASL logins of a domain's applications. Used to
 // purge sasldb2 entries before a domain (and its applications via cascade) is
 // deleted, while the logins are still known (product.md).

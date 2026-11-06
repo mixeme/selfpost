@@ -52,6 +52,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   publish a GitHub Release and wait for an image that never comes. § *CI* now
   points at § *Release image* for what starts a publish, and the diagram names
   the real trigger and version source.
+- **The Outbound log's app filter is one query, not one per domain and one per
+  application** (review 2026-11-05, FT5 / L2): the page is polled every five
+  seconds while open, and each poll asked `ListApplicationsByDomain` for every
+  domain the viewer reaches — which is two statements there, the second one
+  per application for the address rows the filter never uses — all on the
+  single connection the journal-milter's per-message count queues on. The
+  dropdown is now one statement: `ListApplicationLogins` for a global
+  administrator, and the new `ListApplicationLoginsByDomains` restricted to
+  the assigned domain ids for everyone else, its result doubling as the
+  forged-filter check. Tests pin the scope — a domain administrator's
+  dropdown holds their own logins alone, a global one every login — and the
+  store method's empty scope answers nothing, never everything.
 
 ### Documentation
 
