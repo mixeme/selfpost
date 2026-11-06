@@ -136,6 +136,12 @@ func (h *Handlers) HandleAccountProfile(w http.ResponseWriter, r *http.Request) 
 			fail(http.StatusUnauthorized, "Current password is incorrect.")
 			return
 		}
+		// The check this form shares with the backup's re-auth holds to the
+		// rule that one states for it (security.md § Backup and domain
+		// export): a right password gives its attempt back, so a user fixing
+		// their own address is not spending the ten that guard the backups
+		// (review 2026-11-05, L3).
+		h.auth.PasswordCheckPassed(u.ID)
 	}
 	if err := h.store.UpdateUser(u.ID, f.Username, u.PasswordHash, f.Email); err != nil {
 		if errors.Is(err, store.ErrUserExists) {
@@ -230,6 +236,10 @@ func (h *Handlers) HandleAccountPassword(w http.ResponseWriter, r *http.Request)
 		fail(http.StatusUnauthorized, "Current password is incorrect.")
 		return
 	}
+	// As the e-mail change above: a right current password is proof of the
+	// account's owner, not one of the ten attempts that guard the backups
+	// (review 2026-11-05, L3).
+	h.auth.PasswordCheckPassed(u.ID)
 	if password != confirm {
 		fail(http.StatusBadRequest, "New passwords do not match.")
 		return

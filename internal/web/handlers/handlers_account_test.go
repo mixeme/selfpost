@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -78,6 +79,62 @@ func TestAccountProfile(t *testing.T) {
 	rec = postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil, url.Values{"username": {"taken"}, "email": {"other@example.org"}, "current_password": {password}})
 	if u, _ = h.store.GetUser(globalPrincipal.ID); rec.Code != http.StatusConflict || u.Username != "operator" || u.Email != "mix@example.org" {
 		t.Errorf("a taken username = %d, profile now %q / %q", rec.Code, u.Username, u.Email)
+	}
+}
+
+// The Account forms share the backup's password-check limiter, and the rule
+// security.md states for that one - a right password gives its attempt back -
+// holds for them too (review 2026-11-05, L3). Nine wrong current passwords
+// charge the bucket; a right one does not; the tenth wrong is still answered
+// as a wrong password, not as a lockout. Without the refund, ten e-mail
+// changes a user makes themselves would lock them out of the next backup.
+func TestAccountFormsRefundARightCurrentPassword(t *testing.T) {
+	h, password := settingsServer(t)
+
+	// The profile form: an e-mail change asks for the current password.
+	profile := func(current, email string) *httptest.ResponseRecorder {
+		return postFormAs(h.HandleAccountProfile, globalPrincipal, "/account/profile", nil,
+			url.Values{"username": {"admin"}, "email": {email}, "current_password": {current}})
+	}
+	for i := 0; i < 9; i++ {
+		rec := profile("wrong-password-entirely", fmt.Sprintf("wrong%d@example.org", i))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("e-mail change %d with a wrong password = %d:\n%s", i, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := profile(password, "right@example.org"); rec.Code != http.StatusSeeOther {
+		t.Fatalf("e-mail change with the right password = %d:\n%s", rec.Code, rec.Body.String())
+	}
+	if rec := profile("wrong-password-entirely", "tenth@example.org"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("the tenth wrong current password = %d, want 401 - a right one must not use up the attempt:\n%s", rec.Code, rec.Body.String())
+	}
+
+	// The password form, on a user of its own (the bucket above is spent):
+	// the same shape, the same refund.
+	hash, err := bcrypt.GenerateFromPassword([]byte("the-own-password-1"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := h.store.CreateUser("ops", string(hash), store.RoleGlobal, store.Reach{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops := auth.Principal{ID: id, Username: "ops", Role: auth.RoleGlobal}
+	change := func(current, new string) *httptest.ResponseRecorder {
+		return postFormAs(h.HandleAccountPassword, ops, "/account/password", nil,
+			url.Values{"current_password": {current}, "new_password": {new}, "new_password_confirm": {new}})
+	}
+	for i := 0; i < 9; i++ {
+		rec := change("wrong-password-entirely", fmt.Sprintf("a-brand-new-password-%d", i))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("password change %d with a wrong current one = %d:\n%s", i, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := change("the-own-password-1", "a-fresh-password-1"); rec.Code != http.StatusSeeOther {
+		t.Fatalf("password change with the right current one = %d:\n%s", rec.Code, rec.Body.String())
+	}
+	if rec := change("wrong-password-entirely", "another-fresh-password-2"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("the tenth wrong current password = %d, want 401 - a right one must not use up the attempt:\n%s", rec.Code, rec.Body.String())
 	}
 }
 

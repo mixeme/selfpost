@@ -64,6 +64,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   forged-filter check. Tests pin the scope — a domain administrator's
   dropdown holds their own logins alone, a global one every login — and the
   store method's empty scope answers nothing, never everything.
+- **A right current password gives its attempt back on the Account forms
+  too** (review 2026-11-05, L3): the e-mail change and the password change
+  take one of the ten password-checker attempts a user has in fifteen minutes —
+  the bucket shared with the backup's re-auth, whose rule the document states
+  ("a right one gives its attempt back") — and until now never refunded it, so
+  ten address changes, mistyped confirmations included, locked the user out of
+  every backup download for the rest of the window. Both forms now refund as
+  `reauth` does, `security.md` says the rule holds for the Account form, and a
+  test charges the bucket with nine wrong passwords, makes one right change,
+  and asserts the tenth wrong is answered as a wrong password, not a lockout.
 
 ### Documentation
 

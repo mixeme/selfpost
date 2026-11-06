@@ -560,7 +560,10 @@ operator can act on it.
   so a stolen session cookie or a panel left open no longer hands over a
   copy of the server, and the field is no place to guess a password from.
   A wrong one is refused with 401 and logged; nothing is sent
-  (`internal/web/handlers`, `reauth`). *Encrypt with a password* is the
+  (`internal/web/handlers`, `reauth`). A right one gives its attempt back,
+  on the Account form as here (review 2026-11-05, L3): only wrong
+  passwords count, so a user's own ten e-mail changes do not lock them out
+  of the next backup. *Encrypt with a password* is the
   file's own protection, not this one: whoever downloads it chooses that
   password. The import and the `selfpost-backup` CLI, which runs inside the
   container, are not asked.
