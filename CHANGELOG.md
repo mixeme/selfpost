@@ -179,6 +179,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   own copy through `Open`, which checks the schema and application id, applies
   the connection PRAGMAs and restores the private file modes; the template's
   temporary directory is removed after the package finishes.
+- **Repeated tests read fixed RSA keys instead of generating them** (review
+  2026-11-05): public 2048-bit and 4104-bit fixtures under `testdata/` now serve
+  the handler stands, certificate and DKIM tests, the oversized-import check,
+  and the e2e upgrade and mismatched-certificate cases. These keys sign no real
+  mail; production DKIM keys and the throwaway e2e stand's TLS key are still
+  generated afresh, and every test keeps its original assertions.
 
 ### Documentation
 

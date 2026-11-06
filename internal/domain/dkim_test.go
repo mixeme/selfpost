@@ -1,17 +1,24 @@
 package domain
 
 import (
+	"crypto/rsa"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestWriteLoadPrivateKeyRoundtrip(t *testing.T) {
-	key, err := generateDKIMKey()
+func testRSAKey(t *testing.T, name string) *rsa.PrivateKey {
+	t.Helper()
+	key, err := loadPrivateKeyPEM(filepath.Join("..", "..", "testdata", name))
 	if err != nil {
-		t.Fatalf("generateDKIMKey: %v", err)
+		t.Fatalf("load fixed test key: %v", err)
 	}
+	return key
+}
+
+func TestWriteLoadPrivateKeyRoundtrip(t *testing.T) {
+	key := testRSAKey(t, "rsa-2048.pem")
 	path := filepath.Join(t.TempDir(), "selfpost.private")
 	if err := writePrivateKeyPEM(path, key); err != nil {
 		t.Fatalf("writePrivateKeyPEM: %v", err)
@@ -45,10 +52,7 @@ func TestLoadPrivateKeyRejectsGarbage(t *testing.T) {
 }
 
 func TestDKIMRecord(t *testing.T) {
-	key, err := generateDKIMKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := testRSAKey(t, "rsa-2048.pem")
 	rec, err := dkimRecord("selfpost", "example.com", &key.PublicKey)
 	if err != nil {
 		t.Fatalf("dkimRecord: %v", err)

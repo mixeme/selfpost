@@ -3,7 +3,6 @@ package milter
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -26,19 +25,32 @@ type signFixture struct {
 	record              string
 }
 
+func testRSAKey(t *testing.T) (*rsa.PrivateKey, []byte) {
+	t.Helper()
+	pemBytes, err := os.ReadFile(filepath.Join("..", "..", "testdata", "rsa-2048.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		t.Fatal("decode the fixed test RSA key")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key, pemBytes
+}
+
 func newSignFixture(t *testing.T) signFixture {
 	t.Helper()
 	dir := t.TempDir()
 	keysDir := filepath.Join(dir, "keys")
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key, pemBytes := testRSAKey(t)
 	keyPath := filepath.Join(keysDir, "example.org", "sel.private")
 	if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	if err := os.WriteFile(keyPath, pemBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}

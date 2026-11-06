@@ -148,14 +148,28 @@ func TestCheckSocket(t *testing.T) {
 	}
 }
 
+func testRSAKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "rsa-2048.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		t.Fatal("decode the fixed test RSA key")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
+
 // writeCert writes a self-signed certificate expiring after validFor (negative
 // for an already-expired one).
 func writeCert(t *testing.T, path, cn string, validFor time.Duration) {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := testRSAKey(t)
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: cn},
@@ -331,10 +345,7 @@ func TestCertificateForHost(t *testing.T) {
 	}
 
 	san := filepath.Join(dir, "san.pem")
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := testRSAKey(t)
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "mail.example.org"},
 		DNSNames: []string{"*.example.net", "relay.example.org"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(90 * 24 * time.Hour)}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)

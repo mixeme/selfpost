@@ -1,12 +1,10 @@
 package domain
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -206,11 +204,10 @@ func TestImportRollsBackOnAppFailure(t *testing.T) {
 // W4): every signature of the domain would cost seconds. One under 1024 is
 // refused by the parser already.
 func TestImportKeyRefusesAnOversizedKey(t *testing.T) {
-	key, err := rsa.GenerateKey(rand.Reader, 4104)
+	pemKey, err := os.ReadFile(filepath.Join("..", "..", "testdata", "rsa-4104.pem"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pemKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	err = NewKeys(t.TempDir()).ImportKey("example.com", "sel", pemKey)
 	if err == nil || !strings.Contains(err.Error(), "a 4104-bit key; SelfPost signs with keys of 1024 to 4096 bits") {
 		t.Errorf("a 4104-bit key: %v", err)

@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -118,7 +117,7 @@ func servedNotAfter() (time.Time, error) {
 // writeCertWithoutItsKey writes a certificate for a key that is thrown away,
 // leaving the mounted key as it was.
 func writeCertWithoutItsKey(certPath string, notAfter time.Time) error {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := testRSAKey()
 	if err != nil {
 		return err
 	}

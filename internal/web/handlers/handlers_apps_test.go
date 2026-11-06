@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -38,6 +39,17 @@ func newAppStand(t *testing.T) appStand {
 	return newAppStandAt(t, filepath.Join(t.TempDir(), "test.db"))
 }
 
+func importTestKey(t *testing.T, keys *domain.Keys, domainName, selector string) {
+	t.Helper()
+	pemKey, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "rsa-2048.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := keys.ImportKey(domainName, selector, pemKey); err != nil {
+		t.Fatalf("import fixed test key: %v", err)
+	}
+}
+
 // newAppStandAt is newAppStand over a database at a path the test knows.
 func newAppStandAt(t *testing.T, dbPath string) appStand {
 	t.Helper()
@@ -59,9 +71,7 @@ func newAppStandAt(t *testing.T, dbPath string) appStand {
 	// state: a real key in a temporary directory, and a resolver nobody
 	// listens on, so every check answers at once without leaving the machine.
 	keys := domain.NewKeys(t.TempDir())
-	if _, err := keys.EnsureKey("example.org", "mail"); err != nil {
-		t.Fatalf("EnsureKey: %v", err)
-	}
+	importTestKey(t, keys, "example.org", "mail")
 	h.domains = domain.NewService(h.store, keys, h.apps, "mail")
 	h.dns = offlineDNS
 	h.cfg.RateLimitMessagesPerIP, h.cfg.RateLimitWindowSeconds = 600, 3600

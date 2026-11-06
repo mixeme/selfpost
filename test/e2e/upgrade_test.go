@@ -2,10 +2,6 @@ package e2e
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,11 +22,10 @@ func upgradeData(t *testing.T, host string, only27 bool) (string, []byte) {
 	if err := os.Chmod(dataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	pemKey, err := os.ReadFile(filepath.Join("..", "..", "testdata", "rsa-2048.pem"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	pemKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	write := func(rel string, data []byte) {
 		p := filepath.Join(dataDir, rel)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

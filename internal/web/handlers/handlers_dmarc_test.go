@@ -84,9 +84,7 @@ func contains(list []string, want string) bool {
 func TestNewDomainHasNoReports(t *testing.T) {
 	s, _ := hostedStand(t)
 	keys := domain.NewKeys(t.TempDir())
-	if _, err := keys.EnsureKey("example.org", "mail"); err != nil {
-		t.Fatal(err)
-	}
+	importTestKey(t, keys, "example.org", "mail")
 	s.h.domains = domain.NewService(s.h.store, keys, s.h.apps, "mail")
 	rec := postFormAs(s.h.HandleAddDomain, globalPrincipal, "/outbound/domains", nil, url.Values{"name": {"new.example"}})
 	if rec.Code != http.StatusSeeOther {
