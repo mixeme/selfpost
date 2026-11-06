@@ -188,6 +188,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   lets reset links accumulate so a stranger's request cannot revoke the user's.
   The schema now says so, with the five-a-day request limit, thirty-minute
   expiry and removal when a reset link is taken.
+- **The panel's role count includes the update check** (review 2026-11-05,
+  L5): the architecture's list has eight entries, nine with the inbound relay;
+  its introduction still said seven and eight. The count now matches the list.
 
 ## [2.16.13] - 2026-10-28
 

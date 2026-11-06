@@ -345,7 +345,7 @@ then OpenDKIM did, in a program of its own (CHANGELOG `[2.8.0]`).
 
 ### Panel binary ([cmd/panel](../cmd/panel))
 
-One process, seven roles (eight with the inbound relay on: its inbound journal
+One process, eight roles (nine with the inbound relay on: its inbound journal
 milter, § Postfix above, port 25):
 
 1. **HTTP server** — `:8080` (`PANEL_HTTP_ADDR`); HTTPS terminated by reverse
