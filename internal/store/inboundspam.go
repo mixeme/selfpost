@@ -522,6 +522,22 @@ func (s *Store) DeleteSpamListEntry(id int64) error {
 	return nil
 }
 
+// RestoreSpamListEntry puts back an entry exactly as it was — its id and its
+// "added" stamp included. It is the undo of a delete whose map rewrite failed:
+// an entry re-added through AddSpamListEntry would come back under a new id
+// and a new stamp, the page would show it as another one, and the operator's
+// next delete would aim at an id that is no longer there (review 2026-11-05,
+// FT8).
+func (s *Store) RestoreSpamListEntry(e SpamListEntry) error {
+	_, err := s.db.Exec(
+		"INSERT INTO inbound_spam_list (id, list_type, entry_type, value, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		e.ID, e.List, e.Kind, e.Value, e.Note, e.CreatedAt.UTC().Format(time.RFC3339))
+	if err != nil {
+		return fmt.Errorf("restore inbound_spam_list: %w", err)
+	}
+	return nil
+}
+
 // SpamListHit is what the journal holds about one message a filter list
 // decided: who it was from, which server offered it, when, and the detail that
 // says which list it was.

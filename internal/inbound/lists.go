@@ -24,6 +24,7 @@ type ListStore interface {
 	AddSpamListEntry(list, kind, value, note string) (store.SpamListEntry, error)
 	ListSpamListEntries() ([]store.SpamListEntry, error)
 	DeleteSpamListEntry(id int64) error
+	RestoreSpamListEntry(store.SpamListEntry) error
 	ListSpamListHits(marks ...string) ([]store.SpamListHit, error)
 }
 
@@ -129,9 +130,17 @@ func (l *Lists) Delete(id int64) error {
 		return err
 	}
 	if err := l.sync(); err != nil {
+		// The entry goes back exactly as it was, not under a new id: re-added
+		// through AddSpamListEntry it used to come back with a new id and a
+		// new "added" stamp — the page showed it as another one, and the
+		// operator's next delete aimed at an id that no longer existed
+		// (review 2026-11-05, FT8). The files are written again after the row
+		// is back, since some of the six may already be missing it; if that
+		// fails too, the next change or start puts it right.
 		if gone != nil {
-			_, _ = l.store.AddSpamListEntry(gone.List, gone.Kind, gone.Value, gone.Note)
+			_ = l.store.RestoreSpamListEntry(*gone)
 		}
+		_ = l.sync()
 		return err
 	}
 	return nil

@@ -114,6 +114,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   and the reason for it lived in the comment above rather than at the line. The
   choice is an `if` in Go now: a confirmation link replaces the user's earlier
   one, a reset link does not, each in its own sentence of SQL.
+- **A failed map rewrite after a delete puts the entry back as it was**
+  (review 2026-11-05, FT8): the filter lists' `Delete` re-added the row
+  through the same insert an add uses, so it came back under a new id with a
+  new "added" stamp — the page showed it as another one, and the operator's
+  next delete aimed at an id that no longer existed. The new
+  `store.RestoreSpamListEntry` puts it back whole, id and stamp included, and
+  a test holds the shape: a delete whose maps cannot be written fails, the
+  entry is the one that was added, and its id still deletes once the maps
+  can be written.
+
 ### Documentation
 
 - **The three reviews of `2.16.13` are one plan** (triaged by the owner,

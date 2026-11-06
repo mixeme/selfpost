@@ -92,6 +92,48 @@ func TestNormalizeListValue(t *testing.T) {
 	}
 }
 
+// A delete whose map rewrite fails leaves the entry as it was — the same id,
+// the same "added" stamp (review 2026-11-05, FT8). Re-added under a new id it
+// used to show on the page as another one, and the operator's next delete
+// aimed at an id that was no longer there.
+func TestDeleteKeepsTheEntryWhenTheMapsCannotBeWritten(t *testing.T) {
+	l, st, _ := testLists(t)
+	added, err := l.Add(store.SpamListDeny, store.SpamEntryAddress, "spam@evil.example", "why")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A file where the map directory would be: the rewrite cannot even create
+	// the directory, so the delete's sync fails after the row is gone.
+	blocked := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocked, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	blockedLists := NewLists(st, blocked)
+	if err := blockedLists.Delete(added.ID); err == nil {
+		t.Fatal("a delete whose maps cannot be written succeeded")
+	}
+
+	entries, err := l.Entries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].ID != added.ID || entries[0].Value != "spam@evil.example" || entries[0].Note != "why" {
+		t.Fatalf("after the failed delete the entry is not the one that was added: %+v", entries)
+	}
+	if !entries[0].CreatedAt.Equal(added.CreatedAt) {
+		t.Fatalf("the entry came back with a new stamp: %v, want %v", entries[0].CreatedAt, added.CreatedAt)
+	}
+
+	// The id the page shows still works, once the maps can be written.
+	if err := l.Delete(added.ID); err != nil {
+		t.Fatalf("deleting the restored entry by its id: %v", err)
+	}
+	if entries, _ := l.Entries(); len(entries) != 0 {
+		t.Fatalf("the entry survived a delete that worked: %+v", entries)
+	}
+}
+
 func TestListsAddWritesTheMaps(t *testing.T) {
 	l, _, dir := testLists(t)
 	for _, e := range []struct{ list, kind, value string }{
