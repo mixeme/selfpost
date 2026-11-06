@@ -49,6 +49,7 @@ func TestOriginCheck(t *testing.T) {
 		{"none, a navigation with no initiator", post("none", ""), true},
 		{"Sec-Fetch-Site outranks a matching Origin", post("cross-site", "https://panel.example.com"), true},
 		{"Origin host matches", post("", "https://panel.example.com"), false},
+		{"Origin host's case differs", post("", "https://PANEL.EXAMPLE.COM"), false},
 		{"Origin host differs", post("", "https://evil.example.net"), true},
 		{"Origin differs from a neighbour only in host", post("", "https://cms.example.com"), true},
 		{"opaque null Origin", post("", "null"), true},

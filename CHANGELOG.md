@@ -141,6 +141,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   modules. `Module.Stop` ends them (the panel's `Drain` calls it; the test
   helper registers it), `Server.Drain` closes the module's life, and a test
   holds that a stopped sweeper sweeps no more.
+- **The Origin check compares host names without regard to case** (review
+  2026-11-05, N1): DNS host names are case-insensitive, but the fallback check
+  compared the browser's Origin and the request's Host byte for byte, refusing
+  a legitimate form when only the host's capitalisation differed. The host and
+  port still compare together, so a different port remains a different origin;
+  a test covers the case-only match.
 
 ### Documentation
 

@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/mixeme/selfpost/internal/web/auth"
 )
@@ -168,5 +169,5 @@ func originAllowed(r *http.Request) bool {
 		// does not set: D-B3 of the same register.)
 		return false
 	}
-	return u.Host == r.Host
+	return strings.EqualFold(u.Host, r.Host)
 }
