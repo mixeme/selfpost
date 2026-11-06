@@ -30,7 +30,7 @@ directory).
 |---|---|---|---|---|
 | security-audit-2026-10-17 | Stage H of the 2026-10-17 security audit: the test server's host (S1, S2, S5) and its DNS (S3) | stages 0-6 shipped `2.14.4`, the product side of S3 `2.15.0`; stage H the owner's | 27/29 | [security-audit-2026-10-17.md](security-audit-2026-10-17.md) § Stage H |
 | go-milter-upstream | An issue and a PR for go-milter: its header map outlives a message and is unbounded | prepared 2026-10-16, the owner posts | — | [third_party/go-milter/PATCHES.md](../third_party/go-milter/PATCHES.md) |
-| audit-2026-11-05 | Full-tree code audit of `2.16.13`: FT1 (external commands with no deadline in the Health and probe paths), FT2 (the compose build's context), four lows, four nits | findings open — the owner triages | — | [audit-2026-11-05.md](audit-2026-11-05.md) |
+| audit-2026-11-05 | The three reviews of `2.16.13` — the full-tree audit, the second code review and the external security audit — consolidated into one triage: 4 mediums, 8 lows, 8 nits, the test suite's cost | agreed — triaged 2026-11-06, plan written | 0/29 | [plans/audit-2026-11-05.md](plans/audit-2026-11-05.md) |
 
 After a context reset, pick an item marked `agreed` or `in progress`, then work
 the **Implementation checklist** in its linked plan. The `Progress` column above
@@ -118,10 +118,20 @@ then cannot hash; **M2**, the release procedure written twice in
 [development.md](development.md), the copies contradicting each other and
 `release.yml`), five lows and four nits. The two lists overlap at one finding
 (its L2 is FT5 here); § *The other review of the same date* in the audit file
-reconciles them, and a triage should take both.
+reconciles them. The external security audit of the same date
+([security-audit-2026-11-05.md](security-audit-2026-11-05.md)) added nothing
+above low: its one note (**E1**, the absent absolute session cap not recorded
+under Accepted risks) was the owner's to place or decline.
 
-No plan file yet: the owner triages first, and an item that is agreed gets its
-**Implementation checklist** here.
+**Triaged 2026-11-06** — all three folded into one plan,
+[plans/audit-2026-11-05.md](plans/audit-2026-11-05.md): the four mediums and
+the panel-edge lows first, the nits all taken (FT7, FT8, FT10 included), E1
+placed under Accepted risks, the test suite's five speedups in their measured
+order, and no refactoring — the audit's § *Refactoring and optimisation*
+declines it, and the `SetMaxOpenConns(1)` revisit trigger stands as written.
+The offered second line-by-line reads (milter internals, the view layer) were
+declined. The plan's checklist is the list to work from; the three reports
+stay as the record of what was read and what held up.
 
 ---
 

@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Documentation
+
+- **The three reviews of `2.16.13` are one plan** (triaged by the owner,
+  2026-11-06): the full-tree audit, the second code review and the external
+  security audit of 2026-11-05
+  ([docs/audit-2026-11-05.md](docs/audit-2026-11-05.md),
+  [docs/code-review-2026-11-05.md](docs/code-review-2026-11-05.md),
+  [docs/security-audit-2026-11-05.md](docs/security-audit-2026-11-05.md)) are
+  consolidated into one triage and a 29-step checklist,
+  [docs/plans/audit-2026-11-05.md](docs/plans/audit-2026-11-05.md): the four
+  mediums first (the password ceiling with its own message on every form that
+  asks for one, the deadlines on the five external commands that have none,
+  the compose build's context, the release procedure written once), then the
+  panel's edges, the nits (FT7, FT8 and FT10 taken rather than declined), the
+  documents (the session-cap note placed under Accepted risks), and the test
+  suite's five speedups in their measured order. No refactoring; the
+  one-connection decision keeps its written revisit trigger.
+
 ## [2.16.13] - 2026-10-28
 
 No migration; schema 14; the compose files changed only in the pin.
