@@ -496,18 +496,6 @@ func resultsInLog(path string, rows []store.QueuedDelivery) []bool {
 	return out
 }
 
-// resultInLog says whether the current log or the one rotated last holds a
-// final result for row - a delivery line that says sent or bounced, or the
-// message's expiry line. A deferred line is not one: a deferred row has one
-// by definition. Rows reach the sweep minutes after they were written, so
-// the end of those two files is where such a line would be.
-// logrotate 3.22.0, logrotate.c, prerotateSingleLog(): the first rotated
-// name is "<log>.1", without the compression suffix under delaycompress
-// (build/logrotate-mail.conf).
-func resultInLog(path string, row store.QueuedDelivery) bool {
-	return resultsInLog(path, []store.QueuedDelivery{row})[0]
-}
-
 // retentionLoop prunes expired send-log rows immediately and then periodically,
 // and after each sweep the stored log lines no row carries the queue id of:
 // those the deleted rows leave behind, and those that never had a row

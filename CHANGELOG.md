@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Changed
+
+- **Removed the unused single-row `resultInLog` wrapper.** Reconciliation uses
+  the batched `resultsInLog` lookup directly, so staticcheck is clean again.
+
 ## [2.16.15] - 2026-11-07
 
 No migration; schema 14.
