@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **Polling now starts for a monitoring block first inserted by another HTMX
+  request.** The `htmx:load` handler schedules both the inserted element and
+  its polled descendants; previously only blocks present at page load, or
+  refreshed by their own request, were guaranteed a timer.
+
 ## [2.16.16] - 2026-11-08
 
 No migration; schema 14.

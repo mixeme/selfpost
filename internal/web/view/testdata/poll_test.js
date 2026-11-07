@@ -35,13 +35,17 @@ function advance(ms) {
 const FakeDate = { now: () => now };
 
 // --- the page ---------------------------------------------------------------
-function element(id, attrs) {
+function element(id, attrs, children) {
   return {
     id,
     attrs: Object.assign({}, attrs),
+    children: children || [],
     hasAttribute(n) { return n in this.attrs; },
     getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; },
     removeAttribute(n) { delete this.attrs[n]; },
+    querySelectorAll(sel) {
+      return sel === "[data-poll]" ? this.children.filter((e) => e.hasAttribute("data-poll")) : [];
+    },
   };
 }
 const listeners = { document: {}, body: {}, window: {} };
@@ -72,6 +76,9 @@ function activity() {
 }
 function fireBody(type, detail) {
   (listeners.body[type] || []).forEach((fn) => fn({ type, detail, target: detail.elt }));
+}
+function fireDocument(type, detail) {
+  (listeners.document[type] || []).forEach((fn) => fn({ type, detail, target: detail.elt }));
 }
 
 // The page as it loads: one polled box, already holding a fresh reading.
@@ -145,6 +152,23 @@ timers = [];
 inPage.other = element("other", {});
 fireBody("htmx:afterRequest", { target: inPage.other, elt: inPage.other, successful: true });
 check(timers.length === 0, "a request of a box that does not poll scheduled a refresh");
+
+// A polled box first inserted by another HTMX request gets its own schedule,
+// whether it is the inserted root or a descendant of it.
+timers = [];
+activity();
+const inserted = element("inserted-poll", { "data-poll": "", "hx-get": "/inserted" });
+inPage[inserted.id] = inserted;
+fireDocument("htmx:load", { elt: inserted });
+check(pendingDelays().join() === "5000", "an inserted polled root: waits " + pendingDelays() + ", want 5000");
+
+timers = [];
+const nested = element("nested-poll", { "data-poll": "", "hx-get": "/nested" });
+inPage[nested.id] = nested;
+fireDocument("htmx:load", { elt: element("inserted-parent", {}, [nested]) });
+check(pendingDelays().join() === "5000", "an inserted polled descendant: waits " + pendingDelays() + ", want 5000");
+advance(5000);
+check(requests[requests.length - 1].ctx.source === nested, "the inserted descendant's refresh is not its own");
 
 if (failures.length) {
   console.log(failures.join("\n"));

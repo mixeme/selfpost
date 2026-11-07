@@ -299,11 +299,16 @@
 
   // htmx:load fires for each top-level element htmx puts into the page, so
   // swapped-in markup starts with its blocks shown or hidden the way a full
-  // page does. htmx 2.0.4, src/htmx.js insertNodesBefore() queues
-  // makeAjaxLoadTask(child) for each element of the swapped content, which
-  // triggers htmx:load on it (detail.elt); initShowWhen looks inside it.
+  // page does. A polled block first introduced by another request also starts
+  // here: afterRequest belongs to that other request's target and cannot be
+  // relied on to discover it. htmx 2.0.4, src/htmx.js insertNodesBefore()
+  // queues makeAjaxLoadTask(child) for each element of the swapped content,
+  // which triggers htmx:load on it (detail.elt).
   document.addEventListener("htmx:load", function (ev) {
-    initShowWhen(ev.detail.elt);
+    var inserted = ev.detail.elt;
+    initShowWhen(inserted);
+    schedulePoll(inserted);
+    inserted.querySelectorAll("[data-poll]").forEach(schedulePoll);
   });
 
   // --- Adaptive monitoring polling ---------------------------------------
