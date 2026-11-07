@@ -57,31 +57,9 @@ type follower struct {
 }
 
 func (f *follower) run(ctx context.Context) error {
-	openAt := func(offset int64, whence int) error {
-		nf, err := os.Open(f.path)
-		if err != nil {
-			return err
-		}
-		if _, err := nf.Seek(offset, whence); err != nil {
-			nf.Close()
-			return err
-		}
-		ni, err := nf.Stat()
-		if err != nil {
-			nf.Close()
-			return err
-		}
-		if f.f != nil {
-			f.f.Close()
-		}
-		f.f, f.r, f.info, f.pending = nf, bufio.NewReader(nf), ni, ""
-		f.consumed = offset
-		return nil
-	}
-
 	// The container may start before Postfix has created mail.log; wait for it.
 	for {
-		if err := openAt(0, io.SeekStart); err == nil {
+		if err := f.openAt(0, io.SeekStart); err == nil {
 			break
 		}
 		select {
@@ -106,63 +84,6 @@ func (f *follower) run(ctx context.Context) error {
 			f.f.Close()
 		}
 	}()
-
-	drain := func() {
-		defer f.flush()
-		for {
-			line, err := f.r.ReadString('\n')
-			f.consumed += int64(len(line))
-			if err == io.EOF {
-				f.pending += line // hold the partial line until it completes
-				return
-			}
-			if err != nil {
-				log.Printf("log-tailer: read %s: %v", f.path, err)
-				return
-			}
-			full := f.pending + line
-			f.pending = ""
-			f.tr.line = Place{FP: f.tr.fp, End: f.consumed}
-			f.tr.lineStart = f.consumed - int64(len(full))
-			f.handle(strings.TrimRight(full, "\r\n"))
-		}
-	}
-
-	// read returns how many bytes of the open file have actually been consumed:
-	// the descriptor position less the partial line bufio handed back at EOF,
-	// which is re-read (and completed) on the next drain or the next start.
-	read := func() int64 {
-		pos, _ := f.f.Seek(0, io.SeekCurrent)
-		return pos - int64(len(f.pending))
-	}
-
-	// drainOld reads what was written to the rotated file since the switch.
-	// Its lines take places in that file, which the tracker never saves as
-	// the place to resume from: on a restart the rotated file is read from
-	// the saved place in the new one onward only (readRotated).
-	drainOld := func(now time.Time) {
-		if f.old == nil {
-			return
-		}
-		defer f.flush()
-		for {
-			line, err := f.old.r.ReadString('\n')
-			f.old.consumed += int64(len(line))
-			if err != nil {
-				f.old.pending += line
-				break
-			}
-			full := f.old.pending + line
-			f.old.pending = ""
-			f.tr.line = Place{FP: f.old.fp, End: f.old.consumed}
-			f.tr.lineStart = f.old.consumed - int64(len(full))
-			f.handle(strings.TrimRight(full, "\r\n"))
-		}
-		if now.After(f.old.until) {
-			f.old.f.Close()
-			f.old = nil
-		}
-	}
 	defer func() {
 		if f.old != nil {
 			f.old.f.Close()
@@ -176,62 +97,149 @@ func (f *follower) run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			f.blind.see(time.Now(), false)
-			// What postlogd wrote to the rotated file since the last tick:
-			// the next start resumes in the new file only (review of stage
-			// 2c, F8).
-			drainOld(time.Now())
-			f.tr.record(f.f, read(), true) // shutdown: the next start resumes here
+			f.shutdown()
 			return nil
 		case <-ticker.C:
-			drainOld(time.Now())
-			drain()
-			f.once.Do(func() { close(f.caughtUp) })
-			ni, err := os.Stat(f.path)
-			if err != nil {
-				f.blind.see(time.Now(), true)
-				continue // file briefly gone mid-rotation; try again next tick
-			}
-			pos, _ := f.f.Seek(0, io.SeekCurrent)
-			if !os.SameFile(f.info, ni) || ni.Size() < pos {
-				// Rotated away or truncated: the old (renamed) inode may have
-				// gained lines between the drain() above and this check, since
-				// Postfix keeps writing to it until it reloads. Drain it once
-				// more before switching, and - renamed, not truncated - go on
-				// reading it for rotatedGrace after the switch, for what
-				// postlogd writes there until the reload (assumptions A-33).
-				drain()
-				renamed := !os.SameFile(f.info, ni)
-				if f.old != nil {
-					drainOld(time.Time{}) // a second rotation within the grace
-					if f.old != nil {
-						f.old.f.Close()
-						f.old = nil
-					}
-				}
-				prev := &rotatedTail{f: f.f, r: f.r, pending: f.pending, consumed: f.consumed, fp: f.tr.fp, until: time.Now().Add(rotatedGrace)}
-				if renamed {
-					f.f = nil // openAt closes the file it replaces; this one is kept
-				}
-				if err := openAt(0, io.SeekStart); err != nil {
-					if renamed {
-						f.f, f.r = prev.f, prev.r
-					}
-					log.Printf("log-tailer: reopen %s: %v", f.path, err)
-					f.blind.see(time.Now(), true)
-					continue
-				}
-				if renamed {
-					f.old = prev
-				}
-				f.blind.see(time.Now(), false)
-				f.tr.adopt(f.f)
-				continue
-			}
-			f.blind.see(time.Now(), false)
-			f.tr.record(f.f, read(), false)
+			f.tick()
 		}
 	}
+}
+
+func (f *follower) openAt(offset int64, whence int) error {
+	nf, err := os.Open(f.path)
+	if err != nil {
+		return err
+	}
+	if _, err := nf.Seek(offset, whence); err != nil {
+		nf.Close()
+		return err
+	}
+	ni, err := nf.Stat()
+	if err != nil {
+		nf.Close()
+		return err
+	}
+	if f.f != nil {
+		f.f.Close()
+	}
+	f.f, f.r, f.info, f.pending = nf, bufio.NewReader(nf), ni, ""
+	f.consumed = offset
+	return nil
+}
+
+func (f *follower) drainCurrent() {
+	defer f.flush()
+	for {
+		line, err := f.r.ReadString('\n')
+		f.consumed += int64(len(line))
+		if err == io.EOF {
+			f.pending += line // hold the partial line until it completes
+			return
+		}
+		if err != nil {
+			log.Printf("log-tailer: read %s: %v", f.path, err)
+			return
+		}
+		full := f.pending + line
+		f.pending = ""
+		f.tr.line = Place{FP: f.tr.fp, End: f.consumed}
+		f.tr.lineStart = f.consumed - int64(len(full))
+		f.handle(strings.TrimRight(full, "\r\n"))
+	}
+}
+
+// readOffset returns how many bytes of the open file have actually been consumed:
+// the descriptor position less the partial line bufio handed back at EOF,
+// which is re-read (and completed) on the next drain or the next start.
+func (f *follower) readOffset() int64 {
+	pos, _ := f.f.Seek(0, io.SeekCurrent)
+	return pos - int64(len(f.pending))
+}
+
+// drainRotated reads what was written to the rotated file since the switch.
+// Its lines take places in that file, which the tracker never saves as
+// the place to resume from: on a restart the rotated file is read from
+// the saved place in the new one onward only (readRotated).
+func (f *follower) drainRotated(now time.Time) {
+	if f.old == nil {
+		return
+	}
+	defer f.flush()
+	for {
+		line, err := f.old.r.ReadString('\n')
+		f.old.consumed += int64(len(line))
+		if err != nil {
+			f.old.pending += line
+			break
+		}
+		full := f.old.pending + line
+		f.old.pending = ""
+		f.tr.line = Place{FP: f.old.fp, End: f.old.consumed}
+		f.tr.lineStart = f.old.consumed - int64(len(full))
+		f.handle(strings.TrimRight(full, "\r\n"))
+	}
+	if now.After(f.old.until) {
+		f.old.f.Close()
+		f.old = nil
+	}
+}
+
+func (f *follower) tick() {
+	f.drainRotated(time.Now())
+	f.drainCurrent()
+	f.once.Do(func() { close(f.caughtUp) })
+	ni, err := os.Stat(f.path)
+	if err != nil {
+		f.blind.see(time.Now(), true)
+		return // file briefly gone mid-rotation; try again next tick
+	}
+	pos, _ := f.f.Seek(0, io.SeekCurrent)
+	if !os.SameFile(f.info, ni) || ni.Size() < pos {
+		// Rotated away or truncated: the old (renamed) inode may have
+		// gained lines between the drainCurrent() above and this check, since
+		// Postfix keeps writing to it until it reloads. Drain it once
+		// more before switching, and - renamed, not truncated - go on
+		// reading it for rotatedGrace after the switch, for what
+		// postlogd writes there until the reload (assumptions A-33).
+		f.drainCurrent()
+		renamed := !os.SameFile(f.info, ni)
+		if f.old != nil {
+			f.drainRotated(time.Time{}) // a second rotation within the grace
+			if f.old != nil {
+				f.old.f.Close()
+				f.old = nil
+			}
+		}
+		prev := &rotatedTail{f: f.f, r: f.r, pending: f.pending, consumed: f.consumed, fp: f.tr.fp, until: time.Now().Add(rotatedGrace)}
+		if renamed {
+			f.f = nil // openAt closes the file it replaces; this one is kept
+		}
+		if err := f.openAt(0, io.SeekStart); err != nil {
+			if renamed {
+				f.f, f.r = prev.f, prev.r
+			}
+			log.Printf("log-tailer: reopen %s: %v", f.path, err)
+			f.blind.see(time.Now(), true)
+			return
+		}
+		if renamed {
+			f.old = prev
+		}
+		f.blind.see(time.Now(), false)
+		f.tr.adopt(f.f)
+		return
+	}
+	f.blind.see(time.Now(), false)
+	f.tr.record(f.f, f.readOffset(), false)
+}
+
+func (f *follower) shutdown() {
+	f.blind.see(time.Now(), false)
+	// What postlogd wrote to the rotated file since the last tick:
+	// the next start resumes in the new file only (review of stage
+	// 2c, F8).
+	f.drainRotated(time.Now())
+	f.tr.record(f.f, f.readOffset(), true) // shutdown: the next start resumes here
 }
 
 // rotatedTail is mail.log just rotated away, still open: postlogd writes to
