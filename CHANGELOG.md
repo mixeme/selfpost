@@ -5,10 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.16] - 2026-11-08
+
+No migration; schema 14.
+
 ### Changed
 
 - **Removed the unused single-row `resultInLog` wrapper.** Reconciliation uses
   the batched `resultsInLog` lookup directly, so staticcheck is clean again.
+
+### Fixed
+
+- **`Run` now stops and waits for its retention, inbound-retention and
+  reconciliation loops before returning.** Clean shutdown no longer leaves
+  background work running beyond the caller's log-tailer lifecycle.
 
 ## [2.16.15] - 2026-11-07
 
