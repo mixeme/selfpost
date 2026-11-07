@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.17] - 2026-11-08
+
+No migration; schema 14.
+
 ### Fixed
 
 - **Polling now starts for a monitoring block first inserted by another HTMX
