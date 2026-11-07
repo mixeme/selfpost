@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **The retention-loop tests no longer race their probes or restore the shared
+  test interval before the loop exits.** The inbound fake guards its prune
+  history, and the send-log test waits for its goroutine during cleanup.
+
 ### Documentation
 
 - **IP warmup now distinguishes authentication, server acceptance and inbox

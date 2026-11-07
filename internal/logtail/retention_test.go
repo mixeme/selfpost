@@ -79,8 +79,15 @@ func TestRetentionLoopUsesUpdatedValue(t *testing.T) {
 
 	st := &retentionProbeStore{}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go retentionLoop(ctx, st, func() int { return int(days.Load()) })
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		retentionLoop(ctx, st, func() int { return int(days.Load()) })
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {

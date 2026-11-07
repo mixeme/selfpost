@@ -75,8 +75,16 @@ func (f *fakeInboundStore) IsInboundDomain(name string) (bool, error) {
 }
 
 func (f *fakeInboundStore) PruneInboundSpam(_ time.Time, keep int) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.pruned = append(f.pruned, keep)
 	return 0, nil
+}
+
+func (f *fakeInboundStore) pruneCalls() []int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int(nil), f.pruned...)
 }
 
 func inboundFixture() (*inboundJournal, *fakeInboundStore) {
@@ -406,13 +414,14 @@ func TestInboundRetentionPrunesAtStart(t *testing.T) {
 		close(done)
 	}()
 	deadline := time.Now().Add(2 * time.Second)
-	for len(st.pruned) == 0 && time.Now().Before(deadline) {
+	for len(st.pruneCalls()) == 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	cancel()
 	<-done
-	if len(st.pruned) != 1 || st.pruned[0] != inboundSpamLogMaxRows {
-		t.Errorf("prune calls = %v", st.pruned)
+	pruned := st.pruneCalls()
+	if len(pruned) != 1 || pruned[0] != inboundSpamLogMaxRows {
+		t.Errorf("prune calls = %v", pruned)
 	}
 }
 
