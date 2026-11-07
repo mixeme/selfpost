@@ -29,19 +29,36 @@ import (
 // position is saved: a handler that gathers lines to write them together
 // writes them there, so the saved position is never ahead of what was written.
 func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{}, flush func(), handle func(string)) error {
-	var (
-		f       *os.File
-		r       *bufio.Reader
-		info    os.FileInfo
-		pending string
-		// consumed is the offset just past what the reader has handed over,
-		// pending included: where a complete line ends.
-		consumed int64
-		// old is the file rotated away, still read for rotatedGrace.
-		old *rotatedTail
-	)
+	f := &follower{path: path, tr: tr, caughtUp: caughtUp, flush: flush, handle: handle}
+	return f.run(ctx)
+}
+
+// follower owns the mutable state of one follow loop. It is used by that loop
+// alone, so neither it nor the tracker needs locking.
+type follower struct {
+	path     string
+	tr       *tracker
+	caughtUp chan struct{}
+	flush    func()
+	handle   func(string)
+
+	f       *os.File
+	r       *bufio.Reader
+	info    os.FileInfo
+	pending string
+	// consumed is the offset just past what the reader has handed over,
+	// pending included: where a complete line ends.
+	consumed int64
+	// old is the file rotated away, still read for rotatedGrace.
+	old *rotatedTail
+
+	once  sync.Once
+	blind *blindness
+}
+
+func (f *follower) run(ctx context.Context) error {
 	openAt := func(offset int64, whence int) error {
-		nf, err := os.Open(path)
+		nf, err := os.Open(f.path)
 		if err != nil {
 			return err
 		}
@@ -54,11 +71,11 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 			nf.Close()
 			return err
 		}
-		if f != nil {
-			f.Close()
+		if f.f != nil {
+			f.f.Close()
 		}
-		f, r, info, pending = nf, bufio.NewReader(nf), ni, ""
-		consumed = offset
+		f.f, f.r, f.info, f.pending = nf, bufio.NewReader(nf), ni, ""
+		f.consumed = offset
 		return nil
 	}
 
@@ -73,41 +90,41 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 		case <-time.After(pollInterval):
 		}
 	}
-	start := tr.resume(f)
-	if _, err := f.Seek(start, io.SeekStart); err != nil {
-		log.Printf("log-tailer: seek %s: %v", path, err)
+	start := f.tr.resume(f.f)
+	if _, err := f.f.Seek(start, io.SeekStart); err != nil {
+		log.Printf("log-tailer: seek %s: %v", f.path, err)
 		start = 0
 	}
-	consumed = start
-	r.Reset(f) // the reader buffered from the pre-seek position
+	f.consumed = start
+	f.r.Reset(f.f) // the reader buffered from the pre-seek position
 	// Rotated while the panel was down: the end of the old file first.
-	if tr.readRotated(handle) {
-		flush()
+	if f.tr.readRotated(f.handle) {
+		f.flush()
 	}
 	defer func() {
-		if f != nil {
-			f.Close()
+		if f.f != nil {
+			f.f.Close()
 		}
 	}()
 
 	drain := func() {
-		defer flush()
+		defer f.flush()
 		for {
-			line, err := r.ReadString('\n')
-			consumed += int64(len(line))
+			line, err := f.r.ReadString('\n')
+			f.consumed += int64(len(line))
 			if err == io.EOF {
-				pending += line // hold the partial line until it completes
+				f.pending += line // hold the partial line until it completes
 				return
 			}
 			if err != nil {
-				log.Printf("log-tailer: read %s: %v", path, err)
+				log.Printf("log-tailer: read %s: %v", f.path, err)
 				return
 			}
-			full := pending + line
-			pending = ""
-			tr.line = Place{FP: tr.fp, End: consumed}
-			tr.lineStart = consumed - int64(len(full))
-			handle(strings.TrimRight(full, "\r\n"))
+			full := f.pending + line
+			f.pending = ""
+			f.tr.line = Place{FP: f.tr.fp, End: f.consumed}
+			f.tr.lineStart = f.consumed - int64(len(full))
+			f.handle(strings.TrimRight(full, "\r\n"))
 		}
 	}
 
@@ -115,8 +132,8 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 	// the descriptor position less the partial line bufio handed back at EOF,
 	// which is re-read (and completed) on the next drain or the next start.
 	read := func() int64 {
-		pos, _ := f.Seek(0, io.SeekCurrent)
-		return pos - int64(len(pending))
+		pos, _ := f.f.Seek(0, io.SeekCurrent)
+		return pos - int64(len(f.pending))
 	}
 
 	// drainOld reads what was written to the rotated file since the switch.
@@ -124,60 +141,59 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 	// the place to resume from: on a restart the rotated file is read from
 	// the saved place in the new one onward only (readRotated).
 	drainOld := func(now time.Time) {
-		if old == nil {
+		if f.old == nil {
 			return
 		}
-		defer flush()
+		defer f.flush()
 		for {
-			line, err := old.r.ReadString('\n')
-			old.consumed += int64(len(line))
+			line, err := f.old.r.ReadString('\n')
+			f.old.consumed += int64(len(line))
 			if err != nil {
-				old.pending += line
+				f.old.pending += line
 				break
 			}
-			full := old.pending + line
-			old.pending = ""
-			tr.line = Place{FP: old.fp, End: old.consumed}
-			tr.lineStart = old.consumed - int64(len(full))
-			handle(strings.TrimRight(full, "\r\n"))
+			full := f.old.pending + line
+			f.old.pending = ""
+			f.tr.line = Place{FP: f.old.fp, End: f.old.consumed}
+			f.tr.lineStart = f.old.consumed - int64(len(full))
+			f.handle(strings.TrimRight(full, "\r\n"))
 		}
-		if now.After(old.until) {
-			old.f.Close()
-			old = nil
+		if now.After(f.old.until) {
+			f.old.f.Close()
+			f.old = nil
 		}
 	}
 	defer func() {
-		if old != nil {
-			old.f.Close()
+		if f.old != nil {
+			f.old.f.Close()
 		}
 	}()
 
-	var once sync.Once
-	blind := &blindness{add: tr.st.AddTailerBlind}
+	f.blind = &blindness{add: f.tr.st.AddTailerBlind}
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			blind.see(time.Now(), false)
+			f.blind.see(time.Now(), false)
 			// What postlogd wrote to the rotated file since the last tick:
 			// the next start resumes in the new file only (review of stage
 			// 2c, F8).
 			drainOld(time.Now())
-			tr.record(f, read(), true) // shutdown: the next start resumes here
+			f.tr.record(f.f, read(), true) // shutdown: the next start resumes here
 			return nil
 		case <-ticker.C:
 			drainOld(time.Now())
 			drain()
-			once.Do(func() { close(caughtUp) })
-			ni, err := os.Stat(path)
+			f.once.Do(func() { close(f.caughtUp) })
+			ni, err := os.Stat(f.path)
 			if err != nil {
-				blind.see(time.Now(), true)
+				f.blind.see(time.Now(), true)
 				continue // file briefly gone mid-rotation; try again next tick
 			}
-			pos, _ := f.Seek(0, io.SeekCurrent)
-			if !os.SameFile(info, ni) || ni.Size() < pos {
+			pos, _ := f.f.Seek(0, io.SeekCurrent)
+			if !os.SameFile(f.info, ni) || ni.Size() < pos {
 				// Rotated away or truncated: the old (renamed) inode may have
 				// gained lines between the drain() above and this check, since
 				// Postfix keeps writing to it until it reloads. Drain it once
@@ -185,35 +201,35 @@ func follow(ctx context.Context, path string, tr *tracker, caughtUp chan struct{
 				// reading it for rotatedGrace after the switch, for what
 				// postlogd writes there until the reload (assumptions A-33).
 				drain()
-				renamed := !os.SameFile(info, ni)
-				if old != nil {
+				renamed := !os.SameFile(f.info, ni)
+				if f.old != nil {
 					drainOld(time.Time{}) // a second rotation within the grace
-					if old != nil {
-						old.f.Close()
-						old = nil
+					if f.old != nil {
+						f.old.f.Close()
+						f.old = nil
 					}
 				}
-				prev := &rotatedTail{f: f, r: r, pending: pending, consumed: consumed, fp: tr.fp, until: time.Now().Add(rotatedGrace)}
+				prev := &rotatedTail{f: f.f, r: f.r, pending: f.pending, consumed: f.consumed, fp: f.tr.fp, until: time.Now().Add(rotatedGrace)}
 				if renamed {
-					f = nil // openAt closes the file it replaces; this one is kept
+					f.f = nil // openAt closes the file it replaces; this one is kept
 				}
 				if err := openAt(0, io.SeekStart); err != nil {
 					if renamed {
-						f, r = prev.f, prev.r
+						f.f, f.r = prev.f, prev.r
 					}
-					log.Printf("log-tailer: reopen %s: %v", path, err)
-					blind.see(time.Now(), true)
+					log.Printf("log-tailer: reopen %s: %v", f.path, err)
+					f.blind.see(time.Now(), true)
 					continue
 				}
 				if renamed {
-					old = prev
+					f.old = prev
 				}
-				blind.see(time.Now(), false)
-				tr.adopt(f)
+				f.blind.see(time.Now(), false)
+				f.tr.adopt(f.f)
 				continue
 			}
-			blind.see(time.Now(), false)
-			tr.record(f, read(), false)
+			f.blind.see(time.Now(), false)
+			f.tr.record(f.f, read(), false)
 		}
 	}
 }
