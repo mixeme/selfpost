@@ -17,6 +17,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mixeme/selfpost/internal/postfix"
@@ -215,10 +216,25 @@ func parseExpiry(line string) (queueID string, ok bool) {
 // because the sender check did not answer (sendercheck.go). It returns nil on
 // a clean shutdown.
 func Run(ctx context.Context, path string, st StatusStore, retention RetentionDays, inbound *Inbound, sender *SenderCheck) error {
-	go retentionLoop(ctx, st, retention)
+	ctx, cancel := context.WithCancel(ctx)
+	var loops sync.WaitGroup
+	defer func() {
+		cancel()
+		loops.Wait()
+	}()
+
+	loops.Add(1)
+	go func() {
+		defer loops.Done()
+		retentionLoop(ctx, st, retention)
+	}()
 	var journal *inboundJournal
 	if inbound != nil {
-		go inboundRetentionLoop(ctx, inbound)
+		loops.Add(1)
+		go func() {
+			defer loops.Done()
+			inboundRetentionLoop(ctx, inbound)
+		}()
 		journal = newInboundJournal(inbound.Store)
 	}
 
@@ -227,7 +243,11 @@ func Run(ctx context.Context, path string, st StatusStore, retention RetentionDa
 	// the sweep would otherwise close. follow() closes this once it has read to
 	// end-of-file for the first time.
 	caughtUp := make(chan struct{})
-	go reconcileLoop(ctx, st, caughtUp, path)
+	loops.Add(1)
+	go func() {
+		defer loops.Done()
+		reconcileLoop(ctx, st, caughtUp, path)
+	}()
 
 	var deferred *deferredCounter
 	if sender != nil {

@@ -260,8 +260,15 @@ func TestRetentionLoopPrunesLines(t *testing.T) {
 
 	cs := &captureStore{}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go retentionLoop(ctx, cs, func() int { return 90 })
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		retentionLoop(ctx, cs, func() int { return 90 })
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
 
 	waitFor(t, func() bool { return cs.prunes() >= 3 })
 
