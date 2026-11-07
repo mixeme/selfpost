@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.15] - 2026-11-07
+
+No migration; schema 14.
+
+### Changed
+
+- **Log following now has an explicit follower state and focused loop steps.**
+  The refactor moves the follower out of `logtail.go` without changing its
+  public signature or stream behavior. Regression tests pin partial-line
+  handling, flush-before-save ordering, truncation and repeated rotation.
+
 ### Fixed
 
 - **The retention-loop tests no longer race their probes or restore the shared
