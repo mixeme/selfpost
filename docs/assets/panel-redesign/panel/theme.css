@@ -136,8 +136,11 @@ code { background: var(--sp-well); color: var(--sp-ink); border-radius: 3px; pad
 .sp-postmark.sp-warn { color: var(--sp-warn); }
 .sp-postmark.sp-fail { color: var(--sp-fail); }
 .sp-postmark b { font-size: 1.3rem; display: block; }
-/* Below the floor on purpose: an imprint, and the heading beside it says the same in words. */
-.sp-postmark span { font-size: .6rem; display: block; }
+/* Below the floor on purpose: an imprint, and the heading beside it says the
+   same in words. The line has to stay inside the ring's chord: at .6rem/.08em
+   a 13-character count crossed it (owner, 2026-11-08), and 5.1rem is where a
+   longer label wraps instead of touching the ring. */
+.sp-postmark span { font-size: .55rem; letter-spacing: .05em; max-width: 5.1rem; margin-inline: auto; display: block; }
 
 /* ---- box with a numbered mono head */
 .box { box-shadow: none; border: 1px solid var(--sp-rule); padding: 0; overflow: hidden; }
