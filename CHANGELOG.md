@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+### Fixed
+
+- **The postmark's bottom line no longer crosses the ring.** A count like
+  `2 OF 9 CHECKS` reached the outline at the old size; it is now set at
+  `.55rem` with tighter tracking, and a label longer than `5.1rem` wraps
+  instead of touching the ring.
+
 ## [2.16.17] - 2026-11-08
 
 No migration; schema 14.
