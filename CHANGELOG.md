@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ## [Unreleased]
 
+## [2.16.18] - 2026-11-08
+
+No migration; schema 14.
+
 ### Fixed
 
 - **The postmark's bottom line no longer crosses the ring.** A count like
